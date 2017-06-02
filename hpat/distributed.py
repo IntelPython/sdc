@@ -18,6 +18,7 @@ from numba.targets.arrayobj import make_array
 from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
+import hpat
 import h5py
 import time
 # from mpi4py import MPI
@@ -209,18 +210,18 @@ class DistributedPass(object):
         self.typemap[self._set0_var.name] = types.int64
         set0_assign = ir.Assign(ir.Const(0, loc), self._set0_var, loc)
         out.append(set0_assign)
-        # g_dist_var = Global(numba.distributed)
+        # g_dist_var = Global(hpat.distributed)
         g_dist_var = ir.Var(scope, mk_unique_var("$distributed_g_var"), loc)
         self._g_dist_var = g_dist_var
-        self.typemap[g_dist_var.name] = types.misc.Module(numba.distributed)
-        g_dist = ir.Global('distributed', numba.distributed, loc)
+        self.typemap[g_dist_var.name] = types.misc.Module(hpat.distributed)
+        g_dist = ir.Global('distributed', hpat.distributed, loc)
         g_dist_assign = ir.Assign(g_dist, g_dist_var, loc)
         # attr call: rank_attr = getattr(g_dist_var, get_rank)
         rank_attr_call = ir.Expr.getattr(g_dist_var, "get_rank", loc)
         rank_attr_var = ir.Var(scope, mk_unique_var("$get_rank_attr"), loc)
         self.typemap[rank_attr_var.name] = get_global_func_typ(get_rank)
         rank_attr_assign = ir.Assign(rank_attr_call, rank_attr_var, loc)
-        # rank_var = numba.distributed.get_rank()
+        # rank_var = hpat.distributed.get_rank()
         rank_var = ir.Var(scope, mk_unique_var("$rank"), loc)
         self.typemap[rank_var.name] = types.int32
         rank_call = ir.Expr.call(rank_attr_var, [], (), loc)
@@ -235,7 +236,7 @@ class DistributedPass(object):
         size_attr_var = ir.Var(scope, mk_unique_var("$get_size_attr"), loc)
         self.typemap[size_attr_var.name] = get_global_func_typ(get_size)
         size_attr_assign = ir.Assign(size_attr_call, size_attr_var, loc)
-        # size_var = numba.distributed.get_size()
+        # size_var = hpat.distributed.get_size()
         size_var = ir.Var(scope, mk_unique_var("$dist_size"), loc)
         self.typemap[size_var.name] = types.int32
         size_call = ir.Expr.call(size_attr_var, [], (), loc)

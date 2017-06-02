@@ -10,6 +10,7 @@ from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 import numpy as np
 
+import hpat
 import h5py
 
 class PIO(object):
@@ -97,9 +98,9 @@ class PIO(object):
         return out
 
     def _gen_h5size(self, f_id, dset, ndims, scope, loc, out):
-        # g_pio_var = Global(numba.pio)
+        # g_pio_var = Global(hpat.pio)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
-        g_pio = ir.Global('pio', numba.pio, loc)
+        g_pio = ir.Global('pio', hpat.pio, loc)
         g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
         # attr call: h5size_attr = getattr(g_pio_var, h5size)
         h5size_attr_call = ir.Expr.getattr(g_pio_var, "h5size", loc)
@@ -120,9 +121,9 @@ class PIO(object):
         return size_vars
 
     def _gen_h5read_call(self, f_id, dset, size_vars, lhs_var, scope, loc, out):
-        # g_pio_var = Global(numba.pio)
+        # g_pio_var = Global(hpat.pio)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
-        g_pio = ir.Global('pio', numba.pio, loc)
+        g_pio = ir.Global('pio', hpat.pio, loc)
         g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
         # attr call: h5size_attr = getattr(g_pio_var, h5read)
         h5size_attr_call = ir.Expr.getattr(g_pio_var, "h5read", loc)
