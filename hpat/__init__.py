@@ -11,4 +11,5 @@ def jit(signature_or_function=None, **options):
     # set nopython by default
     if 'nopython' not in options:
         options['nopython'] = True
+    options['parallel'] = True
     return numba.jit(signature_or_function, **options)
