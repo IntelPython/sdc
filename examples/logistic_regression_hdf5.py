@@ -4,7 +4,7 @@ import h5py
 import argparse
 import time
 
-@hpat.jit(locals={'X':numba.float64[:,:], 'Y':numba.float64[:]})
+@hpat.jit(locals={'X':hpat.float64[:,:], 'Y':hpat.float64[:]})
 def logistic_regression(iterations):
     f = h5py.File("lr.hdf5", "r")
     X = f['points'][:]

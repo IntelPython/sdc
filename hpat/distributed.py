@@ -487,7 +487,7 @@ class DistributedPass(object):
     def _is_h5_read_call(self, func_var):
         if func_var not in self._call_table:
             return False
-        return self._call_table[func_var]==['h5read', numba.pio]
+        return self._call_table[func_var]==['h5read', hpat.pio]
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
@@ -583,27 +583,27 @@ from llvmlite import ir as lir
 @lower_builtin(get_rank)
 def dist_get_rank(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_get_rank")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_rank")
     return builder.call(fn, [])
 
 @lower_builtin(get_size)
 def dist_get_size(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_get_size")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_size")
     return builder.call(fn, [])
 
 @lower_builtin(get_end, types.int64, types.int64, types.int32, types.int32)
 def dist_get_end(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_get_end")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_end")
     return builder.call(fn, [args[0], args[1], args[2], args[3]])
 
 @lower_builtin(get_node_portion, types.int64, types.int64, types.int32, types.int32)
 def dist_get_portion(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_get_node_portion")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_node_portion")
     return builder.call(fn, [args[0], args[1], args[2], args[3]])
 
 @lower_builtin(dist_reduce, types.int64)
@@ -613,13 +613,13 @@ def dist_get_portion(context, builder, sig, args):
 def lower_dist_reduce(context, builder, sig, args):
     ltyp = args[0].type
     fnty = lir.FunctionType(ltyp, [ltyp])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_reduce")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
     return builder.call(fn, [args[0]])
 
 @lower_builtin(dist_arr_reduce, types.npytypes.Array)
 def lower_dist_arr_reduce(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = numba.pio._h5_typ_table[sig.args[0].dtype]
+    typ_enum = hpat.pio._h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
     ndims = sig.args[0].ndim
     out = make_array(sig.args[0])(context, builder, args[0])
@@ -636,11 +636,11 @@ def lower_dist_arr_reduce(context, builder, sig, args):
     arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64),
         lir.IntType(32), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_arr_reduce")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_arr_reduce")
     return builder.call(fn, call_args)
 
 @lower_builtin(time.time)
 def dist_get_time(context, builder, sig, args):
     fnty = lir.FunctionType(lir.DoubleType(), [])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_dist_get_time")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_time")
     return builder.call(fn, [])

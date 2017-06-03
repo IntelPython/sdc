@@ -217,7 +217,7 @@ def h5_open(context, builder, sig, args):
     val1 = context.insert_const_string(builder.module, arg1.value)
     val2 = context.insert_const_string(builder.module, arg2.value)
     fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_h5_open")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
     return builder.call(fn, [val1, val2, args[2]])
 
 @lower_builtin(h5size, types.int32, types.Const, types.int32)
@@ -227,7 +227,7 @@ def h5_size(context, builder, sig, args):
     arg1, arg2, args3 = sig.args
     val2 = context.insert_const_string(builder.module, arg2.value)
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(32), lir.IntType(8).as_pointer(), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="numba_h5_size")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_size")
     return builder.call(fn, [args[0], val2, args[2]])
 
 @lower_builtin(h5read, types.int32, types.Const, types.int32,
@@ -243,7 +243,7 @@ def h5_read(context, builder, sig, args):
         lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
 
-    fn = builder.module.get_or_insert_function(fnty, name="numba_h5_read")
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_read")
     out = make_array(sig.args[6])(context, builder, args[6])
     # store size vars array struct to pointer
     count_ptr = cgutils.alloca_once(builder, args[3].type)
