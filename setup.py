@@ -4,6 +4,10 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
+ext_io = Extension(name="hio",
+                             sources=["hpat/_io.c"]
+                             )
+
 setup(name='hpat',
       version='0.1.0',
       description='compiling Python code for clusters',
@@ -22,6 +26,5 @@ setup(name='hpat',
       author='Ehsan Totoni',
       author_email='ehsan.totoni@intel.com',
       packages=['hpat'],
-      install_requires=[
-          'numba',
-      ])
+      install_requires=['numba'],
+      ext_modules = [ext_io])

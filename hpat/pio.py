@@ -205,6 +205,11 @@ class H5Read(AbstractTemplate):
         return signature(types.int32, *args)
 
 from llvmlite import ir as lir
+import hio
+import llvmlite.binding as ll
+ll.add_symbol('hpat_h5_open', hio.hpat_h5_open)
+ll.add_symbol('hpat_h5_size', hio.hpat_h5_size)
+ll.add_symbol('hpat_h5_read', hio.hpat_h5_read)
 
 #@lower_builtin(h5py.File, types.string, types.string)
 #@lower_builtin(h5py.File, types.string, types.Const)
