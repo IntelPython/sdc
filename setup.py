@@ -5,10 +5,11 @@ def readme():
         return f.read()
 
 ext_io = Extension(name="hio",
+                             extra_link_args=['-lhdf5'],
                              sources=["hpat/_io.c"]
                              )
 
-ext_io = Extension(name="hdist",
+ext_hdist = Extension(name="hdist",
                              sources=["hpat/_distributed.c"]
                              )
 
@@ -31,4 +32,4 @@ setup(name='hpat',
       author_email='ehsan.totoni@intel.com',
       packages=['hpat'],
       install_requires=['numba'],
-      ext_modules = [ext_io, hdist])
+      ext_modules = [ext_io, ext_hdist])

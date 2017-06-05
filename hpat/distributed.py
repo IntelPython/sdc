@@ -585,6 +585,9 @@ ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
 ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
+ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
+ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
+ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
 
 @lower_builtin(get_rank)
 def dist_get_rank(context, builder, sig, args):
