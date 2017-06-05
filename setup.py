@@ -8,6 +8,10 @@ ext_io = Extension(name="hio",
                              sources=["hpat/_io.c"]
                              )
 
+ext_io = Extension(name="hdist",
+                             sources=["hpat/_distributed.c"]
+                             )
+
 setup(name='hpat',
       version='0.1.0',
       description='compiling Python code for clusters',
@@ -27,4 +31,4 @@ setup(name='hpat',
       author_email='ehsan.totoni@intel.com',
       packages=['hpat'],
       install_requires=['numba'],
-      ext_modules = [ext_io])
+      ext_modules = [ext_io, hdist])

@@ -579,6 +579,12 @@ class DistTime(AbstractTemplate):
         return signature(types.float64, *args)
 
 from llvmlite import ir as lir
+import hdist
+import llvmlite.binding as ll
+ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
+ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
+ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
+ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 
 @lower_builtin(get_rank)
 def dist_get_rank(context, builder, sig, args):
