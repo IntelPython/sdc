@@ -56,8 +56,8 @@ class DistributedPass(object):
             print("distributions: ", self._dist_analysis)
         self._gen_dist_inits()
         self._run_dist_pass(self.func_ir.blocks)
-        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
+        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
 
@@ -112,9 +112,7 @@ class DistributedPass(object):
                 array_dists[lhs] = Distribution.OneD
             return
         elif isinstance(rhs, ir.Expr) and rhs.op=='call':
-            pass# TODO: self._analyze_call(lhs, rhs.func.name, rhs.args)
-            if self._isarray(lhs) and lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
+            self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
@@ -156,6 +154,36 @@ class DistributedPass(object):
             self._analyze_block(b, array_dists, parfor_dists)
         unwrap_parfor_blocks(parfor)
         return
+
+    def _analyze_call(self, lhs, func_var, args, array_dists):
+        if self._is_call(func_var, ['empty',np]):
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            return
+        if self._is_call(func_var, ['h5read',hpat.pio]):
+            return
+        if self._is_call(func_var, ['dot',np]):
+            arg0 = args[0].name
+            arg1 = args[1].name
+            # Fortran layout is caused by X.T and means transpose
+            t0 = self.typemap[arg0].layout=='F'
+            t1 = self.typemap[arg1].layout=='F'
+            if (not t0 and not t1 and array_dists[arg0]==Distribution.OneD
+                    and array_dists[arg1]==Distribution.OneD):
+                # reduction across samples np.dot(Y,X)
+                array_dists[lhs] = Distribution.REP
+                # print("case 1 ", arg0, arg1)
+                return
+            if not t0 and not t1 and array_dists[arg0]==Distribution.OneD:
+                # samples dot weights: np.dot(X,w)
+                array_dists[lhs] = Distribution.OneD
+                # print("case 2 ", arg0, arg1)
+                return
+        for v in args:
+            if self._isarray(v.name):
+                array_dists[v.name] = Distribution.REP
+        if self._isarray(lhs):
+            array_dists[lhs] = Distribution.REP
 
     def _set_REP(self, var_list, array_dists):
         for var in var_list:

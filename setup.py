@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 ext_io = Extension(name="hio",
-                             extra_link_args=['-lhdf5'],
+                             extra_link_args=['-lmpi','-lhdf5'],
                              sources=["hpat/_io.c"]
                              )
 
