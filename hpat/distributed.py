@@ -5,11 +5,11 @@ import types as pytypes # avoid confusion with numba.types
 import copy
 import numba
 from numba import (ir, analysis, types, typing, config, numpy_support, cgutils,
-                    ir_utils)
+                    ir_utils, postproc)
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
                             get_global_func_typ, find_op_typ, get_name_var_table,
-                            get_call_table, get_tuple_table)
+                            get_call_table, get_tuple_table, remove_dels)
 
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                             wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -48,8 +48,13 @@ class DistributedPass(object):
         self._array_starts = {}
         self._array_counts = {}
         self._parallel_accesses = set()
+        # keep shape attr calls on parallel arrays like X.shape
+        self._shape_attrs = {}
+        # keep array sizes of parallel arrays to handle shape attrs
+        self._array_sizes = {}
 
     def run(self):
+        remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
         self._dist_analysis = self._analyze_dist(self.func_ir.blocks)
         if config.DEBUG_ARRAY_OPT==1:
@@ -60,6 +65,8 @@ class DistributedPass(object):
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
+        post_proc = postproc.PostProcessor(self.func_ir)
+        post_proc.run()
 
     def _analyze_dist(self, blocks, array_dists={}, parfor_dists={}):
         topo_order = find_topo_order(blocks)
@@ -212,9 +219,19 @@ class DistributedPass(object):
                             new_body += self._run_getsetitem(rhs.value.name,
                                 rhs.index, rhs, inst)
                             continue
+                        if (rhs.op=='getattr'
+                                and self._is_1D_arr(rhs.value.name)
+                                and rhs.attr=='shape'):
+                            self._shape_attrs[lhs] = rhs.value.name
+                        if (rhs.op=='static_getitem'
+                                and rhs.value.name in self._shape_attrs):
+                            arr = self._shape_attrs[rhs.value.name]
+                            sizes = self._array_sizes[arr]
+                            inst.value = sizes[rhs.index]
                     if isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
+                        self._array_sizes[lhs] = self._array_sizes[rhs.name]
                 if isinstance(inst, ir.SetItem):
                     new_body += self._run_getsetitem(inst.target.name,
                         inst.index, inst, inst)
@@ -286,6 +303,7 @@ class DistributedPass(object):
         if self._is_1D_arr(lhs) and self._is_alloc_call(func_var):
             size_var = rhs.args[0]
             if self.typemap[size_var.name]==types.intp:
+                self._array_sizes[lhs] = [size_var]
                 out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
                     "$alloc", "get_node_portion", get_node_portion)
                 self._array_starts[lhs] = [start_var]
@@ -295,6 +313,7 @@ class DistributedPass(object):
                 # size should be either int or tuple of ints
                 assert size_var.name in self._tuple_table
                 size_list = self._tuple_table[size_var.name]
+                self._array_sizes[lhs] = size_list
                 out, start_var, end_var = self._gen_1D_div(size_list[0], scope, loc,
                     "$alloc", "get_node_portion", get_node_portion)
                 ndims = len(size_list)
