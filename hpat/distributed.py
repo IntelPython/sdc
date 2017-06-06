@@ -223,6 +223,9 @@ class DistributedPass(object):
                                 and self._is_1D_arr(rhs.value.name)
                                 and rhs.attr=='shape'):
                             self._shape_attrs[lhs] = rhs.value.name
+                        if (rhs.op=='exhaust_iter'
+                                and rhs.value.name in self._shape_attrs):
+                            self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
                         if (rhs.op=='static_getitem'
                                 and rhs.value.name in self._shape_attrs):
                             arr = self._shape_attrs[rhs.value.name]
