@@ -167,14 +167,23 @@ class DistributedPass(object):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
-        if self._is_call(func_var, ['h5read',hpat.pio]):
+        if self._is_call(func_var, ['h5read', hpat.pio]):
             return
-        if self._is_call(func_var, ['dot',np]):
+        if self._is_call(func_var, ['dot', np]):
             arg0 = args[0].name
             arg1 = args[1].name
+            ndim0 = self.typemap[arg0].ndim
+            ndim1 = self.typemap[arg1].ndim
             # Fortran layout is caused by X.T and means transpose
             t0 = self.typemap[arg0].layout=='F'
             t1 = self.typemap[arg1].layout=='F'
+            if ndim0==1 and ndim1==1:
+                # vector dot, both vectors should have same layout
+                new_dist = Distribution(min(array_dists[arg0].value,
+                                                    array_dists[arg1].value))
+                array_dists[arg0] = new_dist
+                array_dists[arg1] = new_dist
+                return
             if (not t0 and not t1 and array_dists[arg0]==Distribution.OneD
                     and array_dists[arg1]==Distribution.OneD):
                 # reduction across samples np.dot(Y,X)
@@ -356,15 +365,31 @@ class DistributedPass(object):
                     assert isinstance(rhs, ir.Expr)
                     rhs.args[2] = self._set1_var
         if self._is_call(func_var, ['dot',np]):
+            arg0 = rhs.args[0].name
+            arg1 = rhs.args[1].name
+            ndim0 = self.typemap[arg0].ndim
+            ndim1 = self.typemap[arg1].ndim
+            # Fortran layout is caused by X.T and means transpose
+            t0 = self.typemap[arg0].layout=='F'
+            t1 = self.typemap[arg1].layout=='F'
             # reduction across dataset
             if self._is_1D_arr(rhs.args[0].name) and self._is_1D_arr(rhs.args[1].name):
                 reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
-                reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_arr_reduce", loc)
-                self.typemap[reduce_attr_var.name] = get_global_func_typ(dist_arr_reduce)
+                reduce_func_name = "dist_arr_reduce"
+                reduce_func = dist_arr_reduce
+                # output of vector dot() is scalar
+                if ndim0==1 and ndim1==1:
+                    reduce_func_name = "dist_reduce"
+                    reduce_func = dist_reduce
+                reduce_attr_call = ir.Expr.getattr(self._g_dist_var, reduce_func_name, loc)
+                self.typemap[reduce_attr_var.name] = get_global_func_typ(reduce_func)
                 reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
                 out.append(reduce_assign)
                 err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
                 self.typemap[err_var.name] = types.int32
+                # scalar reduce is not updated inplace
+                if ndim0==1 and ndim1==1:
+                    err_var = assign.target
                 reduce_var = assign.target
                 reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
                 self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
