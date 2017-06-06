@@ -48,6 +48,7 @@ class DistributedPass(object):
         self._array_starts = {}
         self._array_counts = {}
         self._parallel_accesses = set()
+        self._T_arrs = set()
         # keep shape attr calls on parallel arrays like X.shape
         self._shape_attrs = {}
         # keep array sizes of parallel arrays to handle shape attrs
@@ -113,11 +114,20 @@ class DistributedPass(object):
         elif (isinstance(rhs, ir.Expr) and rhs.op=='getitem'
                 and (rhs.value.name,rhs.index.name) in self._parallel_accesses):
             return
-        elif isinstance(rhs, ir.Expr) and rhs.op=='getattr':# and rhs.attr=='shape':
-            # TODO: handle X.T properly
-            if self._isarray(lhs) and lhs not in array_dists:
+        elif (isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='T'
+                    and self._isarray(lhs)):
+            # array and its transpose have same distributions
+            arr = rhs.value.name
+            if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
+            new_dist = Distribution(min(array_dists[lhs].value, array_dists[arr].value))
+            array_dists[lhs] = new_dist
+            array_dists[arr] = new_dist
+            # keep lhs in table for dot() handling
+            self._T_arrs.add(lhs)
             return
+        elif isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='shape':
+            pass # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op=='call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
         else:
@@ -174,9 +184,11 @@ class DistributedPass(object):
             arg1 = args[1].name
             ndim0 = self.typemap[arg0].ndim
             ndim1 = self.typemap[arg1].ndim
+            dist0 = array_dists[arg0]
+            dist1 = array_dists[arg1]
             # Fortran layout is caused by X.T and means transpose
-            t0 = self.typemap[arg0].layout=='F'
-            t1 = self.typemap[arg1].layout=='F'
+            t0 = arg0 in self._T_arrs
+            t1 = arg1 in self._T_arrs
             if ndim0==1 and ndim1==1:
                 # vector dot, both vectors should have same layout
                 new_dist = Distribution(min(array_dists[arg0].value,
@@ -184,16 +196,53 @@ class DistributedPass(object):
                 array_dists[arg0] = new_dist
                 array_dists[arg1] = new_dist
                 return
-            if (not t0 and not t1 and array_dists[arg0]==Distribution.OneD
-                    and array_dists[arg1]==Distribution.OneD):
-                # reduction across samples np.dot(Y,X)
-                array_dists[lhs] = Distribution.REP
-                # print("case 1 ", arg0, arg1)
-                return
-            if not t0 and not t1 and array_dists[arg0]==Distribution.OneD:
+            if ndim0==2 and ndim1==1 and not t0:
+                # special case were arg1 vector is treated as column vector
                 # samples dot weights: np.dot(X,w)
-                array_dists[lhs] = Distribution.OneD
-                # print("case 2 ", arg0, arg1)
+                # w is always REP
+                array_dists[arg1] = Distribution.REP
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.OneD
+                # lhs and X have same distribution
+                new_dist = Distribution(min(array_dists[arg0].value,
+                                                    array_dists[lhs].value))
+                array_dists[arg0] = new_dist
+                array_dists[lhs] = new_dist
+                dprint("dot case 1 Xw:", arg0, arg1)
+                return
+            if ndim0==1 and ndim1==2 and not t1:
+                # reduction across samples np.dot(Y,X)
+                # lhs is always REP
+                array_dists[lhs] = Distribution.REP
+                # Y and X have same distribution
+                new_dist = Distribution(min(array_dists[arg0].value,
+                                                    array_dists[arg1].value))
+                array_dists[arg0] = new_dist
+                array_dists[arg1] = new_dist
+                dprint("dot case 2 YX:", arg0, arg1)
+                return
+            if ndim0==2 and ndim1==2 and t0 and not t1:
+                # reduction across samples np.dot(X.T,Y)
+                # lhs is always REP
+                array_dists[lhs] = Distribution.REP
+                # Y and X have same distribution
+                new_dist = Distribution(min(array_dists[arg0].value,
+                                                    array_dists[arg1].value))
+                array_dists[arg0] = new_dist
+                array_dists[arg1] = new_dist
+                dprint("dot case 3 XtY:", arg0, arg1)
+                return
+            if ndim0==2 and ndim1==2 and not t0 and not t1:
+                # samples dot weights: np.dot(X,w)
+                # w is always REP
+                array_dists[arg1] = Distribution.REP
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.OneD
+                new_dist = Distribution(min(array_dists[arg0].value,
+                                                    array_dists[lhs].value))
+                array_dists[arg0] = new_dist
+                array_dists[lhs] = new_dist
+                dprint("dot case 4 Xw:", arg0, arg1)
                 return
         for v in args:
             if self._isarray(v.name):
@@ -576,6 +625,9 @@ def _find_first_print(body):
             return i
     return -1
 
+def dprint(*s):
+    if config.DEBUG_ARRAY_OPT==1:
+        print(*s)
 
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
