@@ -797,18 +797,19 @@ def lower_dist_arr_reduce(context, builder, sig, args):
     typ_enum = hpat.pio._h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
     ndims = sig.args[0].ndim
+
     out = make_array(sig.args[0])(context, builder, args[0])
-    # TODO: handle multi-dimensional arrays properly
-    #size_arg = builder.alloca(lir.IntType(64))
-    size_arg = builder.load(out.shape.value.operands[0])
-    for i in range(1,ndims):
-        size_arg = builder.mul(size_arg, out.shape.value.operands[i])
+    # store size vars array struct to pointer
+    size_ptr = cgutils.alloca_once(builder, out.shape.type)
+    builder.store(out.shape, size_ptr)
+    size_arg = builder.bitcast(size_ptr, lir.IntType(64).as_pointer())
+
     ndim_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), sig.args[0].ndim))
     call_args = [builder.bitcast(out.data, lir.IntType(8).as_pointer()),
                 size_arg, builder.load(ndim_arg), builder.load(typ_arg)]
 
     # array, shape, ndim, extra last arg type for type enum
-    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64),
+    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64).as_pointer(),
         lir.IntType(32), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_arr_reduce")

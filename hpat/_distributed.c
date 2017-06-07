@@ -9,7 +9,7 @@ int64_t hpat_dist_get_node_portion(int64_t total, int64_t div_chunk,
                                     int num_pes, int node_id);
 double hpat_dist_get_time();
 double hpat_dist_reduce(double value);
-int hpat_dist_arr_reduce(void* out, int64_t shapes, int ndims, int type_enum);
+int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
 
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
@@ -84,16 +84,17 @@ double hpat_dist_reduce(double value)
     return out;
 }
 
-int hpat_dist_arr_reduce(void* out, int64_t shapes, int ndims, int type_enum)
+int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum)
 {
-    // printf("sum value: %lf\n", value);
-    // printf("total size:%d\n", shapes);
-    // TODO: handle multi-dimensional properly
-    fflush(stdout);
-    int total_size = (int)shapes;
     int i;
+    // printf("ndims:%d shape: ", ndims);
+    // for(i=0; i<ndims; i++)
+    //     printf("%d ", shapes[i]);
+    // printf("\n");
+    // fflush(stdout);
+    int total_size = (int)shapes[0];
     for(i=1; i<ndims; i++)
-        total_size *= (int)shapes;
+        total_size *= (int)shapes[i];
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
     int elem_size = get_elem_size(type_enum);
     void* res_buf = malloc(total_size*elem_size);
