@@ -281,14 +281,30 @@ class DistributedPass(object):
                                 and self._is_1D_arr(rhs.value.name)
                                 and rhs.attr=='shape'):
                             self._shape_attrs[lhs] = rhs.value.name
+                        if (rhs.op=='getattr'
+                                and self._is_1D_arr(rhs.value.name)
+                                and rhs.attr=='T'):
+                            assert lhs in self._T_arrs
+                            orig_arr = rhs.value.name
+                            self._array_starts[lhs] = copy.copy(
+                                self._array_starts[orig_arr]).reverse()
+                            self._array_counts[lhs] = copy.copy(
+                                self._array_counts[orig_arr]).reverse()
+                            self._array_sizes[lhs] = copy.copy(
+                                self._array_sizes[orig_arr]).reverse()
                         if (rhs.op=='exhaust_iter'
                                 and rhs.value.name in self._shape_attrs):
                             self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
                         if (rhs.op=='static_getitem'
                                 and rhs.value.name in self._shape_attrs):
                             arr = self._shape_attrs[rhs.value.name]
+                            ndims = self.typemap[arr].ndim
                             sizes = self._array_sizes[arr]
-                            inst.value = sizes[rhs.index]
+                            if arr not in self._T_arrs and rhs.index==0:
+                                inst.value = sizes[rhs.index]
+                            # last dimension of transposed arrays is partitioned
+                            if arr in self._T_arrs and rhs.index==ndims-1:
+                                inst.value = sizes[rhs.index]
                     if isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
@@ -413,16 +429,18 @@ class DistributedPass(object):
                     rhs = stmt.value
                     assert isinstance(rhs, ir.Expr)
                     rhs.args[2] = self._set1_var
-        if self._is_call(func_var, ['dot',np]):
+        if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name
             arg1 = rhs.args[1].name
             ndim0 = self.typemap[arg0].ndim
             ndim1 = self.typemap[arg1].ndim
             # Fortran layout is caused by X.T and means transpose
-            t0 = self.typemap[arg0].layout=='F'
-            t1 = self.typemap[arg1].layout=='F'
+            t0 = arg0 in self._T_arrs
+            t1 = arg1 in self._T_arrs
+
             # reduction across dataset
-            if self._is_1D_arr(rhs.args[0].name) and self._is_1D_arr(rhs.args[1].name):
+            if self._is_1D_arr(arg0) and self._is_1D_arr(arg1):
+                dprint("run dot dist reduce:", arg0, arg1)
                 reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
                 reduce_func_name = "dist_arr_reduce"
                 reduce_func = dist_arr_reduce
@@ -445,6 +463,27 @@ class DistributedPass(object):
                     typing.Context(), [self.typemap[reduce_var.name]], {})
                 reduce_assign = ir.Assign(reduce_call, err_var, loc)
                 out.append(reduce_assign)
+
+            # assign starts/counts/sizes data structures for output array
+            if ndim0==2 and ndim1==1 and not t0 and self._is_1D_arr(arg0):
+                # special case were arg1 vector is treated as column vector
+                # samples dot weights: np.dot(X,w)
+                # output is 1D array same size as dim 0 of X
+                assert self.typemap[lhs].ndim==1
+                assert self._is_1D_arr(lhs)
+                self._array_starts[lhs] = [self._array_starts[arg0][0]]
+                self._array_counts[lhs] = [self._array_counts[arg0][0]]
+                self._array_sizes[lhs] = [self._array_sizes[rhs.name][0]]
+                dprint("run dot case 1 Xw:", arg0, arg1)
+            if ndim0==2 and ndim1==2 and not t0 and not t1:
+                # samples dot weights: np.dot(X,w)
+                assert self._is_1D_arr(lhs)
+                # first dimension is same as X
+                # second dimension not needed
+                self._array_starts[lhs] = [self._array_starts[arg0][0], -1]
+                self._array_counts[lhs] = [self._array_counts[arg0][0], -1]
+                self._array_sizes[lhs] = [self._array_sizes[arg0][0], -1]
+                dprint("run dot case 4 Xw:", arg0, arg1)
 
         return out
 
