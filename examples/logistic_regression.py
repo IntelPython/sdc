@@ -15,15 +15,13 @@ def logistic_regression(iterations):
     for i in range(iterations):
         w -= np.dot(((1.0 / (1.0 + np.exp(-Y * np.dot(X,w))) - 1.0) * Y),X)
     t2 = time.time()
-    print("Execution time:", t2-t1,"\nresult:")
-    for i in range(D):
-        print(w[i]," ")
+    print("Execution time:", t2-t1, "\nresult:", w)
     return w
 
 def main():
     parser = argparse.ArgumentParser(description='Logistic Regression.')
     parser.add_argument('--file', dest='file', type=str, default="lr.hdf5")
-    parser.add_argument('--iterations', dest='iterations', type=int, default=30)
+    parser.add_argument('--iterations', dest='iterations', type=int, default=20)
     args = parser.parse_args()
 
     file_name = args.file

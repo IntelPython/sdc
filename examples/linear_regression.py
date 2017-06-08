@@ -17,10 +17,7 @@ def linear_regression(iterations):
     for i in range(iterations):
         w -= alphaN * np.dot(X.T, np.dot(X,w)-Y)
     t2 = time.time()
-    print("Execution time:", t2-t1,"\nresult:")
-    for i in range(D):
-        for j in range(p):
-            print(w[i,j]," ")
+    print("Execution time:", t2-t1, "\nresult:", w)
     return w
 
 def main():
