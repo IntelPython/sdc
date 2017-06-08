@@ -14,12 +14,11 @@ def gen_lir(N, D, p, file_name):
     dset2[:] = responses
     f.close()
 
-
 def main():
     parser = argparse.ArgumentParser(description='Gen Linear Regression.')
     parser.add_argument('--samples', dest='samples', type=int, default=2000)
-    parser.add_argument('--features', dest='features', type=int, default=3)
-    parser.add_argument('--functions', dest='functions', type=int, default=2)
+    parser.add_argument('--features', dest='features', type=int, default=10)
+    parser.add_argument('--functions', dest='functions', type=int, default=4)
     parser.add_argument('--file', dest='file', type=str, default="lir.hdf5")
     args = parser.parse_args()
     N = args.samples
@@ -28,7 +27,6 @@ def main():
     file_name = args.file
 
     gen_lir(N, D, p, file_name)
-
 
 if __name__ == '__main__':
     main()

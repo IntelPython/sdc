@@ -11,7 +11,6 @@ def gen_kde(N, file_name):
     dset1[:] = points
     f.close()
 
-
 def main():
     parser = argparse.ArgumentParser(description='Gen KDE.')
     parser.add_argument('--size', dest='size', type=int, default=2000)
@@ -21,7 +20,6 @@ def main():
     file_name = args.file
 
     gen_kde(N, file_name)
-
 
 if __name__ == '__main__':
     main()
