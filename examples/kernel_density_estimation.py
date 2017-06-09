@@ -5,7 +5,7 @@ import h5py
 import argparse
 import time
 
-@hpat.jit(locals={'X':hpat.float64[:]})
+@hpat.jit
 def kde():
     f = h5py.File("kde.hdf5", "r")
     X = f['points'][:]

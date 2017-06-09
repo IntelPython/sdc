@@ -4,7 +4,7 @@ import h5py
 import argparse
 import time
 
-@hpat.jit(locals={'X':hpat.float64[:,:], 'Y':hpat.float64[:,:]})
+@hpat.jit
 def linear_regression(iterations):
     f = h5py.File("lir.hdf5", "r")
     X = f['points'][:]
