@@ -8,7 +8,12 @@ int64_t hpat_dist_get_end(int64_t total, int64_t div_chunk, int num_pes,
 int64_t hpat_dist_get_node_portion(int64_t total, int64_t div_chunk,
                                     int num_pes, int node_id);
 double hpat_dist_get_time();
-double hpat_dist_reduce(double value);
+
+int hpat_dist_reduce_i4(int value);
+int64_t hpat_dist_reduce_i8(int64_t value);
+float hpat_dist_reduce_f4(float value);
+double hpat_dist_reduce_f8(double value);
+
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
 
 PyMODINIT_FUNC PyInit_hdist(void) {
@@ -29,8 +34,16 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr(&hpat_dist_get_node_portion));
     PyObject_SetAttrString(m, "hpat_dist_get_time",
                             PyLong_FromVoidPtr(&hpat_dist_get_time));
-    PyObject_SetAttrString(m, "hpat_dist_reduce",
-                            PyLong_FromVoidPtr(&hpat_dist_reduce));
+
+    PyObject_SetAttrString(m, "hpat_dist_reduce_i4",
+                            PyLong_FromVoidPtr(&hpat_dist_reduce_i4));
+    PyObject_SetAttrString(m, "hpat_dist_reduce_i8",
+                            PyLong_FromVoidPtr(&hpat_dist_reduce_i8));
+    PyObject_SetAttrString(m, "hpat_dist_reduce_f4",
+                            PyLong_FromVoidPtr(&hpat_dist_reduce_f4));
+    PyObject_SetAttrString(m, "hpat_dist_reduce_f8",
+                            PyLong_FromVoidPtr(&hpat_dist_reduce_f8));
+
     PyObject_SetAttrString(m, "hpat_dist_arr_reduce",
                             PyLong_FromVoidPtr(&hpat_dist_arr_reduce));
     return m;
@@ -76,7 +89,31 @@ double hpat_dist_get_time()
 }
 
 
-double hpat_dist_reduce(double value)
+int hpat_dist_reduce_i4(int value)
+{
+    // printf("sum value: %d\n", value);
+    int out=0;
+    MPI_Allreduce(&value, &out, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+int64_t hpat_dist_reduce_i8(int64_t value)
+{
+    // printf("sum value: %lld\n", value);
+    int64_t out=0;
+    MPI_Allreduce(&value, &out, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+float hpat_dist_reduce_f4(float value)
+{
+    // printf("sum value: %f\n", value);
+    float out=0;
+    MPI_Allreduce(&value, &out, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+double hpat_dist_reduce_f8(double value)
 {
     // printf("sum value: %lf\n", value);
     double out=0;

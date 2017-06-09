@@ -62,7 +62,7 @@ class DistributedPass(object):
             print("distributions: ", self._dist_analysis)
         self._gen_dist_inits()
         self._run_dist_pass(self.func_ir.blocks)
-        self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
+        #self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
@@ -752,7 +752,10 @@ ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
-ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
+ll.add_symbol('hpat_dist_reduce_i4', hdist.hpat_dist_reduce_i4)
+ll.add_symbol('hpat_dist_reduce_i8', hdist.hpat_dist_reduce_i8)
+ll.add_symbol('hpat_dist_reduce_f4', hdist.hpat_dist_reduce_f4)
+ll.add_symbol('hpat_dist_reduce_f8', hdist.hpat_dist_reduce_f8)
 ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
 
 @lower_builtin(get_rank)
@@ -788,7 +791,9 @@ def dist_get_portion(context, builder, sig, args):
 def lower_dist_reduce(context, builder, sig, args):
     ltyp = args[0].type
     fnty = lir.FunctionType(ltyp, [ltyp])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
+    typ_map = {types.int32:"i4", types.int64:"i8", types.float32:"f4", types.float64:"f8"}
+    typ_str = typ_map[sig.args[0]]
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce_{}".format(typ_str))
     return builder.call(fn, [args[0]])
 
 @lower_builtin(dist_arr_reduce, types.npytypes.Array)
