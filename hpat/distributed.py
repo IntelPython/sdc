@@ -19,6 +19,7 @@ from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
 import hpat
+from hpat import distributed_api
 import h5py
 import time
 # from mpi4py import MPI
@@ -332,18 +333,19 @@ class DistributedPass(object):
         self.typemap[self._set0_var.name] = types.int64
         set0_assign = ir.Assign(ir.Const(0, loc), self._set0_var, loc)
         out.append(set0_assign)
-        # g_dist_var = Global(hpat.distributed)
+        # g_dist_var = Global(hpat.distributed_api)
         g_dist_var = ir.Var(scope, mk_unique_var("$distributed_g_var"), loc)
         self._g_dist_var = g_dist_var
-        self.typemap[g_dist_var.name] = types.misc.Module(hpat.distributed)
-        g_dist = ir.Global('distributed', hpat.distributed, loc)
+        self.typemap[g_dist_var.name] = types.misc.Module(hpat.distributed_api)
+        g_dist = ir.Global('distributed_api', hpat.distributed_api, loc)
         g_dist_assign = ir.Assign(g_dist, g_dist_var, loc)
         # attr call: rank_attr = getattr(g_dist_var, get_rank)
         rank_attr_call = ir.Expr.getattr(g_dist_var, "get_rank", loc)
         rank_attr_var = ir.Var(scope, mk_unique_var("$get_rank_attr"), loc)
-        self.typemap[rank_attr_var.name] = get_global_func_typ(get_rank)
+        self.typemap[rank_attr_var.name] = get_global_func_typ(
+                                                    distributed_api.get_rank)
         rank_attr_assign = ir.Assign(rank_attr_call, rank_attr_var, loc)
-        # rank_var = hpat.distributed.get_rank()
+        # rank_var = hpat.distributed_api.get_rank()
         rank_var = ir.Var(scope, mk_unique_var("$rank"), loc)
         self.typemap[rank_var.name] = types.int32
         rank_call = ir.Expr.call(rank_attr_var, [], (), loc)
@@ -356,9 +358,10 @@ class DistributedPass(object):
         # attr call: size_attr = getattr(g_dist_var, get_size)
         size_attr_call = ir.Expr.getattr(g_dist_var, "get_size", loc)
         size_attr_var = ir.Var(scope, mk_unique_var("$get_size_attr"), loc)
-        self.typemap[size_attr_var.name] = get_global_func_typ(get_size)
+        self.typemap[size_attr_var.name] = get_global_func_typ(
+                                                    distributed_api.get_size)
         size_attr_assign = ir.Assign(size_attr_call, size_attr_var, loc)
-        # size_var = hpat.distributed.get_size()
+        # size_var = hpat.distributed_api.get_size()
         size_var = ir.Var(scope, mk_unique_var("$dist_size"), loc)
         self.typemap[size_var.name] = types.int32
         size_call = ir.Expr.call(size_attr_var, [], (), loc)
@@ -382,7 +385,7 @@ class DistributedPass(object):
             if self.typemap[size_var.name]==types.intp:
                 self._array_sizes[lhs] = [size_var]
                 out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
-                    "$alloc", "get_node_portion", get_node_portion)
+                    "$alloc", "get_node_portion", distributed_api.get_node_portion)
                 self._array_starts[lhs] = [start_var]
                 self._array_counts[lhs] = [end_var]
                 rhs.args[0] = end_var
@@ -392,7 +395,7 @@ class DistributedPass(object):
                 size_list = self._tuple_table[size_var.name]
                 self._array_sizes[lhs] = size_list
                 out, start_var, end_var = self._gen_1D_div(size_list[0], scope, loc,
-                    "$alloc", "get_node_portion", get_node_portion)
+                    "$alloc", "get_node_portion", distributed_api.get_node_portion)
                 ndims = len(size_list)
                 new_size_list = copy.copy(size_list)
                 new_size_list[0] = end_var
@@ -443,13 +446,14 @@ class DistributedPass(object):
                 dprint("run dot dist reduce:", arg0, arg1)
                 reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
                 reduce_func_name = "dist_arr_reduce"
-                reduce_func = dist_arr_reduce
+                reduce_func = distributed_api.dist_arr_reduce
                 # output of vector dot() is scalar
                 if ndim0==1 and ndim1==1:
                     reduce_func_name = "dist_reduce"
-                    reduce_func = dist_reduce
+                    reduce_func = distributed_api.dist_reduce
                 reduce_attr_call = ir.Expr.getattr(self._g_dist_var, reduce_func_name, loc)
-                self.typemap[reduce_attr_var.name] = get_global_func_typ(reduce_func)
+                self.typemap[reduce_attr_var.name] = get_global_func_typ(
+                                                                    reduce_func)
                 reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
                 out.append(reduce_assign)
                 err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
@@ -530,7 +534,7 @@ class DistributedPass(object):
         loc = parfor.init_block.loc
         range_size = parfor.loop_nests[0].stop
 
-        out, start_var, end_var = self._gen_1D_div(range_size, scope, loc, "$loop", "get_end", get_end)
+        out, start_var, end_var = self._gen_1D_div(range_size, scope, loc, "$loop", "get_end", distributed_api.get_end)
         parfor.loop_nests[0].start = start_var
         parfor.loop_nests[0].stop = end_var
         # print_node = ir.Print([div_var, start_var, end_var], None, loc)
@@ -543,7 +547,8 @@ class DistributedPass(object):
         if len(reductions)!=0:
             reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
             reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_reduce", loc)
-            self.typemap[reduce_attr_var.name] = get_global_func_typ(dist_reduce)
+            self.typemap[reduce_attr_var.name] = get_global_func_typ(
+                                                    distributed_api.dist_reduce)
             reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
             out.append(reduce_assign)
 
@@ -668,82 +673,6 @@ def dprint(*s):
     if config.DEBUG_ARRAY_OPT==1:
         print(*s)
 
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing import signature
-
-def get_rank():
-    """dummy function for C mpi get_rank"""
-    return 0
-
-def get_size():
-    """dummy function for C mpi get_size"""
-    return 0
-
-def get_end(total_size, div, pes, rank):
-    """get end point of range for parfor division"""
-    return total_size if rank==pes-1 else (rank+1)*div
-
-def get_node_portion(total_size, div, pes, rank):
-    """get portion of size for alloc division"""
-    return total_size-div*rank if rank==pes-1 else div
-
-def dist_reduce(value):
-    """dummy to implement simple reductions"""
-    return value
-
-def dist_arr_reduce(arr):
-    """dummy to implement array reductions"""
-    return -1
-
-@infer_global(get_rank)
-class DistRank(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==0
-        return signature(types.int32, *args)
-
-@infer_global(get_size)
-class DistSize(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==0
-        return signature(types.int32, *args)
-
-@infer_global(get_end)
-class DistEnd(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==4
-        return signature(types.int64, *args)
-
-@infer_global(get_node_portion)
-class DistPortion(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==4
-        return signature(types.int64, *args)
-
-@infer_global(dist_reduce)
-class DistReduce(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==1
-        return signature(args[0], *args)
-
-@infer_global(dist_arr_reduce)
-class DistArrReduce(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==1
-        return signature(types.int32, *args)
-
-@infer_global(time.time)
-class DistTime(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==0
-        return signature(types.float64, *args)
-
 from llvmlite import ir as lir
 import hdist
 import llvmlite.binding as ll
@@ -758,36 +687,36 @@ ll.add_symbol('hpat_dist_reduce_f4', hdist.hpat_dist_reduce_f4)
 ll.add_symbol('hpat_dist_reduce_f8', hdist.hpat_dist_reduce_f8)
 ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
 
-@lower_builtin(get_rank)
+@lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_rank")
     return builder.call(fn, [])
 
-@lower_builtin(get_size)
+@lower_builtin(distributed_api.get_size)
 def dist_get_size(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_size")
     return builder.call(fn, [])
 
-@lower_builtin(get_end, types.int64, types.int64, types.int32, types.int32)
+@lower_builtin(distributed_api.get_end, types.int64, types.int64, types.int32, types.int32)
 def dist_get_end(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_end")
     return builder.call(fn, [args[0], args[1], args[2], args[3]])
 
-@lower_builtin(get_node_portion, types.int64, types.int64, types.int32, types.int32)
+@lower_builtin(distributed_api.get_node_portion, types.int64, types.int64, types.int32, types.int32)
 def dist_get_portion(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_node_portion")
     return builder.call(fn, [args[0], args[1], args[2], args[3]])
 
-@lower_builtin(dist_reduce, types.int64)
-@lower_builtin(dist_reduce, types.int32)
-@lower_builtin(dist_reduce, types.float32)
-@lower_builtin(dist_reduce, types.float64)
+@lower_builtin(distributed_api.dist_reduce, types.int64)
+@lower_builtin(distributed_api.dist_reduce, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.float32)
+@lower_builtin(distributed_api.dist_reduce, types.float64)
 def lower_dist_reduce(context, builder, sig, args):
     ltyp = args[0].type
     fnty = lir.FunctionType(ltyp, [ltyp])
@@ -796,7 +725,7 @@ def lower_dist_reduce(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce_{}".format(typ_str))
     return builder.call(fn, [args[0]])
 
-@lower_builtin(dist_arr_reduce, types.npytypes.Array)
+@lower_builtin(distributed_api.dist_arr_reduce, types.npytypes.Array)
 def lower_dist_arr_reduce(context, builder, sig, args):
     # store an int to specify data type
     typ_enum = hpat.pio._h5_typ_table[sig.args[0].dtype]
