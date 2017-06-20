@@ -11,6 +11,7 @@ from numba.targets.arrayobj import make_array
 import numpy as np
 
 import hpat
+from hpat import pio_api
 import h5py
 
 class PIO(object):
@@ -98,9 +99,9 @@ class PIO(object):
         return out
 
     def _gen_h5size(self, f_id, dset, ndims, scope, loc, out):
-        # g_pio_var = Global(hpat.pio)
+        # g_pio_var = Global(hpat.pio_api)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
-        g_pio = ir.Global('pio', hpat.pio, loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
         g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
         # attr call: h5size_attr = getattr(g_pio_var, h5size)
         h5size_attr_call = ir.Expr.getattr(g_pio_var, "h5size", loc)
@@ -121,9 +122,9 @@ class PIO(object):
         return size_vars
 
     def _gen_h5read_call(self, f_id, dset, size_vars, lhs_var, scope, loc, out):
-        # g_pio_var = Global(hpat.pio)
+        # g_pio_var = Global(hpat.pio_api)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
-        g_pio = ir.Global('pio', hpat.pio, loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
         g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
         # attr call: h5size_attr = getattr(g_pio_var, h5read)
         h5size_attr_call = ir.Expr.getattr(g_pio_var, "h5read", loc)
@@ -172,38 +173,6 @@ class PIO(object):
         return
 
 
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing import signature
-
-def h5size():
-    """dummy function for C h5_size"""
-    return
-
-def h5read():
-    """dummy function for C h5_read"""
-    return
-
-@infer_global(h5py.File)
-class H5File(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==3
-        return signature(types.int32, *args)
-
-@infer_global(h5size)
-class H5Size(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==3
-        return signature(types.int64, *args)
-
-@infer_global(h5read)
-class H5Read(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==7
-        return signature(types.int32, *args)
-
 from llvmlite import ir as lir
 import hio
 import llvmlite.binding as ll
@@ -225,7 +194,7 @@ def h5_open(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
     return builder.call(fn, [val1, val2, args[2]])
 
-@lower_builtin(h5size, types.int32, types.Const, types.int32)
+@lower_builtin(pio_api.h5size, types.int32, types.Const, types.int32)
 def h5_size(context, builder, sig, args):
     # works for constant string only
     # TODO: extend to string variables
@@ -235,7 +204,7 @@ def h5_size(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_size")
     return builder.call(fn, [args[0], val2, args[2]])
 
-@lower_builtin(h5read, types.int32, types.Const, types.int32,
+@lower_builtin(pio_api.h5read, types.int32, types.Const, types.int32,
     types.containers.UniTuple, types.containers.UniTuple, types.int64,
     types.npytypes.Array)
 def h5_read(context, builder, sig, args):

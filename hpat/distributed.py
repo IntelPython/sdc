@@ -176,7 +176,7 @@ class DistributedPass(object):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
-        if self._is_call(func_var, ['h5read', hpat.pio]):
+        if self._is_call(func_var, ['h5read', hpat.pio_api]):
             return
         if self._is_call(func_var, ['dot', np]):
             arg0 = args[0].name
@@ -653,7 +653,7 @@ class DistributedPass(object):
     def _is_h5_read_call(self, func_var):
         if func_var not in self._call_table:
             return False
-        return self._call_table[func_var]==['h5read', hpat.pio]
+        return self._call_table[func_var]==['h5read', hpat.pio_api]
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
