@@ -59,7 +59,7 @@ def lower_dist_reduce(context, builder, sig, args):
 @lower_builtin(distributed_api.dist_arr_reduce, types.npytypes.Array)
 def lower_dist_arr_reduce(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = hpat.pio._h5_typ_table[sig.args[0].dtype]
+    typ_enum = hpat.pio_lower._h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
     ndims = sig.args[0].ndim
 
