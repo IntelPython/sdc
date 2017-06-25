@@ -2,16 +2,20 @@ from __future__ import print_function, division, absolute_import
 import types as pytypes # avoid confusion with numba.types
 
 import numba
-from numba import ir, analysis, types, config, numpy_support
+from numba import ir, analysis, types, config, numpy_support, typeinfer
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
 import pandas
 
 class Filter(ir.Stmt):
-    def __init__(self, df_out, df_in, bool_arr):
+    def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
         self.df_out = df_out
         self.df_in = df_in
         self.bool_arr = bool_arr
+        # needs df columns for type inference stage
+        self.df_vars = df_vars
+        self.loc = loc
+
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -83,7 +87,7 @@ class HiFrames(object):
                 for col, _ in self.df_vars[rhs.value.name].items():
                     self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
                                                                             loc)
-                return [Filter(lhs, rhs.value.name, rhs.index)]
+                return [Filter(lhs, rhs.value.name, rhs.index, self.df_vars, rhs.loc)]
 
             # d = df.column
             if rhs.op=='getattr' and rhs.value.name in self.df_vars:
@@ -110,3 +114,16 @@ class HiFrames(object):
             col_name = self.str_const_table[col_var]
             df_cols[col_name] = item[1]
         return df_cols
+
+
+def filter_typeinfer(filter_node, typeinferer):
+    df_vars = filter_node.df_vars
+    df_in_vars = df_vars[filter_node.df_in]
+    df_out_vars = df_vars[filter_node.df_out]
+    for col_name, col_var in df_in_vars.items():
+        out_col_var = df_out_vars[col_name]
+        typeinferer.constraints.append(typeinfer.Propagate(dst=out_col_var.name,
+                                              src=col_var.name, loc=filter_node.loc))
+    return
+
+typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
