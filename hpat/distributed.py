@@ -539,8 +539,7 @@ class DistributedPass(object):
         # self.calltypes[print_node] = signature(types.none, types.int64, types.int64, types.int64)
         # out.append(print_node)
         out.append(parfor)
-        parfor_params = get_parfor_params(parfor, self.func_ir)
-        _, reductions = get_parfor_reductions(parfor, parfor_params)
+        _, reductions = get_parfor_reductions(parfor, parfor.params)
 
         if len(reductions)!=0:
             reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
@@ -550,7 +549,7 @@ class DistributedPass(object):
             reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
             out.append(reduce_assign)
 
-        for reduce_varname, (_, reduce_func) in reductions.items():
+        for reduce_varname, (_, reduce_func, _) in reductions.items():
             reduce_var = namevar_table[reduce_varname]
             reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
             self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
