@@ -16,6 +16,9 @@ class Filter(ir.Stmt):
         self.df_vars = df_vars
         self.loc = loc
 
+    def __repr__(self):
+        return "filter: {} = {}[{}]".format(self.df_out, self.df_in,
+                                                                self.bool_arr)
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
