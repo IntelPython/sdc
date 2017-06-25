@@ -7,6 +7,12 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
 import pandas
 
+class Filter(ir.Stmt):
+    def __init__(self, df_out, df_in, bool_arr):
+        self.df_out = df_out
+        self.df_in = df_in
+        self.bool_arr = bool_arr
+
 class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
@@ -63,9 +69,21 @@ class HiFrames(object):
                 return []
 
             # d = df['column']
-            if rhs.op=='static_getitem' and rhs.value.name in self.df_vars:
+            if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
+                                            and isinstance(rhs.index, str)):
                 df = rhs.value.name
-                assign.value = self.df_vars[df][rhs.index_var]
+                assign.value = self.df_vars[df][rhs.index]
+
+            # df1 = df[df.A > .5]
+            if (rhs.op == 'getitem' and rhs.value.name in self.df_vars):
+                # output df1 has same columns as df, create new vars
+                scope = assign.target.scope
+                loc = assign.target.loc
+                self.df_vars[lhs] = {}
+                for col, _ in self.df_vars[rhs.value.name].items():
+                    self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
+                                                                            loc)
+                return [Filter(lhs, rhs.value.name, rhs.index)]
 
             # d = df.column
             if rhs.op=='getattr' and rhs.value.name in self.df_vars:
