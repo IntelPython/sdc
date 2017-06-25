@@ -20,6 +20,36 @@ class Filter(ir.Stmt):
         return "filter: {} = {}[{}]".format(self.df_out, self.df_in,
                                                                 self.bool_arr)
 
+def filter_array_analysis(filter_node, array_analysis):
+    df_vars = filter_node.df_vars
+    df_in_vars = df_vars[filter_node.df_in]
+    df_out_vars = df_vars[filter_node.df_out]
+
+    # arrays of input df have same size in last dimension
+    c_in = array_analysis._get_next_class()
+    for _, col_var in df_in_vars.items():
+        c_in = array_analysis._merge_classes(c_in,
+                            array_analysis.array_shape_classes[col_var.name][0])
+
+    # create correlations for output arrays
+    for _, col_var in df_out_vars.items():
+        array_analysis._add_array_corr(col_var.name)
+
+    # arrays of output df have same size in last dimension
+    c_out = array_analysis._get_next_class()
+    for _, col_var in df_out_vars.items():
+        c_out = array_analysis._merge_classes(c_out,
+                            array_analysis.array_shape_classes[col_var.name][0])
+
+    # gen size variable for an output column
+    out_col = list(df_out_vars.items())[0][1]
+    size_nodes = array_analysis._gen_size_call(out_col, 0)
+    size_var = size_nodes[-1].target
+    array_analysis.class_sizes[c_out] = [size_var]
+    return size_nodes
+
+numba.array_analysis.array_analysis_extensions[Filter] = filter_array_analysis
+
 class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
