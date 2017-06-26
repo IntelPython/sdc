@@ -30,6 +30,8 @@ class Distribution(Enum):
 
 _dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
 
+distributed_analysis_extensions = {}
+
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
     def __init__(self, func_ir, typemap, calltypes):
@@ -91,6 +93,10 @@ class DistributedPass(object):
                     and (inst.target.name,inst.index.name)
                     in self._parallel_accesses):
                 pass # parallel access, don't make REP
+            elif type(inst) in distributed_analysis_extensions:
+                # let external calls handle stmt if type matches
+                f = distributed_analysis_extensions[type(inst)]
+                f(inst, array_dists)
             else:
                 self._set_REP(inst.list_vars(), array_dists)
 
