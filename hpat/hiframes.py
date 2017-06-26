@@ -65,7 +65,7 @@ def filter_distributed_analysis(filter_node, array_dists):
         array_dists[col_var.name] = in_dist
 
     # output columns have same distribution
-    out_dist = Distribution.OneD
+    out_dist = Distribution.OneD_Var
     for _, col_var in df_out_vars.items():
         # output dist might not be assigned yet
         if col_var.name in array_dists:

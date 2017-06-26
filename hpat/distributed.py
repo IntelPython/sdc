@@ -25,7 +25,8 @@ import time
 from enum import Enum
 class Distribution(Enum):
     REP = 1
-    OneD = 3
+    OneD = 4
+    OneD_Var = 3
     TwoD = 2
 
 _dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
