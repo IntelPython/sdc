@@ -5,6 +5,8 @@ import numba
 from numba import ir, analysis, types, config, numpy_support, typeinfer
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
+from hpat import distributed
+from hpat.distributed import Distribution
 import pandas
 
 class Filter(ir.Stmt):
@@ -49,6 +51,31 @@ def filter_array_analysis(filter_node, array_analysis):
     return size_nodes
 
 numba.array_analysis.array_analysis_extensions[Filter] = filter_array_analysis
+
+def filter_distributed_analysis(filter_node, array_dists):
+    df_vars = filter_node.df_vars
+    df_in_vars = df_vars[filter_node.df_in]
+    df_out_vars = df_vars[filter_node.df_out]
+
+    # input columns have same distribution
+    in_dist = Distribution.OneD
+    for _, col_var in df_in_vars.items():
+        in_dist = Distribution(min(in_dist.value, array_dists[col_var.name].value))
+    for _, col_var in df_in_vars.items():
+        array_dists[col_var.name] = in_dist
+
+    # output columns have same distribution
+    out_dist = Distribution.OneD
+    for _, col_var in df_out_vars.items():
+        # output dist might not be assigned yet
+        if col_var.name in array_dists:
+            out_dist = Distribution(min(out_dist.value, array_dists[col_var.name].value))
+    for _, col_var in df_out_vars.items():
+        array_dists[col_var.name] = out_dist
+
+    return
+
+distributed.distributed_analysis_extensions[Filter] = filter_distributed_analysis
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
