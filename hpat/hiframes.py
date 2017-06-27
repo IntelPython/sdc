@@ -5,6 +5,7 @@ import numba
 from numba import ir, analysis, types, config, numpy_support, typeinfer
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
+from numba.typing import signature
 from hpat import distributed
 from hpat.distributed import Distribution
 import pandas
@@ -76,6 +77,28 @@ def filter_distributed_analysis(filter_node, array_dists):
     return
 
 distributed.distributed_analysis_extensions[Filter] = filter_distributed_analysis
+
+def filter_distributed_run(filter_node, typemap, calltypes):
+    # TODO: rebalance if output distributions are 1D instead of 1D_Var
+    df_vars = filter_node.df_vars
+    df_in_vars = df_vars[filter_node.df_in]
+    df_out_vars = df_vars[filter_node.df_out]
+    loc = filter_node.loc
+    bool_arr = filter_node.bool_arr
+
+    out = []
+    for col_name, col_in_var in df_in_vars.items():
+        col_out_var = df_out_vars[col_name]
+        getitem_call = ir.Expr.getitem(col_in_var, bool_arr, loc)
+        calltypes[getitem_call] = signature(
+                typemap[col_out_var.name],  # output type
+                typemap[col_in_var.name],  # input type
+                typemap[bool_arr.name])  # index type
+        out.append(ir.Assign(getitem_call, col_out_var, loc))
+
+    return out
+
+distributed.distributed_run_extensions[Filter] = filter_distributed_run
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""

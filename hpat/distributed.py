@@ -32,6 +32,7 @@ class Distribution(Enum):
 _dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
 
 distributed_analysis_extensions = {}
+distributed_run_extensions = {}
 
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
@@ -269,6 +270,10 @@ class DistributedPass(object):
         for label in topo_order:
             new_body = []
             for inst in blocks[label].body:
+                if type(inst) in distributed_run_extensions:
+                    f = distributed_run_extensions[type(inst)]
+                    new_body += f(inst, self.typemap, self.calltypes)
+                    continue
                 if isinstance(inst, Parfor):
                     new_body += self._run_parfor(inst, namevar_table)
                     continue
@@ -531,6 +536,8 @@ class DistributedPass(object):
         unwrap_parfor_blocks(parfor)
 
         if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
+            # TODO: make sure loop index is not used for calculations in
+            # OneD_Var parfors
             if config.DEBUG_ARRAY_OPT==1:
                 print("parfor "+str(parfor.id)+" not parallelized.")
             return [parfor]
