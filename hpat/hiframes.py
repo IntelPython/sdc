@@ -89,6 +89,8 @@ def filter_distributed_run(filter_node, typemap, calltypes):
     out = []
     for col_name, col_in_var in df_in_vars.items():
         col_out_var = df_out_vars[col_name]
+        # using getitem like Numba for filtering arrays
+        # TODO: generate parfor
         getitem_call = ir.Expr.getitem(col_in_var, bool_arr, loc)
         calltypes[getitem_call] = signature(
                 typemap[col_out_var.name],  # output type
