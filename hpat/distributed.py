@@ -65,7 +65,7 @@ class DistributedPass(object):
             print("distributions: ", self._dist_analysis)
         self._gen_dist_inits()
         self._run_dist_pass(self.func_ir.blocks)
-        #self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
+        self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)

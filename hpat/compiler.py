@@ -22,10 +22,6 @@ def stage_distributed_pass(pipeline):
     dist_pass = DistributedPass(pipeline.func_ir,
         pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
     dist_pass.run()
-    # unset user pipeline function after last pass so recursive jit in lowering
-    # wouldn't run HPAT passes
-    from numba import set_user_pipeline_func
-    set_user_pipeline_func(None)
 
 def stage_df_pass(pipeline):
     """

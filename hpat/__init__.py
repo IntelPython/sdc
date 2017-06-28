@@ -5,9 +5,8 @@ from numba import *
 
 def jit(signature_or_function=None, **options):
     from .compiler import add_hpat_stages
-    set_user_pipeline_func(add_hpat_stages)
     # set nopython by default
     if 'nopython' not in options:
         options['nopython'] = True
     options['parallel'] = True
-    return numba.jit(signature_or_function, **options)
+    return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)
