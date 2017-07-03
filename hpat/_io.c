@@ -31,10 +31,17 @@ int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     assert(plist_id != -1);
     herr_t ret;
     hid_t file_id;
+    unsigned flag = H5F_ACC_RDWR;
+
+    // TODO: handle more open modes
+    if(mode[0]=='r')
+    {
+        flag = H5F_ACC_RDONLY;
+    }
     if(is_parallel)
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
     assert(ret != -1);
-    file_id = H5Fopen((const char*)file_name, H5F_ACC_RDONLY, plist_id);
+    file_id = H5Fopen((const char*)file_name, flag, plist_id);
     assert(file_id != -1);
     ret = H5Pclose(plist_id);
     assert(ret != -1);
