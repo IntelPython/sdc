@@ -76,8 +76,11 @@ class PIO(object):
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_dsets:
                 return self._gen_h5read(assign.target, rhs)
         # handle copies lhs = f
-        if isinstance(rhs, ir.Var) and rhs.name in self.h5_files:
-            self.h5_files[lhs] = self.h5_files[rhs.name]
+        if isinstance(rhs, ir.Var):
+            if rhs.name in self.h5_files:
+                self.h5_files[lhs] = self.h5_files[rhs.name]
+            if rhs.name in self.str_const_table:
+                self.str_const_table[lhs] = self.str_const_table[rhs.name]
         if isinstance(rhs, ir.Const) and isinstance(rhs.value, str):
             self.str_const_table[lhs] = rhs.value
         return [assign]
