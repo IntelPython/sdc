@@ -15,6 +15,10 @@ def h5close():
     """dummy function for C h5_close"""
     return
 
+def h5create_dset():
+    """dummy function for C h5_create_dset"""
+    return
+
 @infer_global(h5py.File)
 class H5File(AbstractTemplate):
     def generic(self, args, kws):
@@ -41,4 +45,11 @@ class H5Close(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==1
+        return signature(types.int32, *args)
+
+@infer_global(h5create_dset)
+class H5CreateDSet(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==4
         return signature(types.int32, *args)

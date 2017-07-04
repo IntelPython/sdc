@@ -7,6 +7,8 @@ int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
 int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_close(hid_t file_id);
+int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
+    int64_t* counts, int typ_enum);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -24,6 +26,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr(&hpat_h5_read));
     PyObject_SetAttrString(m, "hpat_h5_close",
                             PyLong_FromVoidPtr(&hpat_h5_close));
+    PyObject_SetAttrString(m, "hpat_h5_create_dset",
+                            PyLong_FromVoidPtr(&hpat_h5_create_dset));
     return m;
 }
 
@@ -124,4 +128,20 @@ int hpat_h5_close(hid_t file_id)
     // printf("closing: %d\n", file_id);
     H5Fclose(file_id);
     return 0;
+}
+
+int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
+    int64_t* counts, int typ_enum)
+{
+    // printf("dset_name:%s ndims:%d size:%d typ:%d\n", dset_name, ndims, counts[0], typ_enum);
+    // fflush(stdout);
+
+    hid_t dataset_id;
+    hid_t  filespace, memspace;
+    hid_t h5_typ = get_h5_typ(typ_enum);
+    filespace = H5Screate_simple(ndims, counts, NULL);
+    dataset_id = H5Dcreate(file_id, dset_name, h5_typ, filespace,
+                                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Sclose(filespace);
+    return dataset_id;
 }

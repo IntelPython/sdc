@@ -22,6 +22,7 @@ class PIO(object):
         self.h5_files = {}
         self.h5_dsets = {}
         self.h5_close_calls = {}
+        self.h5_create_dset_calls = {}
         # varname -> 'str'
         self.str_const_table = {}
         self.reverse_copies = {}
@@ -74,17 +75,24 @@ class PIO(object):
             if rhs.op=='call' and rhs.func.name in self.h5_close_calls:
                 return self._gen_h5close(assign,
                                             self.h5_close_calls[rhs.func.name])
+            # f.create_dataset("points", (N,), dtype='f8')
+            if rhs.op=='call' and rhs.func.name in self.h5_create_dset_calls:
+                return self._gen_h5create_dset(assign,
+                                    self.h5_create_dset_calls[rhs.func.name])
             # d = f['dset']
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_files:
                 self.h5_dsets[lhs] = (rhs.value, rhs.index_var)
             # x = f['dset'][:]
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_dsets:
                 return self._gen_h5read(assign.target, rhs)
-            # f.close
+            # f.close or f.create_dataset
             if rhs.op=='getattr' and rhs.value.name in self.h5_files:
-                # only close supported
-                assert rhs.attr=='close'
-                self.h5_close_calls[lhs] = rhs.value
+                if rhs.attr=='close':
+                    self.h5_close_calls[lhs] = rhs.value
+                elif rhs.attr=='create_dataset':
+                    self.h5_create_dset_calls[lhs] = rhs.value
+                else:
+                    raise NotImplementedError("file operation not supported")
         # handle copies lhs = f
         if isinstance(rhs, ir.Var):
             if rhs.name in self.h5_files:
@@ -184,9 +192,9 @@ class PIO(object):
         return
 
     def _gen_h5close(self, stmt, f_id):
-        lhs = stmt.target
-        scope = lhs.scope
-        loc = lhs.loc
+        lhs_var = stmt.target
+        scope = lhs_var.scope
+        loc = lhs_var.loc
         # g_pio_var = Global(hpat.pio_api)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
         g_pio = ir.Global('pio_api', hpat.pio_api, loc)
@@ -197,5 +205,27 @@ class PIO(object):
         attr_assign = ir.Assign(h5close_attr_call, attr_var, loc)
         # h5close(f_id)
         close_call = ir.Expr.call(attr_var, [f_id], (), loc)
-        close_assign = ir.Assign(close_call, lhs, loc)
+        close_assign = ir.Assign(close_call, lhs_var, loc)
         return [g_pio_assign, attr_assign, close_assign]
+
+    def _gen_h5create_dset(self, stmt, f_id):
+        lhs_var = stmt.target
+        scope = lhs_var.scope
+        loc = lhs_var.loc
+        args = [f_id]+stmt.value.args
+        # append the dtype arg (e.g. dtype='f8')
+        assert stmt.value.kws and stmt.value.kws[0][0]=='dtype'
+        args.append(stmt.value.kws[0][1])
+        # g_pio_var = Global(hpat.pio_api)
+        g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
+        g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
+        # attr call: h5create_dset_attr = getattr(g_pio_var, h5create_dset)
+        h5create_dset_attr_call = ir.Expr.getattr(
+                                                g_pio_var, "h5create_dset", loc)
+        attr_var = ir.Var(scope, mk_unique_var("$h5create_dset_attr"), loc)
+        attr_assign = ir.Assign(h5create_dset_attr_call, attr_var, loc)
+        # h5create_dset(f_id)
+        create_dset_call = ir.Expr.call(attr_var, args, (), loc)
+        create_dset_assign = ir.Assign(create_dset_call, lhs_var, loc)
+        return [g_pio_assign, attr_assign, create_dset_assign]

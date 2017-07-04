@@ -79,3 +79,44 @@ _h5_typ_table = {
     types.float32:4,
     types.float64:5
     }
+
+@lower_builtin(pio_api.h5create_dset, types.int32, types.Const,
+    types.containers.UniTuple, types.Const)
+def h5_create_dset(context, builder, sig, args):
+    # insert the dset_name string arg
+    dset_name_arg = sig.args[1]
+    val2 = context.insert_const_string(builder.module, dset_name_arg.value)
+
+    # extra last arg type for type enum
+    arg_typs = [lir.IntType(32), lir.IntType(8).as_pointer(), lir.IntType(32),
+        lir.IntType(64).as_pointer(),
+        lir.IntType(32)]
+    fnty = lir.FunctionType(lir.IntType(32), arg_typs)
+
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_create_dset")
+
+    ndims = sig.args[2].count
+    ndims_arg = lir.Constant(lir.IntType(32), ndims)
+
+    # store size vars array struct to pointer
+    count_ptr = cgutils.alloca_once(builder, args[2].type)
+    builder.store(args[2], count_ptr)
+
+    # store an int to specify data type
+    typ_enum = _h5_str_typ_table[sig.args[3].value]
+    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+
+    call_args = [args[0], val2, ndims_arg,
+        builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
+        builder.load(typ_arg)]
+
+    return builder.call(fn, call_args)
+
+_h5_str_typ_table = {
+    'i1':0,
+    'u1':1,
+    'i4':2,
+    'i8':3,
+    'f4':4,
+    'f8':5
+    }
