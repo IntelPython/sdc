@@ -6,6 +6,7 @@ int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
 int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
 int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
+int hpat_h5_close(hid_t file_id);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -21,6 +22,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr(&hpat_h5_size));
     PyObject_SetAttrString(m, "hpat_h5_read",
                             PyLong_FromVoidPtr(&hpat_h5_read));
+    PyObject_SetAttrString(m, "hpat_h5_close",
+                            PyLong_FromVoidPtr(&hpat_h5_close));
     return m;
 }
 
@@ -114,4 +117,11 @@ hid_t get_h5_typ(typ_enum)
     hid_t types_list[] = {H5T_NATIVE_CHAR, H5T_NATIVE_UCHAR,
             H5T_NATIVE_INT, H5T_NATIVE_LLONG, H5T_NATIVE_FLOAT, H5T_NATIVE_DOUBLE};
     return types_list[typ_enum];
+}
+
+int hpat_h5_close(hid_t file_id)
+{
+    // printf("closing: %d\n", file_id);
+    H5Fclose(file_id);
+    return 0;
 }

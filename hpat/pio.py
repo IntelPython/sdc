@@ -21,6 +21,7 @@ class PIO(object):
         self.h5_file_calls = []
         self.h5_files = {}
         self.h5_dsets = {}
+        self.h5_close_calls = {}
         # varname -> 'str'
         self.str_const_table = {}
         self.reverse_copies = {}
@@ -69,12 +70,21 @@ class PIO(object):
                 parallel_assign = ir.Assign(ir.Const(0, loc), parallel_var, loc)
                 rhs.args.append(parallel_var)
                 return [parallel_assign, assign]
+            # f.close()
+            if rhs.op=='call' and rhs.func.name in self.h5_close_calls:
+                return self._gen_h5close(assign,
+                                            self.h5_close_calls[rhs.func.name])
             # d = f['dset']
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_files:
                 self.h5_dsets[lhs] = (rhs.value, rhs.index_var)
             # x = f['dset'][:]
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_dsets:
                 return self._gen_h5read(assign.target, rhs)
+            # f.close
+            if rhs.op=='getattr' and rhs.value.name in self.h5_files:
+                # only close supported
+                assert rhs.attr=='close'
+                self.h5_close_calls[lhs] = rhs.value
         # handle copies lhs = f
         if isinstance(rhs, ir.Var):
             if rhs.name in self.h5_files:
@@ -172,3 +182,20 @@ class PIO(object):
             if isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var):
                 self.reverse_copies[inst.value.name] = inst.target.name
         return
+
+    def _gen_h5close(self, stmt, f_id):
+        lhs = stmt.target
+        scope = lhs.scope
+        loc = lhs.loc
+        # g_pio_var = Global(hpat.pio_api)
+        g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
+        g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
+        # attr call: h5close_attr = getattr(g_pio_var, h5close)
+        h5close_attr_call = ir.Expr.getattr(g_pio_var, "h5close", loc)
+        attr_var = ir.Var(scope, mk_unique_var("$h5close_attr"), loc)
+        attr_assign = ir.Assign(h5close_attr_call, attr_var, loc)
+        # h5close(f_id)
+        close_call = ir.Expr.call(attr_var, [f_id], (), loc)
+        close_assign = ir.Assign(close_call, lhs, loc)
+        return [g_pio_assign, attr_assign, close_assign]

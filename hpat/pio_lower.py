@@ -65,6 +65,12 @@ def h5_read(context, builder, sig, args):
 
     return builder.call(fn, call_args)
 
+@lower_builtin(pio_api.h5close, types.int32)
+def h5_close(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_close")
+    return builder.call(fn, args)
+
 _h5_typ_table = {
     types.int8:0,
     types.uint8:1,
