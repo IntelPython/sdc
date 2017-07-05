@@ -41,18 +41,36 @@ int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
     assert(plist_id != -1);
     herr_t ret;
-    hid_t file_id;
+    hid_t file_id = -1;
     unsigned flag = H5F_ACC_RDWR;
 
-    // TODO: handle more open modes
-    if(mode[0]=='r')
-    {
-        flag = H5F_ACC_RDONLY;
-    }
     if(is_parallel)
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
     assert(ret != -1);
-    file_id = H5Fopen((const char*)file_name, flag, plist_id);
+
+    // TODO: handle 'a' mode
+    if(strcmp(mode, "r")==0)
+    {
+        flag = H5F_ACC_RDONLY;
+        file_id = H5Fopen((const char*)file_name, flag, plist_id);
+    }
+    else if(strcmp(mode, "r+")==0)
+    {
+        flag = H5F_ACC_RDWR;
+        file_id = H5Fopen((const char*)file_name, flag, plist_id);
+    }
+    else if(strcmp(mode, "w")==0)
+    {
+        flag = H5F_ACC_TRUNC;
+        file_id = H5Fcreate((const char*)file_name, flag, H5P_DEFAULT, plist_id);
+    }
+    else if(strcmp(mode, "w-")==0 || strcmp(mode, "x")==0)
+    {
+        flag = H5F_ACC_EXCL;
+        file_id = H5Fcreate((const char*)file_name, flag, H5P_DEFAULT, plist_id);
+        // printf("w- fid:%d\n", file_id);
+    }
+
     assert(file_id != -1);
     ret = H5Pclose(plist_id);
     assert(ret != -1);
