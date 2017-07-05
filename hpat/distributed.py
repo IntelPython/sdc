@@ -184,7 +184,8 @@ class DistributedPass(object):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
-        if self._is_call(func_var, ['h5read', hpat.pio_api]):
+        if (self._is_call(func_var, ['h5read', hpat.pio_api])
+                or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
         if self._is_call(func_var, ['dot', np]):
             arg0 = args[0].name
@@ -420,7 +421,8 @@ class DistributedPass(object):
                 self._array_counts[lhs] = new_size_list
             out.append(assign)
 
-        if self._is_h5_read_call(func_var) and self._is_1D_arr(rhs.args[6].name):
+        if (self._is_h5_read_write_call(func_var)
+                and self._is_1D_arr(rhs.args[6].name)):
             arr = rhs.args[6].name
             ndims = len(self._array_starts[arr])
             starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
@@ -663,10 +665,11 @@ class DistributedPass(object):
             return False
         return self._call_table[func_var]==['empty', np]
 
-    def _is_h5_read_call(self, func_var):
+    def _is_h5_read_write_call(self, func_var):
         if func_var not in self._call_table:
             return False
-        return self._call_table[func_var]==['h5read', hpat.pio_api]
+        return (self._call_table[func_var]==['h5read', hpat.pio_api]
+                or self._call_table[func_var]==['h5write', hpat.pio_api])
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
