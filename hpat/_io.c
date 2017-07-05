@@ -9,6 +9,8 @@ int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
 int hpat_h5_close(hid_t file_id);
 int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
+int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+    int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -28,6 +30,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr(&hpat_h5_close));
     PyObject_SetAttrString(m, "hpat_h5_create_dset",
                             PyLong_FromVoidPtr(&hpat_h5_create_dset));
+    PyObject_SetAttrString(m, "hpat_h5_write",
+                            PyLong_FromVoidPtr(&hpat_h5_write));
     return m;
 }
 
@@ -144,4 +148,36 @@ int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
                                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     H5Sclose(filespace);
     return dataset_id;
+}
+
+int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+    int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
+{
+    //printf("dset_id:%s ndims:%d size:%d typ:%d\n", dset_id, ndims, counts[0], typ_enum);
+    // fflush(stdout);
+    int i;
+    herr_t ret;
+    assert(dataset_id != -1);
+    hid_t space_id = H5Dget_space(dataset_id);
+    assert(space_id != -1);
+
+    hsize_t* HDF5_start = (hsize_t*)starts;
+    hsize_t* HDF5_count = (hsize_t*)counts;
+
+    hid_t xfer_plist_id = H5P_DEFAULT;
+    if(is_parallel)
+    {
+        xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
+        H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
+    }
+
+    ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
+    assert(ret != -1);
+    hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
+    assert (mem_dataspace != -1);
+    hid_t h5_typ = get_h5_typ(typ_enum);
+    ret = H5Dwrite(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
+    assert(ret != -1);
+    H5Dclose(dataset_id);
+    return ret;
 }
