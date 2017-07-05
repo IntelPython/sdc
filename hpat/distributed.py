@@ -180,13 +180,21 @@ class DistributedPass(object):
         return
 
     def _analyze_call(self, lhs, func_var, args, array_dists):
+        if func_var not in self._call_table or not self._call_table[func_var]:
+            self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+            return
+
+        call_list = self._call_table[func_var]
+
         if self._is_call(func_var, ['empty',np]):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
+
         if (self._is_call(func_var, ['h5read', hpat.pio_api])
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
+
         if self._is_call(func_var, ['dot', np]):
             arg0 = args[0].name
             arg1 = args[1].name
@@ -252,6 +260,10 @@ class DistributedPass(object):
                 array_dists[lhs] = new_dist
                 dprint("dot case 4 Xw:", arg0, arg1)
                 return
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+
+    def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
         for v in args:
             if self._isarray(v.name):
                 array_dists[v.name] = Distribution.REP
@@ -654,7 +666,8 @@ class DistributedPass(object):
         return new_blocks
 
     def _isarray(self, varname):
-        return isinstance(self.typemap[varname], types.npytypes.Array)
+        return (varname in self.typemap
+                and isinstance(self.typemap[varname], types.npytypes.Array))
 
     def _is_1D_arr(self, arr_name):
         return (self._isarray(arr_name) and
