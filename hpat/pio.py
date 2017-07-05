@@ -20,12 +20,15 @@ class PIO(object):
         self.h5_globals = []
         self.h5_file_calls = []
         self.h5_files = {}
+        # dset_var -> (f_id, dset_name)
         self.h5_dsets = {}
+        self.h5_dsets_sizes = {}
         self.h5_close_calls = {}
         self.h5_create_dset_calls = {}
         # varname -> 'str'
         self.str_const_table = {}
         self.reverse_copies = {}
+        self.tuple_table = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting IO")
@@ -38,8 +41,10 @@ class PIO(object):
             for inst in self.func_ir.blocks[label].body:
                 if isinstance(inst, ir.Assign):
                     inst_list = self._run_assign(inst)
-                    if inst_list is not None:
-                        new_body.extend(inst_list)
+                    new_body.extend(inst_list)
+                elif isinstance(inst, ir.StaticSetItem):
+                    inst_list = self._run_static_setitem(inst)
+                    new_body.extend(inst_list)
                 else:
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
@@ -93,15 +98,68 @@ class PIO(object):
                     self.h5_create_dset_calls[lhs] = rhs.value
                 else:
                     raise NotImplementedError("file operation not supported")
+            if rhs.op=='build_tuple':
+                self.tuple_table[lhs] = rhs.items
         # handle copies lhs = f
         if isinstance(rhs, ir.Var):
             if rhs.name in self.h5_files:
                 self.h5_files[lhs] = self.h5_files[rhs.name]
             if rhs.name in self.str_const_table:
                 self.str_const_table[lhs] = self.str_const_table[rhs.name]
+            if rhs.name in self.h5_dsets:
+                self.h5_dsets[lhs] = self.h5_dsets[rhs.name]
+            if rhs.name in self.h5_dsets_sizes:
+                self.h5_dsets_sizes[lhs] = self.h5_dsets_sizes[rhs.name]
         if isinstance(rhs, ir.Const) and isinstance(rhs.value, str):
             self.str_const_table[lhs] = rhs.value
         return [assign]
+
+    def _run_static_setitem(self, stmt):
+        # generate h5 write code for dset[:] = arr
+        if stmt.target.name in self.h5_dsets:
+            assert stmt.index==slice(None, None, None)
+            f_id, dset_name = self.h5_dsets[stmt.target.name]
+            return self._gen_h5write(f_id, stmt.target, stmt.value)
+        return [stmt]
+
+    def _gen_h5write(self, f_id, dset_var, arr_var):
+        scope = dset_var.scope
+        loc = dset_var.loc
+
+        # g_pio_var = Global(hpat.pio_api)
+        g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
+        g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
+        # attr call: h5write_attr = getattr(g_pio_var, h5write)
+        h5write_attr_call = ir.Expr.getattr(g_pio_var, "h5write", loc)
+        attr_var = ir.Var(scope, mk_unique_var("$h5write_attr"), loc)
+        attr_assign = ir.Assign(h5write_attr_call, attr_var, loc)
+        out = [g_pio_assign, attr_assign]
+
+        # ndims args
+        ndims = len(self.h5_dsets_sizes[dset_var.name])
+        ndims_var = ir.Var(scope, mk_unique_var("$h5_ndims"), loc)
+        ndims_assign = ir.Assign(ir.Const(np.int32(ndims), loc), ndims_var, loc)
+        # sizes arg
+        sizes_var = ir.Var(scope, mk_unique_var("$h5_sizes"), loc)
+        tuple_call = ir.Expr.getattr(arr_var, 'shape',loc)
+        sizes_assign = ir.Assign(tuple_call, sizes_var, loc)
+
+        zero_var = ir.Var(scope, mk_unique_var("$const_zero"), loc)
+        zero_assign = ir.Assign(ir.Const(0, loc), zero_var, loc)
+        # starts: assign to zeros
+        starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
+        start_tuple_call = ir.Expr.build_tuple([zero_var]*ndims, loc)
+        starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
+        out += [ndims_assign, zero_assign, starts_assign, sizes_assign]
+
+        # err = h5write(f_id)
+        err_var = ir.Var(scope, mk_unique_var("$pio_ret_var"), loc)
+        write_call = ir.Expr.call(attr_var, [f_id, dset_var, ndims_var,
+                    starts_var, sizes_var, zero_var, arr_var], (), loc)
+        write_assign = ir.Assign(write_call, err_var, loc)
+        out.append(write_assign)
+        return out
 
     def _gen_h5read(self, lhs_var, rhs):
         f_id, dset  = self.h5_dsets[rhs.value.name]
@@ -169,7 +227,8 @@ class PIO(object):
         out += [ndims_assign, zero_assign, starts_assign, sizes_assign]
 
         err_var = ir.Var(scope, mk_unique_var("$h5_err_var"), loc)
-        read_call = ir.Expr.call(attr_var, [f_id, dset, ndims_var, starts_var, sizes_var, zero_var, lhs_var], (), loc)
+        read_call = ir.Expr.call(attr_var, [f_id, dset, ndims_var, starts_var,
+                                        sizes_var, zero_var, lhs_var], (), loc)
         out.append(ir.Assign(read_call, err_var, loc))
         return
 
@@ -225,7 +284,9 @@ class PIO(object):
                                                 g_pio_var, "h5create_dset", loc)
         attr_var = ir.Var(scope, mk_unique_var("$h5create_dset_attr"), loc)
         attr_assign = ir.Assign(h5create_dset_attr_call, attr_var, loc)
-        # h5create_dset(f_id)
+        # dset_id = h5create_dset(f_id)
         create_dset_call = ir.Expr.call(attr_var, args, (), loc)
         create_dset_assign = ir.Assign(create_dset_call, lhs_var, loc)
+        self.h5_dsets[lhs_var.name] = (f_id, args[1])
+        self.h5_dsets_sizes[lhs_var.name] = self.tuple_table[args[2].name]
         return [g_pio_assign, attr_assign, create_dset_assign]

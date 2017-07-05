@@ -120,3 +120,31 @@ _h5_str_typ_table = {
     'f4':4,
     'f8':5
     }
+
+@lower_builtin(pio_api.h5write, types.int32, types.int32, types.int32,
+        types.containers.UniTuple, types.containers.UniTuple, types.int64,
+        types.npytypes.Array)
+def h5_write(context, builder, sig, args):
+    # extra last arg type for type enum
+    arg_typs = [lir.IntType(32), lir.IntType(32), lir.IntType(32),
+        lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
+        lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
+    fnty = lir.FunctionType(lir.IntType(32), arg_typs)
+
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_write")
+    out = make_array(sig.args[6])(context, builder, args[6])
+    # store size vars array struct to pointer
+    count_ptr = cgutils.alloca_once(builder, args[3].type)
+    builder.store(args[3], count_ptr)
+    size_ptr = cgutils.alloca_once(builder, args[4].type)
+    builder.store(args[4], size_ptr)
+    # store an int to specify data type
+    typ_enum = _h5_typ_table[sig.args[6].dtype]
+    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    call_args = [args[0], args[1], args[2],
+        builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
+        builder.bitcast(size_ptr, lir.IntType(64).as_pointer()), args[5],
+        builder.bitcast(out.data, lir.IntType(8).as_pointer()),
+        builder.load(typ_arg)]
+
+    return builder.call(fn, call_args)
