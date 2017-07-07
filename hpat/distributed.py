@@ -466,18 +466,41 @@ class DistributedPass(object):
             rhs.args[4] = counts_var
             rhs.args[5] = self._set1_var
             # set parallel arg in file open
+            # TODO: generalize to all blocks
             file_var = rhs.args[0].name
             for stmt in block_body:
                 if isinstance(stmt, ir.Assign) and stmt.target.name==file_var:
                     rhs = stmt.value
                     assert isinstance(rhs, ir.Expr)
                     rhs.args[2] = self._set1_var
+
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod']):
             in_arr = rhs.args[0].name
+            in_arr_var = rhs.args[0]
+            lhs_var = assign.target
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
+            # allocate output array
+            # TODO: compute inplace if input array is dead
+            out = mk_alloc(self.typemap, self.calltypes, lhs_var,
+                            tuple(self._array_sizes[in_arr]),
+                            self.typemap[in_arr].dtype, scope, loc)
+            # generate distributed call
+            dist_attr_var = ir.Var(scope, mk_unique_var("$dist_attr"), loc)
+            dist_func_name = "dist_"+call_list[0]
+            dist_func = getattr(distributed_api, dist_func_name)
+            dist_attr_call = ir.Expr.getattr(self._g_dist_var, dist_func_name, loc)
+            self.typemap[dist_attr_var.name] = get_global_func_typ(dist_func)
+            dist_func_assign = ir.Assign(dist_attr_call, dist_attr_var, loc)
+            err_var = ir.Var(scope, mk_unique_var("$dist_err_var"), loc)
+            self.typemap[err_var.name] = types.int32
+            dist_call = ir.Expr.call(dist_attr_var, [in_arr_var, lhs_var], (), loc)
+            self.calltypes[dist_call] = self.typemap[dist_attr_var.name].get_call_type(
+                typing.Context(), [self.typemap[in_arr], self.typemap[lhs]], {})
+            dist_assign = ir.Assign(dist_call, err_var, loc)
+            return out+[dist_func_assign, dist_assign]
 
         if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name
