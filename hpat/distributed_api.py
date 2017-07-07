@@ -27,6 +27,18 @@ def dist_arr_reduce(arr):
     """dummy to implement array reductions"""
     return -1
 
+def dist_cumsum(arr):
+    """dummy to implement cumsum"""
+    return arr
+
+def dist_cumprod(arr):
+    """dummy to implement cumprod"""
+    return arr
+
+def dist_exscan(value):
+    """dummy to implement simple exscan"""
+    return value
+
 @infer_global(get_rank)
 class DistRank(AbstractTemplate):
     def generic(self, args, kws):
@@ -62,6 +74,13 @@ class DistReduce(AbstractTemplate):
         assert len(args)==1
         return signature(args[0], *args)
 
+@infer_global(dist_exscan)
+class DistExscan(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==1
+        return signature(args[0], *args)
+
 @infer_global(dist_arr_reduce)
 class DistArrReduce(AbstractTemplate):
     def generic(self, args, kws):
@@ -75,3 +94,11 @@ class DistTime(AbstractTemplate):
         assert not kws
         assert len(args)==0
         return signature(types.float64, *args)
+
+@infer_global(dist_cumsum)
+@infer_global(dist_cumprod)
+class DistCumsumprod(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==2
+        return signature(types.int32, *args)

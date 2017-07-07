@@ -14,6 +14,11 @@ int64_t hpat_dist_reduce_i8(int64_t value);
 float hpat_dist_reduce_f4(float value);
 double hpat_dist_reduce_f8(double value);
 
+int hpat_dist_exscan_i4(int value);
+int64_t hpat_dist_exscan_i8(int64_t value);
+float hpat_dist_exscan_f4(float value);
+double hpat_dist_exscan_f8(double value);
+
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
 
 PyMODINIT_FUNC PyInit_hdist(void) {
@@ -44,8 +49,18 @@ PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject_SetAttrString(m, "hpat_dist_reduce_f8",
                             PyLong_FromVoidPtr(&hpat_dist_reduce_f8));
 
+    PyObject_SetAttrString(m, "hpat_dist_exscan_i4",
+                            PyLong_FromVoidPtr(&hpat_dist_exscan_i4));
+    PyObject_SetAttrString(m, "hpat_dist_exscan_i8",
+                            PyLong_FromVoidPtr(&hpat_dist_exscan_i8));
+    PyObject_SetAttrString(m, "hpat_dist_exscan_f4",
+                            PyLong_FromVoidPtr(&hpat_dist_exscan_f4));
+    PyObject_SetAttrString(m, "hpat_dist_exscan_f8",
+                            PyLong_FromVoidPtr(&hpat_dist_exscan_f8));
+
     PyObject_SetAttrString(m, "hpat_dist_arr_reduce",
                             PyLong_FromVoidPtr(&hpat_dist_arr_reduce));
+
     return m;
 }
 
@@ -139,6 +154,39 @@ int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum)
     memcpy(out, res_buf, total_size*elem_size);
     free(res_buf);
     return 0;
+}
+
+
+int hpat_dist_exscan_i4(int value)
+{
+    // printf("sum value: %d\n", value);
+    int out=0;
+    MPI_Exscan(&value, &out, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+int64_t hpat_dist_exscan_i8(int64_t value)
+{
+    // printf("sum value: %lld\n", value);
+    int64_t out=0;
+    MPI_Exscan(&value, &out, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+float hpat_dist_exscan_f4(float value)
+{
+    // printf("sum value: %f\n", value);
+    float out=0;
+    MPI_Exscan(&value, &out, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
+double hpat_dist_exscan_f8(double value)
+{
+    // printf("sum value: %lf\n", value);
+    double out=0;
+    MPI_Exscan(&value, &out, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    return out;
 }
 
 // _h5_typ_table = {
