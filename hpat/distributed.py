@@ -186,13 +186,24 @@ class DistributedPass(object):
 
         call_list = self._call_table[func_var]
 
-        if self._is_call(func_var, ['empty',np]):
+        if self._is_call(func_var, ['empty', np]):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
 
         if (self._is_call(func_var, ['h5read', hpat.pio_api])
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
+            return
+
+        if (len(call_list)==2 and call_list[1]==np
+                and call_list[0] in ['cumsum', 'cumprod']):
+            in_arr = args[0].name
+            lhs_dist = Distribution.OneD
+            if lhs in array_dists:
+                lhs_dist = array_dists[lhs]
+            new_dist = Distribution(min(lhs_dist.value, array_dists[in_arr].value))
+            array_dists[lhs] = new_dist
+            array_dists[in_arr] = new_dist
             return
 
         if self._is_call(func_var, ['dot', np]):
@@ -402,6 +413,11 @@ class DistributedPass(object):
         scope = assign.target.scope
         loc = assign.target.loc
         out = [assign]
+        # shortcut if we don't know the call
+        if func_var not in self._call_table or not self._call_table[func_var]:
+            return out
+        call_list = self._call_table[func_var]
+
         # divide 1D alloc
         if self._is_1D_arr(lhs) and self._is_alloc_call(func_var):
             size_var = rhs.args[0]
@@ -456,6 +472,13 @@ class DistributedPass(object):
                     rhs = stmt.value
                     assert isinstance(rhs, ir.Expr)
                     rhs.args[2] = self._set1_var
+        if (len(call_list)==2 and call_list[1]==np
+                and call_list[0] in ['cumsum', 'cumprod']):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name
             arg1 = rhs.args[1].name
