@@ -13,14 +13,26 @@ class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
         self.func_ir = func_ir
+
         # varname -> 'str'
         self.str_const_table = {}
+
         # var -> list
         self.map_calls = {}
         self.pd_globals = []
         self.pd_df_calls = []
+
+        # rolling_varname -> column_varname
+        self.rolling_vars = {}
+        # rolling call name -> [column_varname, win_size]
+        self.rolling_calls = {}
+        # rolling call agg name -> [column_varname, win_size, func]
+        self.rolling_calls_agg = {}
+
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
+        # df_column -> df_var
+        self.df_cols = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -62,6 +74,7 @@ class HiFrames(object):
 
                 self.df_vars[lhs] = self._process_df_build_map(
                                             self.map_calls[rhs.args[0].name])
+                self._update_df_cols()
                 # remove DataFrame call
                 return []
 
@@ -70,6 +83,7 @@ class HiFrames(object):
                                             and isinstance(rhs.index, str)):
                 df = rhs.value.name
                 assign.value = self.df_vars[df][rhs.index]
+                self.df_cols[lhs] = df  # save lhs as column
 
             # df1 = df[df.A > .5]
             if (rhs.op == 'getitem' and rhs.value.name in self.df_vars):
@@ -80,6 +94,7 @@ class HiFrames(object):
                 for col, _ in self.df_vars[rhs.value.name].items():
                     self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
                                                                             loc)
+                self._update_df_cols()
                 return [hiframes_api.Filter(lhs, rhs.value.name, rhs.index,
                                                         self.df_vars, rhs.loc)]
 
@@ -89,6 +104,29 @@ class HiFrames(object):
                 df_cols = self.df_vars[df]
                 assert rhs.attr in df_cols
                 assign.value = df_cols[rhs.attr]
+                self.df_cols[lhs] = df  # save lhs as column
+
+            # d.rolling
+            if rhs.op=='getattr' and rhs.value.name in self.df_cols:
+                if rhs.attr=='rolling':
+                    self.rolling_vars[lhs] = rhs.value.name
+                    return []  # remove node
+
+            # d.rolling(3)
+            if rhs.op=='call' and rhs.func.name in self.rolling_vars:
+                assert len(rhs.args) == 1  # only window size arg
+                self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name], rhs.args[0]]
+                return []  # remove
+
+            # d.rolling(3).sum
+            if rhs.op=='getattr' and rhs.value.name in self.rolling_calls:
+                self.rolling_calls_agg[lhs] = self.rolling_calls[rhs.value.name]
+                self.rolling_calls_agg[lhs].append(rhs.attr)
+                return []  # remove
+
+            # d.rolling(3).sum()
+            if rhs.op=='call' and rhs.func.name in self.rolling_calls_agg:
+                print(rhs)
 
             if rhs.op == 'build_map':
                 self.map_calls[lhs] = rhs.items
@@ -96,6 +134,9 @@ class HiFrames(object):
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
+        if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
+            self.df_cols[lhs] = self.df_cols[rhs.name]
+
         if isinstance(rhs, ir.Const) and isinstance(rhs.value, str):
             self.str_const_table[lhs] = rhs.value
         return [assign]
@@ -108,3 +149,10 @@ class HiFrames(object):
             col_name = self.str_const_table[col_var]
             df_cols[col_name] = item[1]
         return df_cols
+
+    def _update_df_cols(self):
+        self.df_cols = {}  # reset
+        for df_name, cols_map in self.df_vars.items():
+            for col_name, col_var in cols_map.items():
+                self.df_cols[col_var.name] = df_name
+        return
