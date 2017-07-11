@@ -1,10 +1,9 @@
 from __future__ import print_function, division, absolute_import
-from collections import namedtuple
 
-import types as pytypes # avoid confusion with numba.types
+import types as pytypes  # avoid confusion with numba.types
 import copy
 import numba
-from numba import (ir, analysis, types, typing, config, numpy_support,
+from numba import (ir, types, typing, config, numpy_support,
                     ir_utils, postproc)
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
@@ -17,21 +16,15 @@ from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
 import hpat
-from hpat import distributed_api, distributed_lower
+from hpat import (distributed_api,
+                  distributed_lower)  # import lower for module initialization
+
+from hpat.distributed_analysis import Distribution, DistributedAnalysis
 import h5py
 import time
 # from mpi4py import MPI
 
-from enum import Enum
-class Distribution(Enum):
-    REP = 1
-    OneD = 4
-    OneD_Var = 3
-    TwoD = 2
 
-_dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
-
-distributed_analysis_extensions = {}
 distributed_run_extensions = {}
 
 class DistributedPass(object):
@@ -40,18 +33,21 @@ class DistributedPass(object):
         self.func_ir = func_ir
         self.typemap = typemap
         self.calltypes = calltypes
+
         self._call_table,_ = get_call_table(func_ir.blocks)
         self._tuple_table = get_tuple_table(func_ir.blocks)
+
+        self._dist_analysis = None
+        self._T_arrs = None  # set of transposed arrays (taken from analysis)
+
         self._rank_var = None # will be set in run
         self._size_var = None
-        self._dist_analysis = None
         self._g_dist_var = None
         self._set1_var = None # variable set to 1
         self._set0_var = None # variable set to 0
         self._array_starts = {}
         self._array_counts = {}
-        self._parallel_accesses = set()
-        self._T_arrs = set()
+
         # keep shape attr calls on parallel arrays like X.shape
         self._shape_attrs = {}
         # keep array sizes of parallel arrays to handle shape attrs
@@ -60,232 +56,21 @@ class DistributedPass(object):
     def run(self):
         remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
-        self._dist_analysis = self._analyze_dist(self.func_ir.blocks)
+        dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
+                                                                self.calltypes)
+        self._dist_analysis = dist_analysis_pass.run()
+        self._T_arrs = dist_analysis_pass._T_arrs
         if config.DEBUG_ARRAY_OPT==1:
             print("distributions: ", self._dist_analysis)
+
         self._gen_dist_inits()
         self._run_dist_pass(self.func_ir.blocks)
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
-        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
-
-    def _analyze_dist(self, blocks, array_dists={}, parfor_dists={}):
-        topo_order = find_topo_order(blocks)
-        save_array_dists = {}
-        save_parfor_dists = {1:1} # dummy value
-        # fixed-point iteration
-        while array_dists!=save_array_dists or parfor_dists!=save_parfor_dists:
-            save_array_dists = copy.copy(array_dists)
-            save_parfor_dists = copy.copy(parfor_dists)
-            for label in topo_order:
-                self._analyze_block(blocks[label], array_dists, parfor_dists)
-
-        return _dist_analysis_result(array_dists=array_dists, parfor_dists=parfor_dists)
-
-    def _analyze_block(self, block, array_dists, parfor_dists):
-        for inst in block.body:
-            if isinstance(inst, ir.Assign):
-                self._analyze_assign(inst, array_dists, parfor_dists)
-            elif isinstance(inst, Parfor):
-                self._analyze_parfor(inst, array_dists, parfor_dists)
-            elif (isinstance(inst, ir.SetItem)
-                    and (inst.target.name,inst.index.name)
-                    in self._parallel_accesses):
-                pass # parallel access, don't make REP
-            elif type(inst) in distributed_analysis_extensions:
-                # let external calls handle stmt if type matches
-                f = distributed_analysis_extensions[type(inst)]
-                f(inst, array_dists)
-            else:
-                self._set_REP(inst.list_vars(), array_dists)
-
-    def _analyze_assign(self, inst, array_dists, parfor_dists):
-        lhs = inst.target.name
-        rhs = inst.value
-        # treat return casts like assignments
-        if isinstance(rhs, ir.Expr) and rhs.op=='cast':
-            rhs = rhs.value
-
-        if isinstance(rhs, ir.Var) and self._isarray(lhs):
-            lhs_dist = Distribution.OneD
-            if lhs in array_dists:
-                lhs_dist = array_dists[lhs]
-            new_dist = Distribution(min(lhs_dist.value, array_dists[rhs.name].value))
-            array_dists[lhs] = new_dist
-            array_dists[rhs.name] = new_dist
-            return
-
-        elif (isinstance(rhs, ir.Expr) and rhs.op=='getitem'
-                and (rhs.value.name,rhs.index.name) in self._parallel_accesses):
-            return
-        elif (isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='T'
-                    and self._isarray(lhs)):
-            # array and its transpose have same distributions
-            arr = rhs.value.name
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            new_dist = Distribution(min(array_dists[lhs].value, array_dists[arr].value))
-            array_dists[lhs] = new_dist
-            array_dists[arr] = new_dist
-            # keep lhs in table for dot() handling
-            self._T_arrs.add(lhs)
-            return
-        elif isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='shape':
-            pass # X.shape doesn't affect X distribution
-        elif isinstance(rhs, ir.Expr) and rhs.op=='call':
-            self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
-        else:
-            self._set_REP(inst.list_vars(), array_dists)
-        return
-
-    def _analyze_parfor(self, parfor, array_dists, parfor_dists):
-        if parfor.id not in parfor_dists:
-            parfor_dists[parfor.id] = Distribution.OneD
-
-        # analyze init block first to see array definitions
-        self._analyze_block(parfor.init_block, array_dists, parfor_dists)
-        out_dist = Distribution.OneD
-
-        parfor_arrs = set() # arrays this parfor accesses in parallel
-        array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
-        par_index_var = parfor.loop_nests[0].index_variable.name
-        for (arr,index) in array_accesses.items():
-            if index==par_index_var:
-                parfor_arrs.add(arr)
-                self._parallel_accesses.add((arr,index))
-            if index in self._tuple_table:
-                index_tuple = [(var.name if isinstance(var, ir.Var) else var)
-                    for var in self._tuple_table[index]]
-                if index_tuple[0]==par_index_var:
-                    parfor_arrs.add(arr)
-                    self._parallel_accesses.add((arr,index))
-                if par_index_var in index_tuple[1:]:
-                    out_dist = Distribution.REP
-            # TODO: check for index dependency
-
-        for arr in parfor_arrs:
-            out_dist = Distribution(min(out_dist.value, array_dists[arr].value))
-        parfor_dists[parfor.id] = out_dist
-        for arr in parfor_arrs:
-            array_dists[arr] = out_dist
-
-        # run analysis recursively on parfor body
-        blocks = wrap_parfor_blocks(parfor)
-        for b in blocks.values():
-            self._analyze_block(b, array_dists, parfor_dists)
-        unwrap_parfor_blocks(parfor)
-        return
-
-    def _analyze_call(self, lhs, func_var, args, array_dists):
-        if func_var not in self._call_table or not self._call_table[func_var]:
-            self._analyze_call_set_REP(lhs, func_var, args, array_dists)
-            return
-
-        call_list = self._call_table[func_var]
-
-        if self._is_call(func_var, ['empty', np]):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
-        if (self._is_call(func_var, ['h5read', hpat.pio_api])
-                or self._is_call(func_var, ['h5write', hpat.pio_api])):
-            return
-
-        if (len(call_list)==2 and call_list[1]==np
-                and call_list[0] in ['cumsum', 'cumprod']):
-            in_arr = args[0].name
-            lhs_dist = Distribution.OneD
-            if lhs in array_dists:
-                lhs_dist = array_dists[lhs]
-            new_dist = Distribution(min(lhs_dist.value, array_dists[in_arr].value))
-            array_dists[lhs] = new_dist
-            array_dists[in_arr] = new_dist
-            return
-
-        if self._is_call(func_var, ['dot', np]):
-            arg0 = args[0].name
-            arg1 = args[1].name
-            ndim0 = self.typemap[arg0].ndim
-            ndim1 = self.typemap[arg1].ndim
-            dist0 = array_dists[arg0]
-            dist1 = array_dists[arg1]
-            # Fortran layout is caused by X.T and means transpose
-            t0 = arg0 in self._T_arrs
-            t1 = arg1 in self._T_arrs
-            if ndim0==1 and ndim1==1:
-                # vector dot, both vectors should have same layout
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
-                return
-            if ndim0==2 and ndim1==1 and not t0:
-                # special case were arg1 vector is treated as column vector
-                # samples dot weights: np.dot(X,w)
-                # w is always REP
-                array_dists[arg1] = Distribution.REP
-                if lhs not in array_dists:
-                    array_dists[lhs] = Distribution.OneD
-                # lhs and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[lhs].value))
-                array_dists[arg0] = new_dist
-                array_dists[lhs] = new_dist
-                dprint("dot case 1 Xw:", arg0, arg1)
-                return
-            if ndim0==1 and ndim1==2 and not t1:
-                # reduction across samples np.dot(Y,X)
-                # lhs is always REP
-                array_dists[lhs] = Distribution.REP
-                # Y and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
-                dprint("dot case 2 YX:", arg0, arg1)
-                return
-            if ndim0==2 and ndim1==2 and t0 and not t1:
-                # reduction across samples np.dot(X.T,Y)
-                # lhs is always REP
-                array_dists[lhs] = Distribution.REP
-                # Y and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
-                dprint("dot case 3 XtY:", arg0, arg1)
-                return
-            if ndim0==2 and ndim1==2 and not t0 and not t1:
-                # samples dot weights: np.dot(X,w)
-                # w is always REP
-                array_dists[arg1] = Distribution.REP
-                if lhs not in array_dists:
-                    array_dists[lhs] = Distribution.OneD
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[lhs].value))
-                array_dists[arg0] = new_dist
-                array_dists[lhs] = new_dist
-                dprint("dot case 4 Xw:", arg0, arg1)
-                return
-        # set REP if not found
-        self._analyze_call_set_REP(lhs, func_var, args, array_dists)
-
-    def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
-        for v in args:
-            if self._isarray(v.name):
-                array_dists[v.name] = Distribution.REP
-        if self._isarray(lhs):
-            array_dists[lhs] = Distribution.REP
-
-    def _set_REP(self, var_list, array_dists):
-        for var in var_list:
-            varname = var.name
-            if self._isarray(varname):
-                array_dists[varname] = Distribution.REP
 
     def _run_dist_pass(self, blocks):
         topo_order = find_topo_order(blocks)

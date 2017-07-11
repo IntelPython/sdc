@@ -6,8 +6,8 @@ from numba import ir, analysis, types, config, numpy_support, typeinfer
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
 from numba.typing import signature
-from hpat import distributed
-from hpat.distributed import Distribution
+from hpat import distributed, distributed_analysis
+from hpat.distributed_analysis import Distribution
 import pandas
 
 class Filter(ir.Stmt):
@@ -76,7 +76,7 @@ def filter_distributed_analysis(filter_node, array_dists):
 
     return
 
-distributed.distributed_analysis_extensions[Filter] = filter_distributed_analysis
+distributed_analysis.distributed_analysis_extensions[Filter] = filter_distributed_analysis
 
 def filter_distributed_run(filter_node, typemap, calltypes):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
