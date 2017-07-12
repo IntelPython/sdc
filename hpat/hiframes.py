@@ -7,6 +7,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc)
 import hpat
 from hpat import hiframes_api
+import numpy
 import pandas
 
 class HiFrames(object):
@@ -162,9 +163,10 @@ class HiFrames(object):
     def _gen_rolling_call(self, col_var, win_size, func, out_var):
         scope = col_var.scope
         loc = col_var.loc
+        alloc_nodes = gen_empty_like(col_var, out_var)
         assert func == 'sum'  # only sum for now
         kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
-        func_text = 'def g():\n  return {}\n'.format(kernel_expr)
+        func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         code_obj = loc_vars['g'].__code__
@@ -185,4 +187,20 @@ class HiFrames(object):
         stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
         stencil_call.stencil_def = code_expr
         stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
-        return [g_numba_assign, stencil_attr_assign, stencil_assign]
+        return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+
+def gen_empty_like(in_arr, out_arr):
+    scope = in_arr.scope
+    loc = in_arr.loc
+    # g_np_var = Global(numpy)
+    g_np_var = ir.Var(scope, mk_unique_var("$np_g_var"), loc)
+    g_np = ir.Global('np', numpy, loc)
+    g_np_assign = ir.Assign(g_np, g_np_var, loc)
+    # attr call: empty_attr = getattr(g_np_var, empty_like)
+    empty_attr_call = ir.Expr.getattr(g_np_var, "empty_like", loc)
+    attr_var = ir.Var(scope, mk_unique_var("$empty_attr_attr"), loc)
+    attr_assign = ir.Assign(empty_attr_call, attr_var, loc)
+    # alloc call: out_arr = empty_attr(in_arr)
+    alloc_call = ir.Expr.call(attr_var, [in_arr], (), loc)
+    alloc_assign = ir.Assign(alloc_call, out_arr, loc)
+    return [g_np_assign, attr_assign, alloc_assign]
