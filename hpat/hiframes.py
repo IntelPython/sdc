@@ -15,14 +15,14 @@ class HiFrames(object):
         self.func_ir = func_ir
 
         # varname -> 'str'
-        self.str_const_table = {}
+        self.const_table = {}
 
         # var -> list
         self.map_calls = {}
         self.pd_globals = []
         self.pd_df_calls = []
 
-        # rolling_varname -> column_varname
+        # rolling_varname -> column_var
         self.rolling_vars = {}
         # rolling call name -> [column_varname, win_size]
         self.rolling_calls = {}
@@ -109,13 +109,14 @@ class HiFrames(object):
             # d.rolling
             if rhs.op=='getattr' and rhs.value.name in self.df_cols:
                 if rhs.attr=='rolling':
-                    self.rolling_vars[lhs] = rhs.value.name
+                    self.rolling_vars[lhs] = rhs.value
                     return []  # remove node
 
             # d.rolling(3)
             if rhs.op=='call' and rhs.func.name in self.rolling_vars:
                 assert len(rhs.args) == 1  # only window size arg
-                self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name], rhs.args[0]]
+                self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
+                        self.const_table[rhs.args[0].name]]
                 return []  # remove
 
             # d.rolling(3).sum
@@ -126,7 +127,8 @@ class HiFrames(object):
 
             # d.rolling(3).sum()
             if rhs.op=='call' and rhs.func.name in self.rolling_calls_agg:
-                print(rhs)
+                return self._gen_rolling_call(
+                    *self.rolling_calls_agg[rhs.func.name]+[assign.target])
 
             if rhs.op == 'build_map':
                 self.map_calls[lhs] = rhs.items
@@ -137,16 +139,16 @@ class HiFrames(object):
         if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
             self.df_cols[lhs] = self.df_cols[rhs.name]
 
-        if isinstance(rhs, ir.Const) and isinstance(rhs.value, str):
-            self.str_const_table[lhs] = rhs.value
+        if isinstance(rhs, ir.Const):
+            self.const_table[lhs] = rhs.value
         return [assign]
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
         for item in items_list:
             col_var = item[0].name
-            assert col_var in self.str_const_table
-            col_name = self.str_const_table[col_var]
+            assert col_var in self.const_table
+            col_name = self.const_table[col_var]
             df_cols[col_name] = item[1]
         return df_cols
 
@@ -156,3 +158,31 @@ class HiFrames(object):
             for col_name, col_var in cols_map.items():
                 self.df_cols[col_var.name] = df_name
         return
+
+    def _gen_rolling_call(self, col_var, win_size, func, out_var):
+        scope = col_var.scope
+        loc = col_var.loc
+        assert func == 'sum'  # only sum for now
+        kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
+        func_text = 'def g():\n  return {}\n'.format(kernel_expr)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        code_obj = loc_vars['g'].__code__
+        # code_var = ir.Var(scope, mk_unique_var("$code_var"), loc)
+        code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
+        # code_assign = ir.Assign(code_expr, code_var, loc)
+        # generate stencil call
+        # g_numba_var = Global(numba)
+        g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
+        g_dist = ir.Global('numba', numba, loc)
+        g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
+        # attr call: stencil_attr = getattr(g_numba_var, stencil)
+        stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
+        stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
+        stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
+        # stencil_out = numba.stencil()
+        stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
+        stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
+        stencil_call.stencil_def = code_expr
+        stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
+        return [g_numba_assign, stencil_attr_assign, stencil_assign]
