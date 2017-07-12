@@ -161,7 +161,8 @@ class DistributedAnalysis(object):
             return
 
         if (len(call_list)==2 and call_list[1]==np
-                and call_list[0] in ['cumsum', 'cumprod']):
+                and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
+                    'zeros_like', 'ones_like', 'full_like', 'copy']):
             in_arr = args[0].name
             lhs_dist = Distribution.OneD
             if lhs in array_dists:
