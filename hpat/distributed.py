@@ -413,7 +413,7 @@ class DistributedPass(object):
             arr = arr_set.pop()
             assert not arr_set  # only one array
             self._run_parfor_stencil(parfor, out, start_var, end_var,
-                                        stencil_accesses, arr)
+                                        stencil_accesses, namevar_table[arr])
         else:
             parfor.loop_nests[0].start = start_var
             parfor.loop_nests[0].stop = end_var
@@ -440,25 +440,61 @@ class DistributedPass(object):
         return out
 
     def _run_parfor_stencil(self, parfor, out, start_var, end_var,
-                                                        stencil_accesses, arr):
+                                                    stencil_accesses, arr_var):
         #
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
         left_length = -min(stencil_accesses.values())
         right_length = max(stencil_accesses.values())
-        dtype = self.typemap[arr].dtype
+        dtype = self.typemap[arr_var.name].dtype
 
-        # post left receive
+        # post left send/receive
         if left_length != 0:
-            # allocate left tmp buffer
-            left_buff = ir.Var(scope, mk_unique_var("left_buff"), loc)
-            self.typemap[left_buff.name] = self.typemap[arr]
-            out += mk_alloc(self.typemap, self.calltypes, left_buff,
+            # allocate left tmp buffer for irecv
+            left_recv_buff = ir.Var(scope, mk_unique_var("left_recv_buff"), loc)
+            self.typemap[left_recv_buff.name] = self.typemap[arr_var.name]
+            out += mk_alloc(self.typemap, self.calltypes, left_recv_buff,
                                 (left_length,), dtype, scope, loc)
 
-            self._gen_stencil_comm(left_buff, True, False, out)
+            # recv from left
+            self._gen_stencil_comm(left_recv_buff, left_length, out, is_left=True, is_send=False)
 
-    def _gen_stencil_comm(self, buff, is_left, is_send, out):
+            # send to right to match recv
+            right_send_buff = ir.Var(scope, mk_unique_var("right_send_buff"), loc)
+            self.typemap[right_send_buff.name] = self.typemap[arr_var.name]
+            # const = -size
+            const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
+            self.typemap[const_msize.name] = types.intp
+            out.append(ir.Assign(ir.Const(-left_length, loc), const_msize, loc))
+            # const = none
+            const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
+            self.typemap[const_none.name] = types.none
+            out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
+            # g_slice = Global(slice)
+            g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
+            self.typemap[g_slice_var.name] = get_global_func_typ(slice)
+            out.append(ir.Assign(ir.Global('slice', slice, loc),
+                                                        g_slice_var, loc))
+            # slice_ind_out = slice(-size, none)
+            slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
+            slice_call = ir.Expr.call(g_slice_var, [const_msize,
+                            const_none], (), loc)
+            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
+                                                        [types.intp, types.none], {})
+            self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
+            out.append(ir.Assign(slice_call, slice_ind_out, loc))
+            # right_send_buff = A[slice]
+            getslice_call = ir.Expr.static_getitem(arr_var, slice(-3, None, None), slice_ind_out, loc)
+            self.calltypes[getslice_call] = signature(
+                                self.typemap[right_send_buff.name],
+                                self.typemap[arr_var.name],
+                                self.typemap[slice_ind_out.name])
+            out.append(ir.Assign(getslice_call, right_send_buff, loc))
+            self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
+
+        out.append(parfor)
+
+    def _gen_stencil_comm(self, buff, size, out, is_left, is_send):
         scope = buff.scope
         loc = buff.loc
         rank_op = '+'
@@ -469,42 +505,48 @@ class DistributedPass(object):
         if is_send:
             comm_name = 'isend'
             comm_call = distributed_api.isend
+        comm_tag_const = 22
 
-        # left_pe = rank - 1
-        left_pe = ir.Var(scope, mk_unique_var("left_pe"), loc)
-        self.typemap[left_pe.name] = types.int32
-        left_pe_call = ir.Expr.binop('-', self._rank_var, self._set1_var, loc)
-        if left_pe_call not in self.calltypes:
-            self.calltypes[left_pe_call] = find_op_typ('-', [types.int32, types.int64])
-        out.append(ir.Assign(left_pe_call, left_pe, loc))
+        # comm_size = size
+        comm_size = ir.Var(scope, mk_unique_var("comm_size"), loc)
+        self.typemap[comm_size.name] = types.int32
+        out.append(ir.Assign(ir.Const(size, loc), comm_size, loc))
 
-        # left_tag = 22
-        left_tag = ir.Var(scope, mk_unique_var("left_tag"), loc)
-        self.typemap[left_tag.name] = types.int32
-        out.append(ir.Assign(ir.Const(22, loc), left_tag, loc))
+        # comm_pe = rank +/- 1
+        comm_pe = ir.Var(scope, mk_unique_var("comm_pe"), loc)
+        self.typemap[comm_pe.name] = types.int32
+        comm_pe_call = ir.Expr.binop(rank_op, self._rank_var, self._set1_var, loc)
+        if comm_pe_call not in self.calltypes:
+            self.calltypes[comm_pe_call] = find_op_typ(rank_op, [types.int32, types.int64])
+        out.append(ir.Assign(comm_pe_call, comm_pe, loc))
 
-        # left_cond = rank != 0
-        left_cond = ir.Var(scope, mk_unique_var("left_cond"), loc)
-        self.typemap[left_cond.name] = types.boolean
-        left_cond_call = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
-        if left_cond_call not in self.calltypes:
-            self.calltypes[left_cond_call] = find_op_typ('!=', [types.int32, types.int64])
-        out.append(ir.Assign(left_cond_call, left_cond, loc))
+        # comm_tag = 22
+        comm_tag = ir.Var(scope, mk_unique_var("comm_tag"), loc)
+        self.typemap[comm_tag.name] = types.int32
+        out.append(ir.Assign(ir.Const(comm_tag_const, loc), comm_tag, loc))
 
-        # left_req = irecv()
-        left_req = ir.Var(scope, mk_unique_var("left_req"), loc)
-        self.typemap[left_req.name] = types.int32
-        # attr call: irecv_attr = getattr(g_dist_var, irecv)
-        irecv_attr_call = ir.Expr.getattr(self._g_dist_var, 'irecv', loc)
-        irecv_attr_var = ir.Var(scope, mk_unique_var("$get_irecv_attr"), loc)
-        self.typemap[irecv_attr_var.name] = get_global_func_typ(distributed_api.irecv)
-        out.append(ir.Assign(irecv_attr_call, irecv_attr_var, loc))
-        irecv_call = ir.Expr.call(irecv_attr_var, [buff,
-            left_pe, left_tag, left_cond], (), loc)
-        self.calltypes[irecv_call] = self.typemap[irecv_attr_var.name].get_call_type(
-            typing.Context(), [self.typemap[buff.name],
+        # comm_cond = rank != 0
+        comm_cond = ir.Var(scope, mk_unique_var("comm_cond"), loc)
+        self.typemap[comm_cond.name] = types.boolean
+        comm_cond_call = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
+        if comm_cond_call not in self.calltypes:
+            self.calltypes[comm_cond_call] = find_op_typ('!=', [types.int32, types.int64])
+        out.append(ir.Assign(comm_cond_call, comm_cond, loc))
+
+        # comm_req = irecv()
+        comm_req = ir.Var(scope, mk_unique_var("comm_req"), loc)
+        self.typemap[comm_req.name] = types.int32
+        # attr call: icomm_attr = getattr(g_dist_var, irecv)
+        icomm_attr_call = ir.Expr.getattr(self._g_dist_var, comm_name, loc)
+        icomm_attr_var = ir.Var(scope, mk_unique_var("$get_"+comm_name+"_attr"), loc)
+        self.typemap[icomm_attr_var.name] = get_global_func_typ(comm_call)
+        out.append(ir.Assign(icomm_attr_call, icomm_attr_var, loc))
+        icomm_call = ir.Expr.call(icomm_attr_var, [buff, comm_size,
+            comm_pe, comm_tag, comm_cond], (), loc)
+        self.calltypes[icomm_call] = self.typemap[icomm_attr_var.name].get_call_type(
+            typing.Context(), [self.typemap[buff.name], types.int32,
             types.int32, types.int32, types.boolean], {})
-        out.append(ir.Assign(irecv_call, left_req, loc))
+        out.append(ir.Assign(icomm_call, comm_req, loc))
         return
 
     def _gen_1D_div(self, size_var, scope, loc, prefix, end_call_name, end_call):

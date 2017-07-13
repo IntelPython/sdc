@@ -42,6 +42,9 @@ def dist_exscan(value):
 def irecv():
     return 0
 
+def isend():
+    return 0
+
 @infer_global(get_rank)
 class DistRank(AbstractTemplate):
     def generic(self, args, kws):
@@ -107,8 +110,9 @@ class DistCumsumprod(AbstractTemplate):
         return signature(types.int32, *args)
 
 @infer_global(irecv)
+@infer_global(isend)
 class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==4
+        assert len(args)==5
         return signature(types.int32, *args)
