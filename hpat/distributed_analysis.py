@@ -108,7 +108,7 @@ class DistributedAnalysis(object):
         parfor_arrs = set() # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
-        stencil_accesses = get_stencil_accesses(parfor.loop_body, par_index_var)
+        stencil_accesses, _ = get_stencil_accesses(parfor.loop_body, par_index_var)
         for (arr,index) in array_accesses:
             if index==par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
@@ -254,6 +254,7 @@ def get_stencil_accesses(body, par_index_var):
     # TODO support recursive parfor, multi-D, mutiple body blocks
     const_table = {}
     stencil_accesses = {}
+    arrays_accessed = {}
 
     for block in body.values():
         for stmt in block.body:
@@ -267,8 +268,10 @@ def get_stencil_accesses(body, par_index_var):
                         rhs.lhs.name == par_index_var and
                         rhs.rhs.name in const_table):
                     stencil_accesses[lhs] = const_table[rhs.rhs.name]
+                if rhs.op == 'getitem' and rhs.index.name in stencil_accesses:
+                    arrays_accessed[rhs.index.name] = rhs.value.name
 
-    return stencil_accesses
+    return stencil_accesses, arrays_accessed
 
 def dprint(*s):
     if config.DEBUG_ARRAY_OPT==1:
