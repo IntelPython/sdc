@@ -75,12 +75,7 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and self._isarray(lhs):
-            lhs_dist = Distribution.OneD
-            if lhs in array_dists:
-                lhs_dist = array_dists[lhs]
-            new_dist = Distribution(min(lhs_dist.value, array_dists[rhs.name].value))
-            array_dists[lhs] = new_dist
-            array_dists[rhs.name] = new_dist
+            self._meet_array_dists(lhs, rhs.name, array_dists)
             return
 
         elif (isinstance(rhs, ir.Expr) and rhs.op=='getitem'
@@ -90,11 +85,7 @@ class DistributedAnalysis(object):
                     and self._isarray(lhs)):
             # array and its transpose have same distributions
             arr = rhs.value.name
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            new_dist = Distribution(min(array_dists[lhs].value, array_dists[arr].value))
-            array_dists[lhs] = new_dist
-            array_dists[arr] = new_dist
+            self._meet_array_dists(lhs, arr, array_dists)
             # keep lhs in table for dot() handling
             self._T_arrs.add(lhs)
             return
@@ -165,12 +156,7 @@ class DistributedAnalysis(object):
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
                     'zeros_like', 'ones_like', 'full_like', 'copy']):
             in_arr = args[0].name
-            lhs_dist = Distribution.OneD
-            if lhs in array_dists:
-                lhs_dist = array_dists[lhs]
-            new_dist = Distribution(min(lhs_dist.value, array_dists[in_arr].value))
-            array_dists[lhs] = new_dist
-            array_dists[in_arr] = new_dist
+            self._meet_array_dists(lhs, in_arr, array_dists)
             return
 
         if self._is_call(func_var, ['dot', np]):
@@ -198,10 +184,7 @@ class DistributedAnalysis(object):
                 if lhs not in array_dists:
                     array_dists[lhs] = Distribution.OneD
                 # lhs and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[lhs].value))
-                array_dists[arg0] = new_dist
-                array_dists[lhs] = new_dist
+                self._meet_array_dists(lhs, arg0, array_dists)
                 dprint("dot case 1 Xw:", arg0, arg1)
                 return
             if ndim0==1 and ndim1==2 and not t1:
@@ -209,10 +192,7 @@ class DistributedAnalysis(object):
                 # lhs is always REP
                 array_dists[lhs] = Distribution.REP
                 # Y and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
+                self._meet_array_dists(arg0, arg1, array_dists)
                 dprint("dot case 2 YX:", arg0, arg1)
                 return
             if ndim0==2 and ndim1==2 and t0 and not t1:
@@ -220,22 +200,14 @@ class DistributedAnalysis(object):
                 # lhs is always REP
                 array_dists[lhs] = Distribution.REP
                 # Y and X have same distribution
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
+                self._meet_array_dists(arg0, arg1, array_dists)
                 dprint("dot case 3 XtY:", arg0, arg1)
                 return
             if ndim0==2 and ndim1==2 and not t0 and not t1:
                 # samples dot weights: np.dot(X,w)
                 # w is always REP
                 array_dists[arg1] = Distribution.REP
-                if lhs not in array_dists:
-                    array_dists[lhs] = Distribution.OneD
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[lhs].value))
-                array_dists[arg0] = new_dist
-                array_dists[lhs] = new_dist
+                self._meet_array_dists(lhs, arg0, array_dists)
                 dprint("dot case 4 Xw:", arg0, arg1)
                 return
         # set REP if not found
@@ -249,6 +221,17 @@ class DistributedAnalysis(object):
         if self._isarray(lhs):
             dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
+
+    def _meet_array_dists(self, arr1, arr2, array_dists):
+        if arr1 not in array_dists:
+            array_dists[arr1] = Distribution.OneD
+        if arr2 not in array_dists:
+            array_dists[arr2] = Distribution.OneD
+
+        new_dist = Distribution(min(array_dists[arr1].value,
+                                            array_dists[arr2].value))
+        array_dists[arr1] = new_dist
+        array_dists[arr2] = new_dist
 
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
