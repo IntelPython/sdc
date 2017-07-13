@@ -117,8 +117,9 @@ class DistributedAnalysis(object):
         parfor_arrs = set() # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
-        for (arr,index) in array_accesses.items():
-            if index==par_index_var:
+        stencil_accesses = get_stencil_accesses(parfor.loop_body, par_index_var)
+        for (arr,index) in array_accesses:
+            if index==par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr,index))
             if index in self._tuple_table:
@@ -243,14 +244,17 @@ class DistributedAnalysis(object):
     def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
         for v in args:
             if self._isarray(v.name):
+                dprint("dist setting call arg REP {}".format(v.name))
                 array_dists[v.name] = Distribution.REP
         if self._isarray(lhs):
+            dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
 
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
             if self._isarray(varname):
+                dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
 
     def _isarray(self, varname):
@@ -262,6 +266,26 @@ class DistributedAnalysis(object):
             return False
         return self._call_table[func_var]==call_list
 
+
+def get_stencil_accesses(body, par_index_var):
+    # TODO support recursive parfor, multi-D, mutiple body blocks
+    const_table = {}
+    stencil_accesses = {}
+
+    for block in body.values():
+        for stmt in block.body:
+            if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
+                lhs = stmt.target.name
+                const_table[lhs] = stmt.value.value
+            if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
+                lhs = stmt.target.name
+                rhs = stmt.value
+                if (rhs.op == 'binop' and rhs.fn == '+' and
+                        rhs.lhs.name == par_index_var and
+                        rhs.rhs.name in const_table):
+                    stencil_accesses[lhs] = const_table[rhs.rhs.name]
+
+    return stencil_accesses
 
 def dprint(*s):
     if config.DEBUG_ARRAY_OPT==1:
