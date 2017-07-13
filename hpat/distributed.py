@@ -490,6 +490,7 @@ class DistributedPass(object):
                                 self.typemap[arr_var.name],
                                 self.typemap[slice_ind_out.name])
             out.append(ir.Assign(getslice_call, right_send_buff, loc))
+
             self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
 
         out.append(parfor)
@@ -525,10 +526,21 @@ class DistributedPass(object):
         self.typemap[comm_tag.name] = types.int32
         out.append(ir.Assign(ir.Const(comm_tag_const, loc), comm_tag, loc))
 
+        if is_left:
+            last_pe = self._set0_var
+        else:
+            # last_pe = num_pes - 1
+            last_pe = ir.Var(scope, mk_unique_var("last_pe"), loc)
+            self.typemap[last_pe.name] = types.int32
+            last_pe_call = ir.Expr.binop('-', self._size_var, self._set1_var, loc)
+            if last_pe_call not in self.calltypes:
+                self.calltypes[last_pe_call] = find_op_typ('-', [types.int32, types.int64])
+            out.append(ir.Assign(last_pe_call, last_pe, loc))
+
         # comm_cond = rank != 0
         comm_cond = ir.Var(scope, mk_unique_var("comm_cond"), loc)
         self.typemap[comm_cond.name] = types.boolean
-        comm_cond_call = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
+        comm_cond_call = ir.Expr.binop('!=', self._rank_var, last_pe, loc)
         if comm_cond_call not in self.calltypes:
             self.calltypes[comm_cond_call] = find_op_typ('!=', [types.int32, types.int64])
         out.append(ir.Assign(comm_cond_call, comm_cond, loc))
