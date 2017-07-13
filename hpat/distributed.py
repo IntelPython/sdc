@@ -9,7 +9,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
                             get_global_func_typ, find_op_typ, get_name_var_table,
                             get_call_table, get_tuple_table, remove_dels)
-
+from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                             wrap_parfor_blocks, unwrap_parfor_blocks)
 from numba.parfor import Parfor, lower_parfor_sequential
@@ -400,8 +400,8 @@ class DistributedPass(object):
         out, start_var, end_var = self._gen_1D_div(range_size, scope, loc, "$loop", "get_end", distributed_api.get_end)
         parfor.loop_nests[0].start = start_var
         parfor.loop_nests[0].stop = end_var
-        # print_node = ir.Print([div_var, start_var, end_var], None, loc)
-        # self.calltypes[print_node] = signature(types.none, types.int64, types.int64, types.int64)
+        # print_node = ir.Print([start_var, end_var], None, loc)
+        # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
         # out.append(print_node)
         out.append(parfor)
         _, reductions = get_parfor_reductions(parfor, parfor.params)
