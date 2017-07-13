@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "mpi.h"
 #include <Python.h>
 
@@ -20,6 +21,7 @@ float hpat_dist_exscan_f4(float value);
 double hpat_dist_exscan_f8(double value);
 
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
+int hpat_dist_irecv(void* out, int64_t* shapes, int ndims, int type_enum, int pe, int tag, bool cond);
 
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
@@ -60,7 +62,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
 
     PyObject_SetAttrString(m, "hpat_dist_arr_reduce",
                             PyLong_FromVoidPtr(&hpat_dist_arr_reduce));
-
+    PyObject_SetAttrString(m, "hpat_dist_irecv",
+                            PyLong_FromVoidPtr(&hpat_dist_irecv));
     return m;
 }
 
@@ -187,6 +190,24 @@ double hpat_dist_exscan_f8(double value)
     double out=0;
     MPI_Exscan(&value, &out, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     return out;
+}
+
+int hpat_dist_irecv(void* out, int64_t* shapes, int ndims, int type_enum, int pe, int tag, bool cond)
+{
+    int i;
+    MPI_Request mpi_req_recv = -1;
+    printf("ndims:%d shape:%lld, pe:%d tag:%d, cond:%d\n", ndims, shapes[0], pe, tag, cond);
+    fflush(stdout);
+    if(cond)
+    {
+        int total_size = (int)shapes[0];
+        for(i=1; i<ndims; i++)
+            total_size *= (int)shapes[i];
+        MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+        int elem_size = get_elem_size(type_enum);
+        MPI_Irecv(out, total_size, mpi_typ, pe, tag, MPI_COMM_WORLD, mpi_req_recv);
+    }
+    return mpi_req_recv;
 }
 
 // _h5_typ_table = {
