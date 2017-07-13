@@ -259,14 +259,20 @@ class DistributedPass(object):
                     assert isinstance(rhs, ir.Expr)
                     rhs.args[2] = self._set1_var
 
+        # output array has same properties (starts etc.) as input array
+        if (len(call_list)==2 and call_list[1]==np
+                and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
+                    'zeros_like', 'ones_like', 'full_like', 'copy']):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod']):
             in_arr = rhs.args[0].name
             in_arr_var = rhs.args[0]
             lhs_var = assign.target
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
             # allocate output array
             # TODO: compute inplace if input array is dead
             out = mk_alloc(self.typemap, self.calltypes, lhs_var,
