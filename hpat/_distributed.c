@@ -199,13 +199,15 @@ int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool co
 {
     int i;
     MPI_Request mpi_req_recv = -1;
-    printf("irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
-    fflush(stdout);
+    // printf("irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
+    // fflush(stdout);
     if(cond)
     {
         MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
-        MPI_Irecv(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, mpi_req_recv);
+        MPI_Irecv(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, &mpi_req_recv);
     }
+    // printf("after irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
+    // fflush(stdout);
     return mpi_req_recv;
 }
 
@@ -213,13 +215,15 @@ int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool co
 {
     int i;
     MPI_Request mpi_req_recv = -1;
-    printf("isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
-    fflush(stdout);
+    // printf("isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
+    // fflush(stdout);
     if(cond)
     {
         MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
-        MPI_Isend(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, mpi_req_recv);
+        MPI_Isend(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, &mpi_req_recv);
     }
+    // printf("after isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
+    // fflush(stdout);
     return mpi_req_recv;
 }
 
