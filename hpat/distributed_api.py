@@ -107,8 +107,8 @@ class DistCumsumprod(AbstractTemplate):
         return signature(types.int32, *args)
 
 @infer_global(irecv)
-class DistSize(AbstractTemplate):
+class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==5
+        assert len(args)==4
         return signature(types.int32, *args)

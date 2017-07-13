@@ -448,17 +448,13 @@ class DistributedPass(object):
         right_length = max(stencil_accesses.values())
         dtype = self.typemap[arr].dtype
 
+        # post left receive
         if left_length != 0:
             # allocate left tmp buffer
             left_buff = ir.Var(scope, mk_unique_var("left_buff"), loc)
             self.typemap[left_buff.name] = self.typemap[arr]
             out += mk_alloc(self.typemap, self.calltypes, left_buff,
                                 (left_length,), dtype, scope, loc)
-
-            # left_size = left_length
-            left_size = ir.Var(scope, mk_unique_var("left_size"), loc)
-            self.typemap[left_size.name] = types.int32
-            out.append(ir.Assign(ir.Const(left_length, loc), left_size, loc))
 
             # left_pe = rank - 1
             left_pe = ir.Var(scope, mk_unique_var("left_pe"), loc)
@@ -478,10 +474,9 @@ class DistributedPass(object):
             self.typemap[left_cond.name] = types.boolean
             left_cond_call = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
             if left_cond_call not in self.calltypes:
-                self.calltypes[left_cond_call] = find_op_typ('-', [types.int32, types.int64])
+                self.calltypes[left_cond_call] = find_op_typ('!=', [types.int32, types.int64])
             out.append(ir.Assign(left_cond_call, left_cond, loc))
 
-            # post receive
             # left_req = irecv()
             left_req = ir.Var(scope, mk_unique_var("left_req"), loc)
             self.typemap[left_req.name] = types.int32
@@ -490,10 +485,10 @@ class DistributedPass(object):
             irecv_attr_var = ir.Var(scope, mk_unique_var("$get_irecv_attr"), loc)
             self.typemap[irecv_attr_var.name] = get_global_func_typ(distributed_api.irecv)
             out.append(ir.Assign(irecv_attr_call, irecv_attr_var, loc))
-            irecv_call = ir.Expr.call(irecv_attr_var, [left_buff, left_size,
+            irecv_call = ir.Expr.call(irecv_attr_var, [left_buff,
                 left_pe, left_tag, left_cond], (), loc)
             self.calltypes[irecv_call] = self.typemap[irecv_attr_var.name].get_call_type(
-                typing.Context(), [self.typemap[left_buff.name], types.int32,
+                typing.Context(), [self.typemap[left_buff.name],
                 types.int32, types.int32, types.boolean], {})
             out.append(ir.Assign(irecv_call, left_req, loc))
 

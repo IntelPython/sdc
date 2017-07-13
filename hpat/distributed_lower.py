@@ -22,6 +22,7 @@ ll.add_symbol('hpat_dist_exscan_i4', hdist.hpat_dist_exscan_i4)
 ll.add_symbol('hpat_dist_exscan_i8', hdist.hpat_dist_exscan_i8)
 ll.add_symbol('hpat_dist_exscan_f4', hdist.hpat_dist_exscan_f4)
 ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
+ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
 
 @lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
@@ -124,3 +125,31 @@ def lower_dist_exscan(context, builder, sig, args):
     typ_str = typ_map[sig.args[0]]
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_exscan_{}".format(typ_str))
     return builder.call(fn, [args[0]])
+
+
+@lower_builtin(distributed_api.irecv, types.npytypes.Array,
+types.int32, types.int32, types.boolean)
+def lower_dist_irecv(context, builder, sig, args):
+    # store an int to specify data type
+    typ_enum = hpat.pio_lower._h5_typ_table[sig.args[0].dtype]
+    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+
+    out = make_array(sig.args[0])(context, builder, args[0])
+    # store size vars array struct to pointer
+    size_ptr = cgutils.alloca_once(builder, out.shape.type)
+    builder.store(out.shape, size_ptr)
+    size_arg = builder.bitcast(size_ptr, lir.IntType(64).as_pointer())
+
+    ndim_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), sig.args[0].ndim))
+    call_args = [builder.bitcast(out.data, lir.IntType(8).as_pointer()),
+                size_arg, builder.load(ndim_arg), builder.load(typ_arg),
+                args[1], args[2], args[3]]
+
+    # array, shape, ndim, extra arg type for type enum
+    # pe, tag, cond
+    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64).as_pointer(),
+        lir.IntType(32), lir.IntType(32), lir.IntType(32), lir.IntType(32),
+        lir.IntType(1)]
+    fnty = lir.FunctionType(lir.IntType(32), arg_typs)
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_irecv")
+    return builder.call(fn, call_args)
