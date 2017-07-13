@@ -19,7 +19,9 @@ import hpat
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
 
-from hpat.distributed_analysis import Distribution, DistributedAnalysis
+from hpat.distributed_analysis import (Distribution,
+                                       DistributedAnalysis,
+                                       get_stencil_accesses)
 import h5py
 import time
 # from mpi4py import MPI
@@ -381,6 +383,8 @@ class DistributedPass(object):
         return out
 
     def _run_parfor(self, parfor, namevar_table):
+        stencil_accesses, arrays_accessed = get_stencil_accesses(
+            parfor.loop_body, parfor.loop_nests[0].index_variable.name)
         # run dist pass recursively
         blocks = wrap_parfor_blocks(parfor)
         self._run_dist_pass(blocks)
@@ -397,13 +401,24 @@ class DistributedPass(object):
         loc = parfor.init_block.loc
         range_size = parfor.loop_nests[0].stop
 
-        out, start_var, end_var = self._gen_1D_div(range_size, scope, loc, "$loop", "get_end", distributed_api.get_end)
-        parfor.loop_nests[0].start = start_var
-        parfor.loop_nests[0].stop = end_var
+        out, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
+                                    "$loop", "get_end", distributed_api.get_end)
         # print_node = ir.Print([start_var, end_var], None, loc)
         # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
         # out.append(print_node)
-        out.append(parfor)
+
+        if stencil_accesses:
+            # TODO assuming single array in stencil
+            arr_set = set(arrays_accessed.values())
+            arr = arr_set.pop()
+            assert not arr_set  # only one array
+            self._run_parfor_stencil(parfor, out, start_var, end_var,
+                                        stencil_accesses, arr)
+        else:
+            parfor.loop_nests[0].start = start_var
+            parfor.loop_nests[0].stop = end_var
+            out.append(parfor)
+
         _, reductions = get_parfor_reductions(parfor, parfor.params)
 
         if len(reductions)!=0:
@@ -423,6 +438,64 @@ class DistributedPass(object):
             out.append(reduce_assign)
 
         return out
+
+    def _run_parfor_stencil(self, parfor, out, start_var, end_var,
+                                                        stencil_accesses, arr):
+        #
+        scope = parfor.init_block.scope
+        loc = parfor.init_block.loc
+        left_length = -min(stencil_accesses.values())
+        right_length = max(stencil_accesses.values())
+        dtype = self.typemap[arr].dtype
+
+        if left_length != 0:
+            # allocate left tmp buffer
+            left_buff = ir.Var(scope, mk_unique_var("left_buff"), loc)
+            self.typemap[left_buff.name] = self.typemap[arr]
+            out += mk_alloc(self.typemap, self.calltypes, left_buff,
+                                (left_length,), dtype, scope, loc)
+
+            # left_size = left_length
+            left_size = ir.Var(scope, mk_unique_var("left_size"), loc)
+            self.typemap[left_size.name] = types.int32
+            out.append(ir.Assign(ir.Const(left_length, loc), left_size, loc))
+
+            # left_pe = rank - 1
+            left_pe = ir.Var(scope, mk_unique_var("left_pe"), loc)
+            self.typemap[left_pe.name] = types.int32
+            left_pe_call = ir.Expr.binop('-', self._rank_var, self._set1_var, loc)
+            if left_pe_call not in self.calltypes:
+                self.calltypes[left_pe_call] = find_op_typ('-', [types.int32, types.int64])
+            out.append(ir.Assign(left_pe_call, left_pe, loc))
+
+            # left_tag = 22
+            left_tag = ir.Var(scope, mk_unique_var("left_tag"), loc)
+            self.typemap[left_tag.name] = types.int32
+            out.append(ir.Assign(ir.Const(22, loc), left_tag, loc))
+
+            # left_cond = rank != 0
+            left_cond = ir.Var(scope, mk_unique_var("left_cond"), loc)
+            self.typemap[left_cond.name] = types.boolean
+            left_cond_call = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
+            if left_cond_call not in self.calltypes:
+                self.calltypes[left_cond_call] = find_op_typ('-', [types.int32, types.int64])
+            out.append(ir.Assign(left_cond_call, left_cond, loc))
+
+            # post receive
+            # left_req = irecv()
+            left_req = ir.Var(scope, mk_unique_var("left_req"), loc)
+            self.typemap[left_req.name] = types.int32
+            # attr call: irecv_attr = getattr(g_dist_var, irecv)
+            irecv_attr_call = ir.Expr.getattr(self._g_dist_var, 'irecv', loc)
+            irecv_attr_var = ir.Var(scope, mk_unique_var("$get_irecv_attr"), loc)
+            self.typemap[irecv_attr_var.name] = get_global_func_typ(distributed_api.irecv)
+            out.append(ir.Assign(irecv_attr_call, irecv_attr_var, loc))
+            irecv_call = ir.Expr.call(irecv_attr_var, [left_buff, left_size,
+                left_pe, left_tag, left_cond], (), loc)
+            self.calltypes[irecv_call] = self.typemap[irecv_attr_var.name].get_call_type(
+                typing.Context(), [self.typemap[left_buff.name], types.int32,
+                types.int32, types.int32, types.boolean], {})
+            out.append(ir.Assign(irecv_call, left_req, loc))
 
     def _gen_1D_div(self, size_var, scope, loc, prefix, end_call_name, end_call):
         div_nodes = []
