@@ -457,7 +457,7 @@ class DistributedPass(object):
                                 (left_length,), dtype, scope, loc)
 
             # recv from left
-            self._gen_stencil_comm(left_recv_buff, left_length, out, is_left=True, is_send=False)
+            left_recv_req = self._gen_stencil_comm(left_recv_buff, left_length, out, is_left=True, is_send=False)
 
             # send to right to match recv
             right_send_buff = ir.Var(scope, mk_unique_var("right_send_buff"), loc)
@@ -491,9 +491,33 @@ class DistributedPass(object):
                                 self.typemap[slice_ind_out.name])
             out.append(ir.Assign(getslice_call, right_send_buff, loc))
 
-            self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
+            right_send_req = self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
 
         out.append(parfor)
+
+        # wait on isend/irecv
+        if left_length != 0:
+            self._gen_stencil_wait(left_recv_req, out, is_left=True)
+            self._gen_stencil_wait(right_send_req, out, is_left=False)
+
+        return
+
+    def _gen_stencil_wait(self, req, out, is_left):
+        scope = req.scope
+        loc = req.loc
+        wait_cond = self._get_comm_cond(out, scope, loc, is_left)
+        # wait_err = wait(req)
+        wait_err = ir.Var(scope, mk_unique_var("wait_err"), loc)
+        self.typemap[wait_err.name] = types.int32
+        # attr call: wait_attr = getattr(g_dist_var, irecv)
+        wait_attr_call = ir.Expr.getattr(self._g_dist_var, "wait", loc)
+        wait_attr_var = ir.Var(scope, mk_unique_var("$get_wait_attr"), loc)
+        self.typemap[wait_attr_var.name] = get_global_func_typ(distributed_api.wait)
+        out.append(ir.Assign(wait_attr_call, wait_attr_var, loc))
+        wait_call = ir.Expr.call(wait_attr_var, [req, wait_cond], (), loc)
+        self.calltypes[wait_call] = self.typemap[wait_attr_var.name].get_call_type(
+            typing.Context(), [types.int32, types.boolean], {})
+        out.append(ir.Assign(wait_call, wait_err, loc))
 
     def _gen_stencil_comm(self, buff, size, out, is_left, is_send):
         scope = buff.scope
@@ -526,6 +550,25 @@ class DistributedPass(object):
         self.typemap[comm_tag.name] = types.int32
         out.append(ir.Assign(ir.Const(comm_tag_const, loc), comm_tag, loc))
 
+        comm_cond = self._get_comm_cond(out, scope, loc, is_left)
+
+        # comm_req = irecv()
+        comm_req = ir.Var(scope, mk_unique_var("comm_req"), loc)
+        self.typemap[comm_req.name] = types.int32
+        # attr call: icomm_attr = getattr(g_dist_var, irecv)
+        icomm_attr_call = ir.Expr.getattr(self._g_dist_var, comm_name, loc)
+        icomm_attr_var = ir.Var(scope, mk_unique_var("$get_"+comm_name+"_attr"), loc)
+        self.typemap[icomm_attr_var.name] = get_global_func_typ(comm_call)
+        out.append(ir.Assign(icomm_attr_call, icomm_attr_var, loc))
+        icomm_call = ir.Expr.call(icomm_attr_var, [buff, comm_size,
+            comm_pe, comm_tag, comm_cond], (), loc)
+        self.calltypes[icomm_call] = self.typemap[icomm_attr_var.name].get_call_type(
+            typing.Context(), [self.typemap[buff.name], types.int32,
+            types.int32, types.int32, types.boolean], {})
+        out.append(ir.Assign(icomm_call, comm_req, loc))
+        return comm_req
+
+    def _get_comm_cond(self, out, scope, loc, is_left):
         if is_left:
             last_pe = self._set0_var
         else:
@@ -545,21 +588,7 @@ class DistributedPass(object):
             self.calltypes[comm_cond_call] = find_op_typ('!=', [types.int32, types.int64])
         out.append(ir.Assign(comm_cond_call, comm_cond, loc))
 
-        # comm_req = irecv()
-        comm_req = ir.Var(scope, mk_unique_var("comm_req"), loc)
-        self.typemap[comm_req.name] = types.int32
-        # attr call: icomm_attr = getattr(g_dist_var, irecv)
-        icomm_attr_call = ir.Expr.getattr(self._g_dist_var, comm_name, loc)
-        icomm_attr_var = ir.Var(scope, mk_unique_var("$get_"+comm_name+"_attr"), loc)
-        self.typemap[icomm_attr_var.name] = get_global_func_typ(comm_call)
-        out.append(ir.Assign(icomm_attr_call, icomm_attr_var, loc))
-        icomm_call = ir.Expr.call(icomm_attr_var, [buff, comm_size,
-            comm_pe, comm_tag, comm_cond], (), loc)
-        self.calltypes[icomm_call] = self.typemap[icomm_attr_var.name].get_call_type(
-            typing.Context(), [self.typemap[buff.name], types.int32,
-            types.int32, types.int32, types.boolean], {})
-        out.append(ir.Assign(icomm_call, comm_req, loc))
-        return
+        return comm_cond
 
     def _gen_1D_div(self, size_var, scope, loc, prefix, end_call_name, end_call):
         div_nodes = []

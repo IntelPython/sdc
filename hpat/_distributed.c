@@ -23,6 +23,7 @@ double hpat_dist_exscan_f8(double value);
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
 int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
+int hpat_dist_wait(int req, bool cond);
 
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
@@ -67,6 +68,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr(&hpat_dist_irecv));
     PyObject_SetAttrString(m, "hpat_dist_isend",
                             PyLong_FromVoidPtr(&hpat_dist_isend));
+    PyObject_SetAttrString(m, "hpat_dist_wait",
+                            PyLong_FromVoidPtr(&hpat_dist_wait));
     return m;
 }
 
@@ -225,6 +228,13 @@ int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool co
     // printf("after isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
     return mpi_req_recv;
+}
+
+int hpat_dist_wait(int req, bool cond)
+{
+    if (cond)
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
+    return 0;
 }
 
 // _h5_typ_table = {

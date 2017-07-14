@@ -45,6 +45,9 @@ def irecv():
 def isend():
     return 0
 
+def wait():
+    return 0
+
 @infer_global(get_rank)
 class DistRank(AbstractTemplate):
     def generic(self, args, kws):
@@ -115,4 +118,11 @@ class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==5
+        return signature(types.int32, *args)
+
+@infer_global(wait)
+class DistWait(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==2
         return signature(types.int32, *args)

@@ -24,6 +24,7 @@ ll.add_symbol('hpat_dist_exscan_f4', hdist.hpat_dist_exscan_f4)
 ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
 ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
 ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
+ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 
 @lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
@@ -171,3 +172,9 @@ def lower_dist_isend(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_isend")
     return builder.call(fn, call_args)
+
+@lower_builtin(distributed_api.wait, types.int32, types.boolean)
+def lower_dist_wait(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32), lir.IntType(1)])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
+    return builder.call(fn, args)
