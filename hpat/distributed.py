@@ -87,6 +87,10 @@ class DistributedPass(object):
                     continue
                 if isinstance(inst, Parfor):
                     new_body += self._run_parfor(inst, namevar_table)
+                    # run dist pass recursively
+                    p_blocks = wrap_parfor_blocks(inst)
+                    self._run_dist_pass(p_blocks)
+                    unwrap_parfor_blocks(inst)
                     continue
                 if isinstance(inst, ir.Assign):
                     lhs = inst.target.name
@@ -385,10 +389,6 @@ class DistributedPass(object):
     def _run_parfor(self, parfor, namevar_table):
         stencil_accesses, arrays_accessed = get_stencil_accesses(
             parfor.loop_body, parfor.loop_nests[0].index_variable.name)
-        # run dist pass recursively
-        blocks = wrap_parfor_blocks(parfor)
-        self._run_dist_pass(blocks)
-        unwrap_parfor_blocks(parfor)
 
         if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
             # TODO: make sure loop index is not used for calculations in
@@ -407,6 +407,9 @@ class DistributedPass(object):
         # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
         # out.append(print_node)
 
+        parfor.loop_nests[0].start = start_var
+        parfor.loop_nests[0].stop = end_var
+
         if stencil_accesses:
             # TODO assuming single array in stencil
             arr_set = set(arrays_accessed.values())
@@ -415,8 +418,6 @@ class DistributedPass(object):
             self._run_parfor_stencil(parfor, out, start_var, end_var,
                                         stencil_accesses, namevar_table[arr])
         else:
-            parfor.loop_nests[0].start = start_var
-            parfor.loop_nests[0].stop = end_var
             out.append(parfor)
 
         _, reductions = get_parfor_reductions(parfor, parfor.params)
@@ -499,6 +500,35 @@ class DistributedPass(object):
         if left_length != 0:
             self._gen_stencil_wait(left_recv_req, out, is_left=True)
             self._gen_stencil_wait(right_send_req, out, is_left=False)
+
+            assert len(parfor.loop_body)==1  # only one block supported
+            body_block = parfor.loop_body[min(parfor.loop_body.keys())]
+            border_block = copy.deepcopy(body_block)  # TODO: fix copies of global
+            # set parfor index to right border
+            # buffer index starts from length
+            parfor_index = parfor.loop_nests[0].index_variable
+            buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
+            index_assigns = [ir.Assign(start_var, parfor_index, loc),
+                        ir.Assign(ir.Const(left_length, loc), buff_index, loc)]
+            border_block.body = index_assigns + border_block.body
+            # replace index calculations with negative constants with buff index
+            # replace negatively indexed array accesses with buff access
+            negative_consts = set()
+            buff_indices = set()
+            for stmt in border_block.body:
+                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
+                    value = stmt.value.value
+                    if isinstance(value, int) and value < 0:
+                        negative_consts.add(stmt.target.name)
+                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
+                    expr = stmt.value
+                    if (expr.op == 'binop' and expr.fn == '+'
+                            and expr.lhs.name == parfor_index.name
+                            and expr.rhs.name in negative_consts):
+                        expr.lhs = buff_index
+                        buff_indices = stmt.target.name
+                    if expr.op == 'getitem' and expr.index.name in buff_indices:
+                        expr.value = left_recv_buff
 
         return
 
