@@ -152,7 +152,7 @@ class DistributedPass(object):
             for i, stmt in enumerate(block.body):
                 if not isinstance(stmt, Parfor) or stmt.id not in self._stencil_border_blocks:
                     continue
-                # find wait call
+                # find last wait call
                 for j in reversed(range(i+1, len(block.body))):
                     inst = block.body[j]
                     if isinstance(inst, ir.Assign) and inst.target.name.startswith('wait_err'):
@@ -533,6 +533,21 @@ class DistributedPass(object):
             out.append(ir.Assign(getslice_call, right_send_buff, loc))
 
             right_send_req = self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
+
+            # add stencil length to parfor start
+            index_const = ir.Var(scope, mk_unique_var("stencil_const_var"), loc)
+            self.typemap[index_const.name] = types.intp
+            const_assign = ir.Assign(ir.Const(left_length, loc),
+                                                        index_const, loc)
+            out.append(const_assign)
+            start_ind = ir.Var(scope, mk_unique_var("start_ind"), loc)
+            self.typemap[start_ind.name] = types.intp
+            index_call = ir.Expr.binop('+', parfor.loop_nests[0].start, index_const, loc)
+            self.calltypes[index_call] = ir_utils.find_op_typ('+',
+                                                [types.intp, types.intp])
+            index_assign = ir.Assign(index_call, start_ind, loc)
+            out.append(index_assign)
+            parfor.loop_nests[0].start = start_ind
 
         out.append(parfor)
 
