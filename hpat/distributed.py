@@ -54,6 +54,7 @@ class DistributedPass(object):
         self._shape_attrs = {}
         # keep array sizes of parallel arrays to handle shape attrs
         self._array_sizes = {}
+        self._stencil_border_blocks = {}
 
     def run(self):
         remove_dels(self.func_ir.blocks)
@@ -66,7 +67,7 @@ class DistributedPass(object):
             print("distributions: ", self._dist_analysis)
 
         self._gen_dist_inits()
-        self._run_dist_pass(self.func_ir.blocks)
+        self.func_ir.blocks = self._run_dist_pass(self.func_ir.blocks)
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
         dprint_func_ir(self.func_ir, "after distributed pass")
@@ -141,6 +142,45 @@ class DistributedPass(object):
                     continue
                 new_body.append(inst)
             blocks[label].body = new_body
+
+        if not self._stencil_border_blocks:
+            return blocks
+
+        new_blocks = {}
+        for (block_label, block) in blocks.items():
+            scope = block.scope
+            for i, stmt in enumerate(block.body):
+                if not isinstance(stmt, Parfor) or stmt.id not in self._stencil_border_blocks:
+                    continue
+                # find wait call
+                for j in reversed(range(i+1, len(block.body))):
+                    inst = block.body[j]
+                    if isinstance(inst, ir.Assign) and inst.target.name.startswith('wait_err'):
+                        break
+                border_block = self._stencil_border_blocks.pop(stmt.id)
+                loc = stmt.loc
+                # split block after parfor wait
+                prev_block = ir.Block(scope, loc)
+                new_blocks[block_label] = prev_block
+                block_label = ir_utils.next_label()
+                border_label = ir_utils.next_label()
+
+                prev_block.body = block.body[:j+1]
+                rank_comp_var = ir.Var(scope, mk_unique_var("$rank_comp"), loc)
+                self.typemap[rank_comp_var.name] = types.boolean
+                comp_expr = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
+                expr_typ = find_op_typ('!=',[types.int32, types.int64])
+                self.calltypes[comp_expr] = expr_typ
+                comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
+                prev_block.body.append(comp_assign)
+                border_branch = ir.Branch(rank_comp_var, border_label, block_label, loc)
+                prev_block.body.append(border_branch)
+
+                border_block.body.append(ir.Jump(block_label, loc))
+                new_blocks[border_label] = border_block
+                block.body = block.body[j+1:]
+            new_blocks[block_label] = block
+        return new_blocks
 
     def _gen_dist_inits(self):
         # add initializations
@@ -508,6 +548,7 @@ class DistributedPass(object):
             # buffer index starts from length
             parfor_index = parfor.loop_nests[0].index_variable
             buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
+            self.typemap[buff_index.name] = types.intp
             index_assigns = [ir.Assign(start_var, parfor_index, loc),
                         ir.Assign(ir.Const(left_length, loc), buff_index, loc)]
             border_block.body = index_assigns + border_block.body
@@ -529,6 +570,18 @@ class DistributedPass(object):
                         buff_indices = stmt.target.name
                     if expr.op == 'getitem' and expr.index.name in buff_indices:
                         expr.value = left_recv_buff
+
+            # set calltypes in border_block same as body
+            for i, stmt in enumerate(body_block.body):
+                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
+                    expr = stmt.value
+                    if expr in self.calltypes:
+                        b_expr = border_block.body[len(index_assigns)+i].value
+                        self.calltypes[b_expr] = self.calltypes[expr]
+                if isinstance(stmt, ir.SetItem):
+                    b_stmt = border_block.body[len(index_assigns)+i]
+                    self.calltypes[b_stmt] = self.calltypes[stmt]
+            self._stencil_border_blocks[parfor.id] = border_block
 
         return
 
