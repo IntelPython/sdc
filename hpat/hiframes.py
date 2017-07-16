@@ -10,6 +10,11 @@ from hpat import hiframes_api
 import numpy
 import pandas
 
+import copy
+def global_deepcopy(self, memo):
+    return ir.Global(self.name, self.value, copy.deepcopy(self.loc))
+ir.Global.__deepcopy__ = global_deepcopy
+
 class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
@@ -22,6 +27,7 @@ class HiFrames(object):
         self.map_calls = {}
         self.pd_globals = []
         self.pd_df_calls = []
+        self.make_functions = {}
 
         # rolling_varname -> column_var
         self.rolling_vars = {}
@@ -132,11 +138,14 @@ class HiFrames(object):
 
             # d.rolling(3).sum()
             if rhs.op=='call' and rhs.func.name in self.rolling_calls_agg:
-                return self._gen_rolling_call(
+                return self._gen_rolling_call(rhs.args,
                     *self.rolling_calls_agg[rhs.func.name]+[assign.target])
 
             if rhs.op == 'build_map':
                 self.map_calls[lhs] = rhs.items
+
+            if rhs.op == 'make_function':
+                self.make_functions[lhs] = rhs
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
@@ -164,19 +173,23 @@ class HiFrames(object):
                 self.df_cols[col_var.name] = df_name
         return
 
-    def _gen_rolling_call(self, col_var, win_size, center, func, out_var):
+    def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         scope = col_var.scope
         loc = col_var.loc
         alloc_nodes = gen_empty_like(col_var, out_var)
-        assert func == 'sum'  # only sum for now
-        kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
-        func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        code_obj = loc_vars['g'].__code__
-        # code_var = ir.Var(scope, mk_unique_var("$code_var"), loc)
-        code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
-        # code_assign = ir.Assign(code_expr, code_var, loc)
+        if func == 'apply':
+            code_expr = self.make_functions[args[0].name]
+        elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+            kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
+            kernel_expr = 'np.{}(np.array([{}]))'.format(func, kernel_args)
+            if func == 'sum':  # simplify sum
+                kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
+            func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            code_obj = loc_vars['g'].__code__
+            code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
+
         # generate stencil call
         # g_numba_var = Global(numba)
         g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
@@ -190,8 +203,12 @@ class HiFrames(object):
         stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
         stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
         stencil_call.stencil_def = code_expr
+        index_offsets = [0]
+        if func == 'apply':
+            index_offsets = [-win_size+1]
         if center:
-            stencil_call.index_offsets = [win_size//2]
+            index_offsets[0] += win_size//2
+        stencil_call.index_offsets = index_offsets
         stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
         return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
 
