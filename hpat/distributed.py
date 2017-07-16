@@ -186,7 +186,7 @@ class DistributedPass(object):
                     prev_block.body.append(ir.Assign(last_pe_call, border_rank, loc))
 
                 comp_expr = ir.Expr.binop('!=', self._rank_var, border_rank, loc)
-                expr_typ = find_op_typ('!=',[types.int32, types.int64])
+                expr_typ = find_op_typ('!=', [types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
                 prev_block.body.append(comp_assign)
@@ -457,15 +457,32 @@ class DistributedPass(object):
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
         range_size = parfor.loop_nests[0].stop
+        out = []
 
-        out, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
+        # return range to original size of array
+        if stencil_accesses:
+            new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
+            self.typemap[new_range_size.name] = types.intp
+            right_length = max(stencil_accesses.values())
+            index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
+            self.typemap[index_const.name] = types.intp
+            out.append(ir.Assign(ir.Const(right_length, loc), index_const, loc))
+            calc_call = ir.Expr.binop('+', range_size, index_const, loc)
+            self.calltypes[calc_call] = ir_utils.find_op_typ('+',
+                                                [types.intp, types.intp])
+            out.append(ir.Assign(calc_call, new_range_size, loc))
+            range_size = new_range_size
+
+        div_nodes, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
                                     "$loop", "get_end", distributed_api.get_end)
+        out += div_nodes
         # print_node = ir.Print([start_var, end_var], None, loc)
         # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
         # out.append(print_node)
 
         parfor.loop_nests[0].start = start_var
         parfor.loop_nests[0].stop = end_var
+
 
         if stencil_accesses:
             # TODO assuming single array in stencil
@@ -570,13 +587,13 @@ class DistributedPass(object):
         if left_length != 0:
             border_block_left = copy.copy(body_block)
             border_block_left.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                left_recv_buff, left_length, parfor.loop_nests[0].stop, is_left=True)
+                left_recv_buff, left_length, end_var, is_left=True)
             self._stencil_left_border[parfor.id] = border_block_left
 
         if right_length != 0:
             border_block_right = copy.copy(body_block)
             border_block_right.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                right_recv_buff, right_length, parfor.loop_nests[0].stop, is_left=False)
+                right_recv_buff, right_length, end_var, is_left=False)
             self._stencil_right_border[parfor.id] = border_block_right
 
 
@@ -605,7 +622,7 @@ class DistributedPass(object):
             else:
                 buff_index_start = -(i+1)
 
-            new_body.append(ir.Assign(ir.Const(halo_length-i, loc), buff_index, loc))
+            new_body.append(ir.Assign(ir.Const(buff_index_start, loc), buff_index, loc))
             # replace index calculations with halo constants with buff index
             # replace halo array accesses with buff access
             if is_left:
