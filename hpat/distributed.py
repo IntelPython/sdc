@@ -521,48 +521,63 @@ class DistributedPass(object):
             self._gen_stencil_wait(left_recv_req, out, is_left=True)
             self._gen_stencil_wait(left_send_req, out, is_left=False)
 
-            assert len(parfor.loop_body)==1  # only one block supported
-            body_block = parfor.loop_body[min(parfor.loop_body.keys())]
-            border_block = copy.copy(body_block)
-            # set parfor index to right border
-            # buffer index starts from length
-            parfor_index = parfor.loop_nests[0].index_variable
-            buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
-            self.typemap[buff_index.name] = types.intp
+        if right_length != 0:
+            #
+            self._gen_stencil_wait(right_recv_req, out, is_left=False)
+            self._gen_stencil_wait(right_send_req, out, is_left=True)
 
-            new_body = []
-            for i in range(left_length):
-                index_assigns = [ir.Assign(ir.Const(i, loc), parfor_index, loc),
-                            ir.Assign(ir.Const(left_length-i, loc), buff_index, loc)]
-                new_body += index_assigns
-                # replace index calculations with negative constants with buff index
-                # replace negatively indexed array accesses with buff access
-                negative_consts = set()
-                buff_indices = set()
-                for st in border_block.body:
-                    stmt = copy.deepcopy(st)   # TODO: fix copies of global
-                    if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
-                        value = stmt.value.value
-                        if isinstance(value, int) and value < -i:
-                            negative_consts.add(stmt.target.name)
-                    if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
-                        expr = stmt.value
-                        if (expr.op == 'binop' and expr.fn == '+'
-                                and expr.lhs.name == parfor_index.name
-                                and expr.rhs.name in negative_consts):
-                            expr.lhs = buff_index
-                            buff_indices = stmt.target.name
-                        if expr.op == 'getitem' and expr.index.name in buff_indices:
-                            expr.value = left_recv_buff
-                        if st.value in self.calltypes:
-                            self.calltypes[expr] = self.calltypes[st.value]
-                    if isinstance(stmt, ir.SetItem):
-                        self.calltypes[stmt] = self.calltypes[st]
-                    new_body.append(stmt)
+        # generate border blocks
+        assert len(parfor.loop_body)==1  # only one block supported
+        body_block = parfor.loop_body[min(parfor.loop_body.keys())]
+        border_block = copy.copy(body_block)
+        # set parfor index to right border
+        # buffer index starts from length
+        parfor_index = parfor.loop_nests[0].index_variable
+        buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
+        self.typemap[buff_index.name] = types.intp
+        new_body = []
 
-            border_block.body = new_body
-            self._stencil_border_blocks[parfor.id] = border_block
+        if left_length != 0:
+            self._gen_stencil_border(parfor_index, buff_index, border_block.body,
+                                            new_body, left_recv_buff, left_length, is_left=True)
 
+        border_block.body = new_body
+        self._stencil_border_blocks[parfor.id] = border_block
+
+        return
+
+    def _gen_stencil_border(self, parfor_index, buff_index, body, new_body,
+                                        left_recv_buff, left_length, is_left):
+        scope = parfor_index.scope
+        loc = parfor_index.loc
+        for i in range(left_length):
+            index_assigns = [ir.Assign(ir.Const(i, loc), parfor_index, loc),
+                        ir.Assign(ir.Const(left_length-i, loc), buff_index, loc)]
+            new_body += index_assigns
+            # replace index calculations with negative constants with buff index
+            # replace negatively indexed array accesses with buff access
+            negative_consts = set()
+            buff_indices = set()
+            for st in body:
+                stmt = copy.deepcopy(st)   # TODO: fix copies of globals
+                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
+                    value = stmt.value.value
+                    if isinstance(value, int) and value < -i:
+                        negative_consts.add(stmt.target.name)
+                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
+                    expr = stmt.value
+                    if (expr.op == 'binop' and expr.fn == '+'
+                            and expr.lhs.name == parfor_index.name
+                            and expr.rhs.name in negative_consts):
+                        expr.lhs = buff_index
+                        buff_indices = stmt.target.name
+                    if expr.op == 'getitem' and expr.index.name in buff_indices:
+                        expr.value = left_recv_buff
+                    if st.value in self.calltypes:
+                        self.calltypes[expr] = self.calltypes[st.value]
+                if isinstance(stmt, ir.SetItem):
+                    self.calltypes[stmt] = self.calltypes[st]
+                new_body.append(stmt)
         return
 
     def _gen_stencil_halo(self, halo_length, arr_var, out, is_left):
