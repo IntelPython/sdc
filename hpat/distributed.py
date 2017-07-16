@@ -491,48 +491,8 @@ class DistributedPass(object):
 
         # post left send/receive
         if left_length != 0:
-            # allocate left tmp buffer for irecv
-            left_recv_buff = ir.Var(scope, mk_unique_var("left_recv_buff"), loc)
-            self.typemap[left_recv_buff.name] = self.typemap[arr_var.name]
-            out += mk_alloc(self.typemap, self.calltypes, left_recv_buff,
-                                (left_length,), dtype, scope, loc)
-
-            # recv from left
-            left_recv_req = self._gen_stencil_comm(left_recv_buff, left_length, out, is_left=True, is_send=False)
-
-            # send to right to match recv
-            right_send_buff = ir.Var(scope, mk_unique_var("right_send_buff"), loc)
-            self.typemap[right_send_buff.name] = self.typemap[arr_var.name]
-            # const = -size
-            const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
-            self.typemap[const_msize.name] = types.intp
-            out.append(ir.Assign(ir.Const(-left_length, loc), const_msize, loc))
-            # const = none
-            const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
-            self.typemap[const_none.name] = types.none
-            out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
-            # g_slice = Global(slice)
-            g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
-            self.typemap[g_slice_var.name] = get_global_func_typ(slice)
-            out.append(ir.Assign(ir.Global('slice', slice, loc),
-                                                        g_slice_var, loc))
-            # slice_ind_out = slice(-size, none)
-            slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
-            slice_call = ir.Expr.call(g_slice_var, [const_msize,
-                            const_none], (), loc)
-            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
-                                                        [types.intp, types.none], {})
-            self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
-            out.append(ir.Assign(slice_call, slice_ind_out, loc))
-            # right_send_buff = A[slice]
-            getslice_call = ir.Expr.static_getitem(arr_var, slice(-3, None, None), slice_ind_out, loc)
-            self.calltypes[getslice_call] = signature(
-                                self.typemap[right_send_buff.name],
-                                self.typemap[arr_var.name],
-                                self.typemap[slice_ind_out.name])
-            out.append(ir.Assign(getslice_call, right_send_buff, loc))
-
-            right_send_req = self._gen_stencil_comm(right_send_buff, left_length, out, is_left=False, is_send=True)
+            left_recv_buff, left_recv_req, right_send_req = self._gen_stencil_halo(
+                            left_length, arr_var, out, is_left=True)
 
             # add stencil length to parfor start
             index_const = ir.Var(scope, mk_unique_var("stencil_const_var"), loc)
@@ -599,6 +559,57 @@ class DistributedPass(object):
             self._stencil_border_blocks[parfor.id] = border_block
 
         return
+
+    def _gen_stencil_halo(self, halo_length, arr_var, out, is_left):
+        scope = arr_var.scope
+        loc = arr_var.loc
+        dtype = self.typemap[arr_var.name].dtype
+        # allocate halo tmp buffer for irecv
+        halo_recv_buff = ir.Var(scope, mk_unique_var("halo_recv_buff"), loc)
+        self.typemap[halo_recv_buff.name] = self.typemap[arr_var.name]
+        out += mk_alloc(self.typemap, self.calltypes, halo_recv_buff,
+                            (halo_length,), dtype, scope, loc)
+
+        # recv from halo
+        halo_recv_req = self._gen_stencil_comm(halo_recv_buff, halo_length,
+                                        out, is_left=True, is_send=False)
+
+        # send to right to match recv
+        halo_send_buff = ir.Var(scope, mk_unique_var("halo_send_buff"), loc)
+        self.typemap[halo_send_buff.name] = self.typemap[arr_var.name]
+        # const = -size
+        const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
+        self.typemap[const_msize.name] = types.intp
+        out.append(ir.Assign(ir.Const(-halo_length, loc), const_msize, loc))
+        # const = none
+        const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
+        self.typemap[const_none.name] = types.none
+        out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
+        # g_slice = Global(slice)
+        g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
+        self.typemap[g_slice_var.name] = get_global_func_typ(slice)
+        out.append(ir.Assign(ir.Global('slice', slice, loc),
+                                                    g_slice_var, loc))
+        # slice_ind_out = slice(-size, none)
+        slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
+        slice_call = ir.Expr.call(g_slice_var, [const_msize,
+                        const_none], (), loc)
+        self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
+                                                    [types.intp, types.none], {})
+        self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
+        out.append(ir.Assign(slice_call, slice_ind_out, loc))
+        # halo_send_buff = A[slice]
+        getslice_call = ir.Expr.static_getitem(arr_var, slice(-halo_length, None, None),
+                                                            slice_ind_out, loc)
+        self.calltypes[getslice_call] = signature(
+                            self.typemap[halo_send_buff.name],
+                            self.typemap[arr_var.name],
+                            self.typemap[slice_ind_out.name])
+        out.append(ir.Assign(getslice_call, halo_send_buff, loc))
+
+        halo_send_req = self._gen_stencil_comm(halo_send_buff, halo_length, out,
+                                                    is_left=False, is_send=True)
+        return halo_recv_buff, halo_recv_req, halo_send_req
 
     def _gen_stencil_wait(self, req, out, is_left):
         scope = req.scope
