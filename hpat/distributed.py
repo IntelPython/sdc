@@ -491,7 +491,7 @@ class DistributedPass(object):
 
         # post left send/receive
         if left_length != 0:
-            left_recv_buff, left_recv_req, right_send_req = self._gen_stencil_halo(
+            left_recv_buff, left_recv_req, left_send_req = self._gen_stencil_halo(
                             left_length, arr_var, out, is_left=True)
 
             # add stencil length to parfor start
@@ -509,12 +509,17 @@ class DistributedPass(object):
             out.append(index_assign)
             parfor.loop_nests[0].start = start_ind
 
+        # post right send/receive
+        if right_length != 0:
+            right_recv_buff, right_recv_req, right_send_req = self._gen_stencil_halo(
+                            right_length, arr_var, out, is_left=False)
+
         out.append(parfor)
 
         # wait on isend/irecv
         if left_length != 0:
             self._gen_stencil_wait(left_recv_req, out, is_left=True)
-            self._gen_stencil_wait(right_send_req, out, is_left=False)
+            self._gen_stencil_wait(left_send_req, out, is_left=False)
 
             assert len(parfor.loop_body)==1  # only one block supported
             body_block = parfor.loop_body[min(parfor.loop_body.keys())]
@@ -572,43 +577,47 @@ class DistributedPass(object):
 
         # recv from halo
         halo_recv_req = self._gen_stencil_comm(halo_recv_buff, halo_length,
-                                        out, is_left=True, is_send=False)
+                                        out, is_left=is_left, is_send=False)
 
-        # send to right to match recv
-        halo_send_buff = ir.Var(scope, mk_unique_var("halo_send_buff"), loc)
-        self.typemap[halo_send_buff.name] = self.typemap[arr_var.name]
-        # const = -size
-        const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
-        self.typemap[const_msize.name] = types.intp
-        out.append(ir.Assign(ir.Const(-halo_length, loc), const_msize, loc))
-        # const = none
-        const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
-        self.typemap[const_none.name] = types.none
-        out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
-        # g_slice = Global(slice)
-        g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
-        self.typemap[g_slice_var.name] = get_global_func_typ(slice)
-        out.append(ir.Assign(ir.Global('slice', slice, loc),
-                                                    g_slice_var, loc))
-        # slice_ind_out = slice(-size, none)
-        slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
-        slice_call = ir.Expr.call(g_slice_var, [const_msize,
-                        const_none], (), loc)
-        self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
-                                                    [types.intp, types.none], {})
-        self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
-        out.append(ir.Assign(slice_call, slice_ind_out, loc))
-        # halo_send_buff = A[slice]
-        getslice_call = ir.Expr.static_getitem(arr_var, slice(-halo_length, None, None),
-                                                            slice_ind_out, loc)
-        self.calltypes[getslice_call] = signature(
-                            self.typemap[halo_send_buff.name],
-                            self.typemap[arr_var.name],
-                            self.typemap[slice_ind_out.name])
-        out.append(ir.Assign(getslice_call, halo_send_buff, loc))
+        # send to match recv
+        if is_left:
+            # copy array's last elements to buffer
+            halo_send_buff = ir.Var(scope, mk_unique_var("halo_send_buff"), loc)
+            self.typemap[halo_send_buff.name] = self.typemap[arr_var.name]
+            # const = -size
+            const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
+            self.typemap[const_msize.name] = types.intp
+            out.append(ir.Assign(ir.Const(-halo_length, loc), const_msize, loc))
+            # const = none
+            const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
+            self.typemap[const_none.name] = types.none
+            out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
+            # g_slice = Global(slice)
+            g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
+            self.typemap[g_slice_var.name] = get_global_func_typ(slice)
+            out.append(ir.Assign(ir.Global('slice', slice, loc),
+                                                        g_slice_var, loc))
+            # slice_ind_out = slice(-size, none)
+            slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
+            slice_call = ir.Expr.call(g_slice_var, [const_msize,
+                            const_none], (), loc)
+            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
+                                                        [types.intp, types.none], {})
+            self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
+            out.append(ir.Assign(slice_call, slice_ind_out, loc))
+            # halo_send_buff = A[slice]
+            getslice_call = ir.Expr.static_getitem(arr_var, slice(-halo_length, None, None),
+                                                                slice_ind_out, loc)
+            self.calltypes[getslice_call] = signature(
+                                self.typemap[halo_send_buff.name],
+                                self.typemap[arr_var.name],
+                                self.typemap[slice_ind_out.name])
+            out.append(ir.Assign(getslice_call, halo_send_buff, loc))
+        else:
+            halo_send_buff = arr_var
 
         halo_send_req = self._gen_stencil_comm(halo_send_buff, halo_length, out,
-                                                    is_left=False, is_send=True)
+                                            is_left=(not is_left), is_send=True)
         return halo_recv_buff, halo_recv_req, halo_send_req
 
     def _gen_stencil_wait(self, req, out, is_left):
