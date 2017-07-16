@@ -116,8 +116,12 @@ class HiFrames(object):
             # d.rolling(3)
             if rhs.op=='call' and rhs.func.name in self.rolling_vars:
                 assert len(rhs.args) == 1  # only window size arg
+                center = False
+                kws = dict(rhs.kws)
+                if 'center' in kws:
+                    center = self.const_table[kws['center'].name]
                 self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
-                        self.const_table[rhs.args[0].name]]
+                        self.const_table[rhs.args[0].name], center]
                 return []  # remove
 
             # d.rolling(3).sum
@@ -160,7 +164,7 @@ class HiFrames(object):
                 self.df_cols[col_var.name] = df_name
         return
 
-    def _gen_rolling_call(self, col_var, win_size, func, out_var):
+    def _gen_rolling_call(self, col_var, win_size, center, func, out_var):
         scope = col_var.scope
         loc = col_var.loc
         alloc_nodes = gen_empty_like(col_var, out_var)
@@ -186,6 +190,8 @@ class HiFrames(object):
         stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
         stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
         stencil_call.stencil_def = code_expr
+        if center:
+            stencil_call.index_offsets = [win_size//2]
         stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
         return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
 
