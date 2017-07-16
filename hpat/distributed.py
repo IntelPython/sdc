@@ -54,7 +54,8 @@ class DistributedPass(object):
         self._shape_attrs = {}
         # keep array sizes of parallel arrays to handle shape attrs
         self._array_sizes = {}
-        self._stencil_border_blocks = {}
+        self._stencil_left_border = {}
+        self._stencil_right_border = {}
 
     def run(self):
         remove_dels(self.func_ir.blocks)
@@ -143,21 +144,27 @@ class DistributedPass(object):
                 new_body.append(inst)
             blocks[label].body = new_body
 
-        if not self._stencil_border_blocks:
-            return blocks
+        if self._stencil_left_border:
+            blocks = self._add_stencil_border(blocks, self._stencil_left_border, is_left=True)
 
+        if self._stencil_right_border:
+            blocks = self._add_stencil_border(blocks, self._stencil_right_border, is_left=False)
+
+        return blocks
+
+    def _add_stencil_border(self, blocks, border_dict, is_left):
         new_blocks = {}
         for (block_label, block) in blocks.items():
             scope = block.scope
             for i, stmt in enumerate(block.body):
-                if not isinstance(stmt, Parfor) or stmt.id not in self._stencil_border_blocks:
+                if not isinstance(stmt, Parfor) or stmt.id not in border_dict:
                     continue
                 # find last wait call
                 for j in reversed(range(i+1, len(block.body))):
                     inst = block.body[j]
                     if isinstance(inst, ir.Assign) and inst.target.name.startswith('wait_err'):
                         break
-                border_block = self._stencil_border_blocks.pop(stmt.id)
+                border_block = border_dict.pop(stmt.id)
                 loc = stmt.loc
                 # split block after parfor wait
                 prev_block = ir.Block(scope, loc)
@@ -168,7 +175,17 @@ class DistributedPass(object):
                 prev_block.body = block.body[:j+1]
                 rank_comp_var = ir.Var(scope, mk_unique_var("$rank_comp"), loc)
                 self.typemap[rank_comp_var.name] = types.boolean
-                comp_expr = ir.Expr.binop('!=', self._rank_var, self._set0_var, loc)
+                if is_left:
+                    border_rank = self._set0_var
+                else:
+                    border_rank =  ir.Var(scope, mk_unique_var("$border_rank"), loc)
+                    self.typemap[border_rank.name] = types.intp
+                    last_pe_call = ir.Expr.binop('-', self._size_var, self._set1_var, loc)
+                    if last_pe_call not in self.calltypes:
+                        self.calltypes[last_pe_call] = find_op_typ('-', [types.int32, types.int64])
+                    prev_block.body.append(ir.Assign(last_pe_call, border_rank, loc))
+
+                comp_expr = ir.Expr.binop('!=', self._rank_var, border_rank, loc)
                 expr_typ = find_op_typ('!=',[types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
@@ -514,6 +531,21 @@ class DistributedPass(object):
             right_recv_buff, right_recv_req, right_send_req = self._gen_stencil_halo(
                             right_length, arr_var, out, is_left=False)
 
+            # subtract stencil length from parfor end
+            index_const = ir.Var(scope, mk_unique_var("stencil_const_var"), loc)
+            self.typemap[index_const.name] = types.intp
+            const_assign = ir.Assign(ir.Const(right_length, loc),
+                                                        index_const, loc)
+            out.append(const_assign)
+            end_ind = ir.Var(scope, mk_unique_var("end_ind"), loc)
+            self.typemap[end_ind.name] = types.intp
+            index_call = ir.Expr.binop('-', parfor.loop_nests[0].stop, index_const, loc)
+            self.calltypes[index_call] = ir_utils.find_op_typ('-',
+                                                [types.intp, types.intp])
+            index_assign = ir.Assign(index_call, end_ind, loc)
+            out.append(index_assign)
+            parfor.loop_nests[0].stop = end_ind
+
         out.append(parfor)
 
         # wait on isend/irecv
@@ -529,56 +561,81 @@ class DistributedPass(object):
         # generate border blocks
         assert len(parfor.loop_body)==1  # only one block supported
         body_block = parfor.loop_body[min(parfor.loop_body.keys())]
-        border_block = copy.copy(body_block)
         # set parfor index to right border
         # buffer index starts from length
         parfor_index = parfor.loop_nests[0].index_variable
         buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
         self.typemap[buff_index.name] = types.intp
-        new_body = []
 
         if left_length != 0:
-            self._gen_stencil_border(parfor_index, buff_index, border_block.body,
-                                            new_body, left_recv_buff, left_length, is_left=True)
+            border_block_left = copy.copy(body_block)
+            border_block_left.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
+                left_recv_buff, left_length, parfor.loop_nests[0].stop, is_left=True)
+            self._stencil_left_border[parfor.id] = border_block_left
 
-        border_block.body = new_body
-        self._stencil_border_blocks[parfor.id] = border_block
+        if right_length != 0:
+            border_block_right = copy.copy(body_block)
+            border_block_right.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
+                right_recv_buff, right_length, parfor.loop_nests[0].stop, is_left=False)
+            self._stencil_right_border[parfor.id] = border_block_right
+
 
         return
 
-    def _gen_stencil_border(self, parfor_index, buff_index, body, new_body,
-                                        left_recv_buff, left_length, is_left):
+    def _gen_stencil_border(self, parfor_index, buff_index, body,
+                                halo_recv_buff, halo_length, end_var, is_left):
         scope = parfor_index.scope
         loc = parfor_index.loc
-        for i in range(left_length):
-            index_assigns = [ir.Assign(ir.Const(i, loc), parfor_index, loc),
-                        ir.Assign(ir.Const(left_length-i, loc), buff_index, loc)]
-            new_body += index_assigns
-            # replace index calculations with negative constants with buff index
-            # replace negatively indexed array accesses with buff access
-            negative_consts = set()
+        new_body = []
+        for i in range(halo_length):
+
+            if is_left:
+                new_body.append(ir.Assign(ir.Const(i, loc), parfor_index, loc))
+            else:
+                index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
+                self.typemap[index_const.name] = types.intp
+                new_body.append(ir.Assign(ir.Const(i+1, loc), index_const, loc))
+                calc_call = ir.Expr.binop('-', end_var, index_const, loc)
+                self.calltypes[calc_call] = ir_utils.find_op_typ('-',
+                                                    [types.intp, types.intp])
+                new_body.append(ir.Assign(calc_call, parfor_index, loc))
+
+            if is_left:
+                buff_index_start = halo_length-i
+            else:
+                buff_index_start = -(i+1)
+
+            new_body.append(ir.Assign(ir.Const(halo_length-i, loc), buff_index, loc))
+            # replace index calculations with halo constants with buff index
+            # replace halo array accesses with buff access
+            if is_left:
+                index_com = lambda a: a < -i
+            else:
+                index_com = lambda a: a > i
+
+            halo_consts = set()
             buff_indices = set()
             for st in body:
                 stmt = copy.deepcopy(st)   # TODO: fix copies of globals
                 if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
                     value = stmt.value.value
-                    if isinstance(value, int) and value < -i:
-                        negative_consts.add(stmt.target.name)
+                    if isinstance(value, int) and index_com(value):
+                        halo_consts.add(stmt.target.name)
                 if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
                     expr = stmt.value
                     if (expr.op == 'binop' and expr.fn == '+'
                             and expr.lhs.name == parfor_index.name
-                            and expr.rhs.name in negative_consts):
+                            and expr.rhs.name in halo_consts):
                         expr.lhs = buff_index
                         buff_indices = stmt.target.name
                     if expr.op == 'getitem' and expr.index.name in buff_indices:
-                        expr.value = left_recv_buff
+                        expr.value = halo_recv_buff
                     if st.value in self.calltypes:
                         self.calltypes[expr] = self.calltypes[st.value]
                 if isinstance(stmt, ir.SetItem):
                     self.calltypes[stmt] = self.calltypes[st]
                 new_body.append(stmt)
-        return
+        return new_body
 
     def _gen_stencil_halo(self, halo_length, arr_var, out, is_left):
         scope = arr_var.scope
@@ -707,7 +764,7 @@ class DistributedPass(object):
         else:
             # last_pe = num_pes - 1
             last_pe = ir.Var(scope, mk_unique_var("last_pe"), loc)
-            self.typemap[last_pe.name] = types.int32
+            self.typemap[last_pe.name] = types.intp
             last_pe_call = ir.Expr.binop('-', self._size_var, self._set1_var, loc)
             if last_pe_call not in self.calltypes:
                 self.calltypes[last_pe_call] = find_op_typ('-', [types.int32, types.int64])
