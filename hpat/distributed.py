@@ -464,6 +464,7 @@ class DistributedPass(object):
             new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
             self.typemap[new_range_size.name] = types.intp
             right_length = max(stencil_accesses.values())
+            right_length = max(right_length, 0)  # avoid negative value
             index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
             self.typemap[index_const.name] = types.intp
             out.append(ir.Assign(ir.Const(right_length, loc), index_const, loc))
@@ -520,7 +521,9 @@ class DistributedPass(object):
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
         left_length = -min(stencil_accesses.values())
+        left_length = max(left_length, 0)  # avoid negative value
         right_length = max(stencil_accesses.values())
+        right_length = max(right_length, 0)  # avoid negative value
         dtype = self.typemap[arr_var.name].dtype
 
         # post left send/receive
