@@ -115,7 +115,8 @@ class HiFrames(object):
                 self.df_cols[lhs] = df  # save lhs as column
 
             # c = df.column.shift
-            if rhs.op=='getattr' and rhs.value.name in self.df_cols and rhs.attr in ['shift']:
+            if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
+                                        rhs.attr in ['shift', 'pct_change']):
                 self.df_col_calls[lhs] = (rhs.value, rhs.attr)
 
             # A = df.column.shift(3)
@@ -185,9 +186,17 @@ class HiFrames(object):
 
     def _gen_column_call(self, out_var, args, col_var, func):
         loc = col_var.loc
-        assert func == 'shift'
-        shift_const = self.const_table[args[0].name]
-        func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
+        if func == 'pct_change':
+            shift_const = 1
+            if args:
+                shift_const = self.const_table[args[0].name]
+            func_text = 'def g(a):\n  return (a[0]-a[{}])/a[{}]\n'.format(
+                                                    -shift_const, -shift_const)
+        else:
+            assert func == 'shift'
+            shift_const = self.const_table[args[0].name]
+            func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
+
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         code_obj = loc_vars['g'].__code__
