@@ -184,39 +184,19 @@ class HiFrames(object):
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
-        scope = col_var.scope
         loc = col_var.loc
         assert func == 'shift'
-        alloc_nodes = gen_empty_like(col_var, out_var)
         shift_const = self.const_table[args[0].name]
         func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         code_obj = loc_vars['g'].__code__
         code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
-
-        # generate stencil call
-        # g_numba_var = Global(numba)
-        g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
-        g_dist = ir.Global('numba', numba, loc)
-        g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
-        # attr call: stencil_attr = getattr(g_numba_var, stencil)
-        stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
-        stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
-        stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
-        # stencil_out = numba.stencil()
-        stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
-        stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
-        stencil_call.stencil_def = code_expr
         index_offsets = [0]
-        stencil_call.index_offsets = index_offsets
-        stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
-        return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+        return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
-        scope = col_var.scope
         loc = col_var.loc
-        alloc_nodes = gen_empty_like(col_var, out_var)
         if func == 'apply':
             code_expr = self.make_functions[args[0].name]
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
@@ -229,28 +209,13 @@ class HiFrames(object):
             exec(func_text, {}, loc_vars)
             code_obj = loc_vars['g'].__code__
             code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
-
-        # generate stencil call
-        # g_numba_var = Global(numba)
-        g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
-        g_dist = ir.Global('numba', numba, loc)
-        g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
-        # attr call: stencil_attr = getattr(g_numba_var, stencil)
-        stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
-        stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
-        stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
-        # stencil_out = numba.stencil()
-        stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
-        stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
-        stencil_call.stencil_def = code_expr
         index_offsets = [0]
         if func == 'apply':
             index_offsets = [-win_size+1]
         if center:
             index_offsets[0] += win_size//2
-        stencil_call.index_offsets = index_offsets
-        stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
-        return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+
+        return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
 
 def gen_empty_like(in_arr, out_arr):
     scope = in_arr.scope
@@ -267,3 +232,24 @@ def gen_empty_like(in_arr, out_arr):
     alloc_call = ir.Expr.call(attr_var, [in_arr], (), loc)
     alloc_assign = ir.Assign(alloc_call, out_arr, loc)
     return [g_np_assign, attr_assign, alloc_assign]
+
+def gen_stencil_call(in_arr, out_arr, code_expr, index_offsets):
+    scope = in_arr.scope
+    loc = in_arr.loc
+    alloc_nodes = gen_empty_like(in_arr, out_arr)
+    # generate stencil call
+    # g_numba_var = Global(numba)
+    g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
+    g_dist = ir.Global('numba', numba, loc)
+    g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
+    # attr call: stencil_attr = getattr(g_numba_var, stencil)
+    stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
+    stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
+    stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
+    # stencil_out = numba.stencil()
+    stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
+    stencil_call = ir.Expr.call(stencil_attr_var, [in_arr, out_arr], (), loc)
+    stencil_call.stencil_def = code_expr
+    stencil_call.index_offsets = index_offsets
+    stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
+    return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
