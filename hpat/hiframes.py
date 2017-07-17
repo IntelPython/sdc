@@ -40,6 +40,7 @@ class HiFrames(object):
         self.df_vars = {}
         # df_column -> df_var
         self.df_cols = {}
+        self.df_col_calls = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -113,6 +114,15 @@ class HiFrames(object):
                 assign.value = df_cols[rhs.attr]
                 self.df_cols[lhs] = df  # save lhs as column
 
+            # c = df.column.shift
+            if rhs.op=='getattr' and rhs.value.name in self.df_cols and rhs.attr in ['shift']:
+                self.df_col_calls[lhs] = (rhs.value, rhs.attr)
+
+            # A = df.column.shift(3)
+            if rhs.op=='call' and rhs.func.name in self.df_col_calls:
+                return self._gen_column_call(assign.target, rhs.args,
+                                            *self.df_col_calls[rhs.func.name])
+
             # d.rolling
             if rhs.op=='getattr' and rhs.value.name in self.df_cols:
                 if rhs.attr=='rolling':
@@ -173,6 +183,36 @@ class HiFrames(object):
                 self.df_cols[col_var.name] = df_name
         return
 
+    def _gen_column_call(self, out_var, args, col_var, func):
+        scope = col_var.scope
+        loc = col_var.loc
+        assert func == 'shift'
+        alloc_nodes = gen_empty_like(col_var, out_var)
+        shift_const = self.const_table[args[0].name]
+        func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        code_obj = loc_vars['g'].__code__
+        code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
+
+        # generate stencil call
+        # g_numba_var = Global(numba)
+        g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
+        g_dist = ir.Global('numba', numba, loc)
+        g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
+        # attr call: stencil_attr = getattr(g_numba_var, stencil)
+        stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
+        stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
+        stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
+        # stencil_out = numba.stencil()
+        stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
+        stencil_call = ir.Expr.call(stencil_attr_var, [col_var, out_var], (), loc)
+        stencil_call.stencil_def = code_expr
+        index_offsets = [0]
+        stencil_call.index_offsets = index_offsets
+        stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
+        return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         scope = col_var.scope
         loc = col_var.loc
@@ -220,7 +260,7 @@ def gen_empty_like(in_arr, out_arr):
     g_np = ir.Global('np', numpy, loc)
     g_np_assign = ir.Assign(g_np, g_np_var, loc)
     # attr call: empty_attr = getattr(g_np_var, empty_like)
-    empty_attr_call = ir.Expr.getattr(g_np_var, "empty_like", loc)
+    empty_attr_call = ir.Expr.getattr(g_np_var, "zeros_like", loc)
     attr_var = ir.Var(scope, mk_unique_var("$empty_attr_attr"), loc)
     attr_assign = ir.Assign(empty_attr_call, attr_var, loc)
     # alloc call: out_arr = empty_attr(in_arr)
