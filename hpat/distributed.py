@@ -461,18 +461,19 @@ class DistributedPass(object):
 
         # return range to original size of array
         if stencil_accesses:
-            new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
-            self.typemap[new_range_size.name] = types.intp
             right_length = max(stencil_accesses.values())
             right_length = max(right_length, 0)  # avoid negative value
-            index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
-            self.typemap[index_const.name] = types.intp
-            out.append(ir.Assign(ir.Const(right_length, loc), index_const, loc))
-            calc_call = ir.Expr.binop('+', range_size, index_const, loc)
-            self.calltypes[calc_call] = ir_utils.find_op_typ('+',
-                                                [types.intp, types.intp])
-            out.append(ir.Assign(calc_call, new_range_size, loc))
-            range_size = new_range_size
+            if right_length:
+                new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
+                self.typemap[new_range_size.name] = types.intp
+                index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
+                self.typemap[index_const.name] = types.intp
+                out.append(ir.Assign(ir.Const(right_length, loc), index_const, loc))
+                calc_call = ir.Expr.binop('+', range_size, index_const, loc)
+                self.calltypes[calc_call] = ir_utils.find_op_typ('+',
+                                                    [types.intp, types.intp])
+                out.append(ir.Assign(calc_call, new_range_size, loc))
+                range_size = new_range_size
 
         div_nodes, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
                                     "$loop", "get_end", distributed_api.get_end)
