@@ -2,6 +2,8 @@ from __future__ import print_function, division, absolute_import
 
 import numba
 from numba import *
+import hpat.dict_ext
+from hpat.dict_ext import DictIntInt
 
 def jit(signature_or_function=None, **options):
     from .compiler import add_hpat_stages
