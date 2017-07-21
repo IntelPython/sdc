@@ -1,5 +1,6 @@
 import numba
-from numba import types
+from numba import types, typing
+from numba.typing.templates import signature, AbstractTemplate, infer
 from numba.extending import typeof_impl
 from numba.extending import type_callable
 from numba.extending import models, register_model
@@ -30,6 +31,18 @@ def type_dict(context):
     def typer():
         return dict_int_int_type
     return typer
+
+@infer
+class SetItemDict(AbstractTemplate):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        dict_t, idx, value = args
+        if isinstance(dict_t, DictType):
+            if isinstance(idx, types.Integer):
+                return signature(types.none, dict_t, idx, dict_t.val_typ)
+
+
 
 register_model(DictType)(models.OpaqueModel)
 
