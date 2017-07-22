@@ -48,9 +48,16 @@ register_model(DictType)(models.OpaqueModel)
 
 import hdict_ext
 ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
+ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [])
     fn = builder.module.get_or_insert_function(fnty, name="init_dict_int_int")
     return builder.call(fn, [])
+
+@lower_builtin('setitem', DictType, types.intp, types.intp)
+def setitem_array(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_setitem")
+    return builder.call(fn, args)
