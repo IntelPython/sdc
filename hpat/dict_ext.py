@@ -1,10 +1,11 @@
 import numba
 from numba import types, typing
-from numba.typing.templates import signature, AbstractTemplate, infer, ConcreteTemplate
+from numba.typing.templates import (signature, AbstractTemplate, infer,
+        ConcreteTemplate, AttributeTemplate, bound_function)
 from numba.extending import typeof_impl
-from numba.extending import type_callable
-from numba.extending import models, register_model
-from numba.extending import lower_builtin
+from numba.extending import type_callable, unbox, NativeValue
+from numba.extending import models, register_model, infer_getattr
+from numba.extending import lower_builtin, overload_method
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -47,12 +48,24 @@ class PrintDictIntInt(ConcreteTemplate):
     key = "print_item"
     cases = [signature(types.none, dict_int_int_type)]
 
+@infer_getattr
+class DictAttribute(AttributeTemplate):
+    key = DictType
+
+    @bound_function("dict.get")
+    def resolve_get(self, dict, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(args[1], *args)
+
+
 register_model(DictType)(models.OpaqueModel)
 
 import hdict_ext
 ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
 ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
+ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -61,7 +74,7 @@ def impl_dict_int_int(context, builder, sig, args):
     return builder.call(fn, [])
 
 @lower_builtin('setitem', DictType, types.intp, types.intp)
-def setitem_array(context, builder, sig, args):
+def setitem_dict(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_setitem")
     return builder.call(fn, args)
@@ -75,4 +88,10 @@ def print_dict(context, builder, sig, args):
     # return context.get_dummy_value()
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_print")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.get", DictType, types.intp, types.intp)
+def lower_dict_get(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_get")
     return builder.call(fn, args)
