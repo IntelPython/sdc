@@ -58,6 +58,10 @@ class DictAttribute(AttributeTemplate):
         assert len(args) == 2
         return signature(args[1], *args)
 
+    @bound_function("dict.pop")
+    def resolve_pop(self, dict, args, kws):
+        assert not kws
+        return signature(types.intp, *args)
 
 register_model(DictType)(models.OpaqueModel)
 
@@ -66,6 +70,7 @@ ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
 ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
 ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
+ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -94,4 +99,10 @@ def print_dict(context, builder, sig, args):
 def lower_dict_get(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_get")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.pop", DictType, types.intp)
+def lower_dict_pop(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_pop")
     return builder.call(fn, args)

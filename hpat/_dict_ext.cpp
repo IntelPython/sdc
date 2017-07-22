@@ -6,6 +6,7 @@ void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
 void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t default_val);
+int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index);
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -23,6 +24,8 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dict_int_int_print)));
     PyObject_SetAttrString(m, "dict_int_int_get",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_get)));
+    PyObject_SetAttrString(m, "dict_int_int_pop",
+                            PyLong_FromVoidPtr((void*)(&dict_int_int_pop)));
     return m;
 }
 
@@ -52,4 +55,11 @@ int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index,
     if (val==m->end())
         return default_val;
     return (*val).second;
+}
+
+int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index)
+{
+    int64_t val = m->at(index);
+    m->erase(index);
+    return val;
 }
