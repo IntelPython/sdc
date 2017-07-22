@@ -1,6 +1,6 @@
 import numba
 from numba import types, typing
-from numba.typing.templates import signature, AbstractTemplate, infer
+from numba.typing.templates import signature, AbstractTemplate, infer, ConcreteTemplate
 from numba.extending import typeof_impl
 from numba.extending import type_callable
 from numba.extending import models, register_model
@@ -42,13 +42,17 @@ class SetItemDict(AbstractTemplate):
             if isinstance(idx, types.Integer):
                 return signature(types.none, dict_t, idx, dict_t.val_typ)
 
-
+@infer
+class PrintDictIntInt(ConcreteTemplate):
+    key = "print_item"
+    cases = [signature(types.none, dict_int_int_type)]
 
 register_model(DictType)(models.OpaqueModel)
 
 import hdict_ext
 ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
 ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
+ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -60,4 +64,15 @@ def impl_dict_int_int(context, builder, sig, args):
 def setitem_array(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_setitem")
+    return builder.call(fn, args)
+
+@lower_builtin("print_item", DictType)
+def print_dict(context, builder, sig, args):
+    # pyapi = context.get_python_api(builder)
+    # strobj = pyapi.unserialize(pyapi.serialize_object("hello!"))
+    # pyapi.print_object(strobj)
+    # pyapi.decref(strobj)
+    # return context.get_dummy_value()
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_print")
     return builder.call(fn, args)

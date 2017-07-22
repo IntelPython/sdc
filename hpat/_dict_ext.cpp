@@ -4,6 +4,7 @@
 
 void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
+void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m);
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -17,6 +18,8 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
                             PyLong_FromVoidPtr((void*)(&init_dict_int_int)));
     PyObject_SetAttrString(m, "dict_int_int_setitem",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_setitem)));
+    PyObject_SetAttrString(m, "dict_int_int_print",
+                            PyLong_FromVoidPtr((void*)(&dict_int_int_print)));
     return m;
 }
 
@@ -31,5 +34,14 @@ void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index
     // for (auto& x: *m) {
     //     std::cout << x.first << ": " << x.second << std::endl;
     // }
+    return;
+}
+
+void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m)
+{
+    // TODO: return python string and print in native mode
+    for (auto& x: *m) {
+        std::cout << x.first << ": " << x.second << std::endl;
+    }
     return;
 }
