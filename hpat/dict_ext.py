@@ -3,7 +3,7 @@ from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer,
         ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba.extending import typeof_impl
-from numba.extending import type_callable, unbox, NativeValue
+from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
 from numba.extending import lower_builtin, overload_method
 from numba import cgutils
@@ -69,6 +69,20 @@ class DictAttribute(AttributeTemplate):
         return signature(dict_key_iterator_int_int_type)
 
 register_model(DictType)(models.OpaqueModel)
+
+@box(DictType)
+def box_dict(typ, val, c):
+    """
+    """
+    # interval = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
+    # lo_obj = c.pyapi.float_from_double(interval.lo)
+    # hi_obj = c.pyapi.float_from_double(interval.hi)
+    class_obj = c.pyapi.unserialize(c.pyapi.serialize_object(DictIntInt))
+    res = c.pyapi.call_function_objargs(class_obj, (val,))
+    # c.pyapi.decref(lo_obj)
+    # c.pyapi.decref(hi_obj)
+    c.pyapi.decref(class_obj)
+    return res
 
 class DictKeyIteratorType(types.SimpleIterableType):
     def __init__(self, key_typ, val_typ):
