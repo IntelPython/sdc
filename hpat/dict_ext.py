@@ -44,6 +44,16 @@ class SetItemDict(AbstractTemplate):
                 return signature(types.none, dict_t, idx, dict_t.val_typ)
 
 @infer
+class GetItemDict(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        dict_t, idx = args
+        if isinstance(dict_t, DictType):
+            if isinstance(idx, types.Integer):
+                return signature(dict_t.val_typ, dict_t, idx)
+
+@infer
 class PrintDictIntInt(ConcreteTemplate):
     key = "print_item"
     cases = [signature(types.none, dict_int_int_type)]
@@ -106,9 +116,11 @@ ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
 ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
 ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
+ll.add_symbol('dict_int_int_getitem', hdict_ext.dict_int_int_getitem)
 ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
 ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
 ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
+ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -139,6 +151,12 @@ def lower_dict_get(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_get")
     return builder.call(fn, args)
 
+@lower_builtin("getitem", DictType, types.intp)
+def lower_dict_getitem(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_getitem")
+    return builder.call(fn, args)
+
 @lower_builtin("dict.pop", DictType, types.intp)
 def lower_dict_pop(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -152,7 +170,13 @@ def lower_dict_keys(context, builder, sig, args):
     return builder.call(fn, args)
 
 @lower_builtin(min, DictKeyIteratorType)
-def lower_dict_keys(context, builder, sig, args):
+def lower_dict_min(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_min")
+    return builder.call(fn, args)
+
+@lower_builtin(max, DictKeyIteratorType)
+def lower_dict_max(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_max")
     return builder.call(fn, args)

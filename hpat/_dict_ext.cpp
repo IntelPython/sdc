@@ -6,9 +6,11 @@ void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
 void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t default_val);
+int64_t dict_int_int_getitem(std::unordered_map<int64_t, int64_t>* m, int64_t index);
 int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index);
 void* dict_int_int_keys(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m);
+int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m);
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -26,12 +28,16 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dict_int_int_print)));
     PyObject_SetAttrString(m, "dict_int_int_get",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_get)));
+    PyObject_SetAttrString(m, "dict_int_int_getitem",
+                            PyLong_FromVoidPtr((void*)(&dict_int_int_getitem)));
     PyObject_SetAttrString(m, "dict_int_int_pop",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_pop)));
     PyObject_SetAttrString(m, "dict_int_int_keys",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_keys)));
     PyObject_SetAttrString(m, "dict_int_int_min",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_min)));
+    PyObject_SetAttrString(m, "dict_int_int_max",
+                            PyLong_FromVoidPtr((void*)(&dict_int_int_max)));
     return m;
 }
 
@@ -63,6 +69,11 @@ int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index,
     return (*val).second;
 }
 
+int64_t dict_int_int_getitem(std::unordered_map<int64_t, int64_t>* m, int64_t index)
+{
+    return m->at(index);
+}
+
 int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index)
 {
     int64_t val = m->at(index);
@@ -82,6 +93,17 @@ int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m)
     int64_t res = std::numeric_limits<int64_t>::max();
     for (auto& x: *m) {
         if (x.first<res)
+            res = x.first;
+    }
+    return res;
+}
+
+int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m)
+{
+    // TODO: use actual iterator
+    int64_t res = std::numeric_limits<int64_t>::min();
+    for (auto& x: *m) {
+        if (x.first>res)
             res = x.first;
     }
     return res;
