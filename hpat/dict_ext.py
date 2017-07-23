@@ -1,7 +1,7 @@
 import numba
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer,
-        ConcreteTemplate, AttributeTemplate, bound_function)
+        ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba.extending import typeof_impl
 from numba.extending import type_callable, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
@@ -50,7 +50,7 @@ class PrintDictIntInt(ConcreteTemplate):
 
 @infer_getattr
 class DictAttribute(AttributeTemplate):
-    key = DictType
+    key = dict_int_int_type
 
     @bound_function("dict.get")
     def resolve_get(self, dict, args, kws):
@@ -63,7 +63,29 @@ class DictAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
+    @bound_function("dict.keys")
+    def resolve_keys(self, dict, args, kws):
+        assert not kws
+        return signature(dict_key_iterator_int_int_type)
+
 register_model(DictType)(models.OpaqueModel)
+
+class DictKeyIteratorType(types.SimpleIterableType):
+    def __init__(self, key_typ, val_typ):
+        self.key_typ = key_typ
+        self.val_typ = val_typ
+        super(types.SimpleIterableType, self).__init__('DictKeyIteratorType')
+
+dict_key_iterator_int_int_type = DictKeyIteratorType(types.intp, types.intp)
+
+register_model(DictKeyIteratorType)(models.OpaqueModel)
+
+@infer_global(min)
+@infer_global(max)
+class MinMaxDict(AbstractTemplate):
+    def generic(self, args, kws):
+        if len(args) == 1 and isinstance(args[0],DictKeyIteratorType):
+            return signature(args[0].key_typ, *args)
 
 import hdict_ext
 ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
@@ -71,6 +93,8 @@ ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
 ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
 ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
+ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
+ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -105,4 +129,16 @@ def lower_dict_get(context, builder, sig, args):
 def lower_dict_pop(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_pop")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.keys", DictType)
+def lower_dict_keys(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_keys")
+    return builder.call(fn, args)
+
+@lower_builtin(min, DictKeyIteratorType)
+def lower_dict_keys(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_min")
     return builder.call(fn, args)
