@@ -148,6 +148,9 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
+        if self._is_call(func_var, [len]):
+            return
+
         if (self._is_call(func_var, ['h5read', hpat.pio_api])
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return

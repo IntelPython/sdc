@@ -266,6 +266,10 @@ class DistributedPass(object):
             return out
         call_list = self._call_table[func_var]
 
+        if self._is_call(func_var, [len]) and rhs.args and self._is_1D_arr(rhs.args[0].name):
+            arr = rhs.args[0].name
+            assign.value = self._array_sizes[arr][0]
+
         # divide 1D alloc
         if self._is_1D_arr(lhs) and self._is_alloc_call(func_var):
             size_var = rhs.args[0]
