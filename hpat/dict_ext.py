@@ -2,7 +2,7 @@ import numba
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer,
         ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
-from numba.extending import typeof_impl
+from numba.extending import typeof_impl, lower_cast
 from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
 from numba.extending import lower_builtin, overload_method
@@ -121,6 +121,7 @@ ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
 ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
 ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
 ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
+ll.add_symbol('dict_int_int_not_empty', hdict_ext.dict_int_int_not_empty)
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
@@ -180,3 +181,9 @@ def lower_dict_max(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_max")
     return builder.call(fn, args)
+
+@lower_cast(DictType, types.boolean)
+def dict_empty(context, builder, fromty, toty, val):
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_not_empty")
+    return builder.call(fn, (val,))
