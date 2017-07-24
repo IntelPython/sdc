@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <unordered_map>
 #include <iostream>
+#include <limits>
 
 void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
