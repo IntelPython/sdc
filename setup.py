@@ -17,6 +17,10 @@ ext_dict = Extension(name="hdict_ext",
                              sources=["hpat/_dict_ext.cpp"]
                              )
 
+ext_str = Extension(name="hstr_ext",
+                             sources=["hpat/_str_ext.cpp"]
+                             )
+
 setup(name='hpat',
       version='0.1.0',
       description='compiling Python code for clusters',
@@ -36,4 +40,4 @@ setup(name='hpat',
       author_email='ehsan.totoni@intel.com',
       packages=['hpat'],
       install_requires=['numba'],
-      ext_modules = [ext_io, ext_hdist, ext_dict])
+      ext_modules = [ext_io, ext_hdist, ext_dict, ext_str])
