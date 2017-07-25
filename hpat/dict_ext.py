@@ -24,7 +24,6 @@ class DictIntInt(object):
 
 @typeof_impl.register(DictIntInt)
 def typeof_index(val, c):
-    print(val, c)
     return dict_int_int_type
 
 @type_callable(DictIntInt)
