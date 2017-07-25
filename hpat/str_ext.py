@@ -1,5 +1,6 @@
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                             NativeValue, lower_builtin)
+from numba.targets.imputils import lower_constant
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer,
         ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
@@ -26,6 +27,7 @@ class StringAdd(ConcreteTemplate):
 
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
+ll.add_symbol('init_string_const', hstr_ext.init_string_const)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
 
@@ -33,7 +35,6 @@ ll.add_symbol('str_concat', hstr_ext.str_concat)
 def unbox_string(typ, obj, c):
     """
     """
-    lty = c.context.get_value_type(typ)
     ok, buffer, size = c.pyapi.string_as_string_and_size(obj)
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -53,6 +54,16 @@ def box_str(typ, val, c):
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string(c_str)
     return pystr
+
+@lower_constant(StringType)
+def const_string(context, builder, ty, pyval):
+    cstr = context.insert_const_string(builder.module, pyval)
+
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    ret = builder.call(fn, [cstr])
+    return ret
 
 @lower_builtin("+", string_type, string_type)
 def impl_string_concat(context, builder, sig, args):
