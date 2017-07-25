@@ -4,6 +4,7 @@ import numba
 from numba import *
 import hpat.dict_ext
 from hpat.dict_ext import DictIntInt, dict_int_int_type
+import hpat.str_ext
 
 def jit(signature_or_function=None, **options):
     from .compiler import add_hpat_stages
