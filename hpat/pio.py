@@ -86,6 +86,8 @@ class PIO(object):
             # d = f['dset']
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_files:
                 self.h5_dsets[lhs] = (rhs.value, rhs.index_var)
+            if rhs.op=='getitem' and rhs.value.name in self.h5_files:
+                self.h5_dsets[lhs] = (rhs.value, rhs.index)
             # x = f['dset'][:]
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_dsets:
                 return self._gen_h5read(assign.target, rhs)
@@ -162,9 +164,9 @@ class PIO(object):
 
     def _gen_h5read(self, lhs_var, rhs):
         f_id, dset  = self.h5_dsets[rhs.value.name]
-        file_name = self.str_const_table[self.h5_files[f_id.name]]
-        dset_str = self.str_const_table[dset.name]
-        dset_type = self._get_dset_type(lhs_var.name, file_name, dset_str)
+        # file_name = self.str_const_table[self.h5_files[f_id.name]]
+        # dset_str = self.str_const_table[dset.name]
+        dset_type = self._get_dset_type(lhs_var.name, self.h5_files[f_id.name], dset.name)
         loc = rhs.value.loc
         scope = rhs.value.scope
         # TODO: generate size, alloc calls
@@ -231,17 +233,22 @@ class PIO(object):
         out.append(ir.Assign(read_call, err_var, loc))
         return
 
-    def _get_dset_type(self, lhs, file_name, dset_str):
+    def _get_dset_type(self, lhs, file_varname, dset_varname):
         """get data set type from user-specified locals types or actual file"""
         if lhs in self.local_vars:
             return self.local_vars[lhs]
         if self.reverse_copies[lhs] in self.local_vars:
             return self.local_vars[self.reverse_copies[lhs]]
 
-        f = h5py.File(file_name, "r")
-        ndims = len(f[dset_str].shape)
-        numba_dtype = numpy_support.from_dtype(f[dset_str].dtype)
-        return types.Array(numba_dtype, ndims, 'C')
+        if file_varname in self.str_const_table and dset_varname in self.str_const_table:
+            file_name = self.str_const_table[file_varname]
+            dset_str = self.str_const_table[dset_varname]
+            f = h5py.File(file_name, "r")
+            ndims = len(f[dset_str].shape)
+            numba_dtype = numpy_support.from_dtype(f[dset_str].dtype)
+            return types.Array(numba_dtype, ndims, 'C')
+
+        raise RuntimeError("data set type not found")
 
     def _get_reverse_copies(self, body):
         for inst in body:
