@@ -2,9 +2,11 @@ import h5py
 import numpy as np
 import argparse
 import time
+import hpat
 
+@hpat.jit
 def gen_lir(N, D, p, file_name):
-    np.random.seed(0)
+    # np.random.seed(0)
     points = np.random.random((N,D))
     responses = np.random.random((N,p))
     f = h5py.File(file_name, "w")
