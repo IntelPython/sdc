@@ -4,6 +4,7 @@
 
 void* init_string(char*, int64_t);
 const char* get_c_str(std::string* s);
+void* str_concat(std::string* s1, std::string* s2);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -17,6 +18,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&init_string)));
     PyObject_SetAttrString(m, "get_c_str",
                             PyLong_FromVoidPtr((void*)(&get_c_str)));
+    PyObject_SetAttrString(m, "str_concat",
+                            PyLong_FromVoidPtr((void*)(&str_concat)));
     return m;
 }
 
@@ -30,4 +33,11 @@ const char* get_c_str(std::string* s)
 {
     // printf("in get %s\n", s->c_str());
     return s->c_str();
+}
+
+void* str_concat(std::string* s1, std::string* s2)
+{
+    printf("in concat %s %s\n", s1->c_str(), s2->c_str());
+    std::string* res = new std::string((*s1)+(*s2));
+    return res;
 }

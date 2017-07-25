@@ -1,5 +1,8 @@
-from numba.extending import box, unbox, typeof_impl, register_model, models, NativeValue
+from numba.extending import (box, unbox, typeof_impl, register_model, models,
+                            NativeValue, lower_builtin)
 from numba import types, typing
+from numba.typing.templates import (signature, AbstractTemplate, infer,
+        ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -16,9 +19,15 @@ def _typeof_str(val, c):
 
 register_model(StringType)(models.OpaqueModel)
 
+@infer
+class StringAdd(ConcreteTemplate):
+    key = "+"
+    cases = [signature(string_type, string_type, string_type)]
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
+ll.add_symbol('str_concat', hstr_ext.str_concat)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -43,5 +52,11 @@ def box_str(typ, val, c):
     fn = c.builder.module.get_or_insert_function(fnty, name="get_c_str")
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string(c_str)
-    #c.pyapi.incref(pystr)
     return pystr
+
+@lower_builtin("+", string_type, string_type)
+def impl_string_concat(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_concat")
+    return builder.call(fn, args)
