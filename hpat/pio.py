@@ -67,8 +67,7 @@ class PIO(object):
                 self.h5_file_calls.append(lhs)
             # f = h5py.File(file_name, mode)
             if rhs.op=='call' and rhs.func.name in self.h5_file_calls:
-                file_name = self.str_const_table[rhs.args[0].name]
-                self.h5_files[lhs] = file_name
+                self.h5_files[lhs] = rhs.args[0].name
                 # parallel arg = False for this stage
                 loc = assign.target.loc
                 scope = assign.target.scope

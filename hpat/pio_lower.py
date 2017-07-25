@@ -10,7 +10,10 @@ import llvmlite.binding as ll
 ll.add_symbol('hpat_h5_open', hio.hpat_h5_open)
 ll.add_symbol('hpat_h5_size', hio.hpat_h5_size)
 ll.add_symbol('hpat_h5_read', hio.hpat_h5_read)
-
+ll.add_symbol('hpat_h5_get_type_enum', hio.hpat_h5_get_type_enum)
+ll.add_symbol('hpat_h5_create_dset', hio.hpat_h5_create_dset)
+ll.add_symbol('hpat_h5_write', hio.hpat_h5_write)
+ll.add_symbol('hpat_h5_close', hio.hpat_h5_close)
 
 @lower_builtin(h5py.File, StringType, StringType, types.int64)
 def h5_open(context, builder, sig, args):
@@ -82,7 +85,7 @@ _h5_typ_table = {
     }
 
 @lower_builtin(pio_api.h5create_dset, types.int32, StringType,
-    types.containers.UniTuple, types.Const)
+    types.containers.UniTuple, StringType)
 def h5_create_dset(context, builder, sig, args):
     # insert the dset_name string arg
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -105,24 +108,24 @@ def h5_create_dset(context, builder, sig, args):
     count_ptr = cgutils.alloca_once(builder, args[2].type)
     builder.store(args[2], count_ptr)
 
-    # store an int to specify data type
-    typ_enum = _h5_str_typ_table[sig.args[3].value]
-    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    t_fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer()])
+    t_fn = builder.module.get_or_insert_function(t_fnty, name="hpat_h5_get_type_enum")
+    typ_arg = builder.call(t_fn, [args[3]])
 
     call_args = [args[0], val2, ndims_arg,
         builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
-        builder.load(typ_arg)]
+        typ_arg]
 
     return builder.call(fn, call_args)
 
-_h5_str_typ_table = {
-    'i1':0,
-    'u1':1,
-    'i4':2,
-    'i8':3,
-    'f4':4,
-    'f8':5
-    }
+# _h5_str_typ_table = {
+#     'i1':0,
+#     'u1':1,
+#     'i4':2,
+#     'i8':3,
+#     'f4':4,
+#     'f8':5
+#     }
 
 @lower_builtin(pio_api.h5write, types.int32, types.int32, types.int32,
         types.containers.UniTuple, types.containers.UniTuple, types.int64,
