@@ -22,8 +22,7 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
 
 void* init_string(char* in_str, int64_t size)
 {
-    // std::cout<<in_str<<std::endl;
-    // std::cout<<size<<std::endl;
+    // std::cout<<"init str: "<<in_str<<" "<<size<<std::endl;
     return new std::string(in_str, size);
 }
 

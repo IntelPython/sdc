@@ -42,4 +42,6 @@ def box_str(typ, val, c):
                             [lir.IntType(8).as_pointer()])
     fn = c.builder.module.get_or_insert_function(fnty, name="get_c_str")
     c_str = c.builder.call(fn, [val])
-    return c.pyapi.string_as_string(c_str)
+    pystr = c.pyapi.string_from_string(c_str)
+    #c.pyapi.incref(pystr)
+    return pystr
