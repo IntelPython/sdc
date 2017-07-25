@@ -162,7 +162,7 @@ class PIO(object):
 
     def _gen_h5read(self, lhs_var, rhs):
         f_id, dset  = self.h5_dsets[rhs.value.name]
-        file_name = self.h5_files[f_id.name]
+        file_name = self.str_const_table[self.h5_files[f_id.name]]
         dset_str = self.str_const_table[dset.name]
         dset_type = self._get_dset_type(lhs_var.name, file_name, dset_str)
         loc = rhs.value.loc
