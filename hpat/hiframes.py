@@ -48,7 +48,12 @@ class HiFrames(object):
         for label in topo_order:
             new_body = []
             for inst in self.func_ir.blocks[label].body:
-                if isinstance(inst, ir.Assign):
+                # df['col'] = arr
+                if isinstance(inst, ir.StaticSetItem) and inst.target.name in self.df_vars:
+                    df_name = inst.target.name
+                    self.df_vars[df_name][inst.index] = inst.value
+                    self._update_df_cols()
+                elif isinstance(inst, ir.Assign):
                     inst_list = self._run_assign(inst)
                     if inst_list is not None:
                         new_body.extend(inst_list)
