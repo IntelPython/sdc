@@ -132,13 +132,18 @@ class HiFrames(object):
 
             # d.rolling(3)
             if rhs.op=='call' and rhs.func.name in self.rolling_vars:
-                assert len(rhs.args) == 1  # only window size arg
+                window = -1
                 center = False
                 kws = dict(rhs.kws)
+                if rhs.args:
+                    window = self.const_table[rhs.args[0].name]
+                elif 'window' in kws:
+                    window = self.const_table[kws['window'].name]
+                assert window >= 0
                 if 'center' in kws:
                     center = self.const_table[kws['center'].name]
                 self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
-                        self.const_table[rhs.args[0].name], center]
+                        window, center]
                 return []  # remove
 
             # d.rolling(3).sum

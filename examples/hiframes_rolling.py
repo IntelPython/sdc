@@ -11,7 +11,7 @@ def rolling_df1(n):
 @hpat.jit
 def rolling_df2(n):
     df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-    Ac = df.A.rolling(5, center=True).mean()
+    Ac = df.A.rolling(window=5, center=True).mean()
     return Ac.sum()
 
 @hpat.jit
