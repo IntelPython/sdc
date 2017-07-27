@@ -12,6 +12,7 @@ ll.add_symbol('hpat_h5_size', hio.hpat_h5_size)
 ll.add_symbol('hpat_h5_read', hio.hpat_h5_read)
 ll.add_symbol('hpat_h5_get_type_enum', hio.hpat_h5_get_type_enum)
 ll.add_symbol('hpat_h5_create_dset', hio.hpat_h5_create_dset)
+ll.add_symbol('hpat_h5_create_group', hio.hpat_h5_create_group)
 ll.add_symbol('hpat_h5_write', hio.hpat_h5_write)
 ll.add_symbol('hpat_h5_close', hio.hpat_h5_close)
 
@@ -117,6 +118,20 @@ def h5_create_dset(context, builder, sig, args):
         typ_arg]
 
     return builder.call(fn, call_args)
+
+@lower_builtin(pio_api.h5create_group, types.int32, StringType)
+def h5_create_group(context, builder, sig, args):
+    # insert the group_name string arg
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
+    val2 = builder.call(fn, [args[1]])
+
+    fnty = lir.FunctionType(lir.IntType(32),
+                                [lir.IntType(32), lir.IntType(8).as_pointer()])
+
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_create_group")
+    return builder.call(fn, [args[0], val2])
 
 # _h5_str_typ_table = {
 #     'i1':0,

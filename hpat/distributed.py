@@ -318,13 +318,9 @@ class DistributedPass(object):
             rhs.args[4] = counts_var
             rhs.args[5] = self._set1_var
             # set parallel arg in file open
-            # TODO: generalize to all blocks
-            file_var = rhs.args[0].name
-            for stmt in block_body:
-                if isinstance(stmt, ir.Assign) and stmt.target.name==file_var:
-                    rhs = stmt.value
-                    assert isinstance(rhs, ir.Expr)
-                    rhs.args[2] = self._set1_var
+            file_varname = rhs.args[0].name
+            self._file_open_set_parallel(file_varname)
+
 
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
@@ -882,6 +878,23 @@ class DistributedPass(object):
                 i = _find_first_print(block.body)
             new_blocks[block_label] = block
         return new_blocks
+
+    def _file_open_set_parallel(self, file_varname):
+        for label, block in self.func_ir.blocks.items():
+            for stmt in block.body:
+                if (isinstance(stmt, ir.Assign)
+                        and stmt.target.name == file_varname):
+                    rhs = stmt.value
+                    assert isinstance(rhs, ir.Expr) and rhs.op == 'call'
+                    call_name = self._call_table[rhs.func.name][0]
+                    if call_name == 'h5create_group':
+                        # if read/write call is on a group, find its actual file
+                        f_varname = rhs.args[0].name
+                        self._file_open_set_parallel(f_varname)
+                        return
+                    else:
+                        assert call_name == 'File'
+                        rhs.args[2] = self._set1_var
 
     def _isarray(self, varname):
         return (varname in self.typemap

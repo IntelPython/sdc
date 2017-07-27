@@ -25,6 +25,7 @@ class PIO(object):
         self.h5_dsets_sizes = {}
         self.h5_close_calls = {}
         self.h5_create_dset_calls = {}
+        self.h5_create_group_calls = {}
         # varname -> 'str'
         self.str_const_table = {}
         self.reverse_copies = {}
@@ -83,6 +84,12 @@ class PIO(object):
             if rhs.op=='call' and rhs.func.name in self.h5_create_dset_calls:
                 return self._gen_h5create_dset(assign,
                                     self.h5_create_dset_calls[rhs.func.name])
+
+            # f.create_group("subgroup")
+            if rhs.op=='call' and rhs.func.name in self.h5_create_group_calls:
+                return self._gen_h5create_group(assign,
+                                    self.h5_create_group_calls[rhs.func.name])
+
             # d = f['dset']
             if rhs.op=='static_getitem' and rhs.value.name in self.h5_files:
                 self.h5_dsets[lhs] = (rhs.value, rhs.index_var)
@@ -97,6 +104,8 @@ class PIO(object):
                     self.h5_close_calls[lhs] = rhs.value
                 elif rhs.attr=='create_dataset':
                     self.h5_create_dset_calls[lhs] = rhs.value
+                elif rhs.attr=='create_group':
+                    self.h5_create_group_calls[lhs] = rhs.value
                 else:
                     raise NotImplementedError("file operation not supported")
             if rhs.op=='build_tuple':
@@ -296,3 +305,24 @@ class PIO(object):
         self.h5_dsets[lhs_var.name] = (f_id, args[1])
         self.h5_dsets_sizes[lhs_var.name] = self.tuple_table[args[2].name]
         return [g_pio_assign, attr_assign, create_dset_assign]
+
+    def _gen_h5create_group(self, stmt, f_id):
+        lhs_var = stmt.target
+        scope = lhs_var.scope
+        loc = lhs_var.loc
+        args = [f_id]+stmt.value.args
+        # g_pio_var = Global(hpat.pio_api)
+        g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
+        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
+        g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
+        # attr call: h5create_group_attr = getattr(g_pio_var, h5create_group)
+        h5create_group_attr_call = ir.Expr.getattr(
+                                            g_pio_var, "h5create_group", loc)
+        attr_var = ir.Var(scope, mk_unique_var("$h5create_group_attr"), loc)
+        attr_assign = ir.Assign(h5create_group_attr_call, attr_var, loc)
+        # group_id = h5create_group(f_id)
+        create_group_call = ir.Expr.call(attr_var, args, (), loc)
+        create_group_assign = ir.Assign(create_group_call, lhs_var, loc)
+        # add to files since group behavior is same as files for many calls
+        self.h5_files[lhs_var.name] = "group"
+        return [g_pio_assign, attr_assign, create_group_assign]

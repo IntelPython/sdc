@@ -10,6 +10,7 @@ int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
 int hpat_h5_close(hid_t file_id);
 int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
+int hpat_h5_create_group(hid_t file_id, char* group_name);
 int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_get_type_enum(std::string *s);
@@ -33,6 +34,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_h5_close)));
     PyObject_SetAttrString(m, "hpat_h5_create_dset",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_create_dset)));
+    PyObject_SetAttrString(m, "hpat_h5_create_group",
+                            PyLong_FromVoidPtr((void*)(&hpat_h5_create_group)));
     PyObject_SetAttrString(m, "hpat_h5_write",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_write)));
     PyObject_SetAttrString(m, "hpat_h5_get_type_enum",
@@ -198,6 +201,17 @@ int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
                                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     H5Sclose(filespace);
     return dataset_id;
+}
+
+int hpat_h5_create_group(hid_t file_id, char* group_name)
+{
+    // printf("group_name:%s\n", group_name);
+    // fflush(stdout);
+
+    hid_t group_id;
+    group_id = H5Gcreate2(file_id, group_name,
+                                        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    return group_id;
 }
 
 int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
