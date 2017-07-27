@@ -9,7 +9,8 @@ int64_t hpat_dist_get_end(int64_t total, int64_t div_chunk, int num_pes,
 int64_t hpat_dist_get_node_portion(int64_t total, int64_t div_chunk,
                                     int num_pes, int node_id);
 double hpat_dist_get_time();
-
+MPI_Datatype get_MPI_typ(int typ_enum);
+int get_elem_size(int type_enum);
 int hpat_dist_reduce_i4(int value);
 int64_t hpat_dist_reduce_i8(int64_t value);
 float hpat_dist_reduce_f4(float value);
