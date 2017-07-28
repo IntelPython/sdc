@@ -124,10 +124,12 @@ class DistributedAnalysis(object):
             # TODO: check for index dependency
 
         for arr in parfor_arrs:
-            out_dist = Distribution(min(out_dist.value, array_dists[arr].value))
+            if arr in array_dists:
+                out_dist = Distribution(min(out_dist.value, array_dists[arr].value))
         parfor_dists[parfor.id] = out_dist
         for arr in parfor_arrs:
-            array_dists[arr] = out_dist
+            if arr in array_dists:
+                array_dists[arr] = out_dist
 
         # run analysis recursively on parfor body
         blocks = wrap_parfor_blocks(parfor)
