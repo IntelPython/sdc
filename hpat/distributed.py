@@ -325,14 +325,16 @@ class DistributedPass(object):
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
-                    'zeros_like', 'ones_like', 'full_like', 'copy']):
+                    'zeros_like', 'ones_like', 'full_like', 'copy']
+                and not self._is_REP(rhs.args[0].name)):
             in_arr = rhs.args[0].name
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
         if (len(call_list)==2 and call_list[1]==np
-                and call_list[0] in ['cumsum', 'cumprod']):
+                and call_list[0] in ['cumsum', 'cumprod']
+                and self._is_1D_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
             in_arr_var = rhs.args[0]
             lhs_var = assign.target
@@ -637,7 +639,7 @@ class DistributedPass(object):
             halo_consts = set()
             buff_indices = set()
             for st in body:
-                stmt = copy.deepcopy(st)   # TODO: fix copies of globals
+                stmt = copy.deepcopy(st)
                 if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
                     value = stmt.value.value
                     if isinstance(value, int) and index_com(value):
@@ -905,6 +907,10 @@ class DistributedPass(object):
         # they are not in dists list
         return (arr_name in self._dist_analysis.array_dists and
                 self._dist_analysis.array_dists[arr_name]==Distribution.OneD)
+
+    def _is_REP(self, arr_name):
+        return (arr_name not in self._dist_analysis.array_dists or
+                self._dist_analysis.array_dists[arr_name]==Distribution.REP)
 
     def _is_alloc_call(self, func_var):
         if func_var not in self._call_table:
