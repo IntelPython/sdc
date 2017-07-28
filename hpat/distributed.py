@@ -901,7 +901,9 @@ class DistributedPass(object):
                 and isinstance(self.typemap[varname], types.npytypes.Array))
 
     def _is_1D_arr(self, arr_name):
-        return (self._isarray(arr_name) and
+        # some arrays like stencil buffers are added after analysis so
+        # they are not in dists list
+        return (arr_name in self._dist_analysis.array_dists and
                 self._dist_analysis.array_dists[arr_name]==Distribution.OneD)
 
     def _is_alloc_call(self, func_var):
