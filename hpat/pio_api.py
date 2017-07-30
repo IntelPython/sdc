@@ -2,6 +2,19 @@ from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 import h5py
+from numba.extending import register_model, models
+
+class H5FileType(types.Opaque):
+    def __init__(self):
+        super(H5FileType, self).__init__(name='H5FileType')
+
+h5file_type = H5FileType()
+# TODO: create similar types for groups and datasets
+
+@register_model(H5FileType)
+class H5FileModel(models.IntegerModel):
+    def __init__(self, dmm, fe_type):
+        super(H5FileModel, self).__init__(dmm, types.int32)
 
 def h5size():
     """dummy function for C h5_size"""
@@ -32,7 +45,7 @@ class H5File(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==3
-        return signature(types.int32, *args)
+        return signature(h5file_type, *args)
 
 @infer_global(h5size)
 class H5Size(AbstractTemplate):

@@ -2,6 +2,7 @@ from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
+from hpat.pio_api import h5file_type
 from hpat.str_ext import StringType
 import h5py
 from llvmlite import ir as lir
@@ -27,7 +28,7 @@ def h5_open(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
     return builder.call(fn, [val1, val2, args[2]])
 
-@lower_builtin(pio_api.h5size, types.int32, StringType, types.int32)
+@lower_builtin(pio_api.h5size, h5file_type, StringType, types.int32)
 def h5_size(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
@@ -37,7 +38,7 @@ def h5_size(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_size")
     return builder.call(fn, [args[0], val2, args[2]])
 
-@lower_builtin(pio_api.h5read, types.int32, StringType, types.int32,
+@lower_builtin(pio_api.h5read, h5file_type, StringType, types.int32,
     types.containers.UniTuple, types.containers.UniTuple, types.int64,
     types.npytypes.Array)
 def h5_read(context, builder, sig, args):
@@ -70,7 +71,7 @@ def h5_read(context, builder, sig, args):
 
     return builder.call(fn, call_args)
 
-@lower_builtin(pio_api.h5close, types.int32)
+@lower_builtin(pio_api.h5close, h5file_type)
 def h5_close(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_close")
@@ -85,7 +86,7 @@ _h5_typ_table = {
     types.float64:5
     }
 
-@lower_builtin(pio_api.h5create_dset, types.int32, StringType,
+@lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
     types.containers.UniTuple, StringType)
 def h5_create_dset(context, builder, sig, args):
     # insert the dset_name string arg
@@ -119,7 +120,7 @@ def h5_create_dset(context, builder, sig, args):
 
     return builder.call(fn, call_args)
 
-@lower_builtin(pio_api.h5create_group, types.int32, StringType)
+@lower_builtin(pio_api.h5create_group, h5file_type, StringType)
 def h5_create_group(context, builder, sig, args):
     # insert the group_name string arg
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -142,7 +143,7 @@ def h5_create_group(context, builder, sig, args):
 #     'f8':5
 #     }
 
-@lower_builtin(pio_api.h5write, types.int32, types.int32, types.int32,
+@lower_builtin(pio_api.h5write, h5file_type, types.int32, types.int32,
         types.containers.UniTuple, types.containers.UniTuple, types.int64,
         types.npytypes.Array)
 def h5_write(context, builder, sig, args):
