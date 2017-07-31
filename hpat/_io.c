@@ -2,6 +2,7 @@
 #include "hdf5.h"
 #include <Python.h>
 #include <string>
+#include <iostream>
 
 int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
 int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
@@ -15,6 +16,8 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
+int h5g_get_num_objs(hid_t file_id);
+void* h5g_get_objname_by_idx(hid_t file_id, int ind);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -40,6 +43,10 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_h5_write)));
     PyObject_SetAttrString(m, "hpat_h5_get_type_enum",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_get_type_enum)));
+    PyObject_SetAttrString(m, "h5g_get_num_objs",
+                            PyLong_FromVoidPtr((void*)(&h5g_get_num_objs)));
+    PyObject_SetAttrString(m, "h5g_get_objname_by_idx",
+                            PyLong_FromVoidPtr((void*)(&h5g_get_objname_by_idx)));
     return m;
 }
 
@@ -243,4 +250,29 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     assert(ret != -1);
     H5Dclose(dataset_id);
     return ret;
+}
+
+int h5g_get_num_objs(hid_t file_id)
+{
+    H5G_info_t group_info;
+	herr_t err;
+    err = H5Gget_info(file_id, &group_info);
+    // printf("num links:%lld\n", group_info.nlinks);
+    return group_info.nlinks;
+}
+
+void* h5g_get_objname_by_idx(hid_t file_id, int ind)
+{
+	herr_t err;
+    // first call gets size:
+    // https://support.hdfgroup.org/HDF5/doc1.8/RM/RM_H5L.html#Link-GetNameByIdx
+    int size = H5Lget_name_by_idx(file_id, ".", H5_INDEX_NAME, H5_ITER_NATIVE,
+        (hsize_t)ind, NULL, 0, H5P_DEFAULT);
+    char* name = (char*) malloc(size+1);
+    err = H5Lget_name_by_idx(file_id, ".", H5_INDEX_NAME, H5_ITER_NATIVE,
+        (hsize_t)ind, name, size+1, H5P_DEFAULT);
+    // printf("g name:%s\n", name);
+    std::string *outstr = new std::string(name);
+    // std::cout<<"out: "<<*outstr<<std::endl;
+    return outstr;
 }
