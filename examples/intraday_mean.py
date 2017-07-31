@@ -12,10 +12,12 @@ from hpat import prange
         's_low': hpat.float64[:], 's_close': hpat.float64[:],
         's_vol': hpat.float64[:]})
 def intraday_mean_revert():
-    file_name = "stock_data.hdf5"
+    file_name = "stock_data_all_google.hdf5"
     f = h5py.File(file_name, "r")
     sym_list = list(f.keys())
     nsyms = len(sym_list)
+    max_num_days = 4000
+    all_res = np.zeros(max_num_days)
 
     t1 = time.time()
     for i in prange(nsyms):
@@ -50,8 +52,14 @@ def intraday_mean_revert():
 
         #create a strategy return series by using the daily stock returns where the trade criteria above are met
         df['Rets'] = df['Pct Change'][df['BUY'] == True]
-        print(df['Rets'].sum())
 
+        n_days = len(df['Rets'])
+        res = np.zeros(max_num_days)
+        if n_days:
+            res[-n_days:] = df['Rets'].fillna(0)
+        all_res += res
+
+    print(all_res.mean())
     print("time:", time.time()-t1)
 
 intraday_mean_revert()
