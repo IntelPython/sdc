@@ -16,6 +16,8 @@ ll.add_symbol('hpat_h5_create_dset', hio.hpat_h5_create_dset)
 ll.add_symbol('hpat_h5_create_group', hio.hpat_h5_create_group)
 ll.add_symbol('hpat_h5_write', hio.hpat_h5_write)
 ll.add_symbol('hpat_h5_close', hio.hpat_h5_close)
+ll.add_symbol('h5g_get_num_objs', hio.h5g_get_num_objs)
+ll.add_symbol('h5g_get_objname_by_idx', hio.h5g_get_objname_by_idx)
 
 @lower_builtin(h5py.File, StringType, StringType, types.int64)
 def h5_open(context, builder, sig, args):
@@ -170,3 +172,30 @@ def h5_write(context, builder, sig, args):
         builder.load(typ_arg)]
 
     return builder.call(fn, call_args)
+
+@lower_builtin("h5file.keys", pio_api.h5file_type)
+def lower_dict_get(context, builder, sig, args):
+    def h5f_keys_imp(file_id):
+        obj_name_list = []
+        nobjs = pio_api.h5g_get_num_objs(file_id)
+        for i in range(nobjs):
+            obj_name = pio_api.h5g_get_objname_by_idx(file_id, i)
+            obj_name_list.append(obj_name)
+        return obj_name_list
+
+    res = context.compile_internal(builder, h5f_keys_imp, sig, args)
+    return res
+
+@lower_builtin(pio_api.h5g_get_num_objs, h5file_type)
+def h5g_get_num_objs_lower(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="h5g_get_num_objs")
+    return builder.call(fn, args)
+
+@lower_builtin(pio_api.h5g_get_objname_by_idx, h5file_type, types.int32)
+def h5g_get_objname_by_idx_lower(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(32), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="h5g_get_objname_by_idx")
+    return builder.call(fn, args)

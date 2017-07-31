@@ -1,8 +1,9 @@
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
 import h5py
-from numba.extending import register_model, models
+from numba.extending import register_model, models, infer_getattr
+from hpat.str_ext import string_type
 
 class H5FileType(types.Opaque):
     def __init__(self):
@@ -15,6 +16,25 @@ h5file_type = H5FileType()
 class H5FileModel(models.IntegerModel):
     def __init__(self, dmm, fe_type):
         super(H5FileModel, self).__init__(dmm, types.int32)
+
+# type for list of names
+string_list_type = types.containers.List(string_type)
+
+@infer_getattr
+class FileAttribute(AttributeTemplate):
+    key = h5file_type
+
+    @bound_function("h5file.keys")
+    def resolve_keys(self, dict, args, kws):
+        assert not kws
+        assert not args
+        return signature(string_list_type, *args)
+
+def h5g_get_num_objs():
+    return
+
+def h5g_get_objname_by_idx():
+    return
 
 def h5size():
     """dummy function for C h5_size"""
@@ -88,3 +108,17 @@ class H5Write(AbstractTemplate):
         assert not kws
         assert len(args)==7
         return signature(types.int32, *args)
+
+@infer_global(h5g_get_num_objs)
+class H5GgetNobj(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==1
+        return signature(types.int32, *args)
+
+@infer_global(h5g_get_objname_by_idx)
+class H5GgetObjNameByIdx(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==2
+        return signature(string_type, *args)

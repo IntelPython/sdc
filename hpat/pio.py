@@ -106,6 +106,8 @@ class PIO(object):
                     self.h5_create_dset_calls[lhs] = rhs.value
                 elif rhs.attr=='create_group':
                     self.h5_create_group_calls[lhs] = rhs.value
+                elif rhs.attr=='keys':
+                    pass
                 else:
                     raise NotImplementedError("file operation not supported")
             if rhs.op=='build_tuple':
