@@ -3,11 +3,13 @@ import types as pytypes  # avoid confusion with numba.types
 
 import numba
 from numba import ir, config
+from numba import compiler as numba_compiler
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
-                            dprint_func_ir, remove_dead, mk_alloc)
+                            dprint_func_ir, remove_dead, mk_alloc, remove_dels,
+                            get_name_var_table, replace_var_names)
 import hpat
 from hpat import hiframes_api
-import numpy
+import numpy as np
 import pandas
 
 import copy
@@ -239,17 +241,39 @@ class HiFrames(object):
         if center:
             index_offsets[0] += win_size//2
 
-        return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+
+        def f(A):
+            A[:win_size-1] = np.nan
+        f_blocks = get_inner_ir(f)
+        replace_var_names(f_blocks, {'A': out_var.name})
+        setitem_nodes = f_blocks[0].body
+
+
+        if center:
+            def f1(A):
+                A[:win_size//2] = np.nan
+            def f2(A):
+                A[-(win_size//2):] = np.nan
+            f_blocks = get_inner_ir(f1)
+            replace_var_names(f_blocks, {'A': out_var.name})
+            setitem_nodes1 = f_blocks[0].body
+            f_blocks = get_inner_ir(f2)
+            replace_var_names(f_blocks, {'A': out_var.name})
+            setitem_nodes2 = f_blocks[0].body
+            setitem_nodes = setitem_nodes1 + setitem_nodes2
+
+        return stencil_nodes + setitem_nodes
 
 def gen_empty_like(in_arr, out_arr):
     scope = in_arr.scope
     loc = in_arr.loc
     # g_np_var = Global(numpy)
     g_np_var = ir.Var(scope, mk_unique_var("$np_g_var"), loc)
-    g_np = ir.Global('np', numpy, loc)
+    g_np = ir.Global('np', np, loc)
     g_np_assign = ir.Assign(g_np, g_np_var, loc)
     # attr call: empty_attr = getattr(g_np_var, empty_like)
-    empty_attr_call = ir.Expr.getattr(g_np_var, "zeros_like", loc)
+    empty_attr_call = ir.Expr.getattr(g_np_var, "empty_like", loc)
     attr_var = ir.Var(scope, mk_unique_var("$empty_attr_attr"), loc)
     attr_assign = ir.Assign(empty_attr_call, attr_var, loc)
     # alloc call: out_arr = empty_attr(in_arr)
@@ -277,3 +301,38 @@ def gen_stencil_call(in_arr, out_arr, code_expr, index_offsets):
     stencil_call.index_offsets = index_offsets
     stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
     return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+
+def get_inner_ir(func):
+    # get untyped numba ir
+    f_ir = numba_compiler.run_frontend(func)
+    blocks = f_ir.blocks
+    remove_dels(blocks)
+    topo_order = find_topo_order(blocks)
+    first_block = blocks[topo_order[0]]
+    last_block = blocks[topo_order[-1]]
+    # remove arg nodes
+    new_first_body = []
+    for stmt in first_block.body:
+        if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Arg):
+            continue
+        new_first_body.append(stmt)
+    first_block.body = new_first_body
+    # remove const none, cast, return nodes
+    assert isinstance(last_block.body[-1], ir.Return)
+    last_block.body.pop()
+    assert (isinstance(last_block.body[-1], ir.Assign)
+        and isinstance(last_block.body[-1].value, ir.Expr)
+        and last_block.body[-1].value.op == 'cast')
+    last_block.body.pop()
+    assert (isinstance(last_block.body[-1], ir.Assign)
+        and isinstance(last_block.body[-1].value, ir.Const)
+        and last_block.body[-1].value.value == None)
+    last_block.body.pop()
+    # rename all variables to avoid conflict, except args
+    var_table = get_name_var_table(blocks)
+    new_var_dict = {}
+    for name, var in var_table.items():
+        if not (name in f_ir.arg_names):
+            new_var_dict[name] = mk_unique_var(name)
+    replace_var_names(blocks, new_var_dict)
+    return blocks
