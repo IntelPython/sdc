@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import time
 import hpat
+from hpat import prange
 
 # adopted from:
 # http://www.pythonforfinance.net/2017/02/20/intraday-stock-mean-reversion-trading-backtest-in-python/
@@ -13,11 +14,11 @@ import hpat
 def intraday_mean_revert():
     file_name = "stock_data.hdf5"
     f = h5py.File(file_name, "r")
-    sym_list = list(f.values()) #['IBM']
+    sym_list = list(f.keys())
     nsyms = len(sym_list)
 
     t1 = time.time()
-    for i in hpat.prange(nsyms):
+    for i in prange(nsyms):
         symbol = sym_list[i]
 
         s_open = f[symbol+'/Open'][:]
@@ -30,7 +31,6 @@ def intraday_mean_revert():
 
         #create column to hold our 90 day rolling standard deviation
         df['Stdev'] = df['Close'].rolling(window=90).std()
-        #print(np.array(df['Stdev'])[-1])
 
         #create a column to hold our 20 day moving average
         df['Moving Average'] = df['Close'].rolling(window=20).mean()
@@ -51,6 +51,7 @@ def intraday_mean_revert():
         #create a strategy return series by using the daily stock returns where the trade criteria above are met
         df['Rets'] = df['Pct Change'][df['BUY'] == True]
         print(df['Rets'].sum())
+
     print("time:", time.time()-t1)
 
 intraday_mean_revert()
