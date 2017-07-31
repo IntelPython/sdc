@@ -35,42 +35,42 @@ PyMODINIT_FUNC PyInit_hdist(void) {
         return NULL;
 
     PyObject_SetAttrString(m, "hpat_dist_get_rank",
-                            PyLong_FromVoidPtr(&hpat_dist_get_rank));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_rank)));
     PyObject_SetAttrString(m, "hpat_dist_get_size",
-                            PyLong_FromVoidPtr(&hpat_dist_get_size));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_size)));
     PyObject_SetAttrString(m, "hpat_dist_get_end",
-                            PyLong_FromVoidPtr(&hpat_dist_get_end));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_end)));
     PyObject_SetAttrString(m, "hpat_dist_get_node_portion",
-                            PyLong_FromVoidPtr(&hpat_dist_get_node_portion));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_node_portion)));
     PyObject_SetAttrString(m, "hpat_dist_get_time",
-                            PyLong_FromVoidPtr(&hpat_dist_get_time));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_time)));
 
     PyObject_SetAttrString(m, "hpat_dist_reduce_i4",
-                            PyLong_FromVoidPtr(&hpat_dist_reduce_i4));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_reduce_i4)));
     PyObject_SetAttrString(m, "hpat_dist_reduce_i8",
-                            PyLong_FromVoidPtr(&hpat_dist_reduce_i8));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_reduce_i8)));
     PyObject_SetAttrString(m, "hpat_dist_reduce_f4",
-                            PyLong_FromVoidPtr(&hpat_dist_reduce_f4));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_reduce_f4)));
     PyObject_SetAttrString(m, "hpat_dist_reduce_f8",
-                            PyLong_FromVoidPtr(&hpat_dist_reduce_f8));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_reduce_f8)));
 
     PyObject_SetAttrString(m, "hpat_dist_exscan_i4",
-                            PyLong_FromVoidPtr(&hpat_dist_exscan_i4));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_exscan_i4)));
     PyObject_SetAttrString(m, "hpat_dist_exscan_i8",
-                            PyLong_FromVoidPtr(&hpat_dist_exscan_i8));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_exscan_i8)));
     PyObject_SetAttrString(m, "hpat_dist_exscan_f4",
-                            PyLong_FromVoidPtr(&hpat_dist_exscan_f4));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_exscan_f4)));
     PyObject_SetAttrString(m, "hpat_dist_exscan_f8",
-                            PyLong_FromVoidPtr(&hpat_dist_exscan_f8));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_exscan_f8)));
 
     PyObject_SetAttrString(m, "hpat_dist_arr_reduce",
-                            PyLong_FromVoidPtr(&hpat_dist_arr_reduce));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_arr_reduce)));
     PyObject_SetAttrString(m, "hpat_dist_irecv",
-                            PyLong_FromVoidPtr(&hpat_dist_irecv));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_irecv)));
     PyObject_SetAttrString(m, "hpat_dist_isend",
-                            PyLong_FromVoidPtr(&hpat_dist_isend));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_isend)));
     PyObject_SetAttrString(m, "hpat_dist_wait",
-                            PyLong_FromVoidPtr(&hpat_dist_wait));
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_wait)));
     return m;
 }
 
@@ -201,7 +201,6 @@ double hpat_dist_exscan_f8(double value)
 
 int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    int i;
     MPI_Request mpi_req_recv = -1;
     // printf("irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
@@ -217,7 +216,6 @@ int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool co
 
 int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    int i;
     MPI_Request mpi_req_recv = -1;
     // printf("isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
