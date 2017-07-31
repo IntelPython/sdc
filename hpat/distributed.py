@@ -500,21 +500,35 @@ class DistributedPass(object):
 
         _, reductions = get_parfor_reductions(parfor, parfor.params)
 
-        if len(reductions)!=0:
-            reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
-            reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_reduce", loc)
-            self.typemap[reduce_attr_var.name] = get_global_func_typ(
-                                                    distributed_api.dist_reduce)
-            reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
-            out.append(reduce_assign)
-
         for reduce_varname, (_, reduce_func, _) in reductions.items():
-            reduce_var = namevar_table[reduce_varname]
-            reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
-            self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-                typing.Context(), [self.typemap[reduce_varname]], {})
-            reduce_assign = ir.Assign(reduce_call, reduce_var, loc)
-            out.append(reduce_assign)
+            if self._isarray(reduce_varname):
+                reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
+                reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_arr_reduce", loc)
+                self.typemap[reduce_attr_var.name] = get_global_func_typ(
+                                                distributed_api.dist_arr_reduce)
+                reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
+                out.append(reduce_assign)
+                reduce_var = namevar_table[reduce_varname]
+                reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
+                self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
+                    typing.Context(), [self.typemap[reduce_varname]], {})
+                err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
+                self.typemap[err_var.name] = types.int32
+                reduce_assign = ir.Assign(reduce_call, err_var, loc)
+                out.append(reduce_assign)
+            else:
+                reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
+                reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_reduce", loc)
+                self.typemap[reduce_attr_var.name] = get_global_func_typ(
+                                                        distributed_api.dist_reduce)
+                reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
+                out.append(reduce_assign)
+                reduce_var = namevar_table[reduce_varname]
+                reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
+                self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
+                    typing.Context(), [self.typemap[reduce_varname]], {})
+                reduce_assign = ir.Assign(reduce_call, reduce_var, loc)
+                out.append(reduce_assign)
 
         return out
 
