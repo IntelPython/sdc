@@ -121,7 +121,7 @@ class HiFrames(object):
 
             # c = df.column.shift
             if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
-                                        rhs.attr in ['shift', 'pct_change']):
+                                rhs.attr in ['shift', 'pct_change', 'fillna']):
                 self.df_col_calls[lhs] = (rhs.value, rhs.attr)
 
             # A = df.column.shift(3)
@@ -195,6 +195,8 @@ class HiFrames(object):
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
+        if func=='fillna':
+            return self._gen_fillna(out_var, args, col_var, func)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -213,6 +215,9 @@ class HiFrames(object):
         code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
         index_offsets = [0]
         return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+
+    def _gen_fillna(self, out_var, args, col_var, func):
+        return [ir.Assign(col_var, out_var, col_var.loc)]
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
