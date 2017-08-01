@@ -2,11 +2,11 @@ from __future__ import print_function, division, absolute_import
 import types as pytypes  # avoid confusion with numba.types
 
 import numba
-from numba import ir, config
+from numba import ir, config, ir_utils
 from numba import compiler as numba_compiler
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
-                            get_name_var_table, replace_var_names)
+                            get_name_var_table, replace_var_names, add_offset_to_labels)
 import hpat
 from hpat import hiframes_api
 import numpy as np
@@ -21,6 +21,7 @@ class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
         self.func_ir = func_ir
+        ir_utils._max_label = max(func_ir.blocks.keys())
 
         # varname -> 'str'
         self.const_table = {}
@@ -56,12 +57,29 @@ class HiFrames(object):
                     self.df_vars[df_name][inst.index] = inst.value
                     self._update_df_cols()
                 elif isinstance(inst, ir.Assign):
-                    inst_list = self._run_assign(inst)
-                    if inst_list is not None:
-                        new_body.extend(inst_list)
+                    out_nodes = self._run_assign(inst)
+                    if isinstance(out_nodes, list):
+                        new_body.extend(out_nodes)
+                    if isinstance(out_nodes, dict):
+                        inner_blocks = add_offset_to_labels(out_nodes, ir_utils._max_label+1)
+                        self.func_ir.blocks.update(inner_blocks)
+                        ir_utils._max_label = max(self.func_ir.blocks.keys())
+                        scope = self.func_ir.blocks[label].scope
+                        loc = self.func_ir.blocks[label].loc
+                        inner_topo_order = find_topo_order(inner_blocks)
+                        inner_first_label = inner_topo_order[0]
+                        inner_last_label = inner_topo_order[-1]
+                        remove_non_return_from_block(inner_blocks[inner_last_label])
+                        new_body.append(ir.Jump(inner_first_label, loc))
+                        self.func_ir.blocks[label].body = new_body
+                        label = ir_utils.next_label()
+                        self.func_ir.blocks[label] = ir.Block(scope, loc)
+                        inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
+                        new_body = []
                 else:
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
+
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
         if config.DEBUG_ARRAY_OPT==1:
@@ -198,7 +216,7 @@ class HiFrames(object):
 
     def _gen_column_call(self, out_var, args, col_var, func):
         if func=='fillna':
-            return self._gen_fillna(out_var, args, col_var, func)
+            return self._gen_fillna(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -218,8 +236,20 @@ class HiFrames(object):
         index_offsets = [0]
         return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
 
-    def _gen_fillna(self, out_var, args, col_var, func):
-        return [ir.Assign(col_var, out_var, col_var.loc)]
+    def _gen_fillna(self, out_var, args, col_var):
+        def f(A, B, fill):
+            for i in numba.parfor.prange(len(A)):
+                s = B[i]
+                if np.isnan(s):
+                    s = fill
+                A[i] = s
+        f_blocks = get_inner_ir(f)
+        replace_var_names(f_blocks, {'A': out_var.name})
+        replace_var_names(f_blocks, {'B': col_var.name})
+        replace_var_names(f_blocks, {'fill': args[0].name})
+        alloc_nodes = gen_empty_like(col_var, out_var)
+        f_blocks[0].body = alloc_nodes + f_blocks[0].body
+        return f_blocks
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
@@ -246,6 +276,7 @@ class HiFrames(object):
         def f(A):
             A[:win_size-1] = np.nan
         f_blocks = get_inner_ir(f)
+        remove_non_return_from_block(f_blocks[0])
         replace_var_names(f_blocks, {'A': out_var.name})
         setitem_nodes = f_blocks[0].body
 
@@ -256,9 +287,11 @@ class HiFrames(object):
             def f2(A):
                 A[-(win_size//2):] = np.nan
             f_blocks = get_inner_ir(f1)
+            remove_non_return_from_block(f_blocks[0])
             replace_var_names(f_blocks, {'A': out_var.name})
             setitem_nodes1 = f_blocks[0].body
             f_blocks = get_inner_ir(f2)
+            remove_non_return_from_block(f_blocks[0])
             replace_var_names(f_blocks, {'A': out_var.name})
             setitem_nodes2 = f_blocks[0].body
             setitem_nodes = setitem_nodes1 + setitem_nodes2
@@ -317,6 +350,17 @@ def get_inner_ir(func):
             continue
         new_first_body.append(stmt)
     first_block.body = new_first_body
+    # rename all variables to avoid conflict, except args
+    var_table = get_name_var_table(blocks)
+    new_var_dict = {}
+    for name, var in var_table.items():
+        if not (name in f_ir.arg_names):
+            new_var_dict[name] = mk_unique_var(name)
+    replace_var_names(blocks, new_var_dict)
+    f_ir.dump()
+    return blocks
+
+def remove_non_return_from_block(last_block):
     # remove const none, cast, return nodes
     assert isinstance(last_block.body[-1], ir.Return)
     last_block.body.pop()
@@ -328,11 +372,3 @@ def get_inner_ir(func):
         and isinstance(last_block.body[-1].value, ir.Const)
         and last_block.body[-1].value.value == None)
     last_block.body.pop()
-    # rename all variables to avoid conflict, except args
-    var_table = get_name_var_table(blocks)
-    new_var_dict = {}
-    for name, var in var_table.items():
-        if not (name in f_ir.arg_names):
-            new_var_dict[name] = mk_unique_var(name)
-    replace_var_names(blocks, new_var_dict)
-    return blocks
