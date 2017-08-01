@@ -69,7 +69,7 @@ class HiFrames(object):
                         inner_topo_order = find_topo_order(inner_blocks)
                         inner_first_label = inner_topo_order[0]
                         inner_last_label = inner_topo_order[-1]
-                        remove_non_return_from_block(inner_blocks[inner_last_label])
+                        remove_none_return_from_block(inner_blocks[inner_last_label])
                         new_body.append(ir.Jump(inner_first_label, loc))
                         self.func_ir.blocks[label].body = new_body
                         label = ir_utils.next_label()
@@ -141,7 +141,7 @@ class HiFrames(object):
 
             # c = df.column.shift
             if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
-                                rhs.attr in ['shift', 'pct_change', 'fillna']):
+                        rhs.attr in ['shift', 'pct_change', 'fillna', 'sum']):
                 self.df_col_calls[lhs] = (rhs.value, rhs.attr)
 
             # A = df.column.shift(3)
@@ -217,6 +217,8 @@ class HiFrames(object):
     def _gen_column_call(self, out_var, args, col_var, func):
         if func=='fillna':
             return self._gen_fillna(out_var, args, col_var)
+        if func=='sum':
+            return self._gen_col_sum(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -251,6 +253,23 @@ class HiFrames(object):
         f_blocks[0].body = alloc_nodes + f_blocks[0].body
         return f_blocks
 
+    def _gen_col_sum(self, out_var, args, col_var):
+        def f(A, s):
+            count = 0
+            for i in numba.parfor.prange(len(A)):
+                val = A[i]
+                if not np.isnan(val):
+                    s += val
+                    count += 1
+            if not count:
+                s = np.nan
+        f_blocks = get_inner_ir(f)
+        replace_var_names(f_blocks, {'A': col_var.name})
+        replace_var_names(f_blocks, {'s': out_var.name})
+        loc = out_var.loc
+        f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
+        return f_blocks
+
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
         if func == 'apply':
@@ -276,7 +295,7 @@ class HiFrames(object):
         def f(A):
             A[:win_size-1] = np.nan
         f_blocks = get_inner_ir(f)
-        remove_non_return_from_block(f_blocks[0])
+        remove_none_return_from_block(f_blocks[0])
         replace_var_names(f_blocks, {'A': out_var.name})
         setitem_nodes = f_blocks[0].body
 
@@ -287,11 +306,11 @@ class HiFrames(object):
             def f2(A):
                 A[-(win_size//2):] = np.nan
             f_blocks = get_inner_ir(f1)
-            remove_non_return_from_block(f_blocks[0])
+            remove_none_return_from_block(f_blocks[0])
             replace_var_names(f_blocks, {'A': out_var.name})
             setitem_nodes1 = f_blocks[0].body
             f_blocks = get_inner_ir(f2)
-            remove_non_return_from_block(f_blocks[0])
+            remove_none_return_from_block(f_blocks[0])
             replace_var_names(f_blocks, {'A': out_var.name})
             setitem_nodes2 = f_blocks[0].body
             setitem_nodes = setitem_nodes1 + setitem_nodes2
@@ -360,7 +379,7 @@ def get_inner_ir(func):
     f_ir.dump()
     return blocks
 
-def remove_non_return_from_block(last_block):
+def remove_none_return_from_block(last_block):
     # remove const none, cast, return nodes
     assert isinstance(last_block.body[-1], ir.Return)
     last_block.body.pop()
