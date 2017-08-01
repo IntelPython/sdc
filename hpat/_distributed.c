@@ -27,6 +27,9 @@ int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool co
 int hpat_dist_wait(int req, bool cond);
 int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
 int hpat_dummy_ptr[64];
+void* hpat_get_dummy_ptr() {
+    return hpat_dummy_ptr;
+}
 
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
@@ -75,8 +78,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_wait)));
     PyObject_SetAttrString(m, "hpat_dist_get_item_pointer",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_item_pointer)));
-    PyObject_SetAttrString(m, "hpat_dummy_ptr",
-                            PyLong_FromVoidPtr((void*)(&hpat_dummy_ptr)));
+    PyObject_SetAttrString(m, "hpat_get_dummy_ptr",
+                            PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
     return m;
 }
 
