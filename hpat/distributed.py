@@ -64,6 +64,7 @@ class DistributedPass(object):
                                                                 self.calltypes)
         self._dist_analysis = dist_analysis_pass.run()
         self._T_arrs = dist_analysis_pass._T_arrs
+        self._parallel_accesses = dist_analysis_pass._parallel_accesses
         if config.DEBUG_ARRAY_OPT==1:
             print("distributions: ", self._dist_analysis)
 
@@ -102,7 +103,7 @@ class DistributedPass(object):
                             new_body += self._run_call(inst, blocks[label].body)
                             continue
                         if rhs.op=='getitem':
-                            new_body += self._run_getsetitem(rhs.value.name,
+                            new_body += self._run_getsetitem(rhs.value,
                                 rhs.index, rhs, inst)
                             continue
                         if (rhs.op=='getattr'
@@ -137,9 +138,13 @@ class DistributedPass(object):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
-                if isinstance(inst, ir.SetItem):
-                    new_body += self._run_getsetitem(inst.target.name,
-                        inst.index, inst, inst)
+                if isinstance(inst, (ir.StaticSetItem, ir.SetItem)):
+                    if isinstance(inst, ir.SetItem):
+                        index = inst.index
+                    else:
+                        index = inst.index_var
+                    new_body += self._run_getsetitem(inst.target,
+                        index, inst, inst)
                     continue
                 new_body.append(inst)
             blocks[label].body = new_body
@@ -419,18 +424,18 @@ class DistributedPass(object):
 
     def _run_getsetitem(self, arr, index_var, node, full_node):
         out = [full_node]
-        if self._is_1D_arr(arr):
+        if self._is_1D_arr(arr.name) and (arr.name, index_var.name) in self._parallel_accesses:
             scope = index_var.scope
             loc = index_var.loc
-            ndims = self.typemap[arr].ndim
+            ndims = self.typemap[arr.name].ndim
             if ndims==1:
-                sub_assign = self._get_ind_sub(index_var, self._array_starts[arr][0])
+                sub_assign = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
                 out = [sub_assign]
                 node.index = sub_assign.target
             else:
                 assert index_var.name in self._tuple_table
                 index_list = self._tuple_table[index_var.name]
-                sub_assign = self._get_ind_sub(index_list[0], self._array_starts[arr][0])
+                sub_assign = self._get_ind_sub(index_list[0], self._array_starts[arr.name][0])
                 out = [sub_assign]
                 new_index_list = copy.copy(index_list)
                 new_index_list[0] = sub_assign.target
@@ -442,6 +447,28 @@ class DistributedPass(object):
                 node.index = tuple_var
 
             out.append(full_node)
+
+        elif self._is_1D_arr(arr.name) and isinstance(node, (ir.StaticSetItem, ir.SetItem)):
+            scope = index_var.scope
+            loc = index_var.loc
+            start = self._array_starts[arr.name][0]
+            count = self._array_counts[arr.name][0]
+            setitem_attr_var = ir.Var(scope, mk_unique_var("$setitem_attr"), loc)
+            setitem_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_setitem", loc)
+            self.typemap[setitem_attr_var.name] = get_global_func_typ(
+                                            distributed_api.dist_setitem)
+            setitem_assign = ir.Assign(setitem_attr_call, setitem_attr_var, loc)
+            out = [setitem_assign]
+            setitem_call = ir.Expr.call(setitem_attr_var,
+                                [arr, index_var, node.value, start, count], (), loc)
+            self.calltypes[setitem_call] = self.typemap[setitem_attr_var.name].get_call_type(
+                typing.Context(), [self.typemap[arr.name],
+                self.typemap[index_var.name], self.typemap[node.value.name],
+                types.intp, types.intp], {})
+            err_var = ir.Var(scope, mk_unique_var("$setitem_err_var"), loc)
+            self.typemap[err_var.name] = types.int32
+            setitem_assign = ir.Assign(setitem_call, err_var, loc)
+            out.append(setitem_assign)
 
         return out
 

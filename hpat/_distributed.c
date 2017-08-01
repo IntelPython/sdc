@@ -25,6 +25,8 @@ int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int type_enum);
 int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_wait(int req, bool cond);
+int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
+int hpat_dummy_ptr[64];
 
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
@@ -71,6 +73,10 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_isend)));
     PyObject_SetAttrString(m, "hpat_dist_wait",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_wait)));
+    PyObject_SetAttrString(m, "hpat_dist_get_item_pointer",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_item_pointer)));
+    PyObject_SetAttrString(m, "hpat_dummy_ptr",
+                            PyLong_FromVoidPtr((void*)(&hpat_dummy_ptr)));
     return m;
 }
 
@@ -257,4 +263,12 @@ int get_elem_size(int type_enum)
 {
     int types_sizes[] = {1,1,4,8,4,8};
     return types_sizes[type_enum];
+}
+
+int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count)
+{
+    // printf("ind:%lld start:%lld count:%lld\n", ind, start, count);
+    if (ind >= start && ind < start+count)
+        return ind-start;
+    return -1;
 }

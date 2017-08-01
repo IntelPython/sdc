@@ -25,6 +25,8 @@ ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
 ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
 ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
 ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
+ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
+ll.add_symbol('hpat_dummy_ptr', hdist.hpat_dummy_ptr)
 
 @lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
@@ -178,3 +180,36 @@ def lower_dist_wait(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32), lir.IntType(1)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
+
+import numba.targets.arrayobj
+from numba.targets.arrayobj import normalize_indices, basic_indexing, fancy_setslice, setitem_array
+
+
+@lower_builtin(distributed_api.dist_setitem, types.Array, types.Any, types.Any,
+    types.intp, types.intp)
+def dist_setitem_array(context, builder, sig, args):
+    """copied from numba/numba/targets/arrayobj.py:446 to add rank bound checks"""
+
+    count = args.pop()
+    start = args.pop()
+    sig.args = tuple([sig.args[0], sig.args[1], sig.args[2]])
+    regular_get_item_pointer2 = cgutils.get_item_pointer2
+
+    def dist_get_item_pointer2(builder, data, shape, strides, layout, inds,
+                      wraparound=False):
+        fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64), lir.IntType(64)])
+        fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_item_pointer")
+        first_ind = builder.call(fn, [inds[0], start, count])
+        inds = tuple([first_ind, *inds[1:]])
+        in_ptr = regular_get_item_pointer2(builder, data, shape, strides, layout, inds, wraparound)
+        ret_ptr = in_ptr #cgutils.alloca_once(builder, in_ptr.type)
+        #builder.store(in_ptr, ret_ptr)
+        not_inbound = builder.icmp_signed('==', first_ind, lir.Constant(lir.IntType(64), -1))
+        #with builder.if_then(not_inbound, likely=True) as (on_proc, on_other_proc):
+        #    hpat_dummy_ptr
+        return ret_ptr
+
+    cgutils.get_item_pointer2 = dist_get_item_pointer2
+    setitem_array(context, builder, sig, args)
+    cgutils.get_item_pointer2 = regular_get_item_pointer2
+    return lir.Constant(lir.IntType(32), 0)

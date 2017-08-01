@@ -56,10 +56,14 @@ class DistributedAnalysis(object):
                 self._analyze_assign(inst, array_dists, parfor_dists)
             elif isinstance(inst, Parfor):
                 self._analyze_parfor(inst, array_dists, parfor_dists)
-            elif (isinstance(inst, ir.SetItem)
-                    and (inst.target.name,inst.index.name)
-                    in self._parallel_accesses):
-                pass # parallel access, don't make REP
+            elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
+                if isinstance(inst, ir.SetItem):
+                    index = inst.index.name
+                else:
+                    index = inst.index_var.name
+                if ((inst.target.name, index) not in self._parallel_accesses):
+                    # no parallel to parallel array set (TODO)
+                    self._set_REP([inst.value], array_dists)
             elif type(inst) in distributed_analysis_extensions:
                 # let external calls handle stmt if type matches
                 f = distributed_analysis_extensions[type(inst)]

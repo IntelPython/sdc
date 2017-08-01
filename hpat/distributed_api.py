@@ -39,6 +39,9 @@ def dist_exscan(value):
     """dummy to implement simple exscan"""
     return value
 
+def dist_setitem(arr, index, val):
+    return 0
+
 def irecv():
     return 0
 
@@ -125,4 +128,11 @@ class DistWait(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==2
+        return signature(types.int32, *args)
+
+@infer_global(dist_setitem)
+class DistSetitem(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==5
         return signature(types.int32, *args)
