@@ -17,6 +17,8 @@ def global_deepcopy(self, memo):
     return ir.Global(self.name, self.value, copy.deepcopy(self.loc))
 ir.Global.__deepcopy__ = global_deepcopy
 
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean']
+
 class HiFrames(object):
     """analyze and transform hiframes calls"""
     def __init__(self, func_ir):
@@ -141,7 +143,7 @@ class HiFrames(object):
 
             # c = df.column.shift
             if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
-                        rhs.attr in ['shift', 'pct_change', 'fillna', 'sum']):
+                        rhs.attr in df_col_funcs):
                 self.df_col_calls[lhs] = (rhs.value, rhs.attr)
 
             # A = df.column.shift(3)
@@ -215,12 +217,14 @@ class HiFrames(object):
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
-        if func is not 'sum':
+        if func not in ['sum', 'mean']:
             self.df_cols.add(out_var.name) # output is Series except sum
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var)
         if func == 'sum':
             return self._gen_col_sum(out_var, args, col_var)
+        if func == 'mean':
+            return self._gen_col_mean(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -265,6 +269,25 @@ class HiFrames(object):
                     count += 1
             if not count:
                 s = np.nan
+        f_blocks = get_inner_ir(f)
+        replace_var_names(f_blocks, {'A': col_var.name})
+        replace_var_names(f_blocks, {'s': out_var.name})
+        loc = out_var.loc
+        f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
+        return f_blocks
+
+    def _gen_col_mean(self, out_var, args, col_var):
+        def f(A, s):
+            count = 0
+            for i in numba.parfor.prange(len(A)):
+                val = A[i]
+                if not np.isnan(val):
+                    s += val
+                    count += 1
+            if not count:
+                s = np.nan
+            else:
+                s = s/count
         f_blocks = get_inner_ir(f)
         replace_var_names(f_blocks, {'A': col_var.name})
         replace_var_names(f_blocks, {'s': out_var.name})
