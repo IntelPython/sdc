@@ -41,8 +41,8 @@ class HiFrames(object):
 
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
-        # df_column -> df_var
-        self.df_cols = {}
+        # arrays that are df columns actually (pd.Series)
+        self.df_cols = set()
         self.df_col_calls = {}
 
     def run(self):
@@ -116,7 +116,7 @@ class HiFrames(object):
                                             and isinstance(rhs.index, str)):
                 df = rhs.value.name
                 assign.value = self.df_vars[df][rhs.index]
-                self.df_cols[lhs] = df  # save lhs as column
+                self.df_cols.add(lhs)  # save lhs as column
 
             # df1 = df[df.A > .5]
             if (rhs.op == 'getitem' and rhs.value.name in self.df_vars):
@@ -137,7 +137,7 @@ class HiFrames(object):
                 df_cols = self.df_vars[df]
                 assert rhs.attr in df_cols
                 assign.value = df_cols[rhs.attr]
-                self.df_cols[lhs] = df  # save lhs as column
+                self.df_cols.add(lhs)  # save lhs as column
 
             # c = df.column.shift
             if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
@@ -179,6 +179,7 @@ class HiFrames(object):
 
             # d.rolling(3).sum()
             if rhs.op=='call' and rhs.func.name in self.rolling_calls_agg:
+                self.df_cols.add(lhs) # output is Series
                 return self._gen_rolling_call(rhs.args,
                     *self.rolling_calls_agg[rhs.func.name]+[assign.target])
 
@@ -192,7 +193,7 @@ class HiFrames(object):
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
-            self.df_cols[lhs] = self.df_cols[rhs.name]
+            self.df_cols.add(lhs)
 
         if isinstance(rhs, ir.Const):
             self.const_table[lhs] = rhs.value
@@ -208,16 +209,17 @@ class HiFrames(object):
         return df_cols
 
     def _update_df_cols(self):
-        self.df_cols = {}  # reset
         for df_name, cols_map in self.df_vars.items():
             for col_name, col_var in cols_map.items():
-                self.df_cols[col_var.name] = df_name
+                self.df_cols.add(col_var)
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
-        if func=='fillna':
+        if func is not 'sum':
+            self.df_cols.add(out_var.name) # output is Series except sum
+        if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var)
-        if func=='sum':
+        if func == 'sum':
             return self._gen_col_sum(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
@@ -376,7 +378,6 @@ def get_inner_ir(func):
         if not (name in f_ir.arg_names):
             new_var_dict[name] = mk_unique_var(name)
     replace_var_names(blocks, new_var_dict)
-    f_ir.dump()
     return blocks
 
 def remove_none_return_from_block(last_block):
