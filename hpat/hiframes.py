@@ -17,7 +17,7 @@ def global_deepcopy(self, memo):
     return ir.Global(self.name, self.value, copy.deepcopy(self.loc))
 ir.Global.__deepcopy__ = global_deepcopy
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean']
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var']
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -225,6 +225,8 @@ class HiFrames(object):
             return self._gen_col_sum(out_var, args, col_var)
         if func == 'mean':
             return self._gen_col_mean(out_var, args, col_var)
+        if func == 'var':
+            return self._gen_col_var(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
