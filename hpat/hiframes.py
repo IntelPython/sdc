@@ -361,7 +361,10 @@ class HiFrames(object):
             code_expr = self.make_functions[args[0].name]
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
-            kernel_expr = 'np.{}(np.array([{}]))'.format(func, kernel_args)
+            g_pack = "np"
+            if func in ['std', 'var']:
+                g_pack = "hpat.hiframes_api"
+            kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
             if func == 'sum':  # simplify sum
                 kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
             func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)

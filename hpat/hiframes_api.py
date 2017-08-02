@@ -2,7 +2,9 @@ from __future__ import print_function, division, absolute_import
 
 import numba
 from numba import typeinfer, ir
+from numba import types
 from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 
@@ -124,3 +126,75 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 #         #assert not kws
 #         #assert not args
 #         return signature(ary.copy(layout='C'), types.intp)
+
+
+
+
+def var(A):
+    return 0
+
+def std(A):
+    return 0
+
+# TODO: mean
+
+# copied from numba/numba/typing/arraydecl.py:563
+@infer_global(var)
+@infer_global(std)
+class VarDdof1Type(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        if isinstance(args[0].dtype, (types.Integer, types.Boolean)):
+            return signature(types.float64, *args)
+        return signature(args[0].dtype, *args)
+
+# import numba.typing.arraydecl
+# from numba import types
+# import numba.utils
+# import numpy as np
+
+# copied from numba/numba/typing/arraydecl.py:563
+# def array_attribute_attachment(self, ary):
+#     class VarType(AbstractTemplate):
+#         key = "array.var"
+#         def generic(self, args, kws):
+#             assert not args
+#             # only ddof keyword arg is supported
+#             assert not kws or kws=={'ddof': types.int64}
+#             if isinstance(self.this.dtype, (types.Integer, types.Boolean)):
+#                 sig = signature(types.float64, recvr=self.this)
+#             else:
+#                 sig = signature(self.this.dtype, recvr=self.this)
+#             sig.pysig = numba.utils.pysignature(np.var)
+#             return sig
+#     return types.BoundFunction(VarType, ary)
+#
+# numba.typing.arraydecl.ArrayAttribute.resolve_var = array_attribute_attachment
+
+from numba.targets.imputils import lower_builtin, impl_ret_untracked
+import numpy as np
+
+# copied from numba/numba/targets/arraymath.py:119
+@lower_builtin(var, types.Array)
+def array_var(context, builder, sig, args):
+    def array_var_impl(arr):
+        # TODO: ignore NA
+        # Compute the mean
+        m = arr.mean()
+
+        # Compute the sum of square diffs
+        ssd = 0
+        for v in np.nditer(arr):
+            ssd += (v.item() - m) ** 2
+        return ssd / (arr.size-1)  # ddof=1 in pandas
+
+    res = context.compile_internal(builder, array_var_impl, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+@lower_builtin(std, types.Array)
+def array_std(context, builder, sig, args):
+    def array_std_impl(arry):
+        return var(arry) ** 0.5
+    res = context.compile_internal(builder, array_std_impl, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
