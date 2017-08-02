@@ -17,7 +17,7 @@ def global_deepcopy(self, memo):
     return ir.Global(self.name, self.value, copy.deepcopy(self.loc))
 ir.Global.__deepcopy__ = global_deepcopy
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var']
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -217,7 +217,7 @@ class HiFrames(object):
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
-        if func not in ['sum', 'mean']:
+        if func in ['fillna', 'pct_change', 'shift']:
             self.df_cols.add(out_var.name) # output is Series except sum
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var)
@@ -227,6 +227,8 @@ class HiFrames(object):
             return self._gen_col_mean(out_var, args, col_var)
         if func == 'var':
             return self._gen_col_var(out_var, args, col_var)
+        if func == 'std':
+            return self._gen_col_std(out_var, args, col_var)
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -332,6 +334,26 @@ class HiFrames(object):
         ir_utils._max_label = max(f_blocks.keys())
         f_mean_blocks.update(f_blocks)
         return f_mean_blocks
+
+    def _gen_col_std(self, out_var, args, col_var):
+        loc = out_var.loc
+        scope = out_var.scope
+        # calculate var() first
+        var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
+        f_blocks = self._gen_col_var(var_var, args, col_var)
+        last_label = find_topo_order(f_blocks)[-1]
+        def f(a):
+            a ** 0.5
+        s_blocks = get_inner_ir(f)
+        replace_var_names(s_blocks, {'a': var_var.name})
+        remove_none_return_from_block(s_blocks[0])
+        assert len(s_blocks[0].body) == 2
+        const_node = s_blocks[0].body[0]
+        pow_node = s_blocks[0].body[1]
+        pow_node.target = out_var
+        f_blocks[last_label].body.insert(-3, const_node)
+        f_blocks[last_label].body.insert(-3, pow_node)
+        return f_blocks
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
