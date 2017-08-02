@@ -297,6 +297,42 @@ class HiFrames(object):
         f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
         return f_blocks
 
+    def _gen_col_var(self, out_var, args, col_var):
+        loc = out_var.loc
+        scope = out_var.scope
+        # calculate mean first
+        mean_var = ir.Var(scope, mk_unique_var("mean_val"), loc)
+        f_mean_blocks = self._gen_col_mean(mean_var, args, col_var)
+        f_mean_blocks = add_offset_to_labels(f_mean_blocks, ir_utils._max_label+1)
+        ir_utils._max_label = max(f_mean_blocks.keys())
+        m_last_label = find_topo_order(f_mean_blocks)[-1]
+        remove_none_return_from_block(f_mean_blocks[m_last_label])
+        def f(A, s, m):
+            count = 0
+            for i in numba.parfor.prange(len(A)):
+                val = A[i]
+                if not np.isnan(val):
+                    s += (val-m)**2
+                    count += 1
+            if count <= 1:
+                s = np.nan
+            else:
+                s = s/(count-1)
+        f_blocks = get_inner_ir(f)
+        replace_var_names(f_blocks, {'A': col_var.name})
+        replace_var_names(f_blocks, {'s': out_var.name})
+        replace_var_names(f_blocks, {'m': mean_var.name})
+        f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
+        # attach first var block to last mean block
+        f_mean_blocks[m_last_label].body.extend(f_blocks[0].body)
+        f_blocks.pop(0)
+        f_blocks = add_offset_to_labels(f_blocks, ir_utils._max_label+1)
+        # add offset to jump of first f_block since it didn't go through call
+        f_mean_blocks[m_last_label].body[-1].target += ir_utils._max_label+1
+        ir_utils._max_label = max(f_blocks.keys())
+        f_mean_blocks.update(f_blocks)
+        return f_mean_blocks
+
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
         if func == 'apply':
