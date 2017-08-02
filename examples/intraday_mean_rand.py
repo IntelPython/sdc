@@ -8,26 +8,19 @@ from hpat import prange
 # adopted from:
 # http://www.pythonforfinance.net/2017/02/20/intraday-stock-mean-reversion-trading-backtest-in-python/
 
-@hpat.jit(locals={'s_open': hpat.float64[:], 's_high': hpat.float64[:],
-        's_low': hpat.float64[:], 's_close': hpat.float64[:],
-        's_vol': hpat.float64[:]})
+@hpat.jit
 def intraday_mean_revert():
-    file_name = "stock_data_all_google.hdf5"
-    f = h5py.File(file_name, "r")
-    sym_list = list(f.keys())
-    nsyms = len(sym_list)
+    nsyms = 500
     max_num_days = 4000
     all_res = np.zeros(max_num_days)
 
     t1 = time.time()
     for i in prange(nsyms):
-        symbol = sym_list[i]
-
-        s_open = f[symbol+'/Open'][:]
-        s_high = f[symbol+'/High'][:]
-        s_low = f[symbol+'/Low'][:]
-        s_close = f[symbol+'/Close'][:]
-        s_vol = f[symbol+'/Volume'][:]
+        s_open = 20 * np.random.randn(max_num_days)
+        s_high = 22 * np.random.randn(max_num_days)
+        s_low = 18 * np.random.randn(max_num_days)
+        s_close = 19 * np.random.randn(max_num_days)
+        s_vol = 1000 * np.random.randn(max_num_days)
         df = pd.DataFrame({'Open': s_open, 'High': s_high, 'Low': s_low,
                             'Close': s_close, 'Volume': s_vol,})
 
@@ -53,11 +46,7 @@ def intraday_mean_revert():
         #create a strategy return series by using the daily stock returns where the trade criteria above are met
         df['Rets'] = df['Pct Change'][df['BUY'] == True]
 
-        n_days = len(df['Rets'])
-        res = np.zeros(max_num_days)
-        if n_days:
-            res[-n_days:] = df['Rets'].fillna(0)
-        all_res += res
+        all_res += df['Rets'].fillna(0)
 
     print(all_res.mean())
     print("execution time:", time.time()-t1)
