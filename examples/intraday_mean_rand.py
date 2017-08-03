@@ -11,11 +11,12 @@ from hpat import prange
 @hpat.jit
 def intraday_mean_revert():
     nsyms = 1000
-    max_num_days = 8000
-    all_res = np.zeros(max_num_days)
+    max_num_days = 80000
+    all_res = 0.0
 
     t1 = time.time()
     for i in prange(nsyms):
+        #np.random.seed(0)
         s_open = 20 * np.random.randn(max_num_days)
         s_low = 18 * np.random.randn(max_num_days)
         s_close = 19 * np.random.randn(max_num_days)
@@ -44,9 +45,9 @@ def intraday_mean_revert():
         #create a strategy return series by using the daily stock returns where the trade criteria above are met
         df['Rets'] = df['Pct Change'][df['BUY'] == True]
 
-        all_res += df['Rets'].fillna(0)
+        all_res += df['Rets'].mean()
 
-    print(all_res.mean())
+    print(all_res)
     print("execution time:", time.time()-t1)
 
 intraday_mean_revert()
