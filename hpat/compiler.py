@@ -35,7 +35,7 @@ def stage_df_pass(pipeline):
     """
     # Ensure we have an IR and type information.
     assert pipeline.func_ir
-    df_pass = HiFrames(pipeline.func_ir)
+    df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx, pipeline.args)
     df_pass.run()
 
 def stage_inline_pass(pipeline):

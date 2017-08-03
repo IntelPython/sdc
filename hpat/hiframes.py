@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 import types as pytypes  # avoid confusion with numba.types
 
 import numba
-from numba import ir, config, ir_utils
+from numba import ir, config, ir_utils, types
 from numba import compiler as numba_compiler
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
@@ -21,8 +21,10 @@ df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
-    def __init__(self, func_ir):
+    def __init__(self, func_ir, typingctx, args):
         self.func_ir = func_ir
+        self.typingctx = typingctx
+        self.args = args
         ir_utils._max_label = max(func_ir.blocks.keys())
 
         # varname -> 'str'
@@ -63,26 +65,16 @@ class HiFrames(object):
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
-                        inner_blocks = add_offset_to_labels(out_nodes, ir_utils._max_label+1)
-                        self.func_ir.blocks.update(inner_blocks)
-                        ir_utils._max_label = max(self.func_ir.blocks.keys())
-                        scope = self.func_ir.blocks[label].scope
-                        loc = self.func_ir.blocks[label].loc
-                        inner_topo_order = find_topo_order(inner_blocks)
-                        inner_first_label = inner_topo_order[0]
-                        inner_last_label = inner_topo_order[-1]
-                        remove_none_return_from_block(inner_blocks[inner_last_label])
-                        new_body.append(ir.Jump(inner_first_label, loc))
-                        self.func_ir.blocks[label].body = new_body
-                        label = ir_utils.next_label()
-                        self.func_ir.blocks[label] = ir.Block(scope, loc)
-                        inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
+                        label = include_new_blocks(self.func_ir.blocks, out_nodes, label, new_body)
                         new_body = []
                 else:
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
 
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
+                self.typingctx, self.func_ir, self.args, None)
+        self.fix_series_filter(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if config.DEBUG_ARRAY_OPT==1:
             print("df_vars: ", self.df_vars)
@@ -132,6 +124,9 @@ class HiFrames(object):
                 self._update_df_cols()
                 return [hiframes_api.Filter(lhs, rhs.value.name, rhs.index,
                                                         self.df_vars, rhs.loc)]
+
+            # if (rhs.op == 'getitem' and rhs.value.name in self.df_cols):
+            #     self.col_filters.add(assign)
 
             # d = df.column
             if rhs.op=='getattr' and rhs.value.name in self.df_vars:
@@ -213,7 +208,7 @@ class HiFrames(object):
     def _update_df_cols(self):
         for df_name, cols_map in self.df_vars.items():
             for col_name, col_var in cols_map.items():
-                self.df_cols.add(col_var)
+                self.df_cols.add(col_var.name)
         return
 
     def _gen_column_call(self, out_var, args, col_var, func):
@@ -405,6 +400,45 @@ class HiFrames(object):
 
         return stencil_nodes + setitem_nodes
 
+    def fix_series_filter(self, blocks):
+        topo_order = find_topo_order(blocks)
+        for label in topo_order:
+            new_body = []
+            for stmt in blocks[label].body:
+                # find df['col2'] = df['col1'][arr]
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op=='getitem'
+                        and stmt.value.value.name in self.df_cols
+                        and stmt.target.name in self.df_cols
+                        and self.is_bool_arr(stmt.value.index.name)):
+                    lhs = stmt.target
+                    in_arr = stmt.value.value
+                    index_var = stmt.value.index
+                    def f(A, B, ind):
+                        for i in numba.parfor.prange(len(A)):
+                            if ind[i]:
+                                A[i] = B[i]
+                            else:
+                                A[i] = np.nan
+                    f_blocks = get_inner_ir(f)
+                    replace_var_names(f_blocks, {'A': lhs.name})
+                    replace_var_names(f_blocks, {'B': in_arr.name})
+                    replace_var_names(f_blocks, {'ind': index_var.name})
+                    alloc_nodes = gen_empty_like(in_arr, lhs)
+                    f_blocks[0].body = alloc_nodes + f_blocks[0].body
+                    label = include_new_blocks(blocks, f_blocks, label, new_body)
+                    new_body = []
+                else:
+                    new_body.append(stmt)
+            blocks[label].body = new_body
+
+        return
+
+    def is_bool_arr(self, varname):
+        typ = self.typemap[varname]
+        return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
+
 def gen_empty_like(in_arr, out_arr):
     scope = in_arr.scope
     loc = in_arr.loc
@@ -478,3 +512,21 @@ def remove_none_return_from_block(last_block):
         and isinstance(last_block.body[-1].value, ir.Const)
         and last_block.body[-1].value.value == None)
     last_block.body.pop()
+
+def include_new_blocks(blocks, new_blocks, label, new_body):
+    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label+1)
+    blocks.update(inner_blocks)
+    ir_utils._max_label = max(blocks.keys())
+    scope = blocks[label].scope
+    loc = blocks[label].loc
+    inner_topo_order = find_topo_order(inner_blocks)
+    inner_first_label = inner_topo_order[0]
+    inner_last_label = inner_topo_order[-1]
+    remove_none_return_from_block(inner_blocks[inner_last_label])
+    new_body.append(ir.Jump(inner_first_label, loc))
+    blocks[label].body = new_body
+    label = ir_utils.next_label()
+    blocks[label] = ir.Block(scope, loc)
+    inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
+    #new_body.clear()
+    return label
