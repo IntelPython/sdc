@@ -33,12 +33,21 @@ class DistributedAnalysis(object):
         self._tuple_table = get_tuple_table(func_ir.blocks)
         self._parallel_accesses = set()
         self._T_arrs = set()
+        self.second_pass = False
+        self.in_parallel_parfor = False
 
     def run(self):
         blocks = self.func_ir.blocks
         array_dists = {}
         parfor_dists = {}
         topo_order = find_topo_order(blocks)
+        self._run_analysis(self.func_ir.blocks, topo_order, array_dists, parfor_dists)
+        self.second_pass = True
+        self._run_analysis(self.func_ir.blocks, topo_order, array_dists, parfor_dists)
+
+        return _dist_analysis_result(array_dists=array_dists, parfor_dists=parfor_dists)
+
+    def _run_analysis(self, blocks, topo_order, array_dists, parfor_dists):
         save_array_dists = {}
         save_parfor_dists = {1:1} # dummy value
         # fixed-point iteration
@@ -47,8 +56,6 @@ class DistributedAnalysis(object):
             save_parfor_dists = copy.copy(parfor_dists)
             for label in topo_order:
                 self._analyze_block(blocks[label], array_dists, parfor_dists)
-
-        return _dist_analysis_result(array_dists=array_dists, parfor_dists=parfor_dists)
 
     def _analyze_block(self, block, array_dists, parfor_dists):
         for inst in block.body:
@@ -108,6 +115,8 @@ class DistributedAnalysis(object):
         # analyze init block first to see array definitions
         self._analyze_block(parfor.init_block, array_dists, parfor_dists)
         out_dist = Distribution.OneD
+        if self.in_parallel_parfor:
+            out_dist = Distribution.REP
 
         parfor_arrs = set() # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
@@ -136,10 +145,13 @@ class DistributedAnalysis(object):
                 array_dists[arr] = out_dist
 
         # run analysis recursively on parfor body
+        if self.second_pass and out_dist==Distribution.OneD:
+            self.in_parallel_parfor = True
         blocks = wrap_parfor_blocks(parfor)
         for b in blocks.values():
             self._analyze_block(b, array_dists, parfor_dists)
         unwrap_parfor_blocks(parfor)
+        self.in_parallel_parfor = False
         return
 
     def _analyze_call(self, lhs, func_var, args, array_dists):
