@@ -10,19 +10,17 @@ from hpat import prange
 
 @hpat.jit
 def intraday_mean_revert():
-    nsyms = 500
-    max_num_days = 4000
+    nsyms = 1000
+    max_num_days = 8000
     all_res = np.zeros(max_num_days)
 
     t1 = time.time()
     for i in prange(nsyms):
         s_open = 20 * np.random.randn(max_num_days)
-        s_high = 22 * np.random.randn(max_num_days)
         s_low = 18 * np.random.randn(max_num_days)
         s_close = 19 * np.random.randn(max_num_days)
-        s_vol = 1000 * np.random.randn(max_num_days)
-        df = pd.DataFrame({'Open': s_open, 'High': s_high, 'Low': s_low,
-                            'Close': s_close, 'Volume': s_vol,})
+        df = pd.DataFrame({'Open': s_open, 'Low': s_low,
+                            'Close': s_close})
 
         #create column to hold our 90 day rolling standard deviation
         df['Stdev'] = df['Close'].rolling(window=90).std()
