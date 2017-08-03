@@ -8,7 +8,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names, add_offset_to_labels)
 import hpat
-from hpat import hiframes_api
+from hpat import hiframes_api, pio
 import numpy as np
 import pandas
 
@@ -21,10 +21,11 @@ df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
-    def __init__(self, func_ir, typingctx, args):
+    def __init__(self, func_ir, typingctx, args, _locals):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.args = args
+        self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
 
         # varname -> 'str'
@@ -72,6 +73,8 @@ class HiFrames(object):
             self.func_ir.blocks[label].body = new_body
 
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        io_pass = pio.PIO(self.func_ir, self.locals)
+        io_pass.run()
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
                 self.typingctx, self.func_ir, self.args, None)
         self.fix_series_filter(self.func_ir.blocks)

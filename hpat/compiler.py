@@ -35,7 +35,7 @@ def stage_df_pass(pipeline):
     """
     # Ensure we have an IR and type information.
     assert pipeline.func_ir
-    df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx, pipeline.args)
+    df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx, pipeline.args, pipeline.locals)
     df_pass.run()
 
 def stage_inline_pass(pipeline):
@@ -53,7 +53,8 @@ def add_hpat_stages(pipeline_manager, pipeline):
         if desc=='nopython frontend':
             new_pp.append((lambda:stage_inline_pass(pipeline), "inline funcs"))
             new_pp.append((lambda:stage_df_pass(pipeline), "convert DataFrames"))
-            new_pp.append((lambda:stage_io_pass(pipeline), "replace IO calls"))
+            # run io pass in df pass to enable type inference
+            #new_pp.append((lambda:stage_io_pass(pipeline), "replace IO calls"))
         if desc=='nopython mode backend':
             new_pp.append((lambda:stage_distributed_pass(pipeline), "convert to distributed"))
         new_pp.append((func,desc))
