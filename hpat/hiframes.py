@@ -420,10 +420,12 @@ class HiFrames(object):
                     index_var = stmt.value.index
                     def f(A, B, ind):
                         for i in numba.parfor.prange(len(A)):
+                            s = 0
                             if ind[i]:
-                                A[i] = B[i]
+                                s = B[i]
                             else:
-                                A[i] = np.nan
+                                s= np.nan
+                            A[i] = s
                     f_blocks = get_inner_ir(f)
                     replace_var_names(f_blocks, {'A': lhs.name})
                     replace_var_names(f_blocks, {'B': in_arr.name})
