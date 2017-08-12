@@ -85,7 +85,10 @@ PyMODINIT_FUNC PyInit_hdist(void) {
 
 int hpat_dist_get_rank()
 {
-    MPI_Init(NULL,NULL);
+    int is_initialized;
+    MPI_Initialized(&is_initialized);
+    if (!is_initialized)
+        MPI_Init(NULL, NULL);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // printf("my_rank:%d\n", rank);
