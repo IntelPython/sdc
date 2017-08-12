@@ -11,13 +11,17 @@ def get_size():
     """dummy function for C mpi get_size"""
     return 0
 
-def get_end(total_size, div, pes, rank):
+def get_start(total_size, pes, rank):
     """get end point of range for parfor division"""
-    return total_size if rank==pes-1 else (rank+1)*div
+    return 0
 
-def get_node_portion(total_size, div, pes, rank):
+def get_end(total_size, pes, rank):
+    """get end point of range for parfor division"""
+    return 0
+
+def get_node_portion(total_size, pes, rank):
     """get portion of size for alloc division"""
-    return total_size-div*rank if rank==pes-1 else div
+    return 0
 
 def dist_reduce(value):
     """dummy to implement simple reductions"""
@@ -65,18 +69,25 @@ class DistSize(AbstractTemplate):
         assert len(args)==0
         return signature(types.int32, *args)
 
+@infer_global(get_start)
+class DistStart(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==3
+        return signature(types.int64, *args)
+
 @infer_global(get_end)
 class DistEnd(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==4
+        assert len(args)==3
         return signature(types.int64, *args)
 
 @infer_global(get_node_portion)
 class DistPortion(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==4
+        assert len(args)==3
         return signature(types.int64, *args)
 
 @infer_global(dist_reduce)

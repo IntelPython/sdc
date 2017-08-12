@@ -1,13 +1,14 @@
 #include <stdbool.h>
 #include "mpi.h"
+#include <cmath>
+#include <algorithm>
 #include <Python.h>
 
 int hpat_dist_get_rank();
 int hpat_dist_get_size();
-int64_t hpat_dist_get_end(int64_t total, int64_t div_chunk, int num_pes,
-                            int node_id);
-int64_t hpat_dist_get_node_portion(int64_t total, int64_t div_chunk,
-                                    int num_pes, int node_id);
+int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id);
+int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id);
+int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id);
 double hpat_dist_get_time();
 MPI_Datatype get_MPI_typ(int typ_enum);
 int get_elem_size(int type_enum);
@@ -43,6 +44,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_rank)));
     PyObject_SetAttrString(m, "hpat_dist_get_size",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_size)));
+    PyObject_SetAttrString(m, "hpat_dist_get_start",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_get_start)));
     PyObject_SetAttrString(m, "hpat_dist_get_end",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_end)));
     PyObject_SetAttrString(m, "hpat_dist_get_node_portion",
@@ -103,17 +106,29 @@ int hpat_dist_get_size()
     return size;
 }
 
-int64_t hpat_dist_get_end(int64_t total, int64_t div_chunk, int num_pes,
-                            int node_id)
+int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id)
 {
-    return ((node_id==num_pes-1) ? total : (node_id+1)*div_chunk);
+    int64_t div_chunk = (int64_t)ceil(total/((double)num_pes));
+    int64_t start = std::min(total, node_id*div_chunk);
+    // printf("rank %d start:%lld\n", node_id, start);
+    return start;
 }
 
-int64_t hpat_dist_get_node_portion(int64_t total, int64_t div_chunk,
-                                    int num_pes, int node_id)
+int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id)
 {
-    int64_t portion = ((node_id==num_pes-1) ? total-node_id*div_chunk : div_chunk);
-    // printf("portion:%lld\n", portion);
+    int64_t div_chunk = (int64_t)ceil(total/((double)num_pes));
+    int64_t end = std::min(total, (node_id+1)*div_chunk);
+    // printf("rank %d end:%lld\n", node_id, end);
+    return end;
+}
+
+int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id)
+{
+    int64_t div_chunk = (int64_t)ceil(total/((double)num_pes));
+    int64_t start = std::min(total, node_id*div_chunk);
+    int64_t end = std::min(total, (node_id+1)*div_chunk);
+    int64_t portion = end-start;
+    // printf("rank %d portion:%lld\n", node_id, portion);
     return portion;
 }
 

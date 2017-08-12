@@ -11,6 +11,7 @@ import hdist
 import llvmlite.binding as ll
 ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
 ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
+ll.add_symbol('hpat_dist_get_start', hdist.hpat_dist_get_start)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
@@ -41,19 +42,26 @@ def dist_get_size(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_size")
     return builder.call(fn, [])
 
-@lower_builtin(distributed_api.get_end, types.int64, types.int64, types.int32, types.int32)
+@lower_builtin(distributed_api.get_start, types.int64, types.int32, types.int32)
+def dist_get_start(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64),
+                                            lir.IntType(32), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_start")
+    return builder.call(fn, [args[0], args[1], args[2]])
+
+@lower_builtin(distributed_api.get_end, types.int64, types.int32, types.int32)
 def dist_get_end(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_end")
-    return builder.call(fn, [args[0], args[1], args[2], args[3]])
+    return builder.call(fn, [args[0], args[1], args[2]])
 
-@lower_builtin(distributed_api.get_node_portion, types.int64, types.int64, types.int32, types.int32)
+@lower_builtin(distributed_api.get_node_portion, types.int64, types.int32, types.int32)
 def dist_get_portion(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64),
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64),
                                             lir.IntType(32), lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_node_portion")
-    return builder.call(fn, [args[0], args[1], args[2], args[3]])
+    return builder.call(fn, [args[0], args[1], args[2]])
 
 @lower_builtin(distributed_api.dist_reduce, types.int64)
 @lower_builtin(distributed_api.dist_reduce, types.int32)
