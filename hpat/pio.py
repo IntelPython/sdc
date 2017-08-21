@@ -96,8 +96,10 @@ class PIO(object):
             if rhs.op=='getitem' and rhs.value.name in self.h5_files:
                 self.h5_dsets[lhs] = (rhs.value, rhs.index)
             # x = f['dset'][:]
-            if rhs.op=='static_getitem' and rhs.value.name in self.h5_dsets:
+            # x = f['dset'][a:b]
+            if (rhs.op=='static_getitem' or rhs.op=='getitem') and rhs.value.name in self.h5_dsets:
                 return self._gen_h5read(assign.target, rhs)
+
             # f.close or f.create_dataset
             if rhs.op=='getattr' and rhs.value.name in self.h5_files:
                 if rhs.attr=='close':
@@ -182,9 +184,13 @@ class PIO(object):
         scope = rhs.value.scope
         # TODO: generate size, alloc calls
         out = []
-        size_vars = self._gen_h5size(f_id, dset, dset_type.ndim, scope, loc, out)
+        if rhs.op == 'static_getitem':
+            start_vars = None
+            size_vars = self._gen_h5size(f_id, dset, dset_type.ndim, scope, loc, out)
+        else:
+            start_vars, size_vars = self._get_slice_range(rhs.index)
         out.extend(mk_alloc(None, None, lhs_var, tuple(size_vars), dset_type.dtype, scope, loc))
-        self._gen_h5read_call(f_id, dset, size_vars, lhs_var, scope, loc, out)
+        self._gen_h5read_call(f_id, dset, start_vars, size_vars, lhs_var, scope, loc, out)
         return out
 
     def _gen_h5size(self, f_id, dset, ndims, scope, loc, out):
@@ -210,7 +216,9 @@ class PIO(object):
             out.append(size_assign)
         return size_vars
 
-    def _gen_h5read_call(self, f_id, dset, size_vars, lhs_var, scope, loc, out):
+    def _gen_h5read_call(self, f_id, dset, start_vars, size_vars, lhs_var, scope, loc, out):
+        if not start_vars:
+            start_vars = [zero_var]*ndims
         # g_pio_var = Global(hpat.pio_api)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
         g_pio = ir.Global('pio_api', hpat.pio_api, loc)
@@ -234,7 +242,7 @@ class PIO(object):
         zero_assign = ir.Assign(ir.Const(0, loc), zero_var, loc)
         # starts: assign to zeros
         starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
-        start_tuple_call = ir.Expr.build_tuple([zero_var]*ndims, loc)
+        start_tuple_call = ir.Expr.build_tuple(start_vars, loc)
         starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
         out += [ndims_assign, zero_assign, starts_assign, sizes_assign]
 
@@ -328,3 +336,7 @@ class PIO(object):
         # add to files since group behavior is same as files for many calls
         self.h5_files[lhs_var.name] = "group"
         return [g_pio_assign, attr_assign, create_group_assign]
+
+    def _get_slice_range(self, index_slice):
+        #
+        return 0,0
