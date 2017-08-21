@@ -188,7 +188,7 @@ class PIO(object):
             start_vars = None
             size_vars = self._gen_h5size(f_id, dset, dset_type.ndim, scope, loc, out)
         else:
-            start_vars, size_vars = self._get_slice_range(rhs.index)
+            start_vars, size_vars = self._get_slice_range(rhs.index, out)
         out.extend(mk_alloc(None, None, lhs_var, tuple(size_vars), dset_type.dtype, scope, loc))
         self._gen_h5read_call(f_id, dset, start_vars, size_vars, lhs_var, scope, loc, out)
         return out
@@ -217,8 +217,6 @@ class PIO(object):
         return size_vars
 
     def _gen_h5read_call(self, f_id, dset, start_vars, size_vars, lhs_var, scope, loc, out):
-        if not start_vars:
-            start_vars = [zero_var]*ndims
         # g_pio_var = Global(hpat.pio_api)
         g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
         g_pio = ir.Global('pio_api', hpat.pio_api, loc)
@@ -241,6 +239,8 @@ class PIO(object):
         zero_var = ir.Var(scope, mk_unique_var("$const_zero"), loc)
         zero_assign = ir.Assign(ir.Const(0, loc), zero_var, loc)
         # starts: assign to zeros
+        if not start_vars:
+            start_vars = [zero_var]*ndims
         starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
         start_tuple_call = ir.Expr.build_tuple(start_vars, loc)
         starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
@@ -337,6 +337,20 @@ class PIO(object):
         self.h5_files[lhs_var.name] = "group"
         return [g_pio_assign, attr_assign, create_group_assign]
 
-    def _get_slice_range(self, index_slice):
-        #
-        return 0,0
+    def _get_slice_range(self, index_slice, out):
+        scope = index_slice.scope
+        loc = index_slice.loc
+        # start = s.start
+        start_var = ir.Var(scope, mk_unique_var("$pio_range_start"), loc)
+        start_attr_call = ir.Expr.getattr(index_slice, "start", loc)
+        start_assign = ir.Assign(start_attr_call, start_var, loc)
+        # stop = s.stop
+        stop_var = ir.Var(scope, mk_unique_var("$pio_range_stop"), loc)
+        stop_attr_call = ir.Expr.getattr(index_slice, "stop", loc)
+        stop_assign = ir.Assign(stop_attr_call, stop_var, loc)
+        # size = stop-start
+        size_var = ir.Var(scope, mk_unique_var("$pio_range_size"), loc)
+        size_call = ir.Expr.binop('-', stop_var, start_var, loc)
+        size_assign = ir.Assign(size_call, size_var, loc)
+        out += [start_assign, stop_assign, size_assign]
+        return [start_var], [size_var]
