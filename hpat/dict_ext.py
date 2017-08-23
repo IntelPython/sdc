@@ -117,6 +117,7 @@ class DictKeyIteratorType(types.SimpleIterableType):
                             'DictKeyIteratorType{}{}'.format(key_typ, val_typ))
 
 dict_key_iterator_int_int_type = DictKeyIteratorType(types.intp, types.intp)
+dict_key_iterator_int32_int32_type = DictKeyIteratorType(types.int32, types.int32)
 
 register_model(DictKeyIteratorType)(models.OpaqueModel)
 
@@ -139,6 +140,19 @@ ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
 ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
 ll.add_symbol('dict_int_int_not_empty', hdict_ext.dict_int_int_not_empty)
 
+# int32 versions
+ll.add_symbol('init_dict_int32_int32', hdict_ext.init_dict_int32_int32)
+ll.add_symbol('dict_int32_int32_setitem', hdict_ext.dict_int32_int32_setitem)
+ll.add_symbol('dict_int32_int32_print', hdict_ext.dict_int32_int32_print)
+ll.add_symbol('dict_int32_int32_get', hdict_ext.dict_int32_int32_get)
+ll.add_symbol('dict_int32_int32_getitem', hdict_ext.dict_int32_int32_getitem)
+ll.add_symbol('dict_int32_int32_pop', hdict_ext.dict_int32_int32_pop)
+ll.add_symbol('dict_int32_int32_keys', hdict_ext.dict_int32_int32_keys)
+ll.add_symbol('dict_int32_int32_min', hdict_ext.dict_int32_int32_min)
+ll.add_symbol('dict_int32_int32_max', hdict_ext.dict_int32_int32_max)
+ll.add_symbol('dict_int32_int32_not_empty', hdict_ext.dict_int32_int32_not_empty)
+
+
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [])
@@ -151,7 +165,7 @@ def setitem_dict(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_setitem")
     return builder.call(fn, args)
 
-@lower_builtin("print_item", DictType)
+@lower_builtin("print_item", dict_int_int_type)
 def print_dict(context, builder, sig, args):
     # pyapi = context.get_python_api(builder)
     # strobj = pyapi.unserialize(pyapi.serialize_object("hello!"))
@@ -180,26 +194,93 @@ def lower_dict_pop(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_pop")
     return builder.call(fn, args)
 
-@lower_builtin("dict.keys", DictType)
+@lower_builtin("dict.keys", dict_int_int_type)
 def lower_dict_keys(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_keys")
     return builder.call(fn, args)
 
-@lower_builtin(min, DictKeyIteratorType)
+@lower_builtin(min, dict_key_iterator_int_int_type)
 def lower_dict_min(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_min")
     return builder.call(fn, args)
 
-@lower_builtin(max, DictKeyIteratorType)
+@lower_builtin(max, dict_key_iterator_int_int_type)
 def lower_dict_max(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_max")
     return builder.call(fn, args)
 
-@lower_cast(DictType, types.boolean)
+@lower_cast(dict_int_int_type, types.boolean)
 def dict_empty(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_not_empty")
+    return builder.call(fn, (val,))
+
+
+# ------ int32 versions ------
+@lower_builtin(DictInt32Int32)
+def impl_dict_int_int(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [])
+    fn = builder.module.get_or_insert_function(fnty, name="init_dict_int32_int32")
+    return builder.call(fn, [])
+
+@lower_builtin('setitem', DictType, types.int32, types.int32)
+def setitem_dict(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(), lir.IntType(32), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_setitem")
+    return builder.call(fn, args)
+
+@lower_builtin("print_item", dict_int32_int32_type)
+def print_dict(context, builder, sig, args):
+    # pyapi = context.get_python_api(builder)
+    # strobj = pyapi.unserialize(pyapi.serialize_object("hello!"))
+    # pyapi.print_object(strobj)
+    # pyapi.decref(strobj)
+    # return context.get_dummy_value()
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_print")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.get", DictType, types.int32, types.int32)
+def lower_dict_get(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer(), lir.IntType(32), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_get")
+    return builder.call(fn, args)
+
+@lower_builtin("getitem", DictType, types.int32)
+def lower_dict_getitem(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer(), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_getitem")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.pop", DictType, types.int32)
+def lower_dict_pop(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer(), lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_pop")
+    return builder.call(fn, args)
+
+@lower_builtin("dict.keys", dict_int32_int32_type)
+def lower_dict_keys(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_keys")
+    return builder.call(fn, args)
+
+@lower_builtin(min, dict_key_iterator_int32_int32_type)
+def lower_dict_min(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_min")
+    return builder.call(fn, args)
+
+@lower_builtin(max, dict_key_iterator_int32_int32_type)
+def lower_dict_max(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_max")
+    return builder.call(fn, args)
+
+@lower_cast(dict_int32_int32_type, types.boolean)
+def dict_empty(context, builder, fromty, toty, val):
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int32_int32_not_empty")
     return builder.call(fn, (val,))

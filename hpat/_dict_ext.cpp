@@ -14,6 +14,19 @@ int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m);
 bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m);
 
+// -- int32 versions --
+void* init_dict_int32_int32();
+void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value);
+void dict_int32_int32_print(std::unordered_map<int, int>* m);
+int dict_int32_int32_get(std::unordered_map<int, int>* m, int index, int default_val);
+int dict_int32_int32_getitem(std::unordered_map<int, int>* m, int index);
+int dict_int32_int32_pop(std::unordered_map<int, int>* m, int index);
+void* dict_int32_int32_keys(std::unordered_map<int, int>* m);
+int dict_int32_int32_min(std::unordered_map<int, int>* m);
+int dict_int32_int32_max(std::unordered_map<int, int>* m);
+bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
+
+
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -42,6 +55,27 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dict_int_int_max)));
     PyObject_SetAttrString(m, "dict_int_int_not_empty",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_not_empty)));
+    // ---- int32 versions ----
+    PyObject_SetAttrString(m, "init_dict_int32_int32",
+                            PyLong_FromVoidPtr((void*)(&init_dict_int32_int32)));
+    PyObject_SetAttrString(m, "dict_int32_int32_setitem",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_setitem)));
+    PyObject_SetAttrString(m, "dict_int32_int32_print",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_print)));
+    PyObject_SetAttrString(m, "dict_int32_int32_get",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_get)));
+    PyObject_SetAttrString(m, "dict_int32_int32_getitem",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_getitem)));
+    PyObject_SetAttrString(m, "dict_int32_int32_pop",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_pop)));
+    PyObject_SetAttrString(m, "dict_int32_int32_keys",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_keys)));
+    PyObject_SetAttrString(m, "dict_int32_int32_min",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_min)));
+    PyObject_SetAttrString(m, "dict_int32_int32_max",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_max)));
+    PyObject_SetAttrString(m, "dict_int32_int32_not_empty",
+                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_not_empty)));
     return m;
 }
 
@@ -114,6 +148,81 @@ int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m)
 }
 
 bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m)
+{
+    return !m->empty();
+}
+
+
+// --------- int32 versions ------
+void* init_dict_int32_int32()
+{
+    return new std::unordered_map<int, int>();
+}
+
+void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value)
+{
+    (*m)[index] = value;
+    return;
+}
+
+void dict_int32_int32_print(std::unordered_map<int, int>* m)
+{
+    // TODO: return python string and print in native mode
+    for (auto& x: *m) {
+        std::cout << x.first << ": " << x.second << std::endl;
+    }
+    return;
+}
+
+int dict_int32_int32_get(std::unordered_map<int, int>* m, int index, int default_val)
+{
+    auto val = m->find(index);
+    if (val==m->end())
+        return default_val;
+    return (*val).second;
+}
+
+int dict_int32_int32_getitem(std::unordered_map<int, int>* m, int index)
+{
+    return m->at(index);
+}
+
+int dict_int32_int32_pop(std::unordered_map<int, int>* m, int index)
+{
+    int val = m->at(index);
+    m->erase(index);
+    return val;
+}
+
+void* dict_int32_int32_keys(std::unordered_map<int, int>* m)
+{
+    // TODO: return actual iterator
+    return m;
+}
+
+int dict_int32_int32_min(std::unordered_map<int, int>* m)
+{
+    // TODO: use actual iterator
+    int res = std::numeric_limits<int>::max();
+    for (auto& x: *m) {
+        if (x.first<res)
+            res = x.first;
+    }
+    return res;
+}
+
+int dict_int32_int32_max(std::unordered_map<int, int>* m)
+{
+    // TODO: use actual iterator
+    int res = std::numeric_limits<int>::min();
+    for (auto& x: *m) {
+        if (x.first>res)
+            res = x.first;
+    }
+    return res;
+}
+
+bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m)
 {
     return !m->empty();
 }

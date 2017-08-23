@@ -3,7 +3,7 @@ from __future__ import print_function, division, absolute_import
 import numba
 from numba import *
 import hpat.dict_ext
-from hpat.dict_ext import DictIntInt, dict_int_int_type
+from hpat.dict_ext import DictIntInt, DictInt32Int32, dict_int_int_type, dict_int32_int32_type
 import hpat.str_ext
 
 def jit(signature_or_function=None, **options):
