@@ -14,11 +14,16 @@ class DictType(types.Opaque):
     def __init__(self, key_typ, val_typ):
         self.key_typ = key_typ
         self.val_typ = val_typ
-        super(DictType, self).__init__(name='DictType')
+        super(DictType, self).__init__(name='DictType{}{}'.format(key_typ, val_typ))
 
 dict_int_int_type = DictType(types.intp, types.intp)
+dict_int32_int32_type = DictType(types.int32, types.int32)
 
 class DictIntInt(object):
+    def __new__(cls, *args):
+        return {}
+
+class DictInt32Int32(object):
     def __new__(cls, *args):
         return {}
 
@@ -26,10 +31,20 @@ class DictIntInt(object):
 def typeof_index(val, c):
     return dict_int_int_type
 
+@typeof_impl.register(DictInt32Int32)
+def typeof_index(val, c):
+    return dict_int32_int32_type
+
 @type_callable(DictIntInt)
 def type_dict(context):
     def typer():
         return dict_int_int_type
+    return typer
+
+@type_callable(DictInt32Int32)
+def type_dict(context):
+    def typer():
+        return dict_int32_int32_type
     return typer
 
 @infer
@@ -55,11 +70,12 @@ class GetItemDict(AbstractTemplate):
 @infer
 class PrintDictIntInt(ConcreteTemplate):
     key = "print_item"
-    cases = [signature(types.none, dict_int_int_type)]
+    cases = [signature(types.none, dict_int_int_type),
+            signature(types.none, dict_int32_int32_type)]
 
 @infer_getattr
 class DictAttribute(AttributeTemplate):
-    key = dict_int_int_type
+    key = DictType
 
     @bound_function("dict.get")
     def resolve_get(self, dict, args, kws):
@@ -70,12 +86,12 @@ class DictAttribute(AttributeTemplate):
     @bound_function("dict.pop")
     def resolve_pop(self, dict, args, kws):
         assert not kws
-        return signature(types.intp, *args)
+        return signature(dict.val_typ, *args)
 
     @bound_function("dict.keys")
     def resolve_keys(self, dict, args, kws):
         assert not kws
-        return signature(dict_key_iterator_int_int_type)
+        return signature(DictKeyIteratorType(dict.key_typ, dict.val_typ))
 
 register_model(DictType)(models.OpaqueModel)
 
@@ -97,7 +113,8 @@ class DictKeyIteratorType(types.SimpleIterableType):
     def __init__(self, key_typ, val_typ):
         self.key_typ = key_typ
         self.val_typ = val_typ
-        super(types.SimpleIterableType, self).__init__('DictKeyIteratorType')
+        super(types.SimpleIterableType, self).__init__(
+                            'DictKeyIteratorType{}{}'.format(key_typ, val_typ))
 
 dict_key_iterator_int_int_type = DictKeyIteratorType(types.intp, types.intp)
 
