@@ -15,6 +15,7 @@ ll.add_symbol('hpat_dist_get_start', hdist.hpat_dist_get_start)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
+ll.add_symbol('hpat_get_time', hdist.hpat_get_time)
 ll.add_symbol('hpat_dist_reduce_i4', hdist.hpat_dist_reduce_i4)
 ll.add_symbol('hpat_dist_reduce_i8', hdist.hpat_dist_reduce_i8)
 ll.add_symbol('hpat_dist_reduce_f4', hdist.hpat_dist_reduce_f4)
@@ -101,6 +102,12 @@ def lower_dist_arr_reduce(context, builder, sig, args):
 
 @lower_builtin(time.time)
 def dist_get_time(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.DoubleType(), [])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_get_time")
+    return builder.call(fn, [])
+
+@lower_builtin(distributed_api.dist_time)
+def dist_get_dist_time(context, builder, sig, args):
     fnty = lir.FunctionType(lir.DoubleType(), [])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_time")
     return builder.call(fn, [])

@@ -46,6 +46,9 @@ def dist_exscan(value):
 def dist_setitem(arr, index, val):
     return 0
 
+def dist_time():
+    return time.time()
+
 def irecv():
     return 0
 
@@ -113,6 +116,13 @@ class DistArrReduce(AbstractTemplate):
 
 @infer_global(time.time)
 class DistTime(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==0
+        return signature(types.float64, *args)
+
+@infer_global(dist_time)
+class DistDistTime(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==0

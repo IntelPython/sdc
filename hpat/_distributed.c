@@ -10,6 +10,7 @@ int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id);
 int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id);
 int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id);
 double hpat_dist_get_time();
+double hpat_get_time();
 MPI_Datatype get_MPI_typ(int typ_enum);
 int get_elem_size(int type_enum);
 int hpat_dist_reduce_i4(int value);
@@ -52,6 +53,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_node_portion)));
     PyObject_SetAttrString(m, "hpat_dist_get_time",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_time)));
+    PyObject_SetAttrString(m, "hpat_get_time",
+                            PyLong_FromVoidPtr((void*)(&hpat_get_time)));
 
     PyObject_SetAttrString(m, "hpat_dist_reduce_i4",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_reduce_i4)));
@@ -140,6 +143,12 @@ double hpat_dist_get_time()
     return wtime;
 }
 
+double hpat_get_time()
+{
+    double wtime;
+    wtime = MPI_Wtime();
+    return wtime;
+}
 
 int hpat_dist_reduce_i4(int value)
 {
