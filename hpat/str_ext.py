@@ -25,11 +25,25 @@ class StringAdd(ConcreteTemplate):
     key = "+"
     cases = [signature(string_type, string_type, string_type)]
 
+@infer
+class StringOpEq(AbstractTemplate):
+    key = '=='
+    def generic(self, args, kws):
+        assert not kws
+        (arg1, arg2) = args
+        if isinstance(arg1, StringType) and isinstance(arg2, StringType):
+            return signature(types.boolean, arg1, arg2)
+
+@infer
+class StringOpNotEq(StringOpEq):
+    key = '!='
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
+ll.add_symbol('str_equal', hstr_ext.str_equal)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -71,3 +85,17 @@ def impl_string_concat(context, builder, sig, args):
                 [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_concat")
     return builder.call(fn, args)
+
+@lower_builtin('==', string_type, string_type)
+def string_eq_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1),
+                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_equal")
+    return builder.call(fn, args)
+
+@lower_builtin('!=', string_type, string_type)
+def string_neq_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1),
+                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_equal")
+    return builder.not_(builder.call(fn, args))

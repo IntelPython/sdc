@@ -6,6 +6,7 @@ void* init_string(char*, int64_t);
 void* init_string_const(char* in_str);
 const char* get_c_str(std::string* s);
 void* str_concat(std::string* s1, std::string* s2);
+bool str_equal(std::string* s1, std::string* s2);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -23,6 +24,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&get_c_str)));
     PyObject_SetAttrString(m, "str_concat",
                             PyLong_FromVoidPtr((void*)(&str_concat)));
+    PyObject_SetAttrString(m, "str_equal",
+                            PyLong_FromVoidPtr((void*)(&str_equal)));
     return m;
 }
 
@@ -49,4 +52,10 @@ void* str_concat(std::string* s1, std::string* s2)
     // printf("in concat %s %s\n", s1->c_str(), s2->c_str());
     std::string* res = new std::string((*s1)+(*s2));
     return res;
+}
+
+bool str_equal(std::string* s1, std::string* s2)
+{
+    // printf("in str_equal %s %s\n", s1->c_str(), s2->c_str());
+    return s1->compare(*s2)==0;
 }
