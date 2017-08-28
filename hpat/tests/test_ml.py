@@ -48,5 +48,24 @@ class TestML(unittest.TestCase):
         #self.assertEqual(count_array_OneDs(), 3)
         #self.assertEqual(count_parfor_OneDs(), 3)
 
+    def test_linear_regression(self):
+        def test_impl(N, D):
+            p = 2
+            iterations = 3
+            X = np.ones((N, D)) + .5
+            Y = np.ones((N, p))
+            alphaN = 0.01 / N
+            w = np.zeros((D, p))
+            for i in range(iterations):
+                w -= alphaN * np.dot(X.T, np.dot(X, w) - Y)
+            return w
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        d = 4
+        np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
+        self.assertEqual(count_array_OneDs(), 5)
+        self.assertEqual(count_parfor_OneDs(), 3)
+
 if __name__ == "__main__":
     unittest.main()
