@@ -245,7 +245,16 @@ class HiFrames(object):
         code_obj = loc_vars['g'].__code__
         code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
         index_offsets = [0]
-        return gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+
+        def f(A):
+            A[:shift_const] = np.nan
+        f_blocks = get_inner_ir(f)
+        remove_none_return_from_block(f_blocks[0])
+        replace_var_names(f_blocks, {'A': out_var.name})
+        setitem_nodes = f_blocks[0].body
+
+        return stencil_nodes+setitem_nodes
 
     def _gen_fillna(self, out_var, args, col_var):
         def f(A, B, fill):
