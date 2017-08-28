@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs)
+                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
 class TestHiFrames(unittest.TestCase):
     def test_cumsum(self):
@@ -19,6 +19,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertTrue(dist_IR_contains('dist_cumsum'))
 
 if __name__ == "__main__":
     unittest.main()

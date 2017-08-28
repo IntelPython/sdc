@@ -19,3 +19,6 @@ def count_array_OneDs():
     from hpat.distributed import Distribution
     vals = hpat.distributed.dist_analysis.array_dists.values()
     return sum([v==Distribution.OneD for v in vals])
+
+def dist_IR_contains(*args):
+    return sum([(s in hpat.distributed.fir_text) for s in args])
