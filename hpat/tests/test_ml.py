@@ -67,5 +67,25 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 5)
         self.assertEqual(count_parfor_OneDs(), 3)
 
+    def test_kde(self):
+        def test_impl(n):
+            X = np.ones(n)
+            b = 0.5
+            points = np.array([-1.0, 2.0, 5.0])
+            N = points.shape[0]
+            exps = 0
+            for i in hpat.prange(n):
+                p = X[i]
+                d = (-(p - points)**2) / (2 * b**2)
+                m = np.min(d)
+                exps += m - np.log(b * N)+np.log(np.sum(np.exp(d - m)))
+            return exps
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        np.testing.assert_approx_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_OneDs(), 1)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
 if __name__ == "__main__":
     unittest.main()
