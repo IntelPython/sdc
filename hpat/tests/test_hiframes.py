@@ -94,5 +94,31 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_intraday(self):
+        def test_impl(nsyms):
+            max_num_days = 100
+            all_res = 0.0
+            for i in hpat.prange(nsyms):
+                s_open = 20 * np.ones(max_num_days)
+                s_low = 28 * np.ones(max_num_days)
+                s_close = 19 * np.ones(max_num_days)
+                df = pd.DataFrame({'Open': s_open, 'Low': s_low,
+                                    'Close': s_close})
+                df['Stdev'] = df['Close'].rolling(window=90).std()
+                df['Moving Average'] = df['Close'].rolling(window=20).mean()
+                df['Criteria1'] = (df['Open'] - df['Low'].shift(1)) < -df['Stdev']
+                df['Criteria2'] = df['Open'] > df['Moving Average']
+                df['BUY'] = df['Criteria1'] & df['Criteria2']
+                df['Pct Change'] = (df['Close'] - df['Open']) / df['Open']
+                df['Rets'] = df['Pct Change'][df['BUY'] == True]
+                all_res += df['Rets'].mean()
+            return all_res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_OneDs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 1)
+
 if __name__ == "__main__":
     unittest.main()
