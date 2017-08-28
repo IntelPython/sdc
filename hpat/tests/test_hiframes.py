@@ -70,5 +70,29 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_shift1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            Ac = df.A.shift(1)
+            return Ac.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_shift2(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            Ac = df.A.pct_change()
+            return Ac.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 if __name__ == "__main__":
     unittest.main()
