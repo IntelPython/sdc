@@ -29,6 +29,9 @@ import time
 
 distributed_run_extensions = {}
 
+# analysis data for debugging
+dist_analysis = None
+
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
     def __init__(self, func_ir, typemap, calltypes):
@@ -76,6 +79,10 @@ class DistributedPass(object):
         lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
+
+        # save data for debug and test
+        global dist_analysis
+        dist_analysis = self._dist_analysis
 
     def _run_dist_pass(self, blocks):
         topo_order = find_topo_order(blocks)
