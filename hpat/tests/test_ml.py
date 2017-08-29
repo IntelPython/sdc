@@ -32,21 +32,21 @@ class TestML(unittest.TestCase):
             iterations = 3
             g = 2 * np.ones(D) - 1
             X = 2 * np.ones((N, D)) - 1
-            Y = (np.dot(X, g) > 0.0) == (np.ones(N) > .90)
+            Y = ((np.dot(X, g) > 0.0) == (np.ones(N) > .90))+.0
 
             w = 2 * np.ones(D) - 1
             for i in range(iterations):
                 w -= np.dot(((1.0 / (1.0 + np.exp(-Y * np.dot(X, w))) - 1.0) * Y), X)
-                #R = np.dot(X,w) > 0.0
-                #accuracy = np.sum(R == Y) / N
-            return w
+                R = np.dot(X, w) > 0.0
+                accuracy = np.sum(R == Y) / N
+            return accuracy
 
         hpat_func = hpat.jit(test_impl)
         n = 11
         d = 4
-        #np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
-        #self.assertEqual(count_array_OneDs(), 3)
-        #self.assertEqual(count_parfor_OneDs(), 3)
+        np.testing.assert_approx_equal(hpat_func(n, d), test_impl(n, d))
+        self.assertEqual(count_array_OneDs(), 3)
+        self.assertEqual(count_parfor_OneDs(), 4)
 
     def test_linear_regression(self):
         def test_impl(N, D):
