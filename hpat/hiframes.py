@@ -72,7 +72,7 @@ class HiFrames(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
 
-        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         io_pass = pio.PIO(self.func_ir, self.locals)
         io_pass.run()
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
