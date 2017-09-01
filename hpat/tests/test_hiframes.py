@@ -34,10 +34,22 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_OneDs(), 2)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
-    def test_filter(self):
+    def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
             df1 = df[df.A > .5]
+            return np.sum(df1.B)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_filter2(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df1 = df.loc[df.A > .5]
             return np.sum(df1.B)
 
         hpat_func = hpat.jit(test_impl)

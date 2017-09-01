@@ -129,6 +129,13 @@ class HiFrames(object):
                 return [hiframes_api.Filter(lhs, rhs.value.name, rhs.index,
                                                         self.df_vars, rhs.loc)]
 
+            # df.loc or df.iloc
+            if rhs.op=='getattr' and rhs.value.name in self.df_vars and rhs.attr in ['loc', 'iloc']:
+                # FIXME: treat iloc and loc as regular df variables so getitem
+                # turns them into filter. Only boolean array is supported
+                self.df_vars[lhs] = self.df_vars[rhs.value.name]
+                return []
+
             # if (rhs.op == 'getitem' and rhs.value.name in self.df_cols):
             #     self.col_filters.add(assign)
 
