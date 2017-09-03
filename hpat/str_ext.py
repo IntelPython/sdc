@@ -49,6 +49,16 @@ class StringAttribute(AttributeTemplate):
         assert len(args) == 1
         return signature(types.List(string_type), *args)
 
+@infer
+class GetItemString(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        if (len(args) == 2 and isinstance(args[0], StringType)
+                and isinstance(args[1], types.Integer)):
+            return signature(args[0], *args)
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
@@ -56,6 +66,7 @@ ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
 ll.add_symbol('str_equal', hstr_ext.str_equal)
 ll.add_symbol('str_split', hstr_ext.str_split)
+ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -131,3 +142,12 @@ def string_split_impl(context, builder, sig, args):
         value = builder.load(cgutils.gep_inbounds(builder, ptr, loop.index))
         _list.setitem(loop.index, value)
     return impl_ret_new_ref(context, builder, sig.return_type, _list.value)
+
+@lower_builtin('getitem', StringType, types.Integer)
+def getitem_string(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                    [lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="str_substr_int")
+    # TODO: handle reference counting
+    #return impl_ret_new_ref(builder.call(fn, args))
+    return (builder.call(fn, args))

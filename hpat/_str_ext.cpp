@@ -9,6 +9,7 @@ const char* get_c_str(std::string* s);
 void* str_concat(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
+void* str_substr_int(std::string* str, int64_t index);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -30,6 +31,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_equal)));
     PyObject_SetAttrString(m, "str_split",
                             PyLong_FromVoidPtr((void*)(&str_split)));
+    PyObject_SetAttrString(m, "str_substr_int",
+                            PyLong_FromVoidPtr((void*)(&str_substr_int)));
     return m;
 }
 
@@ -86,4 +89,9 @@ void* str_split(std::string* str, std::string* sep, int64_t *size)
     memcpy(out, res.data(), (*size)*sizeof(void*));
     // std::cout<< *(((std::string**)(out))[1])<<std::endl;
     return out;
+}
+
+void* str_substr_int(std::string* str, int64_t index)
+{
+    return new std::string(*str, index, 1);
 }
