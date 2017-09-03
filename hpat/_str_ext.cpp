@@ -11,6 +11,7 @@ bool str_equal(std::string* s1, std::string* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
 void* str_substr_int(std::string* str, int64_t index);
 int64_t str_to_int64(std::string* str);
+double str_to_float64(std::string* str);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -36,6 +37,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_substr_int)));
     PyObject_SetAttrString(m, "str_to_int64",
                             PyLong_FromVoidPtr((void*)(&str_to_int64)));
+    PyObject_SetAttrString(m, "str_to_float64",
+                            PyLong_FromVoidPtr((void*)(&str_to_float64)));
     return m;
 }
 
@@ -102,4 +105,9 @@ void* str_substr_int(std::string* str, int64_t index)
 int64_t str_to_int64(std::string* str)
 {
     return std::stoll(*str);
+}
+
+double str_to_float64(std::string* str)
+{
+    return std::stod(*str);
 }
