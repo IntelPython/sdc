@@ -1,6 +1,6 @@
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
-                            NativeValue, lower_builtin)
+                            NativeValue, lower_builtin, lower_cast)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
@@ -59,6 +59,14 @@ class GetItemString(AbstractTemplate):
                 and isinstance(args[1], types.Integer)):
             return signature(args[0], *args)
 
+@infer_global(int)
+class StrToInt(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        [arg] = args
+        if isinstance(arg, StringType):
+            return signature(types.intp, arg)
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
@@ -67,6 +75,7 @@ ll.add_symbol('str_concat', hstr_ext.str_concat)
 ll.add_symbol('str_equal', hstr_ext.str_equal)
 ll.add_symbol('str_split', hstr_ext.str_split)
 ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
+ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -151,3 +160,9 @@ def getitem_string(context, builder, sig, args):
     # TODO: handle reference counting
     #return impl_ret_new_ref(builder.call(fn, args))
     return (builder.call(fn, args))
+
+@lower_cast(StringType, types.int64)
+def dict_empty(context, builder, fromty, toty, val):
+    fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_to_int64")
+    return builder.call(fn, (val,))
