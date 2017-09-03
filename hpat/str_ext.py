@@ -1,8 +1,9 @@
+import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                             NativeValue, lower_builtin)
-from numba.targets.imputils import lower_constant
+from numba.targets.imputils import lower_constant, impl_ret_new_ref
 from numba import types, typing
-from numba.typing.templates import (signature, AbstractTemplate, infer,
+from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
         ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba import cgutils
 from llvmlite import ir as lir
@@ -38,12 +39,23 @@ class StringOpEq(AbstractTemplate):
 class StringOpNotEq(StringOpEq):
     key = '!='
 
+@infer_getattr
+class StringAttribute(AttributeTemplate):
+    key = StringType
+
+    @bound_function("str.split")
+    def resolve_split(self, dict, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(types.List(string_type), *args)
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
 ll.add_symbol('str_equal', hstr_ext.str_equal)
+ll.add_symbol('str_split', hstr_ext.str_split)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -99,3 +111,23 @@ def string_neq_impl(context, builder, sig, args):
                     [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
+
+@lower_builtin("str.split", string_type, string_type)
+def string_split_impl(context, builder, sig, args):
+    nitems = cgutils.alloca_once(builder, lir.IntType(64))
+    # input str, sep, size pointer
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
+                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(),
+                lir.IntType(64).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_split")
+    ptr = builder.call(fn, args+[nitems])
+    size = builder.load(nitems)
+    # TODO: use ptr instead of allocating and copying, use NRT_MemInfo_new
+    # TODO: deallocate ptr
+    _list = numba.targets.listobj.ListInstance.allocate(context, builder,
+                                    sig.return_type, size)
+    _list.size = size
+    with cgutils.for_range(builder, size) as loop:
+        value = builder.load(cgutils.gep_inbounds(builder, ptr, loop.index))
+        _list.setitem(loop.index, value)
+    return impl_ret_new_ref(context, builder, sig.return_type, _list.value)

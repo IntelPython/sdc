@@ -1,12 +1,14 @@
 #include <Python.h>
 #include <string>
 #include <iostream>
+#include <vector>
 
 void* init_string(char*, int64_t);
 void* init_string_const(char* in_str);
 const char* get_c_str(std::string* s);
 void* str_concat(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
+void* str_split(std::string* str, std::string* sep, int64_t *size);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -26,6 +28,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_concat)));
     PyObject_SetAttrString(m, "str_equal",
                             PyLong_FromVoidPtr((void*)(&str_equal)));
+    PyObject_SetAttrString(m, "str_split",
+                            PyLong_FromVoidPtr((void*)(&str_split)));
     return m;
 }
 
@@ -58,4 +62,28 @@ bool str_equal(std::string* s1, std::string* s2)
 {
     // printf("in str_equal %s %s\n", s1->c_str(), s2->c_str());
     return s1->compare(*s2)==0;
+}
+
+void* str_split(std::string* str, std::string* sep, int64_t *size)
+{
+    // std::cout << *str << " " << *sep << std::endl;
+    std::vector<std::string*> res;
+
+    size_t last = 0;
+    size_t next = 0;
+    while ((next = str->find(*sep, last)) != std::string::npos) {
+        std::string *token = new std::string(str->substr(last, next-last));
+        res.push_back(token);
+        last = next + 1;
+    }
+    std::string *token = new std::string(str->substr(last));
+    res.push_back(token);
+    *size = res.size();
+    // for(int i=0; i<*size; i++)
+    //    std::cout<<*(res[i])<<std::endl;
+    // TODO: avoid extra copy
+    void* out = new void*[*size];
+    memcpy(out, res.data(), (*size)*sizeof(void*));
+    // std::cout<< *(((std::string**)(out))[1])<<std::endl;
+    return out;
 }
