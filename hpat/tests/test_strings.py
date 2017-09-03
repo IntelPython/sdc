@@ -51,5 +51,12 @@ class TestString(unittest.TestCase):
         arg = 'aa/bb/cc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
 
+    def test_string_int_cast(self):
+        def test_impl(_str):
+            return int(_str)
+        hpat_func = hpat.jit(test_impl)
+        arg = '12'
+        self.assertEqual(hpat_func(arg), test_impl(arg))
+
 if __name__ == "__main__":
     unittest.main()
