@@ -10,3 +10,8 @@
 
 *.o
 *.so
+
+build/
+docs/_build/
+docs/gh-pages/
+
