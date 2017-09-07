@@ -21,7 +21,8 @@ computation on small data can be any code that
 Supported Numpy Functions
 -------------------------
 
-Below is the list of the data-parallel Numpy operators that HPAT supports.
+Below is the list of the data-parallel Numpy operators that HPAT can optimize
+and parallelize.
 
 1. Numpy `element-wise` or `point-wise` array operations:
 
@@ -84,6 +85,21 @@ reduction::
 
 Supported Pandas Functions
 --------------------------
+
+Below is the list of the Pandas operators that HPAT supports. Since Numba
+doesn't support Pandas, only these operations can be used for both large and
+small datasets.
+
+1. Dataframe creation with the ``DataFrame`` constructor. Only a dictionary is
+    supported as input. For example::
+
+        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+
+2. Accessing columns using both getitem (e.g. ``df['A']``) and attribute (``df.A``) is supported. 
+   
+3. Using columns similar to Numpy arrays and performing data-parallel operations listed previously is supported.
+
+4. s
 
 File I/O
 --------
