@@ -156,3 +156,19 @@ are supported. Here are some examples::
     s = s+'_test'
     a = int('12')
     b = float('1.2')
+
+Dictionaries
+------------
+
+HPAT supports basic integer dictionaries currently. ``DictIntInt`` is the type
+for dictionaries with 64-bit integer keys and values, while ``DictInt32Int32``
+is for 32-bit integer ones. Getting and setting values, ``pop`` and ``get``
+operators, as well as ``min`` and ``max`` of keys is supported. For example::
+
+    d = DictIntInt()
+    d[2] = 3
+    a = d[2]
+    b = d.get(3, 0)
+    d.pop(2)
+    d[3] = 4
+    a = min(d.keys())
