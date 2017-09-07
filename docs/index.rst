@@ -12,3 +12,4 @@ HPAT documentation
 
    source/overview
    source/supported
+   source/notsupported

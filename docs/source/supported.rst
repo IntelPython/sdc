@@ -1,7 +1,10 @@
 .. _supported:
 
-Supported Python Programs
-=========================
+User Guide
+==========
+
+HPAT supports a subset of Python that is commonly used for data analytics and
+machine learning. This section describes this subset.
 
 HPAT compiles and parallelizes the functions annotated with the `@hpat.jit`
 decorator. Therefore, file I/O and computations on large datasets should be
