@@ -18,13 +18,13 @@ Numpy and Pandas can be used for large datasets and computations. The sequential
 computation on small data can be any code that
 `Numba supports <http://numba.pydata.org/numba-doc/latest/index.html>`_.
 
-Supported Numpy Functions
--------------------------
+Supported Numpy Operations
+--------------------------
 
 Below is the list of the data-parallel Numpy operators that HPAT can optimize
 and parallelize.
 
-1. Numpy `element-wise` or `point-wise` array operations:
+1. Numpy `element-wise` array operations:
 
     * Unary operators: ``+`` ``-`` ``~``
     * Binary operators: ``+`` ``-`` ``*`` ``/`` ``/?`` ``%`` ``|`` ``>>`` ``^``
@@ -46,7 +46,8 @@ and parallelize.
 
 2. Numpy reduction functions ``sum`` and ``prod``.
 
-3. Numpy array creation functions ``zeros``, ``ones``
+3. Numpy array creation functions ``empty``, ``zeros``, ``ones``,
+    ``empty_like``, ``zeros_like``, ``ones_like``, ``full_like``, ``copy``.
 
 4. Random number generator functions: ``rand``, ``randn``,
     ``ranf``, ``random_sample``, ``sample``, ``random``,
@@ -83,25 +84,58 @@ reduction::
             s += A[i]
         return s
 
-Supported Pandas Functions
---------------------------
+Supported Pandas Operations
+---------------------------
 
 Below is the list of the Pandas operators that HPAT supports. Since Numba
 doesn't support Pandas, only these operations can be used for both large and
 small datasets.
 
-1. Dataframe creation with the ``DataFrame`` constructor. Only a dictionary is
-    supported as input. For example::
+1. HPAT supports Dataframe creation with the ``DataFrame`` constructor.
+    Only a dictionary is supported as input. For example::
 
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
 
-2. Accessing columns using both getitem (e.g. ``df['A']``) and attribute (``df.A``) is supported. 
-   
-3. Using columns similar to Numpy arrays and performing data-parallel operations listed previously is supported.
+2. Accessing columns using both getitem (e.g. ``df['A']``) and attribute
+    (e.g. ``df.A``) is supported.
 
-4. s
+3. Using columns similar to Numpy arrays and performing data-parallel operations
+    listed previously is supported.
+
+4. Filtering data frames using boolean arrays is supported
+    (e.g. ``df[df.A > .5]``).
+
+5. Rolling window operations with `window` and `center` options are supported.
+    Here are a few examples::
+
+         df.A.rolling(window=5).mean()
+         df.A.rolling(3, center=True).apply(lambda a: a[0]+2*a[1]+a[2])
+
+6. ``shift`` operation (e.g. ``df.A.shift(1)``) and ``pct_change`` operation
+    (e.g. ``df.A.pct_change()``) are supported.
 
 File I/O
 --------
 
 Currently, HPAT only supports I/O for the `HDF5 <http://www.h5py.org/>`_ format.
+The syntax is the same as the `h5py <http://www.h5py.org/>`_ package.
+For example::
+
+    @hpat.jit
+    def example():
+        f = h5py.File("lr.hdf5", "r")
+        X = f['points'][:]
+        Y = f['responses'][:]
+
+HPAT needs to know the types of input arrays. If the file name is a constant
+string, HPAT tries to look at the file at compile time and recognize the types.
+Otherwise, the user is responsile for providing the types similar to
+`Numba's typing syntax
+<http://numba.pydata.org/numba-doc/latest/reference/types.html>`_. For
+example::
+
+     @hpat.jit(locals={'X': hpat.float64[:,:], 'Y': hpat.float64[:]})
+     def example(file_name):
+         f = h5py.File(file_name, "r")
+         X = f['points'][:]
+         Y = f['responses'][:]
