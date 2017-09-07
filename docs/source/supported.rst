@@ -139,3 +139,20 @@ example::
          f = h5py.File(file_name, "r")
          X = f['points'][:]
          Y = f['responses'][:]
+
+Strings
+-------
+
+Currently, HPAT provides basic ASCII string support. Constant strings, equality
+comparison of strings (``==`` and ``!=``), ``split`` function, extracting
+characters (e.g. ``s[1]``), concatination, and convertion to `int` and `float`
+are supported. Here are some examples::
+
+    s = 'test_str'
+    flag = (s == 'test_str')
+    flag = (s != 'test_str')
+    s_list = s.split('_')
+    c = s[1]
+    s = s+'_test'
+    a = int('12')
+    b = float('1.2')
