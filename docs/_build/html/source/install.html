@@ -1,0 +1,133 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Installing HPAT &#8212; HPAT 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Not Supported Python Programs" href="notsupported.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="installing-hpat">
+<span id="install"></span><h1>Installing HPAT<a class="headerlink" href="#installing-hpat" title="Permalink to this headline">¶</a></h1>
+<p>These commands install HPAT and its dependencies such as Numba, LLVM and HDF5
+on Ubuntu Linux:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo apt install llvm-4.0 make libc6-dev gcc-4.8
+$ # download and install Anaconda python distribution
+$ conda create -n HPAT
+$ source activate HPAT
+$ conda install numpy scipy pandas gcc mpich2 llvmlite
+$ git clone https://github.com/IntelLabs/numba.git
+$ cd numba
+$ git checkout hpat_req
+$ python setup.py develop
+$ cd ..
+$ # download hdf5 and cd inside
+$ CC=mpicc CXX=mpicxx ./configure --enable-parallel
+$ make; make install
+$ cd ..
+$ export HDF5_DIR=/home/user/hdf5-1.10.1/hdf5/
+$ export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HDF5_DIR/include
+$ export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HDF5_DIR/include
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HDF5_DIR/lib
+$ export LIBRARY_PATH=$LIBRARY_PATH:$HDF5_DIR/lib
+$ git clone https://github.com/h5py/h5py.git
+$ cd h5py
+$ python setup.py configure --hdf5=$HDF5_DIR
+$ LDSHARED=&quot;mpicc -shared&quot; CXX=mpicxx LD=mpicc CC=&quot;mpicc&quot; python setup.py install
+$ cd ..
+$ git clone https://github.com/IntelLabs/hpat.git
+$ cd hpat
+$ LDSHARED=&quot;mpicxx -shared&quot; CXX=mpicxx LD=mpicxx CC=&quot;mpicxx -std=c++11&quot; python setup.py develop
+</pre></div>
+</div>
+<p>Commands for running the logistic regression example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ python generate_data/gen_logistic_regression.py
+$ mpirun -n 2 python examples/logistic_regression.py
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="notsupported.html" title="previous chapter">Not Supported Python Programs</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/source/install.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Ehsan Totoni.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="../_sources/source/install.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

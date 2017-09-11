@@ -1,16 +1,13 @@
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
     <title>Not Supported Python Programs &#8212; HPAT 0.1 documentation</title>
-    
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../',
@@ -24,9 +21,10 @@
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Installation" href="install.html" />
     <link rel="prev" title="User Guide" href="supported.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -35,7 +33,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
   </head>
-  <body role="document">
+  <body>
   
 
     <div class="document">
@@ -55,9 +53,9 @@ to analyze the computations.</p>
 variable should have a single type. The example below is not type stable since
 variable <code class="docutils literal"><span class="pre">a</span></code> can be both a float and an array of floats:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
-    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
-<span class="k">else</span><span class="p">:</span>
     <span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The use of <code class="docutils literal"><span class="pre">isinstance</span></code> operator of Python often means type instabillity and
@@ -65,7 +63,7 @@ is not supported.</p>
 <p>Similarly, function calls should also be deterministic. The below example is
 not supported since function <code class="docutils literal"><span class="pre">f</span></code> is not known in advance:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
-    <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span>
 <span class="n">A</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
@@ -93,6 +91,7 @@ not supported since function <code class="docutils literal"><span class="pre">f<
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
       <li>Previous: <a href="supported.html" title="previous chapter">User Guide</a></li>
+      <li>Next: <a href="install.html" title="next chapter">Installation</a></li>
   </ul></li>
 </ul>
 </div>
@@ -121,7 +120,7 @@ not supported since function <code class="docutils literal"><span class="pre">f<
       &copy;2017, Ehsan Totoni.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.6</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
       
       |
