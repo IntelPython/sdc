@@ -21,33 +21,32 @@ class Filter(ir.Stmt):
         return "filter: {} = {}[{}]".format(self.df_out, self.df_in,
                                                                 self.bool_arr)
 
-def filter_array_analysis(filter_node, array_analysis):
+def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
+    post = []
     df_vars = filter_node.df_vars
     df_in_vars = df_vars[filter_node.df_in]
     df_out_vars = df_vars[filter_node.df_out]
 
-    # arrays of input df have same size in last dimension
-    c_in = array_analysis._get_next_class()
+    # arrays of input df have same size in first dimension
+    all_shapes = []
     for _, col_var in df_in_vars.items():
-        c_in = array_analysis._merge_classes(c_in,
-                            array_analysis.array_shape_classes[col_var.name][0])
+        col_shape = equiv_set.get_shape(col_var)
+        all_shapes.append(col_shape[0])
+    equiv_set.insert_equiv(*all_shapes)
 
     # create correlations for output arrays
-    for _, col_var in df_out_vars.items():
-        array_analysis._add_array_corr(col_var.name)
-
-    # arrays of output df have same size in last dimension
-    c_out = array_analysis._get_next_class()
-    for _, col_var in df_out_vars.items():
-        c_out = array_analysis._merge_classes(c_out,
-                            array_analysis.array_shape_classes[col_var.name][0])
-
+    # arrays of output df have same size in first dimension
     # gen size variable for an output column
-    out_col = list(df_out_vars.items())[0][1]
-    size_nodes = array_analysis._gen_size_call(out_col, 0)
-    size_var = size_nodes[-1].target
-    array_analysis.class_sizes[c_out] = [size_var]
-    return size_nodes
+    all_shapes = []
+    for _, col_var in df_out_vars.items():
+        typ = typemap[col_var.name]
+        (shape, c_post) = array_analysis._gen_shape_call(equiv_set, col_var, typ.ndim, None)
+        post.extend(c_post)
+        all_shapes.append(shape[0])
+        equiv_set.define(col_var)
+    equiv_set.insert_equiv(*all_shapes)
+
+    return [], post
 
 numba.array_analysis.array_analysis_extensions[Filter] = filter_array_analysis
 
