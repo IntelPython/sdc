@@ -77,7 +77,7 @@ class DistributedPass(object):
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
         dprint_func_ir(self.func_ir, "after distributed pass")
-        lower_parfor_sequential(self.func_ir, self.typemap, self.calltypes)
+        lower_parfor_sequential(typing.Context(), self.func_ir, self.typemap, self.calltypes)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
@@ -538,9 +538,9 @@ class DistributedPass(object):
         else:
             out.append(parfor)
 
-        _, reductions = get_parfor_reductions(parfor, parfor.params)
+        _, reductions = get_parfor_reductions(parfor, parfor.params, self.calltypes)
 
-        for reduce_varname, (_, reduce_func, _) in reductions.items():
+        for reduce_varname, (init_val, reduce_nodes) in reductions.items():
             if self._isarray(reduce_varname):
                 reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
                 reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_arr_reduce", loc)
