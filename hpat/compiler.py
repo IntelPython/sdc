@@ -25,7 +25,7 @@ def stage_distributed_pass(pipeline):
     """
     # Ensure we have an IR and type information.
     assert pipeline.func_ir
-    dist_pass = DistributedPass(pipeline.func_ir,
+    dist_pass = DistributedPass(pipeline.func_ir, pipeline.typingctx,
         pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
     dist_pass.run()
 

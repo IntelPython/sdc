@@ -35,8 +35,9 @@ fir_text = None
 
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
-    def __init__(self, func_ir, typemap, calltypes):
+    def __init__(self, func_ir, typingctx, typemap, calltypes):
         self.func_ir = func_ir
+        self.typingctx = typingctx
         self.typemap = typemap
         self.calltypes = calltypes
 
@@ -77,7 +78,7 @@ class DistributedPass(object):
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
         dprint_func_ir(self.func_ir, "after distributed pass")
-        lower_parfor_sequential(typing.Context(), self.func_ir, self.typemap, self.calltypes)
+        lower_parfor_sequential(self.typingctx, self.func_ir, self.typemap, self.calltypes)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
@@ -250,7 +251,7 @@ class DistributedPass(object):
         self.typemap[rank_var.name] = types.int32
         rank_call = ir.Expr.call(rank_attr_var, [], (), loc)
         self.calltypes[rank_call] = self.typemap[rank_attr_var.name].get_call_type(
-            typing.Context(), [], {})
+            self.typingctx, [], {})
         rank_assign = ir.Assign(rank_call, rank_var, loc)
         self._rank_var = rank_var
         out += [g_dist_assign, rank_attr_assign, rank_assign]
@@ -266,7 +267,7 @@ class DistributedPass(object):
         self.typemap[size_var.name] = types.int32
         size_call = ir.Expr.call(size_attr_var, [], (), loc)
         self.calltypes[size_call] = self.typemap[size_attr_var.name].get_call_type(
-            typing.Context(), [], {})
+            self.typingctx, [], {})
         size_assign = ir.Assign(size_call, size_var, loc)
         self._size_var = size_var
         out += [size_attr_assign, size_assign]
@@ -372,7 +373,7 @@ class DistributedPass(object):
             self.typemap[err_var.name] = types.int32
             dist_call = ir.Expr.call(dist_attr_var, [in_arr_var, lhs_var], (), loc)
             self.calltypes[dist_call] = self.typemap[dist_attr_var.name].get_call_type(
-                typing.Context(), [self.typemap[in_arr], self.typemap[lhs]], {})
+                self.typingctx, [self.typemap[in_arr], self.typemap[lhs]], {})
             dist_assign = ir.Assign(dist_call, err_var, loc)
             return out+[dist_func_assign, dist_assign]
 
@@ -408,7 +409,7 @@ class DistributedPass(object):
                 reduce_var = assign.target
                 reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
                 self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-                    typing.Context(), [self.typemap[reduce_var.name]], {})
+                    self.typingctx, [self.typemap[reduce_var.name]], {})
                 reduce_assign = ir.Assign(reduce_call, err_var, loc)
                 out.append(reduce_assign)
 
@@ -475,7 +476,7 @@ class DistributedPass(object):
             setitem_call = ir.Expr.call(setitem_attr_var,
                                 [arr, index_var, node.value, start, count], (), loc)
             self.calltypes[setitem_call] = self.typemap[setitem_attr_var.name].get_call_type(
-                typing.Context(), [self.typemap[arr.name],
+                self.typingctx, [self.typemap[arr.name],
                 self.typemap[index_var.name], self.typemap[node.value.name],
                 types.intp, types.intp], {})
             err_var = ir.Var(scope, mk_unique_var("$setitem_err_var"), loc)
@@ -551,7 +552,7 @@ class DistributedPass(object):
                 reduce_var = namevar_table[reduce_varname]
                 reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
                 self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-                    typing.Context(), [self.typemap[reduce_varname]], {})
+                    self.typingctx, [self.typemap[reduce_varname]], {})
                 err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
                 self.typemap[err_var.name] = types.int32
                 reduce_assign = ir.Assign(reduce_call, err_var, loc)
@@ -566,7 +567,7 @@ class DistributedPass(object):
                 reduce_var = namevar_table[reduce_varname]
                 reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
                 self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-                    typing.Context(), [self.typemap[reduce_varname]], {})
+                    self.typingctx, [self.typemap[reduce_varname]], {})
                 reduce_assign = ir.Assign(reduce_call, reduce_var, loc)
                 out.append(reduce_assign)
 
@@ -750,7 +751,7 @@ class DistributedPass(object):
             slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
             slice_call = ir.Expr.call(g_slice_var, [const_msize,
                             const_none], (), loc)
-            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(typing.Context(),
+            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(self.typingctx,
                                                         [types.intp, types.none], {})
             self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
             out.append(ir.Assign(slice_call, slice_ind_out, loc))
@@ -783,7 +784,7 @@ class DistributedPass(object):
         out.append(ir.Assign(wait_attr_call, wait_attr_var, loc))
         wait_call = ir.Expr.call(wait_attr_var, [req, wait_cond], (), loc)
         self.calltypes[wait_call] = self.typemap[wait_attr_var.name].get_call_type(
-            typing.Context(), [types.int32, types.boolean], {})
+            self.typingctx, [types.int32, types.boolean], {})
         out.append(ir.Assign(wait_call, wait_err, loc))
 
     def _gen_stencil_comm(self, buff, size, out, is_left, is_send):
@@ -830,7 +831,7 @@ class DistributedPass(object):
         icomm_call = ir.Expr.call(icomm_attr_var, [buff, comm_size,
             comm_pe, comm_tag, comm_cond], (), loc)
         self.calltypes[icomm_call] = self.typemap[icomm_attr_var.name].get_call_type(
-            typing.Context(), [self.typemap[buff.name], types.int32,
+            self.typingctx, [self.typemap[buff.name], types.int32,
             types.int32, types.int32, types.boolean], {})
         out.append(ir.Assign(icomm_call, comm_req, loc))
         return comm_req
@@ -878,7 +879,7 @@ class DistributedPass(object):
         start_expr = ir.Expr.call(start_attr_var, [size_var,
             self._size_var, self._rank_var], (), loc)
         self.calltypes[start_expr] = self.typemap[start_attr_var.name].get_call_type(
-            typing.Context(), [types.int64, types.int32, types.int32], {})
+            self.typingctx, [types.int64, types.int32, types.int32], {})
         start_assign = ir.Assign(start_expr, start_var, loc)
 
         # attr call: end_attr = getattr(g_dist_var, get_end)
@@ -892,7 +893,7 @@ class DistributedPass(object):
         end_expr = ir.Expr.call(end_attr_var, [size_var,
             self._size_var, self._rank_var], (), loc)
         self.calltypes[end_expr] = self.typemap[end_attr_var.name].get_call_type(
-            typing.Context(), [types.int64, types.int32, types.int32], {})
+            self.typingctx, [types.int64, types.int32, types.int32], {})
         end_assign = ir.Assign(end_expr, end_var, loc)
         div_nodes += [start_attr_assign, start_assign, end_attr_assign, end_assign]
         return div_nodes, start_var, end_var
