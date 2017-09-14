@@ -18,7 +18,15 @@ class Filter(ir.Stmt):
         self.loc = loc
 
     def __repr__(self):
-        return "filter: {} = {}[{}]".format(self.df_out, self.df_in,
+        out_cols = ""
+        for (c, v) in self.df_vars[self.df_out].items():
+            out_cols += "'{}':{}, ".format(c, v.name)
+        df_out_str = "{}{{{}}}".format(self.df_out, out_cols)
+        in_cols = ""
+        for (c, v) in self.df_vars[self.df_in].items():
+            in_cols += "'{}':{}, ".format(c, v.name)
+        df_in_str = "{}{{{}}}".format(self.df_in, in_cols)
+        return "filter: {} = {} [cond: {}] ".format(df_out_str, df_in_str,
                                                                 self.bool_arr)
 
 def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
