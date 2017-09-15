@@ -179,10 +179,12 @@ class HiFrames(object):
                 center = False
                 kws = dict(rhs.kws)
                 if rhs.args:
-                    window = self.const_table[rhs.args[0].name]
+                    window = rhs.args[0]
                 elif 'window' in kws:
-                    window = self.const_table[kws['window'].name]
-                assert window >= 0
+                    window = kws['window']
+                if window.name in self.const_table:
+                    window = self.const_table[window.name]
+                    assert window >= 0
                 if 'center' in kws:
                     center = self.const_table[kws['center'].name]
                 self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
@@ -384,6 +386,8 @@ class HiFrames(object):
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
         if func == 'apply':
+            assert isinstance(win_size, int), "only constant window size\
+                supported with rolling apply"
             code_obj = self.make_functions[args[0].name].code
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
