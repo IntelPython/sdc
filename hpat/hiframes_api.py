@@ -49,6 +49,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     for _, col_var in df_out_vars.items():
         typ = typemap[col_var.name]
         (shape, c_post) = array_analysis._gen_shape_call(equiv_set, col_var, typ.ndim, None)
+        equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
         equiv_set.define(col_var)
