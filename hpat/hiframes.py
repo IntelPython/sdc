@@ -4,9 +4,11 @@ import collections
 import numba
 from numba import ir, config, ir_utils, types
 from numba import compiler as numba_compiler
+from numba.stencil import StencilFunc
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
-                            get_name_var_table, replace_var_names, add_offset_to_labels)
+                            get_name_var_table, replace_var_names,
+                            add_offset_to_labels, get_ir_of_code)
 import hpat
 from hpat import hiframes_api, pio
 import numpy as np
@@ -258,9 +260,10 @@ class HiFrames(object):
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         code_obj = loc_vars['g'].__code__
-        code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
+
         index_offsets = [0]
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+        fir_globals = self.func_ir.func_id.func.__globals__
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj, index_offsets, fir_globals)
 
         def f(A):
             A[:shift_const] = np.nan
@@ -381,7 +384,7 @@ class HiFrames(object):
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
         if func == 'apply':
-            code_expr = self.make_functions[args[0].name]
+            code_obj = self.make_functions[args[0].name].code
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
             g_pack = "np"
@@ -394,14 +397,14 @@ class HiFrames(object):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             code_obj = loc_vars['g'].__code__
-            code_expr = ir.Expr.make_function(None, code_obj, None, None, loc)
         index_offsets = [0]
         if func == 'apply':
             index_offsets = [-win_size+1]
         if center:
             index_offsets[0] += win_size//2
 
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_expr, index_offsets)
+        fir_globals = self.func_ir.func_id.func.__globals__
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj, index_offsets, fir_globals)
 
         def f(A):
             A[:win_size-1] = np.nan
@@ -485,26 +488,18 @@ def gen_empty_like(in_arr, out_arr):
     alloc_assign = ir.Assign(alloc_call, out_arr, loc)
     return [g_np_assign, attr_assign, alloc_assign]
 
-def gen_stencil_call(in_arr, out_arr, code_expr, index_offsets):
+def gen_stencil_call(in_arr, out_arr, code_obj, index_offsets, fir_globals):
     scope = in_arr.scope
     loc = in_arr.loc
     alloc_nodes = gen_empty_like(in_arr, out_arr)
-    # generate stencil call
-    # g_numba_var = Global(numba)
-    g_numba_var = ir.Var(scope, mk_unique_var("$g_numba_var"), loc)
-    g_dist = ir.Global('numba', numba, loc)
-    g_numba_assign = ir.Assign(g_dist, g_numba_var, loc)
-    # attr call: stencil_attr = getattr(g_numba_var, stencil)
-    stencil_attr_call = ir.Expr.getattr(g_numba_var, "stencil", loc)
-    stencil_attr_var = ir.Var(scope, mk_unique_var("$stencil_attr"), loc)
-    stencil_attr_assign = ir.Assign(stencil_attr_call, stencil_attr_var, loc)
-    # stencil_out = numba.stencil()
-    stencil_out = ir.Var(scope, mk_unique_var("$stencil_out"), loc)
-    stencil_call = ir.Expr.call(stencil_attr_var, [in_arr, out_arr], (), loc)
-    stencil_call.stencil_def = code_expr
-    stencil_call.index_offsets = index_offsets
-    stencil_assign = ir.Assign(stencil_call, stencil_out, loc)
-    return alloc_nodes + [g_numba_assign, stencil_attr_assign, stencil_assign]
+    kernel_ir = get_ir_of_code(fir_globals, code_obj)
+    sf = StencilFunc(kernel_ir, 'constant', {'index_offsets': index_offsets})
+    stencil_obj = ir.Global('stencil', sf, loc)
+    stencil_var = ir.Var(scope, mk_unique_var("$stencil_var"), loc)
+    stencil_assign = ir.Assign(stencil_obj, stencil_var, loc)
+    stencil_call = ir.Expr.call(stencil_var, [in_arr], [('out', out_arr)], loc)
+    out_assign = ir.Assign(stencil_call, out_arr, loc)
+    return alloc_nodes + [stencil_assign, out_assign]
 
 def get_inner_ir(func):
     # get untyped numba ir
