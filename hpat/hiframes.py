@@ -384,16 +384,18 @@ class HiFrames(object):
         return f_blocks
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
+        if not isinstance(win_size, int):
+            return self._gen_rolling_call_var(args, col_var, win_size, center, func, out_var)
         loc = col_var.loc
         if func == 'apply':
             assert isinstance(win_size, int), "only constant window size\
                 supported with rolling apply"
             code_obj = self.make_functions[args[0].name].code
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-            kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
             g_pack = "np"
             if func in ['std', 'var']:
                 g_pack = "hpat.hiframes_api"
+            kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
             kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
             if func == 'sum':  # simplify sum
                 kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
@@ -434,6 +436,35 @@ class HiFrames(object):
             setitem_nodes = setitem_nodes1 + setitem_nodes2
 
         return stencil_nodes + setitem_nodes
+
+    def _gen_rolling_call_var(self, args, col_var, win_size, center, func, out_var):
+        # variable win_size
+        assert func == 'sum', "only sum with var length supported"
+        loc = out_var.loc
+        func_text = 'def g(a, w):\n  s=0\n  for _i in range(w):\n    s+=a[-_i]\n  return s'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        code_obj = loc_vars['g'].__code__
+        index_offsets = [0]
+        def f(win_size):
+            s = -win_size+1
+            numba.stencil(s)
+            return s
+        f_blocks = get_inner_ir(f)
+        win_start = f_blocks[0].body[-2].value.value
+        replace_var_names(f_blocks, {'win_size': win_size.name})
+        start_nodes = f_blocks[0].body[:-2]
+        options = {'neighborhood': ((win_start, 0),)}
+        fir_globals = self.func_ir.func_id.func.__globals__
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj,
+                index_offsets, fir_globals, [win_size], options)
+        def f(A, w):
+            A[:w-1] = np.nan
+        f_blocks = get_inner_ir(f)
+        remove_none_return_from_block(f_blocks[0])
+        replace_var_names(f_blocks, {'A': out_var.name, 'w': win_size.name})
+        setitem_nodes = f_blocks[0].body
+        return start_nodes + stencil_nodes + setitem_nodes
 
     def fix_series_filter(self, blocks):
         topo_order = find_topo_order(blocks)
@@ -492,16 +523,22 @@ def gen_empty_like(in_arr, out_arr):
     alloc_assign = ir.Assign(alloc_call, out_arr, loc)
     return [g_np_assign, attr_assign, alloc_assign]
 
-def gen_stencil_call(in_arr, out_arr, code_obj, index_offsets, fir_globals):
+def gen_stencil_call(in_arr, out_arr, code_obj, index_offsets, fir_globals, other_args=None, options=None):
+    if other_args is None:
+        other_args = []
+    if options is None:
+        options = {}
     scope = in_arr.scope
     loc = in_arr.loc
     alloc_nodes = gen_empty_like(in_arr, out_arr)
     kernel_ir = get_ir_of_code(fir_globals, code_obj)
-    sf = StencilFunc(kernel_ir, 'constant', {'index_offsets': index_offsets})
+    if index_offsets != [0]:
+        options['index_offsets'] = index_offsets
+    sf = StencilFunc(kernel_ir, 'constant', options)
     stencil_obj = ir.Global('stencil', sf, loc)
     stencil_var = ir.Var(scope, mk_unique_var("$stencil_var"), loc)
     stencil_assign = ir.Assign(stencil_obj, stencil_var, loc)
-    stencil_call = ir.Expr.call(stencil_var, [in_arr], [('out', out_arr)], loc)
+    stencil_call = ir.Expr.call(stencil_var, [in_arr] + other_args, [('out', out_arr)], loc)
     out_assign = ir.Assign(stencil_call, out_arr, loc)
     return alloc_nodes + [stencil_assign, out_assign]
 
