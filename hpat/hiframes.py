@@ -30,9 +30,6 @@ class HiFrames(object):
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
 
-        # var -> list
-        self.make_functions = {}
-
         # rolling_varname -> column_var
         self.rolling_vars = {}
         # rolling call name -> [column_varname, win_size]
@@ -181,9 +178,6 @@ class HiFrames(object):
                 self.df_cols.add(lhs) # output is Series
                 return self._gen_rolling_call(rhs.args,
                     *self.rolling_calls_agg[rhs.func.name]+[assign.target])
-
-            if rhs.op == 'make_function':
-                self.make_functions[lhs] = rhs
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
@@ -387,8 +381,13 @@ class HiFrames(object):
             return self._gen_rolling_call_var(args, col_var, win_size, center, func, out_var)
         loc = col_var.loc
         if func == 'apply':
-            code_obj = self.make_functions[args[0].name].code
+            if len(args) != 1:
+                raise ValueError("One argument expected for rolling apply")
+            code_obj = guard(get_definition, self.func_ir, args[0]).code
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+            if len(args) != 0:
+                raise ValueError("No argument expected for rolling {}".format(
+                                                                        func))
             g_pack = "np"
             if func in ['std', 'var']:
                 g_pack = "hpat.hiframes_api"
