@@ -41,7 +41,6 @@ class HiFrames(object):
         self.df_vars = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
-        self.df_col_calls = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -84,7 +83,10 @@ class HiFrames(object):
 
         if isinstance(rhs, ir.Expr):
             if rhs.op=='call':
-                res = self._handle_pd_DataFrame(lhs, rhs)
+                res = self._handle_pd_DataFrame(assign.target, rhs)
+                if res is not None:
+                    return res
+                res = self._handle_column_call(assign.target, rhs)
                 if res is not None:
                     return res
 
@@ -133,16 +135,6 @@ class HiFrames(object):
                 # output is array so it's not added to df_cols
                 assign.value = rhs.value
                 return [assign]
-
-            # c = df.column.shift
-            if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
-                        rhs.attr in df_col_funcs):
-                self.df_col_calls[lhs] = (rhs.value, rhs.attr)
-
-            # A = df.column.shift(3)
-            if rhs.op=='call' and rhs.func.name in self.df_col_calls:
-                return self._gen_column_call(assign.target, rhs.args,
-                                            *self.df_col_calls[rhs.func.name])
 
             # d.rolling
             if rhs.op=='getattr' and rhs.value.name in self.df_cols:
@@ -195,7 +187,7 @@ class HiFrames(object):
             if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':
                 raise ValueError("Invalid DataFrame() arguments (map expected)")
 
-            self.df_vars[lhs] = self._process_df_build_map(arg_def.items)
+            self.df_vars[lhs.name] = self._process_df_build_map(arg_def.items)
             self._update_df_cols()
             # remove DataFrame call
             return []
@@ -216,6 +208,25 @@ class HiFrames(object):
             for col_name, col_var in cols_map.items():
                 self.df_cols.add(col_var.name)
         return
+
+    def _handle_column_call(self, lhs, rhs):
+        """
+        Handle Series calls like:
+          A = df.column.shift(3)
+        """
+        func_def = guard(get_definition, self.func_ir, rhs.func)
+        assert func_def is not None
+        # rare case where function variable is assigned to a new variable
+        if isinstance(func_def, ir.Var):
+            rhs.func = func_def
+            return self._handle_column_call(lhs, rhs)
+        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
+                and func_def.value.name in self.df_cols
+                and func_def.attr in df_col_funcs):
+            func_name = func_def.attr
+            col_var = func_def.value
+            return self._gen_column_call(lhs, rhs.args, col_var, func_name)
+        return None
 
     def _gen_column_call(self, out_var, args, col_var, func):
         if func in ['fillna', 'pct_change', 'shift']:
