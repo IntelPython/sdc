@@ -15,11 +15,6 @@ from hpat import hiframes_api, pio
 import numpy as np
 import pandas
 
-import copy
-def global_deepcopy(self, memo):
-    return ir.Global(self.name, self.value, copy.deepcopy(self.loc))
-ir.Global.__deepcopy__ = global_deepcopy
-
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
 
