@@ -21,6 +21,7 @@ def global_deepcopy(self, memo):
 ir.Global.__deepcopy__ = global_deepcopy
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
+LARGE_WIN_SIZE = 10
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -402,7 +403,7 @@ class HiFrames(object):
             g_pack = "np"
             if func in ['std', 'var']:
                 g_pack = "hpat.hiframes_api"
-            if win_size < 5:
+            if win_size < LARGE_WIN_SIZE:
                 # unroll if size is less than 5
                 kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
                 kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
