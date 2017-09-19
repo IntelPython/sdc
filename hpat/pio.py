@@ -9,7 +9,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 import numpy as np
 
 import hpat
-from hpat import pio_api, pio_lower
+from hpat import pio_api, pio_lower, utils
+from hpat.utils import get_constant, NOT_CONSTANT
 import h5py
 
 class PIO(object):
@@ -26,8 +27,6 @@ class PIO(object):
         self.h5_close_calls = {}
         self.h5_create_dset_calls = {}
         self.h5_create_group_calls = {}
-        # varname -> 'str'
-        self.str_const_table = {}
         self.reverse_copies = {}
         self.tuple_table = {}
 
@@ -68,7 +67,7 @@ class PIO(object):
                 self.h5_file_calls.append(lhs)
             # f = h5py.File(file_name, mode)
             if rhs.op=='call' and rhs.func.name in self.h5_file_calls:
-                self.h5_files[lhs] = rhs.args[0].name
+                self.h5_files[lhs] = rhs.args[0]
                 # parallel arg = False for this stage
                 loc = assign.target.loc
                 scope = assign.target.scope
@@ -118,14 +117,10 @@ class PIO(object):
         if isinstance(rhs, ir.Var):
             if rhs.name in self.h5_files:
                 self.h5_files[lhs] = self.h5_files[rhs.name]
-            if rhs.name in self.str_const_table:
-                self.str_const_table[lhs] = self.str_const_table[rhs.name]
             if rhs.name in self.h5_dsets:
                 self.h5_dsets[lhs] = self.h5_dsets[rhs.name]
             if rhs.name in self.h5_dsets_sizes:
                 self.h5_dsets_sizes[lhs] = self.h5_dsets_sizes[rhs.name]
-        if isinstance(rhs, ir.Const) and isinstance(rhs.value, str):
-            self.str_const_table[lhs] = rhs.value
         return [assign]
 
     def _run_static_setitem(self, stmt):
@@ -177,8 +172,6 @@ class PIO(object):
 
     def _gen_h5read(self, lhs_var, rhs):
         f_id, dset  = self.h5_dsets[rhs.value.name]
-        # file_name = self.str_const_table[self.h5_files[f_id.name]]
-        # dset_str = self.str_const_table[dset.name]
         dset_type = self._get_dset_type(lhs_var.name, self.h5_files[f_id.name], dset.name)
         loc = rhs.value.loc
         scope = rhs.value.scope
@@ -252,16 +245,18 @@ class PIO(object):
         out.append(ir.Assign(read_call, err_var, loc))
         return
 
-    def _get_dset_type(self, lhs, file_varname, dset_varname):
+    def _get_dset_type(self, lhs, file_var, dset_var):
         """get data set type from user-specified locals types or actual file"""
         if lhs in self.local_vars:
             return self.local_vars[lhs]
         if self.reverse_copies[lhs] in self.local_vars:
             return self.local_vars[self.reverse_copies[lhs]]
 
-        if file_varname in self.str_const_table and dset_varname in self.str_const_table:
-            file_name = self.str_const_table[file_varname]
-            dset_str = self.str_const_table[dset_varname]
+        # read type from file if file name and dset name are constant values
+        # TODO: check for file availability
+        file_name = get_constant(self.func_ir, file_var)
+        dset_str = get_constant(self.func_ir, dset_var)
+        if file_name is not NOT_CONSTANT and dset_str is not NOT_CONSTANT:
             f = h5py.File(file_name, "r")
             ndims = len(f[dset_str].shape)
             numba_dtype = numpy_support.from_dtype(f[dset_str].dtype)
@@ -334,7 +329,8 @@ class PIO(object):
         create_group_call = ir.Expr.call(attr_var, args, (), loc)
         create_group_assign = ir.Assign(create_group_call, lhs_var, loc)
         # add to files since group behavior is same as files for many calls
-        self.h5_files[lhs_var.name] = "group"
+        # FIXME:
+        self.h5_files[lhs_var.name] = ir.Var(scope, mk_unique_var("$group"), loc)
         return [g_pio_assign, attr_assign, create_group_assign]
 
     def _get_slice_range(self, index_slice, out):

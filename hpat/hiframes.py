@@ -70,6 +70,7 @@ class HiFrames(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
 
+        # FIXME: need to renew definitions before PIO?
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         io_pass = pio.PIO(self.func_ir, self.locals)
         io_pass.run()
