@@ -388,29 +388,35 @@ class HiFrames(object):
             return self._gen_rolling_call_var(args, col_var, win_size, center, func, out_var)
         loc = col_var.loc
         if func == 'apply':
-            assert isinstance(win_size, int), "only constant window size\
-                supported with rolling apply"
             code_obj = self.make_functions[args[0].name].code
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             g_pack = "np"
             if func in ['std', 'var']:
                 g_pack = "hpat.hiframes_api"
-            kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
-            kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
-            if func == 'sum':  # simplify sum
-                kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
+            if win_size < 5:
+                # unroll if size is less than 5
+                kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
+                kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
+                if func == 'sum':  # simplify sum
+                    kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
+            else:
+                kernel_expr = '{}.{}(a[(-{}+1):1])'.format(g_pack, func, win_size)
             func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             code_obj = loc_vars['g'].__code__
         index_offsets = [0]
+        win_tuple = (-win_size+1, 0)
         if func == 'apply':
             index_offsets = [-win_size+1]
         if center:
             index_offsets[0] += win_size//2
+            win_tuple = (-win_size//2, win_size//2)
 
+        options = {'neighborhood': (win_tuple,)}
         fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj, index_offsets, fir_globals)
+        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj,
+                                    index_offsets, fir_globals, None, options)
 
         def f(A):
             A[:win_size-1] = np.nan
