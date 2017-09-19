@@ -11,12 +11,14 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
-from hpat import hiframes_api, pio
+from hpat import hiframes_api, pio, utils
+from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
 import pandas
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
+
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -26,9 +28,6 @@ class HiFrames(object):
         self.args = args
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
-
-        # varname -> 'str'
-        self.const_table = {}
 
         # var -> list
         self.map_calls = {}
@@ -172,18 +171,17 @@ class HiFrames(object):
 
             # d.rolling(3)
             if rhs.op=='call' and rhs.func.name in self.rolling_vars:
-                window = -1
                 center = False
                 kws = dict(rhs.kws)
                 if rhs.args:
                     window = rhs.args[0]
                 elif 'window' in kws:
                     window = kws['window']
-                if window.name in self.const_table:
-                    window = self.const_table[window.name]
-                    assert window >= 0
+                else:
+                    raise ValueError("window argument to rolling() required")
+                window =  get_constant(self.func_ir, window, window)
                 if 'center' in kws:
-                    center = self.const_table[kws['center'].name]
+                    center =  get_constant(self.func_ir, kws['center'], center)
                 self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
                         window, center]
                 return []  # remove
@@ -212,16 +210,15 @@ class HiFrames(object):
         if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
             self.df_cols.add(lhs)
 
-        if isinstance(rhs, ir.Const):
-            self.const_table[lhs] = rhs.value
         return [assign]
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
         for item in items_list:
-            col_var = item[0].name
-            assert col_var in self.const_table
-            col_name = self.const_table[col_var]
+            col_var = item[0]
+            col_name = get_constant(self.func_ir, col_var)
+            if col_name is NOT_CONSTANT:
+                raise ValueError("data frame column names should be constant")
             df_cols[col_name] = item[1]
         return df_cols
 
@@ -253,12 +250,14 @@ class HiFrames(object):
         if func == 'pct_change':
             shift_const = 1
             if args:
-                shift_const = self.const_table[args[0].name]
+                shift_const = get_constant(self.func_ir, args[0])
+                assert shift_const is not NOT_CONSTANT
             func_text = 'def g(a):\n  return (a[0]-a[{}])/a[{}]\n'.format(
                                                     -shift_const, -shift_const)
         else:
             assert func == 'shift'
-            shift_const = self.const_table[args[0].name]
+            shift_const = get_constant(self.func_ir, args[0])
+            assert shift_const is not NOT_CONSTANT
             func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
 
         loc_vars = {}
