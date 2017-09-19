@@ -8,7 +8,8 @@ from numba.stencil import StencilFunc
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
-                            add_offset_to_labels, get_ir_of_code)
+                            add_offset_to_labels, get_ir_of_code,
+                            compile_to_numba_ir, replace_arg_nodes)
 import hpat
 from hpat import hiframes_api, pio
 import numpy as np
@@ -247,6 +248,11 @@ class HiFrames(object):
             return self._gen_col_var(out_var, args, col_var)
         if func == 'std':
             return self._gen_col_std(out_var, args, col_var)
+        else:
+            assert func in ['pct_change', 'shift']
+            return self._gen_column_shift_pct(out_var, args, col_var, func)
+
+    def _gen_column_shift_pct(self, out_var, args, col_var, func):
         loc = col_var.loc
         if func == 'pct_change':
             shift_const = 1
@@ -267,12 +273,15 @@ class HiFrames(object):
         fir_globals = self.func_ir.func_id.func.__globals__
         stencil_nodes = gen_stencil_call(col_var, out_var, code_obj, index_offsets, fir_globals)
 
-        def f(A):
-            A[:shift_const] = np.nan
-        f_blocks = get_inner_ir(f)
-        remove_none_return_from_block(f_blocks[0])
-        replace_var_names(f_blocks, {'A': out_var.name})
-        setitem_nodes = f_blocks[0].body
+        border_text = 'def f(A):\n  A[:{}] = np.nan\n'.format(shift_const)
+        loc_vars = {}
+        exec(border_text, {}, loc_vars)
+        border_func = loc_vars['f']
+
+        f_blocks = compile_to_numba_ir(border_func, {'np': np}).blocks
+        block = f_blocks[min(f_blocks.keys())]
+        replace_arg_nodes(block, [out_var])
+        setitem_nodes = block.body[:-3]  # remove none return
 
         return stencil_nodes+setitem_nodes
 
