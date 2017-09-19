@@ -9,7 +9,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
                             add_offset_to_labels, get_ir_of_code,
-                            compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes,
+                            find_callname, guard, require, get_definition)
 import hpat
 from hpat import hiframes_api, pio, utils
 from hpat.utils import get_constant, NOT_CONSTANT
@@ -30,9 +31,6 @@ class HiFrames(object):
         ir_utils._max_label = max(func_ir.blocks.keys())
 
         # var -> list
-        self.map_calls = {}
-        self.pd_globals = []
-        self.pd_df_calls = []
         self.make_functions = {}
 
         # rolling_varname -> column_var
@@ -86,27 +84,12 @@ class HiFrames(object):
     def _run_assign(self, assign):
         lhs = assign.target.name
         rhs = assign.value
-        # lhs = pandas
-        if (isinstance(rhs, ir.Global) and isinstance(rhs.value, pytypes.ModuleType)
-                    and rhs.value==pandas):
-            self.pd_globals.append(lhs)
 
         if isinstance(rhs, ir.Expr):
-            # df_call = pd.DataFrame
-            if (rhs.op=='getattr' and rhs.value.name in self.pd_globals
-                    and rhs.attr=='DataFrame'):
-                self.pd_df_calls.append(lhs)
-
-            # df = pd.DataFrame(map_var)
-            if rhs.op=='call' and rhs.func.name in self.pd_df_calls:
-                # only map input allowed now
-                assert len(rhs.args) is 1 and rhs.args[0].name in self.map_calls
-
-                self.df_vars[lhs] = self._process_df_build_map(
-                                            self.map_calls[rhs.args[0].name])
-                self._update_df_cols()
-                # remove DataFrame call
-                return []
+            if rhs.op=='call':
+                res = self._handle_pd_DataFrame(lhs, rhs)
+                if res is not None:
+                    return res
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
@@ -199,9 +182,6 @@ class HiFrames(object):
                 return self._gen_rolling_call(rhs.args,
                     *self.rolling_calls_agg[rhs.func.name]+[assign.target])
 
-            if rhs.op == 'build_map':
-                self.map_calls[lhs] = rhs.items
-
             if rhs.op == 'make_function':
                 self.make_functions[lhs] = rhs
 
@@ -212,6 +192,20 @@ class HiFrames(object):
             self.df_cols.add(lhs)
 
         return [assign]
+
+    def _handle_pd_DataFrame(self, lhs, rhs):
+        if guard(find_callname, self.func_ir, rhs) == ('DataFrame', 'pandas'):
+            if len(rhs.args) != 1:
+                raise ValueError("Invalid DataFrame() arguments (one expected)")
+            arg_def = guard(get_definition, self.func_ir, rhs.args[0])
+            if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':
+                raise ValueError("Invalid DataFrame() arguments (map expected)")
+
+            self.df_vars[lhs] = self._process_df_build_map(arg_def.items)
+            self._update_df_cols()
+            # remove DataFrame call
+            return []
+        return None
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
