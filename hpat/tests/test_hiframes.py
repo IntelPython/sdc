@@ -59,9 +59,21 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_rolling1(self):
+        # size 3 without unroll
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df.A.rolling(5).sum()
+            Ac = df.A.rolling(3).sum()
+            return Ac.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        # size 7 with unroll
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            Ac = df.A.rolling(7).sum()
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
