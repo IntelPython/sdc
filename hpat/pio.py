@@ -24,7 +24,6 @@ class PIO(object):
         # dset_var -> (f_id, dset_name)
         self.h5_dsets = {}
         self.h5_dsets_sizes = {}
-        self.h5_close_calls = {}
         self.h5_create_dset_calls = {}
         self.h5_create_group_calls = {}
         self.reverse_copies = {}
@@ -65,11 +64,11 @@ class PIO(object):
                 res = self._handle_h5_File_call(assign, assign.target, rhs)
                 if res is not None:
                     return res
+                # f.close()
+                res = self._handle_f_close_call(assign, assign.target, rhs)
+                if res is not None:
+                    return res
 
-            # f.close()
-            if rhs.op=='call' and rhs.func.name in self.h5_close_calls:
-                return self._gen_h5close(assign,
-                                            self.h5_close_calls[rhs.func.name])
             # f.create_dataset("points", (N,), dtype='f8')
             if rhs.op=='call' and rhs.func.name in self.h5_create_dset_calls:
                 return self._gen_h5create_dset(assign,
@@ -92,13 +91,11 @@ class PIO(object):
 
             # f.close or f.create_dataset
             if rhs.op=='getattr' and rhs.value.name in self.h5_files:
-                if rhs.attr=='close':
-                    self.h5_close_calls[lhs] = rhs.value
-                elif rhs.attr=='create_dataset':
+                if rhs.attr=='create_dataset':
                     self.h5_create_dset_calls[lhs] = rhs.value
                 elif rhs.attr=='create_group':
                     self.h5_create_group_calls[lhs] = rhs.value
-                elif rhs.attr=='keys':
+                elif rhs.attr in ['keys', 'close']:
                     pass
                 else:
                     raise NotImplementedError("file operation not supported")
@@ -277,22 +274,32 @@ class PIO(object):
                 self.reverse_copies[inst.value.name] = inst.target.name
         return
 
-    def _gen_h5close(self, stmt, f_id):
-        lhs_var = stmt.target
-        scope = lhs_var.scope
-        loc = lhs_var.loc
-        # g_pio_var = Global(hpat.pio_api)
-        g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
-        g_pio = ir.Global('pio_api', hpat.pio_api, loc)
-        g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
-        # attr call: h5close_attr = getattr(g_pio_var, h5close)
-        h5close_attr_call = ir.Expr.getattr(g_pio_var, "h5close", loc)
-        attr_var = ir.Var(scope, mk_unique_var("$h5close_attr"), loc)
-        attr_assign = ir.Assign(h5close_attr_call, attr_var, loc)
-        # h5close(f_id)
-        close_call = ir.Expr.call(attr_var, [f_id], (), loc)
-        close_assign = ir.Assign(close_call, lhs_var, loc)
-        return [g_pio_assign, attr_assign, close_assign]
+    def _handle_f_close_call(self, stmt, lhs_var, rhs):
+        func_def = guard(get_definition, self.func_ir, rhs.func)
+        assert func_def is not None
+        # rare case where function variable is assigned to a new variable
+        if isinstance(func_def, ir.Var):
+            rhs.func = func_def
+            return self._handle_f_close_call(stmt, lhs_var, rhs)
+        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
+                and func_def.value.name in self.h5_files
+                and func_def.attr == 'close'):
+            f_id = func_def.value
+            scope = lhs_var.scope
+            loc = lhs_var.loc
+            # g_pio_var = Global(hpat.pio_api)
+            g_pio_var = ir.Var(scope, mk_unique_var("$pio_g_var"), loc)
+            g_pio = ir.Global('pio_api', hpat.pio_api, loc)
+            g_pio_assign = ir.Assign(g_pio, g_pio_var, loc)
+            # attr call: h5close_attr = getattr(g_pio_var, h5close)
+            h5close_attr_call = ir.Expr.getattr(g_pio_var, "h5close", loc)
+            attr_var = ir.Var(scope, mk_unique_var("$h5close_attr"), loc)
+            attr_assign = ir.Assign(h5close_attr_call, attr_var, loc)
+            # h5close(f_id)
+            close_call = ir.Expr.call(attr_var, [f_id], (), loc)
+            close_assign = ir.Assign(close_call, lhs_var, loc)
+            return [g_pio_assign, attr_assign, close_assign]
+        return None
 
     def _gen_h5create_dset(self, stmt, f_id):
         lhs_var = stmt.target
