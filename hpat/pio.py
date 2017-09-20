@@ -4,7 +4,8 @@ import types as pytypes # avoid confusion with numba.types
 import numba
 from numba import ir, analysis, types, config, numpy_support
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
-                            dprint_func_ir, remove_dead, mk_alloc)
+                            dprint_func_ir, remove_dead, mk_alloc,
+                            find_callname, guard, require, get_definition)
 
 import numpy as np
 
@@ -18,8 +19,7 @@ class PIO(object):
     def __init__(self, func_ir, local_vars):
         self.func_ir = func_ir
         self.local_vars = local_vars
-        self.h5_globals = []
-        self.h5_file_calls = []
+
         self.h5_files = {}
         # dset_var -> (f_id, dset_name)
         self.h5_dsets = {}
@@ -57,24 +57,15 @@ class PIO(object):
     def _run_assign(self, assign):
         lhs = assign.target.name
         rhs = assign.value
-        # lhs = h5py
-        if (isinstance(rhs, ir.Global) and isinstance(rhs.value, pytypes.ModuleType)
-                    and rhs.value==h5py):
-            self.h5_globals.append(lhs)
+
         if isinstance(rhs, ir.Expr):
-            # f_call = h5py.File
-            if rhs.op=='getattr' and rhs.value.name in self.h5_globals and rhs.attr=='File':
-                self.h5_file_calls.append(lhs)
-            # f = h5py.File(file_name, mode)
-            if rhs.op=='call' and rhs.func.name in self.h5_file_calls:
-                self.h5_files[lhs] = rhs.args[0]
-                # parallel arg = False for this stage
-                loc = assign.target.loc
-                scope = assign.target.scope
-                parallel_var = ir.Var(scope, mk_unique_var("$const_parallel"), loc)
-                parallel_assign = ir.Assign(ir.Const(0, loc), parallel_var, loc)
-                rhs.args.append(parallel_var)
-                return [parallel_assign, assign]
+
+            if rhs.op=='call':
+                # f = h5py.File(file_name, mode)
+                res = self._handle_h5_File_call(assign, assign.target, rhs)
+                if res is not None:
+                    return res
+
             # f.close()
             if rhs.op=='call' and rhs.func.name in self.h5_close_calls:
                 return self._gen_h5close(assign,
@@ -122,6 +113,22 @@ class PIO(object):
             if rhs.name in self.h5_dsets_sizes:
                 self.h5_dsets_sizes[lhs] = self.h5_dsets_sizes[rhs.name]
         return [assign]
+
+    def _handle_h5_File_call(self, assign, lhs, rhs):
+        """
+        Handle h5py.File calls like:
+          f = h5py.File(file_name, mode)
+        """
+        if guard(find_callname, self.func_ir, rhs) == ('File', 'h5py'):
+            self.h5_files[lhs.name] = rhs.args[0]
+            # parallel arg = False for this stage
+            loc = lhs.loc
+            scope = lhs.scope
+            parallel_var = ir.Var(scope, mk_unique_var("$const_parallel"), loc)
+            parallel_assign = ir.Assign(ir.Const(0, loc), parallel_var, loc)
+            rhs.args.append(parallel_var)
+            return [parallel_assign, assign]
+        return None
 
     def _run_static_setitem(self, stmt):
         # generate h5 write code for dset[:] = arr
