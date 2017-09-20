@@ -30,12 +30,8 @@ class HiFrames(object):
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
 
-        # rolling_varname -> column_var
-        self.rolling_vars = {}
         # rolling call name -> [column_varname, win_size]
         self.rolling_calls = {}
-        # rolling call agg name -> [column_varname, win_size, func]
-        self.rolling_calls_agg = {}
 
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
@@ -89,6 +85,12 @@ class HiFrames(object):
                 res = self._handle_column_call(assign.target, rhs)
                 if res is not None:
                     return res
+                res = self._handle_rolling_setup(assign.target, rhs)
+                if res is not None:
+                    return res
+                res = self._handle_rolling_call(assign.target, rhs)
+                if res is not None:
+                    return res
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
@@ -135,41 +137,6 @@ class HiFrames(object):
                 # output is array so it's not added to df_cols
                 assign.value = rhs.value
                 return [assign]
-
-            # d.rolling
-            if rhs.op=='getattr' and rhs.value.name in self.df_cols:
-                if rhs.attr=='rolling':
-                    self.rolling_vars[lhs] = rhs.value
-                    return []  # remove node
-
-            # d.rolling(3)
-            if rhs.op=='call' and rhs.func.name in self.rolling_vars:
-                center = False
-                kws = dict(rhs.kws)
-                if rhs.args:
-                    window = rhs.args[0]
-                elif 'window' in kws:
-                    window = kws['window']
-                else:
-                    raise ValueError("window argument to rolling() required")
-                window =  get_constant(self.func_ir, window, window)
-                if 'center' in kws:
-                    center =  get_constant(self.func_ir, kws['center'], center)
-                self.rolling_calls[lhs] = [self.rolling_vars[rhs.func.name],
-                        window, center]
-                return []  # remove
-
-            # d.rolling(3).sum
-            if rhs.op=='getattr' and rhs.value.name in self.rolling_calls:
-                self.rolling_calls_agg[lhs] = self.rolling_calls[rhs.value.name]
-                self.rolling_calls_agg[lhs].append(rhs.attr)
-                return []  # remove
-
-            # d.rolling(3).sum()
-            if rhs.op=='call' and rhs.func.name in self.rolling_calls_agg:
-                self.df_cols.add(lhs) # output is Series
-                return self._gen_rolling_call(rhs.args,
-                    *self.rolling_calls_agg[rhs.func.name]+[assign.target])
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
@@ -226,6 +193,56 @@ class HiFrames(object):
             func_name = func_def.attr
             col_var = func_def.value
             return self._gen_column_call(lhs, rhs.args, col_var, func_name)
+        return None
+
+    def _handle_rolling_setup(self, lhs, rhs):
+        """
+        Handle Series rolling calls like:
+          r = df.column.rolling(3)
+        """
+        func_def = guard(get_definition, self.func_ir, rhs.func)
+        assert func_def is not None
+        # rare case where function variable is assigned to a new variable
+        if isinstance(func_def, ir.Var):
+            rhs.func = func_def
+            return self._handle_rolling_setup(lhs, rhs)
+        # df.column.rolling
+        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
+                and func_def.value.name in self.df_cols
+                and func_def.attr == 'rolling'):
+            center = False
+            kws = dict(rhs.kws)
+            if rhs.args:
+                window = rhs.args[0]
+            elif 'window' in kws:
+                window = kws['window']
+            else:
+                raise ValueError("window argument to rolling() required")
+            window =  get_constant(self.func_ir, window, window)
+            if 'center' in kws:
+                center =  get_constant(self.func_ir, kws['center'], center)
+            self.rolling_calls[lhs.name] = [func_def.value, window, center]
+            return []  # remove
+        return None
+
+    def _handle_rolling_call(self, lhs, rhs):
+        """
+        Handle Series rolling calls like:
+          A = df.column.rolling(3).sum()
+        """
+        func_def = guard(get_definition, self.func_ir, rhs.func)
+        assert func_def is not None
+        # rare case where function variable is assigned to a new variable
+        if isinstance(func_def, ir.Var):
+            rhs.func = func_def
+            return self._handle_rolling_setup(lhs, rhs)
+        # df.column.rolling(3).sum()
+        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
+                and func_def.value.name in self.rolling_calls):
+            func_name =  func_def.attr
+            self.df_cols.add(lhs.name)  # output is Series
+            return self._gen_rolling_call(rhs.args,
+                *self.rolling_calls[func_def.value.name]+[func_name, lhs])
         return None
 
     def _gen_column_call(self, out_var, args, col_var, func):
