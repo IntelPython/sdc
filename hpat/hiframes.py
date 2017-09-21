@@ -12,10 +12,11 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition)
 import hpat
-from hpat import hiframes_api, pio, utils
+from hpat import hiframes_api, pio, utils, parquet_pio
 from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
-import pandas
+from hpat.parquet_pio import ParquetHandler
+
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
@@ -29,6 +30,7 @@ class HiFrames(object):
         self.args = args
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
+        self.pq_handler = ParquetHandler(func_ir, typingctx, args, _locals)
 
         # rolling call name -> [column_varname, win_size]
         self.rolling_calls = {}
@@ -37,6 +39,7 @@ class HiFrames(object):
         self.df_vars = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
+        self.arrow_tables = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -60,7 +63,7 @@ class HiFrames(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
 
-        # FIXME: need to renew definitions before PIO?
+        self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         io_pass = pio.PIO(self.func_ir, self.locals)
         io_pass.run()
@@ -80,6 +83,9 @@ class HiFrames(object):
         if isinstance(rhs, ir.Expr):
             if rhs.op=='call':
                 res = self._handle_pd_DataFrame(assign.target, rhs)
+                if res is not None:
+                    return res
+                res = self._handle_pq_table(assign.target, rhs)
                 if res is not None:
                     return res
                 res = self._handle_column_call(assign.target, rhs)
@@ -143,7 +149,8 @@ class HiFrames(object):
             self.df_vars[lhs] = self.df_vars[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
             self.df_cols.add(lhs)
-
+        if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
+            self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
         return [assign]
 
     def _handle_pd_DataFrame(self, lhs, rhs):
@@ -160,13 +167,40 @@ class HiFrames(object):
             return []
         return None
 
+    def _handle_pq_table(self, lhs, rhs):
+        if guard(find_callname, self.func_ir, rhs) == ('read_table',
+                                                        'pyarrow.parquet'):
+            if len(rhs.args) != 1:
+                raise ValueError("Invalid read_table() arguments")
+            self.arrow_tables[lhs.name] = rhs.args[0]
+            return []
+        # match t.to_pandas()
+        func_def = guard(get_definition, self.func_ir, rhs.func)
+        assert func_def is not None
+        # rare case where function variable is assigned to a new variable
+        if isinstance(func_def, ir.Var):
+            rhs.func = func_def
+            return self._handle_pq_table(lhs, rhs)
+        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
+                and func_def.value.name in self.arrow_tables
+                and func_def.attr == 'to_pandas'):
+            col_items, nodes = self.pq_handler.gen_parquet_read(
+                                        self.arrow_tables[func_def.value.name])
+            self.df_vars[lhs.name] = self._process_df_build_map(col_items)
+            self._update_df_cols()
+            return nodes
+        return None
+
     def _process_df_build_map(self, items_list):
         df_cols = {}
         for item in items_list:
             col_var = item[0]
-            col_name = get_constant(self.func_ir, col_var)
-            if col_name is NOT_CONSTANT:
-                raise ValueError("data frame column names should be constant")
+            if isinstance(col_var, str):
+                col_name = col_var
+            else:
+                col_name = get_constant(self.func_ir, col_var)
+                if col_name is NOT_CONSTANT:
+                    raise ValueError("data frame column names should be constant")
             df_cols[col_name] = item[1]
         return df_cols
 
