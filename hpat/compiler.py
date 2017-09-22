@@ -1,6 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
-from .pio import PIO
+# from .pio import PIO
 from .distributed import DistributedPass
 from .hiframes import HiFrames
 import numba
@@ -10,14 +10,14 @@ from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import (mk_unique_var, add_offset_to_labels,
                             get_name_var_table, replace_vars)
 
-def stage_io_pass(pipeline):
-    """
-    Convert IO calls
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    io_pass = PIO(pipeline.func_ir, pipeline.locals)
-    io_pass.run()
+# def stage_io_pass(pipeline):
+#     """
+#     Convert IO calls
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     io_pass = PIO(pipeline.func_ir, pipeline.locals)
+#     io_pass.run()
 
 def stage_distributed_pass(pipeline):
     """

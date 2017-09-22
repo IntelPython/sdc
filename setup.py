@@ -4,6 +4,21 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
+try:
+    import h5py
+except ImportError:
+    _has_h5py = False
+else:
+    _has_h5py = True
+
+try:
+    import pyarrow
+except ImportError:
+    _has_pyarrow = False
+else:
+    _has_pyarrow = True
+
+
 ext_io = Extension(name="hio",
                              extra_link_args=['-lmpi','-lhdf5'],
                              sources=["hpat/_io.c"]
@@ -26,6 +41,13 @@ ext_parquet = Extension(name="parquet_cpp",
                              sources=["hpat/_parquet.cpp"]
                              )
 
+_ext_mods = [ext_hdist, ext_dict, ext_str]
+
+if _has_h5py:
+    _ext_mods.append(ext_io)
+if _has_pyarrow:
+    _ext_mods.append(ext_parquet)
+
 setup(name='hpat',
       version='0.1.0',
       description='compiling Python code for clusters',
@@ -45,4 +67,5 @@ setup(name='hpat',
       author_email='ehsan.totoni@intel.com',
       packages=['hpat'],
       install_requires=['numba'],
-      ext_modules = [ext_io, ext_hdist, ext_dict, ext_str, ext_parquet])
+      extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
+      ext_modules = _ext_mods)

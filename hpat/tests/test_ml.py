@@ -2,7 +2,6 @@ import unittest
 import pandas as pd
 import numpy as np
 import numba
-import h5py
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)

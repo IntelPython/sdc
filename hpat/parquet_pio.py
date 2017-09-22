@@ -80,9 +80,13 @@ from numba import cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from llvmlite import ir as lir
-import parquet_cpp
 import llvmlite.binding as ll
-ll.add_symbol('pq_read', parquet_cpp.read)
+
+from hpat.config import _has_pyarrow
+if _has_pyarrow:
+    import parquet_cpp
+    ll.add_symbol('pq_read', parquet_cpp.read)
+
 @lower_builtin(read_parquet, types.Type, types.Type, types.Type)
 def pq_read_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),

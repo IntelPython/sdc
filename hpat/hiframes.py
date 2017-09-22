@@ -12,7 +12,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition)
 import hpat
-from hpat import hiframes_api, pio, utils, parquet_pio
+from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
 from hpat.parquet_pio import ParquetHandler
@@ -65,8 +65,10 @@ class HiFrames(object):
 
         self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
-        io_pass = pio.PIO(self.func_ir, self.locals)
-        io_pass.run()
+        if config._has_h5py:
+            from hpat import pio
+            io_pass = pio.PIO(self.func_ir, self.locals)
+            io_pass.run()
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
                 self.typingctx, self.func_ir, self.args, None)
         self.fix_series_filter(self.func_ir.blocks)
