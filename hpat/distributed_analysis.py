@@ -121,7 +121,8 @@ class DistributedAnalysis(object):
         parfor_arrs = set() # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
-        stencil_accesses, _ = get_stencil_accesses(parfor.loop_body, par_index_var)
+        stencil_accesses, _ = get_stencil_accesses(parfor.loop_body,
+                                                par_index_var, self.typemap)
         for (arr,index) in array_accesses:
             if index==par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
@@ -271,9 +272,15 @@ class DistributedAnalysis(object):
         return self._call_table[func_var]==call_list
 
 
-def get_stencil_accesses(body, par_index_var):
+def is_array(varname, typemap):
+    return True
+    return (varname in typemap
+        and isinstance(typemap[varname], numba.types.npytypes.Array))
+
+def get_stencil_accesses(body, par_index_var, typemap):
     # TODO support recursive parfor, multi-D, mutiple body blocks
     const_table = {}
+    offset_accesses = {}
     stencil_accesses = {}
     arrays_accessed = {}
 
@@ -288,9 +295,11 @@ def get_stencil_accesses(body, par_index_var):
                 if (rhs.op == 'binop' and rhs.fn == '+' and
                         rhs.lhs.name == par_index_var and
                         rhs.rhs.name in const_table):
-                    stencil_accesses[lhs] = const_table[rhs.rhs.name]
-                if rhs.op == 'getitem' and rhs.index.name in stencil_accesses:
+                    offset_accesses[lhs] = const_table[rhs.rhs.name]
+                if (rhs.op == 'getitem' and rhs.index.name in offset_accesses
+                        and is_array(rhs.value.name, typemap)):
                     arrays_accessed[rhs.index.name] = rhs.value.name
+                    stencil_accesses[rhs.index.name] = offset_accesses[rhs.index.name]
 
     return stencil_accesses, arrays_accessed
 

@@ -487,7 +487,7 @@ class DistributedPass(object):
 
     def _run_parfor(self, parfor, namevar_table):
         stencil_accesses, arrays_accessed = get_stencil_accesses(
-            parfor.loop_body, parfor.loop_nests[0].index_variable.name)
+            parfor.loop_body, parfor.loop_nests[0].index_variable.name, self.typemap)
 
         if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
             # TODO: make sure loop index is not used for calculations in
