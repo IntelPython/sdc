@@ -22,7 +22,6 @@ from hpat import (distributed_api,
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis,
                                        get_stencil_accesses)
-import h5py
 import time
 # from mpi4py import MPI
 
@@ -980,7 +979,7 @@ class DistributedPass(object):
     def _is_h5_read_write_call(self, func_var):
         if func_var not in self._call_table:
             return False
-        return (self._call_table[func_var]==['h5read', hpat.pio_api]
+        return hpat.config._has_h5py and (self._call_table[func_var]==['h5read', hpat.pio_api]
                 or self._call_table[func_var]==['h5write', hpat.pio_api])
 
     def _is_call(self, func_var, call_list):

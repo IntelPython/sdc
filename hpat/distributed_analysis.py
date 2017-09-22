@@ -3,7 +3,7 @@ from collections import namedtuple
 import copy
 
 import numba
-from numba import ir, ir_utils, config
+from numba import ir, ir_utils
 from numba.ir_utils import get_call_table, get_tuple_table, find_topo_order
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
@@ -169,7 +169,7 @@ class DistributedAnalysis(object):
         if self._is_call(func_var, [len]):
             return
 
-        if (self._is_call(func_var, ['h5read', hpat.pio_api])
+        if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
 
@@ -295,5 +295,5 @@ def get_stencil_accesses(body, par_index_var):
     return stencil_accesses, arrays_accessed
 
 def dprint(*s):
-    if config.DEBUG_ARRAY_OPT==1:
+    if numba.config.DEBUG_ARRAY_OPT==1:
         print(*s)

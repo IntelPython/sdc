@@ -31,6 +31,16 @@ ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 
+
+_h5_typ_table = {
+    types.int8:0,
+    types.uint8:1,
+    types.int32:2,
+    types.int64:3,
+    types.float32:4,
+    types.float64:5
+    }
+
 @lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
@@ -79,7 +89,7 @@ def lower_dist_reduce(context, builder, sig, args):
 @lower_builtin(distributed_api.dist_arr_reduce, types.npytypes.Array)
 def lower_dist_arr_reduce(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = hpat.pio_lower._h5_typ_table[sig.args[0].dtype]
+    typ_enum = _h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
     ndims = sig.args[0].ndim
 
@@ -151,7 +161,7 @@ def lower_dist_exscan(context, builder, sig, args):
 types.int32, types.int32, types.boolean)
 def lower_dist_irecv(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = hpat.pio_lower._h5_typ_table[sig.args[0].dtype]
+    typ_enum = _h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
 
     out = make_array(sig.args[0])(context, builder, args[0])
@@ -173,7 +183,7 @@ def lower_dist_irecv(context, builder, sig, args):
 types.int32, types.int32, types.boolean)
 def lower_dist_isend(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = hpat.pio_lower._h5_typ_table[sig.args[0].dtype]
+    typ_enum = _h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
 
     out = make_array(sig.args[0])(context, builder, args[0])

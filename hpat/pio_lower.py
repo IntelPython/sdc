@@ -2,6 +2,7 @@ from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
+from hpat.distributed_lower import _h5_typ_table
 from hpat.pio_api import h5file_type
 from hpat.str_ext import StringType
 import h5py
@@ -78,15 +79,6 @@ def h5_close(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_close")
     return builder.call(fn, args)
-
-_h5_typ_table = {
-    types.int8:0,
-    types.uint8:1,
-    types.int32:2,
-    types.int64:3,
-    types.float32:4,
-    types.float64:5
-    }
 
 @lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
     types.containers.UniTuple, StringType)

@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 import types as pytypes  # avoid confusion with numba.types
 import collections
 import numba
-from numba import ir, config, ir_utils, types
+from numba import ir, ir_utils, types
 from numba import compiler as numba_compiler
 from numba.stencil import StencilFunc
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
@@ -69,12 +69,13 @@ class HiFrames(object):
             from hpat import pio
             io_pass = pio.PIO(self.func_ir, self.locals)
             io_pass.run()
+        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
                 self.typingctx, self.func_ir, self.args, None)
         self.fix_series_filter(self.func_ir.blocks)
         self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
-        if config.DEBUG_ARRAY_OPT==1:
+        if numba.config.DEBUG_ARRAY_OPT==1:
             print("df_vars: ", self.df_vars)
         return
 

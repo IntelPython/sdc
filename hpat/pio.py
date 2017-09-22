@@ -47,7 +47,7 @@ class PIO(object):
                 else:
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
-        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after IO")
         if config.DEBUG_ARRAY_OPT==1:
             print("h5 files: ", self.h5_files)
