@@ -7,6 +7,9 @@ def get_rank():
     """dummy function for C mpi get_rank"""
     return 0
 
+def barrier():
+    return 0;
+
 def get_size():
     """dummy function for C mpi get_size"""
     return 0
@@ -127,6 +130,13 @@ class DistDistTime(AbstractTemplate):
         assert not kws
         assert len(args)==0
         return signature(types.float64, *args)
+
+@infer_global(barrier)
+class DistBarrier(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==0
+        return signature(types.int32, *args)
 
 @infer_global(dist_cumsum)
 @infer_global(dist_cumprod)

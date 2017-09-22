@@ -8,7 +8,8 @@ from numba import (ir, types, typing, config, numpy_support,
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
                             get_global_func_typ, find_op_typ, get_name_var_table,
-                            get_call_table, get_tuple_table, remove_dels)
+                            get_call_table, get_tuple_table, remove_dels,
+                            compile_to_numba_ir)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                             wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -159,6 +160,8 @@ class DistributedPass(object):
                     new_body += self._run_getsetitem(inst.target,
                         index, inst, inst)
                     continue
+                if isinstance(inst, ir.Return):
+                    new_body += self._gen_barrier()
                 new_body.append(inst)
             blocks[label].body = new_body
 
@@ -956,6 +959,15 @@ class DistributedPass(object):
                     else:
                         assert call_name == 'File'
                         rhs.args[2] = self._set1_var
+
+    def _gen_barrier(self):
+        def f():
+            return hpat.distributed_api.barrier()
+
+        f_blocks = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx, {},
+                        self.typemap, self.calltypes).blocks
+        block = f_blocks[min(f_blocks.keys())]
+        return block.body[:-2]  # remove return
 
     def _isarray(self, varname):
         return (varname in self.typemap
