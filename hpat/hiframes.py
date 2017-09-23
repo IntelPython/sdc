@@ -17,6 +17,9 @@ from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
 from hpat.parquet_pio import ParquetHandler
 
+if config._has_h5py:
+    from hpat import pio
+
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
@@ -66,7 +69,6 @@ class HiFrames(object):
         self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         if config._has_h5py:
-            from hpat import pio
             io_pass = pio.PIO(self.func_ir, self.locals)
             io_pass.run()
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
