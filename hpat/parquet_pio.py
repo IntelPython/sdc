@@ -9,11 +9,15 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 import numpy as np
+from hpat.str_ext import StringType
 
 _pq_type_to_numba = {'DOUBLE': types.Array(types.float64, 1, 'C'),
                     'INT64': types.Array(types.int64, 1, 'C')}
 
 def read_parquet():
+    return 0
+
+def get_column_size_parquet():
     return 0
 
 class ParquetHandler(object):
@@ -44,36 +48,43 @@ class ParquetHandler(object):
                 self.locals[varname] = c_type
                 cvar = ir.Var(scope, varname, loc)
                 col_items.append((cname, cvar))
-                # TODO: handle string constant
-                dummy_const = "np.{}(0)".format(c_type.dtype)
-                # generate column read call
-                read_func_text = ('def f():\n  a = {}\n  {} = read_parquet("{}", {}, a)\n'.
-                        format(dummy_const, cname, file_name_str, i))
-                loc_vars = {}
-                exec(read_func_text, {}, loc_vars)
-                read_func = loc_vars['f']
-                _, f_block = compile_to_numba_ir(read_func,
-                            {'read_parquet': read_parquet, 'np': np}).blocks.popitem()
 
-                # dummy_var = ir.Var(scope, mk_unique_var('dummy_const'), loc)
-                # self.locals[dummy_var.name] = c_type.dtype
-                # dummy_const_assign = ir.Assign(ir.Const(c_type.dtype(0), loc), dummy_var, loc)
-                # out_nodes.append(dummy_const_assign)
-                # replace_arg_nodes(f_block, [dummy_var])
+                size_func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
+                        format(file_name_str, i))
+                size_func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(c_type.dtype)
+                size_func_text += '  status = read_parquet("{}", {}, column)\n'.format(file_name_str, i)
+                loc_vars = {}
+                exec(size_func_text, {}, loc_vars)
+                size_func = loc_vars['f']
+                _, f_block = compile_to_numba_ir(size_func,
+                            {'get_column_size_parquet': get_column_size_parquet,
+                            'read_parquet': read_parquet, 'np': np}).blocks.popitem()
+
                 out_nodes += f_block.body[:-3]
-                assign = ir.Assign(out_nodes[-1].target, cvar, loc)
+                for stmt in out_nodes:
+                    if stmt.target.name.startswith("column"):
+                        assign = ir.Assign(stmt.target, cvar, loc)
+                        break
+
                 out_nodes.append(assign)
 
             return col_items, out_nodes
         raise ValueError("Parquet schema not available")
+
+@infer_global(get_column_size_parquet)
+class SizeParquetInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==2
+        return signature(types.intp, *args)
 
 @infer_global(read_parquet)
 class ReadParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==3
-        array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(array_ty, *args)
+        # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
+        return signature(types.int32, *args)
 
 
 from numba import cgutils
@@ -86,10 +97,22 @@ from hpat.config import _has_pyarrow
 if _has_pyarrow:
     import parquet_cpp
     ll.add_symbol('pq_read', parquet_cpp.read)
+    ll.add_symbol('pq_get_size', parquet_cpp.get_size)
 
-@lower_builtin(read_parquet, types.Type, types.Type, types.Type)
+@lower_builtin(get_column_size_parquet, StringType, types.intp)
+def pq_size_lower(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="pq_get_size")
+    return builder.call(fn, args)
+
+@lower_builtin(read_parquet, StringType, types.intp, types.Array)
 def pq_read_lower(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(8).as_pointer()])
+    out_array = make_array(sig.args[2])(context, builder, args[2])
+
     fn = builder.module.get_or_insert_function(fnty, name="pq_read")
-    return builder.call(fn, [args[0]])
+    return builder.call(fn, [args[0], args[1],
+            builder.bitcast(out_array.data, lir.IntType(8).as_pointer())])
