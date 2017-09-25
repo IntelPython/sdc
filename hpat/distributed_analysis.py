@@ -121,8 +121,7 @@ class DistributedAnalysis(object):
         parfor_arrs = set() # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
-        stencil_accesses, _ = get_stencil_accesses(parfor.loop_body,
-                                                par_index_var, self.typemap)
+        stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
         for (arr,index) in array_accesses:
             if index==par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
@@ -144,6 +143,11 @@ class DistributedAnalysis(object):
         for arr in parfor_arrs:
             if arr in array_dists:
                 array_dists[arr] = out_dist
+
+        # TODO: find prange actually coming from user
+        # for pattern in parfor.patterns:
+        #     if pattern[0] == 'prange' and not self.in_parallel_parfor:
+        #         parfor_dists[parfor.id] = Distribution.OneD
 
         # run analysis recursively on parfor body
         if self.second_pass and out_dist==Distribution.OneD:
@@ -277,31 +281,51 @@ def is_array(varname, typemap):
     return (varname in typemap
         and isinstance(typemap[varname], numba.types.npytypes.Array))
 
-def get_stencil_accesses(body, par_index_var, typemap):
+def get_stencil_accesses(parfor, typemap):
+    # if a parfor has stencil pattern, see which accesses depend on loop index
+    # XXX: assuming loop index is not used for non-stencil arrays
     # TODO support recursive parfor, multi-D, mutiple body blocks
-    const_table = {}
-    offset_accesses = {}
+
+    # no access if not stencil
+    is_stencil = False
+    for pattern in parfor.patterns:
+        if pattern[0] == 'stencil':
+            is_stencil = True
+            neighborhood = pattern[1]
+    if not is_stencil:
+        return {}, None
+
+    par_index_var = parfor.loop_nests[0].index_variable
+    body = parfor.loop_body
+    from hpat.hiframes import _get_definitions
+    body_defs = _get_definitions(body)
+
     stencil_accesses = {}
-    arrays_accessed = {}
 
     for block in body.values():
         for stmt in block.body:
-            if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
-                lhs = stmt.target.name
-                const_table[lhs] = stmt.value.value
             if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
                 lhs = stmt.target.name
                 rhs = stmt.value
-                if (rhs.op == 'binop' and rhs.fn == '+' and
-                        rhs.lhs.name == par_index_var and
-                        rhs.rhs.name in const_table):
-                    offset_accesses[lhs] = const_table[rhs.rhs.name]
-                if (rhs.op == 'getitem' and rhs.index.name in offset_accesses
-                        and is_array(rhs.value.name, typemap)):
-                    arrays_accessed[rhs.index.name] = rhs.value.name
-                    stencil_accesses[rhs.index.name] = offset_accesses[rhs.index.name]
+                if (rhs.op == 'getitem' and is_array(rhs.value.name, typemap)
+                        and vars_dependent(body_defs, rhs.index, par_index_var)):
+                    stencil_accesses[rhs.index.name] = rhs.value.name
 
-    return stencil_accesses, arrays_accessed
+    return stencil_accesses, neighborhood
+
+def vars_dependent(defs, var1, var2):
+    # see if var1 depends on var2 based on definitions in defs
+    if len(defs[var1.name]) != 1:
+        return False
+
+    vardef = defs[var1.name][0]
+    if isinstance(vardef, ir.Var) and vardef.name == var2.name:
+        return True
+    if isinstance(vardef, ir.Expr):
+        for invar in vardef.list_vars():
+            if invar.name == var2.name or vars_dependent(defs, invar, var2):
+                return True
+    return False
 
 def dprint(*s):
     if numba.config.DEBUG_ARRAY_OPT==1:

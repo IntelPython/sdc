@@ -9,7 +9,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
                             get_global_func_typ, find_op_typ, get_name_var_table,
                             get_call_table, get_tuple_table, remove_dels,
-                            compile_to_numba_ir)
+                            compile_to_numba_ir, replace_arg_nodes)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                             wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -445,16 +445,16 @@ class DistributedPass(object):
             loc = index_var.loc
             ndims = self.typemap[arr.name].ndim
             if ndims==1:
-                sub_assign = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
-                out = [sub_assign]
-                node.index = sub_assign.target
+                sub_nodes = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
+                out = sub_nodes
+                node.index = sub_nodes[-1].target
             else:
                 assert index_var.name in self._tuple_table
                 index_list = self._tuple_table[index_var.name]
-                sub_assign = self._get_ind_sub(index_list[0], self._array_starts[arr.name][0])
-                out = [sub_assign]
+                sub_nodes = self._get_ind_sub(index_list[0], self._array_starts[arr.name][0])
+                out = sub_nodes
                 new_index_list = copy.copy(index_list)
-                new_index_list[0] = sub_assign.target
+                new_index_list[0] = sub_nodes[-1].target
                 tuple_var = ir.Var(scope, mk_unique_var("$tuple_var"), loc)
                 self.typemap[tuple_var.name] = self.typemap[index_var.name]
                 tuple_call = ir.Expr.build_tuple(new_index_list, loc)
@@ -489,8 +489,8 @@ class DistributedPass(object):
         return out
 
     def _run_parfor(self, parfor, namevar_table):
-        stencil_accesses, arrays_accessed = get_stencil_accesses(
-            parfor.loop_body, parfor.loop_nests[0].index_variable.name, self.typemap)
+        stencil_accesses, neighborhood = get_stencil_accesses(
+            parfor, self.typemap)
 
         if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
             # TODO: make sure loop index is not used for calculations in
@@ -506,8 +506,7 @@ class DistributedPass(object):
 
         # return range to original size of array
         if stencil_accesses:
-            right_length = max(stencil_accesses.values())
-            right_length = max(right_length, 0)  # avoid negative value
+            right_length = neighborhood[1][0]
             if right_length:
                 new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
                 self.typemap[new_range_size.name] = types.intp
@@ -533,11 +532,11 @@ class DistributedPass(object):
 
         if stencil_accesses:
             # TODO assuming single array in stencil
-            arr_set = set(arrays_accessed.values())
+            arr_set = set(stencil_accesses.values())
             arr = arr_set.pop()
             assert not arr_set  # only one array
             self._run_parfor_stencil(parfor, out, start_var, end_var,
-                                        stencil_accesses, namevar_table[arr])
+                                        neighborhood, namevar_table[arr])
         else:
             out.append(parfor)
 
@@ -576,13 +575,13 @@ class DistributedPass(object):
         return out
 
     def _run_parfor_stencil(self, parfor, out, start_var, end_var,
-                                                    stencil_accesses, arr_var):
+                                                    neighborhood, arr_var):
         #
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
-        left_length = -min(stencil_accesses.values())
+        left_length = -neighborhood[0][0]
         left_length = max(left_length, 0)  # avoid negative value
-        right_length = max(stencil_accesses.values())
+        right_length = neighborhood[1][0]
         right_length = max(right_length, 0)  # avoid negative value
         dtype = self.typemap[arr_var.name].dtype
 
@@ -901,12 +900,39 @@ class DistributedPass(object):
         return div_nodes, start_var, end_var
 
     def _get_ind_sub(self, ind_var, start_var):
+        if (isinstance(ind_var, slice)
+                or isinstance(self.typemap[ind_var.name],
+                    types.misc.SliceType)):
+            return self._get_ind_sub_slice(ind_var, start_var)
         sub_var = ir.Var(ind_var.scope, mk_unique_var("$sub_var"), ind_var.loc)
         self.typemap[sub_var.name] = types.int64
         sub_expr = ir.Expr.binop('-', ind_var, start_var, ind_var.loc)
         self.calltypes[sub_expr] = find_op_typ('-', [types.int64, types.int64])
         sub_assign = ir.Assign(sub_expr, sub_var, ind_var.loc)
-        return sub_assign
+        return [sub_assign]
+
+    def _get_ind_sub_slice(self, slice_var, offset_var):
+        if isinstance(slice_var, slice):
+            f_text = """def f(offset):
+                return slice({} - offset, {} - offset)
+            """.format(slice_var.start, slice_var.stop)
+            loc = {}
+            exec(f_text, {}, loc)
+            f = loc['f']
+            args = [offset_var]
+            arg_typs = (types.intp,)
+        else:
+            def f(old_slice, offset):
+                return slice(old_slice.start - offset, old_slice.stop - offset)
+            args = [slice_var, offset_var]
+            slice_type = self.typemap[slice_var.name]
+            arg_typs = (slice_type, types.intp,)
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, _globals, self.typingctx, arg_typs,
+                                    self.typemap, self.calltypes)
+        _, block = f_ir.blocks.popitem()
+        replace_arg_nodes(block, args)
+        return block.body[:-2]  # ignore return nodes
 
     def _dist_prints(self, blocks):
         new_blocks = {}

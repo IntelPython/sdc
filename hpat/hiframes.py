@@ -476,7 +476,7 @@ class HiFrames(object):
             index_offsets = [-win_size+1]
         if center:
             index_offsets[0] += win_size//2
-            win_tuple = (-win_size//2, win_size//2)
+            win_tuple = (-(win_size//2), win_size//2)
 
         options = {'neighborhood': (win_tuple,)}
         fir_globals = self.func_ir.func_id.func.__globals__
