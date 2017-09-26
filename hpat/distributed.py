@@ -9,7 +9,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
                             get_global_func_typ, find_op_typ, get_name_var_table,
                             get_call_table, get_tuple_table, remove_dels,
-                            compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes,
+                            guard, get_definition)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                             wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -506,7 +507,8 @@ class DistributedPass(object):
 
         # return range to original size of array
         if stencil_accesses:
-            right_length = neighborhood[1][0]
+            #right_length = neighborhood[1][0]
+            left_length, right_length = self._get_stencil_border_length(neighborhood)
             if right_length:
                 new_range_size = ir.Var(scope, mk_unique_var("new_range_size"), loc)
                 self.typemap[new_range_size.name] = types.intp
@@ -579,10 +581,9 @@ class DistributedPass(object):
         #
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
-        left_length = -neighborhood[0][0]
-        left_length = max(left_length, 0)  # avoid negative value
-        right_length = neighborhood[1][0]
-        right_length = max(right_length, 0)  # avoid negative value
+
+        left_length, right_length = self._get_stencil_border_length(neighborhood)
+
         dtype = self.typemap[arr_var.name].dtype
 
         # post left send/receive
@@ -660,6 +661,54 @@ class DistributedPass(object):
 
 
         return
+
+    def _get_stencil_border_length(self, neighborhood):
+        # XXX: hack to get lengths assuming they are constant
+        from hpat.hiframes import _get_definitions
+        self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
+        left_length = -self._get_var_const_val(neighborhood[0][0])
+        # left_length = -neighborhood[0][0]
+        left_length = max(left_length, 0)  # avoid negative value
+        #right_length = neighborhood[1][0]
+        right_length = self._get_var_const_val(neighborhood[1][0])
+        right_length = max(right_length, 0)  # avoid negative value
+
+        return left_length, right_length
+        # def f(w):
+        #     return max(-w, 0)
+        # f_block = compile_to_numba_ir(f, {}, self.typingctx, (types.intp,),
+        #                     self.typemap, self.calltypes).blocks.popitem()[1]
+        # replace_arg_nodes(f_block, [neighborhood[0][0]])
+        # out.extend(f_block.body[:-2])  # remove none return
+        # left_length = out[-1].target
+        #
+        # def f(w):
+        #     return max(w, 0)
+        # f_block = compile_to_numba_ir(f, {}, self.typingctx, (types.intp,),
+        #                     self.typemap, self.calltypes).blocks.popitem()[1]
+        # replace_arg_nodes(f_block, [neighborhood[1][0]])
+        # out.extend(f_block.body[:-2])  # remove none return
+        # right_length = out[-1].target
+
+    def _get_var_const_val(self, var):
+        if isinstance(var, int):
+            return var
+        node = guard(get_definition, self.func_ir, var)
+        if isinstance(node, ir.Const):
+            return node.value
+        if isinstance(node, ir.Expr):
+            if node.op=='unary' and node.fn=='-':
+                return -self._get_var_const_val(node.value)
+            if node.op=='binop':
+                lhs = self._get_var_const_val(node.lhs)
+                rhs = self._get_var_const_val(node.rhs)
+                if node.fn=='+':
+                    return lhs+rhs
+                if node.fn=='-':
+                    return lhs-rhs
+                if node.fn=='//':
+                    return lhs // rhs
+        return None
 
     def _gen_stencil_border(self, parfor_index, buff_index, body,
                                 halo_recv_buff, halo_length, end_var, is_left):

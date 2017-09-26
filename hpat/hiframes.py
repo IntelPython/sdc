@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 import types as pytypes  # avoid confusion with numba.types
 import collections
+from collections import namedtuple
 import numba
 from numba import ir, ir_utils, types
 from numba import compiler as numba_compiler
@@ -11,6 +12,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition)
+from numba.inline_closurecall import InlineClosureCallPass
 import hpat
 from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT
@@ -72,6 +74,9 @@ class HiFrames(object):
             io_pass = pio.PIO(self.func_ir, self.locals)
             io_pass.run()
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        DummyFlags = namedtuple('DummyFlags', 'auto_parallel')
+        inline_pass = InlineClosureCallPass(self.func_ir, DummyFlags(True))
+        inline_pass.run()
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
                 self.typingctx, self.func_ir, self.args, None)
         self.fix_series_filter(self.func_ir.blocks)
@@ -318,11 +323,11 @@ class HiFrames(object):
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
-        code_obj = loc_vars['g'].__code__
+        kernel_func = loc_vars['g']
 
         index_offsets = [0]
         fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj, index_offsets, fir_globals)
+        stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func, index_offsets, fir_globals)
 
         border_text = 'def f(A):\n  A[:{}] = np.nan\n'.format(shift_const)
         loc_vars = {}
@@ -444,13 +449,12 @@ class HiFrames(object):
         return f_blocks
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
-        if not isinstance(win_size, int):
-            return self._gen_rolling_call_var(args, col_var, win_size, center, func, out_var)
         loc = col_var.loc
+        scope = col_var.scope
         if func == 'apply':
             if len(args) != 1:
                 raise ValueError("One argument expected for rolling apply")
-            code_obj = guard(get_definition, self.func_ir, args[0]).code
+            kernel_func = guard(get_definition, self.func_ir, args[0])
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             if len(args) != 0:
                 raise ValueError("No argument expected for rolling {}".format(
@@ -458,84 +462,110 @@ class HiFrames(object):
             g_pack = "np"
             if func in ['std', 'var']:
                 g_pack = "hpat.hiframes_api"
-            if win_size < LARGE_WIN_SIZE:
+            if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
                 # unroll if size is less than 5
                 kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
                 kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
                 if func == 'sum':  # simplify sum
                     kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
             else:
-                kernel_expr = '{}.{}(a[(-{}+1):1])'.format(g_pack, func, win_size)
-            func_text = 'def g(a):\n  return {}\n'.format(kernel_expr)
+                kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
+            func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
-            code_obj = loc_vars['g'].__code__
-        index_offsets = [0]
-        win_tuple = (-win_size+1, 0)
+            kernel_func = loc_vars['g']
+
+        init_nodes = []
+        if isinstance(win_size, int):
+            win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
+            init_nodes.append(
+                        ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
+            win_size = win_size_var
+
+        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(win_size,
+                                                                func, center)
+
+        init_nodes += option_nodes
+        other_args = [win_size]
         if func == 'apply':
-            index_offsets = [-win_size+1]
-        if center:
-            index_offsets[0] += win_size//2
-            win_tuple = (-(win_size//2), win_size//2)
-
-        options = {'neighborhood': (win_tuple,)}
+            other_args = None
+        options = {'neighborhood': win_tuple}
         fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj,
-                                    index_offsets, fir_globals, None, options)
-
-        def f(A):
-            A[:win_size-1] = np.nan
-        f_blocks = get_inner_ir(f)
-        remove_none_return_from_block(f_blocks[0])
-        replace_var_names(f_blocks, {'A': out_var.name})
-        setitem_nodes = f_blocks[0].body
+        stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func,
+                                    index_offsets, fir_globals, other_args, options)
 
 
-        if center:
-            def f1(A):
-                A[:win_size//2] = np.nan
-            def f2(A):
-                A[-(win_size//2):] = np.nan
-            f_blocks = get_inner_ir(f1)
-            remove_none_return_from_block(f_blocks[0])
-            replace_var_names(f_blocks, {'A': out_var.name})
-            setitem_nodes1 = f_blocks[0].body
-            f_blocks = get_inner_ir(f2)
-            remove_none_return_from_block(f_blocks[0])
-            replace_var_names(f_blocks, {'A': out_var.name})
-            setitem_nodes2 = f_blocks[0].body
-            setitem_nodes = setitem_nodes1 + setitem_nodes2
-
-        return stencil_nodes + setitem_nodes
-
-    def _gen_rolling_call_var(self, args, col_var, win_size, center, func, out_var):
-        # variable win_size
-        assert func == 'sum', "only sum with var length supported"
-        loc = out_var.loc
-        func_text = 'def g(a, w):\n  s=0\n  for _i in range(w):\n    s+=a[-_i]\n  return s'
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        code_obj = loc_vars['g'].__code__
-        index_offsets = [0]
-        def f(win_size):
-            s = -win_size+1
-            numba.stencil(s)
-            return s
-        f_blocks = get_inner_ir(f)
-        win_start = f_blocks[0].body[-2].value.value
-        replace_var_names(f_blocks, {'win_size': win_size.name})
-        start_nodes = f_blocks[0].body[:-2]
-        options = {'neighborhood': ((win_start, 0),)}
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, code_obj,
-                index_offsets, fir_globals, [win_size], options)
         def f(A, w):
             A[:w-1] = np.nan
-        f_blocks = get_inner_ir(f)
-        remove_none_return_from_block(f_blocks[0])
-        replace_var_names(f_blocks, {'A': out_var.name, 'w': win_size.name})
-        setitem_nodes = f_blocks[0].body
-        return start_nodes + stencil_nodes + setitem_nodes
+        f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [out_var, win_size])
+        setitem_nodes = f_block.body[:-3]  # remove none return
+
+        if center:
+            def f1(A, w):
+                A[:w//2] = np.nan
+            def f2(A, w):
+                A[-(w//2):] = np.nan
+            f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [out_var, win_size])
+            setitem_nodes1 = f_block.body[:-3]  # remove none return
+            f_block = compile_to_numba_ir(f2, {'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [out_var, win_size])
+            setitem_nodes2 = f_block.body[:-3]  # remove none return
+            setitem_nodes = setitem_nodes1 + setitem_nodes2
+
+        return init_nodes + stencil_nodes + setitem_nodes
+
+    def _gen_rolling_init(self, win_size, func, center):
+        nodes = []
+        right_length = 0
+        scope = win_size.scope
+        loc = win_size.loc
+        right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
+        nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
+
+        def f(w):
+            return -w+1
+        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [win_size])
+        nodes.extend(f_block.body[:-2])  # remove none return
+        left_length = nodes[-1].target
+
+        if center:
+            def f(w):
+                return -(w//2)
+            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [win_size])
+            nodes.extend(f_block.body[:-2])  # remove none return
+            left_length = nodes[-1].target
+            def f(w):
+                return (w//2)
+            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [win_size])
+            nodes.extend(f_block.body[:-2])  # remove none return
+            right_length = nodes[-1].target
+
+
+        def f(a, b):
+            return ((a, b),)
+        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [left_length, right_length])
+        nodes.extend(f_block.body[:-2])  # remove none return
+        win_tuple = nodes[-1].target
+
+        index_offsets = [right_length]
+
+        if func == 'apply':
+            index_offsets = [left_length]
+
+        def f(a):
+            return (a,)
+        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, index_offsets)
+        nodes.extend(f_block.body[:-2])  # remove none return
+        index_offsets = nodes[-1].target
+
+        return index_offsets, win_tuple, nodes
 
     def fix_series_filter(self, blocks):
         topo_order = find_topo_order(blocks)
@@ -594,24 +624,36 @@ def gen_empty_like(in_arr, out_arr):
     alloc_assign = ir.Assign(alloc_call, out_arr, loc)
     return [g_np_assign, attr_assign, alloc_assign]
 
-def gen_stencil_call(in_arr, out_arr, code_obj, index_offsets, fir_globals, other_args=None, options=None):
+def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
+                                                other_args=None, options=None):
     if other_args is None:
         other_args = []
     if options is None:
         options = {}
-    scope = in_arr.scope
-    loc = in_arr.loc
-    alloc_nodes = gen_empty_like(in_arr, out_arr)
-    kernel_ir = get_ir_of_code(fir_globals, code_obj)
     if index_offsets != [0]:
         options['index_offsets'] = index_offsets
-    sf = StencilFunc(kernel_ir, 'constant', options)
-    stencil_obj = ir.Global('stencil', sf, loc)
-    stencil_var = ir.Var(scope, mk_unique_var("$stencil_var"), loc)
-    stencil_assign = ir.Assign(stencil_obj, stencil_var, loc)
-    stencil_call = ir.Expr.call(stencil_var, [in_arr] + other_args, [('out', out_arr)], loc)
-    out_assign = ir.Assign(stencil_call, out_arr, loc)
-    return alloc_nodes + [stencil_assign, out_assign]
+    scope = in_arr.scope
+    loc = in_arr.loc
+    stencil_nodes = []
+    stencil_nodes += gen_empty_like(in_arr, out_arr)
+
+    kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
+    if not isinstance(kernel_func, ir.Expr):
+        kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
+                    kernel_func.__closure__, kernel_func.__defaults__, loc)
+    stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
+
+    def f(A, B, f):
+        numba.stencil(f)(A, out=B)
+    f_block = compile_to_numba_ir(f, {'numba': numba}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
+    stencil_nodes += f_block.body[:-3]  # remove none return
+    setup_call = stencil_nodes[-2].value
+    stencil_call = stencil_nodes[-1].value
+    setup_call.kws = list(options.items())
+    stencil_call.args += other_args
+
+    return stencil_nodes
 
 def get_inner_ir(func):
     # get untyped numba ir
