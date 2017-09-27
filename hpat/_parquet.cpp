@@ -32,15 +32,11 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
 
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 {
-    auto pool = ::arrow::default_memory_pool();
-    std::unique_ptr<FileReader> arrow_reader;
-    arrow_reader.reset(new FileReader(pool,
-        ParquetFileReader::OpenFile(*file_name, false)));
-    std::shared_ptr<::arrow::Table> table;
-    arrow_reader->ReadTable(&table);
-    std::shared_ptr< ::arrow::Column > column = table->column(column_idx);
-    int64_t num_values = column->length();
-    return num_values;
+    auto pqreader = ParquetFileReader::OpenFile(*file_name);
+    int64_t nrows = pqreader->metadata()->num_rows();
+    // std::cout << nrows << std::endl;
+    pqreader->Close();
+    return nrows;
 }
 
 int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
