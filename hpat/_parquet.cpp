@@ -46,21 +46,16 @@ int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
     arrow_reader.reset(new FileReader(pool,
         ParquetFileReader::OpenFile(*file_name, false)));
     //
-    std::shared_ptr<::arrow::Table> table;
-    arrow_reader->ReadTable(&table);
-    // std::vector<int> column_indices;
-    // column_indices.push_back(column_idx);
-    // arrow_reader->ReadRowGroup(0, column_indices, &table);
-    std::shared_ptr< ::arrow::Column > column = table->column(column_idx);
-    int64_t num_values = column->length();
-    std::shared_ptr< ::arrow::ChunkedArray > data = column->data();
-    for(int i=0; i<data->num_chunks(); i++) {
-        std::shared_ptr< ::arrow::Array > arr = data->chunk(i);
-        auto buffers = arr->data()->buffers;
-        std::cout<<"num buffs: "<< buffers.size()<<std::endl;
-        int buff_size = buffers[1]->size();
-        memcpy(out_data, buffers[1]->data(), buff_size);
-    }
+    std::shared_ptr< ::arrow::Array > arr;
+    arrow_reader->ReadColumn(column_idx, &arr);
+    // std::cout << arr->ToString() << std::endl;
 
+    auto buffers = arr->data()->buffers;
+    // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
+    if (buffers.size()!=2) {
+        std::cerr << "invalid parquet number of array buffers" << std::endl;
+    }
+    int64_t buff_size = buffers[1]->size();
+    memcpy(out_data, buffers[1]->data(), buff_size);
     return 0;
 }
