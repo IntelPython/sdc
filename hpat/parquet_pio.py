@@ -1,3 +1,4 @@
+import numba
 from numba import ir, config, ir_utils, types
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
@@ -22,6 +23,16 @@ def read_parquet_parallel():
 
 def get_column_size_parquet():
     return 0
+
+def remove_parquet(rhs, lives, call_list):
+    # the call is dead if the read array is dead
+    if call_list == [read_parquet] and rhs.args[2].name not in lives:
+        return True
+    if call_list == [get_column_size_parquet]:
+        return True
+    return False
+
+numba.ir_utils.remove_call_handlers.append(remove_parquet)
 
 class ParquetHandler(object):
     """analyze and transform parquet IO calls"""
