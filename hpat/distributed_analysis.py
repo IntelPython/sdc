@@ -178,6 +178,9 @@ class DistributedAnalysis(object):
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
 
+        if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet]:
+            return
+
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
                     'zeros_like', 'ones_like', 'full_like', 'copy']):

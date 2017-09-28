@@ -17,6 +17,9 @@ _pq_type_to_numba = {'DOUBLE': types.Array(types.float64, 1, 'C'),
 def read_parquet():
     return 0
 
+def read_parquet_parallel():
+    return 0
+
 def get_column_size_parquet():
     return 0
 
@@ -86,6 +89,13 @@ class ReadParquetInfer(AbstractTemplate):
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
         return signature(types.int32, *args)
 
+@infer_global(read_parquet_parallel)
+class ReadParallelParquetInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==5
+        # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
+        return signature(types.int32, *args)
 
 from numba import cgutils
 from numba.targets.imputils import lower_builtin
@@ -97,6 +107,7 @@ from hpat.config import _has_pyarrow
 if _has_pyarrow:
     import parquet_cpp
     ll.add_symbol('pq_read', parquet_cpp.read)
+    ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
     ll.add_symbol('pq_get_size', parquet_cpp.get_size)
 
 @lower_builtin(get_column_size_parquet, StringType, types.intp)
@@ -116,3 +127,16 @@ def pq_read_lower(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="pq_read")
     return builder.call(fn, [args[0], args[1],
             builder.bitcast(out_array.data, lir.IntType(8).as_pointer())])
+
+@lower_builtin(read_parquet_parallel, StringType, types.intp, types.Array, types.intp, types.intp)
+def pq_read_parallel_lower(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64), lir.IntType(64)])
+    out_array = make_array(sig.args[2])(context, builder, args[2])
+
+    fn = builder.module.get_or_insert_function(fnty, name="pq_read_parallel")
+    return builder.call(fn, [args[0], args[1],
+            builder.bitcast(out_array.data, lir.IntType(8).as_pointer()),
+            args[3], args[4]])

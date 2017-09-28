@@ -20,7 +20,7 @@ import numpy as np
 import hpat
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
-
+from hpat.str_ext import string_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis,
                                        get_stencil_accesses)
@@ -343,6 +343,22 @@ class DistributedPass(object):
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)
 
+        if (self._is_parquet_read_call(func_var)
+                and self._is_1D_arr(rhs.args[2].name)):
+            arr = rhs.args[2].name
+            assert len(self._array_starts[arr]) == 1, "only 1D arrs in parquet"
+            start_var = self._array_starts[arr][0]
+            count_var = self._array_counts[arr][0]
+            rhs.args += [start_var, count_var]
+            def f(fname, cindex, arr, start, count):
+                return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
+                                                            arr, start, count)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+            (string_type, types.intp, self.typemap[arr], types.intp, types.intp),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-2]
 
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
@@ -1068,6 +1084,11 @@ class DistributedPass(object):
             return False
         return hpat.config._has_h5py and (self._call_table[func_var]==['h5read', hpat.pio_api]
                 or self._call_table[func_var]==['h5write', hpat.pio_api])
+
+    def _is_parquet_read_call(self, func_var):
+        if func_var not in self._call_table:
+            return False
+        return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet])
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
