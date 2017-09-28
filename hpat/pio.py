@@ -14,6 +14,16 @@ from hpat import pio_api, pio_lower, utils
 from hpat.utils import get_constant, NOT_CONSTANT
 import h5py
 
+def remove_h5(rhs, lives, call_list):
+    # the call is dead if the read array is dead
+    if call_list == ['h5read', pio_api] and rhs.args[6].name not in lives:
+        return True
+    if call_list == ['h5size', pio_api]:
+        return True
+    return False
+
+numba.ir_utils.remove_call_handlers.append(remove_h5)
+
 class PIO(object):
     """analyze and transform hdf5 calls"""
     def __init__(self, func_ir, local_vars):
