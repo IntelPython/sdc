@@ -48,15 +48,14 @@ class ParquetHandler(object):
         if isinstance(fname_def, ir.Const):
             assert isinstance(fname_def.value, str)
             file_name_str = fname_def.value
-            f = pq.ParquetFile(file_name_str)
+            col_names, col_types = parquet_file_schema(file_name_str)
             scope = file_name.scope
             loc = file_name.loc
-            col_names = f.schema.names
             out_nodes = []
             col_items = []
             for i, cname in enumerate(col_names):
                 # get column type from schema
-                c_type = _pq_type_to_numba[f.schema.column(i).physical_type]
+                c_type = col_types[i]
                 # create a variable for column and assign type
                 varname = mk_unique_var(cname)
                 self.locals[varname] = c_type
@@ -84,6 +83,24 @@ class ParquetHandler(object):
 
             return col_items, out_nodes
         raise ValueError("Parquet schema not available")
+
+def parquet_file_schema(file_name):
+    import pyarrow.parquet as pq
+    import pyarrow as pa
+    col_names = []
+    col_types = []
+
+    if file_name.startswith("hdfs://"):
+        fs = pa.hdfs.connect()
+    else:
+        fs = pa.LocalFileSystem()
+    with fs.open(file_name) as _file:
+        f = pq.ParquetFile(_file)
+        col_names = f.schema.names
+        num_cols = len(col_names)
+        col_types = [_pq_type_to_numba[f.schema.column(i).physical_type]
+                                                    for i in range(num_cols)]
+    return col_names, col_types
 
 @infer_global(get_column_size_parquet)
 class SizeParquetInfer(AbstractTemplate):

@@ -7,10 +7,13 @@
 #include "parquet/api/reader.h"
 #include "parquet/arrow/reader.h"
 #include "arrow/table.h"
+#include "arrow/io/hdfs.h"
 
 using parquet::arrow::FileReader;
 using parquet::ParquetFileReader;
 
+void pq_init_reader(std::string* file_name,
+        std::shared_ptr<FileReader> *a_reader);
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
 int pq_read(std::string* file_name, int64_t column_idx, void* out);
 int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_data, int64_t start, int64_t count);
@@ -35,19 +38,18 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
 
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 {
-    auto pqreader = ParquetFileReader::OpenFile(*file_name);
-    int64_t nrows = pqreader->metadata()->num_rows();
+    std::shared_ptr<FileReader> arrow_reader;
+    pq_init_reader(file_name, &arrow_reader);
+    int64_t nrows = arrow_reader->parquet_reader()->metadata()->num_rows();
     // std::cout << nrows << std::endl;
-    pqreader->Close();
     return nrows;
 }
 
 int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
 {
-    auto pool = ::arrow::default_memory_pool();
-    std::unique_ptr<FileReader> arrow_reader;
-    arrow_reader.reset(new FileReader(pool,
-        ParquetFileReader::OpenFile(*file_name, false)));
+
+    std::shared_ptr<FileReader> arrow_reader;
+    pq_init_reader(file_name, &arrow_reader);
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
@@ -70,10 +72,8 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_da
     // boolean, int32, int64, int96, float, double
     int type_sizes[] = {1, 4, 8, 12, 4, 8};
 
-    auto pool = ::arrow::default_memory_pool();
-    std::unique_ptr<FileReader> arrow_reader;
-    arrow_reader.reset(new FileReader(pool,
-        ParquetFileReader::OpenFile(*file_name, false)));
+    std::shared_ptr<FileReader> arrow_reader;
+    pq_init_reader(file_name, &arrow_reader);
 
     int64_t n_row_groups = arrow_reader->parquet_reader()->metadata()->num_row_groups();
     std::vector<int> column_indices;
@@ -141,4 +141,39 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_da
     if (read_rows!=count)
         std::cerr << "parquet read incomplete" << '\n';
     return 0;
+}
+
+void pq_init_reader(std::string* file_name,
+        std::shared_ptr<FileReader> *a_reader)
+{
+    auto pool = ::arrow::default_memory_pool();
+
+    // HDFS if starts with hdfs://
+    if (file_name->find("hdfs://")==0)
+    {
+        ::arrow::Status stat = ::arrow::io::HaveLibHdfs();
+        if (!stat.ok())
+            std::cerr << "libhdfs not found" << '\n';
+            ::arrow::io::HdfsConnectionConfig hfs_config;
+        // TODO: extract localhost and port from path if available
+        hfs_config.host = std::string("default");
+        hfs_config.port = 0;
+        hfs_config.driver = ::arrow::io::HdfsDriver::LIBHDFS;
+        hfs_config.user = std::string("");
+        hfs_config.kerb_ticket = std::string("");
+
+        std::shared_ptr<::arrow::io::HadoopFileSystem> fs;
+        ::arrow::io::HadoopFileSystem::Connect(&hfs_config, &fs);
+        std::shared_ptr<::arrow::io::HdfsReadableFile> file;
+        fs->OpenReadable(*file_name, &file);
+        a_reader->reset(new FileReader(pool, ParquetFileReader::Open(file)));
+    }
+    else  // regular file system
+    {
+        a_reader->reset(new FileReader(pool,
+                            ParquetFileReader::OpenFile(*file_name, false)));
+    }
+    // printf("file open for arrow reader done\n");
+    // fflush(stdout);
+    return;
 }
