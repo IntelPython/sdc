@@ -5,7 +5,7 @@ import numpy as np
 import argparse
 import time
 
-#@hpat.jit
+@hpat.jit
 def kde():
     t = pq.read_table('kde.parquet')
     df = t.to_pandas()
