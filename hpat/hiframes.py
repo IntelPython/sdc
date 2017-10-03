@@ -18,7 +18,7 @@ from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
 from hpat.parquet_pio import ParquetHandler
-
+from hpat.str_arr_ext import StringArray
 if config._has_h5py:
     from hpat import pio
 
@@ -26,6 +26,12 @@ if config._has_h5py:
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
 
+def remove_hiframes(rhs, lives, call_list):
+    if call_list == ['fix_df_array', 'hiframes_api', hpat]:
+        return True
+    return False
+
+numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
@@ -79,7 +85,7 @@ class HiFrames(object):
         inline_pass.run()
         self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
                 self.typingctx, self.func_ir, self.args, None)
-        self.fix_series_filter(self.func_ir.blocks)
+        self.fixes_after_typing(self.func_ir.blocks)
         self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if numba.config.DEBUG_ARRAY_OPT==1:
@@ -170,11 +176,11 @@ class HiFrames(object):
             arg_def = guard(get_definition, self.func_ir, rhs.args[0])
             if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':
                 raise ValueError("Invalid DataFrame() arguments (map expected)")
-
-            self.df_vars[lhs.name] = self._process_df_build_map(arg_def.items)
+            out, items = self._fix_df_arrays(arg_def.items)
+            self.df_vars[lhs.name] = self._process_df_build_map(items)
             self._update_df_cols()
             # remove DataFrame call
-            return []
+            return out
         return None
 
     def _handle_pq_table(self, lhs, rhs):
@@ -200,6 +206,21 @@ class HiFrames(object):
             self._update_df_cols()
             return nodes
         return None
+
+    def _fix_df_arrays(self, items_list):
+        nodes = []
+        new_list = []
+        for item in items_list:
+            col_varname = item[0]
+            col_arr = item[1]
+            def f(arr):
+                df_arr = hpat.hiframes_api.fix_df_array(arr)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [col_arr])
+            nodes += f_block.body[:-3]  # remove none return
+            new_col_arr = nodes[-1].target
+            new_list.append((col_varname, new_col_arr))
+        return nodes, new_list
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
@@ -567,11 +588,22 @@ class HiFrames(object):
 
         return index_offsets, win_tuple, nodes
 
-    def fix_series_filter(self, blocks):
+    def fixes_after_typing(self, blocks):
+        call_table, _ = ir_utils.get_call_table(self.func_ir.blocks)
         topo_order = find_topo_order(blocks)
         for label in topo_order:
             new_body = []
             for stmt in blocks[label].body:
+                # arr = fix_df_array(col) -> arr=col if col is array
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'
+                        and stmt.value.func.name in call_table
+                        and call_table[stmt.value.func.name] ==
+                                    ['fix_df_array', 'hiframes_api', hpat]
+                        and isinstance(self.typemap[stmt.value.args[0].name],
+                                                (types.Array, StringArray))):
+                    stmt.value = stmt.value.args[0]
                 # find df['col2'] = df['col1'][arr]
                 if (isinstance(stmt, ir.Assign)
                         and isinstance(stmt.value, ir.Expr)

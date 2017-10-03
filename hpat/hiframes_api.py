@@ -206,3 +206,30 @@ def array_std(context, builder, sig, args):
         return var(arry) ** 0.5
     res = context.compile_internal(builder, array_std_impl, sig, args)
     return impl_ret_untracked(context, builder, sig.return_type, res)
+
+def fix_df_array(c):
+    return c
+
+from numba.extending import overload
+from hpat.str_ext import StringType
+from hpat.str_arr_ext import StringArray
+
+@overload(fix_df_array)
+def fix_df_array_overload(column):
+    # convert list of numbers/bools to numpy array
+    if (isinstance(column, types.List)
+            and (isinstance(column.dtype, types.Number)
+            or column.dtype==types.boolean)):
+        def fix_df_array_impl(column):
+            return np.array(column)
+        return fix_df_array_impl
+    # convert list of strings to string array
+    if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+        def fix_df_array_impl(column):
+            return StringArray(column)
+        return fix_df_array_impl
+    # column is array if not list
+    assert isinstance(column, (types.Array, StringArray))
+    def fix_df_array_impl(column):
+        return column
+    return fix_df_array_impl
