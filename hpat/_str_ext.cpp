@@ -18,6 +18,8 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
 
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
+char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
+void print_int(int64_t val);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -51,6 +53,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&allocate_string_array)));
     PyObject_SetAttrString(m, "setitem_string_array",
                             PyLong_FromVoidPtr((void*)(&setitem_string_array)));
+    PyObject_SetAttrString(m, "getitem_string_array",
+                            PyLong_FromVoidPtr((void*)(&getitem_string_array)));
+    PyObject_SetAttrString(m, "print_int",
+                            PyLong_FromVoidPtr((void*)(&print_int)));
     return m;
 }
 
@@ -126,15 +132,15 @@ double str_to_float64(std::string* str)
 
 int64_t get_str_len(std::string* str)
 {
-    std::cout << "str len called: " << *str << " " << str->length()<<std::endl;
+    // std::cout << "str len called: " << *str << " " << str->length()<<std::endl;
     return str->length();
 }
 
 void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
                                                             int64_t total_size)
 {
-    std::cout << "allocating string array: " << num_strings << " " <<
-                                                    total_size << std::endl;
+    // std::cout << "allocating string array: " << num_strings << " " <<
+    //                                                 total_size << std::endl;
     *offsets = new uint32_t[num_strings+1];
     *data = new char[total_size];
     // *data = (char*) new std::string("gggg");
@@ -144,13 +150,31 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index)
 {
-    std::cout << "setitem str: " << *str << " " << index << std::endl;
+    // std::cout << "setitem str: " << *str << " " << index << std::endl;
     if (index==0)
         offsets[index] = 0;
     uint32_t start = offsets[index];
     uint32_t len = str->length();
-    std::cout << "start " << start << " len " << len << std::endl;
+    // std::cout << "start " << start << " len " << len << std::endl;
     memcpy(&data[start], str->c_str(), len);
     offsets[index+1] = start+len;
     return;
+}
+
+char* getitem_string_array(uint32_t *offsets, char *data, int64_t index)
+{
+    // printf("getitem string arr index: %d offsets: %d %d", index,
+    //                                  offsets[index], offsets[index+1]);
+    uint32_t size = offsets[index+1]-offsets[index]+1;
+    uint32_t start = offsets[index];
+    char* res = new char[size];
+    res[size-1] = '\0';
+    memcpy(res, &data[start], size-1);
+    // printf(" res %s\n", res);
+    return res;
+}
+
+void print_int(int64_t val)
+{
+    printf("%ld\n", val);
 }
