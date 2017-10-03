@@ -12,6 +12,12 @@ void* str_split(std::string* str, std::string* sep, int64_t *size);
 void* str_substr_int(std::string* str, int64_t index);
 int64_t str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
+int64_t get_str_len(std::string* str);
+void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
+                                                            int64_t total_size);
+
+void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
+                                                                int64_t index);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -39,6 +45,12 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_to_int64)));
     PyObject_SetAttrString(m, "str_to_float64",
                             PyLong_FromVoidPtr((void*)(&str_to_float64)));
+    PyObject_SetAttrString(m, "get_str_len",
+                            PyLong_FromVoidPtr((void*)(&get_str_len)));
+    PyObject_SetAttrString(m, "allocate_string_array",
+                            PyLong_FromVoidPtr((void*)(&allocate_string_array)));
+    PyObject_SetAttrString(m, "setitem_string_array",
+                            PyLong_FromVoidPtr((void*)(&setitem_string_array)));
     return m;
 }
 
@@ -110,4 +122,35 @@ int64_t str_to_int64(std::string* str)
 double str_to_float64(std::string* str)
 {
     return std::stod(*str);
+}
+
+int64_t get_str_len(std::string* str)
+{
+    std::cout << "str len called: " << *str << " " << str->length()<<std::endl;
+    return str->length();
+}
+
+void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
+                                                            int64_t total_size)
+{
+    std::cout << "allocating string array: " << num_strings << " " <<
+                                                    total_size << std::endl;
+    *offsets = new uint32_t[num_strings+1];
+    *data = new char[total_size];
+    // *data = (char*) new std::string("gggg");
+    return;
+}
+
+void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
+                                                                int64_t index)
+{
+    std::cout << "setitem str: " << *str << " " << index << std::endl;
+    if (index==0)
+        offsets[index] = 0;
+    uint32_t start = offsets[index];
+    uint32_t len = str->length();
+    std::cout << "start " << start << " len " << len << std::endl;
+    memcpy(&data[start], str->c_str(), len);
+    offsets[index+1] = start+len;
+    return;
 }
