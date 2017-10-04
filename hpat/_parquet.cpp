@@ -15,8 +15,16 @@ using parquet::ParquetFileReader;
 void pq_init_reader(std::string* file_name,
         std::shared_ptr<FileReader> *a_reader);
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
-int pq_read(std::string* file_name, int64_t column_idx, void* out);
-int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_data, int64_t start, int64_t count);
+int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out);
+int pq_read_parallel(std::string* file_name, int64_t column_idx,
+                            uint8_t* out_data, int64_t start, int64_t count);
+inline void copy_data(uint8_t* out_data, const uint8_t* buff,
+                    int64_t rows_to_skip, int64_t rows_to_read, int dtype);
+
+// parquet type sizes (NOT arrow)
+// boolean, int32, int64, int96, float, double
+int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
+
 
 PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     PyObject *m;
@@ -45,7 +53,7 @@ int64_t pq_get_size(std::string* file_name, int64_t column_idx)
     return nrows;
 }
 
-int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
+int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out_data)
 {
 
     std::shared_ptr<FileReader> arrow_reader;
@@ -53,7 +61,11 @@ int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
+    int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
+    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
+                                            ColumnChunk(column_idx)->type();
+    int dtype_size = pq_type_sizes[dtype];
 
     auto buffers = arr->data()->buffers;
     // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
@@ -61,16 +73,18 @@ int pq_read(std::string* file_name, int64_t column_idx, void* out_data)
         std::cerr << "invalid parquet number of array buffers" << std::endl;
     }
     int64_t buff_size = buffers[1]->size();
-    memcpy(out_data, buffers[1]->data(), buff_size);
+    const uint8_t* buff = buffers[1]->data();
+
+    copy_data(out_data, buff, 0, num_values, dtype);
+    // memcpy(out_data, buffers[1]->data(), buff_size);
     return 0;
 }
 
-int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_data, int64_t start, int64_t count)
+int pq_read_parallel(std::string* file_name, int64_t column_idx,
+                                uint8_t* out_data, int64_t start, int64_t count)
 {
     // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
     //                                                 column_idx, start, count);
-    // boolean, int32, int64, int96, float, double
-    int type_sizes[] = {1, 4, 8, 12, 4, 8};
 
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
@@ -86,8 +100,8 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_da
 
     auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
     int64_t nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
-    int  dtype = rg_metadata->ColumnChunk(column_idx)->type();
-    int dtype_size = type_sizes[dtype];
+    int dtype = rg_metadata->ColumnChunk(column_idx)->type();
+    int dtype_size = pq_type_sizes[dtype];
 
     // skip whole row groups if no need to read any rows
     while (start-skipped_rows >= nrows_in_group)
@@ -125,7 +139,9 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_da
         int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
         // printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
 
-        memcpy(out_data+read_rows*dtype_size, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype);
+        // memcpy(out_data+read_rows*dtype_size, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+
         skipped_rows += rows_to_skip;
         read_rows += rows_to_read;
 
@@ -141,6 +157,14 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx, uint8_t* out_da
     if (read_rows!=count)
         std::cerr << "parquet read incomplete" << '\n';
     return 0;
+}
+
+inline void copy_data(uint8_t* out_data, const uint8_t* buff,
+                    int64_t rows_to_skip, int64_t rows_to_read, int dtype)
+{
+    int dtype_size = pq_type_sizes[dtype];
+    memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+    return;
 }
 
 void pq_init_reader(std::string* file_name,
