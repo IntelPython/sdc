@@ -11,12 +11,14 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 import numpy as np
 from hpat.str_ext import StringType
+from hpat.str_arr_ext import StringArray
 
 _pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
                     'INT32': types.Array(types.int32, 1, 'C'),
                     'INT64': types.Array(types.int64, 1, 'C'),
                     'FLOAT': types.Array(types.float32, 1, 'C'),
                     'DOUBLE': types.Array(types.float64, 1, 'C'),
+                    'BYTE_ARRAY': StringArray,
                     }
 
 def read_parquet():
@@ -79,7 +81,7 @@ class ParquetHandler(object):
                             'read_parquet': read_parquet, 'np': np}).blocks.popitem()
 
                 out_nodes += f_block.body[:-3]
-                for stmt in out_nodes:
+                for stmt in reversed(out_nodes):
                     if stmt.target.name.startswith("column"):
                         assign = ir.Assign(stmt.target, cvar, loc)
                         break
