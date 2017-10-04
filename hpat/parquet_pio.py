@@ -12,13 +12,14 @@ from numba.typing import signature
 import numpy as np
 from hpat.str_ext import StringType
 from hpat.str_arr_ext import StringArray
+from hpat.str_arr_ext import string_array_type
 
 _pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
                     'INT32': types.Array(types.int32, 1, 'C'),
                     'INT64': types.Array(types.int64, 1, 'C'),
                     'FLOAT': types.Array(types.float32, 1, 'C'),
                     'DOUBLE': types.Array(types.float64, 1, 'C'),
-                    'BYTE_ARRAY': StringArray,
+                    'BYTE_ARRAY': string_array_type,
                     }
 
 def read_parquet():
@@ -75,20 +76,29 @@ class ParquetHandler(object):
         raise ValueError("Parquet schema not available")
 
 def get_column_read_nodes(c_type, cvar, file_name_str, i):
+
     loc = cvar.loc
-    el_type = get_element_type(c_type.dtype)
 
     func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
             format(file_name_str, i))
-    func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
-    func_text += '  status = read_parquet("{}", {}, column)\n'.format(
+    # generate strings differently
+    if c_type == string_array_type:
+        # pass size for easier allocation and distributed analysis
+        func_text += '  column = read_parquet("{}", {}, col_size)\n'.format(
+                                                            file_name_str, i)
+    else:
+        el_type = get_element_type(c_type.dtype)
+        func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
+                                                                        el_type)
+        func_text += '  status = read_parquet("{}", {}, column)\n'.format(
                                                             file_name_str, i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
     _, f_block = compile_to_numba_ir(size_func,
                 {'get_column_size_parquet': get_column_size_parquet,
-                'read_parquet': read_parquet, 'np': np}).blocks.popitem()
+                'read_parquet': read_parquet, 'np': np,
+                'StringArray': StringArray}).blocks.popitem()
 
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
@@ -135,6 +145,8 @@ class ReadParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==3
+        if args[2] == types.intp:  # string read call, returns string array
+            return signature(string_array_type, *args)
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
         return signature(types.int32, *args)
 
@@ -158,6 +170,7 @@ if _has_pyarrow:
     ll.add_symbol('pq_read', parquet_cpp.read)
     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
     ll.add_symbol('pq_get_size', parquet_cpp.get_size)
+    ll.add_symbol('pq_read_string', parquet_cpp.read_string)
 
 @lower_builtin(get_column_size_parquet, StringType, types.intp)
 def pq_size_lower(context, builder, sig, args):
@@ -189,3 +202,21 @@ def pq_read_parallel_lower(context, builder, sig, args):
     return builder.call(fn, [args[0], args[1],
             builder.bitcast(out_array.data, lir.IntType(8).as_pointer()),
             args[3], args[4]])
+
+# read strings
+@lower_builtin(read_parquet, StringType, types.intp, types.intp)
+def pq_read_string_lower(context, builder, sig, args):
+    typ = sig.return_type
+    string_array = cgutils.create_struct_proxy(typ)(context, builder)
+    string_array.size = args[2]
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer()])
+
+    fn = builder.module.get_or_insert_function(fnty, name="pq_read_string")
+    res = builder.call(fn, [args[0], args[1],
+                            string_array._get_ptr_by_name('offsets'),
+                            string_array._get_ptr_by_name('data')])
+
+    return string_array._getvalue()

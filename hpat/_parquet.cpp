@@ -20,6 +20,8 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
                             uint8_t* out_data, int64_t start, int64_t count);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype);
+int pq_read_string(std::string* file_name, int64_t column_idx,
+                                    uint8_t **out_offsets, uint8_t **out_data);
 
 // parquet type sizes (NOT arrow)
 // boolean, int32, int64, int96, float, double
@@ -40,6 +42,8 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
                             PyLong_FromVoidPtr((void*)(&pq_read_parallel)));
     PyObject_SetAttrString(m, "get_size",
                             PyLong_FromVoidPtr((void*)(&pq_get_size)));
+    PyObject_SetAttrString(m, "read_string",
+                            PyLong_FromVoidPtr((void*)(&pq_read_string)));
 
     return m;
 }
@@ -176,6 +180,44 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
     int dtype_size = pq_type_sizes[dtype];
     memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
     return;
+}
+
+int pq_read_string(std::string* file_name, int64_t column_idx,
+                                    uint8_t **out_offsets, uint8_t **out_data)
+{
+
+    std::shared_ptr<FileReader> arrow_reader;
+    pq_init_reader(file_name, &arrow_reader);
+    //
+    std::shared_ptr< ::arrow::Array > arr;
+    arrow_reader->ReadColumn(column_idx, &arr);
+    int64_t num_values = arr->length();
+    // std::cout << arr->ToString() << std::endl;
+    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
+                                            ColumnChunk(column_idx)->type();
+    if (dtype!=6) // TODO: get constant from parquet-cpp
+        std::cerr << "Invalid Parquet string data type" << '\n';
+
+
+    auto buffers = arr->data()->buffers;
+    // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
+    if (buffers.size()!=3) {
+        std::cerr << "invalid parquet string number of array buffers" << std::endl;
+    }
+
+    int64_t offsets_size = buffers[1]->size();
+    int64_t data_size = buffers[2]->size();
+    // std::cout << "offsets: " << offsets_size << " chars: " << data_size << std::endl;
+
+    *out_offsets = new uint8_t[offsets_size];
+    *out_data = new uint8_t[data_size];
+
+    const uint8_t* offsets_buff = buffers[1]->data();
+    const uint8_t* data_buff = buffers[2]->data();
+
+    memcpy(*out_offsets, offsets_buff, offsets_size);
+    memcpy(*out_data, data_buff, data_size);
+    return 0;
 }
 
 void pq_init_reader(std::string* file_name,
