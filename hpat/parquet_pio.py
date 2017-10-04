@@ -12,8 +12,12 @@ from numba.typing import signature
 import numpy as np
 from hpat.str_ext import StringType
 
-_pq_type_to_numba = {'DOUBLE': types.Array(types.float64, 1, 'C'),
-                    'INT64': types.Array(types.int64, 1, 'C')}
+_pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
+                    'INT32': types.Array(types.int32, 1, 'C'),
+                    'INT64': types.Array(types.int64, 1, 'C'),
+                    'FLOAT': types.Array(types.float32, 1, 'C'),
+                    'DOUBLE': types.Array(types.float64, 1, 'C'),
+                    }
 
 def read_parquet():
     return 0
@@ -59,12 +63,13 @@ class ParquetHandler(object):
                 # create a variable for column and assign type
                 varname = mk_unique_var(cname)
                 self.locals[varname] = c_type
+                el_type = get_element_type(c_type.dtype)
                 cvar = ir.Var(scope, varname, loc)
                 col_items.append((cname, cvar))
 
                 size_func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
                         format(file_name_str, i))
-                size_func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(c_type.dtype)
+                size_func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
                 size_func_text += '  status = read_parquet("{}", {}, column)\n'.format(file_name_str, i)
                 loc_vars = {}
                 exec(size_func_text, {}, loc_vars)
@@ -83,6 +88,12 @@ class ParquetHandler(object):
 
             return col_items, out_nodes
         raise ValueError("Parquet schema not available")
+
+def get_element_type(dtype):
+    out = repr(dtype)
+    if out=='bool':
+        out = 'bool_'
+    return out
 
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
