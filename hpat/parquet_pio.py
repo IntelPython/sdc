@@ -65,31 +65,39 @@ class ParquetHandler(object):
                 # create a variable for column and assign type
                 varname = mk_unique_var(cname)
                 self.locals[varname] = c_type
-                el_type = get_element_type(c_type.dtype)
                 cvar = ir.Var(scope, varname, loc)
                 col_items.append((cname, cvar))
 
-                size_func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
-                        format(file_name_str, i))
-                size_func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
-                size_func_text += '  status = read_parquet("{}", {}, column)\n'.format(file_name_str, i)
-                loc_vars = {}
-                exec(size_func_text, {}, loc_vars)
-                size_func = loc_vars['f']
-                _, f_block = compile_to_numba_ir(size_func,
-                            {'get_column_size_parquet': get_column_size_parquet,
-                            'read_parquet': read_parquet, 'np': np}).blocks.popitem()
-
-                out_nodes += f_block.body[:-3]
-                for stmt in reversed(out_nodes):
-                    if stmt.target.name.startswith("column"):
-                        assign = ir.Assign(stmt.target, cvar, loc)
-                        break
-
-                out_nodes.append(assign)
+                out_nodes += get_column_read_nodes(c_type, cvar, file_name_str,
+                                                                            i)
 
             return col_items, out_nodes
         raise ValueError("Parquet schema not available")
+
+def get_column_read_nodes(c_type, cvar, file_name_str, i):
+    loc = cvar.loc
+    el_type = get_element_type(c_type.dtype)
+
+    func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
+            format(file_name_str, i))
+    func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
+    func_text += '  status = read_parquet("{}", {}, column)\n'.format(
+                                                            file_name_str, i)
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    size_func = loc_vars['f']
+    _, f_block = compile_to_numba_ir(size_func,
+                {'get_column_size_parquet': get_column_size_parquet,
+                'read_parquet': read_parquet, 'np': np}).blocks.popitem()
+
+    out_nodes = f_block.body[:-3]
+    for stmt in reversed(out_nodes):
+        if stmt.target.name.startswith("column"):
+            assign = ir.Assign(stmt.target, cvar, loc)
+            break
+
+    out_nodes.append(assign)
+    return out_nodes
 
 def get_element_type(dtype):
     out = repr(dtype)
