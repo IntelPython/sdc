@@ -1,10 +1,11 @@
 import numba
 import hpat
 from numba import types
+from numba.typing.templates import infer_global, AbstractTemplate, infer, signature
 from numba.extending import (typeof_impl, type_callable, models, register_model,
                                 make_attribute_wrapper, lower_builtin, box)
 from numba import cgutils
-
+from hpat.str_ext import string_type
 
 class StringArray(object):
     def __init__(self, offsets, data, size):
@@ -48,6 +49,20 @@ class StringArrayModel(models.StructModel):
             ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+@infer
+class GetItemStringArray(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        [ary, idx] = args
+        if isinstance(ary, StringArrayType):
+            if isinstance(idx, types.SliceType):
+                return signature(string_array_type, *args)
+            else:
+                assert isinstance(idx, types.Integer)
+                return signature(string_type, *args)
+
 make_attribute_wrapper(StringArrayType, 'size', 'size')
 make_attribute_wrapper(StringArrayType, 'offsets', 'offsets')
 make_attribute_wrapper(StringArrayType, 'data', 'data')
@@ -69,6 +84,7 @@ ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
+ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
 ll.add_symbol('print_int', hstr_ext.print_int)
 
 @lower_builtin(StringArray)
@@ -153,3 +169,17 @@ def box_str(typ, val, c):
 
     c.context.nrt.decref(c.builder, typ, val)
     return c.builder.load(res)
+
+
+@lower_builtin('getitem', StringArrayType, types.Integer)
+def lower_string_arr_getitem(context, builder, sig, args):
+    typ = sig.args[0]
+    string_array = cgutils.create_struct_proxy(typ)(context, builder, args[0])
+    fnty = lir.FunctionType( lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer(),
+                            lir.IntType(8).as_pointer(),
+                            lir.IntType(64)])
+    fn_getitem = builder.module.get_or_insert_function(fnty,
+                                                name="getitem_string_array_std")
+    return builder.call(fn_getitem, [string_array.offsets,
+                                string_array.data, args[1]])

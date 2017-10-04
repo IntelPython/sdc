@@ -19,6 +19,7 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
+void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_int(int64_t val);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
@@ -55,6 +56,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&setitem_string_array)));
     PyObject_SetAttrString(m, "getitem_string_array",
                             PyLong_FromVoidPtr((void*)(&getitem_string_array)));
+    PyObject_SetAttrString(m, "getitem_string_array_std",
+                            PyLong_FromVoidPtr((void*)(&getitem_string_array_std)));
     PyObject_SetAttrString(m, "print_int",
                             PyLong_FromVoidPtr((void*)(&print_int)));
     return m;
@@ -172,6 +175,15 @@ char* getitem_string_array(uint32_t *offsets, char *data, int64_t index)
     memcpy(res, &data[start], size-1);
     // printf(" res %s\n", res);
     return res;
+}
+
+void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index)
+{
+    // printf("getitem string arr index: %d offsets: %d %d", index,
+    //                                  offsets[index], offsets[index+1]);
+    uint32_t size = offsets[index+1]-offsets[index];
+    uint32_t start = offsets[index];
+    return new std::string(&data[start], size);
 }
 
 void print_int(int64_t val)
