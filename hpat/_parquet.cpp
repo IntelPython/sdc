@@ -66,6 +66,7 @@ int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out_data)
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
     int dtype_size = pq_type_sizes[dtype];
+    // printf("dtype %d\n", dtype);
 
     auto buffers = arr->data()->buffers;
     // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
@@ -162,6 +163,16 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype)
 {
+    // unpack booleans from bits
+    if (dtype==0)
+    {
+        for(int64_t i=0; i<rows_to_read; i++)
+        {
+            // std::cout << ::arrow::BitUtil::GetBit(buff, i+rows_to_skip) << std::endl;
+            out_data[i] = (uint8_t) ::arrow::BitUtil::GetBit(buff, i+rows_to_skip);
+        }
+        return;
+    }
     int dtype_size = pq_type_sizes[dtype];
     memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
     return;
