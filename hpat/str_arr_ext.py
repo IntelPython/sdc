@@ -34,7 +34,7 @@ def typeof_string_array(val, c):
 
 @type_callable(StringArray)
 def type_string_array_call2(context):
-    def typer(string_list):
+    def typer(string_list=None):
         return string_array_type
     return typer
 
@@ -71,11 +71,15 @@ ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
 
-@lower_builtin(StringArray, types.Type)
+@lower_builtin(StringArray)
+@lower_builtin(StringArray, types.List)
 def impl_string_array_single(context, builder, sig, args):
     typ = sig.return_type
-    string_list = ListInstance(context, builder, sig.args[0], args[0])
     string_array = cgutils.create_struct_proxy(typ)(context, builder)
+    if not sig.args:  # return empty string array if no args
+        return string_array._getvalue()
+
+    string_list = ListInstance(context, builder, sig.args[0], args[0])
 
     # get total size of string buffer
     fnty = lir.FunctionType( lir.IntType(64),
