@@ -63,6 +63,25 @@ class GetItemStringArray(AbstractTemplate):
                 assert isinstance(idx, types.Integer)
                 return signature(string_type, *args)
 
+
+@infer
+class CmpOpEqStringArray(AbstractTemplate):
+    key = '=='
+
+    def generic(self, args, kws):
+        assert not kws
+        [va, vb] = args
+        # if one of the inputs is string array
+        if va==string_array_type or vb==string_array_type:
+            # inputs should be either string array or string
+            assert va == string_array_type or va == string_type
+            assert vb == string_array_type or vb == string_type
+            return signature(types.Array(types.boolean, 1, 'C'), va, vb)
+
+@infer
+class CmpOpNEqStringArray(CmpOpEqStringArray):
+    key = '!='
+
 make_attribute_wrapper(StringArrayType, 'size', 'size')
 make_attribute_wrapper(StringArrayType, 'offsets', 'offsets')
 make_attribute_wrapper(StringArrayType, 'data', 'data')

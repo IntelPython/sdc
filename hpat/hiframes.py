@@ -18,7 +18,7 @@ from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT
 import numpy as np
 from hpat.parquet_pio import ParquetHandler
-from hpat.str_arr_ext import StringArray
+from hpat.str_arr_ext import StringArray, string_array_type, StringArrayType
 if config._has_h5py:
     from hpat import pio
 
@@ -594,6 +594,38 @@ class HiFrames(object):
         for label in topo_order:
             new_body = []
             for stmt in blocks[label].body:
+                # convert str_arr==str into parfor
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'binop'
+                        and stmt.value.fn in ['==', '!=']
+                        and (self.typemap[stmt.value.lhs.name] == string_array_type
+                        or self.typemap[stmt.value.rhs.name] == string_array_type)):
+                    lhs = stmt.value.lhs
+                    rhs = stmt.value.rhs
+                    lhs_access = 'A'
+                    rhs_access = 'B'
+                    len_call = 'A.size'
+                    if self.typemap[lhs.name] == string_array_type:
+                        lhs_access = 'A[i]'
+                    if self.typemap[rhs.name] == string_array_type:
+                        lhs_access = 'B[i]'
+                        len_call = 'B.size'
+                    func_text = 'def f(A, B):\n'
+                    func_text += '  l = {}\n'.format(len_call)
+                    func_text += '  S = np.empty(l, dtype=np.bool_)\n'
+                    func_text += '  for i in numba.parfor.prange(l):\n'
+                    func_text += '    S[i] = {} {} {}\n'.format(lhs_access, stmt.value.fn, rhs_access)
+                    loc_vars = {}
+                    exec(func_text, {}, loc_vars)
+                    f = loc_vars['f']
+                    f_blocks = compile_to_numba_ir(f, {'numba': numba, 'np': np}).blocks
+                    replace_arg_nodes(f_blocks[min(f_blocks.keys())], [lhs, rhs])
+                    label = include_new_blocks(blocks, f_blocks, label, new_body)
+                    new_body = []
+                    # replace == expression with result of parfor (S)
+                    # S is target of last statement in 1st block of f
+                    stmt.value = f_blocks[min(f_blocks.keys())].body[-2].target
                 # arr = fix_df_array(col) -> arr=col if col is array
                 if (isinstance(stmt, ir.Assign)
                         and isinstance(stmt.value, ir.Expr)
