@@ -3,7 +3,7 @@ from collections import namedtuple
 import copy
 
 import numba
-from numba import ir, ir_utils
+from numba import ir, ir_utils, types
 from numba.ir_utils import get_call_table, get_tuple_table, find_topo_order
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
@@ -179,6 +179,12 @@ class DistributedAnalysis(object):
             return
 
         if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet]:
+            return
+
+        if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet_str]:
+            # string read creates array in output
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
             return
 
         if (len(call_list)==2 and call_list[1]==np

@@ -21,6 +21,7 @@ import hpat
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
 from hpat.str_ext import string_type
+from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis,
                                        get_stencil_accesses)
@@ -360,6 +361,29 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
+        if (self._is_parquet_read_str_call(func_var)
+                and self._is_1D_arr(lhs)):
+            arr = lhs
+            size_var = rhs.args[2]
+            assert self.typemap[size_var.name] == types.intp
+            self._array_sizes[arr] = [size_var]
+            out, start_var, count_var = self._gen_1D_div(size_var, scope, loc,
+                "$alloc", "get_node_portion", distributed_api.get_node_portion)
+            self._array_starts[lhs] = [start_var]
+            self._array_counts[lhs] = [count_var]
+            rhs.args[2] = start_var
+            rhs.args.append(count_var)
+            def f(fname, cindex, start, count):
+                return hpat.parquet_pio.read_parquet_str_parallel(fname, cindex,
+                                                            start, count)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+            (string_type, types.intp, types.intp, types.intp),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out += f_block.body[:-2]
+            out[-1].target = assign.target
+
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
@@ -460,7 +484,7 @@ class DistributedPass(object):
         if self._is_1D_arr(arr.name) and (arr.name, index_var.name) in self._parallel_accesses:
             scope = index_var.scope
             loc = index_var.loc
-            ndims = self.typemap[arr.name].ndim
+            ndims = self._get_arr_ndim(arr.name)
             if ndims==1:
                 sub_nodes = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
                 out = sub_nodes
@@ -1064,6 +1088,11 @@ class DistributedPass(object):
         return (varname in self.typemap
                 and isinstance(self.typemap[varname], types.npytypes.Array))
 
+    def _get_arr_ndim(self, arrname):
+        if self.typemap[arrname] == string_array_type:
+            return 1
+        return self.typemap[arrname].ndim
+
     def _is_1D_arr(self, arr_name):
         # some arrays like stencil buffers are added after analysis so
         # they are not in dists list
@@ -1089,6 +1118,11 @@ class DistributedPass(object):
         if func_var not in self._call_table:
             return False
         return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet])
+
+    def _is_parquet_read_str_call(self, func_var):
+        if func_var not in self._call_table:
+            return False
+        return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet_str])
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:

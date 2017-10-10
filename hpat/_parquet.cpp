@@ -22,7 +22,8 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype);
 int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint8_t **out_offsets, uint8_t **out_data);
-
+int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
+        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
 // parquet type sizes (NOT arrow)
 // boolean, int32, int64, int96, float, double
 int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
@@ -44,6 +45,8 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
                             PyLong_FromVoidPtr((void*)(&pq_get_size)));
     PyObject_SetAttrString(m, "read_string",
                             PyLong_FromVoidPtr((void*)(&pq_read_string)));
+    PyObject_SetAttrString(m, "read_string_parallel",
+                            PyLong_FromVoidPtr((void*)(&pq_read_string_parallel)));
 
     return m;
 }
@@ -217,6 +220,101 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
 
     memcpy(*out_offsets, offsets_buff, offsets_size);
     memcpy(*out_data, data_buff, data_size);
+    return 0;
+}
+
+int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
+        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count)
+{
+    printf("read parquet parallel column: %lld start: %lld count: %lld\n",
+                                                     column_idx, start, count);
+
+    std::shared_ptr<FileReader> arrow_reader;
+    pq_init_reader(file_name, &arrow_reader);
+    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
+                                            ColumnChunk(column_idx)->type();
+    if (dtype!=6) // TODO: get constant from parquet-cpp
+        std::cerr << "Invalid Parquet string data type" << '\n';
+
+
+    *out_offsets = new uint32_t[count+1];
+    int offset_dtype_size = sizeof(uint32_t);
+
+    int64_t n_row_groups = arrow_reader->parquet_reader()->metadata()->num_row_groups();
+    std::vector<int> column_indices;
+    column_indices.push_back(column_idx);
+
+    int row_group_index = 0;
+    int64_t skipped_rows = 0;
+    int64_t read_rows = 0;
+
+    auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
+    int64_t nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
+
+    // skip whole row groups if no need to read any rows
+    while (start-skipped_rows >= nrows_in_group)
+    {
+        skipped_rows += nrows_in_group;
+        row_group_index++;
+        auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
+        nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
+    }
+
+    // printf("first row group: %d skipped_rows: %lld nrows_in_group: %lld\n", row_group_index, skipped_rows, nrows_in_group);
+    const uint32_t* offsets_buff;
+
+    while (read_rows<count)
+    {
+        /* -------- read row group ---------- */
+        std::shared_ptr<::arrow::Table> table;
+        arrow_reader->ReadRowGroup(row_group_index, column_indices, &table);
+        std::shared_ptr< ::arrow::Column > column = table->column(0);
+        std::shared_ptr< ::arrow::ChunkedArray > chunked_arr = column->data();
+        // std::cout << chunked_arr->num_chunks() << std::endl;
+        if (chunked_arr->num_chunks()!=1) {
+            std::cerr << "invalid parquet number of array chunks" << std::endl;
+        }
+        std::shared_ptr< ::arrow::Array > arr = chunked_arr->chunk(0);
+        // std::cout << arr->ToString() << std::endl;
+        auto buffers = arr->data()->buffers;
+        // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
+        if (buffers.size()!=3) {
+            std::cerr << "invalid parquet string number of array buffers" << std::endl;
+        }
+
+        offsets_buff = (const uint32_t*) buffers[1]->data();
+        const uint8_t* data_buff = buffers[2]->data();
+
+        /* ----------- read row group ------- */
+
+        int64_t rows_to_skip = start - skipped_rows;
+        int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
+        printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
+
+        memcpy(*out_offsets+read_rows,
+            offsets_buff+rows_to_skip,
+            rows_to_read*offset_dtype_size);
+
+        skipped_rows += rows_to_skip;
+        read_rows += rows_to_read;
+
+        row_group_index++;
+        if (row_group_index<n_row_groups)
+        {
+            auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
+            nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
+        }
+        else
+            break;
+    }
+    if (read_rows!=count)
+        std::cerr << "parquet read incomplete" << '\n';
+
+    for(int i=0; i<=count; i++)
+    {
+        printf("%d ", (*out_offsets)[i]);
+    }
+    printf("\n");
     return 0;
 }
 

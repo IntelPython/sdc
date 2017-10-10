@@ -27,6 +27,8 @@ def read_parquet():
 
 def read_parquet_str():
     return 0
+def read_parquet_str_parallel():
+    return 0
 
 def read_parquet_parallel():
     return 0
@@ -157,10 +159,17 @@ class ReadParquetInfer(AbstractTemplate):
         return signature(types.int32, *args)
 
 @infer_global(read_parquet_str)
-class ReadParquetInfer(AbstractTemplate):
+class ReadParquetStrInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==3
+        return signature(string_array_type, *args)
+
+@infer_global(read_parquet_str_parallel)
+class ReadParquetStrParallelInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args)==4
         return signature(string_array_type, *args)
 
 @infer_global(read_parquet_parallel)
@@ -184,6 +193,7 @@ if _has_pyarrow:
     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
     ll.add_symbol('pq_get_size', parquet_cpp.get_size)
     ll.add_symbol('pq_read_string', parquet_cpp.read_string)
+    ll.add_symbol('pq_read_string_parallel', parquet_cpp.read_string_parallel)
 
 @lower_builtin(get_column_size_parquet, StringType, types.intp)
 def pq_size_lower(context, builder, sig, args):
@@ -231,5 +241,23 @@ def pq_read_string_lower(context, builder, sig, args):
     res = builder.call(fn, [args[0], args[1],
                             string_array._get_ptr_by_name('offsets'),
                             string_array._get_ptr_by_name('data')])
+
+    return string_array._getvalue()
+
+@lower_builtin(read_parquet_str_parallel, StringType, types.intp, types.intp, types.intp)
+def pq_read_string_parallel_lower(context, builder, sig, args):
+    typ = sig.return_type
+    string_array = cgutils.create_struct_proxy(typ)(context, builder)
+    string_array.size = args[2]
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64), lir.IntType(64)])
+
+    fn = builder.module.get_or_insert_function(fnty, name="pq_read_string_parallel")
+    res = builder.call(fn, [args[0], args[1],
+                            string_array._get_ptr_by_name('offsets'),
+                            string_array._get_ptr_by_name('data'), args[2],
+                            args[3]])
 
     return string_array._getvalue()
