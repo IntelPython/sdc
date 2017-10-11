@@ -226,8 +226,8 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count)
 {
-    printf("read parquet parallel column: %lld start: %lld count: %lld\n",
-                                                     column_idx, start, count);
+    // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
+    //                                                  column_idx, start, count);
 
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
@@ -238,7 +238,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
 
 
     *out_offsets = new uint32_t[count+1];
-    int offset_dtype_size = sizeof(uint32_t);
+    std::vector<uint8_t> tmp_buffer;
 
     int64_t n_row_groups = arrow_reader->parquet_reader()->metadata()->num_row_groups();
     std::vector<int> column_indices;
@@ -261,8 +261,10 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     }
 
     // printf("first row group: %d skipped_rows: %lld nrows_in_group: %lld\n", row_group_index, skipped_rows, nrows_in_group);
-    const uint32_t* offsets_buff;
 
+    uint32_t curr_offset = 0;
+
+    /* ------- read offsets and data ------ */
     while (read_rows<count)
     {
         /* -------- read row group ---------- */
@@ -282,18 +284,27 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
             std::cerr << "invalid parquet string number of array buffers" << std::endl;
         }
 
-        offsets_buff = (const uint32_t*) buffers[1]->data();
+        const uint32_t* offsets_buff = (const uint32_t*) buffers[1]->data();
         const uint8_t* data_buff = buffers[2]->data();
 
         /* ----------- read row group ------- */
 
         int64_t rows_to_skip = start - skipped_rows;
         int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
-        printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
+        // printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
 
-        memcpy(*out_offsets+read_rows,
-            offsets_buff+rows_to_skip,
-            rows_to_read*offset_dtype_size);
+        for(int64_t i=0; i<rows_to_read; i++) {
+            uint32_t str_size = offsets_buff[rows_to_skip+i+1]-offsets_buff[rows_to_skip+i];
+            (*out_offsets)[read_rows+i] = curr_offset;
+            curr_offset += str_size;
+        }
+
+        int data_size = offsets_buff[rows_to_skip+rows_to_read]
+                                    - offsets_buff[rows_to_skip];
+
+        tmp_buffer.insert(tmp_buffer.end(),
+            data_buff+offsets_buff[rows_to_skip],
+            data_buff+offsets_buff[rows_to_skip]+data_size);
 
         skipped_rows += rows_to_skip;
         read_rows += rows_to_read;
@@ -310,11 +321,17 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     if (read_rows!=count)
         std::cerr << "parquet read incomplete" << '\n';
 
-    for(int i=0; i<=count; i++)
-    {
-        printf("%d ", (*out_offsets)[i]);
-    }
-    printf("\n");
+    (*out_offsets)[count] = curr_offset;
+    *out_data = new uint8_t[curr_offset];
+    // printf("buffer size:%d curr_offset:%d\n", tmp_buffer.size(), curr_offset);
+    memcpy(*out_data, tmp_buffer.data(), curr_offset);
+
+    // printf("offsets: ");
+    // for(int i=0; i<=count; i++)
+    // {
+    //     printf("%d ", (*out_offsets)[i]);
+    // }
+    // printf("\n");
     return 0;
 }
 
