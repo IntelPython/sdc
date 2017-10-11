@@ -1,5 +1,6 @@
 import unittest
 import hpat
+from hpat.str_arr_ext import StringArray
 
 class TestString(unittest.TestCase):
     def test_pass_return(self):
@@ -64,6 +65,22 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         arg = '12.2'
         self.assertEqual(hpat_func(arg), test_impl(arg))
+
+    # string array tests
+    def test_string_array_constructor(self):
+        # create StringArray and return as list of strings
+        def test_impl():
+            return StringArray(['ABC', 'BB', 'CDEF'])
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), ['ABC', 'BB', 'CDEF'])
+
+    def test_string_array_comp(self):
+        def test_impl():
+            A = StringArray(['ABC', 'BB', 'CDEF'])
+            B = A=='ABC'
+            return B.sum()
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), 1)
 
 if __name__ == "__main__":
     unittest.main()
