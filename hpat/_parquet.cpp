@@ -94,6 +94,10 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
     // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
     //                                                 column_idx, start, count);
 
+    if (count==0) {
+        return 0;
+    }
+
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
 
@@ -228,6 +232,12 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
 {
     // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
     //                                                  column_idx, start, count);
+
+    if (count==0) {
+        *out_offsets = NULL;
+        *out_data = NULL;
+        return 0;
+    }
 
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
