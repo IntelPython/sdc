@@ -634,7 +634,7 @@ class HiFrames(object):
                         and call_table[stmt.value.func.name] ==
                                     ['fix_df_array', 'hiframes_api', hpat]
                         and isinstance(self.typemap[stmt.value.args[0].name],
-                                                (types.Array, StringArray))):
+                                            (types.Array, StringArrayType))):
                     stmt.value = stmt.value.args[0]
                 # find df['col2'] = df['col1'][arr]
                 if (isinstance(stmt, ir.Assign)

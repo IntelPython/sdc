@@ -212,7 +212,7 @@ def fix_df_array(c):
 
 from numba.extending import overload
 from hpat.str_ext import StringType
-from hpat.str_arr_ext import StringArray
+from hpat.str_arr_ext import StringArray, StringArrayType
 
 @overload(fix_df_array)
 def fix_df_array_overload(column):
@@ -229,7 +229,7 @@ def fix_df_array_overload(column):
             return StringArray(column)
         return fix_df_array_impl
     # column is array if not list
-    assert isinstance(column, (types.Array, StringArray))
+    assert isinstance(column, (types.Array, StringArrayType))
     def fix_df_array_impl(column):
         return column
     return fix_df_array_impl
