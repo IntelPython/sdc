@@ -248,7 +248,7 @@ def pq_read_string_lower(context, builder, sig, args):
 def pq_read_string_parallel_lower(context, builder, sig, args):
     typ = sig.return_type
     string_array = cgutils.create_struct_proxy(typ)(context, builder)
-    string_array.size = args[2]
+    string_array.size = args[3]
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
                              lir.IntType(8).as_pointer().as_pointer(),
