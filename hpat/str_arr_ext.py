@@ -82,6 +82,12 @@ class CmpOpEqStringArray(AbstractTemplate):
 class CmpOpNEqStringArray(CmpOpEqStringArray):
     key = '!='
 
+@infer_global(len)
+class LenStringArray(AbstractTemplate):
+    def generic(self, args, kws):
+        if not kws and len(args)==1 and args[0]==string_array_type:
+            return signature(types.intp, *args)
+
 make_attribute_wrapper(StringArrayType, 'size', 'size')
 make_attribute_wrapper(StringArrayType, 'offsets', 'offsets')
 make_attribute_wrapper(StringArrayType, 'data', 'data')
