@@ -3,7 +3,7 @@
 Installing HPAT
 ===============
 
-We recommend `Anaconda <https://www.anaconda.com/download/>`_ distribution of
+We recommend `Anaconda 4.4 <https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh>`_ distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba and LLVM on Ubuntu Linux::
 

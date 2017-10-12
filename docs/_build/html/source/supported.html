@@ -1,16 +1,13 @@
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
     <title>User Guide &#8212; HPAT 0.1 documentation</title>
-    
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../',
@@ -24,7 +21,7 @@
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Not Supported Python Programs" href="notsupported.html" />
@@ -36,7 +33,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
   </head>
-  <body role="document">
+  <body>
   
 
     <div class="document">
@@ -131,13 +128,13 @@ dimensions of size 1 is not supported.</p>
 <h2>Explicit Parallel Loops<a class="headerlink" href="#explicit-parallel-loops" title="Permalink to this headline">¶</a></h2>
 <p>Sometimes a program cannot be written in terms of data-parallel operators easy
 and explicit parallel loops are required.
-In this case, one can use HPAT&#8217;s <code class="docutils literal"><span class="pre">prange</span></code> instead of <code class="docutils literal"><span class="pre">range</span></code> to specify that a
+In this case, one can use HPAT’s <code class="docutils literal"><span class="pre">prange</span></code> instead of <code class="docutils literal"><span class="pre">range</span></code> to specify that a
 loop can be parallelized. The user is required to make sure that the loop does
 not have cross iteration dependencies except the supported reductions.
 Currently, only sum using the <code class="docutils literal"><span class="pre">+=</span></code> operator is supported.
 The example below demonstrates a parallel loop with a
 reduction:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">HPAT</span> <span class="k">import</span> <span class="n">jit</span><span class="p">,</span> <span class="n">prange</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">hpat</span> <span class="k">import</span> <span class="n">jit</span><span class="p">,</span> <span class="n">prange</span>
 <span class="nd">@jit</span>
 <span class="k">def</span> <span class="nf">prange_test</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
@@ -151,7 +148,7 @@ reduction:</p>
 <div class="section" id="supported-pandas-operations">
 <h2>Supported Pandas Operations<a class="headerlink" href="#supported-pandas-operations" title="Permalink to this headline">¶</a></h2>
 <p>Below is the list of the Pandas operators that HPAT supports. Since Numba
-doesn&#8217;t support Pandas, only these operations can be used for both large and
+doesn’t support Pandas, only these operations can be used for both large and
 small datasets.</p>
 <ol class="arabic">
 <li><dl class="first docutils">
@@ -214,7 +211,7 @@ For example:</p>
 <p>HPAT needs to know the types of input arrays. If the file name is a constant
 string, HPAT tries to look at the file at compile time and recognize the types.
 Otherwise, the user is responsile for providing the types similar to
-<a class="reference external" href="http://numba.pydata.org/numba-doc/latest/reference/types.html">Numba&#8217;s typing syntax</a>. For
+<a class="reference external" href="http://numba.pydata.org/numba-doc/latest/reference/types.html">Numba’s typing syntax</a>. For
 example:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="nb">locals</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;X&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:,:],</span> <span class="s1">&#39;Y&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:]})</span>
 <span class="k">def</span> <span class="nf">example</span><span class="p">(</span><span class="n">file_name</span><span class="p">):</span>
@@ -312,7 +309,7 @@ operators, as well as <code class="docutils literal"><span class="pre">min</span
       &copy;2017, Ehsan Totoni.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.5</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
       
       |

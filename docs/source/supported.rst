@@ -78,7 +78,7 @@ Currently, only sum using the ``+=`` operator is supported.
 The example below demonstrates a parallel loop with a
 reduction::
 
-    from HPAT import jit, prange
+    from hpat import jit, prange
     @jit
     def prange_test(n):
         A = np.random.ranf(n)
