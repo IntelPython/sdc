@@ -9,7 +9,7 @@ from numba import ir_utils, ir
 from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import (mk_unique_var, add_offset_to_labels,
                             get_name_var_table, replace_vars)
-
+from hpat.utils import get_definitions
 # def stage_io_pass(pipeline):
 #     """
 #     Convert IO calls
@@ -73,6 +73,7 @@ def inline_calls(func_ir):
                         py_func = call_table[func][0].py_func
                         inline_calls_inner(func_ir, block, stmt, i, py_func)
                         return  # inline_calls_inner will call back recursively
+    func_ir._definitions = get_definitions(func_ir.blocks)
 
 def inline_calls_inner(func_ir, block, stmt, i, py_func):
     call_expr = stmt.value
