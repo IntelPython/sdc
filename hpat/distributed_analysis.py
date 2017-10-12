@@ -10,6 +10,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
+from hpat.utils import get_definitions
 
 from enum import Enum
 class Distribution(Enum):
@@ -306,8 +307,7 @@ def get_stencil_accesses(parfor, typemap):
 
     par_index_var = parfor.loop_nests[0].index_variable
     body = parfor.loop_body
-    from hpat.hiframes import _get_definitions
-    body_defs = _get_definitions(body)
+    body_defs = get_definitions(body)
 
     stencil_accesses = {}
 

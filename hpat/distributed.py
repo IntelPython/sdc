@@ -27,7 +27,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-
+from hpat.utils import get_definitions
 
 distributed_run_extensions = {}
 
@@ -704,8 +704,7 @@ class DistributedPass(object):
 
     def _get_stencil_border_length(self, neighborhood):
         # XXX: hack to get lengths assuming they are constant
-        from hpat.hiframes import _get_definitions
-        self.func_ir._definitions = _get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         left_length = -self._get_var_const_val(neighborhood[0][0])
         # left_length = -neighborhood[0][0]
         left_length = max(left_length, 0)  # avoid negative value
