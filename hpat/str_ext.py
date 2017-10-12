@@ -59,6 +59,12 @@ class GetItemString(AbstractTemplate):
                 and isinstance(args[1], types.Integer)):
             return signature(args[0], *args)
 
+@infer_global(len)
+class LenStringArray(AbstractTemplate):
+    def generic(self, args, kws):
+        if not kws and len(args) == 1 and args[0] == string_type:
+            return signature(types.intp, *args)
+
 @infer_global(int)
 class StrToInt(AbstractTemplate):
     def generic(self, args, kws):
@@ -85,6 +91,7 @@ ll.add_symbol('str_split', hstr_ext.str_split)
 ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
 ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
+ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -181,3 +188,10 @@ def cast_str_to_float64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.DoubleType(), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_to_float64")
     return builder.call(fn, (val,))
+
+@lower_builtin(len, StringType)
+def len_string(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64),
+                    [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
+    return (builder.call(fn, args))
