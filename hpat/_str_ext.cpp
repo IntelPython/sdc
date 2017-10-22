@@ -29,6 +29,7 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
+void print_str(std::string* str);
 void print_int(int64_t val);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
@@ -71,6 +72,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&getitem_string_array)));
     PyObject_SetAttrString(m, "getitem_string_array_std",
                             PyLong_FromVoidPtr((void*)(&getitem_string_array_std)));
+    PyObject_SetAttrString(m, "print_str",
+                            PyLong_FromVoidPtr((void*)(&print_str)));
     PyObject_SetAttrString(m, "print_int",
                             PyLong_FromVoidPtr((void*)(&print_int)));
     return m;
@@ -214,6 +217,12 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index)
     uint32_t size = offsets[index+1]-offsets[index];
     uint32_t start = offsets[index];
     return new std::string(&data[start], size);
+}
+
+void print_str(std::string* str)
+{
+    std::cout<< *str;
+    return;
 }
 
 void print_int(int64_t val)

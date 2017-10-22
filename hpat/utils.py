@@ -1,6 +1,9 @@
 import numba
-from numba import ir_utils, ir
+from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import guard, get_definition
+from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate
+from numba.targets.imputils import lower_builtin
 import collections
 
 # sentinel value representing non-constant values
@@ -28,3 +31,42 @@ def get_definitions(blocks):
             if isinstance(inst, ir.Assign):
                 definitions[inst.target.name].append(inst.value)
     return definitions
+
+def cprint(*s):
+    print(*s)
+
+@infer_global(cprint)
+class CprintInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.none, *args)
+
+typ_to_format = {
+    types.int32: 'd',
+    types.int64: 'lld',
+    types.float32: 'f',
+    types.float64: 'lf',
+}
+
+from llvmlite import ir as lir
+import llvmlite.binding as ll
+import hstr_ext
+ll.add_symbol('print_str', hstr_ext.print_str)
+
+
+@lower_builtin(cprint, types.VarArg(types.Any))
+def cprint_lower(context, builder, sig, args):
+    from hpat.str_ext import string_type
+
+    for i, val in enumerate(args):
+        typ = sig.args[i]
+        if typ == string_type:
+            fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
+            fn = builder.module.get_or_insert_function(fnty, name="print_str")
+            builder.call(fn, [val])
+            cgutils.printf(builder, " ")
+            continue
+        format_str = typ_to_format[typ]
+        cgutils.printf(builder, "%{} ".format(format_str), val)
+    cgutils.printf(builder, "\n")
+    return context.get_dummy_value()

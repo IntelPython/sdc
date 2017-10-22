@@ -6,7 +6,8 @@ import hpat.dict_ext
 import hpat.distributed_api
 from hpat.distributed_api import dist_time
 from hpat.dict_ext import DictIntInt, DictInt32Int32, dict_int_int_type, dict_int32_int32_type
-import hpat.str_ext
+from hpat.str_ext import string_type
+from hpat.utils import cprint
 
 def jit(signature_or_function=None, **options):
     from .compiler import add_hpat_stages
