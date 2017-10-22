@@ -3,9 +3,17 @@
 #include <iostream>
 #include <vector>
 
+
+struct str_arr_payload {
+    int64_t size;
+    int32_t *offsets;
+    char* data;
+};
+
 void* init_string(char*, int64_t);
 void* init_string_const(char* in_str);
 void dtor_string(std::string** in_str, int64_t size, void* in);
+void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 const char* get_c_str(std::string* s);
 void* str_concat(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
@@ -37,6 +45,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&init_string_const)));
     PyObject_SetAttrString(m, "dtor_string",
                             PyLong_FromVoidPtr((void*)(&dtor_string)));
+    PyObject_SetAttrString(m, "dtor_string_array",
+                            PyLong_FromVoidPtr((void*)(&dtor_string_array)));
     PyObject_SetAttrString(m, "get_c_str",
                             PyLong_FromVoidPtr((void*)(&get_c_str)));
     PyObject_SetAttrString(m, "str_concat",
@@ -81,8 +91,17 @@ void* init_string_const(char* in_str)
 void dtor_string(std::string** in_str, int64_t size, void* info)
 {
     printf("dtor size: %d\n", size); fflush(stdout);
-    std::cout<<"del str: "<< (*in_str)->c_str() <<std::endl;
-    delete (*in_str);
+    // std::cout<<"del str: "<< (*in_str)->c_str() <<std::endl;
+    // delete (*in_str);
+    return;
+}
+
+void dtor_string_array(str_arr_payload* in_str_arr, int64_t size, void* in)
+{
+    // printf("str arr dtor size: %lld\n", in_str_arr->size);
+    // printf("num chars: %d\n", in_str_arr->offsets[in_str_arr->size]);
+    delete[] in_str_arr->offsets;
+    delete[] in_str_arr->data;
     return;
 }
 

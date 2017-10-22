@@ -9,9 +9,10 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
 from hpat.str_ext import StringType
-from hpat.str_arr_ext import StringArray
+from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
 _pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
@@ -230,7 +231,9 @@ def pq_read_parallel_lower(context, builder, sig, args):
 @lower_builtin(read_parquet_str, StringType, types.intp, types.intp)
 def pq_read_string_lower(context, builder, sig, args):
     typ = sig.return_type
-    string_array = cgutils.create_struct_proxy(typ)(context, builder)
+    dtype = StringArrayPayloadType()
+    meminfo, data_pointer = construct_string_array(context, builder)
+    string_array = cgutils.create_struct_proxy(dtype)(context, builder)
     string_array.size = args[2]
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -241,13 +244,20 @@ def pq_read_string_lower(context, builder, sig, args):
     res = builder.call(fn, [args[0], args[1],
                             string_array._get_ptr_by_name('offsets'),
                             string_array._get_ptr_by_name('data')])
+    builder.store(string_array._getvalue(),
+                  data_pointer)
+    inst_struct = context.make_helper(builder, typ)
+    inst_struct.meminfo = meminfo
+    ret = inst_struct._getvalue()
+    return impl_ret_new_ref(context, builder, typ, ret)
 
-    return string_array._getvalue()
 
 @lower_builtin(read_parquet_str_parallel, StringType, types.intp, types.intp, types.intp)
 def pq_read_string_parallel_lower(context, builder, sig, args):
     typ = sig.return_type
-    string_array = cgutils.create_struct_proxy(typ)(context, builder)
+    dtype = StringArrayPayloadType()
+    meminfo, data_pointer = construct_string_array(context, builder)
+    string_array = cgutils.create_struct_proxy(dtype)(context, builder)
     string_array.size = args[3]
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -260,4 +270,9 @@ def pq_read_string_parallel_lower(context, builder, sig, args):
                             string_array._get_ptr_by_name('data'), args[2],
                             args[3]])
 
-    return string_array._getvalue()
+    builder.store(string_array._getvalue(),
+                  data_pointer)
+    inst_struct = context.make_helper(builder, typ)
+    inst_struct.meminfo = meminfo
+    ret = inst_struct._getvalue()
+    return impl_ret_new_ref(context, builder, typ, ret)
