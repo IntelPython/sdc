@@ -4,6 +4,10 @@
 #include <iostream>
 #include <cstring>
 
+#if _MSC_VER >= 1900
+  #undef timezone
+#endif
+
 #include "parquet/api/reader.h"
 #include "parquet/arrow/reader.h"
 #include "arrow/table.h"

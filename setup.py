@@ -1,4 +1,5 @@
 from setuptools import setup, Extension
+import platform
 
 def readme():
     with open('README.rst') as f:
@@ -18,13 +19,18 @@ except ImportError:
 else:
     _has_pyarrow = True
 
+MPI_LIBS = []
+if platform.system() == 'Windows':
+    MPI_LIBS = ['impi', 'impicxx']
+
 
 ext_io = Extension(name="hio",
-                             extra_link_args=['-lmpi','-lhdf5'],
+                             libraries = ['hdf5'],
                              sources=["hpat/_io.cpp"]
                              )
 
 ext_hdist = Extension(name="hdist",
+                             libraries = MPI_LIBS,
                              sources=["hpat/_distributed.cpp"]
                              )
 
@@ -37,7 +43,7 @@ ext_str = Extension(name="hstr_ext",
                              )
 
 ext_parquet = Extension(name="parquet_cpp",
-                             extra_link_args=['-lparquet', '-larrow'],
+                             libraries = ['parquet', 'arrow'],
                              sources=["hpat/_parquet.cpp"]
                              )
 
