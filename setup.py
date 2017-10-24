@@ -21,11 +21,11 @@ else:
 
 ext_io = Extension(name="hio",
                              extra_link_args=['-lmpi','-lhdf5'],
-                             sources=["hpat/_io.c"]
+                             sources=["hpat/_io.cpp"]
                              )
 
 ext_hdist = Extension(name="hdist",
-                             sources=["hpat/_distributed.c"]
+                             sources=["hpat/_distributed.cpp"]
                              )
 
 ext_dict = Extension(name="hdict_ext",
