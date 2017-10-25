@@ -61,7 +61,7 @@ such as Numba and LLVM on Ubuntu Linux:</p>
 </pre></div>
 </div>
 <p>A command line for running the Pi example on 4 cores:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">mpirun</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">pi</span><span class="o">.</span><span class="n">py</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">mpiexec</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">pi</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
 <div class="section" id="hdf5-support">
@@ -87,10 +87,65 @@ LDSHARED=&quot;mpicc -shared&quot; CXX=mpicxx LD=mpicc CC=&quot;mpicc&quot; \
     python setup.py install
 </pre></div>
 </div>
-<p>Commands for generating HDF5 data and running the logistic regression example:</p>
+<p>HPAT needs to be rebuilt after setting up HDF5.
+Commands for generating HDF5 data and running the logistic regression example:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">generate_data</span><span class="o">/</span><span class="n">gen_logistic_regression</span><span class="o">.</span><span class="n">py</span>
-<span class="n">mpirun</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">logistic_regression</span><span class="o">.</span><span class="n">py</span>
+<span class="n">mpiexec</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">logistic_regression</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
+</div>
+</div>
+<div class="section" id="parquet-support">
+<h2>Parquet Support<a class="headerlink" href="#parquet-support" title="Permalink to this headline">¶</a></h2>
+<p>HPAT uses the <cite>pyarrow</cite> package to provide Parquet support:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+</pre></div>
+</div>
+<p>HPAT needs to be rebuilt after setting up pyarrow.</p>
+</div>
+<div class="section" id="installing-on-windows">
+<h2>Installing on Windows<a class="headerlink" href="#installing-on-windows" title="Permalink to this headline">¶</a></h2>
+<p>Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:</p>
+<ul>
+<li><p class="first">Install <a class="reference external" href="https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017">Build Tools for Visual Studio 2017 (14.0)</a>.</p>
+</li>
+<li><p class="first">Setup the environment by running <code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Microsoft</span> <span class="pre">Visual</span> <span class="pre">Studio</span> <span class="pre">14.0\VC\vcvarsall.bat</span> <span class="pre">amd64</span></code>.</p>
+</li>
+<li><p class="first">Install <a class="reference external" href="https://software.intel.com/en-us/intel-mpi-library">Intel MPI</a>.</p>
+</li>
+<li><p class="first">Setup the environment by following
+<a class="reference external" href="https://software.intel.com/en-us/articles/intel-mpi-library-for-windows-installation-instructions">Intel MPI installation instructions</a>.</p>
+</li>
+<li><p class="first">Install <a class="reference external" href="https://repo.continuum.io/archive/Anaconda2-4.4.0-Windows-x86_64.exe">Anaconda 4.4 for Windows</a>.</p>
+</li>
+<li><p class="first">Setup the Conda environment in Anaconda Prompt:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">HPAT</span>
+<span class="n">activate</span> <span class="n">HPAT</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">pandas</span> <span class="n">llvmlite</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">IntelLabs</span><span class="o">/</span><span class="n">numba</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">numba</span>
+<span class="n">git</span> <span class="n">checkout</span> <span class="n">hpat_req</span>
+<span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">install</span>
+<span class="n">cd</span> <span class="o">..</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">IntelLabs</span><span class="o">/</span><span class="n">hpat</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">hpat</span>
+<span class="nb">set</span> <span class="n">INCLUDE</span><span class="o">=%</span><span class="n">INCLUDE</span><span class="o">%</span><span class="p">;</span><span class="o">%</span><span class="n">CONDA_PREFIX</span><span class="o">%</span>\<span class="n">Library</span>\<span class="n">include</span>
+<span class="nb">set</span> <span class="n">LIB</span><span class="o">=%</span><span class="n">LIB</span><span class="o">%</span><span class="p">;</span><span class="o">%</span><span class="n">CONDA_PREFIX</span><span class="o">%</span>\<span class="n">Library</span>\<span class="n">lib</span>
+<span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">install</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="section" id="troubleshooting-windows-build">
+<h3>Troubleshooting Windows Build<a class="headerlink" href="#troubleshooting-windows-build" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>If the <code class="docutils literal"><span class="pre">cl</span></code> compiler throws the error fatal <code class="docutils literal"><span class="pre">error</span> <span class="pre">LNK1158:</span> <span class="pre">cannot</span> <span class="pre">run</span> <span class="pre">‘rc.exe’</span></code>,
+add Windows Kits to your PATH (e.g. <code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Windows</span> <span class="pre">Kits\8.0\bin\x86</span></code>).</li>
+<li>Some errors can be mitigated by <code class="docutils literal"><span class="pre">set</span> <span class="pre">DISTUTILS_USE_SDK=1</span></code>.</li>
+<li>For setting up Visual Studio, one might need go to registry at
+<code class="docutils literal"><span class="pre">HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7</span></code>,
+and add a string value named <code class="docutils literal"><span class="pre">14.0</span></code> whose data is <code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Microsoft</span> <span class="pre">Visual</span> <span class="pre">Studio</span> <span class="pre">14.0\</span></code>.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -105,6 +160,11 @@ LDSHARED=&quot;mpicc -shared&quot; CXX=mpicxx LD=mpicc CC=&quot;mpicc&quot; \
   <ul>
 <li><a class="reference internal" href="#">Installing HPAT</a><ul>
 <li><a class="reference internal" href="#hdf5-support">HDF5 Support</a></li>
+<li><a class="reference internal" href="#parquet-support">Parquet Support</a></li>
+<li><a class="reference internal" href="#installing-on-windows">Installing on Windows</a><ul>
+<li><a class="reference internal" href="#troubleshooting-windows-build">Troubleshooting Windows Build</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

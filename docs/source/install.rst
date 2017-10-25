@@ -23,7 +23,7 @@ such as Numba and LLVM on Ubuntu Linux::
 
 A command line for running the Pi example on 4 cores::
 
-    mpirun -n 4 python examples/pi.py
+    mpiexec -n 4 python examples/pi.py
 
 HDF5 Support
 ------------
@@ -49,7 +49,56 @@ describe building and setting up HDF5 from its
     LDSHARED="mpicc -shared" CXX=mpicxx LD=mpicc CC="mpicc" \
         python setup.py install
 
+HPAT needs to be rebuilt after setting up HDF5.
 Commands for generating HDF5 data and running the logistic regression example::
 
     python generate_data/gen_logistic_regression.py
-    mpirun -n 4 python examples/logistic_regression.py
+    mpiexec -n 4 python examples/logistic_regression.py
+
+Parquet Support
+---------------
+
+HPAT uses the `pyarrow` package to provide Parquet support::
+
+    conda install pyarrow -c conda-forge
+
+HPAT needs to be rebuilt after setting up pyarrow.
+
+Installing on Windows
+---------------------
+
+Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:
+
+* Install `Build Tools for Visual Studio 2017 (14.0) <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017>`_.
+* Setup the environment by running ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat amd64``.
+* Install `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_.
+* Setup the environment by following
+  `Intel MPI installation instructions <https://software.intel.com/en-us/articles/intel-mpi-library-for-windows-installation-instructions>`_.
+* Install `Anaconda 4.4 for Windows <https://repo.continuum.io/archive/Anaconda2-4.4.0-Windows-x86_64.exe>`_.
+* Setup the Conda environment in Anaconda Prompt::
+
+    conda create -n HPAT
+    activate HPAT
+    conda install numpy scipy pandas llvmlite
+    git clone https://github.com/IntelLabs/numba.git
+    cd numba
+    git checkout hpat_req
+    python setup.py install
+    cd ..
+    conda install pyarrow -c conda-forge
+    git clone https://github.com/IntelLabs/hpat.git
+    cd hpat
+    set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
+    set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
+    python setup.py install
+
+
+Troubleshooting Windows Build
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run ‘rc.exe’``,
+  add Windows Kits to your PATH (e.g. ``C:\Program Files (x86)\Windows Kits\8.0\bin\x86``).
+* Some errors can be mitigated by ``set DISTUTILS_USE_SDK=1``.
+* For setting up Visual Studio, one might need go to registry at
+  ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
+  and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
