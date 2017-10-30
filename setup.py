@@ -1,5 +1,5 @@
 from setuptools import setup, Extension
-import platform
+import platform, os
 
 def readme():
     with open('README.rst') as f:
@@ -18,6 +18,13 @@ except ImportError:
     _has_pyarrow = False
 else:
     _has_pyarrow = True
+
+_has_daal = False
+
+if 'DAALROOT' in os.environ:
+    _has_daal = True
+    DAALROOT = os.environ['DAALROOT']
+
 
 MPI_LIBS = []
 if platform.system() == 'Windows':
@@ -47,12 +54,21 @@ ext_parquet = Extension(name="parquet_cpp",
                              sources=["hpat/_parquet.cpp"]
                              )
 
+ext_daal_wrapper = Extension(name="daal_wrapper",
+                             include_dirs = [DAALROOT+'/include'],
+                             libraries = ['daal_core', 'daal_sequential'],
+                             sources=["hpat/_daal.cpp"]
+                             )
+
 _ext_mods = [ext_hdist, ext_dict, ext_str]
 
 if _has_h5py:
     _ext_mods.append(ext_io)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
+if _has_daal:
+    _ext_mods.append(ext_daal_wrapper)
+
 
 setup(name='hpat',
       version='0.1.0',
