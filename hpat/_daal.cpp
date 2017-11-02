@@ -1,5 +1,6 @@
 #include <Python.h>
 #include "daal.h"
+#include <unordered_set>
 
 using namespace std;
 using namespace daal;
@@ -11,7 +12,7 @@ struct svc_payload {
     int64_t n_classes;
 };
 
-void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t n_classes);
+void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t *n_classes_ptr);
 void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res, int64_t n_classes);
 void dtor_svc(void* model_ptr, int64_t size, void* in);
 
@@ -33,11 +34,24 @@ PyMODINIT_FUNC PyInit_daal_wrapper(void) {
     return m;
 }
 
-
-void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t n_classes)
+int64_t get_num_classes(double *y, int64_t num_samples)
 {
+    std::unordered_set<double> vals;
+    for(int64_t i=0; i<num_samples; i++)
+        vals.insert(y[i]);
+    return vals.size();
+}
+
+void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t *n_classes_ptr)
+{
+    int64_t n_classes = *n_classes_ptr;
+    // if number of classes is not known, count label values and assign to ptr
+    // to update SVC data
+    if (n_classes==-1)
+        n_classes = get_num_classes(y, num_samples);
+        *n_classes_ptr = n_classes;
     // printf("svn_train nFeatures:%ld nSamples:%ld X[0]:%lf y[0]:%lf\n", num_features, num_samples, X[0], y[0]);
-    printf("train classes: %lld\n", n_classes);
+    // printf("train classes: %lld\n", n_classes);
     services::SharedPtr<svm::training::Batch<> > training(new svm::training::Batch<>());
     services::SharedPtr<multi_class_classifier::training::Result> trainingResult;
     services::SharedPtr<svm::prediction::Batch<> > prediction(new svm::prediction::Batch<>());
@@ -54,7 +68,7 @@ void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y,
 
     multi_class_classifier::training::Batch<> algorithm;
 
-    algorithm.parameter.nClasses = 2; // FIXME
+    algorithm.parameter.nClasses = n_classes;
     algorithm.parameter.training = training;
     algorithm.parameter.prediction = prediction;
 
@@ -74,7 +88,7 @@ void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y,
 
 void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res, int64_t n_classes)
 {
-    printf("predict classes: %lld\n", n_classes);
+    // printf("predict classes: %lld\n", n_classes);
     services::SharedPtr<multi_class_classifier::training::Result>* trainingResultPtr =
         (services::SharedPtr<multi_class_classifier::training::Result>*)(model_ptr);
     services::SharedPtr<classifier::prediction::Result> predictionResult;
@@ -91,7 +105,7 @@ void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, dou
 
     multi_class_classifier::prediction::Batch<> algorithm;
 
-    algorithm.parameter.nClasses = 2; // FIXME
+    algorithm.parameter.nClasses = n_classes;
     algorithm.parameter.training = training;
     algorithm.parameter.prediction = prediction;
 

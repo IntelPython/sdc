@@ -136,7 +136,7 @@ def svc_train_impl(context, builder, sig, args):
     # num_features, num_samples, X, y
     arg_typs = [lir.IntType(64), lir.IntType(64),
                 lir.DoubleType().as_pointer(), lir.DoubleType().as_pointer(),
-                lir.IntType(64),]
+                lir.IntType(64).as_pointer()]
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), arg_typs)
 
     fn = builder.module.get_or_insert_function(fnty, name="svc_train")
@@ -149,7 +149,8 @@ def svc_train_impl(context, builder, sig, args):
 
     svc_struct = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
 
-    call_args = [num_features, num_samples, X.data, y.data, svc_struct.n_classes]
+    call_args = [num_features, num_samples, X.data, y.data,
+                                svc_struct._get_ptr_by_name('n_classes')]
     model = builder.call(fn, call_args)
     svc_struct.model = model
     builder.store(svc_struct._getvalue(), data_pointer)
