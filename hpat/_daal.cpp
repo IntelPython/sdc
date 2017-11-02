@@ -8,10 +8,11 @@ using namespace daal::data_management;
 
 struct svc_payload {
     services::SharedPtr<multi_class_classifier::training::Result>* trainingResultPtr;
+    int64_t n_classes;
 };
 
-void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y);
-void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res);
+void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t n_classes);
+void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res, int64_t n_classes);
 void dtor_svc(void* model_ptr, int64_t size, void* in);
 
 PyMODINIT_FUNC PyInit_daal_wrapper(void) {
@@ -33,9 +34,10 @@ PyMODINIT_FUNC PyInit_daal_wrapper(void) {
 }
 
 
-void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y)
+void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y, int64_t n_classes)
 {
     // printf("svn_train nFeatures:%ld nSamples:%ld X[0]:%lf y[0]:%lf\n", num_features, num_samples, X[0], y[0]);
+    printf("train classes: %lld\n", n_classes);
     services::SharedPtr<svm::training::Batch<> > training(new svm::training::Batch<>());
     services::SharedPtr<multi_class_classifier::training::Result> trainingResult;
     services::SharedPtr<svm::prediction::Batch<> > prediction(new svm::prediction::Batch<>());
@@ -70,9 +72,9 @@ void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y)
     return ptres;
 }
 
-void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res)
+void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res, int64_t n_classes)
 {
-
+    printf("predict classes: %lld\n", n_classes);
     services::SharedPtr<multi_class_classifier::training::Result>* trainingResultPtr =
         (services::SharedPtr<multi_class_classifier::training::Result>*)(model_ptr);
     services::SharedPtr<classifier::prediction::Result> predictionResult;
