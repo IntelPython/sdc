@@ -6,6 +6,10 @@ using namespace daal;
 using namespace daal::algorithms;
 using namespace daal::data_management;
 
+struct svc_payload {
+    services::SharedPtr<multi_class_classifier::training::Result>* trainingResultPtr;
+};
+
 void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y);
 void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res);
 void dtor_svc(void* model_ptr, int64_t size, void* in);
@@ -108,8 +112,7 @@ void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, dou
 
 void dtor_svc(void* model_ptr, int64_t size, void* in)
 {
-    services::SharedPtr<multi_class_classifier::training::Result>* trainingResultPtr =
-        (services::SharedPtr<multi_class_classifier::training::Result>*)(model_ptr);
-    //delete trainingResultPtr;
+    svc_payload* st = (svc_payload*) model_ptr;
+    delete st->trainingResultPtr;
     return;
 }
