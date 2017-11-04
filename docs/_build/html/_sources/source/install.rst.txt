@@ -74,7 +74,7 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and 
 * Install `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_.
 * Setup the environment by following
   `Intel MPI installation instructions <https://software.intel.com/en-us/articles/intel-mpi-library-for-windows-installation-instructions>`_.
-* Install `Anaconda 4.4 for Windows <https://repo.continuum.io/archive/Anaconda2-4.4.0-Windows-x86_64.exe>`_.
+* Install `Anaconda 4.4 for Windows <https://repo.continuum.io/archive/Anaconda3-4.4.0-Windows-x86_64.exe>`_.
 * Setup the Conda environment in Anaconda Prompt::
 
     conda create -n HPAT
