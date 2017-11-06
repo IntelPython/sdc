@@ -20,6 +20,7 @@ else:
     _has_pyarrow = True
 
 _has_daal = False
+DAALROOT = ""
 
 if 'DAALROOT' in os.environ:
     _has_daal = True
