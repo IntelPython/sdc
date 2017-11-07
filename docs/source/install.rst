@@ -30,26 +30,23 @@ HDF5 Support
 
 HPAT supports reading and writing HDF5 files in parallel. The instructions below
 describe building and setting up HDF5 from its
-`source code <https://www.hdfgroup.org/downloads/hdf5/source-code/>`_::
+`source code (v1.8.19) <https://support.hdfgroup.org/ftp/HDF5/current18/src/hdf5-1.8.19.tar.gz>`_::
 
-    # download hdf5-1.10.1.tar.gz
-    tar xzf hdf5-1.10.1.tar.gz
-    cd hdf5-1.10.1/
+    # download hdf5-1.8.19.tar.gz
+    tar xzf hdf5-1.8.19.tar.gz
+    cd hdf5-1.8.19/
     CC=mpicc CXX=mpicxx ./configure --enable-parallel
     make; make install
     cd ..
-    export HDF5_DIR=/home/user/hdf5-1.10.1/hdf5/
-    export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HDF5_DIR/include
-    export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HDF5_DIR/include
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HDF5_DIR/lib
-    export LIBRARY_PATH=$LIBRARY_PATH:$HDF5_DIR/lib
+    export HDF5_DIR=$HOME/hdf5-1.8.19/hdf5/
     git clone https://github.com/h5py/h5py.git
     cd h5py
     python setup.py configure --hdf5=$HDF5_DIR
     LDSHARED="mpicc -shared" CXX=mpicxx LD=mpicc CC="mpicc" \
         python setup.py install
 
-HPAT needs to be rebuilt after setting up HDF5.
+HPAT needs to be rebuilt after setting up HDF5. We use HDF5 v1.8.x since the
+latest versions (v1.10.x) have an issue with LLVM which is under investigation.
 Commands for generating HDF5 data and running the logistic regression example::
 
     python generate_data/gen_logistic_regression.py
