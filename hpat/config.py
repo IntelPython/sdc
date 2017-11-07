@@ -1,5 +1,5 @@
 try:
-    import h5py
+    import hio
 except ImportError:
     _has_h5py = False
 else:

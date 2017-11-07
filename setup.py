@@ -5,12 +5,13 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-try:
-    import h5py
-except ImportError:
-    _has_h5py = False
-else:
+
+_has_h5py = False
+HDF5_DIR = ""
+
+if 'HDF5_DIR' in os.environ:
     _has_h5py = True
+    HDF5_DIR = os.environ['HDF5_DIR']
 
 try:
     import pyarrow
@@ -34,6 +35,8 @@ if platform.system() == 'Windows':
 
 ext_io = Extension(name="hio",
                              libraries = ['hdf5'],
+                             include_dirs = [HDF5_DIR+'/include/'],
+                             library_dirs = [HDF5_DIR+'/lib/'],
                              sources=["hpat/_io.cpp"]
                              )
 
