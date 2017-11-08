@@ -1,25 +1,21 @@
 from __future__ import print_function, division, absolute_import
-import types as pytypes  # avoid confusion with numba.types
-from collections import namedtuple
+
 import numba
 from numba import ir, ir_utils, types
 from numba import compiler as numba_compiler
-from numba.stencil import StencilFunc
+
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition)
-from numba.inline_closurecall import InlineClosureCallPass
+
 import hpat
 from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import numpy as np
 from hpat.parquet_pio import ParquetHandler
-from hpat.str_arr_ext import StringArray, string_array_type, StringArrayType
-if config._has_h5py:
-    from hpat import pio
 
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
@@ -74,18 +70,8 @@ class HiFrames(object):
             self.func_ir.blocks[label].body = new_body
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir.df_cols = self.df_cols
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
-        if config._has_h5py:
-            io_pass = pio.PIO(self.func_ir, self.locals)
-            io_pass.run()
-        remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
-        DummyFlags = namedtuple('DummyFlags', 'auto_parallel')
-        inline_pass = InlineClosureCallPass(self.func_ir, DummyFlags(True))
-        inline_pass.run()
-        self.typemap, self.return_type, self.calltypes = numba_compiler.type_inference_stage(
-                self.typingctx, self.func_ir, self.args, None)
-        self.fixes_after_typing(self.func_ir.blocks)
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if numba.config.DEBUG_ARRAY_OPT==1:
             print("df_vars: ", self.df_vars)
@@ -586,90 +572,6 @@ class HiFrames(object):
         index_offsets = nodes[-1].target
 
         return index_offsets, win_tuple, nodes
-
-    def fixes_after_typing(self, blocks):
-        call_table, _ = ir_utils.get_call_table(self.func_ir.blocks)
-        topo_order = find_topo_order(blocks)
-        for label in topo_order:
-            new_body = []
-            for stmt in blocks[label].body:
-                # convert str_arr==str into parfor
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op == 'binop'
-                        and stmt.value.fn in ['==', '!=']
-                        and (self.typemap[stmt.value.lhs.name] == string_array_type
-                        or self.typemap[stmt.value.rhs.name] == string_array_type)):
-                    lhs = stmt.value.lhs
-                    rhs = stmt.value.rhs
-                    lhs_access = 'A'
-                    rhs_access = 'B'
-                    len_call = 'A.size'
-                    if self.typemap[lhs.name] == string_array_type:
-                        lhs_access = 'A[i]'
-                    if self.typemap[rhs.name] == string_array_type:
-                        lhs_access = 'B[i]'
-                        len_call = 'B.size'
-                    func_text = 'def f(A, B):\n'
-                    func_text += '  l = {}\n'.format(len_call)
-                    func_text += '  S = np.empty(l, dtype=np.bool_)\n'
-                    func_text += '  for i in numba.parfor.prange(l):\n'
-                    func_text += '    S[i] = {} {} {}\n'.format(lhs_access, stmt.value.fn, rhs_access)
-                    loc_vars = {}
-                    exec(func_text, {}, loc_vars)
-                    f = loc_vars['f']
-                    f_blocks = compile_to_numba_ir(f, {'numba': numba, 'np': np}).blocks
-                    replace_arg_nodes(f_blocks[min(f_blocks.keys())], [lhs, rhs])
-                    label = include_new_blocks(blocks, f_blocks, label, new_body)
-                    new_body = []
-                    # replace == expression with result of parfor (S)
-                    # S is target of last statement in 1st block of f
-                    stmt.value = f_blocks[min(f_blocks.keys())].body[-2].target
-                # arr = fix_df_array(col) -> arr=col if col is array
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op == 'call'
-                        and stmt.value.func.name in call_table
-                        and call_table[stmt.value.func.name] ==
-                                    ['fix_df_array', 'hiframes_api', hpat]
-                        and isinstance(self.typemap[stmt.value.args[0].name],
-                                            (types.Array, StringArrayType))):
-                    stmt.value = stmt.value.args[0]
-                # find df['col2'] = df['col1'][arr]
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op=='getitem'
-                        and stmt.value.value.name in self.df_cols
-                        and stmt.target.name in self.df_cols
-                        and self.is_bool_arr(stmt.value.index.name)):
-                    lhs = stmt.target
-                    in_arr = stmt.value.value
-                    index_var = stmt.value.index
-                    def f(A, B, ind):
-                        for i in numba.parfor.prange(len(A)):
-                            s = 0
-                            if ind[i]:
-                                s = B[i]
-                            else:
-                                s= np.nan
-                            A[i] = s
-                    f_blocks = get_inner_ir(f)
-                    replace_var_names(f_blocks, {'A': lhs.name})
-                    replace_var_names(f_blocks, {'B': in_arr.name})
-                    replace_var_names(f_blocks, {'ind': index_var.name})
-                    alloc_nodes = gen_empty_like(in_arr, lhs)
-                    f_blocks[0].body = alloc_nodes + f_blocks[0].body
-                    label = include_new_blocks(blocks, f_blocks, label, new_body)
-                    new_body = []
-                else:
-                    new_body.append(stmt)
-            blocks[label].body = new_body
-
-        return
-
-    def is_bool_arr(self, varname):
-        typ = self.typemap[varname]
-        return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
 
 def gen_empty_like(in_arr, out_arr):
     scope = in_arr.scope
