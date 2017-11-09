@@ -145,7 +145,7 @@ class HiFramesTyped(object):
             f_blocks[first_block].body = alloc_nodes + f_blocks[first_block].body
             return f_blocks
 
-    def _handle_df_col_calls(self, lhs, rhs, assign):
+    def _handle_df_col_calls(self, lhs_name, rhs, assign):
         if guard(find_callname, self.func_ir, rhs) == ('fillna', 'hpat.hiframes_api'):
             out_arr = rhs.args[0]
             in_arr = rhs.args[1]
@@ -157,6 +157,20 @@ class HiFramesTyped(object):
                     self.typemap, self.calltypes).blocks
             first_block = min(f_blocks.keys())
             replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
+            return f_blocks
+
+        if guard(find_callname, self.func_ir, rhs) == ('column_sum', 'hpat.hiframes_api'):
+            in_arr = rhs.args[0]
+            f_blocks = compile_to_numba_ir(_column_sum_impl,
+                    {'numba': numba, 'np': np}, self.typingctx,
+                    (self.typemap[in_arr.name],),
+                    self.typemap, self.calltypes).blocks
+            topo_order = find_topo_order(f_blocks)
+            first_block = topo_order[0]
+            last_block = topo_order[-1]
+            replace_arg_nodes(f_blocks[first_block], [in_arr])
+            # assign results to lhs output
+            f_blocks[last_block].body[-4].target = assign.target
             return f_blocks
         return
 
@@ -180,3 +194,15 @@ def _column_fillna_impl(A, B, fill):
         if np.isnan(s):
             s = fill
         A[i] = s
+
+def _column_sum_impl(A):
+    count = 0
+    s = 0
+    for i in numba.parfor.prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s += val
+            count += 1
+    if not count:
+        s = np.nan
+    res = s

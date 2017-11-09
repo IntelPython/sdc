@@ -369,21 +369,14 @@ class HiFrames(object):
         return alloc_nodes + nodes
 
     def _gen_col_sum(self, out_var, args, col_var):
-        def f(A, s):
-            count = 0
-            for i in numba.parfor.prange(len(A)):
-                val = A[i]
-                if not np.isnan(val):
-                    s += val
-                    count += 1
-            if not count:
-                s = np.nan
-        f_blocks = get_inner_ir(f)
-        replace_var_names(f_blocks, {'A': col_var.name})
-        replace_var_names(f_blocks, {'s': out_var.name})
-        loc = out_var.loc
-        f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
-        return f_blocks
+        def f(A):
+            s = hpat.hiframes_api.column_sum(A)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
 
     def _gen_col_mean(self, out_var, args, col_var):
         def f(A, s):

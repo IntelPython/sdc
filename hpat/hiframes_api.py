@@ -138,6 +138,9 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 def fillna(A):
     return 0
 
+def column_sum(A):
+    return 0
+
 def var(A):
     return 0
 
@@ -145,6 +148,7 @@ def std(A):
     return 0
 
 # TODO: mean
+from numba.typing.arraydecl import _expand_integer
 
 @infer_global(fillna)
 class FillNaType(AbstractTemplate):
@@ -153,6 +157,15 @@ class FillNaType(AbstractTemplate):
         assert len(args) == 3
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
+
+@infer_global(column_sum)
+class SumType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        # arg: in_arr
+        return signature(_expand_integer(args[0].dtype), *args)
+
 
 # copied from numba/numba/typing/arraydecl.py:563
 @infer_global(var)
