@@ -207,6 +207,27 @@ class VarDdof1Type(AbstractTemplate):
 from numba.targets.imputils import lower_builtin, impl_ret_untracked
 import numpy as np
 
+@lower_builtin(mean, types.Array)
+def lower_column_mean_impl(context, builder, sig, args):
+    zero = sig.return_type(0)
+    def array_mean_impl(arr):
+        count = 0
+        s = zero
+        for val in arr:
+            if not np.isnan(val):
+                s += val
+                count += 1
+        if not count:
+            s = np.nan
+        else:
+            s = s/count
+        return s
+
+    res = context.compile_internal(builder, array_mean_impl, sig, args,
+                                   locals=dict(s=sig.return_type))
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+
 # copied from numba/numba/targets/arraymath.py:119
 @lower_builtin(var, types.Array)
 def array_var(context, builder, sig, args):

@@ -456,7 +456,7 @@ class HiFrames(object):
                 raise ValueError("No argument expected for rolling {}".format(
                                                                         func))
             g_pack = "np"
-            if func in ['std', 'var']:
+            if func in ['std', 'var', 'mean']:
                 g_pack = "hpat.hiframes_api"
             if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
                 # unroll if size is less than 5
