@@ -51,6 +51,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_column_mean(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = np.nan
+            df = pd.DataFrame({'A': A})
+            return df.A.mean()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})

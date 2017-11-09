@@ -147,7 +147,9 @@ def var(A):
 def std(A):
     return 0
 
-# TODO: mean
+def mean(A):
+    return 0
+
 from numba.typing.arraydecl import _expand_integer
 
 @infer_global(fillna)
@@ -168,6 +170,7 @@ class SumType(AbstractTemplate):
 
 
 # copied from numba/numba/typing/arraydecl.py:563
+@infer_global(mean)
 @infer_global(var)
 @infer_global(std)
 class VarDdof1Type(AbstractTemplate):
