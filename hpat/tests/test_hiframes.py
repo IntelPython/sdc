@@ -19,6 +19,17 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_fillna(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = np.nan
+            df = pd.DataFrame({'A': A})
+            B = df.A.fillna(5.0)
+            return B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
