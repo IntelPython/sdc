@@ -348,11 +348,18 @@ class HiFrames(object):
         return stencil_nodes+setitem_nodes
 
     def _gen_fillna(self, out_var, args, col_var, kws):
-        if 'inplace' in kws and get_constant(self.func_ir, kws['inplace'])==True:
+        inplace = False
+        if 'inplace' in kws:
+            inplace = get_constant(self.func_ir, kws['inplace'])
+            if inplace==NOT_CONSTANT:
+                raise ValueError("inplace arg to fillna should be constant")
+
+        if inplace:
             out_var = col_var  # output array is same as input array
             alloc_nodes = []
         else:
             alloc_nodes = gen_empty_like(col_var, out_var)
+
         val = args[0]
         def f(A, B, fill):
             hpat.hiframes_api.fillna(A, B, fill)
