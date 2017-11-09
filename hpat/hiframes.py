@@ -348,15 +348,14 @@ class HiFrames(object):
         return stencil_nodes+setitem_nodes
 
     def _gen_fillna(self, out_var, args, col_var):
+        val = args[0]
         def f(A, B, fill):
             hpat.hiframes_api.fillna(A, B, fill)
-        f_blocks = get_inner_ir(f)
-        replace_var_names(f_blocks, {'A': out_var.name})
-        replace_var_names(f_blocks, {'B': col_var.name})
-        replace_var_names(f_blocks, {'fill': args[0].name})
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [out_var, col_var, val])
+        nodes = f_block.body[:-3]  # remove none return
         alloc_nodes = gen_empty_like(col_var, out_var)
-        f_blocks[0].body = alloc_nodes + f_blocks[0].body
-        return f_blocks
+        return alloc_nodes + nodes
 
     def _gen_col_sum(self, out_var, args, col_var):
         def f(A, s):
