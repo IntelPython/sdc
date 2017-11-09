@@ -135,8 +135,8 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 #         #assert not args
 #         return signature(ary.copy(layout='C'), types.intp)
 
-
-
+def fillna(A):
+    return 0
 
 def var(A):
     return 0
@@ -145,6 +145,14 @@ def std(A):
     return 0
 
 # TODO: mean
+
+@infer_global(fillna)
+class FillNaType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 3
+        # args: out_arr, in_arr, value
+        return signature(types.none, *args)
 
 # copied from numba/numba/typing/arraydecl.py:563
 @infer_global(var)

@@ -349,11 +349,7 @@ class HiFrames(object):
 
     def _gen_fillna(self, out_var, args, col_var):
         def f(A, B, fill):
-            for i in numba.parfor.prange(len(A)):
-                s = B[i]
-                if np.isnan(s):
-                    s = fill
-                A[i] = s
+            hpat.hiframes_api.fillna(A, B, fill)
         f_blocks = get_inner_ir(f)
         replace_var_names(f_blocks, {'A': out_var.name})
         replace_var_names(f_blocks, {'B': col_var.name})

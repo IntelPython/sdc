@@ -3,7 +3,9 @@ from __future__ import print_function, division, absolute_import
 import numpy as np
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import replace_arg_nodes, compile_to_numba_ir, find_topo_order, gen_np_call
+from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
+                            find_topo_order, gen_np_call, get_definition, guard,
+                            find_callname)
 
 import hpat
 from hpat.utils import get_definitions
@@ -62,6 +64,11 @@ class HiFramesTyped(object):
             res = self._handle_df_col_filter(lhs, rhs, assign)
             if res is not None:
                 return res
+
+            if rhs.op == 'call':
+                res = self._handle_df_col_calls(lhs, rhs, assign)
+                if res is not None:
+                    return res
 
         return [assign]
 
@@ -138,6 +145,21 @@ class HiFramesTyped(object):
             f_blocks[first_block].body = alloc_nodes + f_blocks[first_block].body
             return f_blocks
 
+    def _handle_df_col_calls(self, lhs, rhs, assign):
+        if guard(find_callname, self.func_ir, rhs) == ('fillna', 'hpat.hiframes_api'):
+            out_arr = rhs.args[0]
+            in_arr = rhs.args[1]
+            val = rhs.args[2]
+            f_blocks = compile_to_numba_ir(_column_fillna_impl,
+                    {'numba': numba, 'np': np}, self.typingctx,
+                    (self.typemap[out_arr.name], self.typemap[in_arr.name],
+                    self.typemap[val.name]),
+                    self.typemap, self.calltypes).blocks
+            first_block = min(f_blocks.keys())
+            replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
+            return f_blocks
+        return
+
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
         return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
@@ -150,4 +172,11 @@ def _column_filter_impl_float(A, B, ind):
             s = B[i]
         else:
             s = np.nan
+        A[i] = s
+
+def _column_fillna_impl(A, B, fill):
+    for i in numba.parfor.prange(len(A)):
+        s = B[i]
+        if np.isnan(s):
+            s = fill
         A[i] = s
