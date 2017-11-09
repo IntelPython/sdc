@@ -389,25 +389,14 @@ class HiFrames(object):
         return nodes
 
     def _gen_col_var(self, out_var, args, col_var):
-        loc = out_var.loc
+        def f(A):
+            s = hpat.hiframes_api.var(A)
 
-        def f(A, s):
-            m = hpat.hiframes_api.mean(A)
-            count = 0
-            for i in numba.parfor.prange(len(A)):
-                val = A[i]
-                if not np.isnan(val):
-                    s += (val-m)**2
-                    count += 1
-            if count <= 1:
-                s = np.nan
-            else:
-                s = s/(count-1)
-        f_blocks = get_inner_ir(f)
-        replace_var_names(f_blocks, {'A': col_var.name})
-        replace_var_names(f_blocks, {'s': out_var.name})
-        f_blocks[0].body.insert(0, ir.Assign(ir.Const(0.0, loc), out_var, loc))
-        return f_blocks
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
 
     def _gen_col_std(self, out_var, args, col_var):
         loc = out_var.loc

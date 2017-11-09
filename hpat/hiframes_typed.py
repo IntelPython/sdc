@@ -187,6 +187,20 @@ class HiFramesTyped(object):
             f_blocks[last_block].body[-4].target = assign.target
             return f_blocks
 
+        if guard(find_callname, self.func_ir, rhs) == ('var', 'hpat.hiframes_api'):
+            in_arr = rhs.args[0]
+            f_blocks = compile_to_numba_ir(_column_var_impl,
+                    {'numba': numba, 'np': np}, self.typingctx,
+                    (self.typemap[in_arr.name],),
+                    self.typemap, self.calltypes).blocks
+            topo_order = find_topo_order(f_blocks)
+            first_block = topo_order[0]
+            last_block = topo_order[-1]
+            replace_arg_nodes(f_blocks[first_block], [in_arr])
+            # assign results to lhs output
+            f_blocks[last_block].body[-4].target = assign.target
+            return f_blocks
+
         return
 
     def is_bool_arr(self, varname):
@@ -234,4 +248,30 @@ def _column_mean_impl(A):
         s = np.nan
     else:
         s = s/count
+    res = s
+
+
+def _column_var_impl(A):
+    count_m = 0
+    m = 0
+    for i in numba.parfor.prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            m += val
+            count_m += 1
+    if not count_m:
+        m = np.nan
+    else:
+        m = m/count_m
+    s = 0
+    count = 0
+    for i in numba.parfor.prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s += (val-m)**2
+            count += 1
+    if count <= 1:
+        s = np.nan
+    else:
+        s = s/(count-1)
     res = s
