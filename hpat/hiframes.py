@@ -403,8 +403,8 @@ class HiFrames(object):
         scope = out_var.scope
         # calculate var() first
         var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
-        f_blocks = self._gen_col_var(var_var, args, col_var)
-        last_label = find_topo_order(f_blocks)[-1]
+        nodes = self._gen_col_var(var_var, args, col_var)
+
         def f(a):
             a ** 0.5
         s_blocks = get_inner_ir(f)
@@ -414,9 +414,7 @@ class HiFrames(object):
         const_node = s_blocks[0].body[0]
         pow_node = s_blocks[0].body[1]
         pow_node.target = out_var
-        f_blocks[last_label].body.insert(-3, const_node)
-        f_blocks[last_label].body.insert(-3, pow_node)
-        return f_blocks
+        return nodes + [const_node, pow_node]
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc

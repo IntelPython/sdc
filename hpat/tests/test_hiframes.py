@@ -71,6 +71,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    def test_column_std(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = 4.0
+            df = pd.DataFrame({'A': A})
+            return df.A.std()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
