@@ -9,7 +9,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
 
 import hpat
 from hpat.utils import get_definitions
-from hpat.hiframes import include_new_blocks, gen_empty_like, get_inner_ir, replace_var_names
+from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.str_arr_ext import string_array_type, StringArrayType
 
 class HiFramesTyped(object):

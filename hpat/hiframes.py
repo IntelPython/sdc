@@ -403,18 +403,16 @@ class HiFrames(object):
         scope = out_var.scope
         # calculate var() first
         var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
-        nodes = self._gen_col_var(var_var, args, col_var)
+        v_nodes = self._gen_col_var(var_var, args, col_var)
 
         def f(a):
             a ** 0.5
-        s_blocks = get_inner_ir(f)
-        replace_var_names(s_blocks, {'a': var_var.name})
-        remove_none_return_from_block(s_blocks[0])
-        assert len(s_blocks[0].body) == 2
-        const_node = s_blocks[0].body[0]
-        pow_node = s_blocks[0].body[1]
-        pow_node.target = out_var
-        return nodes + [const_node, pow_node]
+        s_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+        replace_arg_nodes(s_block, [var_var])
+        s_nodes = s_block.body[:-3]
+        assert len(s_nodes) == 3
+        s_nodes[-1].target = out_var
+        return v_nodes + s_nodes
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
@@ -582,29 +580,6 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
 
     return stencil_nodes
 
-def get_inner_ir(func):
-    # get untyped numba ir
-    f_ir = numba_compiler.run_frontend(func)
-    blocks = f_ir.blocks
-    remove_dels(blocks)
-    topo_order = find_topo_order(blocks)
-    first_block = blocks[topo_order[0]]
-    last_block = blocks[topo_order[-1]]
-    # remove arg nodes
-    new_first_body = []
-    for stmt in first_block.body:
-        if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Arg):
-            continue
-        new_first_body.append(stmt)
-    first_block.body = new_first_body
-    # rename all variables to avoid conflict, except args
-    var_table = get_name_var_table(blocks)
-    new_var_dict = {}
-    for name, var in var_table.items():
-        if not (name in f_ir.arg_names):
-            new_var_dict[name] = mk_unique_var(name)
-    replace_var_names(blocks, new_var_dict)
-    return blocks
 
 def remove_none_return_from_block(last_block):
     # remove const none, cast, return nodes
