@@ -117,6 +117,8 @@ class HiFramesTyped(object):
 
     def _handle_df_col_filter(self, lhs_name, rhs, assign):
         # find df['col2'] = df['col1'][arr]
+        # since columns should have the same size, output is filled with NaNs
+        # TODO: check for float, make sure col1 and col2 are in the same df
         if (rhs.op=='getitem'
                 and rhs.value.name in self.df_cols
                 and lhs_name in self.df_cols
@@ -124,15 +126,7 @@ class HiFramesTyped(object):
             lhs = assign.target
             in_arr = rhs.value
             index_var = rhs.index
-            def f(A, B, ind):
-                for i in numba.parfor.prange(len(A)):
-                    s = 0
-                    if ind[i]:
-                        s = B[i]
-                    else:
-                        s= np.nan
-                    A[i] = s
-            f_blocks = compile_to_numba_ir(f,
+            f_blocks = compile_to_numba_ir(_column_filter_impl_float,
                     {'numba': numba, 'np': np}, self.typingctx,
                     (self.typemap[lhs.name], self.typemap[in_arr.name],
                     self.typemap[index_var.name]),
@@ -147,3 +141,13 @@ class HiFramesTyped(object):
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
         return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
+
+# float columns can have regular np.nan
+def _column_filter_impl_float(A, B, ind):
+    for i in numba.parfor.prange(len(A)):
+        s = 0
+        if ind[i]:
+            s = B[i]
+        else:
+            s = np.nan
+        A[i] = s
