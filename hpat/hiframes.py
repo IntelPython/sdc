@@ -242,7 +242,7 @@ class HiFrames(object):
                 and func_def.attr in df_col_funcs):
             func_name = func_def.attr
             col_var = func_def.value
-            return self._gen_column_call(lhs, rhs.args, col_var, func_name)
+            return self._gen_column_call(lhs, rhs.args, col_var, func_name, dict(rhs.kws))
         return None
 
     def _handle_rolling_setup(self, lhs, rhs):
@@ -295,11 +295,11 @@ class HiFrames(object):
                 *self.rolling_calls[func_def.value.name]+[func_name, lhs])
         return None
 
-    def _gen_column_call(self, out_var, args, col_var, func):
+    def _gen_column_call(self, out_var, args, col_var, func, kws):
         if func in ['fillna', 'pct_change', 'shift']:
             self.df_cols.add(out_var.name) # output is Series except sum
         if func == 'fillna':
-            return self._gen_fillna(out_var, args, col_var)
+            return self._gen_fillna(out_var, args, col_var, kws)
         if func == 'sum':
             return self._gen_col_sum(out_var, args, col_var)
         if func == 'mean':
@@ -347,14 +347,18 @@ class HiFrames(object):
 
         return stencil_nodes+setitem_nodes
 
-    def _gen_fillna(self, out_var, args, col_var):
+    def _gen_fillna(self, out_var, args, col_var, kws):
+        if 'inplace' in kws and get_constant(self.func_ir, kws['inplace'])==True:
+            out_var = col_var  # output array is same as input array
+            alloc_nodes = []
+        else:
+            alloc_nodes = gen_empty_like(col_var, out_var)
         val = args[0]
         def f(A, B, fill):
             hpat.hiframes_api.fillna(A, B, fill)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
-        alloc_nodes = gen_empty_like(col_var, out_var)
         return alloc_nodes + nodes
 
     def _gen_col_sum(self, out_var, args, col_var):
