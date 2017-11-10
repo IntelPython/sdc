@@ -6,7 +6,7 @@ from .hiframes import HiFrames
 from .hiframes_typed import HiFramesTyped
 import numba
 import numba.compiler
-from numba import ir_utils, ir
+from numba import ir_utils, ir, postproc
 from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
 from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
@@ -65,6 +65,8 @@ def stage_repeat_inline_closure(pipeline):
     assert pipeline.func_ir
     inline_pass = InlineClosureCallPass(pipeline.func_ir, pipeline.flags)
     inline_pass.run()
+    post_proc = postproc.PostProcessor(pipeline.func_ir)
+    post_proc.run()
 
 def add_hpat_stages(pipeline_manager, pipeline):
     pp = pipeline_manager.pipeline_stages['nopython']
