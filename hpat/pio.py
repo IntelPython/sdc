@@ -11,7 +11,7 @@ import numpy as np
 
 import hpat
 from hpat import pio_api, pio_lower, utils
-from hpat.utils import get_constant, NOT_CONSTANT
+from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import h5py
 
 def remove_h5(rhs, lives, call_list):
@@ -58,6 +58,7 @@ class PIO(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after IO")
         if config.DEBUG_ARRAY_OPT==1:
             print("h5 files: ", self.h5_files)
