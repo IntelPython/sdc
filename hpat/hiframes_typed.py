@@ -5,7 +5,7 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
-                            find_callname)
+                            find_callname, mk_alloc)
 
 import hpat
 from hpat.utils import get_definitions
@@ -58,6 +58,10 @@ class HiFramesTyped(object):
                 return res
 
             res = self._handle_fix_df_array(lhs, rhs, assign, call_table)
+            if res is not None:
+                return res
+
+            res = self._handle_empty_like(lhs, rhs, assign, call_table)
             if res is not None:
                 return res
 
@@ -120,6 +124,25 @@ class HiFramesTyped(object):
             assign.value = rhs.args[0]
             return [assign]
 
+        return None
+
+    def _handle_empty_like(self, lhs, rhs, assign, call_table):
+        # B = empty_like(A) -> B = empty(len(A), dtype)
+        if (rhs.op == 'call'
+                and rhs.func.name in call_table
+                and call_table[rhs.func.name] == ['empty_like', np]):
+            in_arr= rhs.args[0]
+            def f(A):
+                c = len(A)
+            f_block = compile_to_numba_ir(f, {}, self.typingctx, (self.typemap[in_arr.name],),
+                                self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr])
+            nodes = f_block.body[:-3]  # remove none return
+            size_var = nodes[-1].target
+            alloc_nodes = mk_alloc(self.typemap, self.calltypes, assign.target,
+                            size_var,
+                            self.typemap[in_arr.name].dtype, in_arr.scope, in_arr.loc)
+            return nodes + alloc_nodes
         return None
 
     def _handle_df_col_filter(self, lhs_name, rhs, assign):
