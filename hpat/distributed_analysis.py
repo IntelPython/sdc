@@ -4,7 +4,7 @@ import copy
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import get_call_table, get_tuple_table, find_topo_order
+from numba.ir_utils import get_call_table, get_tuple_table, find_topo_order, guard, get_definition
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -15,9 +15,10 @@ from hpat.utils import get_definitions
 from enum import Enum
 class Distribution(Enum):
     REP = 1
-    OneD = 4
-    OneD_Var = 3
-    TwoD = 2
+    Thread = 2
+    TwoD = 3
+    OneD_Var = 4
+    OneD = 5
 
 _dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
 
@@ -246,6 +247,19 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, arg0, array_dists)
                 dprint("dot case 4 Xw:", arg0, arg1)
                 return
+
+        if call_list == ['train']:
+            getattr_call = guard(get_definition, self.func_ir, func_var)
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc_type:
+                self._meet_array_dists(args[0].name, args[1].name, array_dists, Distribution.Thread)
+                return
+
+        if call_list == ['predict']:
+            getattr_call = guard(get_definition, self.func_ir, func_var)
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc_type:
+                self._meet_array_dists(lhs, args[0].name, array_dists, Distribution.Thread)
+                return
+
         # set REP if not found
         self._analyze_call_set_REP(lhs, func_var, args, array_dists)
 
@@ -258,14 +272,17 @@ class DistributedAnalysis(object):
             dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
 
-    def _meet_array_dists(self, arr1, arr2, array_dists):
+    def _meet_array_dists(self, arr1, arr2, array_dists, top_dist=None):
+        if top_dist is None:
+            top_dist = Distribution.OneD
         if arr1 not in array_dists:
-            array_dists[arr1] = Distribution.OneD
+            array_dists[arr1] = top_dist
         if arr2 not in array_dists:
-            array_dists[arr2] = Distribution.OneD
+            array_dists[arr2] = top_dist
 
         new_dist = Distribution(min(array_dists[arr1].value,
                                             array_dists[arr2].value))
+        new_dist = Distribution(min(new_dist.value, top_dist.value))
         array_dists[arr1] = new_dist
         array_dists[arr2] = new_dist
 

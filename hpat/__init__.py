@@ -10,6 +10,8 @@ from hpat.str_ext import string_type
 from numba.types import List
 from hpat.utils import cprint
 
+multithread_mode = False
+
 def jit(signature_or_function=None, **options):
     from .compiler import add_hpat_stages
     # set nopython by default

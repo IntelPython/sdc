@@ -1,19 +1,24 @@
 import numpy as np
 import hpat
+from hpat import prange
 import hpat.ml
 
+hpat.multithread_mode = True
+
 @hpat.jit
-def f(X, y, p):
+def f(N, D, M):
+    X = np.random.ranf((N, D))
+    y = np.empty(N)
+    for i in prange(N):
+        y[i] = i%2
+    p = np.random.ranf((M, D))
     clf = hpat.ml.SVC(n_classes=2)
     clf.train(X, y)
-    return clf.predict(p)
+    res = clf.predict(p)
+    return res.sum()
 
-N = 1000
+N = 1024
 D = 20
-np.random.seed(10)
-X = np.random.ranf((N, D))
-y = np.empty(N)
-for i in range(N):
-    y[i] = i%2
-p = np.random.ranf((10, D))
-print(f(X, y, p))
+M = 128
+
+print(f(N, D, M))

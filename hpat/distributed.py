@@ -67,6 +67,7 @@ class DistributedPass(object):
     def run(self):
         remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
+        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
                                                                 self.calltypes)
         self._dist_analysis = dist_analysis_pass.run()
@@ -533,13 +534,19 @@ class DistributedPass(object):
         stencil_accesses, neighborhood = get_stencil_accesses(
             parfor, self.typemap)
 
+        # Thread and 1D parfors turn to gufunc in multithread mode
+        if (hpat.multithread_mode
+                and self._dist_analysis.parfor_dists[parfor.id]
+                                                        != Distribution.REP):
+            parfor.no_sequential_lowering = True
+
         if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
             # TODO: make sure loop index is not used for calculations in
             # OneD_Var parfors
             if config.DEBUG_ARRAY_OPT==1:
                 print("parfor "+str(parfor.id)+" not parallelized.")
             return [parfor]
-        #
+
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
         range_size = parfor.loop_nests[0].stop

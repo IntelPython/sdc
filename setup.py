@@ -60,7 +60,7 @@ ext_parquet = Extension(name="parquet_cpp",
 
 ext_daal_wrapper = Extension(name="daal_wrapper",
                              include_dirs = [DAALROOT+'/include'],
-                             libraries = ['daal_core', 'daal_sequential'],
+                             libraries = ['daal_core', 'daal_thread'],
                              sources=["hpat/_daal.cpp"]
                              )
 
