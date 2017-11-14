@@ -1,0 +1,13 @@
+version: '3'
+services:
+    mpi_head:
+        # image: hpatv0.1:latest
+        build: .
+        ports:
+          - "22"
+        links:
+          - mpi_node
+
+    mpi_node:
+        build: .
+        # image: hpatv0.1:latest
