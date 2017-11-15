@@ -91,8 +91,8 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
 
-        elif (isinstance(rhs, ir.Expr) and rhs.op=='getitem'
-                and (rhs.value.name,rhs.index.name) in self._parallel_accesses):
+        elif isinstance(rhs, ir.Expr) and rhs.op=='getitem':
+            self._analyze_getitem(inst, lhs, rhs, array_dists)
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='T'
                     and self._isarray(lhs)):
@@ -277,6 +277,19 @@ class DistributedAnalysis(object):
             dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
 
+    def _analyze_getitem(self, inst, lhs, rhs, array_dists):
+        if (rhs.value.name, rhs.index.name) in self._parallel_accesses:
+            return
+        # array selection with boolean index
+        if (is_array(rhs.index.name, self.typemap)
+                    and self.typemap[rhs.index.name].dtype==types.boolean):
+            # input array and bool index have the same distribution
+            new_dist = self._meet_array_dists(rhs.index.name, rhs.value.name, array_dists)
+            array_dists[lhs] = Distribution(min(Distribution.OneD_Var.value, new_dist.value))
+            return
+        self._set_REP(inst.list_vars(), array_dists)
+        return
+
     def _meet_array_dists(self, arr1, arr2, array_dists, top_dist=None):
         if top_dist is None:
             top_dist = Distribution.OneD
@@ -290,6 +303,7 @@ class DistributedAnalysis(object):
         new_dist = Distribution(min(new_dist.value, top_dist.value))
         array_dists[arr1] = new_dist
         array_dists[arr2] = new_dist
+        return new_dist
 
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
