@@ -94,6 +94,10 @@ class DistributedAnalysis(object):
         elif isinstance(rhs, ir.Expr) and rhs.op=='getitem':
             self._analyze_getitem(inst, lhs, rhs, array_dists)
             return
+        elif isinstance(rhs, ir.Expr) and rhs.op == 'build_tuple':
+            # parallel arrays can be packed and unpacked from tuples
+            # e.g. boolean array index in test_getitem_multidim
+            return
         elif (isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='T'
                     and self._isarray(lhs)):
             # array and its transpose have same distributions
@@ -280,11 +284,20 @@ class DistributedAnalysis(object):
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
         if (rhs.value.name, rhs.index.name) in self._parallel_accesses:
             return
+        index_var = rhs.index.name
+        # in multi-dimensional case, we only consider first dimension
+        # TODO: extend to 2D distribution
+        if index_var in self._tuple_table:
+            inds = self._tuple_table[index_var]
+            index_var = inds[0].name
+            # rest of indices should be replicated if array
+            self._set_REP(inds[1:], array_dists)
+
         # array selection with boolean index
-        if (is_array(rhs.index.name, self.typemap)
-                    and self.typemap[rhs.index.name].dtype==types.boolean):
+        if (is_array(index_var, self.typemap)
+                    and self.typemap[index_var].dtype==types.boolean):
             # input array and bool index have the same distribution
-            new_dist = self._meet_array_dists(rhs.index.name, rhs.value.name, array_dists)
+            new_dist = self._meet_array_dists(index_var, rhs.value.name, array_dists)
             array_dists[lhs] = Distribution(min(Distribution.OneD_Var.value, new_dist.value))
             return
         self._set_REP(inst.list_vars(), array_dists)

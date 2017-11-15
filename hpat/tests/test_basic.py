@@ -21,5 +21,18 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_getitem_multidim(self):
+        def test_impl(N):
+            A = np.ones((N, 3))
+            B = np.ones(N) > .5
+            C = A[B, 2]
+            return C.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 if __name__ == "__main__":
     unittest.main()
