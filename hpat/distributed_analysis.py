@@ -309,7 +309,7 @@ class DistributedAnalysis(object):
 
 
 def is_array(varname, typemap):
-    return True
+    #return True
     return (varname in typemap
         and isinstance(typemap[varname], numba.types.npytypes.Array))
 
