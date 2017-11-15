@@ -27,7 +27,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-from hpat.utils import get_definitions
+from hpat.utils import get_definitions, is_alloc_call
 
 distributed_run_extensions = {}
 
@@ -295,7 +295,7 @@ class DistributedPass(object):
             assign.value = self._array_sizes[arr][0]
 
         # divide 1D alloc
-        if self._is_1D_arr(lhs) and self._is_alloc_call(func_var):
+        if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
             size_var = rhs.args[0]
             if self.typemap[size_var.name]==types.intp:
                 self._array_sizes[lhs] = [size_var]
@@ -1112,7 +1112,8 @@ class DistributedPass(object):
     def _is_alloc_call(self, func_var):
         if func_var not in self._call_table:
             return False
-        return self._call_table[func_var]==['empty', np]
+        return self._call_table[func_var] in [['empty', np],
+                                        [numba.unsafe.ndarray.empty_inferred]]
 
     def _is_h5_read_write_call(self, func_var):
         if func_var not in self._call_table:

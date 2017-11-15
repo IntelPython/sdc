@@ -10,7 +10,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
-from hpat.utils import get_definitions
+from hpat.utils import get_definitions, is_alloc_call
 
 from enum import Enum
 class Distribution(Enum):
@@ -168,7 +168,7 @@ class DistributedAnalysis(object):
 
         call_list = self._call_table[func_var]
 
-        if self._is_call(func_var, ['empty', np]):
+        if is_alloc_call(func_var, self._call_table):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return

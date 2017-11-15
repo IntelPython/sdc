@@ -5,6 +5,7 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 import collections
+import numpy as np
 
 # sentinel value representing non-constant values
 class NotConstant:
@@ -31,6 +32,11 @@ def get_definitions(blocks):
             if isinstance(inst, ir.Assign):
                 definitions[inst.target.name].append(inst.value)
     return definitions
+
+def is_alloc_call(func_var, call_table):
+    assert func_var in call_table
+    return call_table[func_var] in [['empty', np],
+                                    [numba.unsafe.ndarray.empty_inferred]]
 
 def cprint(*s):
     print(*s)
