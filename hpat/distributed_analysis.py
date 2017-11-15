@@ -102,7 +102,8 @@ class DistributedAnalysis(object):
             # keep lhs in table for dot() handling
             self._T_arrs.add(lhs)
             return
-        elif isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='shape':
+        elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
+                and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype']):
             pass # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op=='call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
@@ -174,6 +175,10 @@ class DistributedAnalysis(object):
             return
 
         if self._is_call(func_var, [len]):
+            return
+
+        if self._is_call(func_var, ['ravel', np]):
+            self._meet_array_dists(lhs, args[0].name, array_dists)
             return
 
         if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
