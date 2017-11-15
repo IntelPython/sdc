@@ -388,8 +388,10 @@ class DistributedPass(object):
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
-                    'zeros_like', 'ones_like', 'full_like', 'copy']
+                    'zeros_like', 'ones_like', 'full_like', 'copy', 'ravel']
                 and not self._is_REP(rhs.args[0].name)):
+            if call_list[0] == 'ravel':
+                assert self.typemap[rhs.args[0].name].ndim == 1, "only 1D ravel supported"
             in_arr = rhs.args[0].name
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]
