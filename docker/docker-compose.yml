@@ -1,13 +1,38 @@
 version: '3'
+
+networks:
+  mynet:
+    driver: overlay
+
 services:
-    mpi_head:
+    mpi_node1:
         # image: hpatv0.1:latest
         build: .
         ports:
           - "22"
-        links:
-          - mpi_node
+        networks:
+          - mynet
 
-    mpi_node:
+    mpi_node2:
         build: .
+        ports:
+          - "22"
         # image: hpatv0.1:latest
+        networks:
+          - mynet
+
+    mpi_node3:
+        build: .
+        ports:
+          - "22"
+        # image: hpatv0.1:latest
+        networks:
+          - mynet
+
+    mpi_node4:
+        build: .
+        ports:
+          - "22"
+        # image: hpatv0.1:latest
+        networks:
+          - mynet
