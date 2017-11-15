@@ -95,7 +95,7 @@ class HiFramesTyped(object):
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
-            func_text += '  for i in numba.parfor.prange(l):\n'
+            func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
                                                                     arg2_access)
             loc_vars = {}
@@ -232,7 +232,7 @@ class HiFramesTyped(object):
 
 # float columns can have regular np.nan
 def _column_filter_impl_float(A, B, ind):
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         s = 0
         if ind[i]:
             s = B[i]
@@ -241,7 +241,7 @@ def _column_filter_impl_float(A, B, ind):
         A[i] = s
 
 def _column_fillna_impl(A, B, fill):
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
         if np.isnan(s):
             s = fill
@@ -250,7 +250,7 @@ def _column_fillna_impl(A, B, fill):
 def _column_sum_impl(A):
     count = 0
     s = 0
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
         if not np.isnan(val):
             s += val
@@ -262,7 +262,7 @@ def _column_sum_impl(A):
 def _column_mean_impl(A):
     count = 0
     s = 0
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
         if not np.isnan(val):
             s += val
@@ -277,7 +277,7 @@ def _column_mean_impl(A):
 def _column_var_impl(A):
     count_m = 0
     m = 0
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
         if not np.isnan(val):
             m += val
@@ -288,7 +288,7 @@ def _column_var_impl(A):
         m = m/count_m
     s = 0
     count = 0
-    for i in numba.parfor.prange(len(A)):
+    for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
         if not np.isnan(val):
             s += (val-m)**2

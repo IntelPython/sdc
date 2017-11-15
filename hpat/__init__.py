@@ -17,5 +17,12 @@ def jit(signature_or_function=None, **options):
     # set nopython by default
     if 'nopython' not in options:
         options['nopython'] = True
-    options['parallel'] = True
+    #options['parallel'] = True
+    options['parallel'] =  { 'comprehension': True,
+     'setitem':       False,  # FIXME: support parallel setitem
+     'reduction':     True,
+     'numpy':         True,
+     'stencil':       True,
+     'fusion':        True,
+    }
     return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)

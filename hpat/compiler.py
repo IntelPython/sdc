@@ -63,7 +63,7 @@ def stage_inline_pass(pipeline):
 
 def stage_repeat_inline_closure(pipeline):
     assert pipeline.func_ir
-    inline_pass = InlineClosureCallPass(pipeline.func_ir, pipeline.flags)
+    inline_pass = InlineClosureCallPass(pipeline.func_ir, pipeline.flags.auto_parallel)
     inline_pass.run()
     post_proc = postproc.PostProcessor(pipeline.func_ir)
     post_proc.run()
