@@ -542,12 +542,15 @@ class DistributedPass(object):
                                                         != Distribution.REP):
             parfor.no_sequential_lowering = True
 
-        if self._dist_analysis.parfor_dists[parfor.id]!=Distribution.OneD:
+        if self._dist_analysis.parfor_dists[parfor.id] != Distribution.OneD:
+            out = [parfor]
             # TODO: make sure loop index is not used for calculations in
             # OneD_Var parfors
+            if self._dist_analysis.parfor_dists[parfor.id] == Distribution.OneD_Var:
+                out += self._gen_parfor_reductions(parfor, namevar_table)
             if config.DEBUG_ARRAY_OPT==1:
                 print("parfor "+str(parfor.id)+" not parallelized.")
-            return [parfor]
+            return out
 
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
@@ -591,6 +594,13 @@ class DistributedPass(object):
         else:
             out.append(parfor)
 
+        out += self._gen_parfor_reductions(parfor, namevar_table)
+        return out
+
+    def _gen_parfor_reductions(self, parfor, namevar_table):
+        scope = parfor.init_block.scope
+        loc = parfor.init_block.loc
+        out = []
         _, reductions = get_parfor_reductions(parfor, parfor.params, self.calltypes)
 
         for reduce_varname, (init_val, reduce_nodes) in reductions.items():
@@ -622,7 +632,6 @@ class DistributedPass(object):
                     self.typingctx, [self.typemap[reduce_varname]], {})
                 reduce_assign = ir.Assign(reduce_call, reduce_var, loc)
                 out.append(reduce_assign)
-
         return out
 
     def _run_parfor_stencil(self, parfor, out, start_var, end_var,
