@@ -1,6 +1,7 @@
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import guard, get_definition
+from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
@@ -25,12 +26,17 @@ def get_constant(func_ir, var, default=NOT_CONSTANT):
     return default
 
 
-def get_definitions(blocks):
-    definitions = collections.defaultdict(list)
+def get_definitions(blocks, definitions=None):
+    if definitions is None:
+        definitions = collections.defaultdict(list)
     for block in blocks.values():
         for inst in block.body:
             if isinstance(inst, ir.Assign):
                 definitions[inst.target.name].append(inst.value)
+            if isinstance(inst, numba.parfor.Parfor):
+                parfor_blocks = wrap_parfor_blocks(inst)
+                get_definitions(parfor_blocks, definitions)
+                unwrap_parfor_blocks(inst)
     return definitions
 
 def is_alloc_call(func_var, call_table):
