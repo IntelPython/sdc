@@ -488,8 +488,10 @@ class DistributedPass(object):
         if self._is_1D_arr(arr.name) and (arr.name, index_var.name) in self._parallel_accesses:
             scope = index_var.scope
             loc = index_var.loc
-            ndims = self._get_arr_ndim(arr.name)
-            if ndims==1:
+            #ndims = self._get_arr_ndim(arr.name)
+            #if ndims==1:
+            # multi-dimensional array could be indexed with 1D index
+            if self.typemap[index_var.name] == types.intp:
                 sub_nodes = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
                 out = sub_nodes
                 node.index = sub_nodes[-1].target
