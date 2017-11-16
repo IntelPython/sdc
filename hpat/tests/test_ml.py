@@ -1,10 +1,13 @@
 import unittest
 import pandas as pd
 import numpy as np
+from math import sqrt
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                            count_parfor_OneDs, count_array_OneDs,
+                            count_parfor_OneD_Vars, count_array_OneD_Vars,
+                            dist_IR_contains)
 
 
 class TestML(unittest.TestCase):
@@ -85,6 +88,29 @@ class TestML(unittest.TestCase):
         np.testing.assert_approx_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 2)
+
+    def test_kmeans(self):
+        def test_impl(numCenter, numIter, N, D):
+            A = np.ones((N, D))
+            centroids = np.zeros((numCenter, D))
+
+            for l in range(numIter):
+                dist = np.array([[sqrt(np.sum((A[i,:]-centroids[j,:])**2))
+                                        for j in range(numCenter)] for i in range(N)])
+                labels = np.array([dist[i,:].argmin() for i in range(N)])
+
+                centroids = np.array([[np.sum(A[labels==i, j])/np.sum(labels==i)
+                                         for j in range(D)] for i in range(numCenter)])
+
+            return centroids
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        np.testing.assert_allclose(hpat_func(1, 1, n, 2), test_impl(1, 1, n, 2))
+        self.assertEqual(count_array_OneDs(), 4)
+        self.assertEqual(count_array_OneD_Vars(), 1)
+        self.assertEqual(count_parfor_OneDs(), 5)
+        self.assertEqual(count_parfor_OneD_Vars(), 1)
 
 if __name__ == "__main__":
     unittest.main()
