@@ -297,6 +297,7 @@ class DistributedPass(object):
         # divide 1D alloc
         if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
             size_var = rhs.args[0]
+            rhs.args = list(rhs.args)  # empty_inferred is tuple for some reason
             if self.typemap[size_var.name]==types.intp:
                 self._array_sizes[lhs] = [size_var]
                 out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
