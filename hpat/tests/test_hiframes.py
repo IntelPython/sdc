@@ -96,6 +96,26 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_OneDs(), 2)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
+    def test_column_distribution(self):
+        # make sure all column calls are distributed
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            df.A.fillna(5.0, inplace=True)
+            DF = df.A.fillna(5.0)
+            s = DF.sum()
+            m = df.A.mean()
+            v = df.A.var()
+            t = df.A.std()
+            Ac = df.A.cumsum()
+            return Ac.sum() + s + m + v + t
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(dist_IR_contains('dist_cumsum'))
+
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
