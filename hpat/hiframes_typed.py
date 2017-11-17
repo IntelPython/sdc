@@ -185,7 +185,7 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('column_sum', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_sum_impl,
-                    {'numba': numba, 'np': np}, self.typingctx,
+                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
                     (self.typemap[in_arr.name],),
                     self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
@@ -199,7 +199,7 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('mean', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_mean_impl,
-                    {'numba': numba, 'np': np}, self.typingctx,
+                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
                     (self.typemap[in_arr.name],),
                     self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
@@ -213,7 +213,7 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('var', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_var_impl,
-                    {'numba': numba, 'np': np}, self.typingctx,
+                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
                     (self.typemap[in_arr.name],),
                     self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
@@ -247,6 +247,12 @@ def _column_fillna_impl(A, B, fill):
             s = fill
         A[i] = s
 
+@numba.njit
+def _sum_handle_nan(s, count):
+    if not count:
+        s = np.nan
+    return s
+
 def _column_sum_impl(A):
     count = 0
     s = 0
@@ -255,9 +261,16 @@ def _column_sum_impl(A):
         if not np.isnan(val):
             s += val
             count += 1
+
+    res = hpat.hiframes_typed._sum_handle_nan(s, count)
+
+@numba.njit
+def _mean_handle_nan(s, count):
     if not count:
         s = np.nan
-    res = s
+    else:
+        s = s/count
+    return s
 
 def _column_mean_impl(A):
     count = 0
@@ -267,12 +280,16 @@ def _column_mean_impl(A):
         if not np.isnan(val):
             s += val
             count += 1
-    if not count:
+
+    res = hpat.hiframes_typed._mean_handle_nan(s, count)
+
+@numba.njit
+def _var_handle_nan(s, count):
+    if count <= 1:
         s = np.nan
     else:
-        s = s/count
-    res = s
-
+        s = s/(count-1)
+    return s
 
 def _column_var_impl(A):
     count_m = 0
@@ -282,10 +299,8 @@ def _column_var_impl(A):
         if not np.isnan(val):
             m += val
             count_m += 1
-    if not count_m:
-        m = np.nan
-    else:
-        m = m/count_m
+
+    m = hpat.hiframes_typed._mean_handle_nan(m, count_m)
     s = 0
     count = 0
     for i in numba.parfor.internal_prange(len(A)):
@@ -293,8 +308,5 @@ def _column_var_impl(A):
         if not np.isnan(val):
             s += (val-m)**2
             count += 1
-    if count <= 1:
-        s = np.nan
-    else:
-        s = s/(count-1)
-    res = s
+
+    res = hpat.hiframes_typed._var_handle_nan(s, count)
