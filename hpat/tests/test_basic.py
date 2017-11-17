@@ -34,5 +34,17 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_assert(self):
+        # make sure assert in an inlined function works
+        def g(a):
+            assert a==0
+
+        hpat_g = hpat.jit(g)
+        def f():
+            hpat_g(0)
+
+        hpat_f = hpat.jit(f)
+        hpat_f()
+
 if __name__ == "__main__":
     unittest.main()
