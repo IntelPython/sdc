@@ -24,6 +24,10 @@ LARGE_WIN_SIZE = 10
 def remove_hiframes(rhs, lives, call_list):
     if call_list == ['fix_df_array', 'hiframes_api', hpat]:
         return True
+    if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
+            call_list[0]
+                in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
+        return True
     return False
 
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
