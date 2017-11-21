@@ -2,6 +2,7 @@ from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 import numba.targets.arrayobj
+from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
@@ -76,15 +77,20 @@ def dist_get_portion(context, builder, sig, args):
 @lower_builtin(distributed_api.dist_reduce, types.int32, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.float32, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.float64, types.int32)
+@lower_builtin(distributed_api.dist_reduce, IndexValueType, types.int32)
 def lower_dist_reduce(context, builder, sig, args):
     val_typ = args[0].type
     op_typ = args[1].type
+
+    target_typ = sig.args[0]
+    if isinstance(target_typ, IndexValueType):
+        target_typ = target_typ.val_typ
 
     in_ptr = cgutils.alloca_once(builder, val_typ)
     out_ptr = cgutils.alloca_once(builder, val_typ)
     builder.store(args[0], in_ptr)
 
-    typ_enum = _h5_typ_table[sig.args[0]]
+    typ_enum = _h5_typ_table[target_typ]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32),
                                                                     typ_enum))
 
@@ -93,6 +99,7 @@ def lower_dist_reduce(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
     builder.call(fn, [in_ptr, out_ptr, args[1], builder.load(typ_arg)])
     return builder.load(out_ptr)
+
 
 @lower_builtin(distributed_api.dist_reduce, types.npytypes.Array, types.int32)
 def lower_dist_arr_reduce(context, builder, sig, args):

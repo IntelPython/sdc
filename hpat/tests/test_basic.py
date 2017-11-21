@@ -49,8 +49,11 @@ class TestBasic(unittest.TestCase):
 
     def test_reduce(self):
         dtypes = ['float32', 'float64', 'int32', 'int64']
-        funcs = ['sum', 'prod', 'min', 'max']
+        funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
         for (dtype, func) in itertools.product(dtypes, funcs):
+            # loc allreduce doesn't support int64
+            if dtype=='int64' and func in ['argmin', 'argmax']:
+                continue
             func_text = """def f(n):
                 A = np.ones(n, dtype=np.{})
                 return A.{}()
