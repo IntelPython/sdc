@@ -254,6 +254,7 @@ def _sum_handle_nan(s, count):
     return s
 
 def _column_sum_impl(A):
+    numba.parfor.init_prange()
     count = 0
     s = 0
     for i in numba.parfor.internal_prange(len(A)):
@@ -273,6 +274,7 @@ def _mean_handle_nan(s, count):
     return s
 
 def _column_mean_impl(A):
+    numba.parfor.init_prange()
     count = 0
     s = 0
     for i in numba.parfor.internal_prange(len(A)):
