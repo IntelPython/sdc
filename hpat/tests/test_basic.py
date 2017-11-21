@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
 import numpy as np
+import itertools
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -45,6 +46,24 @@ class TestBasic(unittest.TestCase):
 
         hpat_f = hpat.jit(f)
         hpat_f()
+
+    def test_reduce(self):
+        dtypes = ['float32', 'float64', 'int32', 'int64']
+        funcs = ['sum', 'prod', 'min', 'max']
+        for (dtype, func) in itertools.product(dtypes, funcs):
+            func_text = """def f(n):
+                A = np.ones(n, dtype=np.{})
+                return A.{}()
+            """.format(dtype, func)
+            loc_vars = {}
+            exec(func_text, {'np': np}, loc_vars)
+            test_impl = loc_vars['f']
+
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_REPs(), 0)
+            self.assertEqual(count_parfor_REPs(), 0)
 
 if __name__ == "__main__":
     unittest.main()
