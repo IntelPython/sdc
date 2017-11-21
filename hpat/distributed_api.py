@@ -3,6 +3,15 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 import time
 
+from enum import Enum
+class Reduce_Type(Enum):
+    Sum = 0
+    Prod = 1
+    Min = 2
+    Max = 3
+    Argmin = 4
+    Argmax = 5
+
 def get_rank():
     """dummy function for C mpi get_rank"""
     return 0
@@ -100,7 +109,7 @@ class DistPortion(AbstractTemplate):
 class DistReduce(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==1
+        assert len(args) == 2  # value and reduce_op
         return signature(args[0], *args)
 
 @infer_global(dist_exscan)
@@ -114,7 +123,7 @@ class DistExscan(AbstractTemplate):
 class DistArrReduce(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==1
+        assert len(args) == 2  # value and reduce_op
         return signature(types.int32, *args)
 
 @infer_global(time.time)

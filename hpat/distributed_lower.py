@@ -17,10 +17,7 @@ ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
 ll.add_symbol('hpat_get_time', hdist.hpat_get_time)
 ll.add_symbol('hpat_barrier', hdist.hpat_barrier)
-ll.add_symbol('hpat_dist_reduce_i4', hdist.hpat_dist_reduce_i4)
-ll.add_symbol('hpat_dist_reduce_i8', hdist.hpat_dist_reduce_i8)
-ll.add_symbol('hpat_dist_reduce_f4', hdist.hpat_dist_reduce_f4)
-ll.add_symbol('hpat_dist_reduce_f8', hdist.hpat_dist_reduce_f8)
+ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
 ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
 ll.add_symbol('hpat_dist_exscan_i4', hdist.hpat_dist_exscan_i4)
 ll.add_symbol('hpat_dist_exscan_i8', hdist.hpat_dist_exscan_i8)
@@ -75,20 +72,33 @@ def dist_get_portion(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_node_portion")
     return builder.call(fn, [args[0], args[1], args[2]])
 
-@lower_builtin(distributed_api.dist_reduce, types.int64)
-@lower_builtin(distributed_api.dist_reduce, types.int32)
-@lower_builtin(distributed_api.dist_reduce, types.float32)
-@lower_builtin(distributed_api.dist_reduce, types.float64)
+@lower_builtin(distributed_api.dist_reduce, types.int64, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.int32, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.float32, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.float64, types.int32)
 def lower_dist_reduce(context, builder, sig, args):
-    ltyp = args[0].type
-    fnty = lir.FunctionType(ltyp, [ltyp])
-    typ_map = {types.int32:"i4", types.int64:"i8", types.float32:"f4", types.float64:"f8"}
-    typ_str = typ_map[sig.args[0]]
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce_{}".format(typ_str))
-    return builder.call(fn, [args[0]])
+    val_typ = args[0].type
+    op_typ = args[1].type
 
-@lower_builtin(distributed_api.dist_arr_reduce, types.npytypes.Array)
+    in_ptr = cgutils.alloca_once(builder, val_typ)
+    out_ptr = cgutils.alloca_once(builder, val_typ)
+    builder.store(args[0], in_ptr)
+
+    typ_enum = _h5_typ_table[sig.args[0]]
+    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32),
+                                                                    typ_enum))
+
+    fnty = lir.FunctionType(lir.VoidType(), [val_typ.as_pointer(),
+                                    val_typ.as_pointer(), op_typ, lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
+    builder.call(fn, [in_ptr, out_ptr, args[1], builder.load(typ_arg)])
+    return builder.load(out_ptr)
+
+@lower_builtin(distributed_api.dist_reduce, types.npytypes.Array, types.int32)
 def lower_dist_arr_reduce(context, builder, sig, args):
+
+    op_typ = args[1].type
+
     # store an int to specify data type
     typ_enum = _h5_typ_table[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
@@ -102,14 +112,15 @@ def lower_dist_arr_reduce(context, builder, sig, args):
 
     ndim_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), sig.args[0].ndim))
     call_args = [builder.bitcast(out.data, lir.IntType(8).as_pointer()),
-                size_arg, builder.load(ndim_arg), builder.load(typ_arg)]
+                size_arg, builder.load(ndim_arg), args[1], builder.load(typ_arg)]
 
     # array, shape, ndim, extra last arg type for type enum
     arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64).as_pointer(),
-        lir.IntType(32), lir.IntType(32)]
+        lir.IntType(32), op_typ, lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_arr_reduce")
-    return builder.call(fn, call_args)
+    builder.call(fn, call_args)
+    return out._value()
 
 @lower_builtin(time.time)
 def dist_get_time(context, builder, sig, args):

@@ -283,6 +283,7 @@ class DistributedAnalysis(object):
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
         if (rhs.value.name, rhs.index.name) in self._parallel_accesses:
+            #self._set_REP([inst.target], array_dists)
             return
         index_var = rhs.index.name
         # in multi-dimensional case, we only consider first dimension
