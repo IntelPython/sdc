@@ -2,6 +2,7 @@ from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 import numba.targets.arrayobj
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
@@ -127,7 +128,8 @@ def lower_dist_arr_reduce(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_arr_reduce")
     builder.call(fn, call_args)
-    return out._value()
+    res = out._getvalue()
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 @lower_builtin(time.time)
 def dist_get_time(context, builder, sig, args):
