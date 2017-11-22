@@ -93,15 +93,20 @@ def lower_dist_reduce(context, builder, sig, args):
     in_ptr = cgutils.alloca_once(builder, val_typ)
     out_ptr = cgutils.alloca_once(builder, val_typ)
     builder.store(args[0], in_ptr)
+    # cast to char *
+    in_ptr = builder.bitcast(in_ptr, lir.IntType(8).as_pointer())
+    out_ptr = builder.bitcast(out_ptr, lir.IntType(8).as_pointer())
 
     typ_enum = _h5_typ_table[target_typ]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32),
                                                                     typ_enum))
 
-    fnty = lir.FunctionType(lir.VoidType(), [val_typ.as_pointer(),
-                                    val_typ.as_pointer(), op_typ, lir.IntType(32)])
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
+                        lir.IntType(8).as_pointer(), op_typ, lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
     builder.call(fn, [in_ptr, out_ptr, args[1], builder.load(typ_arg)])
+    # cast back to value type
+    out_ptr = builder.bitcast(out_ptr, val_typ.as_pointer())
     return builder.load(out_ptr)
 
 
