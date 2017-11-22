@@ -91,7 +91,7 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
 
-        elif isinstance(rhs, ir.Expr) and rhs.op=='getitem':
+        elif isinstance(rhs, ir.Expr) and rhs.op in ['getitem', 'static_getitem']:
             self._analyze_getitem(inst, lhs, rhs, array_dists)
             return
         elif isinstance(rhs, ir.Expr) and rhs.op == 'build_tuple':
@@ -282,10 +282,18 @@ class DistributedAnalysis(object):
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
-        if (rhs.value.name, rhs.index.name) in self._parallel_accesses:
+        if rhs.op == 'static_getitem':
+            if rhs.index_var is None:
+                return
+            index_var = rhs.index_var.name
+        else:
+            assert rhs.op == 'getitem'
+            index_var = rhs.index.name
+
+        if (rhs.value.name, index_var) in self._parallel_accesses:
             #self._set_REP([inst.target], array_dists)
             return
-        index_var = rhs.index.name
+
         # in multi-dimensional case, we only consider first dimension
         # TODO: extend to 2D distribution
         if index_var in self._tuple_table:
