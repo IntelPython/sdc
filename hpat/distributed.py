@@ -438,29 +438,9 @@ class DistributedPass(object):
             # reduction across dataset
             if self._is_1D_arr(arg0) and self._is_1D_arr(arg1):
                 dprint("run dot dist reduce:", arg0, arg1)
-                reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
-                reduce_func_name = "dist_arr_reduce"
-                reduce_func = distributed_api.dist_arr_reduce
-                # output of vector dot() is scalar
-                if ndim0==1 and ndim1==1:
-                    reduce_func_name = "dist_reduce"
-                    reduce_func = distributed_api.dist_reduce
-                reduce_attr_call = ir.Expr.getattr(self._g_dist_var, reduce_func_name, loc)
-                self.typemap[reduce_attr_var.name] = get_global_func_typ(
-                                                                    reduce_func)
-                reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
-                out.append(reduce_assign)
-                err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
-                self.typemap[err_var.name] = types.int32
-                # scalar reduce is not updated inplace
-                if ndim0==1 and ndim1==1:
-                    err_var = assign.target
+                reduce_op = Reduce_Type.Sum
                 reduce_var = assign.target
-                reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var], (), loc)
-                self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-                    self.typingctx, [self.typemap[reduce_var.name]], {})
-                reduce_assign = ir.Assign(reduce_call, err_var, loc)
-                out.append(reduce_assign)
+                out += self._gen_reduce(reduce_var, reduce_op, scope, loc)
 
             # assign starts/counts/sizes data structures for output array
             if ndim0==2 and ndim1==1 and not t0 and self._is_1D_arr(arg0):
@@ -610,54 +590,10 @@ class DistributedPass(object):
 
         for reduce_varname, (init_val, reduce_nodes) in reductions.items():
             reduce_op = guard(self._get_reduce_op, reduce_nodes)
-            # TODO: argmin/argmax
+            # TODO: initialize reduction vars (arrays)
             reduce_var = namevar_table[reduce_varname]
-            op_var = ir.Var(scope, mk_unique_var("$reduce_op"), loc)
-            self.typemap[op_var.name] = types.int32
-            op_assign = ir.Assign(ir.Const(reduce_op.value, loc), op_var, loc)
+            out += self._gen_reduce(reduce_var, reduce_op, scope, loc)
 
-            def f(val, op):
-                hpat.distributed_api.dist_reduce(val, op)
-
-            f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                (self.typemap[reduce_varname], types.int32),
-                                        self.typemap, self.calltypes)
-            _, block = f_ir.blocks.popitem()
-
-            replace_arg_nodes(block, [reduce_var, op_var])
-            dist_reduce_nodes = [op_assign] + block.body[:-3]
-            dist_reduce_nodes[-1].target = reduce_var
-            out += dist_reduce_nodes
-            # import pdb; pdb.set_trace()
-            #
-            # if self._isarray(reduce_varname):
-            #     reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
-            #     reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_arr_reduce", loc)
-            #     self.typemap[reduce_attr_var.name] = get_global_func_typ(
-            #                                     distributed_api.dist_arr_reduce)
-            #     reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
-            #     out.append(reduce_assign)
-            #     reduce_var = namevar_table[reduce_varname]
-            #     reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var, reduce_op], (), loc)
-            #     self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-            #         self.typingctx, [self.typemap[reduce_varname]], {})
-            #     err_var = ir.Var(scope, mk_unique_var("$reduce_err_var"), loc)
-            #     self.typemap[err_var.name] = types.int32
-            #     reduce_assign = ir.Assign(reduce_call, err_var, loc)
-            #     out.append(reduce_assign)
-            # else:
-            #     reduce_attr_var = ir.Var(scope, mk_unique_var("$reduce_attr"), loc)
-            #     reduce_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_reduce", loc)
-            #     self.typemap[reduce_attr_var.name] = get_global_func_typ(
-            #                                             distributed_api.dist_reduce)
-            #     reduce_assign = ir.Assign(reduce_attr_call, reduce_attr_var, loc)
-            #     out.append(reduce_assign)
-            #     reduce_var = namevar_table[reduce_varname]
-            #     reduce_call = ir.Expr.call(reduce_attr_var, [reduce_var, reduce_op], (), loc)
-            #     self.calltypes[reduce_call] = self.typemap[reduce_attr_var.name].get_call_type(
-            #         self.typingctx, [self.typemap[reduce_varname]], {})
-            #     reduce_assign = ir.Assign(reduce_call, reduce_var, loc)
-            #     out.append(reduce_assign)
         return out
 
     def _run_parfor_stencil(self, parfor, out, start_var, end_var,
@@ -1126,6 +1062,24 @@ class DistributedPass(object):
                         self.typemap, self.calltypes).blocks
         block = f_blocks[min(f_blocks.keys())]
         return block.body[:-2]  # remove return
+
+    def _gen_reduce(self, reduce_var, reduce_op, scope, loc):
+        op_var = ir.Var(scope, mk_unique_var("$reduce_op"), loc)
+        self.typemap[op_var.name] = types.int32
+        op_assign = ir.Assign(ir.Const(reduce_op.value, loc), op_var, loc)
+
+        def f(val, op):
+            hpat.distributed_api.dist_reduce(val, op)
+
+        f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                            (self.typemap[reduce_var.name], types.int32),
+                                    self.typemap, self.calltypes)
+        _, block = f_ir.blocks.popitem()
+
+        replace_arg_nodes(block, [reduce_var, op_var])
+        dist_reduce_nodes = [op_assign] + block.body[:-3]
+        dist_reduce_nodes[-1].target = reduce_var
+        return dist_reduce_nodes
 
     def _get_reduce_op(self, reduce_nodes):
         require(len(reduce_nodes) == 2)
