@@ -16,7 +16,7 @@ MPI_Datatype get_MPI_typ(int typ_enum);
 MPI_Datatype get_val_rank_MPI_typ(int typ_enum);
 MPI_Op get_MPI_op(int op_enum);
 int get_elem_size(int type_enum);
-void hpat_dist_reduce(void *in_ptr, void *out_ptr, int op, int type_enum);
+void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op, int type_enum);
 
 int hpat_dist_exscan_i4(int value);
 int64_t hpat_dist_exscan_i8(int64_t value);
@@ -152,7 +152,7 @@ int hpat_barrier()
     return 0;
 }
 
-void hpat_dist_reduce(void *in_ptr, void *out_ptr, int op_enum, int type_enum)
+void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op_enum, int type_enum)
 {
     // printf("reduce value: %d\n", value);
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
@@ -177,10 +177,10 @@ void hpat_dist_reduce(void *in_ptr, void *out_ptr, int op_enum, int type_enum)
         //     *(int64_t*)in_ptr, *(double*)(in_ptr+sizeof(int64_t)), value_size);
 
         // format: value + int (input format is int64+value)
-        void *in_val_rank = malloc(value_size+sizeof(int));
-        void *out_val_rank = malloc(value_size+sizeof(int));
+        char *in_val_rank = (char*) malloc(value_size+sizeof(int));
+        char *out_val_rank = (char*) malloc(value_size+sizeof(int));
 
-        void *in_val_ptr = in_ptr + sizeof(int64_t);
+        char *in_val_ptr = in_ptr + sizeof(int64_t);
         memcpy(in_val_rank, in_val_ptr, value_size);
         memcpy(in_val_rank+value_size, &rank, sizeof(int));
         // TODO: support int64_int value
@@ -190,6 +190,8 @@ void hpat_dist_reduce(void *in_ptr, void *out_ptr, int op_enum, int type_enum)
         int target_rank = *((int*)(out_val_rank+value_size));
         // printf("rank:%d allreduce rank:%d val:%lf\n", rank, target_rank, *(double*)out_val_rank);
         MPI_Bcast(out_ptr, value_size+sizeof(int64_t), MPI_BYTE, target_rank, MPI_COMM_WORLD);
+        free(in_val_rank);
+        free(out_val_rank);
         return;
     }
 
