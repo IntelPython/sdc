@@ -68,5 +68,19 @@ class TestBasic(unittest.TestCase):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_array_reduce(self):
+        def test_impl(N):
+            A = np.ones(3);
+            B = np.ones(3);
+            for i in numba.prange(N):
+                A += B
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_OneDs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 1)
+
 if __name__ == "__main__":
     unittest.main()
