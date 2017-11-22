@@ -86,6 +86,9 @@ def lower_dist_reduce(context, builder, sig, args):
     target_typ = sig.args[0]
     if isinstance(target_typ, IndexValueType):
         target_typ = target_typ.val_typ
+        if target_typ not in [types.int32, types.float32, types.float64]:
+            raise TypeError("argmin/argmax not supported for type {}".format(
+                                                                    target_typ))
 
     in_ptr = cgutils.alloca_once(builder, val_typ)
     out_ptr = cgutils.alloca_once(builder, val_typ)
