@@ -280,3 +280,18 @@ def dist_setitem_array(context, builder, sig, args):
     numba.targets.arrayobj.setitem_array(context, builder, sig, args)
     cgutils.get_item_pointer2 = regular_get_item_pointer2
     return lir.Constant(lir.IntType(32), 0)
+
+# find overlapping range of an input range (start:stop) and a chunk range
+# (chunk_start:chunk_start+chunk_count). Inputs are assumed positive.
+# output is set to empty range of local range goes out of bounds
+@numba.njit
+def _get_local_range(start, stop, chunk_start, chunk_count):
+    assert start >= 0 and stop > 0
+    new_start = max(start, chunk_start)
+    new_stop = min(stop, chunk_start + chunk_count)
+    loc_start = new_start - chunk_start
+    loc_stop = new_stop - chunk_start
+    if loc_start < 0 or loc_stop < 0:
+        loc_start = 1
+        loc_stop = 0
+    return loc_start, loc_stop

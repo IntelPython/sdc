@@ -494,26 +494,48 @@ class DistributedPass(object):
             out.append(full_node)
 
         elif self._is_1D_arr(arr.name) and isinstance(node, (ir.StaticSetItem, ir.SetItem)):
-            scope = index_var.scope
-            loc = index_var.loc
+            # scope = index_var.scope
+            # loc = index_var.loc
             start = self._array_starts[arr.name][0]
             count = self._array_counts[arr.name][0]
-            setitem_attr_var = ir.Var(scope, mk_unique_var("$setitem_attr"), loc)
-            setitem_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_setitem", loc)
-            self.typemap[setitem_attr_var.name] = get_global_func_typ(
-                                            distributed_api.dist_setitem)
-            setitem_assign = ir.Assign(setitem_attr_call, setitem_attr_var, loc)
-            out = [setitem_assign]
-            setitem_call = ir.Expr.call(setitem_attr_var,
-                                [arr, index_var, node.value, start, count], (), loc)
-            self.calltypes[setitem_call] = self.typemap[setitem_attr_var.name].get_call_type(
-                self.typingctx, [self.typemap[arr.name],
-                self.typemap[index_var.name], self.typemap[node.value.name],
-                types.intp, types.intp], {})
-            err_var = ir.Var(scope, mk_unique_var("$setitem_err_var"), loc)
-            self.typemap[err_var.name] = types.int32
-            setitem_assign = ir.Assign(setitem_call, err_var, loc)
-            out.append(setitem_assign)
+            # convert setitem with global range to setitem with local range
+            # that overlaps with the local array chunk
+            def f(A, val, start, stop, chunk_start, chunk_count):
+                loc_start, loc_stop = hpat.distributed_lower._get_local_range(
+                                        start, stop, chunk_start, chunk_count)
+                A[loc_start:loc_stop] = val
+
+            f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                (self.typemap[arr.name],
+                                self.typemap[node.value.name],
+                                types.intp, types.intp, types.intp, types.intp),
+                                        self.typemap, self.calltypes)
+            _, block = f_ir.blocks.popitem()
+            slice_call = get_definition(self.func_ir, index_var)
+            slice_start = slice_call.args[0]
+            slice_stop = slice_call.args[1]
+            replace_arg_nodes(block, [arr, node.value, slice_start, slice_stop, start, count])
+            out = block.body[:-3]
+            # print_node = ir.Print([start_var, end_var], None, loc)
+            # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
+            # out.append(print_node)
+            #
+            # setitem_attr_var = ir.Var(scope, mk_unique_var("$setitem_attr"), loc)
+            # setitem_attr_call = ir.Expr.getattr(self._g_dist_var, "dist_setitem", loc)
+            # self.typemap[setitem_attr_var.name] = get_global_func_typ(
+            #                                 distributed_api.dist_setitem)
+            # setitem_assign = ir.Assign(setitem_attr_call, setitem_attr_var, loc)
+            # out = [setitem_assign]
+            # setitem_call = ir.Expr.call(setitem_attr_var,
+            #                     [arr, index_var, node.value, start, count], (), loc)
+            # self.calltypes[setitem_call] = self.typemap[setitem_attr_var.name].get_call_type(
+            #     self.typingctx, [self.typemap[arr.name],
+            #     self.typemap[index_var.name], self.typemap[node.value.name],
+            #     types.intp, types.intp], {})
+            # err_var = ir.Var(scope, mk_unique_var("$setitem_err_var"), loc)
+            # self.typemap[err_var.name] = types.int32
+            # setitem_assign = ir.Assign(setitem_call, err_var, loc)
+            # out.append(setitem_assign)
 
         return out
 
@@ -760,21 +782,16 @@ class DistributedPass(object):
             else:
                 index_com = lambda a: a > i
 
-            halo_consts = set()
             buff_indices = set()
             for st in body:
                 stmt = copy.deepcopy(st)
-                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Const):
-                    value = stmt.value.value
-                    if isinstance(value, int) and index_com(value):
-                        halo_consts.add(stmt.target.name)
                 if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
                     expr = stmt.value
                     if (expr.op == 'binop' and expr.fn == '+'
                             and expr.lhs.name == parfor_index.name
-                            and expr.rhs.name in halo_consts):
+                            and index_com(self._get_var_const_val(expr.rhs))):
                         expr.lhs = buff_index
-                        buff_indices = stmt.target.name
+                        buff_indices.add(stmt.target.name)
                     if expr.op == 'getitem' and expr.index.name in buff_indices:
                         expr.value = halo_recv_buff
                     if st.value in self.calltypes:
@@ -782,6 +799,11 @@ class DistributedPass(object):
                 if isinstance(stmt, ir.SetItem):
                     self.calltypes[stmt] = self.calltypes[st]
                 new_body.append(stmt)
+                # if isinstance(stmt, ir.SetItem):
+                #     print_node = ir.Print([self._rank_var, stmt.target, stmt.index, stmt.value], None, loc)
+                #     self.calltypes[print_node] = signature(types.none, types.int64,
+                #         types.Array(types.float64,1,'C'), types.int64, types.float64)
+                #     new_body.append(print_node)
         return new_body
 
     def _gen_stencil_halo(self, halo_length, arr_var, out, is_left):
