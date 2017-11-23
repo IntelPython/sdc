@@ -339,7 +339,7 @@ class HiFrames(object):
         fir_globals = self.func_ir.func_id.func.__globals__
         stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func, index_offsets, fir_globals)
 
-        border_text = 'def f(A):\n  A[:{}] = np.nan\n'.format(shift_const)
+        border_text = 'def f(A):\n  A[0:{}] = np.nan\n'.format(shift_const)
         loc_vars = {}
         exec(border_text, {}, loc_vars)
         border_func = loc_vars['f']
@@ -466,16 +466,17 @@ class HiFrames(object):
 
 
         def f(A, w):
-            A[:w-1] = np.nan
+            A[0:w-1] = np.nan
         f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [out_var, win_size])
         setitem_nodes = f_block.body[:-3]  # remove none return
 
         if center:
             def f1(A, w):
-                A[:w//2] = np.nan
+                A[0:w//2] = np.nan
             def f2(A, w):
-                A[-(w//2):] = np.nan
+                n = len(A)
+                A[n-(w//2):n] = np.nan
             f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [out_var, win_size])
             setitem_nodes1 = f_block.body[:-3]  # remove none return
