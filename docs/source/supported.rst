@@ -12,13 +12,43 @@ inside the jitted functions. The supported data structures for large datasets
 are `Numpy <http://www.numpy.org/>`_ arrays and
 `Pandas <http://pandas.pydata.org/>`_ dataframes.
 
-Enabling Parallelization
-------------------------
+Automatic Parallelization
+-------------------------
 
-To enable parallelization, HPAT needs to recognize the large datasets and their
-computation in the program. Hence, only the supported data-parallel operators of
-Numpy and Pandas can be used for large datasets and computations. The sequential
-computation on small data can be any code that
+HPAT parallelizes programs automatically based on the `map-reduce` parallel
+pattern. Put simply, this means the compiler analyzes the program to
+determine whether each array should be distributed or not. This analysis uses
+the semantics of array operations as the program below demonstrates::
+
+    @hpat.jit
+    def example_1D(n):
+        f = h5py.File("data.h5", "r")
+        A = f['A'][:]
+        return np.sum(A)
+
+This program reads a one-dimensional array called `A` from file and sums its
+values. Array `A` is the output of an I/O operation and is input to `np.sum`.
+Based on semantics of I/O and `np.sum`, HPAT determines that `A` can be
+distributed. HPAT distributes `A` and all operations associated with `A`
+(i.e. I/O and `np.sum`) and generates a parallel binary.
+This binary replaces the `example_1D` function in the Python program.
+
+Arrays are distributed in one-dimensional block (`1D_Block`) manner
+among processors. This means that processors own equal chunks of each
+distributed array, except possibly the last processor. The figure below
+illustrates the distribution of a 9-element one-dimensional Numpy array on
+three processors:
+
+.. image:: ../figs/1D_dist.jpg
+    :height: 500
+    :width: 150
+    :scale: 60
+    :alt: distribution of 1D array
+    :align: center
+
+To enable parallelization, only the supported data-parallel operators of
+Numpy and Pandas can be used for distributed datasets and computations.
+The sequential computation on small data can be any code that
 `Numba supports <http://numba.pydata.org/numba-doc/latest/index.html>`_.
 
 Supported Numpy Operations
