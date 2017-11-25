@@ -7,6 +7,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 import collections
 import numpy as np
+import hpat
 
 # sentinel value representing non-constant values
 class NotConstant:
@@ -82,3 +83,25 @@ def cprint_lower(context, builder, sig, args):
         cgutils.printf(builder, "%{} ".format(format_str), val)
     cgutils.printf(builder, "\n")
     return context.get_dummy_value()
+
+from hpat.distributed_analysis import Distribution
+
+def print_dist(d):
+    if d == Distribution.REP:
+        return "REP"
+    if d == Distribution.OneD:
+        return "1D_Block"
+    if d == Distribution.OneD_Var:
+        return "1D_Block_Var"
+    if d == Distribution.Thread:
+        return "Multi-thread"
+    if d == Distribution.TwoD:
+        return "2D_Block"
+
+def distribution_report():
+    print("Array distributions:")
+    for arr, dist in hpat.distributed.dist_analysis.array_dists.items():
+        print("   {0:20} {1}".format(arr, print_dist(dist)))
+    print("\nParfor distributions:")
+    for p, dist in hpat.distributed.dist_analysis.parfor_dists.items():
+        print("   {0:<20} {1}".format(p, print_dist(dist)))

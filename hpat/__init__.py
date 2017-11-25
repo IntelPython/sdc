@@ -8,7 +8,7 @@ from hpat.distributed_api import dist_time
 from hpat.dict_ext import DictIntInt, DictInt32Int32, dict_int_int_type, dict_int32_int32_type
 from hpat.str_ext import string_type
 from numba.types import List
-from hpat.utils import cprint
+from hpat.utils import cprint, distribution_report
 
 multithread_mode = False
 
