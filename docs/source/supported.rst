@@ -35,13 +35,16 @@ This binary replaces the `example_1D` function in the Python program.
 
 Arrays are distributed in one-dimensional block (`1D_Block`) manner
 among processors. This means that processors own equal chunks of each
-distributed array, except possibly the last processor. The figure below
-illustrates the distribution of a 9-element one-dimensional Numpy array on
-three processors:
+distributed array, except possibly the last processor.
+Multi-dimensional arrays are distributed along their first dimension by default.
+For example, chunks of rows are distributed for a 2D matrix.
+The figure below
+illustrates the distribution of a 9-element one-dimensional Numpy array, as well
+as a 9 by 2 array, on three processors:
 
-.. image:: ../figs/1D_dist.jpg
+.. image:: ../figs/dist.jpg
     :height: 500
-    :width: 150
+    :width: 500
     :scale: 60
     :alt: distribution of 1D array
     :align: center

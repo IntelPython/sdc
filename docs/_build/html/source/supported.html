@@ -71,10 +71,13 @@ distributed. HPAT distributes <cite>A</cite> and all operations associated with 
 This binary replaces the <cite>example_1D</cite> function in the Python program.</p>
 <p>Arrays are distributed in one-dimensional block (<cite>1D_Block</cite>) manner
 among processors. This means that processors own equal chunks of each
-distributed array, except possibly the last processor. The figure below
-illustrates the distribution of a 9-element one-dimensional Numpy array on
-three processors:</p>
-<a class="reference internal image-reference" href="../_images/1D_dist.jpg"><img alt="distribution of 1D array" class="align-center" src="../_images/1D_dist.jpg" style="width: 90.0px; height: 300.0px;" /></a>
+distributed array, except possibly the last processor.
+Multi-dimensional arrays are distributed along their first dimension by default.
+For example, chunks of rows are distributed for a 2D matrix.
+The figure below
+illustrates the distribution of a 9-element one-dimensional Numpy array, as well
+as a 9 by 2 array, on three processors:</p>
+<a class="reference internal image-reference" href="../_images/dist.jpg"><img alt="distribution of 1D array" class="align-center" src="../_images/dist.jpg" style="width: 300.0px; height: 300.0px;" /></a>
 <p>To enable parallelization, only the supported data-parallel operators of
 Numpy and Pandas can be used for distributed datasets and computations.
 The sequential computation on small data can be any code that
