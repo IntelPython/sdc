@@ -69,6 +69,20 @@ Based on semantics of I/O and <cite>np.sum</cite>, HPAT determines that <cite>A<
 distributed. HPAT distributes <cite>A</cite> and all operations associated with <cite>A</cite>
 (i.e. I/O and <cite>np.sum</cite>) and generates a parallel binary.
 This binary replaces the <cite>example_1D</cite> function in the Python program.</p>
+<p>The distributions found by HPAT can be printed using
+<cite>hpat.distribution_report()</cite> function. The report for the above example code is
+as follows:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
+    $A.23                1D_Block
+
+Parfor distributions:
+    0                    1D_Block
+</pre></div>
+</div>
+<p>This report suggests that the program has an array that is distributed in
+1D_Block fashion. The variable name is renamed from <cite>A</cite> to <cite>$A.23</cite> through
+the optimization passes. The report also suggests that a <cite>parfor</cite>
+(data-parallel for loop) is also 1D_Block distributed.</p>
 <p>Arrays are distributed in one-dimensional block (<cite>1D_Block</cite>) manner
 among processors. This means that processors own equal chunks of each
 distributed array, except possibly the last processor.
