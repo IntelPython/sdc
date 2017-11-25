@@ -10,3 +10,4 @@ def cumsum_df(n):
 
 n = 10
 print(cumsum_df(n))
+hpat.distribution_report()
