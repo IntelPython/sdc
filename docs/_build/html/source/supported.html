@@ -43,11 +43,13 @@
             
   <div class="section" id="user-guide">
 <span id="supported"></span><h1>User Guide<a class="headerlink" href="#user-guide" title="Permalink to this headline">¶</a></h1>
-<p>HPAT supports a subset of Python that is commonly used for data analytics and
-machine learning. This section describes this subset.</p>
+<p>HPAT automatically parallelizes a subset of Python that is commonly used for
+data analytics and machine learning. This section describes this subset
+and how parallelization is performed.</p>
 <p>HPAT compiles and parallelizes the functions annotated with the <cite>&#64;hpat.jit</cite>
-decorator. Therefore, file I/O and computations on large datasets should be
-inside the jitted functions. The supported data structures for large datasets
+decorator. The decorated functions are replaced with generated parallel
+binaries that run on bare metal.
+The supported data structures for large datasets
 are <a class="reference external" href="http://www.numpy.org/">Numpy</a> arrays and
 <a class="reference external" href="http://pandas.pydata.org/">Pandas</a> dataframes.</p>
 <div class="section" id="automatic-parallelization">
@@ -66,7 +68,11 @@ the semantics of array operations as the program below demonstrates:</p>
 <p>This program reads a one-dimensional array called <cite>A</cite> from file and sums its
 values. Array <cite>A</cite> is the output of an I/O operation and is input to <cite>np.sum</cite>.
 Based on semantics of I/O and <cite>np.sum</cite>, HPAT determines that <cite>A</cite> can be
-distributed. HPAT distributes <cite>A</cite> and all operations associated with <cite>A</cite>
+distributed since I/O can output a distributed array and <cite>np.sum</cite> can
+take a distributed array as input.
+In <cite>map-reduce</cite> terminology, <cite>A</cite> is output of a <cite>map</cite> operator and is input
+to a <cite>reduce</cite> operator. Hence,
+HPAT distributes <cite>A</cite> and all operations associated with <cite>A</cite>
 (i.e. I/O and <cite>np.sum</cite>) and generates a parallel binary.
 This binary replaces the <cite>example_1D</cite> function in the Python program.</p>
 <p>HPAT can only analyze and parallelize the supported data-parallel operations of
@@ -74,23 +80,6 @@ Numpy and Pandas (listed below). Hence, only the supported operations can be
 used for distributed datasets and computations.
 The sequential computation on small data can be any code that
 <a class="reference external" href="http://numba.pydata.org/numba-doc/latest/index.html">Numba supports</a>.</p>
-<div class="section" id="distribution-report">
-<h3>Distribution Report<a class="headerlink" href="#distribution-report" title="Permalink to this headline">¶</a></h3>
-<p>The distributions found by HPAT can be printed using
-<cite>hpat.distribution_report()</cite> function. The distribution report for the above
-example code is as follows:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
-    $A.23                1D_Block
-
-Parfor distributions:
-    0                    1D_Block
-</pre></div>
-</div>
-<p>This report suggests that the function has an array that is distributed in
-1D_Block fashion. The variable name is renamed from <cite>A</cite> to <cite>$A.23</cite> through
-the optimization passes. The report also suggests that a <cite>parfor</cite>
-(data-parallel for loop) is also 1D_Block distributed.</p>
-</div>
 <div class="section" id="array-distribution">
 <h3>Array Distribution<a class="headerlink" href="#array-distribution" title="Permalink to this headline">¶</a></h3>
 <p>Arrays are distributed in one-dimensional block (<cite>1D_Block</cite>) manner
@@ -105,8 +94,25 @@ as a 9 by 2 array, on three processors:</p>
 <p>HPAT replicates the arrays that are not distributed.
 This is called <cite>REP</cite> distribution for consistency.</p>
 </div>
-<div class="section" id="dot-function">
-<h3>Dot function<a class="headerlink" href="#dot-function" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="distribution-report">
+<h3>Distribution Report<a class="headerlink" href="#distribution-report" title="Permalink to this headline">¶</a></h3>
+<p>The distributions found by HPAT can be printed using the
+<cite>hpat.distribution_report()</cite> function. The distribution report for the above
+example code is as follows:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
+    $A.23                1D_Block
+
+Parfor distributions:
+    0                    1D_Block
+</pre></div>
+</div>
+<p>This report suggests that the function has an array that is distributed in
+1D_Block fashion. The variable name is renamed from <cite>A</cite> to <cite>$A.23</cite> through
+the optimization passes. The report also suggests that there is a <cite>parfor</cite>
+(data-parallel for loop) that is 1D_Block distributed.</p>
+</div>
+<div class="section" id="numpy-dot-parallelization">
+<h3>Numpy dot() Parallelization<a class="headerlink" href="#numpy-dot-parallelization" title="Permalink to this headline">¶</a></h3>
 <p>The <cite>np.dot</cite> function has different distribution rules based on the number of
 dimensions and the distributions of its input arrays. The example below
 demonstrates two cases:</p>
@@ -136,15 +142,15 @@ Parfor distributions:
 </div>
 <p>The first <cite>dot</cite> has a 1D array with <cite>1D_Block</cite> distribution as first input
 (<cite>Y</cite>), while the second input is a 2D array with <cite>1D_Block</cite> distribution (<cite>X</cite>).
-Hence, <cite>dot</cite> is a sum reduction across distributed data and therefore,
+Hence, <cite>dot</cite> is a sum reduction across distributed datasets and therefore,
 the output (<cite>w</cite>) is on the <cite>reduce</cite> side and is assiged <cite>REP</cite> distribution.</p>
 <p>The second <cite>dot</cite> has a 2D array with <cite>1D_Block</cite> distribution (<cite>X</cite>) as first
 input, while the second input is a REP array (<cite>w</cite>). Hence, the computation is
 data-parallel across rows of <cite>X</cite>, which implies a <cite>1D_Block</cite> distibution for
 output (<cite>z</cite>).</p>
-<p>Variable <cite>z</cite> doesn’t exist in the distribution report since
-the compiler optimizations were able to remove it. Its values are generated
-and consumed on-the-fly without storing in memory.</p>
+<p>Variable <cite>z</cite> does not exist in the distribution report since
+the compiler optimizations were able to eliminate it. Its values are generated
+and consumed on-the-fly, without memory load/store overheads.</p>
 </div>
 </div>
 <div class="section" id="supported-numpy-operations">
@@ -156,58 +162,49 @@ and parallelize.</p>
 <blockquote>
 <div><ul class="simple">
 <li>Unary operators: <code class="docutils literal"><span class="pre">+</span></code> <code class="docutils literal"><span class="pre">-</span></code> <code class="docutils literal"><span class="pre">~</span></code></li>
-<li><dl class="first docutils">
-<dt>Binary operators: <code class="docutils literal"><span class="pre">+</span></code> <code class="docutils literal"><span class="pre">-</span></code> <code class="docutils literal"><span class="pre">*</span></code> <code class="docutils literal"><span class="pre">/</span></code> <code class="docutils literal"><span class="pre">/?</span></code> <code class="docutils literal"><span class="pre">%</span></code> <code class="docutils literal"><span class="pre">|</span></code> <code class="docutils literal"><span class="pre">&gt;&gt;</span></code> <code class="docutils literal"><span class="pre">^</span></code></dt>
-<dd><code class="docutils literal"><span class="pre">&lt;&lt;</span></code> <code class="docutils literal"><span class="pre">&amp;</span></code> <code class="docutils literal"><span class="pre">**</span></code> <code class="docutils literal"><span class="pre">//</span></code></dd>
-</dl>
-</li>
+<li>Binary operators: <code class="docutils literal"><span class="pre">+</span></code> <code class="docutils literal"><span class="pre">-</span></code> <code class="docutils literal"><span class="pre">*</span></code> <code class="docutils literal"><span class="pre">/</span></code> <code class="docutils literal"><span class="pre">/?</span></code> <code class="docutils literal"><span class="pre">%</span></code> <code class="docutils literal"><span class="pre">|</span></code> <code class="docutils literal"><span class="pre">&gt;&gt;</span></code> <code class="docutils literal"><span class="pre">^</span></code>
+<code class="docutils literal"><span class="pre">&lt;&lt;</span></code> <code class="docutils literal"><span class="pre">&amp;</span></code> <code class="docutils literal"><span class="pre">**</span></code> <code class="docutils literal"><span class="pre">//</span></code></li>
 <li>Comparison operators: <code class="docutils literal"><span class="pre">==</span></code> <code class="docutils literal"><span class="pre">!=</span></code> <code class="docutils literal"><span class="pre">&lt;</span></code> <code class="docutils literal"><span class="pre">&lt;=</span></code> <code class="docutils literal"><span class="pre">&gt;</span></code> <code class="docutils literal"><span class="pre">&gt;=</span></code></li>
-<li><dl class="first docutils">
-<dt>data-parallel math operations: <code class="docutils literal"><span class="pre">add</span></code>, <code class="docutils literal"><span class="pre">subtract</span></code>, <code class="docutils literal"><span class="pre">multiply</span></code>,</dt>
-<dd><code class="docutils literal"><span class="pre">divide</span></code>, <code class="docutils literal"><span class="pre">logaddexp</span></code>, <code class="docutils literal"><span class="pre">logaddexp2</span></code>, <code class="docutils literal"><span class="pre">true_divide</span></code>,
+<li>data-parallel math operations: <code class="docutils literal"><span class="pre">add</span></code>, <code class="docutils literal"><span class="pre">subtract</span></code>, <code class="docutils literal"><span class="pre">multiply</span></code>,
+<code class="docutils literal"><span class="pre">divide</span></code>, <code class="docutils literal"><span class="pre">logaddexp</span></code>, <code class="docutils literal"><span class="pre">logaddexp2</span></code>, <code class="docutils literal"><span class="pre">true_divide</span></code>,
 <code class="docutils literal"><span class="pre">floor_divide</span></code>, <code class="docutils literal"><span class="pre">negative</span></code>, <code class="docutils literal"><span class="pre">power</span></code>, <code class="docutils literal"><span class="pre">remainder</span></code>,
 <code class="docutils literal"><span class="pre">mod</span></code>, <code class="docutils literal"><span class="pre">fmod</span></code>, <code class="docutils literal"><span class="pre">abs</span></code>, <code class="docutils literal"><span class="pre">absolute</span></code>, <code class="docutils literal"><span class="pre">fabs</span></code>, <code class="docutils literal"><span class="pre">rint</span></code>, <code class="docutils literal"><span class="pre">sign</span></code>,
 <code class="docutils literal"><span class="pre">conj</span></code>, <code class="docutils literal"><span class="pre">exp</span></code>, <code class="docutils literal"><span class="pre">exp2</span></code>, <code class="docutils literal"><span class="pre">log</span></code>, <code class="docutils literal"><span class="pre">log2</span></code>, <code class="docutils literal"><span class="pre">log10</span></code>, <code class="docutils literal"><span class="pre">expm1</span></code>,
-<code class="docutils literal"><span class="pre">log1p</span></code>, <code class="docutils literal"><span class="pre">sqrt</span></code>, <code class="docutils literal"><span class="pre">square</span></code>, <code class="docutils literal"><span class="pre">reciprocal</span></code>, <code class="docutils literal"><span class="pre">conjugate</span></code></dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Trigonometric functions: <code class="docutils literal"><span class="pre">sin</span></code>, <code class="docutils literal"><span class="pre">cos</span></code>, <code class="docutils literal"><span class="pre">tan</span></code>, <code class="docutils literal"><span class="pre">arcsin</span></code>,</dt>
-<dd><code class="docutils literal"><span class="pre">arccos</span></code>, <code class="docutils literal"><span class="pre">arctan</span></code>, <code class="docutils literal"><span class="pre">arctan2</span></code>, <code class="docutils literal"><span class="pre">hypot</span></code>, <code class="docutils literal"><span class="pre">sinh</span></code>, <code class="docutils literal"><span class="pre">cosh</span></code>,
+<code class="docutils literal"><span class="pre">log1p</span></code>, <code class="docutils literal"><span class="pre">sqrt</span></code>, <code class="docutils literal"><span class="pre">square</span></code>, <code class="docutils literal"><span class="pre">reciprocal</span></code>, <code class="docutils literal"><span class="pre">conjugate</span></code></li>
+<li>Trigonometric functions: <code class="docutils literal"><span class="pre">sin</span></code>, <code class="docutils literal"><span class="pre">cos</span></code>, <code class="docutils literal"><span class="pre">tan</span></code>, <code class="docutils literal"><span class="pre">arcsin</span></code>,
+<code class="docutils literal"><span class="pre">arccos</span></code>, <code class="docutils literal"><span class="pre">arctan</span></code>, <code class="docutils literal"><span class="pre">arctan2</span></code>, <code class="docutils literal"><span class="pre">hypot</span></code>, <code class="docutils literal"><span class="pre">sinh</span></code>, <code class="docutils literal"><span class="pre">cosh</span></code>,
 <code class="docutils literal"><span class="pre">tanh</span></code>, <code class="docutils literal"><span class="pre">arcsinh</span></code>, <code class="docutils literal"><span class="pre">arccosh</span></code>, <code class="docutils literal"><span class="pre">arctanh</span></code>, <code class="docutils literal"><span class="pre">deg2rad</span></code>,
-<code class="docutils literal"><span class="pre">rad2deg</span></code>, <code class="docutils literal"><span class="pre">degrees</span></code>, <code class="docutils literal"><span class="pre">radians</span></code></dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Bit manipulation functions: <code class="docutils literal"><span class="pre">bitwise_and</span></code>, <code class="docutils literal"><span class="pre">bitwise_or</span></code>,</dt>
-<dd><code class="docutils literal"><span class="pre">bitwise_xor</span></code>, <code class="docutils literal"><span class="pre">bitwise_not</span></code>, <code class="docutils literal"><span class="pre">invert</span></code>, <code class="docutils literal"><span class="pre">left_shift</span></code>,
-<code class="docutils literal"><span class="pre">right_shift</span></code></dd>
-</dl>
-</li>
+<code class="docutils literal"><span class="pre">rad2deg</span></code>, <code class="docutils literal"><span class="pre">degrees</span></code>, <code class="docutils literal"><span class="pre">radians</span></code></li>
+<li>Bit manipulation functions: <code class="docutils literal"><span class="pre">bitwise_and</span></code>, <code class="docutils literal"><span class="pre">bitwise_or</span></code>,
+<code class="docutils literal"><span class="pre">bitwise_xor</span></code>, <code class="docutils literal"><span class="pre">bitwise_not</span></code>, <code class="docutils literal"><span class="pre">invert</span></code>, <code class="docutils literal"><span class="pre">left_shift</span></code>,
+<code class="docutils literal"><span class="pre">right_shift</span></code></li>
 </ul>
 </div></blockquote>
 </li>
-<li><p class="first">Numpy reduction functions <code class="docutils literal"><span class="pre">sum</span></code> and <code class="docutils literal"><span class="pre">prod</span></code>.</p>
+<li><p class="first">Numpy reduction functions <code class="docutils literal"><span class="pre">sum</span></code>, <code class="docutils literal"><span class="pre">prod</span></code>, <code class="docutils literal"><span class="pre">min</span></code>, <code class="docutils literal"><span class="pre">max</span></code>, <code class="docutils literal"><span class="pre">argmin</span></code>
+and <code class="docutils literal"><span class="pre">argmax</span></code>. Currently, <cite>int64</cite> data type is not supported for
+<code class="docutils literal"><span class="pre">argmin</span></code> and <code class="docutils literal"><span class="pre">argmax</span></code>.</p>
 </li>
-<li><dl class="first docutils">
-<dt>Numpy array creation functions <code class="docutils literal"><span class="pre">empty</span></code>, <code class="docutils literal"><span class="pre">zeros</span></code>, <code class="docutils literal"><span class="pre">ones</span></code>,</dt>
-<dd><p class="first last"><code class="docutils literal"><span class="pre">empty_like</span></code>, <code class="docutils literal"><span class="pre">zeros_like</span></code>, <code class="docutils literal"><span class="pre">ones_like</span></code>, <code class="docutils literal"><span class="pre">full_like</span></code>, <code class="docutils literal"><span class="pre">copy</span></code>.</p>
-</dd>
-</dl>
+<li><p class="first">Numpy array creation functions <code class="docutils literal"><span class="pre">empty</span></code>, <code class="docutils literal"><span class="pre">zeros</span></code>, <code class="docutils literal"><span class="pre">ones</span></code>,
+<code class="docutils literal"><span class="pre">empty_like</span></code>, <code class="docutils literal"><span class="pre">zeros_like</span></code>, <code class="docutils literal"><span class="pre">ones_like</span></code>, <code class="docutils literal"><span class="pre">full_like</span></code>, <code class="docutils literal"><span class="pre">copy</span></code>,
+<code class="docutils literal"><span class="pre">arange</span></code> and <code class="docutils literal"><span class="pre">linspace</span></code>.</p>
 </li>
-<li><dl class="first docutils">
-<dt>Random number generator functions: <code class="docutils literal"><span class="pre">rand</span></code>, <code class="docutils literal"><span class="pre">randn</span></code>,</dt>
-<dd><p class="first last"><code class="docutils literal"><span class="pre">ranf</span></code>, <code class="docutils literal"><span class="pre">random_sample</span></code>, <code class="docutils literal"><span class="pre">sample</span></code>, <code class="docutils literal"><span class="pre">random</span></code>,
+<li><p class="first">Random number generator functions: <code class="docutils literal"><span class="pre">rand</span></code>, <code class="docutils literal"><span class="pre">randn</span></code>,
+<code class="docutils literal"><span class="pre">ranf</span></code>, <code class="docutils literal"><span class="pre">random_sample</span></code>, <code class="docutils literal"><span class="pre">sample</span></code>, <code class="docutils literal"><span class="pre">random</span></code>,
 <code class="docutils literal"><span class="pre">standard_normal</span></code>, <code class="docutils literal"><span class="pre">chisquare</span></code>, <code class="docutils literal"><span class="pre">weibull</span></code>, <code class="docutils literal"><span class="pre">power</span></code>, <code class="docutils literal"><span class="pre">geometric</span></code>,
 <code class="docutils literal"><span class="pre">exponential</span></code>, <code class="docutils literal"><span class="pre">poisson</span></code>, <code class="docutils literal"><span class="pre">rayleigh</span></code>, <code class="docutils literal"><span class="pre">normal</span></code>, <code class="docutils literal"><span class="pre">uniform</span></code>,
 <code class="docutils literal"><span class="pre">beta</span></code>, <code class="docutils literal"><span class="pre">binomial</span></code>, <code class="docutils literal"><span class="pre">f</span></code>, <code class="docutils literal"><span class="pre">gamma</span></code>, <code class="docutils literal"><span class="pre">lognormal</span></code>, <code class="docutils literal"><span class="pre">laplace</span></code>,
 <code class="docutils literal"><span class="pre">randint</span></code>, <code class="docutils literal"><span class="pre">triangular</span></code>.</p>
-</dd>
-</dl>
 </li>
 </ol>
-<ol class="arabic simple" start="4">
-<li>Numpy <code class="docutils literal"><span class="pre">dot</span></code> function between a matrix and a vector, or two vectors.</li>
+<ol class="arabic" start="4">
+<li><p class="first">Numpy <code class="docutils literal"><span class="pre">dot</span></code> function between a matrix and a vector, or two vectors.</p>
+</li>
+<li><p class="first">Numpy array comprehensions, such as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)])</span>
+</pre></div>
+</div>
+</li>
 </ol>
 <p>Optional arguments are not supported unless if explicitly mentioned here.
 For operations on multi-dimensional arrays, automatic broadcast of
@@ -215,14 +212,12 @@ dimensions of size 1 is not supported.</p>
 </div>
 <div class="section" id="explicit-parallel-loops">
 <h2>Explicit Parallel Loops<a class="headerlink" href="#explicit-parallel-loops" title="Permalink to this headline">¶</a></h2>
-<p>Sometimes a program cannot be written in terms of data-parallel operators easy
-and explicit parallel loops are required.
-In this case, one can use HPAT’s <code class="docutils literal"><span class="pre">prange</span></code> instead of <code class="docutils literal"><span class="pre">range</span></code> to specify that a
-loop can be parallelized. The user is required to make sure that the loop does
-not have cross iteration dependencies except the supported reductions.
-Currently, only sum using the <code class="docutils literal"><span class="pre">+=</span></code> operator is supported.
-The example below demonstrates a parallel loop with a
-reduction:</p>
+<p>Sometimes explicit parallel loops are required since a program cannot be written
+in terms of data-parallel operators easily.
+In this case, one can use HPAT’s <code class="docutils literal"><span class="pre">prange</span></code> in place of <code class="docutils literal"><span class="pre">range</span></code> to specify
+that a loop can be parallelized. The user is required to make sure the
+loop does not have cross iteration dependencies except for supported reductions.</p>
+<p>The example below demonstrates a parallel loop with a reduction:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">hpat</span> <span class="k">import</span> <span class="n">jit</span><span class="p">,</span> <span class="n">prange</span>
 <span class="nd">@jit</span>
 <span class="k">def</span> <span class="nf">prange_test</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
@@ -233,6 +228,8 @@ reduction:</p>
     <span class="k">return</span> <span class="n">s</span>
 </pre></div>
 </div>
+<p>Currently, reductions using <code class="docutils literal"><span class="pre">+=</span></code>, <code class="docutils literal"><span class="pre">*=</span></code>, <code class="docutils literal"><span class="pre">min</span></code>, and <code class="docutils literal"><span class="pre">max</span></code> operators are
+supported.</p>
 </div>
 <div class="section" id="supported-pandas-operations">
 <h2>Supported Pandas Operations<a class="headerlink" href="#supported-pandas-operations" title="Permalink to this headline">¶</a></h2>
@@ -240,50 +237,38 @@ reduction:</p>
 doesn’t support Pandas, only these operations can be used for both large and
 small datasets.</p>
 <ol class="arabic">
-<li><dl class="first docutils">
-<dt>HPAT supports Dataframe creation with the <code class="docutils literal"><span class="pre">DataFrame</span></code> constructor.</dt>
-<dd><p class="first">Only a dictionary is supported as input. For example:</p>
-<div class="last highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)})</span>
+<li><p class="first">HPAT supports Dataframe creation with the <code class="docutils literal"><span class="pre">DataFrame</span></code> constructor.
+Only a dictionary is supported as input. For example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)})</span>
 </pre></div>
 </div>
-</dd>
-</dl>
 </li>
-<li><dl class="first docutils">
-<dt>Accessing columns using both getitem (e.g. <code class="docutils literal"><span class="pre">df['A']</span></code>) and attribute</dt>
-<dd><p class="first last">(e.g. <code class="docutils literal"><span class="pre">df.A</span></code>) is supported.</p>
-</dd>
-</dl>
+<li><p class="first">Accessing columns using both getitem (e.g. <code class="docutils literal"><span class="pre">df['A']</span></code>) and attribute
+(e.g. <code class="docutils literal"><span class="pre">df.A</span></code>) is supported.</p>
 </li>
-<li><dl class="first docutils">
-<dt>Using columns similar to Numpy arrays and performing data-parallel operations</dt>
-<dd><p class="first last">listed previously is supported.</p>
-</dd>
-</dl>
+<li><p class="first">Using columns similar to Numpy arrays and performing data-parallel operations
+listed previously is supported.</p>
 </li>
-<li><dl class="first docutils">
-<dt>Filtering data frames using boolean arrays is supported</dt>
-<dd><p class="first last">(e.g. <code class="docutils literal"><span class="pre">df[df.A</span> <span class="pre">&gt;</span> <span class="pre">.5]</span></code>).</p>
-</dd>
-</dl>
+<li><p class="first">Filtering data frames using boolean arrays is supported
+(e.g. <code class="docutils literal"><span class="pre">df[df.A</span> <span class="pre">&gt;</span> <span class="pre">.5]</span></code>).</p>
 </li>
-<li><dl class="first docutils">
-<dt>Rolling window operations with <cite>window</cite> and <cite>center</cite> options are supported.</dt>
-<dd><p class="first">Here are a few examples:</p>
-<div class="last highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<li><p class="first">Rolling window operations with <cite>window</cite> and <cite>center</cite> options are supported.
+Here are a few examples:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 <span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">2</span><span class="o">*</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
 </pre></div>
 </div>
-</dd>
-</dl>
 </li>
-<li><dl class="first docutils">
-<dt><code class="docutils literal"><span class="pre">shift</span></code> operation (e.g. <code class="docutils literal"><span class="pre">df.A.shift(1)</span></code>) and <code class="docutils literal"><span class="pre">pct_change</span></code> operation</dt>
-<dd><p class="first last">(e.g. <code class="docutils literal"><span class="pre">df.A.pct_change()</span></code>) are supported.</p>
-</dd>
-</dl>
+<li><p class="first"><code class="docutils literal"><span class="pre">shift</span></code> operation (e.g. <code class="docutils literal"><span class="pre">df.A.shift(1)</span></code>) and <code class="docutils literal"><span class="pre">pct_change</span></code> operation
+(e.g. <code class="docutils literal"><span class="pre">df.A.pct_change()</span></code>) are supported.</p>
 </li>
 </ol>
+<p>DataFrame columns with integer data need special care. Pandas dynamically
+converts integer columns to floating point when NaN values are needed.
+This is because Numpy does not support NaN values for integers.
+HPAT does not have perform this conversion since enough information is not
+available at compilation time. Hence, the user is responsible for manual
+conversion of integer data to floating point data if needed.</p>
 </div>
 <div class="section" id="file-i-o">
 <h2>File I/O<a class="headerlink" href="#file-i-o" title="Permalink to this headline">¶</a></h2>
@@ -355,9 +340,9 @@ operators, as well as <code class="docutils literal"><span class="pre">min</span
   <ul>
 <li><a class="reference internal" href="#">User Guide</a><ul>
 <li><a class="reference internal" href="#automatic-parallelization">Automatic Parallelization</a><ul>
-<li><a class="reference internal" href="#distribution-report">Distribution Report</a></li>
 <li><a class="reference internal" href="#array-distribution">Array Distribution</a></li>
-<li><a class="reference internal" href="#dot-function">Dot function</a></li>
+<li><a class="reference internal" href="#distribution-report">Distribution Report</a></li>
+<li><a class="reference internal" href="#numpy-dot-parallelization">Numpy dot() Parallelization</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#supported-numpy-operations">Supported Numpy Operations</a></li>

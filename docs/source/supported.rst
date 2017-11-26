@@ -3,12 +3,14 @@
 User Guide
 ==========
 
-HPAT supports a subset of Python that is commonly used for data analytics and
-machine learning. This section describes this subset.
+HPAT automatically parallelizes a subset of Python that is commonly used for
+data analytics and machine learning. This section describes this subset
+and how parallelization is performed.
 
 HPAT compiles and parallelizes the functions annotated with the `@hpat.jit`
-decorator. Therefore, file I/O and computations on large datasets should be
-inside the jitted functions. The supported data structures for large datasets
+decorator. The decorated functions are replaced with generated parallel
+binaries that run on bare metal.
+The supported data structures for large datasets
 are `Numpy <http://www.numpy.org/>`_ arrays and
 `Pandas <http://pandas.pydata.org/>`_ dataframes.
 
@@ -29,7 +31,11 @@ the semantics of array operations as the program below demonstrates::
 This program reads a one-dimensional array called `A` from file and sums its
 values. Array `A` is the output of an I/O operation and is input to `np.sum`.
 Based on semantics of I/O and `np.sum`, HPAT determines that `A` can be
-distributed. HPAT distributes `A` and all operations associated with `A`
+distributed since I/O can output a distributed array and `np.sum` can
+take a distributed array as input.
+In `map-reduce` terminology, `A` is output of a `map` operator and is input
+to a `reduce` operator. Hence,
+HPAT distributes `A` and all operations associated with `A`
 (i.e. I/O and `np.sum`) and generates a parallel binary.
 This binary replaces the `example_1D` function in the Python program.
 
@@ -38,24 +44,6 @@ Numpy and Pandas (listed below). Hence, only the supported operations can be
 used for distributed datasets and computations.
 The sequential computation on small data can be any code that
 `Numba supports <http://numba.pydata.org/numba-doc/latest/index.html>`_.
-
-Distribution Report
-~~~~~~~~~~~~~~~~~~~
-
-The distributions found by HPAT can be printed using
-`hpat.distribution_report()` function. The distribution report for the above
-example code is as follows::
-
-    Array distributions:
-        $A.23                1D_Block
-
-    Parfor distributions:
-        0                    1D_Block
-
-This report suggests that the function has an array that is distributed in
-1D_Block fashion. The variable name is renamed from `A` to `$A.23` through
-the optimization passes. The report also suggests that a `parfor`
-(data-parallel for loop) is also 1D_Block distributed.
 
 Array Distribution
 ~~~~~~~~~~~~~~~~~~
@@ -79,8 +67,27 @@ as a 9 by 2 array, on three processors:
 HPAT replicates the arrays that are not distributed.
 This is called `REP` distribution for consistency.
 
-Dot function
-~~~~~~~~~~~~
+
+Distribution Report
+~~~~~~~~~~~~~~~~~~~
+
+The distributions found by HPAT can be printed using the
+`hpat.distribution_report()` function. The distribution report for the above
+example code is as follows::
+
+    Array distributions:
+        $A.23                1D_Block
+
+    Parfor distributions:
+        0                    1D_Block
+
+This report suggests that the function has an array that is distributed in
+1D_Block fashion. The variable name is renamed from `A` to `$A.23` through
+the optimization passes. The report also suggests that there is a `parfor`
+(data-parallel for loop) that is 1D_Block distributed.
+
+Numpy dot() Parallelization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The `np.dot` function has different distribution rules based on the number of
 dimensions and the distributions of its input arrays. The example below
@@ -111,7 +118,7 @@ Here is the output of `hpat.distribution_report()`::
 
 The first `dot` has a 1D array with `1D_Block` distribution as first input
 (`Y`), while the second input is a 2D array with `1D_Block` distribution (`X`).
-Hence, `dot` is a sum reduction across a distributed data and therefore,
+Hence, `dot` is a sum reduction across distributed datasets and therefore,
 the output (`w`) is on the `reduce` side and is assiged `REP` distribution.
 
 The second `dot` has a 2D array with `1D_Block` distribution (`X`) as first
@@ -119,8 +126,8 @@ input, while the second input is a REP array (`w`). Hence, the computation is
 data-parallel across rows of `X`, which implies a `1D_Block` distibution for
 output (`z`).
 
-Variable `z` doesn't exist in the distribution report since
-the compiler optimizations were able to remove it. Its values are generated
+Variable `z` does not exist in the distribution report since
+the compiler optimizations were able to eliminate it. Its values are generated
 and consumed on-the-fly, without memory load/store overheads.
 
 Supported Numpy Operations
@@ -133,35 +140,42 @@ and parallelize.
 
     * Unary operators: ``+`` ``-`` ``~``
     * Binary operators: ``+`` ``-`` ``*`` ``/`` ``/?`` ``%`` ``|`` ``>>`` ``^``
-        ``<<`` ``&`` ``**`` ``//``
+      ``<<`` ``&`` ``**`` ``//``
     * Comparison operators: ``==`` ``!=`` ``<`` ``<=`` ``>`` ``>=``
     * data-parallel math operations: ``add``, ``subtract``, ``multiply``,
-        ``divide``, ``logaddexp``, ``logaddexp2``, ``true_divide``,
-        ``floor_divide``, ``negative``, ``power``, ``remainder``,
-        ``mod``, ``fmod``, ``abs``, ``absolute``, ``fabs``, ``rint``, ``sign``,
-        ``conj``, ``exp``, ``exp2``, ``log``, ``log2``, ``log10``, ``expm1``,
-        ``log1p``, ``sqrt``, ``square``, ``reciprocal``, ``conjugate``
+      ``divide``, ``logaddexp``, ``logaddexp2``, ``true_divide``,
+      ``floor_divide``, ``negative``, ``power``, ``remainder``,
+      ``mod``, ``fmod``, ``abs``, ``absolute``, ``fabs``, ``rint``, ``sign``,
+      ``conj``, ``exp``, ``exp2``, ``log``, ``log2``, ``log10``, ``expm1``,
+      ``log1p``, ``sqrt``, ``square``, ``reciprocal``, ``conjugate``
     * Trigonometric functions: ``sin``, ``cos``, ``tan``, ``arcsin``,
-        ``arccos``, ``arctan``, ``arctan2``, ``hypot``, ``sinh``, ``cosh``,
-        ``tanh``, ``arcsinh``, ``arccosh``, ``arctanh``, ``deg2rad``,
-        ``rad2deg``, ``degrees``, ``radians``
+      ``arccos``, ``arctan``, ``arctan2``, ``hypot``, ``sinh``, ``cosh``,
+      ``tanh``, ``arcsinh``, ``arccosh``, ``arctanh``, ``deg2rad``,
+      ``rad2deg``, ``degrees``, ``radians``
     * Bit manipulation functions: ``bitwise_and``, ``bitwise_or``,
-        ``bitwise_xor``, ``bitwise_not``, ``invert``, ``left_shift``,
-        ``right_shift``
+      ``bitwise_xor``, ``bitwise_not``, ``invert``, ``left_shift``,
+      ``right_shift``
 
-2. Numpy reduction functions ``sum`` and ``prod``.
+2. Numpy reduction functions ``sum``, ``prod``, ``min``, ``max``, ``argmin``
+   and ``argmax``. Currently, `int64` data type is not supported for
+   ``argmin`` and ``argmax``.
 
 3. Numpy array creation functions ``empty``, ``zeros``, ``ones``,
-    ``empty_like``, ``zeros_like``, ``ones_like``, ``full_like``, ``copy``.
+   ``empty_like``, ``zeros_like``, ``ones_like``, ``full_like``, ``copy``,
+   ``arange`` and ``linspace``.
 
 4. Random number generator functions: ``rand``, ``randn``,
-    ``ranf``, ``random_sample``, ``sample``, ``random``,
-    ``standard_normal``, ``chisquare``, ``weibull``, ``power``, ``geometric``,
-    ``exponential``, ``poisson``, ``rayleigh``, ``normal``, ``uniform``,
-    ``beta``, ``binomial``, ``f``, ``gamma``, ``lognormal``, ``laplace``,
-    ``randint``, ``triangular``.
+   ``ranf``, ``random_sample``, ``sample``, ``random``,
+   ``standard_normal``, ``chisquare``, ``weibull``, ``power``, ``geometric``,
+   ``exponential``, ``poisson``, ``rayleigh``, ``normal``, ``uniform``,
+   ``beta``, ``binomial``, ``f``, ``gamma``, ``lognormal``, ``laplace``,
+   ``randint``, ``triangular``.
 
 4. Numpy ``dot`` function between a matrix and a vector, or two vectors.
+
+5. Numpy array comprehensions, such as::
+
+    A = np.array([i**2 for i in range(N)])
 
 Optional arguments are not supported unless if explicitly mentioned here.
 For operations on multi-dimensional arrays, automatic broadcast of
@@ -171,14 +185,13 @@ dimensions of size 1 is not supported.
 Explicit Parallel Loops
 -----------------------
 
-Sometimes a program cannot be written in terms of data-parallel operators easily
-and explicit parallel loops are required.
-In this case, one can use HPAT's ``prange`` instead of ``range`` to specify that a
-loop can be parallelized. The user is required to make sure that the loop does
-not have cross iteration dependencies except the supported reductions.
-Currently, only sum using the ``+=`` operator is supported.
-The example below demonstrates a parallel loop with a
-reduction::
+Sometimes explicit parallel loops are required since a program cannot be written
+in terms of data-parallel operators easily.
+In this case, one can use HPAT's ``prange`` in place of ``range`` to specify
+that a loop can be parallelized. The user is required to make sure the
+loop does not have cross iteration dependencies except for supported reductions.
+
+The example below demonstrates a parallel loop with a reduction::
 
     from hpat import jit, prange
     @jit
@@ -189,6 +202,9 @@ reduction::
             s += A[i]
         return s
 
+Currently, reductions using ``+=``, ``*=``, ``min``, and ``max`` operators are
+supported.
+
 Supported Pandas Operations
 ---------------------------
 
@@ -197,27 +213,35 @@ doesn't support Pandas, only these operations can be used for both large and
 small datasets.
 
 1. HPAT supports Dataframe creation with the ``DataFrame`` constructor.
-    Only a dictionary is supported as input. For example::
+   Only a dictionary is supported as input. For example::
 
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
 
 2. Accessing columns using both getitem (e.g. ``df['A']``) and attribute
-    (e.g. ``df.A``) is supported.
+   (e.g. ``df.A``) is supported.
 
 3. Using columns similar to Numpy arrays and performing data-parallel operations
-    listed previously is supported.
+   listed previously is supported.
 
 4. Filtering data frames using boolean arrays is supported
-    (e.g. ``df[df.A > .5]``).
+   (e.g. ``df[df.A > .5]``).
 
 5. Rolling window operations with `window` and `center` options are supported.
-    Here are a few examples::
+   Here are a few examples::
 
          df.A.rolling(window=5).mean()
          df.A.rolling(3, center=True).apply(lambda a: a[0]+2*a[1]+a[2])
 
 6. ``shift`` operation (e.g. ``df.A.shift(1)``) and ``pct_change`` operation
-    (e.g. ``df.A.pct_change()``) are supported.
+   (e.g. ``df.A.pct_change()``) are supported.
+
+
+DataFrame columns with integer data need special care. Pandas dynamically
+converts integer columns to floating point when NaN values are needed.
+This is because Numpy does not support NaN values for integers.
+HPAT does not have perform this conversion since enough information is not
+available at compilation time. Hence, the user is responsible for manual
+conversion of integer data to floating point data if needed.
 
 File I/O
 --------
