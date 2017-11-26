@@ -99,6 +99,9 @@ def print_dist(d):
         return "2D_Block"
 
 def distribution_report():
+    import hpat.distributed
+    if hpat.distributed.dist_analysis is None:
+        return
     print("Array distributions:")
     for arr, dist in hpat.distributed.dist_analysis.array_dists.items():
         print("   {0:20} {1}".format(arr, print_dist(dist)))
