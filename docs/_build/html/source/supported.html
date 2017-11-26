@@ -69,9 +69,16 @@ Based on semantics of I/O and <cite>np.sum</cite>, HPAT determines that <cite>A<
 distributed. HPAT distributes <cite>A</cite> and all operations associated with <cite>A</cite>
 (i.e. I/O and <cite>np.sum</cite>) and generates a parallel binary.
 This binary replaces the <cite>example_1D</cite> function in the Python program.</p>
+<p>HPAT can only analyze and parallelize the supported data-parallel operations of
+Numpy and Pandas (listed below). Hence, only the supported operations can be
+used for distributed datasets and computations.
+The sequential computation on small data can be any code that
+<a class="reference external" href="http://numba.pydata.org/numba-doc/latest/index.html">Numba supports</a>.</p>
+<div class="section" id="distribution-report">
+<h3>Distribution Report<a class="headerlink" href="#distribution-report" title="Permalink to this headline">¶</a></h3>
 <p>The distributions found by HPAT can be printed using
-<cite>hpat.distribution_report()</cite> function. The report for the above example code is
-as follows:</p>
+<cite>hpat.distribution_report()</cite> function. The distribution report for the above
+example code is as follows:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
     $A.23                1D_Block
 
@@ -79,10 +86,13 @@ Parfor distributions:
     0                    1D_Block
 </pre></div>
 </div>
-<p>This report suggests that the program has an array that is distributed in
+<p>This report suggests that the function has an array that is distributed in
 1D_Block fashion. The variable name is renamed from <cite>A</cite> to <cite>$A.23</cite> through
 the optimization passes. The report also suggests that a <cite>parfor</cite>
 (data-parallel for loop) is also 1D_Block distributed.</p>
+</div>
+<div class="section" id="array-distribution">
+<h3>Array Distribution<a class="headerlink" href="#array-distribution" title="Permalink to this headline">¶</a></h3>
 <p>Arrays are distributed in one-dimensional block (<cite>1D_Block</cite>) manner
 among processors. This means that processors own equal chunks of each
 distributed array, except possibly the last processor.
@@ -92,10 +102,50 @@ The figure below
 illustrates the distribution of a 9-element one-dimensional Numpy array, as well
 as a 9 by 2 array, on three processors:</p>
 <a class="reference internal image-reference" href="../_images/dist.jpg"><img alt="distribution of 1D array" class="align-center" src="../_images/dist.jpg" style="width: 300.0px; height: 300.0px;" /></a>
-<p>To enable parallelization, only the supported data-parallel operators of
-Numpy and Pandas can be used for distributed datasets and computations.
-The sequential computation on small data can be any code that
-<a class="reference external" href="http://numba.pydata.org/numba-doc/latest/index.html">Numba supports</a>.</p>
+<p>HPAT replicates the arrays that are not distributed.
+This is called <cite>REP</cite> distribution for consistency.</p>
+</div>
+<div class="section" id="dot-function">
+<h3>Dot function<a class="headerlink" href="#dot-function" title="Permalink to this headline">¶</a></h3>
+<p>The <cite>np.dot</cite> function has different distribution rules based on the number of
+dimensions and the distributions of its input arrays. The example below
+demonstrates two cases:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span> <span class="nf">example_dot</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">Y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">z</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+<span class="n">example_dot</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+<span class="n">hpat</span><span class="o">.</span><span class="n">distribution_report</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Here is the output of <cite>hpat.distribution_report()</cite>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
+   $X.43                1D_Block
+   $Y.45                1D_Block
+   $w.44                REP
+
+Parfor distributions:
+   0                    1D_Block
+   1                    1D_Block
+   2                    1D_Block
+</pre></div>
+</div>
+<p>The first <cite>dot</cite> has a 1D array with <cite>1D_Block</cite> distribution as first input
+(<cite>Y</cite>), while the second input is a 2D array with <cite>1D_Block</cite> distribution (<cite>X</cite>).
+Hence, <cite>dot</cite> is a sum reduction across distributed data and therefore,
+the output (<cite>w</cite>) is on the <cite>reduce</cite> side and is assiged <cite>REP</cite> distribution.</p>
+<p>The second <cite>dot</cite> has a 2D array with <cite>1D_Block</cite> distribution (<cite>X</cite>) as first
+input, while the second input is a REP array (<cite>w</cite>). Hence, the computation is
+data-parallel across rows of <cite>X</cite>, which implies a <cite>1D_Block</cite> distibution for
+output (<cite>z</cite>).</p>
+<p>Variable <cite>z</cite> doesn’t exist in the distribution report since
+the compiler optimizations were able to remove it. Its values are generated
+and consumed on-the-fly without storing in memory.</p>
+</div>
 </div>
 <div class="section" id="supported-numpy-operations">
 <h2>Supported Numpy Operations<a class="headerlink" href="#supported-numpy-operations" title="Permalink to this headline">¶</a></h2>
@@ -304,7 +354,12 @@ operators, as well as <code class="docutils literal"><span class="pre">min</span
   <h3><a href="../index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">User Guide</a><ul>
-<li><a class="reference internal" href="#automatic-parallelization">Automatic Parallelization</a></li>
+<li><a class="reference internal" href="#automatic-parallelization">Automatic Parallelization</a><ul>
+<li><a class="reference internal" href="#distribution-report">Distribution Report</a></li>
+<li><a class="reference internal" href="#array-distribution">Array Distribution</a></li>
+<li><a class="reference internal" href="#dot-function">Dot function</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#supported-numpy-operations">Supported Numpy Operations</a></li>
 <li><a class="reference internal" href="#explicit-parallel-loops">Explicit Parallel Loops</a></li>
 <li><a class="reference internal" href="#supported-pandas-operations">Supported Pandas Operations</a></li>

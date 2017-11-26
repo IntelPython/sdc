@@ -33,6 +33,15 @@ distributed. HPAT distributes `A` and all operations associated with `A`
 (i.e. I/O and `np.sum`) and generates a parallel binary.
 This binary replaces the `example_1D` function in the Python program.
 
+HPAT can only analyze and parallelize the supported data-parallel operations of
+Numpy and Pandas (listed below). Hence, only the supported operations can be
+used for distributed datasets and computations.
+The sequential computation on small data can be any code that
+`Numba supports <http://numba.pydata.org/numba-doc/latest/index.html>`_.
+
+Distribution Report
+~~~~~~~~~~~~~~~~~~~
+
 The distributions found by HPAT can be printed using
 `hpat.distribution_report()` function. The distribution report for the above
 example code is as follows::
@@ -47,6 +56,9 @@ This report suggests that the function has an array that is distributed in
 1D_Block fashion. The variable name is renamed from `A` to `$A.23` through
 the optimization passes. The report also suggests that a `parfor`
 (data-parallel for loop) is also 1D_Block distributed.
+
+Array Distribution
+~~~~~~~~~~~~~~~~~~
 
 Arrays are distributed in one-dimensional block (`1D_Block`) manner
 among processors. This means that processors own equal chunks of each
@@ -64,10 +76,52 @@ as a 9 by 2 array, on three processors:
     :alt: distribution of 1D array
     :align: center
 
-To enable parallelization, only the supported data-parallel operators of
-Numpy and Pandas can be used for distributed datasets and computations.
-The sequential computation on small data can be any code that
-`Numba supports <http://numba.pydata.org/numba-doc/latest/index.html>`_.
+HPAT replicates the arrays that are not distributed.
+This is called `REP` distribution for consistency.
+
+Dot function
+~~~~~~~~~~~~
+
+The `np.dot` function has different distribution rules based on the number of
+dimensions and the distributions of its input arrays. The example below
+demonstrates two cases::
+
+    @hpat.jit
+    def example_dot(N, D):
+        X = np.random.ranf((N, D))
+        Y = np.random.ranf(N)
+        w = np.dot(Y, X)
+        z = np.dot(X, w)
+        return z.sum()
+
+    example_dot(1024, 10)
+    hpat.distribution_report()
+
+Here is the output of `hpat.distribution_report()`::
+
+    Array distributions:
+       $X.43                1D_Block
+       $Y.45                1D_Block
+       $w.44                REP
+
+    Parfor distributions:
+       0                    1D_Block
+       1                    1D_Block
+       2                    1D_Block
+
+The first `dot` has a 1D array with `1D_Block` distribution as first input
+(`Y`), while the second input is a 2D array with `1D_Block` distribution (`X`).
+Hence, `dot` is a sum reduction across a distributed data and therefore,
+the output (`w`) is on the `reduce` side and is assiged `REP` distribution.
+
+The second `dot` has a 2D array with `1D_Block` distribution (`X`) as first
+input, while the second input is a REP array (`w`). Hence, the computation is
+data-parallel across rows of `X`, which implies a `1D_Block` distibution for
+output (`z`).
+
+Variable `z` doesn't exist in the distribution report since
+the compiler optimizations were able to remove it. Its values are generated
+and consumed on-the-fly, without memory load/store overheads.
 
 Supported Numpy Operations
 --------------------------
@@ -117,7 +171,7 @@ dimensions of size 1 is not supported.
 Explicit Parallel Loops
 -----------------------
 
-Sometimes a program cannot be written in terms of data-parallel operators easy
+Sometimes a program cannot be written in terms of data-parallel operators easily
 and explicit parallel loops are required.
 In this case, one can use HPAT's ``prange`` instead of ``range`` to specify that a
 loop can be parallelized. The user is required to make sure that the loop does
