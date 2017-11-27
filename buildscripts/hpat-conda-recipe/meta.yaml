@@ -1,0 +1,53 @@
+package:
+  name: hpat
+  version: {{ GIT_DESCRIBE_TAG }}
+
+source:
+   path: ../..
+
+build:
+  number: {{ GIT_DESCRIBE_NUMBER|int }}
+  script_env:
+    - LDSHARED
+    - LD
+    - CC
+    - CXX
+    - HDF5_DIR
+    - DAALROOT
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy
+    - pandas
+    - scipy
+    - gcc
+    - mpich
+    - pyarrow
+    - numba
+    - hdf5-parallel
+    - h5py
+
+  run:
+    - python
+    - numpy
+    - pandas
+    - scipy
+    - gcc
+    - mpich
+    - pyarrow
+    - numba
+    - hdf5-parallel
+    - h5py
+
+test:
+  imports:
+    - hpat
+
+
+about:
+  home: https://github.com/IntelLabs/hpat
+  license: BSD
+  license_file: LICENSE.md
+  summary: A compiler-based big data framework in Python

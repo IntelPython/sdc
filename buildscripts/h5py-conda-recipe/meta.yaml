@@ -1,0 +1,47 @@
+package:
+  name: h5py
+  version: {{ GIT_DESCRIBE_TAG }}
+
+source:
+   path: /Users/etotoni/pse-hpc/python/h5py
+
+build:
+  number: {{ GIT_DESCRIBE_NUMBER|int }}
+  script_env:
+    - LDSHARED
+    - LD
+    - CC
+    - CXX
+    - HDF5_DIR
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy
+    - cython
+    - pkgconfig
+    - six
+    - gcc
+    - mpich
+    - libgfortran
+  run:
+    - python
+    - numpy
+    - cython
+    - pkgconfig
+    - six
+    - gcc
+    - mpich
+    - libgfortran
+
+test:
+  imports:
+    - h5py
+
+
+about:
+  home: https://github.com/h5py/h5py.git
+  license: BSD
+  license_file: licenses/license.txt
+  summary: Python wrappers for hdf5 library
