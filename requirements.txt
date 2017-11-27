@@ -1,0 +1,4 @@
+mpich
+scipy
+pandas
+numba
