@@ -60,8 +60,10 @@ ext_parquet = Extension(name="parquet_cpp",
                              libraries = ['parquet', 'arrow', 'mpi'],
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
-                             extra_compile_args=['-D_GLIBCXX_USE_CXX11_ABI=0'],
-                             extra_link_args=['-D_GLIBCXX_USE_CXX11_ABI=0'],
+                             extra_compile_args=['-D_GLIBCXX_USE_CXX11_ABI=0',
+                                                                '-std=c++11'],
+                             extra_link_args=['-D_GLIBCXX_USE_CXX11_ABI=0',
+                                                                '-std=c++11'],
                              )
 
 ext_daal_wrapper = Extension(name="daal_wrapper",

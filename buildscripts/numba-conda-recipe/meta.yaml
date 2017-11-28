@@ -3,7 +3,7 @@ package:
    version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-   path: ../numba
+   path: ../../../numba
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
@@ -20,8 +20,8 @@ requirements:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
   host:
-    - python
-    - numpy
+    - python 3.6.*
+    - numpy 1.13.*
     - setuptools
     # On channel https://anaconda.org/numba/
     - llvmlite 0.20.*

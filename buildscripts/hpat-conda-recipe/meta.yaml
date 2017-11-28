@@ -24,8 +24,8 @@ requirements:
     - h5py
 
   run:
-    - python
-    - numpy
+    - python 3.6.*
+    - numpy 1.13.*
     - pandas
     - scipy
     - mpich
