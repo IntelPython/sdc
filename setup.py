@@ -13,6 +13,8 @@ if 'HDF5_DIR' in os.environ:
     _has_h5py = True
     HDF5_DIR = os.environ['HDF5_DIR']
 
+PREFIX_DIR = os.environ['PREFIX']
+
 try:
     import pyarrow
 except ImportError:
@@ -34,15 +36,16 @@ if platform.system() == 'Windows':
 
 
 ext_io = Extension(name="hio",
-                             libraries = ['hdf5'],
+                             libraries = ['hdf5', 'mpi'],
                              include_dirs = [HDF5_DIR+'/include/'],
                              library_dirs = [HDF5_DIR+'/lib/'],
                              sources=["hpat/_io.cpp"]
                              )
 
 ext_hdist = Extension(name="hdist",
-                             libraries = MPI_LIBS,
-                             sources=["hpat/_distributed.cpp"]
+                             libraries = MPI_LIBS+['mpi'],
+                             sources=["hpat/_distributed.cpp"],
+                             include_dirs=[PREFIX_DIR+'/include/'],
                              )
 
 ext_dict = Extension(name="hdict_ext",
@@ -54,7 +57,7 @@ ext_str = Extension(name="hstr_ext",
                              )
 
 ext_parquet = Extension(name="parquet_cpp",
-                             libraries = ['parquet', 'arrow'],
+                             libraries = ['parquet', 'arrow', 'mpi'],
                              sources=["hpat/_parquet.cpp"]
                              )
 

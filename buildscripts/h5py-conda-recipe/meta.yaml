@@ -1,39 +1,35 @@
+{% set version = "2.7.1" %}
+
 package:
   name: h5py
-  version: {{ GIT_DESCRIBE_TAG }}
+  version: {{ version }}
 
 source:
-   path: /Users/etotoni/pse-hpc/python/h5py
+   url: https://github.com/h5py/h5py/archive/{{ version }}.tar.gz
 
 build:
-  number: {{ GIT_DESCRIBE_NUMBER|int }}
-  script_env:
-    - LDSHARED
-    - LD
-    - CC
-    - CXX
-    - HDF5_DIR
+  number: 2
 
 requirements:
   build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
     - python
     - setuptools
     - numpy
     - cython
     - pkgconfig
     - six
-    - gcc
     - mpich
-    - libgfortran
+    - hdf5-parallel
   run:
     - python
     - numpy
     - cython
     - pkgconfig
     - six
-    - gcc
     - mpich
-    - libgfortran
+    - hdf5-parallel
 
 test:
   imports:
