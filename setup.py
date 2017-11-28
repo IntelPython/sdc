@@ -58,7 +58,10 @@ ext_str = Extension(name="hstr_ext",
 
 ext_parquet = Extension(name="parquet_cpp",
                              libraries = ['parquet', 'arrow', 'mpi'],
-                             sources=["hpat/_parquet.cpp"]
+                             sources=["hpat/_parquet.cpp"],
+                             include_dirs=[PREFIX_DIR+'/include/'],
+                             extra_compile_args=['-D_GLIBCXX_USE_CXX11_ABI=0'],
+                             extra_link_args=['-D_GLIBCXX_USE_CXX11_ABI=0'],
                              )
 
 ext_daal_wrapper = Extension(name="daal_wrapper",

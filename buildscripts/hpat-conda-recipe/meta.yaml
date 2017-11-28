@@ -12,9 +12,9 @@ requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
-    - python
+    - python 3.6.*
     - setuptools
-    - numpy
+    - numpy 1.13.*
     - pandas
     - scipy
     - mpich
