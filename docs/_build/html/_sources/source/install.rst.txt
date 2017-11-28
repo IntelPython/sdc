@@ -3,7 +3,16 @@
 Installing HPAT
 ===============
 
-We recommend `Anaconda 4.4 <https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh>`_ distribution of
+HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ environment easily::
+
+    conda install numpy scipy pandas llvmlite=0.20 python=3.6
+    conda install pyarrow mpich -c conda-forge
+    conda install hpat -c ehsantn
+
+Building HPAT from Source
+-------------------------
+
+We use `Anaconda 4.4 <https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh>`_ distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba and LLVM on Ubuntu Linux::
 
@@ -25,8 +34,8 @@ A command line for running the Pi example on 4 cores::
 
     mpiexec -n 4 python examples/pi.py
 
-HDF5 Support
-------------
+Building HDF5 Support
+---------------------
 
 HPAT supports reading and writing HDF5 files in parallel. The instructions below
 describe building and setting up HDF5 from its
@@ -61,8 +70,8 @@ HPAT uses the `pyarrow` package to provide Parquet support::
 
 HPAT needs to be rebuilt after setting up pyarrow.
 
-Installing on Windows
----------------------
+Building from Source on Windows
+-------------------------------
 
 Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:
 

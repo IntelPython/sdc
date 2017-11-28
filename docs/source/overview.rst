@@ -23,7 +23,7 @@ regression program using HPAT::
         return w
 
 This code runs on cluster and cloud environments using a simple command like
-`mpirun -n 1024 python logistic_regression.py`.
+`mpiexec -n 1024 python logistic_regression.py`.
 
 HPAT compiles a :ref:`subset of Python <supported>` to efficient native parallel code
 (with `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_).

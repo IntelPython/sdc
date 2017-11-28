@@ -42,7 +42,15 @@
             
   <div class="section" id="installing-hpat">
 <span id="install"></span><h1>Installing HPAT<a class="headerlink" href="#installing-hpat" title="Permalink to this headline">¶</a></h1>
-<p>We recommend <a class="reference external" href="https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh">Anaconda 4.4</a> distribution of
+<p>HPAT can be installed in <a class="reference external" href="https://www.anaconda.com/download/">Anaconda</a> environment easily:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">pandas</span> <span class="n">llvmlite</span><span class="o">=</span><span class="mf">0.20</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.6</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="n">mpich</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">hpat</span> <span class="o">-</span><span class="n">c</span> <span class="n">ehsantn</span>
+</pre></div>
+</div>
+<div class="section" id="building-hpat-from-source">
+<h2>Building HPAT from Source<a class="headerlink" href="#building-hpat-from-source" title="Permalink to this headline">¶</a></h2>
+<p>We use <a class="reference external" href="https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh">Anaconda 4.4</a> distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba and LLVM on Ubuntu Linux:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">llvm</span><span class="o">-</span><span class="mf">4.0</span> <span class="n">make</span> <span class="n">libc6</span><span class="o">-</span><span class="n">dev</span> <span class="n">gcc</span><span class="o">-</span><span class="mf">4.8</span>
@@ -64,8 +72,9 @@ such as Numba and LLVM on Ubuntu Linux:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">mpiexec</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">pi</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
-<div class="section" id="hdf5-support">
-<h2>HDF5 Support<a class="headerlink" href="#hdf5-support" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="building-hdf5-support">
+<h2>Building HDF5 Support<a class="headerlink" href="#building-hdf5-support" title="Permalink to this headline">¶</a></h2>
 <p>HPAT supports reading and writing HDF5 files in parallel. The instructions below
 describe building and setting up HDF5 from its
 <a class="reference external" href="https://support.hdfgroup.org/ftp/HDF5/current18/src/hdf5-1.8.19.tar.gz">source code (v1.8.19)</a>:</p>
@@ -99,8 +108,8 @@ Commands for generating HDF5 data and running the logistic regression example:</
 </div>
 <p>HPAT needs to be rebuilt after setting up pyarrow.</p>
 </div>
-<div class="section" id="installing-on-windows">
-<h2>Installing on Windows<a class="headerlink" href="#installing-on-windows" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="building-from-source-on-windows">
+<h2>Building from Source on Windows<a class="headerlink" href="#building-from-source-on-windows" title="Permalink to this headline">¶</a></h2>
 <p>Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:</p>
 <ul>
 <li><p class="first">Install <a class="reference external" href="https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017">Build Tools for Visual Studio 2017 (14.0)</a>.</p>
@@ -156,9 +165,10 @@ and add a string value named <code class="docutils literal"><span class="pre">14
   <h3><a href="../index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Installing HPAT</a><ul>
-<li><a class="reference internal" href="#hdf5-support">HDF5 Support</a></li>
+<li><a class="reference internal" href="#building-hpat-from-source">Building HPAT from Source</a></li>
+<li><a class="reference internal" href="#building-hdf5-support">Building HDF5 Support</a></li>
 <li><a class="reference internal" href="#parquet-support">Parquet Support</a></li>
-<li><a class="reference internal" href="#installing-on-windows">Installing on Windows</a><ul>
+<li><a class="reference internal" href="#building-from-source-on-windows">Building from Source on Windows</a><ul>
 <li><a class="reference internal" href="#troubleshooting-windows-build">Troubleshooting Windows Build</a></li>
 </ul>
 </li>

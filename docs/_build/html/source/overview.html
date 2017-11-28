@@ -63,7 +63,7 @@ regression program using HPAT:</p>
 </pre></div>
 </div>
 <p>This code runs on cluster and cloud environments using a simple command like
-<cite>mpirun -n 1024 python logistic_regression.py</cite>.</p>
+<cite>mpiexec -n 1024 python logistic_regression.py</cite>.</p>
 <p>HPAT compiles a <a class="reference internal" href="supported.html#supported"><span class="std std-ref">subset of Python</span></a> to efficient native parallel code
 (with <a class="reference external" href="https://en.wikipedia.org/wiki/Message_Passing_Interface">MPI</a>).
 This is in contrast to other frameworks such as Apache Spark which are
