@@ -100,10 +100,12 @@ int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim)
     hid_t space_id = H5Dget_space(dataset_id);
     assert(space_id != -1);
     hsize_t data_ndim = H5Sget_simple_extent_ndims(space_id);
-    hsize_t space_dims[data_ndim];
+    hsize_t *space_dims = new hsize_t[data_ndim];
     H5Sget_simple_extent_dims(space_id, space_dims, NULL);
     H5Dclose(dataset_id);
-    return space_dims[dim];
+    hsize_t ret = space_dims[dim];
+    delete[] space_dims;
+    return ret;
 }
 
 int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
