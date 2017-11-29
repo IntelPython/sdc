@@ -32,6 +32,13 @@ installed separately instead of `mpich`. The rest is the same::
     conda install pyarrow -c conda-forge
     conda install hpat -c ehsantn
 
+Docker Container
+----------------
+
+An HPAT docker image is also available for running containers. For example::
+
+    docker run -it ehsantn/hpat bash
+
 Example
 #######
 
