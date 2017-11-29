@@ -26,7 +26,7 @@ HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ enviro
 Example
 #######
 
-Here is a Pi calculation example in HPAT::
+Here is a Pi calculation example in HPAT:
 
 .. code:: python
 
