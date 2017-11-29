@@ -30,20 +30,25 @@ if 'DAALROOT' in os.environ:
     DAALROOT = os.environ['DAALROOT']
 
 
-MPI_LIBS = []
+MPI_LIBS = ['mpi']
+H5_COMPILE_FLAGS = []
 if platform.system() == 'Windows':
+    # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
+    # hdf5-parallel Windows build uses CMake which needs this flag
+    H5_COMPILE_FLAGS = ['-DH5_BUILT_AS_DYNAMIC_LIB']
 
 
 ext_io = Extension(name="hio",
-                             libraries = ['hdf5', 'mpi'],
+                             libraries = ['hdf5'] + MPI_LIBS,
                              include_dirs = [HDF5_DIR+'/include/'],
                              library_dirs = [HDF5_DIR+'/lib/'],
+                             extra_compile_args = H5_COMPILE_FLAGS,
                              sources=["hpat/_io.cpp"]
                              )
 
 ext_hdist = Extension(name="hdist",
-                             libraries = MPI_LIBS+['mpi'],
+                             libraries = MPI_LIBS,
                              sources=["hpat/_distributed.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
                              )
