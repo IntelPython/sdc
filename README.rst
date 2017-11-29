@@ -17,10 +17,19 @@ HPAT's documentation can be found `here <https://intellabs.github.io/hpat/>`_.
 Installation
 ############
 
-HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ environment easily::
+HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_
+environment easily (Linux/Mac)::
 
     conda install numpy scipy pandas llvmlite=0.20 python=3.6
     conda install pyarrow mpich -c conda-forge
+    conda install hpat -c ehsantn
+
+Windows installaton requires
+`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ (in place of
+`mpich`)::
+
+    conda install numpy scipy pandas llvmlite=0.20 python=3.6
+    conda install pyarrow -c conda-forge
     conda install hpat -c ehsantn
 
 Example
