@@ -28,7 +28,7 @@ Example
 
 Here is a Pi calculation example in HPAT::
 
-.. code-block:: python
+.. code:: python
 
     import hpat
     import numpy as np
