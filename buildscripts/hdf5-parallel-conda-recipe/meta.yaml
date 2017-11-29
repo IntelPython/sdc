@@ -13,9 +13,11 @@ requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
-    - mpich
+    - cmake >=3.1   # [win]
+    - python 3.6.*
+    - mpich # [not win]
   run:
-    - mpich
+    - mpich # [not win]
 
 
 about:

@@ -20,7 +20,7 @@ requirements:
     - cython
     - pkgconfig
     - six
-    - mpich
+    - mpich # [not win]
     - hdf5-parallel
   run:
     - python
@@ -28,7 +28,7 @@ requirements:
     - cython
     - pkgconfig
     - six
-    - mpich
+    - mpich # [not win]
     - hdf5-parallel
 
 test:
