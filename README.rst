@@ -25,8 +25,8 @@ environment easily (Linux/Mac)::
     conda install hpat -c ehsantn
 
 Windows installaton requires
-`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ (in place of
-`mpich`)::
+`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
+installed separately instead of `mpich`. The rest is the same::
 
     conda install numpy scipy pandas llvmlite=0.20 python=3.6
     conda install pyarrow -c conda-forge
