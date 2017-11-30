@@ -13,7 +13,11 @@ if 'HDF5_DIR' in os.environ:
     _has_h5py = True
     HDF5_DIR = os.environ['HDF5_DIR']
 
-PREFIX_DIR = os.environ['PREFIX']
+# package environment variable is PREFIX during build time
+if 'CONDA_BUILD' in os.environ:
+    PREFIX_DIR = os.environ['PREFIX']
+else:
+    PREFIX_DIR = os.environ['CONDA_PREFIX']
 
 try:
     import pyarrow
