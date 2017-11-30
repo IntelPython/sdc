@@ -295,3 +295,9 @@ def _get_local_range(start, stop, chunk_start, chunk_count):
         loc_start = 1
         loc_stop = 0
     return loc_start, loc_stop
+
+@numba.njit
+def _root_rank_select(old_val, new_val):
+    if distributed_api.get_rank() == 0:
+        return old_val
+    return new_val

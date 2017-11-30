@@ -70,7 +70,7 @@ class TestBasic(unittest.TestCase):
 
     def test_array_reduce(self):
         def test_impl(N):
-            A = np.zeros(3);
+            A = np.ones(3);
             B = np.ones(3);
             for i in numba.prange(N):
                 A += B
