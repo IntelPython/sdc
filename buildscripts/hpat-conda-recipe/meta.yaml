@@ -22,6 +22,7 @@ requirements:
     - numba
     - hdf5-parallel
     - h5py
+    - daal-devel
 
   run:
     - python 3.6.*
