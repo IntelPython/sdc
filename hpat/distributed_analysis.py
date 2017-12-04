@@ -4,13 +4,14 @@ import copy
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import get_call_table, get_tuple_table, find_topo_order, guard, get_definition
+from numba.ir_utils import (get_call_table, get_tuple_table, find_topo_order,
+                            guard, get_definition, require, find_callname)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
-from hpat.utils import get_definitions, is_alloc_call
+from hpat.utils import get_definitions, is_alloc_call, is_whole_slice
 
 from enum import Enum
 class Distribution(Enum):
@@ -66,13 +67,7 @@ class DistributedAnalysis(object):
             elif isinstance(inst, Parfor):
                 self._analyze_parfor(inst, array_dists, parfor_dists)
             elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
-                if isinstance(inst, ir.SetItem):
-                    index = inst.index.name
-                else:
-                    index = inst.index_var.name
-                if ((inst.target.name, index) not in self._parallel_accesses):
-                    # no parallel to parallel array set (TODO)
-                    self._set_REP([inst.value], array_dists)
+                self._analyze_setitem(inst, array_dists)
             elif type(inst) in distributed_analysis_extensions:
                 # let external calls handle stmt if type matches
                 f = distributed_analysis_extensions[type(inst)]
@@ -285,32 +280,63 @@ class DistributedAnalysis(object):
         if rhs.op == 'static_getitem':
             if rhs.index_var is None:
                 return
-            index_var = rhs.index_var.name
+            index_var = rhs.index_var
         else:
             assert rhs.op == 'getitem'
-            index_var = rhs.index.name
+            index_var = rhs.index
 
-        if (rhs.value.name, index_var) in self._parallel_accesses:
+        if (rhs.value.name, index_var.name) in self._parallel_accesses:
             #self._set_REP([inst.target], array_dists)
             return
 
         # in multi-dimensional case, we only consider first dimension
         # TODO: extend to 2D distribution
-        if index_var in self._tuple_table:
-            inds = self._tuple_table[index_var]
-            index_var = inds[0].name
+        if index_var.name in self._tuple_table:
+            inds = self._tuple_table[index_var.name]
+            index_var = inds[0]
             # rest of indices should be replicated if array
             self._set_REP(inds[1:], array_dists)
 
         # array selection with boolean index
-        if (is_array(index_var, self.typemap)
-                    and self.typemap[index_var].dtype==types.boolean):
+        if (is_array(index_var.name, self.typemap)
+                    and self.typemap[index_var.name].dtype == types.boolean):
             # input array and bool index have the same distribution
-            new_dist = self._meet_array_dists(index_var, rhs.value.name, array_dists)
-            array_dists[lhs] = Distribution(min(Distribution.OneD_Var.value, new_dist.value))
+            new_dist = self._meet_array_dists(index_var.name, rhs.value.name,
+                                                                    array_dists)
+            array_dists[lhs] = Distribution(min(Distribution.OneD_Var.value,
+                                                                new_dist.value))
             return
+
+        if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+            # for example: A = X[:,3]
+            self._meet_array_dists(lhs, rhs.value.name, array_dists)
+            return
+
         self._set_REP(inst.list_vars(), array_dists)
         return
+
+    def _analyze_setitem(self, inst, array_dists):
+        if isinstance(inst, ir.SetItem):
+            index_var = inst.index
+        else:
+            index_var = inst.index_var
+
+        if ((inst.target.name, index_var.name) in self._parallel_accesses):
+            # no parallel to parallel array set (TODO)
+            return
+
+        if index_var.name in self._tuple_table:
+            inds = self._tuple_table[index_var.name]
+            index_var = inds[0]
+            # rest of indices should be replicated if array
+            self._set_REP(inds[1:], array_dists)
+
+        if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+            # for example: X[:,3] = A
+            self._meet_array_dists(inst.target.name, inst.value.name, array_dists)
+            return
+
+        self._set_REP([inst.value], array_dists)
 
     def _meet_array_dists(self, arr1, arr2, array_dists, top_dist=None):
         if top_dist is None:

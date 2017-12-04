@@ -1,13 +1,12 @@
 import numba
 from numba import ir_utils, ir, types, cgutils
-from numba.ir_utils import guard, get_definition
+from numba.ir_utils import guard, get_definition, find_callname, require
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 import collections
 import numpy as np
-import hpat
 
 # sentinel value representing non-constant values
 class NotConstant:
@@ -84,9 +83,8 @@ def cprint_lower(context, builder, sig, args):
     cgutils.printf(builder, "\n")
     return context.get_dummy_value()
 
-from hpat.distributed_analysis import Distribution
-
 def print_dist(d):
+    from hpat.distributed_analysis import Distribution
     if d == Distribution.REP:
         return "REP"
     if d == Distribution.OneD:
@@ -108,3 +106,17 @@ def distribution_report():
     print("\nParfor distributions:")
     for p, dist in hpat.distributed.dist_analysis.parfor_dists.items():
         print("   {0:<20} {1}".format(p, print_dist(dist)))
+
+
+def is_whole_slice(typemap, func_ir, var):
+    """ return True if var can be determined to be a whole slice """
+    require(typemap[var.name] == types.slice2_type)
+    call_expr = get_definition(func_ir, var)
+    require(isinstance(call_expr, ir.Expr) and call_expr.op=='call')
+    assert len(call_expr.args) == 2
+    assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
+    arg0_def = get_definition(func_ir, call_expr.args[0])
+    arg1_def = get_definition(func_ir, call_expr.args[1])
+    require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
+    require(isinstance(arg1_def, ir.Const) and arg1_def.value == None)
+    return True

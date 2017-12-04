@@ -35,6 +35,18 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_whole_slice(self):
+        def test_impl(N):
+            X = np.ones((N, 4))
+            X[:,3] = (X[:,3]) / (np.max(X[:,3]) - np.min(X[:,3]))
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_assert(self):
         # make sure assert in an inlined function works
         def g(a):

@@ -28,7 +28,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-from hpat.utils import get_definitions, is_alloc_call
+from hpat.utils import get_definitions, is_alloc_call, is_whole_slice
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -121,9 +121,13 @@ class DistributedPass(object):
                         if rhs.op=='call':
                             new_body += self._run_call(inst, blocks[label].body)
                             continue
-                        if rhs.op=='getitem':
+                        if rhs.op in ['getitem', 'static_getitem']:
+                            if rhs.op == 'getitem':
+                                index = rhs.index
+                            else:
+                                index = rhs.index_var
                             new_body += self._run_getsetitem(rhs.value,
-                                rhs.index, rhs, inst)
+                                index, rhs, inst)
                             continue
                         if (rhs.op=='getattr'
                                 and self._is_1D_arr(rhs.value.name)
@@ -494,8 +498,19 @@ class DistributedPass(object):
             out.append(full_node)
 
         elif self._is_1D_arr(arr.name) and isinstance(node, (ir.StaticSetItem, ir.SetItem)):
-            # scope = index_var.scope
-            # loc = index_var.loc
+            is_multi_dim = False
+            # we only consider 1st dimension for multi-dim arrays
+            if index_var.name in self._tuple_table:
+                inds = self._tuple_table[index_var.name]
+                index_var = inds[0]
+                is_multi_dim = True
+
+            # no need for transformation for whole slices
+            if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+                return out
+
+            # TODO: support multi-dim slice setitem like X[a:b, c:d]
+            assert not is_multi_dim
             start = self._array_starts[arr.name][0]
             count = self._array_counts[arr.name][0]
             # convert setitem with global range to setitem with local range
@@ -536,6 +551,22 @@ class DistributedPass(object):
             # self.typemap[err_var.name] = types.int32
             # setitem_assign = ir.Assign(setitem_call, err_var, loc)
             # out.append(setitem_assign)
+
+        elif self._is_1D_arr(arr.name) and node.op in ['getitem', 'static_getitem']:
+            is_multi_dim = False
+            # we only consider 1st dimension for multi-dim arrays
+            if index_var.name in self._tuple_table:
+                inds = self._tuple_table[index_var.name]
+                index_var = inds[0]
+                is_multi_dim = True
+
+            # no need for transformation for whole slices
+            if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+                # A = X[:,3]
+                lhs = full_node.target.name
+                self._array_starts[lhs] = [self._array_starts[arr.name][0]]
+                self._array_counts[lhs] = [self._array_counts[arr.name][0]]
+                self._array_sizes[lhs] = [self._array_sizes[arr.name][0]]
 
         return out
 
