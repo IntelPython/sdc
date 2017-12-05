@@ -254,14 +254,20 @@ class DistributedAnalysis(object):
 
         if call_list == ['train']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc_type:
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
                 self._meet_array_dists(args[0].name, args[1].name, array_dists, Distribution.Thread)
+                return
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
+                self._meet_array_dists(args[0].name, args[1].name, array_dists)
                 return
 
         if call_list == ['predict']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc_type:
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
                 self._meet_array_dists(lhs, args[0].name, array_dists, Distribution.Thread)
+                return
+            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
+                self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
         # set REP if not found
