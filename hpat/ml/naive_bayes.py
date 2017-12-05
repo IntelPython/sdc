@@ -80,7 +80,7 @@ class MultinomialNBAttribute(AttributeTemplate):
     def resolve_predict(self, dict, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.Array(types.float64, 1, 'C'), *args)
+        return signature(types.Array(types.int32, 1, 'C'), *args)
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -135,7 +135,7 @@ def mnb_train_impl(context, builder, sig, args):
 
     # num_features, num_samples, X, y
     arg_typs = [lir.IntType(64), lir.IntType(64),
-                lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
+                lir.IntType(32).as_pointer(), lir.IntType(32).as_pointer(),
                 lir.IntType(64).as_pointer()]
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), arg_typs)
 
@@ -177,7 +177,7 @@ def mnb_predict_impl(context, builder, sig, args):
 
     # model, num_features, num_samples, p, ret
     arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64),
-                lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
+                lir.IntType(32).as_pointer(), lir.IntType(32).as_pointer(),
                 lir.IntType(64)]
     fnty = lir.FunctionType(lir.VoidType(), arg_typs)
 

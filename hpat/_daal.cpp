@@ -23,8 +23,8 @@ void* svc_train(int64_t num_features, int64_t num_samples, double* X, double *y,
 void svc_predict(void* model_ptr, int64_t num_features, int64_t num_samples, double* p, double *res, int64_t n_classes);
 void dtor_svc(void* model_ptr, int64_t size, void* in);
 
-void* mnb_train(int64_t num_features, int64_t num_samples, int64_t* X, int64_t *y, int64_t *n_classes_ptr);
-void mnb_predict(void* model_ptr, int64_t num_features, int64_t num_samples, int64_t* p, int64_t *res, int64_t n_classes);
+void* mnb_train(int64_t num_features, int64_t num_samples, int* X, int *y, int64_t *n_classes_ptr);
+void mnb_predict(void* model_ptr, int64_t num_features, int64_t num_samples, int *p, int *res, int64_t n_classes);
 void dtor_mnb(void* model_ptr, int64_t size, void* in);
 
 PyMODINIT_FUNC PyInit_daal_wrapper(void) {
@@ -44,7 +44,7 @@ PyMODINIT_FUNC PyInit_daal_wrapper(void) {
     PyObject_SetAttrString(m, "mnb_train",
                             PyLong_FromVoidPtr((void*)(&mnb_train)));
     PyObject_SetAttrString(m, "mnb_predict",
-                            PyLong_FromVoidPtr((void*)(&svc_predict)));
+                            PyLong_FromVoidPtr((void*)(&mnb_predict)));
     PyObject_SetAttrString(m, "dtor_mnb",
                             PyLong_FromVoidPtr((void*)(&dtor_mnb)));
 
@@ -151,7 +151,7 @@ void dtor_svc(void* model_ptr, int64_t size, void* in)
     return;
 }
 
-void* mnb_train(int64_t num_features, int64_t num_samples, int64_t* X, int64_t *y,
+void* mnb_train(int64_t num_features, int64_t num_samples, int* X, int *y,
                                                         int64_t *n_classes_ptr)
 {
     int rankId, num_pes;
@@ -169,10 +169,10 @@ void* mnb_train(int64_t num_features, int64_t num_samples, int64_t* X, int64_t *
     // printf("mnb_train nClasses:%ld nFeatures:%ld nSamples:%ld X[0]:%ld y[0]:%ld\n",
     //         n_classes, num_features, num_samples, X[0], y[0]);
 
-    services::SharedPtr< HomogenNumericTable< int64_t > > trainData =
-            HomogenNumericTable<int64_t>::create(X, num_features, num_samples);
-    services::SharedPtr< HomogenNumericTable< int64_t > > trainGroundTruth =
-                        HomogenNumericTable<int64_t>::create(y, 1, num_samples);
+    services::SharedPtr< HomogenNumericTable< int > > trainData =
+            HomogenNumericTable<int>::create(X, num_features, num_samples);
+    services::SharedPtr< HomogenNumericTable< int > > trainGroundTruth =
+                        HomogenNumericTable<int>::create(y, 1, num_samples);
 
     multinomial_naive_bayes::training::ResultPtr trainingResult;
     multinomial_naive_bayes::training::Distributed<step1Local> localAlgorithm(n_classes);
@@ -229,11 +229,36 @@ void* mnb_train(int64_t num_features, int64_t num_samples, int64_t* X, int64_t *
 }
 
 void mnb_predict(void* model_ptr, int64_t num_features, int64_t num_samples,
-                                    int64_t* p, int64_t *res, int64_t n_classes)
+                                    int* p, int *res, int64_t n_classes)
 {
+    // printf("predict mnb classes: %lld\n", n_classes);
+    services::SharedPtr<multinomial_naive_bayes::training::Result>* trainingResult =
+        (services::SharedPtr<multinomial_naive_bayes::training::Result>*)(model_ptr);
+    services::SharedPtr<classifier::prediction::Result> predictionResult;
+
+    services::SharedPtr< HomogenNumericTable< int > > testData =
+            HomogenNumericTable<int>::create(p, num_features, num_samples);
+
+    multinomial_naive_bayes::prediction::Batch<> algorithm(n_classes);
+
+    algorithm.input.set(classifier::prediction::data,  testData);
+    algorithm.input.set(classifier::prediction::model, (*trainingResult)->get(classifier::training::model));
+
+    algorithm.compute();
+
+    predictionResult = algorithm.getResult();
+    NumericTablePtr res_table = predictionResult->get(classifier::prediction::prediction);
+    BlockDescriptor<int> block1;
+    res_table->getBlockOfRows(0, num_samples, readOnly, block1);
+    int *data_ptr = block1.getBlockPtr();
+    // printf("%lf %lf\n", data_ptr[0], data_ptr[1]);
+    memcpy(res, data_ptr, num_samples*sizeof(int));
+    res_table->releaseBlockOfRows(block1);
     return;
 }
 void dtor_mnb(void* model_ptr, int64_t size, void* in)
 {
+    mnb_payload* st = (mnb_payload*) model_ptr;
+    delete st->trainingResultPtr;
     return;
 }
