@@ -22,6 +22,26 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_astype(self):
+        def test_impl(N):
+            return np.ones(N).astype(np.int32).sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_shape(self):
+        def test_impl(N):
+            return np.ones(N).shape[0]
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_getitem_multidim(self):
         def test_impl(N):
             A = np.ones((N, 3))

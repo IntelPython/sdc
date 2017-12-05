@@ -121,6 +121,16 @@ class DistributedPass(object):
                         if rhs.op=='call':
                             new_body += self._run_call(inst, blocks[label].body)
                             continue
+                        if (rhs.op=='static_getitem'
+                                and rhs.value.name in self._shape_attrs):
+                            arr = self._shape_attrs[rhs.value.name]
+                            ndims = self.typemap[arr].ndim
+                            sizes = self._array_sizes[arr]
+                            if arr not in self._T_arrs and rhs.index==0:
+                                inst.value = sizes[rhs.index]
+                            # last dimension of transposed arrays is partitioned
+                            if arr in self._T_arrs and rhs.index==ndims-1:
+                                inst.value = sizes[rhs.index]
                         if rhs.op in ['getitem', 'static_getitem']:
                             if rhs.op == 'getitem':
                                 index = rhs.index
@@ -132,6 +142,7 @@ class DistributedPass(object):
                         if (rhs.op=='getattr'
                                 and self._is_1D_arr(rhs.value.name)
                                 and rhs.attr=='shape'):
+                            # XXX: return a new tuple using sizes here?
                             self._shape_attrs[lhs] = rhs.value.name
                         if (rhs.op=='getattr'
                                 and self._is_1D_arr(rhs.value.name)
@@ -147,16 +158,6 @@ class DistributedPass(object):
                         if (rhs.op=='exhaust_iter'
                                 and rhs.value.name in self._shape_attrs):
                             self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
-                        if (rhs.op=='static_getitem'
-                                and rhs.value.name in self._shape_attrs):
-                            arr = self._shape_attrs[rhs.value.name]
-                            ndims = self.typemap[arr].ndim
-                            sizes = self._array_sizes[arr]
-                            if arr not in self._T_arrs and rhs.index==0:
-                                inst.value = sizes[rhs.index]
-                            # last dimension of transposed arrays is partitioned
-                            if arr in self._T_arrs and rhs.index==ndims-1:
-                                inst.value = sizes[rhs.index]
                     if isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
@@ -391,6 +392,16 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out += f_block.body[:-2]
             out[-1].target = assign.target
+
+        if call_list == ['astype']:
+            call_def = guard(get_definition, self.func_ir, func_var)
+            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
+                                and self._isarray(call_def.value.name)
+                                and not self._is_REP(call_def.value.name)):
+                in_arr_name = call_def.value.name
+                self._array_starts[lhs] = self._array_starts[in_arr_name]
+                self._array_counts[lhs] = self._array_counts[in_arr_name]
+                self._array_sizes[lhs] = self._array_sizes[in_arr_name]
 
         # output array has same properties (starts etc.) as input array
         if (len(call_list)==2 and call_list[1]==np
