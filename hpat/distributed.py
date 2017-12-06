@@ -478,6 +478,16 @@ class DistributedPass(object):
                 self._array_sizes[lhs] = [self._array_sizes[arg0][0], -1]
                 dprint("run dot case 4 Xw:", arg0, arg1)
 
+        # output of mnb.predict is 1D with same size as 1st dimension of input
+        if call_list == ['predict']:
+            getattr_call = guard(get_definition, self.func_ir, func_var)
+            if (getattr_call and self.typemap[getattr_call.value.name]
+                                            == hpat.ml.naive_bayes.mnb_type):
+                in_arr = rhs.args[0].name
+                self._array_starts[lhs] = [self._array_starts[in_arr][0]]
+                self._array_counts[lhs] = [self._array_counts[in_arr][0]]
+                self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
+
         return out
 
     def _run_getsetitem(self, arr, index_var, node, full_node):
