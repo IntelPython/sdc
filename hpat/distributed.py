@@ -84,6 +84,11 @@ class DistributedPass(object):
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
         dprint_func_ir(self.func_ir, "after distributed pass")
         lower_parfor_sequential(self.typingctx, self.func_ir, self.typemap, self.calltypes)
+        if hpat.multithread_mode:
+            # parfor params need to be updated for multithread_mode since some
+            # new variables like alloc_start are introduced by distributed pass
+            # and are used in later parfors
+            parfor_ids = get_parfor_params(self.func_ir.blocks)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
