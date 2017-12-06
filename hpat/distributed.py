@@ -1258,12 +1258,6 @@ class DistributedPass(object):
         return (arr_name not in self._dist_analysis.array_dists or
                 self._dist_analysis.array_dists[arr_name]==Distribution.REP)
 
-    def _is_alloc_call(self, func_var):
-        if func_var not in self._call_table:
-            return False
-        return self._call_table[func_var] in [['empty', np],
-                                        [numba.unsafe.ndarray.empty_inferred]]
-
     def _is_h5_read_write_call(self, func_var):
         if func_var not in self._call_table:
             return False
