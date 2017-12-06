@@ -220,7 +220,30 @@ void* mnb_train(int64_t num_features, int64_t num_samples, int* X, int *y,
 
         trainingResult = masterAlgorithm.getResult();
     }
-    // TODO: broadcast model
+
+    // broadcast model
+    size_t modelArchLength = 0;
+    services::SharedPtr<byte> serializedModel;
+    if (rankId == mpi_root)
+    {
+        InputDataArchive modelArch;
+        trainingResult->serialize(modelArch);
+        modelArchLength = modelArch.getSizeOfArchive();
+        serializedModel.reset(new byte[modelArchLength]);
+        modelArch.copyArchiveToArray(serializedModel.get(), modelArchLength);
+    }
+    // broadcast model size to enable memory allocation
+    MPI_Bcast(&modelArchLength, sizeof(size_t), MPI_CHAR, mpi_root, MPI_COMM_WORLD);
+    if (rankId != mpi_root)
+        serializedModel.reset(new byte[modelArchLength]);
+    MPI_Bcast(serializedModel.get(), modelArchLength, MPI_CHAR, mpi_root, MPI_COMM_WORLD);
+    if (rankId != mpi_root)
+    {
+        OutputDataArchive modelArch(serializedModel.get(), modelArchLength);
+        trainingResult.reset(new multinomial_naive_bayes::training::Result());
+        trainingResult->deserialize(modelArch);
+    }
+
     // FIXME: return pointer to SharedPtr since get/set functions don't work
     services::SharedPtr<multinomial_naive_bayes::training::Result> * ptres =
         new services::SharedPtr<multinomial_naive_bayes::training::Result>();
