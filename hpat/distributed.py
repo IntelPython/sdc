@@ -309,33 +309,9 @@ class DistributedPass(object):
         # divide 1D alloc
         if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
             size_var = rhs.args[0]
+            out, new_size_var = self._run_alloc(size_var, lhs)
             rhs.args = list(rhs.args)  # empty_inferred is tuple for some reason
-            if self.typemap[size_var.name]==types.intp:
-                self._array_sizes[lhs] = [size_var]
-                out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
-                    "$alloc", "get_node_portion", distributed_api.get_node_portion)
-                self._array_starts[lhs] = [start_var]
-                self._array_counts[lhs] = [end_var]
-                rhs.args[0] = end_var
-            else:
-                # size should be either int or tuple of ints
-                assert size_var.name in self._tuple_table
-                size_list = self._tuple_table[size_var.name]
-                self._array_sizes[lhs] = size_list
-                out, start_var, end_var = self._gen_1D_div(size_list[0], scope, loc,
-                    "$alloc", "get_node_portion", distributed_api.get_node_portion)
-                ndims = len(size_list)
-                new_size_list = copy.copy(size_list)
-                new_size_list[0] = end_var
-                tuple_var = ir.Var(scope, mk_unique_var("$tuple_var"), loc)
-                self.typemap[tuple_var.name] = self.typemap[size_var.name]
-                tuple_call = ir.Expr.build_tuple(new_size_list, loc)
-                tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
-                out.append(tuple_assign)
-                rhs.args[0] = tuple_var
-                self._array_starts[lhs] = [self._set0_var]*ndims
-                self._array_starts[lhs][0] = start_var
-                self._array_counts[lhs] = new_size_list
+            rhs.args[0] = new_size_var
             out.append(assign)
 
         if (self._is_h5_read_write_call(func_var)
@@ -494,6 +470,44 @@ class DistributedPass(object):
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
         return out
+
+    def _run_alloc(self, size_var, lhs):
+        """ divides array sizes and assign its sizes/starts/counts attributes
+        returns generated nodes and the new size variable to enable update of
+        the alloc call.
+        """
+        scope = size_var.scope
+        loc = size_var.loc
+        out = []
+        new_size_var = None
+        if self.typemap[size_var.name]==types.intp:
+            self._array_sizes[lhs] = [size_var]
+            out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
+                "$alloc", "get_node_portion", distributed_api.get_node_portion)
+            self._array_starts[lhs] = [start_var]
+            self._array_counts[lhs] = [end_var]
+            new_size_var = end_var
+        else:
+            # size should be either int or tuple of ints
+            assert size_var.name in self._tuple_table
+            size_list = self._tuple_table[size_var.name]
+            self._array_sizes[lhs] = size_list
+            out, start_var, end_var = self._gen_1D_div(size_list[0], scope, loc,
+                "$alloc", "get_node_portion", distributed_api.get_node_portion)
+            ndims = len(size_list)
+            new_size_list = copy.copy(size_list)
+            new_size_list[0] = end_var
+            tuple_var = ir.Var(scope, mk_unique_var("$tuple_var"), loc)
+            self.typemap[tuple_var.name] = self.typemap[size_var.name]
+            tuple_call = ir.Expr.build_tuple(new_size_list, loc)
+            tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
+            out.append(tuple_assign)
+            self._array_starts[lhs] = [self._set0_var]*ndims
+            self._array_starts[lhs][0] = start_var
+            self._array_counts[lhs] = new_size_list
+            new_size_var = tuple_var
+
+        return out, new_size_var
 
     def _run_getsetitem(self, arr, index_var, node, full_node):
         out = [full_node]
