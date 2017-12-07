@@ -103,7 +103,7 @@ class DistributedAnalysis(object):
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
-                                                                    'astype']):
+                                                        'astype', 'reshape']):
             pass # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op=='call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
@@ -177,7 +177,7 @@ class DistributedAnalysis(object):
         if self._is_call(func_var, [len]):
             return
 
-        if call_list == ['astype']:
+        if call_list == ['astype'] or call_list == ['reshape']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
                                         and self._isarray(call_def.value.name)):
