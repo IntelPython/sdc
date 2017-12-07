@@ -123,7 +123,26 @@ class HiFramesTyped(object):
                                     (types.Array, StringArrayType))):
             assign.value = rhs.args[0]
             return [assign]
-
+        # arr = fix_rolling_array(col) -> arr=col if col is float array
+        if (rhs.op == 'call'
+                and rhs.func.name in call_table
+                and call_table[rhs.func.name] ==
+                            ['fix_rolling_array', 'hiframes_api', hpat]):
+            in_arr = rhs.args[0]
+            if isinstance(self.typemap[in_arr.name].dtype, types.Float):
+                assign.value = rhs.args[0]
+                return [assign]
+            else:
+                def f(column):
+                    a = column.astype(np.float64)
+                f_block = compile_to_numba_ir(f,
+                        {'hpat': hpat, 'np': np}, self.typingctx,
+                        (self.typemap[in_arr.name],),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [in_arr])
+                nodes = f_block.body[:-3]
+                nodes[-1].target = assign.target
+                return nodes
         return None
 
     def _handle_empty_like(self, lhs, rhs, assign, call_table):

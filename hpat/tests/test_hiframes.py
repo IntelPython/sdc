@@ -143,7 +143,7 @@ class TestHiFrames(unittest.TestCase):
     def test_rolling1(self):
         # size 3 without unroll
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.random.ranf(n)})
             Ac = df.A.rolling(3).sum()
             return Ac.sum()
 
@@ -154,7 +154,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         # size 7 with unroll
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.random.ranf(n)})
             Ac = df.A.rolling(7).sum()
             return Ac.sum()
 

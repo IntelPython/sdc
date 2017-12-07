@@ -255,6 +255,9 @@ def array_std(context, builder, sig, args):
 def fix_df_array(c):
     return c
 
+def fix_rolling_array(c):
+    return c
+
 from numba.extending import overload
 from hpat.str_ext import StringType
 from hpat.str_arr_ext import StringArray, StringArrayType
@@ -278,3 +281,16 @@ def fix_df_array_overload(column):
     def fix_df_array_impl(column):
         return column
     return fix_df_array_impl
+
+@overload(fix_rolling_array)
+def fix_rolling_array_overload(column):
+    assert isinstance(column, types.Array)
+    dtype = column.dtype
+    # convert bool and integer to float64
+    if dtype == types.boolean or isinstance(dtype, types.Integer):
+        def fix_rolling_array_impl(column):
+            return column.astype(np.float64)
+    else:
+        def fix_rolling_array_impl(column):
+            return column
+    return fix_rolling_array_impl

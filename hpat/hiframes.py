@@ -15,6 +15,7 @@ import hpat
 from hpat import hiframes_api, utils, parquet_pio, config
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import numpy as np
+import math
 from hpat.parquet_pio import ParquetHandler
 
 
@@ -22,7 +23,19 @@ df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
 LARGE_WIN_SIZE = 10
 
 def remove_hiframes(rhs, lives, call_list):
-    if call_list == ['fix_df_array', 'hiframes_api', hpat]:
+    # used in stencil generation of rolling
+    if len(call_list) == 1 and call_list[0] in [min, max, abs]:
+        return True
+    # used in stencil generation of rolling
+    if (len(call_list) == 1 and isinstance(call_list[0],
+            numba.targets.registry.CPUDispatcher)
+            and call_list[0].py_func == numba.stencilparfor._compute_last_ind):
+        return True
+    # used in stencil generation of rolling
+    if call_list == ['ceil', math]:
+        return True
+    if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
+            call_list[0] in ['fix_df_array', 'fix_rolling_array']):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
             call_list[0]
@@ -446,6 +459,8 @@ class HiFrames(object):
             kernel_func = loc_vars['g']
 
         init_nodes = []
+        col_var, init_nodes = self._fix_rolling_array(col_var, func)
+
         if isinstance(win_size, int):
             win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
             init_nodes.append(
@@ -486,6 +501,20 @@ class HiFrames(object):
             setitem_nodes = setitem_nodes1 + setitem_nodes2
 
         return init_nodes + stencil_nodes + setitem_nodes
+
+    def _fix_rolling_array(self, col_var, func):
+        """
+        for integers and bools, the output should be converted to float64
+        """
+        # TODO: check all possible funcs
+        def f(arr):
+            df_arr = hpat.hiframes_api.fix_rolling_array(arr)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
+        nodes = f_block.body[:-3]  # remove none return
+        new_col_var = nodes[-1].target
+        return new_col_var, nodes
+
 
     def _gen_rolling_init(self, win_size, func, center):
         nodes = []
