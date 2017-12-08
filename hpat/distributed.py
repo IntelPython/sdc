@@ -887,7 +887,7 @@ class DistributedPass(object):
                 new_body.append(ir.Assign(calc_call, parfor_index, loc))
 
             if is_left:
-                buff_index_start = halo_length-i
+                buff_index_start = halo_length+i
             else:
                 buff_index_start = -(i+1)
 
