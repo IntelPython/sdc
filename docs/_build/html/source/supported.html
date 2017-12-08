@@ -266,14 +266,15 @@ Here are a few examples:</p>
 <p>DataFrame columns with integer data need special care. Pandas dynamically
 converts integer columns to floating point when NaN values are needed.
 This is because Numpy does not support NaN values for integers.
-HPAT does not have perform this conversion since enough information is not
+HPAT does not perform this conversion unless enough information is
 available at compilation time. Hence, the user is responsible for manual
 conversion of integer data to floating point data if needed.</p>
 </div>
 <div class="section" id="file-i-o">
 <h2>File I/O<a class="headerlink" href="#file-i-o" title="Permalink to this headline">¶</a></h2>
-<p>Currently, HPAT only supports I/O for the <a class="reference external" href="http://www.h5py.org/">HDF5</a> format.
-The syntax is the same as the <a class="reference external" href="http://www.h5py.org/">h5py</a> package.
+<p>Currently, HPAT supports I/O for the <a class="reference external" href="http://www.h5py.org/">HDF5</a> and
+<a class="reference external" href="http://parquet.apache.org/">Parquet</a> formats.
+For HDF5, the syntax is the same as the <a class="reference external" href="http://www.h5py.org/">h5py</a> package.
 For example:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span> <span class="nf">example</span><span class="p">():</span>
@@ -282,6 +283,17 @@ For example:</p>
     <span class="n">Y</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s1">&#39;responses&#39;</span><span class="p">][:]</span>
 </pre></div>
 </div>
+<p>For Parquet, the syntax is the same as <a class="reference external" href="https://arrow.apache.org/docs/python/">pyarrow</a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pyarrow.parquet</span> <span class="k">as</span> <span class="nn">pq</span>
+<span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span> <span class="nf">kde</span><span class="p">():</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="s1">&#39;kde.parquet&#39;</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;points&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+</pre></div>
+</div>
+<p>HPAT automatically parallelizes I/O of different nodes in a distributed setting
+without any code changes.</p>
 <p>HPAT needs to know the types of input arrays. If the file name is a constant
 string, HPAT tries to look at the file at compile time and recognize the types.
 Otherwise, the user is responsile for providing the types similar to

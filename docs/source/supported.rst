@@ -239,15 +239,16 @@ small datasets.
 DataFrame columns with integer data need special care. Pandas dynamically
 converts integer columns to floating point when NaN values are needed.
 This is because Numpy does not support NaN values for integers.
-HPAT does not have perform this conversion since enough information is not
+HPAT does not perform this conversion unless enough information is
 available at compilation time. Hence, the user is responsible for manual
 conversion of integer data to floating point data if needed.
 
 File I/O
 --------
 
-Currently, HPAT only supports I/O for the `HDF5 <http://www.h5py.org/>`_ format.
-The syntax is the same as the `h5py <http://www.h5py.org/>`_ package.
+Currently, HPAT supports I/O for the `HDF5 <http://www.h5py.org/>`_ and
+`Parquet <http://parquet.apache.org/>`_ formats.
+For HDF5, the syntax is the same as the `h5py <http://www.h5py.org/>`_ package.
 For example::
 
     @hpat.jit
@@ -255,6 +256,18 @@ For example::
         f = h5py.File("lr.hdf5", "r")
         X = f['points'][:]
         Y = f['responses'][:]
+
+For Parquet, the syntax is the same as `pyarrow <https://arrow.apache.org/docs/python/>`_::
+
+    import pyarrow.parquet as pq
+    @hpat.jit
+    def kde():
+        t = pq.read_table('kde.parquet')
+        df = t.to_pandas()
+        X = df['points'].values
+
+HPAT automatically parallelizes I/O of different nodes in a distributed setting
+without any code changes.
 
 HPAT needs to know the types of input arrays. If the file name is a constant
 string, HPAT tries to look at the file at compile time and recognize the types.
