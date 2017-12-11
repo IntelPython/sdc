@@ -42,6 +42,20 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+
+    def test_inplace_binop(self):
+        def test_impl(N):
+            A = np.ones(N)
+            B = np.ones(N)
+            B += A
+            return B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_getitem_multidim(self):
         def test_impl(N):
             A = np.ones((N, 3))

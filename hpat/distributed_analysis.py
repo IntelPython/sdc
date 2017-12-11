@@ -85,7 +85,14 @@ class DistributedAnalysis(object):
         if isinstance(rhs, ir.Var) and self._isarray(lhs):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
-
+        elif self._isarray(lhs) and isinstance(rhs, ir.Expr) and rhs.op == 'inplace_binop':
+            # distributions of all 3 variables should meet (lhs, arg1, arg2)
+            arg1 = rhs.lhs.name
+            arg2 = rhs.rhs.name
+            dist = self._meet_array_dists(arg1, arg2, array_dists)
+            dist = self._meet_array_dists(arg1, lhs, array_dists, dist)
+            self._meet_array_dists(arg1, arg2, array_dists, dist)
+            return
         elif isinstance(rhs, ir.Expr) and rhs.op in ['getitem', 'static_getitem']:
             self._analyze_getitem(inst, lhs, rhs, array_dists)
             return

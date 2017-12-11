@@ -163,6 +163,10 @@ class DistributedPass(object):
                         if (rhs.op=='exhaust_iter'
                                 and rhs.value.name in self._shape_attrs):
                             self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
+                        if rhs.op == 'inplace_binop' and self._is_1D_arr(rhs.lhs.name):
+                            self._array_starts[lhs] = self._array_starts[rhs.lhs.name]
+                            self._array_counts[lhs] = self._array_counts[rhs.lhs.name]
+                            self._array_sizes[lhs] = self._array_sizes[rhs.lhs.name]
                     if isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
