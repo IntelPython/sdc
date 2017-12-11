@@ -1,0 +1,28 @@
+# reference: https://github.com/numba/numba/blob/master/.travis.yml
+
+dist: trusty
+
+matrix:
+    include:
+        - os: osx
+          env: PYTHON=3.6 NUMPY=1.13 CONDA_ENV=travisci
+        - env: PYTHON=3.6 NUMPY=1.13 CONDA_ENV=travisci
+
+branches:
+    only:
+        - master
+
+before_install:
+    - buildscripts/setup_conda.sh
+    - export PATH=$HOME/miniconda3/bin:$PATH
+install:
+    - buildscripts/build.sh
+
+script:
+    - buildscripts/test.sh
+
+# after_success:
+#     - buildscripts/after_success.sh
+
+notifications:
+    email: false
