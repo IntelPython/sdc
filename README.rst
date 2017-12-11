@@ -2,6 +2,9 @@
 HPAT
 *****
 
+.. image:: https://travis-ci.org/IntelLabs/hpat.svg?branch=master
+    :target: https://travis-ci.org/IntelLabs/hpat
+
 A compiler-based framework for big data in Python
 #################################################
 
