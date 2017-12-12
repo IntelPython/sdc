@@ -5,6 +5,9 @@ HPAT
 .. image:: https://travis-ci.org/IntelLabs/hpat.svg?branch=master
     :target: https://travis-ci.org/IntelLabs/hpat
 
+.. image:: https://coveralls.io/repos/github/IntelLabs/hpat/badge.svg?branch=master
+    :target: https://coveralls.io/github/IntelLabs/hpat?branch=master
+
 A compiler-based framework for big data in Python
 #################################################
 
