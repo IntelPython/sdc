@@ -37,3 +37,5 @@ elif [[ "$unamestr" == 'Darwin' ]]; then
 else
     echo "Error in compiler install"
 fi
+
+if [ "$RUN_COVERAGE" == "yes" ]; then $CONDA_INSTALL coveralls -c conda-forge; fi

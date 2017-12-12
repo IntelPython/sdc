@@ -6,7 +6,7 @@ matrix:
     include:
         - os: osx
           env: PYTHON=3.6 NUMPY=1.13 CONDA_ENV=travisci
-        - env: PYTHON=3.6 NUMPY=1.13 CONDA_ENV=travisci
+        - env: PYTHON=3.6 NUMPY=1.13 RUN_COVERAGE=yes CONDA_ENV=travisci
 
 branches:
     only:
@@ -21,8 +21,8 @@ install:
 script:
     - buildscripts/test.sh
 
-# after_success:
-#     - buildscripts/after_success.sh
+after_success:
+    - buildscripts/after_success.sh
 
 notifications:
     email: false
