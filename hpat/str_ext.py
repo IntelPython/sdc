@@ -81,6 +81,20 @@ class StrToFloat(AbstractTemplate):
         if isinstance(arg, StringType):
             return signature(types.float64, arg)
 
+def contains_regex(str, pat):
+    return False
+
+def contains_noregex(str, pat):
+    return False
+
+@infer_global(contains_regex)
+@infer_global(contains_noregex)
+class ContainsInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(types.boolean, *args)
+
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
@@ -92,6 +106,8 @@ ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
 ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
+ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
+ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -195,3 +211,17 @@ def len_string(context, builder, sig, args):
                     [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
     return (builder.call(fn, args))
+
+@lower_builtin(contains_regex, string_type, string_type)
+def impl_string_concat(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1),
+                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
+    return builder.call(fn, args)
+
+@lower_builtin(contains_noregex, string_type, string_type)
+def impl_string_concat(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1),
+                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_contains_noregex")
+    return builder.call(fn, args)

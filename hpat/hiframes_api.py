@@ -150,6 +150,12 @@ def std(A):
 def mean(A):
     return 0
 
+def str_contains_regex(str_arr, pat):
+    return 0;
+
+def str_contains_noregex(str_arr, pat):
+    return 0;
+
 from numba.typing.arraydecl import _expand_integer
 
 @infer_global(fillna)
@@ -180,6 +186,16 @@ class VarDdof1Type(AbstractTemplate):
         if isinstance(args[0].dtype, (types.Integer, types.Boolean)):
             return signature(types.float64, *args)
         return signature(args[0].dtype, *args)
+
+@infer_global(str_contains_regex)
+@infer_global(str_contains_noregex)
+class ContainsType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        # args: str_arr, pat
+        return signature(types.Array(types.boolean, 1, 'C'), *args)
+
 
 # import numba.typing.arraydecl
 # from numba import types

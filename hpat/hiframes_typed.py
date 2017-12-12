@@ -74,6 +74,10 @@ class HiFramesTyped(object):
                 if res is not None:
                     return res
 
+            res = self._handle_str_contains(lhs, rhs, assign, call_table)
+            if res is not None:
+                return res
+
         return [assign]
 
     def _handle_string_array_expr(self, lhs, rhs, assign):
@@ -163,6 +167,38 @@ class HiFramesTyped(object):
                             self.typemap[in_arr.name].dtype, in_arr.scope, in_arr.loc)
             return nodes + alloc_nodes
         return None
+
+    def _handle_str_contains(self, lhs, rhs, assign, call_table):
+        fname = guard(find_callname, self.func_ir, rhs)
+        if fname is None:
+            return None
+
+        if fname == ('str_contains_regex', 'hpat.hiframes_api'):
+            comp_func = 'hpat.str_ext.contains_regex'
+        elif fname == ('str_contains_noregex', 'hpat.hiframes_api'):
+            comp_func = 'hpat.str_ext.contains_noregex'
+        else:
+            return None
+
+        str_arr = rhs.args[0]
+        pat = rhs.args[1]
+        func_text = 'def f(str_arr, pat):\n'
+        func_text += '  l = str_arr.size\n'
+        func_text += '  S = np.empty(l, dtype=np.bool_)\n'
+        func_text += '  for i in numba.parfor.internal_prange(l):\n'
+        func_text += '    S[i] = {}(str_arr[i], pat)\n'.format(comp_func)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+        f_blocks = compile_to_numba_ir(f,
+                {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
+                (self.typemap[str_arr.name], self.typemap[pat.name]),
+                self.typemap, self.calltypes).blocks
+        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [str_arr, pat])
+        # replace call with result of parfor (S)
+        # S is target of last statement in 1st block of f
+        assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
+        return (f_blocks, [assign])
 
     def _handle_df_col_filter(self, lhs_name, rhs, assign):
         # find df['col2'] = df['col1'][arr]

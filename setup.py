@@ -62,7 +62,9 @@ ext_dict = Extension(name="hdict_ext",
                              )
 
 ext_str = Extension(name="hstr_ext",
-                             sources=["hpat/_str_ext.cpp"]
+                             sources=["hpat/_str_ext.cpp"],
+                             extra_compile_args=['-std=c++11'],
+                             extra_link_args=['-std=c++11'],
                              )
 
 ext_parquet = Extension(name="parquet_cpp",
