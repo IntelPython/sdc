@@ -13,4 +13,4 @@ popd
 popd
 
 # build HPAT
-HDF5_DIR=$CONDA_PREFIX python setup.py install
+DAALROOT=$CONDA_PREFIX HDF5_DIR=$CONDA_PREFIX python setup.py install
