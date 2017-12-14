@@ -25,8 +25,8 @@ double quantile_parallel_char(char* data, int64_t local_size, double at, int typ
 double quantile_parallel_uchar(unsigned char* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
 double quantile_parallel_int(int* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
 double quantile_parallel_int64(int64_t* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
-double quantile_parallel_float(float* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
-double quantile_parallel_double(double* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
+double quantile_parallel_float(float* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes);
+double quantile_parallel_double(double* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes);
 
 PyMODINIT_FUNC PyInit_quantile_alg(void) {
     PyObject *m;
@@ -58,9 +58,9 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
     if (type_enum == 3)
         return quantile_parallel_int64((int64_t*)data, local_size, at, type_enum, myrank, n_pes);
     if (type_enum == 4)
-        return quantile_parallel_float((float*)data, local_size, at, type_enum, myrank, n_pes);
+        return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
     if (type_enum == 5)
-        return quantile_parallel_double((double*)data, local_size, at, type_enum, myrank, n_pes);
+        return quantile_parallel_double((double*)data, local_size, quantile, type_enum, myrank, n_pes);
 
     printf("unknown quantile data type");
     return -1.0;
@@ -114,24 +114,60 @@ double quantile_parallel_int64(int64_t* data, int64_t local_size, double at, int
     return res1 + (res2 - res1) * fraction;
 }
 
-double quantile_parallel_float(float* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes)
+double quantile_parallel_float(float* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes)
 {
+    std::vector<float> my_array(local_size);
+    // copy data but skip over NaNs
+    int64_t new_ind = 0;
+    for(int64_t i=0; i<local_size; i++)
+    {
+        float val = data[i];
+        if (!std::isnan(val))
+        {
+            my_array[new_ind] = val;
+            new_ind++;
+        }
+    }
+    local_size = new_ind;
+    my_array.resize(local_size);
+    // recalculate total size since there could be NaNs
+    int64_t total_size;
+    MPI_Allreduce(&local_size, &total_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    double at = quantile * (total_size-1);
     int64_t k1 = (int64_t)at;
     int64_t k2 = k1+1;
     double fraction = at - (double)k1;
-    std::vector<float> my_array(data, data+local_size);
+
     double res1 = get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
     double res2 = get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
     // linear method, TODO: support other methods
     return res1 + (res2 - res1) * fraction;
 }
 
-double quantile_parallel_double(double* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes)
+double quantile_parallel_double(double* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes)
 {
+    std::vector<double> my_array(local_size);
+    // copy data but skip over NaNs
+    int64_t new_ind = 0;
+    for(int64_t i=0; i<local_size; i++)
+    {
+        double val = data[i];
+        if (!std::isnan(val))
+        {
+            my_array[new_ind] = val;
+            new_ind++;
+        }
+    }
+    local_size = new_ind;
+    my_array.resize(local_size);
+    // recalculate total size since there could be NaNs
+    int64_t total_size;
+    MPI_Allreduce(&local_size, &total_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    double at = quantile * (total_size-1);
     int64_t k1 = (int64_t)at;
     int64_t k2 = k1+1;
     double fraction = at - (double)k1;
-    std::vector<double> my_array(data, data+local_size);
+
     double res1 = get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
     double res2 = get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
     // linear method, TODO: support other methods
