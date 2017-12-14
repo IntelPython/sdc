@@ -67,6 +67,14 @@ ext_str = Extension(name="hstr_ext",
                              extra_link_args=['-std=c++11'],
                              )
 
+ext_quantile = Extension(name="quantile_alg_ext",
+                             libraries = MPI_LIBS,
+                             sources=["hpat/_quantile_alg.cpp"],
+                             include_dirs=[PREFIX_DIR+'/include/'],
+                             extra_compile_args=['-std=c++11'],
+                             extra_link_args=['-std=c++11'],
+                             )
+
 ext_parquet = Extension(name="parquet_cpp",
                              libraries = ['parquet', 'arrow', 'mpi'],
                              sources=["hpat/_parquet.cpp"],
@@ -83,7 +91,7 @@ ext_daal_wrapper = Extension(name="daal_wrapper",
                              sources=["hpat/_daal.cpp"]
                              )
 
-_ext_mods = [ext_hdist, ext_dict, ext_str]
+_ext_mods = [ext_hdist, ext_dict, ext_str, ext_quantile]
 
 if _has_h5py:
     _ext_mods.append(ext_io)
