@@ -81,6 +81,13 @@ class StrToFloat(AbstractTemplate):
         if isinstance(arg, StringType):
             return signature(types.float64, arg)
 
+@infer_global(str)
+class StrConstInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(string_type, *args)
+
 def contains_regex(str, pat):
     return False
 
@@ -108,6 +115,10 @@ ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
 ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
+ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
+ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
+ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
+ll.add_symbol('str_from_float64', hstr_ext.str_from_float64)
 
 @unbox(StringType)
 def unbox_string(typ, obj, c):
@@ -142,6 +153,14 @@ def const_string(context, builder, ty, pyval):
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
     ret = builder.call(fn, [cstr])
     return ret
+
+@lower_builtin(str, types.Any)
+def string_from_impl(context, builder, sig, args):
+    in_typ = sig.args[0]
+    ll_in_typ = context.get_value_type(sig.args[0])
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
+    fn = builder.module.get_or_insert_function(fnty, name="str_from_"+str(in_typ))
+    return builder.call(fn, args)
 
 @lower_builtin("+", string_type, string_type)
 def impl_string_concat(context, builder, sig, args):

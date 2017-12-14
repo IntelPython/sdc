@@ -35,6 +35,11 @@ void print_int(int64_t val);
 bool str_contains_regex(std::string* str, std::string* pat);
 bool str_contains_noregex(std::string* str, std::string* pat);
 
+void* str_from_int32(int in);
+void* str_from_int64(int64_t in);
+void* str_from_float32(float in);
+void* str_from_float64(double in);
+
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -83,6 +88,14 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_contains_noregex)));
     PyObject_SetAttrString(m, "str_contains_regex",
                             PyLong_FromVoidPtr((void*)(&str_contains_regex)));
+    PyObject_SetAttrString(m, "str_from_int32",
+                            PyLong_FromVoidPtr((void*)(&str_from_int32)));
+    PyObject_SetAttrString(m, "str_from_int64",
+                            PyLong_FromVoidPtr((void*)(&str_from_int64)));
+    PyObject_SetAttrString(m, "str_from_float32",
+                            PyLong_FromVoidPtr((void*)(&str_from_float32)));
+    PyObject_SetAttrString(m, "str_from_float64",
+                            PyLong_FromVoidPtr((void*)(&str_from_float64)));
     return m;
 }
 
@@ -246,4 +259,24 @@ void print_str(std::string* str)
 void print_int(int64_t val)
 {
     printf("%ld\n", val);
+}
+
+void* str_from_int32(int in)
+{
+    return new std::string(std::to_string(in));
+}
+
+void* str_from_int64(int64_t in)
+{
+    return new std::string(std::to_string(in));
+}
+
+void* str_from_float32(float in)
+{
+    return new std::string(std::to_string(in));
+}
+
+void* str_from_float64(double in)
+{
+    return new std::string(std::to_string(in));
 }
