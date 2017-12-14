@@ -222,6 +222,16 @@ class ContainsType(AbstractTemplate):
         # args: str_arr, pat
         return signature(types.Array(types.boolean, 1, 'C'), *args)
 
+# @jit
+# def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):
+#     s = "count    "+str(a_count)+"\n"\
+#         "mean     "+str(a_mean)+"\n"\
+#         "std      "+str(a_std)+"\n"\
+#         "min      "+str(a_min)+"\n"\
+#         "25%      "+str(q25)+"\n"\
+#         "50%      "+str(q50)+"\n"\
+#         "75%      "+str(q75)+"\n"\
+#         "max      "+str(a_max)+"\n"
 
 # import numba.typing.arraydecl
 # from numba import types

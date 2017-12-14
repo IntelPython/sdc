@@ -513,8 +513,14 @@ class HiFrames(object):
             q25 = hpat.hiframes_api.quantile(A, .25)
             q50 = hpat.hiframes_api.quantile(A, .5)
             q75 = hpat.hiframes_api.quantile(A, .75)
-            s = hpat.hiframes_api.describe(a_count, a_mean, a_std, a_min, q25,
-                                                                q50, q75, a_max)
+            s = "count    "+str(a_count)+"\n"\
+                "mean     "+str(a_mean)+"\n"\
+                "std      "+str(a_std)+"\n"\
+                "min      "+str(a_min)+"\n"\
+                "25%      "+str(q25)+"\n"\
+                "50%      "+str(q50)+"\n"\
+                "75%      "+str(q75)+"\n"\
+                "max      "+str(a_max)+"\n"
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var])
