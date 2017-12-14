@@ -33,9 +33,14 @@ double quantile_parallel(double* data, int64_t local_size, int64_t total_size, d
     MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     std::vector<double> my_array(data, data+local_size);
-    int64_t k = (int64_t)(quantile*total_size);
-    double res = get_nth_parallel(my_array, k, myrank, n_pes);
-    return res;
+    double at = quantile * (total_size-1);
+    int64_t k1 = (int64_t)at;
+    int64_t k2 = k1+1;
+    double fraction = at - (double)k1;
+    double res1 = get_nth_parallel(my_array, k1, myrank, n_pes);
+    double res2 = get_nth_parallel(my_array, k2, myrank, n_pes);
+    // linear method, TODO: support other methods
+    return res1 + (res2 - res1) * fraction;
 }
 
 double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, int n_pes)
@@ -43,7 +48,7 @@ double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, in
     int64_t local_size = my_array.size();
     int64_t total_size;
     MPI_Allreduce(&local_size, &total_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
-    printf("total size: %ld k: %ld\n", total_size, k);
+    // printf("total size: %ld k: %ld\n", total_size, k);
     int64_t threshold = (int64_t) pow(10.0, 7.0); // 100 million
     // int64_t threshold = 20;
     if (total_size < threshold)
@@ -55,7 +60,7 @@ double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, in
         std::pair<double, double> kths = get_lower_upper_kth_parallel(my_array, total_size, myrank, n_pes, k);
         double k1_val = kths.first;
         double k2_val = kths.second;
-        printf("k1_val: %lf  k2_val: %lf\n", k1_val, k2_val);
+        // printf("k1_val: %lf  k2_val: %lf\n", k1_val, k2_val);
         int64_t local_l0_num = 0, local_l1_num = 0, local_l2_num = 0;
         int64_t l0_num = 0, l1_num = 0, l2_num = 0;
         for(auto val: my_array)
@@ -85,9 +90,9 @@ double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, in
         int64_t new_ind = 0;
         if (k < l0_num)
         {
-            printf("first set\n");
-            new_my_array.resize(local_l0_num);
             // first set
+            // printf("first set\n");
+            new_my_array.resize(local_l0_num);
             // throw away
             for(auto val: my_array)
             {
@@ -101,8 +106,8 @@ double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, in
         }
         else if (k < l0_num + l1_num)
         {
-            printf("second set\n");
             // middle set
+            // printf("second set\n");
             new_my_array.resize(local_l1_num);
             for(auto val: my_array)
             {
@@ -116,8 +121,8 @@ double get_nth_parallel(std::vector<double> &my_array, int64_t k, int myrank, in
         }
         else
         {
-            printf("last set\n");
             // last set
+            // printf("last set\n");
             new_my_array.resize(local_l2_num);
             for(auto val: my_array)
             {
@@ -186,7 +191,7 @@ std::pair<double, double> get_lower_upper_kth_parallel(std::vector<double> &my_a
         k1_val = all_sample_vec[k1];
         std::nth_element(all_sample_vec.begin(), all_sample_vec.begin()+k2, all_sample_vec.end());
         k2_val = all_sample_vec[k2];
-        printf("k1: %d k2: %d k1_val: %lf k2_val:%lf\n", k1, k2, k1_val, k2_val);
+        // printf("k1: %d k2: %d k1_val: %lf k2_val:%lf\n", k1, k2, k1_val, k2_val);
     }
     MPI_Bcast(&k1_val, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
     MPI_Bcast(&k2_val, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
@@ -216,7 +221,7 @@ double small_get_nth_parallel(std::vector<double> &my_array, int64_t total_size,
             displs[i] = total_data_size;
             total_data_size += rcounts[i];
         }
-        printf("total small data size: %d\n", total_data_size);
+        // printf("total small data size: %d\n", total_data_size);
         all_data_vec.resize(total_data_size);
     }
     // gather data
