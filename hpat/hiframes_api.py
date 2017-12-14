@@ -288,23 +288,25 @@ import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
+from hpat.distributed_lower import _h5_typ_table
 
 @lower_builtin(quantile_parallel, types.npytypes.Array, types.float64, types.intp)
 def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
-    # typ_enum = _h5_typ_table[sig.args[0].dtype]
-    # typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1
 
     arr = make_array(sig.args[0])(context, builder, args[0])
     local_size = builder.extract_value(arr.shape, 0)
 
     call_args = [builder.bitcast(arr.data, lir.IntType(8).as_pointer()),
-                local_size, args[2], args[1]]
+                local_size, args[2], args[1], builder.load(typ_arg)]
 
-    # array, shape, ndim, extra last arg type for type enum
-    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64), lir.DoubleType()]
+    # array, size, total_size, quantile, type enum
+    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64),
+                                            lir.DoubleType(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.DoubleType(), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="quantile_parallel")
     return builder.call(fn, call_args)
