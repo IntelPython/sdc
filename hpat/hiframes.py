@@ -20,7 +20,7 @@ from hpat.parquet_pio import ParquetHandler
 
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
-                                                            'quantile', 'count']
+                                                'quantile', 'count', 'describe']
 LARGE_WIN_SIZE = 10
 
 def remove_hiframes(rhs, lives, call_list):
@@ -375,6 +375,8 @@ class HiFrames(object):
             return self._gen_col_std(out_var, args, col_var)
         if func == 'quantile':
             return self._gen_col_quantile(out_var, args, col_var)
+        if func == 'describe':
+            return self._gen_col_describe(out_var, args, col_var)
         else:
             assert func in ['pct_change', 'shift']
             return self._gen_column_shift_pct(out_var, args, col_var, func)
@@ -497,6 +499,25 @@ class HiFrames(object):
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var, args[0]])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
+
+    def _gen_col_describe(self, out_var, args, col_var):
+        def f(A):
+            a_count = hpat.hiframes_api.count(A)
+            a_min = np.min(A)
+            a_max = np.max(A)
+            a_mean = hpat.hiframes_api.mean(A)
+            a_std = hpat.hiframes_api.var(A)**0.5
+            q25 = hpat.hiframes_api.quantile(A, .25)
+            q50 = hpat.hiframes_api.quantile(A, .5)
+            q75 = hpat.hiframes_api.quantile(A, .75)
+            s = hpat.hiframes_api.describe(a_count, a_mean, a_std, a_min, q25,
+                                                                q50, q75, a_max)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = out_var
         return nodes

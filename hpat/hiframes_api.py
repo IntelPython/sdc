@@ -7,6 +7,8 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
+from hpat.str_ext import StringType, string_type
+from hpat.str_arr_ext import StringArray, StringArrayType
 
 class Filter(ir.Stmt):
     def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
@@ -329,8 +331,6 @@ def fix_rolling_array(c):
     return c
 
 from numba.extending import overload
-from hpat.str_ext import StringType
-from hpat.str_arr_ext import StringArray, StringArrayType
 
 @overload(fix_df_array)
 def fix_df_array_overload(column):
