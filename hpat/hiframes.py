@@ -20,7 +20,7 @@ from hpat.parquet_pio import ParquetHandler
 
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
-                                                                    'quantile']
+                                                            'quantile', 'count']
 LARGE_WIN_SIZE = 10
 
 def remove_hiframes(rhs, lives, call_list):
@@ -361,6 +361,8 @@ class HiFrames(object):
     def _gen_column_call(self, out_var, args, col_var, func, kws):
         if func in ['fillna', 'pct_change', 'shift']:
             self.df_cols.add(out_var.name) # output is Series except sum
+        if func == 'count':
+            return self._gen_col_count(out_var, args, col_var)
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
         if func == 'sum':
@@ -411,6 +413,16 @@ class HiFrames(object):
         setitem_nodes = block.body[:-3]  # remove none return
 
         return stencil_nodes+setitem_nodes
+
+    def _gen_col_count(self, out_var, args, col_var):
+        def f(A):
+            s = hpat.hiframes_api.count(A)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
 
     def _gen_fillna(self, out_var, args, col_var, kws):
         inplace = False

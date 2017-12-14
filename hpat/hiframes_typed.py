@@ -224,6 +224,21 @@ class HiFramesTyped(object):
             return f_blocks
 
     def _handle_df_col_calls(self, lhs_name, rhs, assign):
+
+        if guard(find_callname, self.func_ir, rhs) == ('count', 'hpat.hiframes_api'):
+            in_arr = rhs.args[0]
+            f_blocks = compile_to_numba_ir(_column_count_impl,
+                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
+                    (self.typemap[in_arr.name],),
+                    self.typemap, self.calltypes).blocks
+            topo_order = find_topo_order(f_blocks)
+            first_block = topo_order[0]
+            last_block = topo_order[-1]
+            replace_arg_nodes(f_blocks[first_block], [in_arr])
+            # assign results to lhs output
+            f_blocks[last_block].body[-4].target = assign.target
+            return f_blocks
+
         if guard(find_callname, self.func_ir, rhs) == ('fillna', 'hpat.hiframes_api'):
             out_arr = rhs.args[0]
             in_arr = rhs.args[1]
@@ -294,6 +309,16 @@ def _column_filter_impl_float(A, B, ind):
         else:
             s = np.nan
         A[i] = s
+
+def _column_count_impl(A):
+    numba.parfor.init_prange()
+    count = 0
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            count += 1
+
+    res = count
 
 def _column_fillna_impl(A, B, fill):
     for i in numba.parfor.internal_prange(len(A)):

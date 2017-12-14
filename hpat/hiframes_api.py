@@ -135,6 +135,9 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 #         #assert not args
 #         return signature(ary.copy(layout='C'), types.intp)
 
+def count(A):
+    return 0
+
 def fillna(A):
     return 0
 
@@ -163,6 +166,13 @@ def str_contains_noregex(str_arr, pat):
     return 0;
 
 from numba.typing.arraydecl import _expand_integer
+
+@infer_global(count)
+class CountTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(types.intp, *args)
 
 @infer_global(fillna)
 class FillNaType(AbstractTemplate):
