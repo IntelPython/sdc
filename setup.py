@@ -67,7 +67,7 @@ ext_str = Extension(name="hstr_ext",
                              extra_link_args=['-std=c++11'],
                              )
 
-ext_quantile = Extension(name="quantile_alg_ext",
+ext_quantile = Extension(name="quantile_alg",
                              libraries = MPI_LIBS,
                              sources=["hpat/_quantile_alg.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],

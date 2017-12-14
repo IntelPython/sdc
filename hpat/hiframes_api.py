@@ -150,6 +150,12 @@ def std(A):
 def mean(A):
     return 0
 
+def quantile(A, q):
+    return 0
+
+def quantile_parallel(A, q):
+    return 0
+
 def str_contains_regex(str_arr, pat):
     return 0;
 
@@ -186,6 +192,14 @@ class VarDdof1Type(AbstractTemplate):
         if isinstance(args[0].dtype, (types.Integer, types.Boolean)):
             return signature(types.float64, *args)
         return signature(args[0].dtype, *args)
+
+@infer_global(quantile)
+@infer_global(quantile_parallel)
+class QuantileType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) in [2, 3]
+        return signature(types.float64, *args)
 
 @infer_global(str_contains_regex)
 @infer_global(str_contains_noregex)
@@ -267,6 +281,34 @@ def array_std(context, builder, sig, args):
         return var(arry) ** 0.5
     res = context.compile_internal(builder, array_std_impl, sig, args)
     return impl_ret_untracked(context, builder, sig.return_type, res)
+
+from llvmlite import ir as lir
+import quantile_alg
+import llvmlite.binding as ll
+ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+from numba.targets.arrayobj import make_array
+from numba import cgutils
+
+@lower_builtin(quantile_parallel, types.npytypes.Array, types.float64, types.intp)
+def lower_dist_quantile(context, builder, sig, args):
+
+    # store an int to specify data type
+    # typ_enum = _h5_typ_table[sig.args[0].dtype]
+    # typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    assert sig.args[0].ndim == 1
+
+    arr = make_array(sig.args[0])(context, builder, args[0])
+    local_size = builder.extract_value(arr.shape, 0)
+
+    call_args = [builder.bitcast(arr.data, lir.IntType(8).as_pointer()),
+                local_size, args[2], args[1]]
+
+    # array, shape, ndim, extra last arg type for type enum
+    arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64), lir.DoubleType()]
+    fnty = lir.FunctionType(lir.DoubleType(), arg_typs)
+    fn = builder.module.get_or_insert_function(fnty, name="quantile_parallel")
+    return builder.call(fn, call_args)
+
 
 def fix_df_array(c):
     return c

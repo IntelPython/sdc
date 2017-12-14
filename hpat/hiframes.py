@@ -19,7 +19,8 @@ import math
 from hpat.parquet_pio import ParquetHandler
 
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std']
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
+                                                                    'quantile']
 LARGE_WIN_SIZE = 10
 
 def remove_hiframes(rhs, lives, call_list):
@@ -370,6 +371,8 @@ class HiFrames(object):
             return self._gen_col_var(out_var, args, col_var)
         if func == 'std':
             return self._gen_col_std(out_var, args, col_var)
+        if func == 'quantile':
+            return self._gen_col_quantile(out_var, args, col_var)
         else:
             assert func in ['pct_change', 'shift']
             return self._gen_column_shift_pct(out_var, args, col_var, func)
@@ -475,6 +478,16 @@ class HiFrames(object):
         assert len(s_nodes) == 3
         s_nodes[-1].target = out_var
         return v_nodes + s_nodes
+
+    def _gen_col_quantile(self, out_var, args, col_var):
+        def f(A, q):
+            s = hpat.hiframes_api.quantile(A, q)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var, args[0]])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc

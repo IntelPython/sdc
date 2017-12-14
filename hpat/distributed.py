@@ -454,6 +454,21 @@ class DistributedPass(object):
             dist_assign = ir.Assign(dist_call, err_var, loc)
             return out+[dist_func_assign, dist_assign]
 
+        if call_list == ['quantile', 'hiframes_api', hpat] and self._is_1D_arr(rhs.args[0].name):
+            arr = rhs.args[0].name
+            assert len(self._array_sizes[arr]) == 1, "only 1D arrs in quantile"
+            size_var = self._array_sizes[arr][0]
+            rhs.args += [size_var]
+            def f(arr, q, size):
+                s = hpat.hiframes_api.quantile_parallel(arr, q, size)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+            (self.typemap[arr], types.float64, types.intp),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-3]
+            out[-1].target = assign.target
+
         if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name
             arg1 = rhs.args[1].name

@@ -200,6 +200,10 @@ class DistributedAnalysis(object):
                 or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
 
+        if call_list == ['quantile', 'hiframes_api', hpat]:
+            # quantile doesn't affect input's distribution
+            return
+
         if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet]:
             return
 
