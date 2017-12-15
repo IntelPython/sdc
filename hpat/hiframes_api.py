@@ -1,7 +1,8 @@
 from __future__ import print_function, division, absolute_import
 
 import numba
-from numba import typeinfer, ir
+from numba import typeinfer, ir, ir_utils, config
+from numba.ir_utils import visit_vars_inner
 from numba import types
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -128,6 +129,25 @@ def filter_typeinfer(filter_node, typeinferer):
 
 typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 
+
+def visit_vars_filter(filter_node, callback, cbdata):
+    if config.DEBUG_ARRAY_OPT == 1:
+        print("visiting filter vars for:", filter_node)
+        print("cbdata: ", sorted(cbdata.items()))
+
+    df_vars = filter_node.df_vars
+    df_in_vars = df_vars[filter_node.df_in]
+    df_out_vars = df_vars[filter_node.df_out]
+    filter_node.bool_arr = visit_vars_inner(filter_node.bool_arr, callback, cbdata)
+
+    for col_name in list(df_in_vars.keys()):
+        df_in_vars[col_name] = visit_vars_inner(df_in_vars[col_name], callback, cbdata)
+    for col_name in list(df_out_vars.keys()):
+        df_out_vars[col_name] = visit_vars_inner(df_out_vars[col_name], callback, cbdata)
+
+
+# add call to visit parfor variable
+ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
