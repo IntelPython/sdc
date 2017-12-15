@@ -454,10 +454,14 @@ class DistributedPass(object):
             dist_assign = ir.Assign(dist_call, err_var, loc)
             return out+[dist_func_assign, dist_assign]
 
-        if call_list == ['quantile', 'hiframes_api', hpat] and self._is_1D_arr(rhs.args[0].name):
+        if call_list == ['quantile', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
+                        or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
-            assert len(self._array_sizes[arr]) == 1, "only 1D arrs in quantile"
-            size_var = self._array_sizes[arr][0]
+            if arr in self._array_sizes:
+                assert len(self._array_sizes[arr]) == 1, "only 1D arrs in quantile"
+                size_var = self._array_sizes[arr][0]
+            else:
+                size_var = self._set0_var
             rhs.args += [size_var]
             def f(arr, q, size):
                 s = hpat.hiframes_api.quantile_parallel(arr, q, size)
@@ -1326,6 +1330,12 @@ class DistributedPass(object):
         # they are not in dists list
         return (arr_name in self._dist_analysis.array_dists and
                 self._dist_analysis.array_dists[arr_name]==Distribution.OneD)
+
+    def _is_1D_Var_arr(self, arr_name):
+        # some arrays like stencil buffers are added after analysis so
+        # they are not in dists list
+        return (arr_name in self._dist_analysis.array_dists and
+                self._dist_analysis.array_dists[arr_name]==Distribution.OneD_Var)
 
     def _is_REP(self, arr_name):
         return (arr_name not in self._dist_analysis.array_dists or

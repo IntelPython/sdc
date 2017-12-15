@@ -46,6 +46,8 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
     int myrank, n_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    if (total_size == 0)
+        MPI_Allreduce(&local_size, &total_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
     double at = quantile * (total_size-1);
 
     // FIXME: refactor constants
