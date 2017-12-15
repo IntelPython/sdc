@@ -97,11 +97,11 @@ class CmpOpEqStringArray(AbstractTemplate):
 class CmpOpNEqStringArray(CmpOpEqStringArray):
     key = '!='
 
-@infer_global(len)
-class LenStringArray(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args)==1 and args[0]==string_array_type:
-            return signature(types.intp, *args)
+# @infer_global(len)
+# class LenStringArray(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args)==1 and args[0]==string_array_type:
+#             return signature(types.intp, *args)
 
 make_attribute_wrapper(StringArrayPayloadType, 'size', 'size')
 make_attribute_wrapper(StringArrayPayloadType, 'offsets', 'offsets')
@@ -138,6 +138,15 @@ def str_arr_size_impl(context, builder, typ, val):
 #     string_array.offsets = offsets
 #     string_array.data = data
 #     return string_array._getvalue()
+
+from numba.extending import overload
+
+@overload(len)
+def str_arr_len_overload(str_arr):
+    if str_arr == string_array_type:
+        def str_arr_len(s):
+            return s.size
+        return str_arr_len
 
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
