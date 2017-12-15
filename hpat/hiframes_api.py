@@ -8,7 +8,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType
+from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 
 class Filter(ir.Stmt):
     def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
@@ -40,6 +40,9 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     # arrays of input df have same size in first dimension
     all_shapes = []
     for _, col_var in df_in_vars.items():
+        typ = typemap[col_var.name]
+        if typ == string_array_type:
+            continue
         col_shape = equiv_set.get_shape(col_var)
         all_shapes.append(col_shape[0])
     equiv_set.insert_equiv(*all_shapes)
@@ -50,6 +53,8 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     all_shapes = []
     for _, col_var in df_out_vars.items():
         typ = typemap[col_var.name]
+        if typ == string_array_type:
+            continue
         (shape, c_post) = array_analysis._gen_shape_call(equiv_set, col_var, typ.ndim, None)
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
