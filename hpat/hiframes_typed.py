@@ -90,12 +90,12 @@ class HiFramesTyped(object):
             arg2 = rhs.rhs
             arg1_access = 'A'
             arg2_access = 'B'
-            len_call = 'A.size'
+            len_call = 'len(A)'
             if self.typemap[arg1.name] == string_array_type:
                 arg1_access = 'A[i]'
             if self.typemap[arg2.name] == string_array_type:
                 arg1_access = 'B[i]'
-                len_call = 'B.size'
+                len_call = 'len(B)'
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
@@ -183,7 +183,7 @@ class HiFramesTyped(object):
         str_arr = rhs.args[0]
         pat = rhs.args[1]
         func_text = 'def f(str_arr, pat):\n'
-        func_text += '  l = str_arr.size\n'
+        func_text += '  l = len(str_arr)\n'
         func_text += '  S = np.empty(l, dtype=np.bool_)\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}(str_arr[i], pat)\n'.format(comp_func)
