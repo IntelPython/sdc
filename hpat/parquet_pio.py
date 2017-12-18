@@ -79,7 +79,7 @@ class ParquetHandler(object):
             c_type = col_types[i]
             # create a variable for column and assign type
             varname = mk_unique_var(cname)
-            self.locals[varname] = c_type
+            #self.locals[varname] = c_type
             cvar = ir.Var(scope, varname, loc)
             col_items.append((cname, cvar))
 
