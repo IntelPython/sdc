@@ -64,11 +64,13 @@ class HiFrames(object):
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
         self.arrow_tables = {}
+        self.reverse_copies = {}
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
         topo_order = find_topo_order(self.func_ir.blocks)
         for label in topo_order:
+            self._get_reverse_copies(self.func_ir.blocks[label].body)
             new_body = []
             for inst in self.func_ir.blocks[label].body:
                 # df['col'] = arr
@@ -175,6 +177,12 @@ class HiFrames(object):
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
         return [assign]
 
+    def _get_reverse_copies(self, body):
+        for inst in body:
+            if isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var):
+                self.reverse_copies[inst.value.name] = inst.target.name
+        return
+
     def _handle_pd_DataFrame(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('DataFrame', 'pandas'):
             if len(rhs.args) != 1:
@@ -206,8 +214,16 @@ class HiFrames(object):
         if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
                 and func_def.value.name in self.arrow_tables
                 and func_def.attr == 'to_pandas'):
+            table_types = None
+            if lhs.name in self.locals:
+                table_types = self.locals[lhs.name]
+                self.locals.pop(lhs.name)
+            if lhs.name in self.reverse_copies and self.reverse_copies[lhs.name] in self.locals:
+                table_types = self.locals[self.reverse_copies[lhs.name]]
+                self.locals.pop(self.reverse_copies[lhs.name])
+
             col_items, nodes = self.pq_handler.gen_parquet_read(
-                                        self.arrow_tables[func_def.value.name])
+                            self.arrow_tables[func_def.value.name], table_types)
             self.df_vars[lhs.name] = self._process_df_build_map(col_items)
             self._update_df_cols()
             return nodes

@@ -57,49 +57,52 @@ class ParquetHandler(object):
         self.args = args
         self.locals = _locals
 
-    def gen_parquet_read(self, file_name):
+    def gen_parquet_read(self, file_name, table_types):
         import pyarrow.parquet as pq
-        fname_def = guard(get_definition, self.func_ir, file_name)
-        if isinstance(fname_def, ir.Const):
-            assert isinstance(fname_def.value, str)
+        scope = file_name.scope
+        loc = file_name.loc
+
+        if table_types is None:
+            fname_def = guard(get_definition, self.func_ir, file_name)
+            if not isinstance(fname_def, ir.Const) or not isinstance(fname_def.value, str):
+                raise ValueError("Parquet schema not available")
             file_name_str = fname_def.value
             col_names, col_types = parquet_file_schema(file_name_str)
-            scope = file_name.scope
-            loc = file_name.loc
-            out_nodes = []
-            col_items = []
-            for i, cname in enumerate(col_names):
-                # get column type from schema
-                c_type = col_types[i]
-                # create a variable for column and assign type
-                varname = mk_unique_var(cname)
-                self.locals[varname] = c_type
-                cvar = ir.Var(scope, varname, loc)
-                col_items.append((cname, cvar))
+        else:
+            col_names = list(table_types.keys())
+            col_types = list(table_types.values())
 
-                out_nodes += get_column_read_nodes(c_type, cvar, file_name_str,
-                                                                            i)
+        out_nodes = []
+        col_items = []
+        for i, cname in enumerate(col_names):
+            # get column type from schema
+            c_type = col_types[i]
+            # create a variable for column and assign type
+            varname = mk_unique_var(cname)
+            self.locals[varname] = c_type
+            cvar = ir.Var(scope, varname, loc)
+            col_items.append((cname, cvar))
 
-            return col_items, out_nodes
-        raise ValueError("Parquet schema not available")
+            out_nodes += get_column_read_nodes(c_type, cvar, file_name, i)
 
-def get_column_read_nodes(c_type, cvar, file_name_str, i):
+        return col_items, out_nodes
+
+def get_column_read_nodes(c_type, cvar, file_name, i):
 
     loc = cvar.loc
 
-    func_text = ('def f():\n  col_size = get_column_size_parquet("{}", {})\n'.
-            format(file_name_str, i))
+    func_text = ('def f(fname):\n  col_size = get_column_size_parquet(fname, {})\n'.
+            format(i))
     # generate strings differently
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_parquet_str("{}", {}, col_size)\n'.format(
-                                                            file_name_str, i)
+        func_text += '  column = read_parquet_str(fname, {}, col_size)\n'.format(
+                                                            i)
     else:
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
                                                                         el_type)
-        func_text += '  status = read_parquet("{}", {}, column)\n'.format(
-                                                            file_name_str, i)
+        func_text += '  status = read_parquet(fname, {}, column)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -109,6 +112,7 @@ def get_column_read_nodes(c_type, cvar, file_name_str, i):
                 'read_parquet_str': read_parquet_str, 'np': np,
                 'StringArray': StringArray}).blocks.popitem()
 
+    replace_arg_nodes(f_block, [file_name])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("column"):
