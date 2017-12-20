@@ -18,7 +18,7 @@ requirements:
     - pandas
     - scipy
     - mpich # [not win]
-    - pyarrow
+    - pyarrow 0.8.*
     - numba
     - hdf5-parallel
     - h5py
@@ -30,7 +30,7 @@ requirements:
     - pandas
     - scipy
     - mpich # [not win]
-    - pyarrow
+    - pyarrow 0.8.*
     - numba
     - hdf5-parallel
     - h5py

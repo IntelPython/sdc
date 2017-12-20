@@ -27,7 +27,7 @@ HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_
 environment easily (Linux/Mac)::
 
     conda install numpy scipy pandas llvmlite=0.20 python=3.6
-    conda install pyarrow mpich -c conda-forge
+    conda install pyarrow=0.8.* mpich -c conda-forge
     conda install hpat -c ehsantn
 
 Windows installaton requires
@@ -35,7 +35,7 @@ Windows installaton requires
 installed separately instead of `mpich`. The rest is the same::
 
     conda install numpy scipy pandas llvmlite=0.20 python=3.6
-    conda install pyarrow -c conda-forge
+    conda install pyarrow=0.8.* -c conda-forge
     conda install hpat -c ehsantn
 
 Docker Container

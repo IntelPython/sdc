@@ -6,7 +6,7 @@ Installing HPAT
 HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ environment easily::
 
     conda install numpy scipy pandas llvmlite=0.20 python=3.6
-    conda install pyarrow mpich -c conda-forge
+    conda install pyarrow=0.8.* mpich -c conda-forge
     conda install hpat -c ehsantn
 
 Building HPAT from Source
@@ -66,7 +66,7 @@ Parquet Support
 
 HPAT uses the `pyarrow` package to provide Parquet support::
 
-    conda install pyarrow -c conda-forge
+    conda install pyarrow=0.8.* -c conda-forge
 
 HPAT needs to be rebuilt after setting up pyarrow.
 
@@ -91,7 +91,7 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and 
     git checkout hpat_req
     python setup.py install
     cd ..
-    conda install pyarrow -c conda-forge
+    conda install pyarrow=0.8.* -c conda-forge
     git clone https://github.com/IntelLabs/hpat.git
     cd hpat
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include

@@ -44,7 +44,7 @@
 <span id="install"></span><h1>Installing HPAT<a class="headerlink" href="#installing-hpat" title="Permalink to this headline">¶</a></h1>
 <p>HPAT can be installed in <a class="reference external" href="https://www.anaconda.com/download/">Anaconda</a> environment easily:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">pandas</span> <span class="n">llvmlite</span><span class="o">=</span><span class="mf">0.20</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.6</span>
-<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="n">mpich</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span><span class="o">=</span><span class="mf">0.8</span><span class="o">.*</span> <span class="n">mpich</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
 <span class="n">conda</span> <span class="n">install</span> <span class="n">hpat</span> <span class="o">-</span><span class="n">c</span> <span class="n">ehsantn</span>
 </pre></div>
 </div>
@@ -103,7 +103,7 @@ Commands for generating HDF5 data and running the logistic regression example:</
 <div class="section" id="parquet-support">
 <h2>Parquet Support<a class="headerlink" href="#parquet-support" title="Permalink to this headline">¶</a></h2>
 <p>HPAT uses the <cite>pyarrow</cite> package to provide Parquet support:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span><span class="o">=</span><span class="mf">0.8</span><span class="o">.*</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
 </pre></div>
 </div>
 <p>HPAT needs to be rebuilt after setting up pyarrow.</p>
@@ -132,7 +132,7 @@ Commands for generating HDF5 data and running the logistic regression example:</
 <span class="n">git</span> <span class="n">checkout</span> <span class="n">hpat_req</span>
 <span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">install</span>
 <span class="n">cd</span> <span class="o">..</span>
-<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span><span class="o">=</span><span class="mf">0.8</span><span class="o">.*</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
 <span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">IntelLabs</span><span class="o">/</span><span class="n">hpat</span><span class="o">.</span><span class="n">git</span>
 <span class="n">cd</span> <span class="n">hpat</span>
 <span class="nb">set</span> <span class="n">INCLUDE</span><span class="o">=%</span><span class="n">INCLUDE</span><span class="o">%</span><span class="p">;</span><span class="o">%</span><span class="n">CONDA_PREFIX</span><span class="o">%</span>\<span class="n">Library</span>\<span class="n">include</span>
