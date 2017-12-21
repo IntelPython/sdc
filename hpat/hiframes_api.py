@@ -15,6 +15,8 @@ class Filter(ir.Stmt):
     def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
         self.df_out = df_out
         self.df_in = df_in
+        self.df_out_vars = df_vars[self.df_out]
+        self.df_in_vars = df_vars[self.df_in]
         self.bool_arr = bool_arr
         # needs df columns for type inference stage
         self.df_vars = df_vars
@@ -22,11 +24,11 @@ class Filter(ir.Stmt):
 
     def __repr__(self):
         out_cols = ""
-        for (c, v) in self.df_vars[self.df_out].items():
+        for (c, v) in self.df_out_vars.items():
             out_cols += "'{}':{}, ".format(c, v.name)
         df_out_str = "{}{{{}}}".format(self.df_out, out_cols)
         in_cols = ""
-        for (c, v) in self.df_vars[self.df_in].items():
+        for (c, v) in self.df_in_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_in_str = "{}{{{}}}".format(self.df_in, in_cols)
         return "filter: {} = {} [cond: {}] ".format(df_out_str, df_in_str,
@@ -34,25 +36,27 @@ class Filter(ir.Stmt):
 
 def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     post = []
-    df_vars = filter_node.df_vars
-    df_in_vars = df_vars[filter_node.df_in]
-    df_out_vars = df_vars[filter_node.df_out]
+    # empty filter nodes should be deleted in remove dead
+    assert len(filter_node.df_in_vars) > 0, "empty filter in array analysis"
 
-    # arrays of input df have same size in first dimension
-    all_shapes = []
-    for _, col_var in df_in_vars.items():
+    # arrays of input df have same size in first dimension as bool array
+    col_shape = equiv_set.get_shape(filter_node.bool_arr)
+    all_shapes = [col_shape[0]]
+    for _, col_var in filter_node.df_in_vars.items():
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
         col_shape = equiv_set.get_shape(col_var)
         all_shapes.append(col_shape[0])
-    equiv_set.insert_equiv(*all_shapes)
+
+    if len(all_shapes) > 1:
+        equiv_set.insert_equiv(*all_shapes)
 
     # create correlations for output arrays
     # arrays of output df have same size in first dimension
     # gen size variable for an output column
     all_shapes = []
-    for _, col_var in df_out_vars.items():
+    for _, col_var in filter_node.df_out_vars.items():
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
@@ -61,31 +65,30 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
         post.extend(c_post)
         all_shapes.append(shape[0])
         equiv_set.define(col_var)
-    equiv_set.insert_equiv(*all_shapes)
+
+    if len(all_shapes) > 1:
+        equiv_set.insert_equiv(*all_shapes)
 
     return [], post
 
 numba.array_analysis.array_analysis_extensions[Filter] = filter_array_analysis
 
 def filter_distributed_analysis(filter_node, array_dists):
-    df_vars = filter_node.df_vars
-    df_in_vars = df_vars[filter_node.df_in]
-    df_out_vars = df_vars[filter_node.df_out]
 
     # input columns have same distribution
     in_dist = Distribution.OneD
-    for _, col_var in df_in_vars.items():
+    for _, col_var in filter_node.df_in_vars.items():
         in_dist = Distribution(min(in_dist.value, array_dists[col_var.name].value))
-    for _, col_var in df_in_vars.items():
+    for _, col_var in filter_node.df_in_vars.items():
         array_dists[col_var.name] = in_dist
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
-    for _, col_var in df_out_vars.items():
+    for _, col_var in filter_node.df_out_vars.items():
         # output dist might not be assigned yet
         if col_var.name in array_dists:
             out_dist = Distribution(min(out_dist.value, array_dists[col_var.name].value))
-    for _, col_var in df_out_vars.items():
+    for _, col_var in filter_node.df_out_vars.items():
         array_dists[col_var.name] = out_dist
 
     return
@@ -94,15 +97,12 @@ distributed_analysis.distributed_analysis_extensions[Filter] = filter_distribute
 
 def filter_distributed_run(filter_node, typemap, calltypes):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
-    df_vars = filter_node.df_vars
-    df_in_vars = df_vars[filter_node.df_in]
-    df_out_vars = df_vars[filter_node.df_out]
     loc = filter_node.loc
     bool_arr = filter_node.bool_arr
 
     out = []
-    for col_name, col_in_var in df_in_vars.items():
-        col_out_var = df_out_vars[col_name]
+    for col_name, col_in_var in filter_node.df_in_vars.items():
+        col_out_var = filter_node.df_out_vars[col_name]
         # using getitem like Numba for filtering arrays
         # TODO: generate parfor
         getitem_call = ir.Expr.getitem(col_in_var, bool_arr, loc)
@@ -118,11 +118,8 @@ distributed.distributed_run_extensions[Filter] = filter_distributed_run
 
 
 def filter_typeinfer(filter_node, typeinferer):
-    df_vars = filter_node.df_vars
-    df_in_vars = df_vars[filter_node.df_in]
-    df_out_vars = df_vars[filter_node.df_out]
-    for col_name, col_var in df_in_vars.items():
-        out_col_var = df_out_vars[col_name]
+    for col_name, col_var in filter_node.df_in_vars.items():
+        out_col_var = filter_node.df_out_vars[col_name]
         typeinferer.constraints.append(typeinfer.Propagate(dst=out_col_var.name,
                                               src=col_var.name, loc=filter_node.loc))
     return
@@ -135,19 +132,36 @@ def visit_vars_filter(filter_node, callback, cbdata):
         print("visiting filter vars for:", filter_node)
         print("cbdata: ", sorted(cbdata.items()))
 
-    df_vars = filter_node.df_vars
-    df_in_vars = df_vars[filter_node.df_in]
-    df_out_vars = df_vars[filter_node.df_out]
     filter_node.bool_arr = visit_vars_inner(filter_node.bool_arr, callback, cbdata)
 
-    for col_name in list(df_in_vars.keys()):
-        df_in_vars[col_name] = visit_vars_inner(df_in_vars[col_name], callback, cbdata)
-    for col_name in list(df_out_vars.keys()):
-        df_out_vars[col_name] = visit_vars_inner(df_out_vars[col_name], callback, cbdata)
+    for col_name in list(filter_node.df_in_vars.keys()):
+        filter_node.df_in_vars[col_name] = visit_vars_inner(filter_node.df_in_vars[col_name], callback, cbdata)
+    for col_name in list(filter_node.df_out_vars.keys()):
+        filter_node.df_out_vars[col_name] = visit_vars_inner(filter_node.df_out_vars[col_name], callback, cbdata)
 
 
 # add call to visit parfor variable
 ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
+
+def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, typemap):
+    #
+    dead_cols = []
+
+    for col_name, col_var in filter_node.df_out_vars.items():
+        if col_var.name not in lives:
+            dead_cols.append(col_name)
+
+    for cname in dead_cols:
+        filter_node.df_in_vars.pop(cname)
+        filter_node.df_out_vars.pop(cname)
+
+    # remove empty filter node
+    if len(filter_node.df_in_vars) == 0:
+        return None
+
+    return filter_node
+
+ir_utils.remove_dead_extensions[Filter] = remove_dead_filter
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
