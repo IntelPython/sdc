@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <cmath>
 
 #if _MSC_VER >= 1900
   #undef timezone
@@ -23,7 +24,8 @@ int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out);
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
                             uint8_t* out_data, int64_t start, int64_t count);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                    int64_t rows_to_skip, int64_t rows_to_read, int dtype);
+                    int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                    const uint8_t* null_bitmap_buff);
 int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint8_t **out_offsets, uint8_t **out_data);
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
@@ -86,8 +88,9 @@ int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out_data)
     }
     int64_t buff_size = buffers[1]->size();
     const uint8_t* buff = buffers[1]->data();
+    const uint8_t* null_bitmap_buff = buffers[0]->data();
 
-    copy_data(out_data, buff, 0, num_values, dtype);
+    copy_data(out_data, buff, 0, num_values, dtype, null_bitmap_buff);
     // memcpy(out_data, buffers[1]->data(), buff_size);
     return 0;
 }
@@ -149,13 +152,14 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
             std::cerr << "invalid parquet number of array buffers" << std::endl;
         }
         const uint8_t* buff = buffers[1]->data();
+        const uint8_t* null_bitmap_buff = buffers[0]->data();
         /* ----------- read row group ------- */
 
         int64_t rows_to_skip = start - skipped_rows;
         int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
         // printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
 
-        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype);
+        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype, null_bitmap_buff);
         // memcpy(out_data+read_rows*dtype_size, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
 
         skipped_rows += rows_to_skip;
@@ -176,7 +180,8 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
 }
 
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                    int64_t rows_to_skip, int64_t rows_to_read, int dtype)
+                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        const uint8_t* null_bitmap_buff)
 {
     // unpack booleans from bits
     if (dtype==0)
@@ -190,6 +195,34 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
     }
     int dtype_size = pq_type_sizes[dtype];
     memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+    // set NaNs for double values
+    if (dtype==5)
+    {
+        double *double_data = (double*)out_data;
+        for(int64_t i=0; i<rows_to_read; i++)
+        {
+            if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
+            {
+                // std::cout << "NULL found" << std::endl;
+                // TODO: use NPY_NAN
+                double_data[i] = std::nan("");
+            }
+        }
+    }
+    // set NaNs for float values
+    if (dtype==4)
+    {
+        float *float_data = (float*)out_data;
+        for(int64_t i=0; i<rows_to_read; i++)
+        {
+            if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
+            {
+                // std::cout << "NULL found" << std::endl;
+                // TODO: use NPY_NAN
+                float_data[i] = std::nanf("");
+            }
+        }
+    }
     return;
 }
 
