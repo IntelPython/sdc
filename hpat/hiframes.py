@@ -353,7 +353,8 @@ class HiFrames(object):
             regex = get_constant(self.func_ir, kws['regex'], regex)
         if regex:
             def f(str_arr, pat):
-                hpat.hiframes_api.str_contains_regex(str_arr, pat)
+                e = hpat.str_ext.compile_regex(pat)
+                hpat.hiframes_api.str_contains_regex(str_arr, e)
         else:
             def f(str_arr, pat):
                 hpat.hiframes_api.str_contains_noregex(str_arr, pat)

@@ -88,6 +88,24 @@ class StrConstInfer(AbstractTemplate):
         assert len(args) == 1
         return signature(string_type, *args)
 
+class RegexType(types.Opaque):
+    def __init__(self):
+        super(RegexType, self).__init__(name='RegexType')
+
+regex_type = RegexType()
+
+register_model(RegexType)(models.OpaqueModel)
+
+def compile_regex(pat):
+    return 0
+
+@infer_global(compile_regex)
+class CompileRegexInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(regex_type, *args)
+
 def contains_regex(str, pat):
     return False
 
@@ -113,6 +131,7 @@ ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
 ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
+ll.add_symbol('compile_regex', hstr_ext.compile_regex)
 ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
 ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
 ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
@@ -231,7 +250,14 @@ def len_string(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
     return (builder.call(fn, args))
 
-@lower_builtin(contains_regex, string_type, string_type)
+@lower_builtin(compile_regex, string_type)
+def lower_compile_regex(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                    [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="compile_regex")
+    return builder.call(fn, args)
+
+@lower_builtin(contains_regex, string_type, regex_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                 [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])

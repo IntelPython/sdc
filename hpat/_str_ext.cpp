@@ -32,7 +32,8 @@ char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_str(std::string* str);
 void print_int(int64_t val);
-bool str_contains_regex(std::string* str, std::string* pat);
+void* compile_regex(std::string* pat);
+bool str_contains_regex(std::string* str, std::regex* e);
 bool str_contains_noregex(std::string* str, std::string* pat);
 
 void* str_from_int32(int in);
@@ -84,6 +85,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&print_str)));
     PyObject_SetAttrString(m, "print_int",
                             PyLong_FromVoidPtr((void*)(&print_int)));
+    PyObject_SetAttrString(m, "compile_regex",
+                            PyLong_FromVoidPtr((void*)(&compile_regex)));
     PyObject_SetAttrString(m, "str_contains_noregex",
                             PyLong_FromVoidPtr((void*)(&str_contains_noregex)));
     PyObject_SetAttrString(m, "str_contains_regex",
@@ -239,10 +242,16 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index)
     return new std::string(&data[start], size);
 }
 
-bool str_contains_regex(std::string* str, std::string* pat)
+void* compile_regex(std::string* pat)
 {
-    std::regex e(*pat);
-    return std::regex_search(*str, e);
+    return new std::regex(*pat);
+}
+
+bool str_contains_regex(std::string* str, std::regex* e)
+{
+    // std::regex e(*pat);
+    // return std::regex_search(*str, e, std::regex_constants::match_any);
+    return std::regex_search(*str, *e);
 }
 
 bool str_contains_noregex(std::string* str, std::string* pat)
