@@ -3,7 +3,7 @@ Overview
 ========
 
 High Performance Analytics Toolkit (HPAT) is a big data analytics and machine
-learning framework that provides Python's ease of use but is extremly fast.
+learning framework that provides Python's ease of use but is extremely fast.
 
 HPAT scales analytics programs in python to cluster/cloud environments
 automatically, requiring only minimal code changes. Here is a logistic
