@@ -131,15 +131,16 @@ def get_element_type(dtype):
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
     import pyarrow as pa
+    from pyarrow.parquet import ParquetDataset
     col_names = []
     col_types = []
 
     if file_name.startswith("hdfs://"):
         fs = pa.hdfs.connect()
         _file = fs.open(file_name)
-        f = pq.ParquetFile(_file)
+        f = pq.ParquetDataset(_file)
     else:
-        f = pq.ParquetFile(file_name)
+        f = pq.ParquetDataset(file_name)
 
     col_names = f.schema.names
     num_cols = len(col_names)
