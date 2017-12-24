@@ -25,6 +25,8 @@ int64_t pq_get_size(const std::string* file_name, int64_t column_idx);
 int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out);
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
                             uint8_t* out_data, int64_t start, int64_t count);
+int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
+                            uint8_t* out_data, int64_t start, int64_t count);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype,
                     const uint8_t* null_bitmap_buff);
@@ -168,6 +170,73 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         return 0;
     }
 
+    boost::filesystem::path f_path(*file_name);
+
+    if (!boost::filesystem::exists(f_path))
+        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
+
+    if (boost::filesystem::is_directory(f_path))
+    {
+        // std::cout << "pq path is dir" << '\n';
+        // TODO: get file sizes on root rank only
+        std::vector<std::string> all_files;
+        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
+        {
+            std::string inner_file = x.path().string();
+            if (!pq_exclude_file(inner_file))
+                all_files.push_back(inner_file);
+        }
+        // sort file names to match pyarrow order
+        std::sort(all_files.begin(), all_files.end());
+
+        // skip whole files if no need to read any rows
+        int file_ind = 0;
+        int64_t file_size = pq_get_size(&all_files[0], column_idx);
+        while (start >= file_size)
+        {
+            start -= file_size;
+            file_ind++;
+            file_size = pq_get_size(&all_files[file_ind], column_idx);
+        }
+
+        // get data type
+        std::shared_ptr<FileReader> arrow_reader;
+        pq_init_reader(&all_files[file_ind], &arrow_reader);
+        int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
+                                                ColumnChunk(column_idx)->type();
+        int dtype_size = pq_type_sizes[dtype];
+        // std::cout << "dtype_size: " << dtype_size << '\n';
+
+        // read data
+        int64_t read_rows = 0;
+        while (read_rows<count)
+        {
+            int64_t rows_to_read = std::min(count-read_rows, file_size-start);
+            pq_read_parallel_single_file(&all_files[file_ind], column_idx,
+                            out_data+read_rows*dtype_size, start, rows_to_read);
+            read_rows += rows_to_read;
+            start = 0;  // start becomes 0 after reading non-empty first chunk
+            file_ind++;
+            file_size = pq_get_size(&all_files[file_ind], column_idx);
+        }
+        return 0;
+        // std::cout << "total pq dir size: " << byte_offset << '\n';
+    }
+    else
+    {
+        return pq_read_parallel_single_file(file_name, column_idx,
+                                        out_data, start, count);
+    }
+    return 0;
+}
+
+int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
+                                uint8_t* out_data, int64_t start, int64_t count)
+{
+
+    if (count==0) {
+        return 0;
+    }
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
 
@@ -286,6 +355,18 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
             }
         }
     }
+    // if (dtype==2)
+    // {
+    //     int64_t *int64_data = (int64_t*)out_data;
+    //     for(int64_t i=0; i<rows_to_read; i++)
+    //     {
+    //         if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
+    //         {
+    //             // std::cout << "NULL found" << std::endl;
+    //             int64_data[i] = 0;
+    //         }
+    //     }
+    // }
     return;
 }
 
