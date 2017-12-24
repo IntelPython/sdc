@@ -76,7 +76,7 @@ ext_quantile = Extension(name="quantile_alg",
                              )
 
 ext_parquet = Extension(name="parquet_cpp",
-                             libraries = ['parquet', 'arrow', 'mpi'],
+                             libraries = ['parquet', 'arrow', 'mpi', 'boost_filesystem'],
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
                              extra_compile_args=['-D_GLIBCXX_USE_CXX11_ABI=0',

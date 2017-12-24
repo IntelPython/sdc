@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/filesystem.hpp>
 
 #if _MSC_VER >= 1900
   #undef timezone
@@ -17,10 +19,10 @@
 using parquet::arrow::FileReader;
 using parquet::ParquetFileReader;
 
-void pq_init_reader(std::string* file_name,
+void pq_init_reader(const std::string* file_name,
         std::shared_ptr<FileReader> *a_reader);
-int64_t pq_get_size(std::string* file_name, int64_t column_idx);
-int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out);
+int64_t pq_get_size(const std::string* file_name, int64_t column_idx);
+int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out);
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
                             uint8_t* out_data, int64_t start, int64_t count);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
@@ -57,8 +59,39 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     return m;
 }
 
-int64_t pq_get_size(std::string* file_name, int64_t column_idx)
+bool pq_exclude_file(const std::string &file_name)
 {
+    return ( file_name.compare("_SUCCESS")==0
+            || boost::algorithm::ends_with(file_name, "/_SUCCESS")
+            || boost::algorithm::ends_with(file_name, "_common_metadata")
+            || boost::algorithm::ends_with(file_name, "_metadata")
+            || boost::algorithm::ends_with(file_name, ".crc"));
+}
+
+int64_t pq_get_size(const std::string* file_name, int64_t column_idx)
+{
+    // TODO: run on rank 0 and broadcast
+    boost::filesystem::path f_path(*file_name);
+
+    if (!boost::filesystem::exists(f_path))
+        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
+
+    if (boost::filesystem::is_directory(f_path))
+    {
+        // std::cout << "pq path is dir" << '\n';
+        int64_t ret = 0;
+        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
+        {
+            std::string inner_file = x.path().string();
+            // std::cout << inner_file << '\n';
+            if (!pq_exclude_file(inner_file))
+                ret += pq_get_size(&inner_file, column_idx);
+        }
+
+        // std::cout << "total pq dir size: " << ret << '\n';
+        return ret;
+    }
+
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
     int64_t nrows = arrow_reader->parquet_reader()->metadata()->num_rows();
@@ -66,16 +99,46 @@ int64_t pq_get_size(std::string* file_name, int64_t column_idx)
     return nrows;
 }
 
-int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out_data)
+int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out_data)
 {
+
+    boost::filesystem::path f_path(*file_name);
+
+    if (!boost::filesystem::exists(f_path))
+        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
+
+    if (boost::filesystem::is_directory(f_path))
+    {
+        // std::cout << "pq path is dir" << '\n';
+        std::vector<std::string> all_files;
+        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
+        {
+            std::string inner_file = x.path().string();
+            if (!pq_exclude_file(inner_file))
+                all_files.push_back(inner_file);
+        }
+        // sort file names to match pyarrow order
+        std::sort(all_files.begin(), all_files.end());
+        int64_t byte_offset = 0;
+        for (const auto& inner_file : all_files)
+        {
+            byte_offset += pq_read(&inner_file, column_idx, out_data+byte_offset);
+        }
+
+        // std::cout << "total pq dir size: " << byte_offset << '\n';
+        return byte_offset;
+    }
 
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
-    //
+
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
+    if (arr==NULL)
+        return 0;
+
     int64_t num_values = arr->length();
-    // std::cout << arr->ToString() << std::endl;
+    // std::cout << "arr: " << arr->ToString() << std::endl;
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
     int dtype_size = pq_type_sizes[dtype];
@@ -92,7 +155,7 @@ int pq_read(std::string* file_name, int64_t column_idx, uint8_t *out_data)
 
     copy_data(out_data, buff, 0, num_values, dtype, null_bitmap_buff);
     // memcpy(out_data, buffers[1]->data(), buff_size);
-    return 0;
+    return num_values*dtype_size;
 }
 
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
@@ -382,7 +445,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     return 0;
 }
 
-void pq_init_reader(std::string* file_name,
+void pq_init_reader(const std::string* file_name,
         std::shared_ptr<FileReader> *a_reader)
 {
     auto pool = ::arrow::default_memory_pool();

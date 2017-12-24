@@ -164,7 +164,7 @@ class ReadParquetInfer(AbstractTemplate):
         if args[2] == types.intp:  # string read call, returns string array
             return signature(string_array_type, *args)
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(types.int32, *args)
+        return signature(types.int64, *args)
 
 @infer_global(read_parquet_str)
 class ReadParquetStrInfer(AbstractTemplate):
@@ -212,7 +212,7 @@ def pq_size_lower(context, builder, sig, args):
 
 @lower_builtin(read_parquet, StringType, types.intp, types.Array)
 def pq_read_lower(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(32),
+    fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
                              lir.IntType(8).as_pointer()])
     out_array = make_array(sig.args[2])(context, builder, args[2])
