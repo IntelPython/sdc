@@ -54,7 +54,6 @@ class HiFrames(object):
         self.args = args
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
-        self.pq_handler = ParquetHandler(func_ir, typingctx, args, _locals)
 
         # rolling call name -> [column_varname, win_size]
         self.rolling_calls = {}
@@ -65,6 +64,7 @@ class HiFrames(object):
         self.df_cols = set()
         self.arrow_tables = {}
         self.reverse_copies = {}
+        self.pq_handler = ParquetHandler(func_ir, typingctx, args, _locals, self.reverse_copies)
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -214,16 +214,9 @@ class HiFrames(object):
         if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
                 and func_def.value.name in self.arrow_tables
                 and func_def.attr == 'to_pandas'):
-            table_types = None
-            if lhs.name in self.locals:
-                table_types = self.locals[lhs.name]
-                self.locals.pop(lhs.name)
-            if lhs.name in self.reverse_copies and self.reverse_copies[lhs.name] in self.locals:
-                table_types = self.locals[self.reverse_copies[lhs.name]]
-                self.locals.pop(self.reverse_copies[lhs.name])
 
             col_items, nodes = self.pq_handler.gen_parquet_read(
-                            self.arrow_tables[func_def.value.name], table_types)
+                            self.arrow_tables[func_def.value.name], lhs)
             self.df_vars[lhs.name] = self._process_df_build_map(col_items)
             self._update_df_cols()
             return nodes

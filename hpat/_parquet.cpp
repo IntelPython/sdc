@@ -22,14 +22,15 @@ using parquet::ParquetFileReader;
 void pq_init_reader(const std::string* file_name,
         std::shared_ptr<FileReader> *a_reader);
 int64_t pq_get_size(const std::string* file_name, int64_t column_idx);
-int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out);
+int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out,
+                int out_dtype);
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
-                            uint8_t* out_data, int64_t start, int64_t count);
+                uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
-                            uint8_t* out_data, int64_t start, int64_t count);
+                uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype,
-                    const uint8_t* null_bitmap_buff);
+                    const uint8_t* null_bitmap_buff, int out_dtype);
 int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint8_t **out_offsets, uint8_t **out_data);
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
@@ -101,7 +102,8 @@ int64_t pq_get_size(const std::string* file_name, int64_t column_idx)
     return nrows;
 }
 
-int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out_data)
+int64_t pq_read(const std::string* file_name, int64_t column_idx,
+                uint8_t *out_data, int out_dtype)
 {
 
     boost::filesystem::path f_path(*file_name);
@@ -124,7 +126,7 @@ int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out_d
         int64_t byte_offset = 0;
         for (const auto& inner_file : all_files)
         {
-            byte_offset += pq_read(&inner_file, column_idx, out_data+byte_offset);
+            byte_offset += pq_read(&inner_file, column_idx, out_data+byte_offset, out_dtype);
         }
 
         // std::cout << "total pq dir size: " << byte_offset << '\n';
@@ -143,7 +145,7 @@ int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out_d
     // std::cout << "arr: " << arr->ToString() << std::endl;
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
-    int dtype_size = pq_type_sizes[dtype];
+    int dtype_size = pq_type_sizes[out_dtype];
     // printf("dtype %d\n", dtype);
 
     auto buffers = arr->data()->buffers;
@@ -155,13 +157,13 @@ int64_t pq_read(const std::string* file_name, int64_t column_idx, uint8_t *out_d
     const uint8_t* buff = buffers[1]->data();
     const uint8_t* null_bitmap_buff = buffers[0]->data();
 
-    copy_data(out_data, buff, 0, num_values, dtype, null_bitmap_buff);
+    copy_data(out_data, buff, 0, num_values, dtype, null_bitmap_buff, out_dtype);
     // memcpy(out_data, buffers[1]->data(), buff_size);
     return num_values*dtype_size;
 }
 
 int pq_read_parallel(std::string* file_name, int64_t column_idx,
-                                uint8_t* out_data, int64_t start, int64_t count)
+                uint8_t* out_data, int out_dtype, int64_t start, int64_t count)
 {
     // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
     //                                                 column_idx, start, count);
@@ -199,12 +201,7 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
             file_size = pq_get_size(&all_files[file_ind], column_idx);
         }
 
-        // get data type
-        std::shared_ptr<FileReader> arrow_reader;
-        pq_init_reader(&all_files[file_ind], &arrow_reader);
-        int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
-                                                ColumnChunk(column_idx)->type();
-        int dtype_size = pq_type_sizes[dtype];
+        int dtype_size = pq_type_sizes[out_dtype];
         // std::cout << "dtype_size: " << dtype_size << '\n';
 
         // read data
@@ -213,7 +210,7 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         {
             int64_t rows_to_read = std::min(count-read_rows, file_size-start);
             pq_read_parallel_single_file(&all_files[file_ind], column_idx,
-                            out_data+read_rows*dtype_size, start, rows_to_read);
+                out_data+read_rows*dtype_size, out_dtype, start, rows_to_read);
             read_rows += rows_to_read;
             start = 0;  // start becomes 0 after reading non-empty first chunk
             file_ind++;
@@ -225,13 +222,13 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
     else
     {
         return pq_read_parallel_single_file(file_name, column_idx,
-                                        out_data, start, count);
+                                        out_data, out_dtype, start, count);
     }
     return 0;
 }
 
 int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
-                                uint8_t* out_data, int64_t start, int64_t count)
+                uint8_t* out_data, int out_dtype, int64_t start, int64_t count)
 {
 
     if (count==0) {
@@ -252,7 +249,7 @@ int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
     auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
     int64_t nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
     int dtype = rg_metadata->ColumnChunk(column_idx)->type();
-    int dtype_size = pq_type_sizes[dtype];
+    int dtype_size = pq_type_sizes[out_dtype];
 
     // skip whole row groups if no need to read any rows
     while (start-skipped_rows >= nrows_in_group)
@@ -291,7 +288,7 @@ int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
         int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
         // printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
 
-        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype, null_bitmap_buff);
+        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype, null_bitmap_buff, out_dtype);
         // memcpy(out_data+read_rows*dtype_size, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
 
         skipped_rows += rows_to_skip;
@@ -311,13 +308,76 @@ int pq_read_parallel_single_file(std::string* file_name, int64_t column_idx,
     return 0;
 }
 
+template <typename T_in, typename T_out>
+inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
+                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        int out_dtype)
+{
+    T_out *out_data_cast = (T_out*)out_data;
+    T_in *in_data_cast = (T_in*)buff;
+    for(int64_t i=0; i<rows_to_read; i++)
+    {
+        out_data_cast[i] = (T_out)in_data_cast[i];
+    }
+}
+
+inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
+                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        int out_dtype)
+{
+    // TODO: convert boolean
+    // input is int32
+    if (dtype==1)
+    {
+        if (out_dtype==2)
+            copy_data_cast<int, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==4)
+            copy_data_cast<int, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==5)
+            copy_data_cast<int, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+    }
+    // input is int64
+    if (dtype==2)
+    {
+        if (out_dtype==1)
+            copy_data_cast<int64_t, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==4)
+            copy_data_cast<int64_t, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==5)
+            copy_data_cast<int64_t, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+    }
+    // input is float
+    if (dtype==4)
+    {
+        if (out_dtype==1)
+            copy_data_cast<float, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==2)
+            copy_data_cast<float, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==5)
+            copy_data_cast<float, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+    }
+    // input is double
+    if (dtype==5)
+    {
+        if (out_dtype==1)
+            copy_data_cast<double, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==2)
+            copy_data_cast<double, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        if (out_dtype==4)
+            copy_data_cast<double, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+    }
+}
+
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                         int64_t rows_to_skip, int64_t rows_to_read, int dtype,
-                        const uint8_t* null_bitmap_buff)
+                        const uint8_t* null_bitmap_buff, int out_dtype)
 {
     // unpack booleans from bits
-    if (dtype==0)
+    if (out_dtype==0)
     {
+        if (dtype!=0)
+            std::cerr << "boolean type error" << '\n';
+
         for(int64_t i=0; i<rows_to_read; i++)
         {
             // std::cout << ::arrow::BitUtil::GetBit(buff, i+rows_to_skip) << std::endl;
@@ -326,9 +386,17 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         return;
     }
     int dtype_size = pq_type_sizes[dtype];
-    memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+    if (dtype==out_dtype)
+    {
+        // fast path if no conversion required
+        memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+    }
+    else
+    {
+        copy_data_dispatch(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+    }
     // set NaNs for double values
-    if (dtype==5)
+    if (out_dtype==5)
     {
         double *double_data = (double*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
@@ -342,7 +410,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         }
     }
     // set NaNs for float values
-    if (dtype==4)
+    if (out_dtype==4)
     {
         float *float_data = (float*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
@@ -355,18 +423,6 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
             }
         }
     }
-    // if (dtype==2)
-    // {
-    //     int64_t *int64_data = (int64_t*)out_data;
-    //     for(int64_t i=0; i<rows_to_read; i++)
-    //     {
-    //         if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
-    //         {
-    //             // std::cout << "NULL found" << std::endl;
-    //             int64_data[i] = 0;
-    //         }
-    //     }
-    // }
     return;
 }
 

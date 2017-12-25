@@ -23,6 +23,10 @@ _pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
                     'BYTE_ARRAY': string_array_type,
                     }
 
+# boolean, int32, int64, int96, float, double
+_type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
+            'int96': 3, 'float32': 4, 'float64': 5}
+
 def read_parquet():
     return 0
 
@@ -51,16 +55,30 @@ numba.ir_utils.remove_call_handlers.append(remove_parquet)
 
 class ParquetHandler(object):
     """analyze and transform parquet IO calls"""
-    def __init__(self, func_ir, typingctx, args, _locals):
+    def __init__(self, func_ir, typingctx, args, _locals, _reverse_copies):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.args = args
         self.locals = _locals
+        self.reverse_copies = _reverse_copies
 
-    def gen_parquet_read(self, file_name, table_types):
+    def gen_parquet_read(self, file_name, lhs):
         import pyarrow.parquet as pq
         scope = file_name.scope
         loc = file_name.loc
+
+        table_types = None
+        # lhs is temporary and will possibly be assigned to user variable
+        assert lhs.name.startswith('$')
+        if lhs.name in self.reverse_copies and self.reverse_copies[lhs.name] in self.locals:
+            table_types = self.locals[self.reverse_copies[lhs.name]]
+            self.locals.pop(self.reverse_copies[lhs.name])
+
+        convert_types = {}
+        # user-specified type conversion
+        if lhs.name in self.reverse_copies and (self.reverse_copies[lhs.name]+':convert') in self.locals:
+            convert_types = self.locals[self.reverse_copies[lhs.name]+':convert']
+            self.locals.pop(self.reverse_copies[lhs.name]+':convert')
 
         if table_types is None:
             fname_def = guard(get_definition, self.func_ir, file_name)
@@ -77,6 +95,9 @@ class ParquetHandler(object):
         for i, cname in enumerate(col_names):
             # get column type from schema
             c_type = col_types[i]
+            if cname in convert_types:
+                c_type = convert_types[cname]
+
             # create a variable for column and assign type
             varname = mk_unique_var(cname)
             #self.locals[varname] = c_type
@@ -102,7 +123,8 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
                                                                         el_type)
-        func_text += '  status = read_parquet(fname, {}, column)\n'.format(i)
+        func_text += '  status = read_parquet(fname, {}, column, np.int32({}))\n'.format(
+                                        i, _type_to_pq_dtype_number[el_type])
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -160,7 +182,7 @@ class SizeParquetInfer(AbstractTemplate):
 class ReadParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==3
+        assert len(args) == 4
         if args[2] == types.intp:  # string read call, returns string array
             return signature(string_array_type, *args)
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
@@ -184,7 +206,7 @@ class ReadParquetStrParallelInfer(AbstractTemplate):
 class ReadParallelParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args)==5
+        assert len(args) == 6
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
         return signature(types.int32, *args)
 
@@ -210,29 +232,30 @@ def pq_size_lower(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="pq_get_size")
     return builder.call(fn, args)
 
-@lower_builtin(read_parquet, StringType, types.intp, types.Array)
+@lower_builtin(read_parquet, StringType, types.intp, types.Array, types.int32)
 def pq_read_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
-                             lir.IntType(8).as_pointer()])
+                             lir.IntType(8).as_pointer()], lir.IntType(32))
     out_array = make_array(sig.args[2])(context, builder, args[2])
 
     fn = builder.module.get_or_insert_function(fnty, name="pq_read")
     return builder.call(fn, [args[0], args[1],
-            builder.bitcast(out_array.data, lir.IntType(8).as_pointer())])
+            builder.bitcast(out_array.data, lir.IntType(8).as_pointer()),
+            args[3]])
 
-@lower_builtin(read_parquet_parallel, StringType, types.intp, types.Array, types.intp, types.intp)
+@lower_builtin(read_parquet_parallel, StringType, types.intp, types.Array, types.int32, types.intp, types.intp)
 def pq_read_parallel_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
                              lir.IntType(8).as_pointer(),
-                             lir.IntType(64), lir.IntType(64)])
+                             lir.IntType(32), lir.IntType(64), lir.IntType(64)])
     out_array = make_array(sig.args[2])(context, builder, args[2])
 
     fn = builder.module.get_or_insert_function(fnty, name="pq_read_parallel")
     return builder.call(fn, [args[0], args[1],
             builder.bitcast(out_array.data, lir.IntType(8).as_pointer()),
-            args[3], args[4]])
+            args[3], args[4], args[5]])
 
 # read strings
 @lower_builtin(read_parquet_str, StringType, types.intp, types.intp)

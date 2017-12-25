@@ -345,12 +345,12 @@ class DistributedPass(object):
             start_var = self._array_starts[arr][0]
             count_var = self._array_counts[arr][0]
             rhs.args += [start_var, count_var]
-            def f(fname, cindex, arr, start, count):
+            def f(fname, cindex, arr, out_dtype, start, count):
                 return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
-                                                            arr, start, count)
+                                                arr, out_dtype, start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-            (string_type, types.intp, self.typemap[arr], types.intp, types.intp),
+            (string_type, types.intp, self.typemap[arr], types.int32, types.intp, types.intp),
                             self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
