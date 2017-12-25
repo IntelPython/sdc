@@ -71,6 +71,22 @@ bool pq_exclude_file(const std::string &file_name)
             || boost::algorithm::ends_with(file_name, ".crc"));
 }
 
+
+std::vector<std::string> get_dir_pq_files(boost::filesystem::path &f_path)
+{
+    std::vector<std::string> all_files;
+
+    for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
+    {
+        std::string inner_file = x.path().string();
+        if (!pq_exclude_file(inner_file))
+            all_files.push_back(inner_file);
+    }
+    // sort file names to match pyarrow order
+    std::sort(all_files.begin(), all_files.end());
+    return all_files;
+}
+
 int64_t pq_get_size(const std::string* file_name, int64_t column_idx)
 {
     // TODO: run on rank 0 and broadcast
@@ -83,12 +99,10 @@ int64_t pq_get_size(const std::string* file_name, int64_t column_idx)
     {
         // std::cout << "pq path is dir" << '\n';
         int64_t ret = 0;
-        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
+        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        for (const auto& inner_file : all_files)
         {
-            std::string inner_file = x.path().string();
-            // std::cout << inner_file << '\n';
-            if (!pq_exclude_file(inner_file))
-                ret += pq_get_size(&inner_file, column_idx);
+            ret += pq_get_size(&inner_file, column_idx);
         }
 
         // std::cout << "total pq dir size: " << ret << '\n';
@@ -114,15 +128,8 @@ int64_t pq_read(const std::string* file_name, int64_t column_idx,
     if (boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files;
-        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
-        {
-            std::string inner_file = x.path().string();
-            if (!pq_exclude_file(inner_file))
-                all_files.push_back(inner_file);
-        }
-        // sort file names to match pyarrow order
-        std::sort(all_files.begin(), all_files.end());
+        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+
         int64_t byte_offset = 0;
         for (const auto& inner_file : all_files)
         {
@@ -153,7 +160,7 @@ int64_t pq_read(const std::string* file_name, int64_t column_idx,
     if (buffers.size()!=2) {
         std::cerr << "invalid parquet number of array buffers" << std::endl;
     }
-    int64_t buff_size = buffers[1]->size();
+    // int64_t buff_size = buffers[1]->size();
     const uint8_t* buff = buffers[1]->data();
     const uint8_t* null_bitmap_buff = buffers[0]->data();
 
@@ -181,15 +188,7 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
     {
         // std::cout << "pq path is dir" << '\n';
         // TODO: get file sizes on root rank only
-        std::vector<std::string> all_files;
-        for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
-        {
-            std::string inner_file = x.path().string();
-            if (!pq_exclude_file(inner_file))
-                all_files.push_back(inner_file);
-        }
-        // sort file names to match pyarrow order
-        std::sort(all_files.begin(), all_files.end());
+        std::vector<std::string> all_files = get_dir_pq_files(f_path);
 
         // skip whole files if no need to read any rows
         int file_ind = 0;
@@ -435,7 +434,7 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
-    int64_t num_values = arr->length();
+    // int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
