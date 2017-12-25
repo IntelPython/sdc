@@ -316,7 +316,7 @@ inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
     T_in *in_data_cast = (T_in*)buff;
     for(int64_t i=0; i<rows_to_read; i++)
     {
-        out_data_cast[i] = (T_out)in_data_cast[i];
+        out_data_cast[i] = (T_out)in_data_cast[rows_to_skip+i];
     }
 }
 
