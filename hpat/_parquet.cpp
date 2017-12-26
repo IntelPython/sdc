@@ -223,7 +223,9 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
             read_rows += rows_to_read;
             start = 0;  // start becomes 0 after reading non-empty first chunk
             file_ind++;
-            file_size = pq_get_size(&all_files[file_ind], column_idx);
+            // std::cout << "next file: " << all_files[file_ind] << '\n';
+            if (read_rows<count)
+                file_size = pq_get_size(&all_files[file_ind], column_idx);
         }
         return 0;
         // std::cout << "total pq dir size: " << byte_offset << '\n';
@@ -597,7 +599,8 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
             read_rows += rows_to_read;
             start = 0;  // start becomes 0 after reading non-empty first chunk
             file_ind++;
-            file_size = pq_get_size(&all_files[file_ind], column_idx);
+            if (read_rows<count)
+                file_size = pq_get_size(&all_files[file_ind], column_idx);
         }
         offset_vec.push_back(last_offset);
 
