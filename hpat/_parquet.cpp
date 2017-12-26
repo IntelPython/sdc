@@ -32,7 +32,10 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype,
                     const uint8_t* null_bitmap_buff, int out_dtype);
 int pq_read_string(std::string* file_name, int64_t column_idx,
-                                    uint8_t **out_offsets, uint8_t **out_data);
+                                    uint32_t **out_offsets, uint8_t **out_data);
+int64_t pq_read_string_single_file(const std::string* file_name, int64_t column_idx,
+                                uint32_t **out_offsets, uint8_t **out_data,
+    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
 // parquet type sizes (NOT arrow)
@@ -426,15 +429,69 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
 }
 
 int pq_read_string(std::string* file_name, int64_t column_idx,
-                                    uint8_t **out_offsets, uint8_t **out_data)
+                                    uint32_t **out_offsets, uint8_t **out_data)
 {
+    // std::cout << "string read file" << *file_name << '\n';
+    boost::filesystem::path f_path(*file_name);
 
+    if (!boost::filesystem::exists(f_path))
+        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
+
+    if (boost::filesystem::is_directory(f_path))
+    {
+        // std::cout << "pq path is dir" << '\n';
+        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+
+        std::vector<uint32_t> offset_vec;
+        std::vector<uint8_t> data_vec;
+        int32_t last_offset = 0;
+        int64_t res = 0;
+        for (const auto& inner_file : all_files)
+        {
+            int64_t n_vals = pq_read_string_single_file(&inner_file, column_idx, NULL, NULL, &offset_vec, &data_vec);
+            if (n_vals==-1)
+                continue;
+
+            int size = offset_vec.size();
+            for(int64_t i=1; i<=n_vals+1; i++)
+                offset_vec[size-i] += last_offset;
+            last_offset = offset_vec[size-1];
+            offset_vec.pop_back();
+            res += n_vals;
+        }
+        offset_vec.push_back(last_offset);
+
+        *out_offsets = new uint32_t[offset_vec.size()];
+        *out_data = new uint8_t[data_vec.size()];
+
+        memcpy(*out_offsets, offset_vec.data(), offset_vec.size()*sizeof(uint32_t));
+        memcpy(*out_data, data_vec.data(), data_vec.size());
+        // for(int i=0; i<offset_vec.size(); i++)
+        //     std::cout << (*out_offsets)[i] << ' ';
+        // std::cout << '\n';
+        // std::cout << "string dir read done" << '\n';
+        return res;
+    }
+    else
+    {
+        return pq_read_string_single_file(file_name, column_idx, out_offsets, out_data);
+    }
+    return 0;
+}
+
+int64_t pq_read_string_single_file(const std::string* file_name, int64_t column_idx,
+                                    uint32_t **out_offsets, uint8_t **out_data,
+    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
+{
+    // std::cout << "string read file" << *file_name << '\n';
     std::shared_ptr<FileReader> arrow_reader;
     pq_init_reader(file_name, &arrow_reader);
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
-    // int64_t num_values = arr->length();
+    if (arr==NULL)
+        return -1;
+    int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
@@ -452,21 +509,33 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
     int64_t data_size = buffers[2]->size();
     // std::cout << "offsets: " << offsets_size << " chars: " << data_size << std::endl;
 
-    *out_offsets = new uint8_t[offsets_size];
-    *out_data = new uint8_t[data_size];
-
-    const uint8_t* offsets_buff = buffers[1]->data();
+    const uint32_t* offsets_buff = (const uint32_t*) buffers[1]->data();
     const uint8_t* data_buff = buffers[2]->data();
 
-    memcpy(*out_offsets, offsets_buff, offsets_size);
-    memcpy(*out_data, data_buff, data_size);
-    return 0;
+    if (offset_vec==NULL)
+    {
+        if (data_vec!=NULL)
+            std::cerr << "parquet read string input error" << '\n';
+
+        *out_offsets = new uint32_t[offsets_size/sizeof(uint32_t)];
+        *out_data = new uint8_t[data_size];
+
+        memcpy(*out_offsets, offsets_buff, offsets_size);
+        memcpy(*out_data, data_buff, data_size);
+    }
+    else
+    {
+        offset_vec->insert(offset_vec->end(), offsets_buff, offsets_buff+offsets_size/sizeof(uint32_t));
+        data_vec->insert(data_vec->end(), data_buff, data_buff+data_size);
+    }
+
+    return num_values;
 }
 
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count)
 {
-    // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
+    // printf("read parquet parallel str column: %lld start: %lld count: %lld\n",
     //                                                  column_idx, start, count);
 
     if (count==0) {
