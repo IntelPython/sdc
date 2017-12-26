@@ -79,8 +79,12 @@ def filter_distributed_analysis(filter_node, array_dists):
     in_dist = Distribution.OneD
     for _, col_var in filter_node.df_in_vars.items():
         in_dist = Distribution(min(in_dist.value, array_dists[col_var.name].value))
+
+    # bool arr
+    in_dist = Distribution(min(in_dist.value, array_dists[filter_node.bool_arr.name].value))
     for _, col_var in filter_node.df_in_vars.items():
         array_dists[col_var.name] = in_dist
+    array_dists[filter_node.bool_arr.name] = in_dist
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
@@ -88,8 +92,17 @@ def filter_distributed_analysis(filter_node, array_dists):
         # output dist might not be assigned yet
         if col_var.name in array_dists:
             out_dist = Distribution(min(out_dist.value, array_dists[col_var.name].value))
+
+    # out dist should meet input dist (e.g. REP in causes REP out)
+    out_dist = Distribution(min(out_dist.value, in_dist.value))
     for _, col_var in filter_node.df_out_vars.items():
         array_dists[col_var.name] = out_dist
+
+    # output can cause input REP
+    if out_dist != Distribution.OneD_Var:
+        array_dists[filter_node.bool_arr.name] = out_dist
+        for _, col_var in filter_node.df_in_vars.items():
+            array_dists[col_var.name] = out_dist
 
     return
 
