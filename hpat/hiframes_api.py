@@ -191,8 +191,14 @@ def filter_usedefs(filter_node, use_set=None, def_set=None):
 
     return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
-
 numba.analysis.ir_extension_usedefs[Filter] = filter_usedefs
+
+def get_copies_filter(filter_node, typemap):
+    # filter doesn't generate copies, it just kills the output columns
+    kill_set = set(v.name for v in filter_node.df_out_vars.values())
+    return set(), kill_set
+
+ir_utils.copy_propagate_extensions[Filter] = get_copies_filter
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
