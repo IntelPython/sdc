@@ -1,5 +1,6 @@
 import unittest
 import hpat
+import numpy as np
 from hpat.str_arr_ext import StringArray
 
 class TestString(unittest.TestCase):
@@ -65,6 +66,16 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         arg = '12.2'
         self.assertEqual(hpat_func(arg), test_impl(arg))
+
+    def test_string_str_cast(self):
+        def test_impl(a):
+            return str(a)
+        hpat_func = hpat.jit(test_impl)
+        for arg in [np.int32(45), 43, np.float32(1.4), 4.5]:
+            py_res = test_impl(arg)
+            h_res = hpat_func(arg)
+            # XXX: use startswith since hpat output can have extra characters
+            self.assertTrue(h_res.startswith(py_res))
 
     # string array tests
     def test_string_array_constructor(self):
