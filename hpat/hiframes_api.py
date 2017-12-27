@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import numba
 from numba import typeinfer, ir, ir_utils, config
-from numba.ir_utils import visit_vars_inner
+from numba.ir_utils import visit_vars_inner, replace_vars_inner
 from numba import types
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -199,6 +199,20 @@ def get_copies_filter(filter_node, typemap):
     return set(), kill_set
 
 ir_utils.copy_propagate_extensions[Filter] = get_copies_filter
+
+def apply_copies_filter(filter_node, var_dict, name_var_table, ext_func, ext_data,
+                        typemap, calltypes, save_copies):
+    """apply copy propagate in filter node"""
+    filter_node.bool_arr = replace_vars_inner(filter_node.bool_arr, var_dict)
+
+    for col_name in list(filter_node.df_in_vars.keys()):
+        filter_node.df_in_vars[col_name] = replace_vars_inner(filter_node.df_in_vars[col_name], var_dict)
+    for col_name in list(filter_node.df_out_vars.keys()):
+        filter_node.df_out_vars[col_name] = replace_vars_inner(filter_node.df_out_vars[col_name], var_dict)
+
+    return
+
+ir_utils.apply_copy_propagate_extensions[Filter] = apply_copies_filter
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
