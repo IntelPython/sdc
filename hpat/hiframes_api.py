@@ -176,6 +176,24 @@ def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, typemap):
 
 ir_utils.remove_dead_extensions[Filter] = remove_dead_filter
 
+def filter_usedefs(filter_node, use_set=None, def_set=None):
+    if use_set is None:
+        use_set = set()
+    if def_set is None:
+        def_set = set()
+
+    # bool array and input columns are used
+    use_set.add(filter_node.bool_arr.name)
+    use_set.update({v.name for v in filter_node.df_in_vars.values()})
+
+    # output columns are defined
+    def_set.update({v.name for v in filter_node.df_out_vars.values()})
+
+    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+
+
+numba.analysis.ir_extension_usedefs[Filter] = filter_usedefs
+
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
 #
