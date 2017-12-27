@@ -1,0 +1,2 @@
+lib_LTLIBRARIES = libhpat_parquet_reader.la
+libhpat_parquet_reader_la_SOURCES = hpat_parquet_reader.cpp
