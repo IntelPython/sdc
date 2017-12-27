@@ -7,7 +7,7 @@ ENV http_proxy http://proxy-chain.intel.com:911
 ENV https_proxy http://proxy-chain.intel.com:911
 
 RUN apt-get update
-RUN apt-get install -y wget bzip2 llvm-4.0 git vim
+RUN apt-get install -y wget bzip2 llvm-4.0 git vim make
 RUN wget -q https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
 RUN bash Anaconda3-5.0.1-Linux-x86_64.sh -b
 ENV PATH="/root/anaconda3/bin/:${PATH}"
