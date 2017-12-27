@@ -48,6 +48,13 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     if (total_size == 0)
         MPI_Allreduce(&local_size, &total_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+
+    // return NA if no elements
+    if (total_size == 0)
+    {
+        return std::nan("");
+    }
+
     double at = quantile * (total_size-1);
 
     // FIXME: refactor constants
