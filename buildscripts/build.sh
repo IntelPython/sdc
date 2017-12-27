@@ -12,5 +12,9 @@ python setup.py install
 popd
 popd
 
+pushd parquet_reader
+PREFIX=$CONDA_PREFIX make
+popd
+
 # build HPAT
 DAALROOT=$CONDA_PREFIX HDF5_DIR=$CONDA_PREFIX python setup.py install

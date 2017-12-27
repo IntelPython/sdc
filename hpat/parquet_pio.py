@@ -218,7 +218,6 @@ import llvmlite.binding as ll
 
 from hpat.config import _has_pyarrow
 if _has_pyarrow:
-    import parquet_impl
     import parquet_cpp
     ll.add_symbol('pq_read', parquet_cpp.read)
     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)

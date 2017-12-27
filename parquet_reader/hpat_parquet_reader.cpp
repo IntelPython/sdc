@@ -1,4 +1,3 @@
-#include <Python.h>
 #include <string>
 #include <iostream>
 #include <cstring>
@@ -28,18 +27,6 @@ int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
 int pq_read_string_parallel_single_file(const char* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
         std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
-
-PyMODINIT_FUNC PyInit_parquet_impl(void) {
-    PyObject *m;
-    static struct PyModuleDef moduledef = {
-            PyModuleDef_HEAD_INIT, "parquet_impl", "No docs", -1, NULL, };
-    m = PyModule_Create(&moduledef);
-    if (m == NULL)
-        return NULL;
-
-    return m;
-}
-
 
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype,

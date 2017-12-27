@@ -76,21 +76,12 @@ ext_quantile = Extension(name="quantile_alg",
                              )
 
 ext_parquet = Extension(name="parquet_cpp",
-                             libraries = ['mpi', 'boost_filesystem'],
+                             libraries = ['mpi', 'boost_filesystem',
+                                            'hpat_parquet_reader'],
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
                              extra_compile_args=['-std=c++11'],
                              extra_link_args=['-std=c++11'],
-                             )
-
-ext_parquet_impl = Extension(name="parquet_impl",
-                             libraries = ['parquet', 'arrow'],
-                             sources=["hpat/_parquet_impl.cpp"],
-                             include_dirs=[PREFIX_DIR+'/include/'],
-                             extra_compile_args=['-D_GLIBCXX_USE_CXX11_ABI=0',
-                                                                '-std=c++11'],
-                             extra_link_args=['-D_GLIBCXX_USE_CXX11_ABI=0',
-                                                                '-std=c++11'],
                              )
 
 ext_daal_wrapper = Extension(name="daal_wrapper",
@@ -105,7 +96,6 @@ if _has_h5py:
     _ext_mods.append(ext_io)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-    _ext_mods.append(ext_parquet_impl)
 if _has_daal:
     _ext_mods.append(ext_daal_wrapper)
 

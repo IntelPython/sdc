@@ -24,6 +24,7 @@ requirements:
     - hdf5-parallel
     - h5py
     - daal-devel
+    - hpat-parquet-reader
 
   run:
     - python 3.6.*
@@ -36,6 +37,7 @@ requirements:
     - numba
     - hdf5-parallel
     - h5py
+    - hpat-parquet-reader
 
 test:
   imports:

@@ -1,0 +1,22 @@
+package:
+  name: hpat-parquet-reader
+  version: "0.1"
+
+source:
+   path: ../../parquet_reader
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - cmake >=3.1   # [win]
+    - pyarrow 0.8.*
+
+
+about:
+  home: https://github.com/IntelLabs/hpat
+  license: BSD
+  summary: Parquet reader for HPAT
