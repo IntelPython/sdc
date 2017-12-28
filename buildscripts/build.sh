@@ -13,8 +13,13 @@ popd
 popd
 
 pushd parquet_reader
-PREFIX=$CONDA_PREFIX make
-PREFIX=$CONDA_PREFIX make install
+mkdir build
+pushd build
+cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
+    -DCMAKE_INSTALL_LIBDIR=$CONDA_PREFIX/lib -DPREFIX=$CONDA_PREFIX ..
+make
+make install
+popd
 popd
 
 # build HPAT

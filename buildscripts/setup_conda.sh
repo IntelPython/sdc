@@ -22,7 +22,7 @@ source deactivate
 
 conda remove --all -q -y -n $CONDA_ENV
 
-conda create -n $CONDA_ENV -q -y python=$PYTHON numpy=$NUMPY scipy pandas llvmlite=0.20 boost
+conda create -n $CONDA_ENV -q -y python=$PYTHON numpy=$NUMPY scipy pandas llvmlite=0.20 boost cmake
 source activate $CONDA_ENV
 $CONDA_INSTALL pyarrow=0.8.* mpich -c conda-forge
 $CONDA_INSTALL h5py hdf5-parallel -c ehsantn
