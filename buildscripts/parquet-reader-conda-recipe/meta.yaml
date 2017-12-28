@@ -12,7 +12,9 @@ requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
-    - cmake >=3.1   # [win]
+    - python 3.6.*
+    - pyarrow 0.8.*
+  run:
     - pyarrow 0.8.*
 
 
