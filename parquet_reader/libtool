@@ -1,6 +1,6 @@
 #! /bin/sh
 # Generated automatically by config.status (hpat-parquet-reader) 0.1
-# Libtool was configured on host etotoni-mac03.local:
+# Libtool was configured on host d3b40cab2c44:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 
 # Provide generalized library-building support services.
@@ -51,7 +51,7 @@ build_old_libs=yes
 pic_mode=default
 
 # Whether or not to optimize for fast installation.
-fast_install=needless
+fast_install=yes
 
 # Shared archive member basename,for filename based shared library versioning on AIX.
 shared_archive_member_spec=
@@ -67,37 +67,37 @@ PATH_SEPARATOR=":"
 
 # The host system.
 host_alias=
-host=x86_64-apple-darwin17.3.0
-host_os=darwin17.3.0
+host=x86_64-pc-linux-gnu
+host_os=linux-gnu
 
 # The build system.
 build_alias=
-build=x86_64-apple-darwin17.3.0
-build_os=darwin17.3.0
+build=x86_64-pc-linux-gnu
+build_os=linux-gnu
 
 # A sed program that does not truncate output.
-SED="/usr/local/bin/gsed"
+SED="/bin/sed"
 
 # Sed that helps us avoid accidentally triggering echo(1) options like -n.
 Xsed="$SED -e 1s/^X//"
 
 # A grep program that handles long lines.
-GREP="/usr/bin/grep"
+GREP="/bin/grep"
 
 # An ERE matcher.
-EGREP="/usr/bin/grep -E"
+EGREP="/bin/grep -E"
 
 # A literal string matcher.
-FGREP="/usr/bin/grep -F"
+FGREP="/bin/grep -F"
 
 # A BSD- or MS-compatible name lister.
-NM="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-nm"
+NM="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-nm"
 
 # Whether we need soft or hard links.
 LN_S="ln -s"
 
 # What is the maximum length of a command?
-max_cmd_len=196608
+max_cmd_len=1572864
 
 # Object file suffix (normally "o").
 objext=o
@@ -121,7 +121,7 @@ to_host_file_cmd=func_convert_file_noop
 to_tool_file_cmd=func_convert_file_noop
 
 # An object symbol dumper.
-OBJDUMP="objdump"
+OBJDUMP="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-objdump"
 
 # Method to check whether dependent libraries are shared objects.
 deplibs_check_method="pass_all"
@@ -142,51 +142,51 @@ DLLTOOL="false"
 sharedlib_from_linklib_cmd="printf %s\\n"
 
 # The archiver.
-AR="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-ar"
+AR="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-ar"
 
 # Flags to create an archive.
 AR_FLAGS="cru"
 
 # How to feed a file listing to the archiver.
-archiver_list_spec=""
+archiver_list_spec="@"
 
 # A symbol stripping program.
-STRIP="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-strip"
+STRIP="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-strip"
 
 # Commands used to install an old-style archive.
-RANLIB="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-ranlib"
+RANLIB="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-ranlib"
 old_postinstall_cmds="chmod 644 \$oldlib~\$RANLIB \$tool_oldlib"
 old_postuninstall_cmds=""
 
 # Whether to use a lock for old archive extraction.
-lock_old_archive_extraction=yes
+lock_old_archive_extraction=no
 
 # A C compiler.
-LTCC="x86_64-apple-darwin13.4.0-clang"
+LTCC="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-cc"
 
 # LTCC compiler flags.
-LTCFLAGS="-march=core2 -mtune=haswell -mssse3 -ftree-vectorize -fPIC -fPIE -fstack-protector-strong -O2 -pipe"
+LTCFLAGS="-march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -pipe"
 
 # Take the output of nm and produce a listing of raw symbols and C names.
-global_symbol_pipe="sed -n -e 's/^.*[	 ]\\([BCDEGRST][BCDEGRST]*\\)[	 ][	 ]*_\\([_A-Za-z][_A-Za-z0-9]*\\)\$/\\1 _\\2 \\2/p' | sed '/ __gnu_lto/d'"
+global_symbol_pipe="sed -n -e 's/^.*[	 ]\\([ABCDGIRSTW][ABCDGIRSTW]*\\)[	 ][	 ]*\\([_A-Za-z][_A-Za-z0-9]*\\)\$/\\1 \\2 \\2/p' | sed '/ __gnu_lto/d'"
 
 # Transform the output of nm in a proper C declaration.
-global_symbol_to_cdecl="sed -n -e 's/^T .* \\(.*\\)\$/extern int \\1();/p' -e 's/^[BCDEGRST][BCDEGRST]* .* \\(.*\\)\$/extern char \\1;/p'"
+global_symbol_to_cdecl="sed -n -e 's/^T .* \\(.*\\)\$/extern int \\1();/p' -e 's/^[ABCDGIRSTW][ABCDGIRSTW]* .* \\(.*\\)\$/extern char \\1;/p'"
 
 # Transform the output of nm into a list of symbols to manually relocate.
 global_symbol_to_import=""
 
 # Transform the output of nm in a C name address pair.
-global_symbol_to_c_name_address="sed -n -e 's/^: \\(.*\\) .*\$/  {\"\\1\", (void *) 0},/p' -e 's/^[BCDEGRST][BCDEGRST]* .* \\(.*\\)\$/  {\"\\1\", (void *) \\&\\1},/p'"
+global_symbol_to_c_name_address="sed -n -e 's/^: \\(.*\\) .*\$/  {\"\\1\", (void *) 0},/p' -e 's/^[ABCDGIRSTW][ABCDGIRSTW]* .* \\(.*\\)\$/  {\"\\1\", (void *) \\&\\1},/p'"
 
 # Transform the output of nm in a C name address pair when lib prefix is needed.
-global_symbol_to_c_name_address_lib_prefix="sed -n -e 's/^: \\(.*\\) .*\$/  {\"\\1\", (void *) 0},/p' -e 's/^[BCDEGRST][BCDEGRST]* .* \\(lib.*\\)\$/  {\"\\1\", (void *) \\&\\1},/p' -e 's/^[BCDEGRST][BCDEGRST]* .* \\(.*\\)\$/  {\"lib\\1\", (void *) \\&\\1},/p'"
+global_symbol_to_c_name_address_lib_prefix="sed -n -e 's/^: \\(.*\\) .*\$/  {\"\\1\", (void *) 0},/p' -e 's/^[ABCDGIRSTW][ABCDGIRSTW]* .* \\(lib.*\\)\$/  {\"\\1\", (void *) \\&\\1},/p' -e 's/^[ABCDGIRSTW][ABCDGIRSTW]* .* \\(.*\\)\$/  {\"lib\\1\", (void *) \\&\\1},/p'"
 
 # The name lister interface.
 nm_interface="BSD nm"
 
 # Specify filename containing input files for $NM.
-nm_file_list_spec=""
+nm_file_list_spec="@"
 
 # The root where to search for dependent libraries,and where our libraries should be installed.
 lt_sysroot=
@@ -207,32 +207,32 @@ need_locks="no"
 MANIFEST_TOOL=":"
 
 # Tool to manipulate archived DWARF debug symbol files on Mac OS X.
-DSYMUTIL="dsymutil"
+DSYMUTIL=""
 
 # Tool to change global to local symbols on Mac OS X.
-NMEDIT="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-nmedit"
+NMEDIT=""
 
 # Tool to manipulate fat objects and archives on Mac OS X.
-LIPO="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-lipo"
+LIPO=""
 
 # ldd/readelf like tool for Mach-O binaries on Mac OS X.
-OTOOL="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-otool"
+OTOOL=""
 
 # ldd/readelf like tool for 64 bit Mach-O binaries on Mac OS X 10.4.
-OTOOL64=":"
+OTOOL64=""
 
 # Old archive suffix (normally "a").
 libext=a
 
 # Shared library suffix (normally ".so").
-shrext_cmds="\`test .\$module = .yes && echo .so || echo .dylib\`"
+shrext_cmds=".so"
 
 # The commands to extract the exported symbol list from a shared archive.
 extract_expsyms_cmds=""
 
 # Variables whose values should be saved in libtool wrapper scripts and
 # restored at link time.
-variables_saved_for_relink="PATH DYLD_LIBRARY_PATH  GCC_EXEC_PREFIX COMPILER_PATH LIBRARY_PATH"
+variables_saved_for_relink="PATH LD_LIBRARY_PATH LD_RUN_PATH GCC_EXEC_PREFIX COMPILER_PATH LIBRARY_PATH"
 
 # Do we need the "lib" prefix for modules?
 need_lib_prefix=no
@@ -241,26 +241,26 @@ need_lib_prefix=no
 need_version=no
 
 # Library versioning type.
-version_type=darwin
+version_type=linux
 
 # Shared library runtime path variable.
-runpath_var=
+runpath_var=LD_RUN_PATH
 
 # Shared library path variable.
-shlibpath_var=DYLD_LIBRARY_PATH
+shlibpath_var=LD_LIBRARY_PATH
 
 # Is shlibpath searched before the hard-coded library search path?
-shlibpath_overrides_runpath=yes
+shlibpath_overrides_runpath=no
 
 # Format of library name prefix.
 libname_spec="lib\$name"
 
 # List of archive names.  First name is the real one, the rest are links.
 # The last name is the one that the linker finds with -lNAME
-library_names_spec="\$libname\$release\$major\$shared_ext \$libname\$shared_ext"
+library_names_spec="\$libname\$release\$shared_ext\$versuffix \$libname\$release\$shared_ext\$major \$libname\$shared_ext"
 
 # The coded name of the library, if different from the real name.
-soname_spec="\$libname\$release\$major\$shared_ext"
+soname_spec="\$libname\$release\$shared_ext\$major"
 
 # Permission mode override for installation of shared libraries.
 install_override_mode=""
@@ -272,20 +272,20 @@ postinstall_cmds=""
 postuninstall_cmds=""
 
 # Commands used to finish a libtool library installation in a directory.
-finish_cmds=""
+finish_cmds="PATH=\\\"\\\$PATH:/sbin\\\" ldconfig -n \$libdir"
 
 # As "finish_cmds", except a single script fragment to be evaled but
 # not shown.
 finish_eval=""
 
 # Whether we should hardcode library paths into libraries.
-hardcode_into_libs=no
+hardcode_into_libs=yes
 
 # Compile-time system search path for libraries.
-sys_lib_search_path_spec="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/lib/clang/4.0.1  /usr/local/lib"
+sys_lib_search_path_spec="/root/anaconda3/envs/HPAT/lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0 /root/anaconda3/envs/HPAT/lib/gcc /root/anaconda3/envs/HPAT/x86_64-conda_cos6-linux-gnu/lib /root/anaconda3/envs/HPAT/x86_64-conda_cos6-linux-gnu/sysroot/lib /root/anaconda3/envs/HPAT/x86_64-conda_cos6-linux-gnu/sysroot/usr/lib "
 
 # Detected run-time system search path for libraries.
-sys_lib_dlsearch_path_spec="/usr/local/lib /lib /usr/lib"
+sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu "
 
 # Explicit LT_SYS_LIBRARY_PATH set during ./configure time.
 configure_time_lt_sys_library_path=""
@@ -300,37 +300,37 @@ dlopen_self=unknown
 dlopen_self_static=unknown
 
 # Commands to strip libraries.
-old_striplib="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-strip -S"
-striplib="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-strip -x"
+old_striplib="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-strip --strip-debug"
+striplib="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-strip --strip-unneeded"
 
 
 # The linker used to build libraries.
-LD="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-ld"
+LD="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-ld -m elf_x86_64"
 
 # How to create reloadable object files.
 reload_flag=" -r"
-reload_cmds="\$LTCC \$LTCFLAGS -nostdlib \$wl-r -o \$output\$reload_objs"
+reload_cmds="\$LD\$reload_flag -o \$output\$reload_objs"
 
 # Commands used to build an old-style archive.
 old_archive_cmds="\$AR \$AR_FLAGS \$oldlib\$oldobjs~\$RANLIB \$tool_oldlib"
 
 # A language specific compiler.
-CC="x86_64-apple-darwin13.4.0-clang"
+CC="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-cc"
 
 # Is the compiler the GNU compiler?
 with_gcc=yes
 
 # Compiler flag to turn off builtin functions.
-no_builtin_flag=" -fno-builtin -fno-rtti -fno-exceptions"
+no_builtin_flag=" -fno-builtin"
 
 # Additional compiler flags for building library objects.
-pic_flag=" -fno-common -DPIC"
+pic_flag=" -fPIC -DPIC"
 
 # How to pass a linker flag through the compiler.
 wl="-Wl,"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -342,10 +342,10 @@ build_libtool_need_lc=no
 allow_libtool_libs_with_static_runtimes=no
 
 # Compiler flag to allow reflexive dlopens.
-export_dynamic_flag_spec=""
+export_dynamic_flag_spec="\$wl--export-dynamic"
 
 # Compiler flag to generate shared objects directly from archives.
-whole_archive_flag_spec="\`for conv in \$convenience\\\"\\\"; do test  -n \\\"\$conv\\\" && new_convenience=\\\"\$new_convenience \$wl-force_load,\$conv\\\"; done; func_echo_all \\\"\$new_convenience\\\"\`"
+whole_archive_flag_spec="\$wl--whole-archive\$convenience \$wl--no-whole-archive"
 
 # Whether the compiler copes with passing no objects directly.
 compiler_needs_object="no"
@@ -357,26 +357,29 @@ old_archive_from_new_cmds=""
 old_archive_from_expsyms_cmds=""
 
 # Commands used to build a shared archive.
-archive_cmds="\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring \$single_module"
-archive_expsym_cmds="sed 's|^|_|' < \$export_symbols > \$output_objdir/\$libname-symbols.expsym~\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring \$single_module \$wl-exported_symbols_list,\$output_objdir/\$libname-symbols.expsym"
+archive_cmds="\$CC -shared \$pic_flag \$libobjs \$deplibs \$compiler_flags \$wl-soname \$wl\$soname -o \$lib"
+archive_expsym_cmds="echo \\\"{ global:\\\" > \$output_objdir/\$libname.ver~
+            cat \$export_symbols | sed -e \\\"s/\\\\(.*\\\\)/\\\\1;/\\\" >> \$output_objdir/\$libname.ver~
+            echo \\\"local: *; };\\\" >> \$output_objdir/\$libname.ver~
+            \$CC -shared \$pic_flag \$libobjs \$deplibs \$compiler_flags \$wl-soname \$wl\$soname \$wl-version-script \$wl\$output_objdir/\$libname.ver -o \$lib"
 
 # Commands used to build a loadable module if different from building
 # a shared archive.
-module_cmds="\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags"
-module_expsym_cmds="sed -e 's|^|_|' < \$export_symbols > \$output_objdir/\$libname-symbols.expsym~\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags \$wl-exported_symbols_list,\$output_objdir/\$libname-symbols.expsym"
+module_cmds=""
+module_expsym_cmds=""
 
 # Whether we are building with GNU ld or not.
-with_gnu_ld="no"
+with_gnu_ld="yes"
 
 # Flag that allows shared libraries with undefined symbols to be built.
-allow_undefined_flag="\$wl-undefined \${wl}dynamic_lookup"
+allow_undefined_flag=""
 
 # Flag that enforces no undefined symbols.
 no_undefined_flag=""
 
 # Flag to hardcode $libdir into a binary during linking.
 # This must work even if $libdir does not exist
-hardcode_libdir_flag_spec=""
+hardcode_libdir_flag_spec="\$wl-rpath \$wl\$libdir"
 
 # Whether we need a single "-rpath" flag with a separated argument.
 hardcode_libdir_separator=""
@@ -402,14 +405,14 @@ hardcode_shlibpath_var=unsupported
 # Set to "yes" if building a shared library automatically hardcodes DIR
 # into the library and all subsequent libraries and executables linked
 # against it.
-hardcode_automatic=yes
+hardcode_automatic=no
 
 # Set to yes if linker adds runtime paths of dependent libraries
 # to runtime path list.
 inherit_rpath=no
 
 # Whether libtool must link a program against all its dependency libraries.
-link_all_deplibs=yes
+link_all_deplibs=no
 
 # Set to "yes" if exported symbols are required.
 always_export_symbols=no
@@ -7729,11 +7732,6 @@ func_mode_link ()
 	arg=$func_stripname_result
 	;;
 
-      -Wl,--as-needed)
-	deplibs="$deplibs $arg"
-	continue
-	;;
-
       -Wl,*)
 	func_stripname '-Wl,' '' "$arg"
 	args=$func_stripname_result
@@ -8038,7 +8036,6 @@ func_mode_link ()
 
     case $linkmode in
     lib)
-	as_needed_flag=
 	passes="conv dlpreopen link"
 	for file in $dlfiles $dlprefiles; do
 	  case $file in
@@ -8050,7 +8047,6 @@ func_mode_link ()
 	done
 	;;
     prog)
-	as_needed_flag=
 	compile_deplibs=
 	finalize_deplibs=
 	alldeplibs=false
@@ -8120,15 +8116,6 @@ func_mode_link ()
 	lib=
 	found=false
 	case $deplib in
-	-Wl,--as-needed)
-	  if test prog,link = "$linkmode,$pass" ||
-	     test lib,link = "$linkmode,$pass"; then
-	    as_needed_flag="$deplib "
-	  else
-	    deplibs="$deplib $deplibs"
-	  fi
-	  continue
-	  ;;
 	-mt|-mthreads|-kthread|-Kthread|-pthread|-pthreads|--thread-safe \
         |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*)
 	  if test prog,link = "$linkmode,$pass"; then
@@ -10546,13 +10533,6 @@ EOF
 	  test "X$libobjs" = "X " && libobjs=
 	fi
 
-	# A bit hacky. I had wanted to add \$as_needed_flag to archive_cmds instead, but that
-	# comes from libtool.m4 which is part of the project being built. This should put it
-	# in the right place though.
-	if test lib,link = "$linkmode,$pass" && test -n "$as_needed_flag"; then
-	  libobjs=$as_needed_flag$libobjs
-	fi
-
 	save_ifs=$IFS; IFS='~'
 	for cmd in $cmds; do
 	  IFS=$sp$nl
@@ -10785,8 +10765,8 @@ EOF
       compile_deplibs=$new_libs
 
 
-      func_append compile_command " $as_needed_flag $compile_deplibs"
-      func_append finalize_command " $as_needed_flag $finalize_deplibs"
+      func_append compile_command " $compile_deplibs"
+      func_append finalize_command " $finalize_deplibs"
 
       if test -n "$rpath$xrpath"; then
 	# If the user specified any rpath flags, then add them.
@@ -11681,17 +11661,17 @@ build_old_libs=`case $build_libtool_libs in yes) echo no;; *) echo yes;; esac`
 # ### BEGIN LIBTOOL TAG CONFIG: CXX
 
 # The linker used to build libraries.
-LD="/Users/etotoni/pse-hpc/python/anaconda3/envs/PA/bin/x86_64-apple-darwin13.4.0-ld"
+LD="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-ld -m elf_x86_64"
 
 # How to create reloadable object files.
 reload_flag=" -r"
-reload_cmds="\$LTCC \$LTCFLAGS -nostdlib \$wl-r -o \$output\$reload_objs"
+reload_cmds="\$LD\$reload_flag -o \$output\$reload_objs"
 
 # Commands used to build an old-style archive.
 old_archive_cmds="\$AR \$AR_FLAGS \$oldlib\$oldobjs~\$RANLIB \$tool_oldlib"
 
 # A language specific compiler.
-CC="x86_64-apple-darwin13.4.0-clang++"
+CC="/root/anaconda3/envs/HPAT/bin/x86_64-conda_cos6-linux-gnu-c++"
 
 # Is the compiler the GNU compiler?
 with_gcc=yes
@@ -11700,13 +11680,13 @@ with_gcc=yes
 no_builtin_flag=" -fno-builtin"
 
 # Additional compiler flags for building library objects.
-pic_flag=" -fno-common -DPIC"
+pic_flag=" -fPIC -DPIC"
 
 # How to pass a linker flag through the compiler.
 wl="-Wl,"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -11718,10 +11698,10 @@ build_libtool_need_lc=no
 allow_libtool_libs_with_static_runtimes=no
 
 # Compiler flag to allow reflexive dlopens.
-export_dynamic_flag_spec=""
+export_dynamic_flag_spec="\$wl--export-dynamic"
 
 # Compiler flag to generate shared objects directly from archives.
-whole_archive_flag_spec="\`for conv in \$convenience\\\"\\\"; do test  -n \\\"\$conv\\\" && new_convenience=\\\"\$new_convenience \$wl-force_load,\$conv\\\"; done; func_echo_all \\\"\$new_convenience\\\"\`"
+whole_archive_flag_spec="\$wl--whole-archive\$convenience \$wl--no-whole-archive"
 
 # Whether the compiler copes with passing no objects directly.
 compiler_needs_object="no"
@@ -11733,26 +11713,26 @@ old_archive_from_new_cmds=""
 old_archive_from_expsyms_cmds=""
 
 # Commands used to build a shared archive.
-archive_cmds="\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring \$single_module"
-archive_expsym_cmds="sed 's|^|_|' < \$export_symbols > \$output_objdir/\$libname-symbols.expsym~\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring \$single_module \$wl-exported_symbols_list,\$output_objdir/\$libname-symbols.expsym"
+archive_cmds="\$CC \$pic_flag -shared -nostdlib \$predep_objects \$libobjs \$deplibs \$postdep_objects \$compiler_flags \$wl-soname \$wl\$soname -o \$lib"
+archive_expsym_cmds="\$CC \$pic_flag -shared -nostdlib \$predep_objects \$libobjs \$deplibs \$postdep_objects \$compiler_flags \$wl-soname \$wl\$soname \$wl-retain-symbols-file \$wl\$export_symbols -o \$lib"
 
 # Commands used to build a loadable module if different from building
 # a shared archive.
-module_cmds="\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags"
-module_expsym_cmds="sed -e 's|^|_|' < \$export_symbols > \$output_objdir/\$libname-symbols.expsym~\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags \$wl-exported_symbols_list,\$output_objdir/\$libname-symbols.expsym"
+module_cmds=""
+module_expsym_cmds=""
 
 # Whether we are building with GNU ld or not.
-with_gnu_ld="no"
+with_gnu_ld="yes"
 
 # Flag that allows shared libraries with undefined symbols to be built.
-allow_undefined_flag="\$wl-undefined \${wl}dynamic_lookup"
+allow_undefined_flag=""
 
 # Flag that enforces no undefined symbols.
 no_undefined_flag=""
 
 # Flag to hardcode $libdir into a binary during linking.
 # This must work even if $libdir does not exist
-hardcode_libdir_flag_spec=""
+hardcode_libdir_flag_spec="\$wl-rpath \$wl\$libdir"
 
 # Whether we need a single "-rpath" flag with a separated argument.
 hardcode_libdir_separator=""
@@ -11778,14 +11758,14 @@ hardcode_shlibpath_var=unsupported
 # Set to "yes" if building a shared library automatically hardcodes DIR
 # into the library and all subsequent libraries and executables linked
 # against it.
-hardcode_automatic=yes
+hardcode_automatic=no
 
 # Set to yes if linker adds runtime paths of dependent libraries
 # to runtime path list.
 inherit_rpath=no
 
 # Whether libtool must link a program against all its dependency libraries.
-link_all_deplibs=yes
+link_all_deplibs=no
 
 # Set to "yes" if exported symbols are required.
 always_export_symbols=no
@@ -11812,17 +11792,17 @@ file_list_spec=""
 hardcode_action=immediate
 
 # The directories searched by this compiler when creating a shared library.
-compiler_lib_search_dirs=""
+compiler_lib_search_dirs="/root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0 /root/anaconda3/envs/HPAT/bin/../lib/gcc /root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/../../../../x86_64-conda_cos6-linux-gnu/lib/../lib /root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/lib/../lib /root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib/../lib /root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/../../../../x86_64-conda_cos6-linux-gnu/lib /root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/lib /root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib"
 
 # Dependencies to place before and after the objects being linked to
 # create a shared library.
-predep_objects=""
-postdep_objects=""
+predep_objects="/root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib/../lib/crti.o /root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/crtbeginS.o"
+postdep_objects="/root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/crtendS.o /root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib/../lib/crtn.o"
 predeps=""
-postdeps=""
+postdeps="-lstdc++ -lm -lgcc_s -lc -lgcc_s"
 
 # The library search path used internally by the compiler when linking
 # a shared library.
-compiler_lib_search_path=""
+compiler_lib_search_path="-L/root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0 -L/root/anaconda3/envs/HPAT/bin/../lib/gcc -L/root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/../../../../x86_64-conda_cos6-linux-gnu/lib/../lib -L/root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/lib/../lib -L/root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib/../lib -L/root/anaconda3/envs/HPAT/bin/../lib/gcc/x86_64-conda_cos6-linux-gnu/7.2.0/../../../../x86_64-conda_cos6-linux-gnu/lib -L/root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/lib -L/root/anaconda3/envs/HPAT/bin/../x86_64-conda_cos6-linux-gnu/sysroot/usr/lib"
 
 # ### END LIBTOOL TAG CONFIG: CXX
