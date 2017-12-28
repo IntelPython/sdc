@@ -14,6 +14,7 @@ popd
 
 pushd parquet_reader
 PREFIX=$CONDA_PREFIX make
+make install
 popd
 
 # build HPAT
