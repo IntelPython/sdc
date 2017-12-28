@@ -17,7 +17,7 @@ mkdir build
 pushd build
 cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
     -DCMAKE_INSTALL_LIBDIR=$CONDA_PREFIX/lib -DPREFIX=$CONDA_PREFIX ..
-make
+make VERBOSE=1
 make install
 popd
 popd
