@@ -1,6 +1,6 @@
 # http://www.gnu.org/software/automake
 
-Makefile.in
+#Makefile.in
 /ar-lib
 /mdate-sh
 /py-compile
@@ -17,7 +17,7 @@ Makefile.in
 /config.guess
 /config.h.in
 /config.sub
-/configure
+#/configure
 /configure.scan
 /depcomp
 /install-sh
