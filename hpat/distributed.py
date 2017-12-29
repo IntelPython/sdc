@@ -130,12 +130,19 @@ class DistributedPass(object):
                                 and rhs.value.name in self._shape_attrs):
                             arr = self._shape_attrs[rhs.value.name]
                             ndims = self.typemap[arr].ndim
-                            sizes = self._array_sizes[arr]
                             if arr not in self._T_arrs and rhs.index==0:
-                                inst.value = sizes[rhs.index]
+                                # return parallel size
+                                if self._is_1D_arr(arr):
+                                    inst.value =  self._array_sizes[arr][rhs.index]
+                                else:
+                                    assert self._is_1D_Var_arr(arr)
+                                    new_body += self._gen_1D_Var_len(namevar_table[arr])
+                                    new_body[-1].target = inst.target
+                                    continue
                             # last dimension of transposed arrays is partitioned
                             if arr in self._T_arrs and rhs.index==ndims-1:
-                                inst.value = sizes[rhs.index]
+                                assert not self._is_1D_Var_arr(arr), "1D_Var arrays cannot transpose"
+                                inst.value =  self._array_sizes[arr][rhs.index]
                         if rhs.op in ['getitem', 'static_getitem']:
                             if rhs.op == 'getitem':
                                 index = rhs.index
@@ -145,7 +152,8 @@ class DistributedPass(object):
                                 index, rhs, inst)
                             continue
                         if (rhs.op=='getattr'
-                                and self._is_1D_arr(rhs.value.name)
+                                and (self._is_1D_arr(rhs.value.name)
+                                    or self._is_1D_Var_arr(rhs.value.name))
                                 and rhs.attr=='shape'):
                             # XXX: return a new tuple using sizes here?
                             self._shape_attrs[lhs] = rhs.value.name
@@ -191,6 +199,17 @@ class DistributedPass(object):
             blocks = self._add_stencil_border(blocks, self._stencil_right_border, is_left=False)
 
         return blocks
+
+    def _gen_1D_Var_len(self, arr):
+        def f(A, op):
+            c = len(A)
+            res = hpat.distributed_api.dist_reduce(c, op)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                            (self.typemap[arr.name], types.int32),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr, ir.Const(Reduce_Type.Sum.value, arr.loc)])
+        nodes = f_block.body[:-3]  # remove none return
+        return nodes
 
     def _add_stencil_border(self, blocks, border_dict, is_left):
         new_blocks = {}
