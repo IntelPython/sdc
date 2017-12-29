@@ -123,7 +123,7 @@ class TestHiFrames(unittest.TestCase):
             return df.A.quantile(.25)
 
         hpat_func = hpat.jit(test_impl)
-        n = int(11e7)  # greater than 10e7 algorithm threshold
+        n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -134,7 +134,7 @@ class TestHiFrames(unittest.TestCase):
             return df.A.quantile(.25)
 
         hpat_func = hpat.jit(test_impl)
-        n = int(11e7)
+        n = 1001
         A = np.arange(0, n, 1, np.float64)
         np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
 
