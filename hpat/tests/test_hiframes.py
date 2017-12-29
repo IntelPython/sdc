@@ -116,6 +116,27 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
+    def test_quantile_parallel(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
+            return df.A.quantile(.25)
+
+        hpat_func = hpat.jit(test_impl)
+        n = int(11e7)  # greater than 10e7 algorithm threshold
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_quantile_sequential(self):
+        def test_impl(A):
+            df = pd.DataFrame({'A': A})
+            return df.A.quantile(.25)
+
+        hpat_func = hpat.jit(test_impl)
+        n = int(11e7)
+        A = np.arange(0, n, 1, np.float64)
+        np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
+
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
