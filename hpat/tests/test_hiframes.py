@@ -2,6 +2,7 @@ import unittest
 import pandas as pd
 import numpy as np
 import hpat
+from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
@@ -136,6 +137,26 @@ class TestHiFrames(unittest.TestCase):
         n = int(11e7)
         A = np.arange(0, n, 1, np.float64)
         np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
+
+    def test_str_contains_regex(self):
+        def test_impl():
+            A = StringArray(['ABC', 'BB', 'ADEF'])
+            df = pd.DataFrame({'A': A})
+            B = df.A.str.contains('AB*', regex=True)
+            return B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), 2)
+
+    def test_str_contains_noregex(self):
+        def test_impl():
+            A = StringArray(['ABC', 'BB', 'ADEF'])
+            df = pd.DataFrame({'A': A})
+            B = df.A.str.contains('BB', regex=False)
+            return B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), 1)
 
     def test_filter1(self):
         def test_impl(n):
