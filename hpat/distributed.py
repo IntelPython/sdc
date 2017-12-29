@@ -640,6 +640,25 @@ class DistributedPass(object):
             assert not is_multi_dim
             start = self._array_starts[arr.name][0]
             count = self._array_counts[arr.name][0]
+
+            if self.typemap[index_var.name]==types.intp:
+                def f(A, val, index, chunk_start, chunk_count):
+                    hpat.distributed_lower._set_if_in_range(
+                                        A, val, index, chunk_start, chunk_count)
+
+                f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                    (self.typemap[arr.name],
+                                    self.typemap[node.value.name],
+                                    types.intp, types.intp, types.intp),
+                                            self.typemap, self.calltypes)
+                _, block = f_ir.blocks.popitem()
+                replace_arg_nodes(block, [arr, node.value, index_var, start, count])
+                out = block.body[:-3]
+                return out
+
+            assert isinstance(self.typemap[index_var.name],
+                                types.misc.SliceType), "slice index expected"
+
             # convert setitem with global range to setitem with local range
             # that overlaps with the local array chunk
             def f(A, val, start, stop, chunk_start, chunk_count):

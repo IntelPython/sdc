@@ -297,6 +297,11 @@ def _get_local_range(start, stop, chunk_start, chunk_count):
     return loc_start, loc_stop
 
 @numba.njit
+def _set_if_in_range(A, val, index, chunk_start, chunk_count):
+    if index >= chunk_start and index < chunk_start+chunk_count:
+        A[index] = val
+
+@numba.njit
 def _root_rank_select(old_val, new_val):
     if distributed_api.get_rank() == 0:
         return old_val

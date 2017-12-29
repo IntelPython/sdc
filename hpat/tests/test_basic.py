@@ -22,6 +22,30 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_setitem1(self):
+        def test_impl(N):
+            A = np.arange(10)+1.0
+            A[0] = 30
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_setitem2(self):
+        def test_impl(N):
+            A = np.arange(10)+1.0
+            A[0:4] = 30
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_astype(self):
         def test_impl(N):
             return np.ones(N).astype(np.int32).sum()
