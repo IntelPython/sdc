@@ -65,6 +65,8 @@ class DistributedPass(object):
         self._array_sizes = {}
         self._stencil_left_border = {}
         self._stencil_right_border = {}
+        # save output of converted 1DVar array len() variables to recover 1DVar parfors
+        self.oneDVar_len_vars = {}
 
     def run(self):
         remove_dels(self.func_ir.blocks)
@@ -136,8 +138,11 @@ class DistributedPass(object):
                                     inst.value =  self._array_sizes[arr][rhs.index]
                                 else:
                                     assert self._is_1D_Var_arr(arr)
-                                    new_body += self._gen_1D_Var_len(namevar_table[arr])
+                                    arr_var = namevar_table[arr]
+                                    new_body += self._gen_1D_Var_len(arr_var)
                                     new_body[-1].target = inst.target
+                                    # save output of converted 1DVar array len() variables to recover 1DVar parfors
+                                    self.oneDVar_len_vars[inst.target.name] = arr_var
                                     continue
                             # last dimension of transposed arrays is partitioned
                             if arr in self._T_arrs and rhs.index==ndims-1:
@@ -707,9 +712,23 @@ class DistributedPass(object):
             # TODO: make sure loop index is not used for calculations in
             # OneD_Var parfors
             if self._dist_analysis.parfor_dists[parfor.id] == Distribution.OneD_Var:
+                # recover range of 1DVar parfors coming from converted 1DVar array len()
+                prepend = []
+                for l in parfor.loop_nests:
+                    if l.stop.name in self.oneDVar_len_vars:
+                        arr_var = self.oneDVar_len_vars[l.stop.name]
+                        def f(A):
+                            arr_len = len(A)
+                        f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                        (self.typemap[arr_var.name],),
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+                        replace_arg_nodes(f_block, [arr_var])
+                        nodes = f_block.body[:-3]  # remove none return
+                        l.stop = nodes[-1].target
+                        prepend += nodes
                 init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(parfor, namevar_table)
                 parfor.init_block.body += init_reduce_nodes
-                out += reduce_nodes
+                out = prepend + out + reduce_nodes
             if config.DEBUG_ARRAY_OPT==1:
                 print("parfor "+str(parfor.id)+" not parallelized.")
             return out
