@@ -402,6 +402,8 @@ from numba.targets.arrayobj import make_array
 from numba import cgutils
 from hpat.distributed_lower import _h5_typ_table
 
+
+@lower_builtin(quantile, types.npytypes.Array, types.float64)
 @lower_builtin(quantile_parallel, types.npytypes.Array, types.float64, types.intp)
 def lower_dist_quantile(context, builder, sig, args):
 
@@ -413,8 +415,14 @@ def lower_dist_quantile(context, builder, sig, args):
     arr = make_array(sig.args[0])(context, builder, args[0])
     local_size = builder.extract_value(arr.shape, 0)
 
+    if len(args) == 3:
+        total_size = args[2]
+    else:
+        # sequential case
+        total_size = local_size
+
     call_args = [builder.bitcast(arr.data, lir.IntType(8).as_pointer()),
-                local_size, args[2], args[1], builder.load(typ_arg)]
+                local_size, total_size, args[1], builder.load(typ_arg)]
 
     # array, size, total_size, quantile, type enum
     arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64),

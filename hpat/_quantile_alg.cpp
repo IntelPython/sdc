@@ -210,7 +210,7 @@ T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, i
     // printf("total size: %ld k: %ld\n", total_size, k);
     int64_t threshold = (int64_t) pow(10.0, 7.0); // 100 million
     // int64_t threshold = 20;
-    if (total_size < threshold)
+    if (total_size < threshold || n_pes==1)
     {
         return small_get_nth_parallel(my_array, total_size, myrank, n_pes, k, type_enum);
     }
@@ -372,6 +372,14 @@ T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
     int my_data_size = my_array.size();
     int total_data_size = 0;
     std::vector<T> all_data_vec;
+
+    // no need to gather data if only 1 processor
+    if (n_pes==1)
+    {
+        std::nth_element(my_array.begin(), my_array.begin() + k, my_array.end());
+        res = my_array[k];
+        return res;
+    }
 
     // gather the data sizes
     int *rcounts = new int[n_pes];
