@@ -2,6 +2,9 @@
 
 source activate $CONDA_ENV
 
+# generate test data for test_io
+python hpat/tests/gen_test_data.py
+
 if [ "$RUN_COVERAGE" == "yes" ]; then
     export PYTHONPATH=.
     coverage erase
