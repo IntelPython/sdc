@@ -137,7 +137,7 @@ class HiFramesTyped(object):
                 assign.value = rhs.args[0]
                 return [assign]
             else:
-                def f(column):
+                def f(column):  # pragma: no cover
                     a = column.astype(np.float64)
                 f_block = compile_to_numba_ir(f,
                         {'hpat': hpat, 'np': np}, self.typingctx,
@@ -155,7 +155,7 @@ class HiFramesTyped(object):
                 and rhs.func.name in call_table
                 and call_table[rhs.func.name] == ['empty_like', np]):
             in_arr= rhs.args[0]
-            def f(A):
+            def f(A):  # pragma: no cover
                 c = len(A)
             f_block = compile_to_numba_ir(f, {}, self.typingctx, (self.typemap[in_arr.name],),
                                 self.typemap, self.calltypes).blocks.popitem()[1]
@@ -301,7 +301,7 @@ class HiFramesTyped(object):
         return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
 
 # float columns can have regular np.nan
-def _column_filter_impl_float(A, B, ind):
+def _column_filter_impl_float(A, B, ind):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = 0
         if ind[i]:
@@ -310,7 +310,7 @@ def _column_filter_impl_float(A, B, ind):
             s = np.nan
         A[i] = s
 
-def _column_count_impl(A):
+def _column_count_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     for i in numba.parfor.internal_prange(len(A)):
@@ -320,7 +320,7 @@ def _column_count_impl(A):
 
     res = count
 
-def _column_fillna_impl(A, B, fill):
+def _column_fillna_impl(A, B, fill):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
         if np.isnan(s):
@@ -328,12 +328,12 @@ def _column_fillna_impl(A, B, fill):
         A[i] = s
 
 @numba.njit
-def _sum_handle_nan(s, count):
+def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
         s = np.nan
     return s
 
-def _column_sum_impl(A):
+def _column_sum_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = 0
@@ -346,14 +346,14 @@ def _column_sum_impl(A):
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
 
 @numba.njit
-def _mean_handle_nan(s, count):
+def _mean_handle_nan(s, count):  # pragma: no cover
     if not count:
         s = np.nan
     else:
         s = s/count
     return s
 
-def _column_mean_impl(A):
+def _column_mean_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = 0
@@ -366,14 +366,14 @@ def _column_mean_impl(A):
     res = hpat.hiframes_typed._mean_handle_nan(s, count)
 
 @numba.njit
-def _var_handle_nan(s, count):
+def _var_handle_nan(s, count):  # pragma: no cover
     if count <= 1:
         s = np.nan
     else:
         s = s/(count-1)
     return s
 
-def _column_var_impl(A):
+def _column_var_impl(A):  # pragma: no cover
     count_m = 0
     m = 0
     for i in numba.parfor.internal_prange(len(A)):
