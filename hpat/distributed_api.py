@@ -12,62 +12,62 @@ class Reduce_Type(Enum):
     Argmin = 4
     Argmax = 5
 
-def get_rank():
+def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""
     return 0
 
-def barrier():
+def barrier():  # pragma: no cover
     return 0;
 
-def get_size():
+def get_size():  # pragma: no cover
     """dummy function for C mpi get_size"""
     return 0
 
-def get_start(total_size, pes, rank):
+def get_start(total_size, pes, rank):  # pragma: no cover
     """get end point of range for parfor division"""
     return 0
 
-def get_end(total_size, pes, rank):
+def get_end(total_size, pes, rank):  # pragma: no cover
     """get end point of range for parfor division"""
     return 0
 
-def get_node_portion(total_size, pes, rank):
+def get_node_portion(total_size, pes, rank):  # pragma: no cover
     """get portion of size for alloc division"""
     return 0
 
-def dist_reduce(value):
+def dist_reduce(value):  # pragma: no cover
     """dummy to implement simple reductions"""
     return value
 
-def dist_arr_reduce(arr):
+def dist_arr_reduce(arr):  # pragma: no cover
     """dummy to implement array reductions"""
     return -1
 
-def dist_cumsum(arr):
+def dist_cumsum(arr):  # pragma: no cover
     """dummy to implement cumsum"""
     return arr
 
-def dist_cumprod(arr):
+def dist_cumprod(arr):  # pragma: no cover
     """dummy to implement cumprod"""
     return arr
 
-def dist_exscan(value):
+def dist_exscan(value):  # pragma: no cover
     """dummy to implement simple exscan"""
     return value
 
-def dist_setitem(arr, index, val):
+def dist_setitem(arr, index, val):  # pragma: no cover
     return 0
 
-def dist_time():
+def dist_time():  # pragma: no cover
     return time.time()
 
-def irecv():
+def irecv():  # pragma: no cover
     return 0
 
-def isend():
+def isend():  # pragma: no cover
     return 0
 
-def wait():
+def wait():  # pragma: no cover
     return 0
 
 @infer_global(get_rank)
@@ -170,9 +170,9 @@ class DistWait(AbstractTemplate):
         assert len(args)==2
         return signature(types.int32, *args)
 
-@infer_global(dist_setitem)
-class DistSetitem(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args)==5
-        return signature(types.int32, *args)
+# @infer_global(dist_setitem)
+# class DistSetitem(AbstractTemplate):
+#     def generic(self, args, kws):
+#         assert not kws
+#         assert len(args)==5
+#         return signature(types.int32, *args)
