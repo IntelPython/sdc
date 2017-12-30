@@ -776,8 +776,8 @@ class DistributedPass(object):
         div_nodes, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
                                     "$loop", "get_end", distributed_api.get_end)
         out += div_nodes
-        # print_node = ir.Print([start_var, end_var], None, loc)
-        # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
+        # print_node = ir.Print([start_var, end_var, range_size], None, loc)
+        # self.calltypes[print_node] = signature(types.none, types.int64, types.int64, types.intp)
         # out.append(print_node)
 
         parfor.loop_nests[0].start = start_var
@@ -889,13 +889,13 @@ class DistributedPass(object):
         if left_length != 0:
             border_block_left = copy.copy(body_block)
             border_block_left.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                left_recv_buff, left_length, end_var, is_left=True)
+                left_recv_buff, left_length, end_var, arr_var, is_left=True)
             self._stencil_left_border[parfor.id] = border_block_left
 
         if right_length != 0:
             border_block_right = copy.copy(body_block)
             border_block_right.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                right_recv_buff, right_length, end_var, is_left=False)
+                right_recv_buff, right_length, end_var, arr_var, is_left=False)
             self._stencil_right_border[parfor.id] = border_block_right
 
 
@@ -949,7 +949,7 @@ class DistributedPass(object):
         return None
 
     def _gen_stencil_border(self, parfor_index, buff_index, body,
-                                halo_recv_buff, halo_length, end_var, is_left):
+                                halo_recv_buff, halo_length, end_var, arr_var, is_left):
         scope = parfor_index.scope
         loc = parfor_index.loc
         new_body = []
@@ -961,10 +961,16 @@ class DistributedPass(object):
                 index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
                 self.typemap[index_const.name] = types.intp
                 new_body.append(ir.Assign(ir.Const(i+1, loc), index_const, loc))
-                calc_call = ir.Expr.binop('-', end_var, index_const, loc)
-                self.calltypes[calc_call] = ir_utils.find_op_typ('-',
-                                                    [types.intp, types.intp])
-                new_body.append(ir.Assign(calc_call, parfor_index, loc))
+
+                def f(end_var, alloc_start, index_const):
+                    parfor_ind = end_var - alloc_start - index_const
+
+                f_block = compile_to_numba_ir(f, {}, self.typingctx,
+                                (types.intp, types.intp, types.intp),
+                                self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [end_var, self._array_starts[arr_var.name][0], index_const])
+                new_body += f_block.body[:-3]
+                new_body[-1].target = parfor_index
 
             if is_left:
                 buff_index_start = halo_length+i
