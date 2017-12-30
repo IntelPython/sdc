@@ -86,7 +86,12 @@ def lower_dist_reduce(context, builder, sig, args):
     target_typ = sig.args[0]
     if isinstance(target_typ, IndexValueType):
         target_typ = target_typ.val_typ
-        if target_typ not in [types.int32, types.float32, types.float64]:
+        supported_typs = [types.int32, types.float32, types.float64]
+        import sys
+        if not sys.platform.startswith('win'):
+            # long is 4 byte on Windows
+            supported_typs.append(types.int64)
+        if target_typ not in supported_typs:
             raise TypeError("argmin/argmax not supported for type {}".format(
                                                                     target_typ))
 

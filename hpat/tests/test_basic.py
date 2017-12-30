@@ -118,11 +118,13 @@ class TestBasic(unittest.TestCase):
         hpat_f()
 
     def test_reduce(self):
+        import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
         funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
         for (dtype, func) in itertools.product(dtypes, funcs):
-            # loc allreduce doesn't support int64
-            if dtype=='int64' and func in ['argmin', 'argmax']:
+            # loc allreduce doesn't support int64 on windows
+            if (sys.platform.startswith('win') and dtype=='int64'
+                                            and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(n):
                 A = np.ones(n, dtype=np.{})

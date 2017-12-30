@@ -183,7 +183,7 @@ void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op_enum, int type_enum)
         char *in_val_ptr = in_ptr + sizeof(int64_t);
         memcpy(in_val_rank, in_val_ptr, value_size);
         memcpy(in_val_rank+value_size, &rank, sizeof(int));
-        // TODO: support int64_int value
+        // TODO: support int64_int value on Windows
         MPI_Datatype val_rank_mpi_typ = get_val_rank_MPI_typ(type_enum);
         MPI_Allreduce(in_val_rank, out_val_rank, 1, val_rank_mpi_typ, mpi_op, MPI_COMM_WORLD);
 
@@ -310,8 +310,9 @@ MPI_Datatype get_MPI_typ(int typ_enum)
 MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
+    // XXX: LONG is used for int64, which doesn't work on Windows
     MPI_Datatype types_list[] = {MPI_UNDEFINED, MPI_UNDEFINED,
-            MPI_2INT, MPI_UNDEFINED, MPI_FLOAT_INT, MPI_DOUBLE_INT};
+            MPI_2INT, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT};
     return types_list[typ_enum];
 }
 
