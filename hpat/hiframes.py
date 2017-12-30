@@ -93,7 +93,7 @@ class HiFrames(object):
         self.func_ir.df_cols = self.df_cols
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
-        if numba.config.DEBUG_ARRAY_OPT==1:
+        if numba.config.DEBUG_ARRAY_OPT==1:  # pragma: no cover
             print("df_vars: ", self.df_vars)
         return
 
@@ -185,10 +185,10 @@ class HiFrames(object):
 
     def _handle_pd_DataFrame(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('DataFrame', 'pandas'):
-            if len(rhs.args) != 1:
+            if len(rhs.args) != 1:  # pragma: no cover
                 raise ValueError("Invalid DataFrame() arguments (one expected)")
             arg_def = guard(get_definition, self.func_ir, rhs.args[0])
-            if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':
+            if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':  # pragma: no cover
                 raise ValueError("Invalid DataFrame() arguments (map expected)")
             out, items = self._fix_df_arrays(arg_def.items)
             self.df_vars[lhs.name] = self._process_df_build_map(items)
@@ -200,7 +200,7 @@ class HiFrames(object):
     def _handle_pq_table(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('read_table',
                                                         'pyarrow.parquet'):
-            if len(rhs.args) != 1:
+            if len(rhs.args) != 1:  # pragma: no cover
                 raise ValueError("Invalid read_table() arguments")
             self.arrow_tables[lhs.name] = rhs.args[0]
             return []
@@ -228,7 +228,7 @@ class HiFrames(object):
         for item in items_list:
             col_varname = item[0]
             col_arr = item[1]
-            def f(arr):
+            def f(arr):  # pragma: no cover
                 df_arr = hpat.hiframes_api.fix_df_array(arr)
             f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [col_arr])
@@ -245,7 +245,7 @@ class HiFrames(object):
                 col_name = col_var
             else:
                 col_name = get_constant(self.func_ir, col_var)
-                if col_name is NOT_CONSTANT:
+                if col_name is NOT_CONSTANT:  # pragma: no cover
                     raise ValueError("data frame column names should be constant")
             df_cols[col_name] = item[1]
         return df_cols
@@ -296,7 +296,7 @@ class HiFrames(object):
                 window = rhs.args[0]
             elif 'window' in kws:
                 window = kws['window']
-            else:
+            else:  # pragma: no cover
                 raise ValueError("window argument to rolling() required")
             window =  get_constant(self.func_ir, window, window)
             if 'center' in kws:
@@ -345,11 +345,11 @@ class HiFrames(object):
         if 'regex' in kws:
             regex = get_constant(self.func_ir, kws['regex'], regex)
         if regex:
-            def f(str_arr, pat):
+            def f(str_arr, pat):  # pragma: no cover
                 e = hpat.str_ext.compile_regex(pat)
                 hpat.hiframes_api.str_contains_regex(str_arr, e)
         else:
-            def f(str_arr, pat):
+            def f(str_arr, pat):  # pragma: no cover
                 hpat.hiframes_api.str_contains_noregex(str_arr, pat)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -427,7 +427,7 @@ class HiFrames(object):
         return stencil_nodes+setitem_nodes
 
     def _gen_col_count(self, out_var, args, col_var):
-        def f(A):
+        def f(A):  # pragma: no cover
             s = hpat.hiframes_api.count(A)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -440,7 +440,7 @@ class HiFrames(object):
         inplace = False
         if 'inplace' in kws:
             inplace = get_constant(self.func_ir, kws['inplace'])
-            if inplace==NOT_CONSTANT:
+            if inplace==NOT_CONSTANT:  # pragma: no cover
                 raise ValueError("inplace arg to fillna should be constant")
 
         if inplace:
@@ -450,7 +450,7 @@ class HiFrames(object):
             alloc_nodes = gen_empty_like(col_var, out_var)
 
         val = args[0]
-        def f(A, B, fill):
+        def f(A, B, fill):  # pragma: no cover
             hpat.hiframes_api.fillna(A, B, fill)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [out_var, col_var, val])
@@ -458,7 +458,7 @@ class HiFrames(object):
         return alloc_nodes + nodes
 
     def _gen_col_sum(self, out_var, args, col_var):
-        def f(A):
+        def f(A):  # pragma: no cover
             s = hpat.hiframes_api.column_sum(A)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -468,7 +468,7 @@ class HiFrames(object):
         return nodes
 
     def _gen_col_mean(self, out_var, args, col_var):
-        def f(A):
+        def f(A):  # pragma: no cover
             s = hpat.hiframes_api.mean(A)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -478,7 +478,7 @@ class HiFrames(object):
         return nodes
 
     def _gen_col_var(self, out_var, args, col_var):
-        def f(A):
+        def f(A):  # pragma: no cover
             s = hpat.hiframes_api.var(A)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -494,7 +494,7 @@ class HiFrames(object):
         var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
         v_nodes = self._gen_col_var(var_var, args, col_var)
 
-        def f(a):
+        def f(a):  # pragma: no cover
             a ** 0.5
         s_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
         replace_arg_nodes(s_block, [var_var])
@@ -504,7 +504,7 @@ class HiFrames(object):
         return v_nodes + s_nodes
 
     def _gen_col_quantile(self, out_var, args, col_var):
-        def f(A, q):
+        def f(A, q):  # pragma: no cover
             s = hpat.hiframes_api.quantile(A, q)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -514,7 +514,7 @@ class HiFrames(object):
         return nodes
 
     def _gen_col_describe(self, out_var, args, col_var):
-        def f(A):
+        def f(A):  # pragma: no cover
             a_count = hpat.hiframes_api.count(A)
             a_min = np.min(A)
             a_max = np.max(A)
@@ -542,11 +542,11 @@ class HiFrames(object):
         loc = col_var.loc
         scope = col_var.scope
         if func == 'apply':
-            if len(args) != 1:
+            if len(args) != 1:  # pragma: no cover
                 raise ValueError("One argument expected for rolling apply")
             kernel_func = guard(get_definition, self.func_ir, args[0])
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-            if len(args) != 0:
+            if len(args) != 0:  # pragma: no cover
                 raise ValueError("No argument expected for rolling {}".format(
                                                                         func))
             g_pack = "np"
@@ -587,16 +587,16 @@ class HiFrames(object):
                                     index_offsets, fir_globals, other_args, options)
 
 
-        def f(A, w):
+        def f(A, w):  # pragma: no cover
             A[0:w-1] = np.nan
         f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [out_var, win_size])
         setitem_nodes = f_block.body[:-3]  # remove none return
 
         if center:
-            def f1(A, w):
+            def f1(A, w):  # pragma: no cover
                 A[0:w//2] = np.nan
-            def f2(A, w):
+            def f2(A, w):  # pragma: no cover
                 n = len(A)
                 A[n-(w//2):n] = np.nan
             f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
@@ -614,7 +614,7 @@ class HiFrames(object):
         for integers and bools, the output should be converted to float64
         """
         # TODO: check all possible funcs
-        def f(arr):
+        def f(arr):  # pragma: no cover
             df_arr = hpat.hiframes_api.fix_rolling_array(arr)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var])
@@ -631,7 +631,7 @@ class HiFrames(object):
         right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
         nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
 
-        def f(w):
+        def f(w):  # pragma: no cover
             return -w+1
         f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [win_size])
@@ -639,13 +639,13 @@ class HiFrames(object):
         left_length = nodes[-1].target
 
         if center:
-            def f(w):
+            def f(w):  # pragma: no cover
                 return -(w//2)
             f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [win_size])
             nodes.extend(f_block.body[:-2])  # remove none return
             left_length = nodes[-1].target
-            def f(w):
+            def f(w):  # pragma: no cover
                 return (w//2)
             f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [win_size])
@@ -653,7 +653,7 @@ class HiFrames(object):
             right_length = nodes[-1].target
 
 
-        def f(a, b):
+        def f(a, b):  # pragma: no cover
             return ((a, b),)
         f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [left_length, right_length])
@@ -665,7 +665,7 @@ class HiFrames(object):
         if func == 'apply':
             index_offsets = [left_length]
 
-        def f(a):
+        def f(a):  # pragma: no cover
             return (a,)
         f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
         replace_arg_nodes(f_block, index_offsets)
@@ -709,7 +709,7 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
                     kernel_func.__closure__, kernel_func.__defaults__, loc)
     stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
 
-    def f(A, B, f):
+    def f(A, B, f):  # pragma: no cover
         numba.stencil(f)(A, out=B)
     f_block = compile_to_numba_ir(f, {'numba': numba}).blocks.popitem()[1]
     replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
