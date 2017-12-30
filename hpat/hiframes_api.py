@@ -22,7 +22,7 @@ class Filter(ir.Stmt):
         self.df_vars = df_vars
         self.loc = loc
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         out_cols = ""
         for (c, v) in self.df_out_vars.items():
             out_cols += "'{}':{}, ".format(c, v.name)
@@ -141,7 +141,7 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 
 
 def visit_vars_filter(filter_node, callback, cbdata):
-    if config.DEBUG_ARRAY_OPT == 1:
+    if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
         print("visiting filter vars for:", filter_node)
         print("cbdata: ", sorted(cbdata.items()))
 
@@ -227,34 +227,34 @@ ir_utils.apply_copy_propagate_extensions[Filter] = apply_copies_filter
 #         #assert not args
 #         return signature(ary.copy(layout='C'), types.intp)
 
-def count(A):
+def count(A):  # pragma: no cover
     return 0
 
-def fillna(A):
+def fillna(A):  # pragma: no cover
     return 0
 
-def column_sum(A):
+def column_sum(A):  # pragma: no cover
     return 0
 
-def var(A):
+def var(A):  # pragma: no cover
     return 0
 
-def std(A):
+def std(A):  # pragma: no cover
     return 0
 
-def mean(A):
+def mean(A):  # pragma: no cover
     return 0
 
-def quantile(A, q):
+def quantile(A, q):  # pragma: no cover
     return 0
 
-def quantile_parallel(A, q):
+def quantile_parallel(A, q):  # pragma: no cover
     return 0
 
-def str_contains_regex(str_arr, pat):
+def str_contains_regex(str_arr, pat):  # pragma: no cover
     return 0;
 
-def str_contains_noregex(str_arr, pat):
+def str_contains_noregex(str_arr, pat):  # pragma: no cover
     return 0;
 
 from numba.typing.arraydecl import _expand_integer
@@ -352,7 +352,7 @@ import numpy as np
 @lower_builtin(mean, types.Array)
 def lower_column_mean_impl(context, builder, sig, args):
     zero = sig.return_type(0)
-    def array_mean_impl(arr):
+    def array_mean_impl(arr):  # pragma: no cover
         count = 0
         s = zero
         for val in arr:
@@ -373,7 +373,7 @@ def lower_column_mean_impl(context, builder, sig, args):
 # copied from numba/numba/targets/arraymath.py:119
 @lower_builtin(var, types.Array)
 def array_var(context, builder, sig, args):
-    def array_var_impl(arr):
+    def array_var_impl(arr):  # pragma: no cover
         # TODO: ignore NA
         # Compute the mean
         m = arr.mean()
@@ -389,7 +389,7 @@ def array_var(context, builder, sig, args):
 
 @lower_builtin(std, types.Array)
 def array_std(context, builder, sig, args):
-    def array_std_impl(arry):
+    def array_std_impl(arry):  # pragma: no cover
         return var(arry) ** 0.5
     res = context.compile_internal(builder, array_std_impl, sig, args)
     return impl_ret_untracked(context, builder, sig.return_type, res)
@@ -432,10 +432,10 @@ def lower_dist_quantile(context, builder, sig, args):
     return builder.call(fn, call_args)
 
 
-def fix_df_array(c):
+def fix_df_array(c):  # pragma: no cover
     return c
 
-def fix_rolling_array(c):
+def fix_rolling_array(c):  # pragma: no cover
     return c
 
 from numba.extending import overload
@@ -446,17 +446,17 @@ def fix_df_array_overload(column):
     if (isinstance(column, types.List)
             and (isinstance(column.dtype, types.Number)
             or column.dtype==types.boolean)):
-        def fix_df_array_impl(column):
+        def fix_df_array_impl(column):  # pragma: no cover
             return np.array(column)
         return fix_df_array_impl
     # convert list of strings to string array
     if isinstance(column, types.List) and isinstance(column.dtype, StringType):
-        def fix_df_array_impl(column):
+        def fix_df_array_impl(column):  # pragma: no cover
             return StringArray(column)
         return fix_df_array_impl
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
-    def fix_df_array_impl(column):
+    def fix_df_array_impl(column):  # pragma: no cover
         return column
     return fix_df_array_impl
 
@@ -466,9 +466,9 @@ def fix_rolling_array_overload(column):
     dtype = column.dtype
     # convert bool and integer to float64
     if dtype == types.boolean or isinstance(dtype, types.Integer):
-        def fix_rolling_array_impl(column):
+        def fix_rolling_array_impl(column):  # pragma: no cover
             return column.astype(np.float64)
     else:
-        def fix_rolling_array_impl(column):
+        def fix_rolling_array_impl(column):  # pragma: no cover
             return column
     return fix_rolling_array_impl
