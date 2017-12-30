@@ -77,7 +77,7 @@ class DistributedPass(object):
         self._dist_analysis = dist_analysis_pass.run()
         self._T_arrs = dist_analysis_pass._T_arrs
         self._parallel_accesses = dist_analysis_pass._parallel_accesses
-        if config.DEBUG_ARRAY_OPT==1:
+        if config.DEBUG_ARRAY_OPT==1:  # pragma: no cover
             print("distributions: ", self._dist_analysis)
 
         self._gen_dist_inits()
@@ -206,7 +206,7 @@ class DistributedPass(object):
         return blocks
 
     def _gen_1D_Var_len(self, arr):
-        def f(A, op):
+        def f(A, op):  # pragma: no cover
             c = len(A)
             res = hpat.distributed_api.dist_reduce(c, op)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
@@ -369,7 +369,7 @@ class DistributedPass(object):
             start_var = self._array_starts[arr][0]
             count_var = self._array_counts[arr][0]
             rhs.args += [start_var, count_var]
-            def f(fname, cindex, arr, out_dtype, start, count):
+            def f(fname, cindex, arr, out_dtype, start, count):  # pragma: no cover
                 return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
                                                 arr, out_dtype, start, count)
 
@@ -391,7 +391,7 @@ class DistributedPass(object):
             self._array_counts[lhs] = [count_var]
             rhs.args[2] = start_var
             rhs.args.append(count_var)
-            def f(fname, cindex, start, count):
+            def f(fname, cindex, start, count):  # pragma: no cover
                 return hpat.parquet_pio.read_parquet_str_parallel(fname, cindex,
                                                             start, count)
 
@@ -487,7 +487,7 @@ class DistributedPass(object):
             else:
                 size_var = self._set0_var
             rhs.args += [size_var]
-            def f(arr, q, size):
+            def f(arr, q, size):  # pragma: no cover
                 s = hpat.hiframes_api.quantile_parallel(arr, q, size)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
@@ -642,7 +642,7 @@ class DistributedPass(object):
             count = self._array_counts[arr.name][0]
 
             if self.typemap[index_var.name]==types.intp:
-                def f(A, val, index, chunk_start, chunk_count):
+                def f(A, val, index, chunk_start, chunk_count):  # pragma: no cover
                     hpat.distributed_lower._set_if_in_range(
                                         A, val, index, chunk_start, chunk_count)
 
@@ -661,7 +661,7 @@ class DistributedPass(object):
 
             # convert setitem with global range to setitem with local range
             # that overlaps with the local array chunk
-            def f(A, val, start, stop, chunk_start, chunk_count):
+            def f(A, val, start, stop, chunk_start, chunk_count):  # pragma: no cover
                 loc_start, loc_stop = hpat.distributed_lower._get_local_range(
                                         start, stop, chunk_start, chunk_count)
                 A[loc_start:loc_stop] = val
@@ -736,7 +736,7 @@ class DistributedPass(object):
                 for l in parfor.loop_nests:
                     if l.stop.name in self.oneDVar_len_vars:
                         arr_var = self.oneDVar_len_vars[l.stop.name]
-                        def f(A):
+                        def f(A):  # pragma: no cover
                             arr_len = len(A)
                         f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
                                         (self.typemap[arr_var.name],),
@@ -748,7 +748,7 @@ class DistributedPass(object):
                 init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(parfor, namevar_table)
                 parfor.init_block.body += init_reduce_nodes
                 out = prepend + out + reduce_nodes
-            if config.DEBUG_ARRAY_OPT==1:
+            if config.DEBUG_ARRAY_OPT==1:  # pragma: no cover
                 print("parfor "+str(parfor.id)+" not parallelized.")
             return out
 
@@ -962,7 +962,7 @@ class DistributedPass(object):
                 self.typemap[index_const.name] = types.intp
                 new_body.append(ir.Assign(ir.Const(i+1, loc), index_const, loc))
 
-                def f(end_var, alloc_start, index_const):
+                def f(end_var, alloc_start, index_const):  # pragma: no cover
                     parfor_ind = end_var - alloc_start - index_const
 
                 f_block = compile_to_numba_ir(f, {}, self.typingctx,
@@ -1215,7 +1215,7 @@ class DistributedPass(object):
             args = [offset_var]
             arg_typs = (types.intp,)
         else:
-            def f(old_slice, offset):
+            def f(old_slice, offset):  # pragma: no cover
                 return slice(old_slice.start - offset, old_slice.stop - offset)
             args = [slice_var, offset_var]
             slice_type = self.typemap[slice_var.name]
@@ -1280,7 +1280,7 @@ class DistributedPass(object):
                         rhs.args[2] = self._set1_var
 
     def _gen_barrier(self):
-        def f():
+        def f():  # pragma: no cover
             return hpat.distributed_api.barrier()
 
         f_blocks = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx, {},
@@ -1293,7 +1293,7 @@ class DistributedPass(object):
         self.typemap[op_var.name] = types.int32
         op_assign = ir.Assign(ir.Const(reduce_op.value, loc), op_var, loc)
 
-        def f(val, op):
+        def f(val, op):  # pragma: no cover
             hpat.distributed_api.dist_reduce(val, op)
 
         f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
@@ -1333,7 +1333,7 @@ class DistributedPass(object):
                     return Reduce_Type.Argmax
                 return Reduce_Type.Max
 
-        raise GuardException
+        raise GuardException  # pragma: no cover
 
     def _gen_init_reduce(self, reduce_var, reduce_op):
         """generate code to initialize reduction variables on non-root
@@ -1405,23 +1405,23 @@ class DistributedPass(object):
                 self._dist_analysis.array_dists[arr_name]==Distribution.REP)
 
     def _is_h5_read_write_call(self, func_var):
-        if func_var not in self._call_table:
+        if func_var not in self._call_table:  # pragma: no cover
             return False
         return hpat.config._has_h5py and (self._call_table[func_var]==['h5read', hpat.pio_api]
                 or self._call_table[func_var]==['h5write', hpat.pio_api])
 
     def _is_parquet_read_call(self, func_var):
-        if func_var not in self._call_table:
+        if func_var not in self._call_table:  # pragma: no cover
             return False
         return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet])
 
     def _is_parquet_read_str_call(self, func_var):
-        if func_var not in self._call_table:
+        if func_var not in self._call_table:  # pragma: no cover
             return False
         return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet_str])
 
     def _is_call(self, func_var, call_list):
-        if func_var not in self._call_table:
+        if func_var not in self._call_table:  # pragma: no cover
             return False
         return self._call_table[func_var]==call_list
 
@@ -1432,6 +1432,6 @@ def _find_first_print(body):
             return i
     return -1
 
-def dprint(*s):
+def dprint(*s):  # pragma: no cover
     if config.DEBUG_ARRAY_OPT==1:
         print(*s)
