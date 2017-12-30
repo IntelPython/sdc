@@ -214,7 +214,7 @@ class TestHiFrames(unittest.TestCase):
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 11
+        n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -225,7 +225,7 @@ class TestHiFrames(unittest.TestCase):
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 11
+        n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -237,7 +237,7 @@ class TestHiFrames(unittest.TestCase):
             return df['moving average'].sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 11
+        n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         # small input array to mean is REP
         self.assertEqual(count_array_REPs(), 1)
@@ -250,7 +250,7 @@ class TestHiFrames(unittest.TestCase):
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 11
+        n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
