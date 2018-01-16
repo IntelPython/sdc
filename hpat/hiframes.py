@@ -109,6 +109,9 @@ class HiFrames(object):
                 res = self._handle_pq_table(assign.target, rhs)
                 if res is not None:
                     return res
+                res = self._handle_ros(assign.target, rhs)
+                if res is not None:
+                    return res
                 res = self._handle_column_call(assign.target, rhs)
                 if res is not None:
                     return res
@@ -220,6 +223,15 @@ class HiFrames(object):
             self.df_vars[lhs.name] = self._process_df_build_map(col_items)
             self._update_df_cols()
             return nodes
+        return None
+
+    def _handle_ros(self, lhs, rhs):
+        if guard(find_callname, self.func_ir, rhs) == ('read_ros_images',
+                                                        'hpat.ros'):
+            if len(rhs.args) != 1:  # pragma: no cover
+                raise ValueError("Invalid read_ros_images() arguments")
+            import hpat.ros
+            return hpat.ros._handle_read_images(lhs, rhs)
         return None
 
     def _fix_df_arrays(self, items_list):
