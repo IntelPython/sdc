@@ -89,12 +89,14 @@ class ReadInnerTyper(AbstractTemplate):
         return signature(types.int32, *args)
 
 from numba import cgutils
+from numba.targets.arrayobj import make_array
 from llvmlite import ir as lir
 import ros_cpp
 import llvmlite.binding as ll
 ll.add_symbol('open_bag', ros_cpp.open_bag)
 ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)
 ll.add_symbol('get_image_dims', ros_cpp.get_image_dims)
+ll.add_symbol('read_images', ros_cpp.read_images)
 
 @lower_builtin(open_bag, hpat.string_type)
 def lower_open_bag(context, builder, sig, args):
@@ -121,3 +123,14 @@ def lower_get_image_dims(context, builder, sig, args):
     builder.call(fn, [out_ptr] + args)
     out_ptr_fixed_typ = builder.bitcast(out_ptr, out_typ.as_pointer())
     return builder.load(out_ptr_fixed_typ)
+
+@lower_builtin(read_ros_images_inner, types.Array, bag_file_type)
+def lower_read_images_inner(context, builder, sig, args):
+    bag = args[1]
+    out = make_array(sig.args[0])(context, builder, args[0])
+
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(),
+                            lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="read_images")
+    return builder.call(fn, [ builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag])
