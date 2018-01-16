@@ -90,10 +90,18 @@ from llvmlite import ir as lir
 import ros_cpp
 import llvmlite.binding as ll
 ll.add_symbol('open_bag', ros_cpp.open_bag)
+ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)
 
 @lower_builtin(open_bag, hpat.string_type)
 def lower_open_bag(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="open_bag")
+    return builder.call(fn, args)
+
+@lower_builtin(get_msg_count, bag_file_type)
+def lower_open_bag(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_msg_count")
     return builder.call(fn, args)
