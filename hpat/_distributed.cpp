@@ -303,7 +303,8 @@ MPI_Datatype get_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
     MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
+            MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE,
+            MPI_UNSIGNED_LONG_LONG};
     return types_list[typ_enum];
 }
 

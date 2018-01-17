@@ -38,7 +38,8 @@ _h5_typ_table = {
     types.int32:2,
     types.int64:3,
     types.float32:4,
-    types.float64:5
+    types.float64:5,
+    types.uint64:6
     }
 
 @lower_builtin(distributed_api.get_rank)
@@ -79,6 +80,7 @@ def dist_get_portion(context, builder, sig, args):
 @lower_builtin(distributed_api.dist_reduce, types.float32, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.float64, types.int32)
 @lower_builtin(distributed_api.dist_reduce, IndexValueType, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.uint64, types.int32)
 def lower_dist_reduce(context, builder, sig, args):
     val_typ = args[0].type
     op_typ = args[1].type
