@@ -308,6 +308,8 @@ class DistributedAnalysis(object):
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
         if rhs.op == 'static_getitem':
             if rhs.index_var is None:
+                # TODO: things like A[0] need broadcast
+                self._set_REP(inst.list_vars(), array_dists)
                 return
             index_var = rhs.index_var
         else:
@@ -324,7 +326,13 @@ class DistributedAnalysis(object):
             inds = self._tuple_table[index_var.name]
             index_var = inds[0]
             # rest of indices should be replicated if array
-            self._set_REP(inds[1:], array_dists)
+            other_ind_vars = [v for v in inds[1:] if isinstance(v, ir.Var)]
+            self._set_REP(other_ind_vars, array_dists)
+
+        if isinstance(index_var, int):
+            self._set_REP(inst.list_vars(), array_dists)
+            return
+        assert isinstance(index_var, ir.Var)
 
         # array selection with boolean index
         if (is_array(index_var.name, self.typemap)
