@@ -622,18 +622,25 @@ class DistributedPass(object):
 
     def _run_array_size(self, lhs, arr):
         # get total size by multiplying all dimension sizes
-        ndims = self._get_arr_ndim(arr.name)
-        size_varnames = ['s{}'.format(i) for i in range(ndims)]
-        func_text = 'def f({}):\n'.format(', '.join(size_varnames))
-        func_text += '  size = {}\n'.format('*'.join(size_varnames))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-        f_block = compile_to_numba_ir(f, {}, self.typingctx,
-                (types.intp, )*ndims,
-                self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, self._array_sizes[arr.name])
-        nodes = f_block.body[:-3]
+        nodes = []
+        if self._is_1D_arr(arr.name):
+            dim1_size = self._array_sizes[arr.name][0]
+        else:
+            assert self._is_1D_Var_arr(arr.name)
+            nodes += self._gen_1D_Var_len(arr)
+            dim1_size = nodes[-1].target
+
+        def f(arr, dim1):  # pragma: no cover
+            sizes = np.array(arr.shape)
+            sizes[0] = dim1
+            s = sizes.prod()
+
+        f_ir = compile_to_numba_ir(f, {'np': np}, self.typingctx,
+                            (self.typemap[arr.name], types.intp),
+                                    self.typemap, self.calltypes)
+        f_block = f_ir.blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr, dim1_size])
+        nodes += f_block.body[:-3]
         nodes[-1].target = lhs
         return nodes
 
