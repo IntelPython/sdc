@@ -128,6 +128,12 @@ class DistributedPass(object):
                         if rhs.op=='call':
                             new_body += self._run_call(inst, blocks[label].body)
                             continue
+                        if (rhs.op=='getattr'
+                                and (self._is_1D_arr(rhs.value.name))
+                                    #TODO: or self._is_1D_Var_arr(rhs.value.name))
+                                and rhs.attr=='size'):
+                            new_body += self._run_array_size(inst.target, rhs.value)
+                            continue
                         if (rhs.op=='static_getitem'
                                 and rhs.value.name in self._shape_attrs):
                             arr = self._shape_attrs[rhs.value.name]
@@ -613,6 +619,23 @@ class DistributedPass(object):
         self._array_counts[lhs] = new_size_list
         new_size_var = tuple_var
         return out, new_size_var
+
+    def _run_array_size(self, lhs, arr):
+        # get total size by multiplying all dimension sizes
+        ndims = self._get_arr_ndim(arr.name)
+        size_varnames = ['s{}'.format(i) for i in range(ndims)]
+        func_text = 'def f({}):\n'.format(', '.join(size_varnames))
+        func_text += '  size = {}\n'.format('*'.join(size_varnames))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+        f_block = compile_to_numba_ir(f, {}, self.typingctx,
+                (types.intp, )*ndims,
+                self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, self._array_sizes[arr.name])
+        nodes = f_block.body[:-3]
+        nodes[-1].target = lhs
+        return nodes
 
     def _run_getsetitem(self, arr, index_var, node, full_node):
         out = [full_node]
