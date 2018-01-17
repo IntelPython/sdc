@@ -88,6 +88,13 @@ class ReadInnerTyper(AbstractTemplate):
         assert len(args) == 2
         return signature(types.int32, *args)
 
+@infer_global(read_ros_images_inner_parallel)
+class ReadInnerParallelTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 4
+        return signature(types.int32, *args)
+
 from numba import cgutils
 from numba.targets.arrayobj import make_array
 from llvmlite import ir as lir
@@ -97,6 +104,7 @@ ll.add_symbol('open_bag', ros_cpp.open_bag)
 ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)
 ll.add_symbol('get_image_dims', ros_cpp.get_image_dims)
 ll.add_symbol('read_images', ros_cpp.read_images)
+ll.add_symbol('read_images_parallel', ros_cpp.read_images_parallel)
 
 @lower_builtin(open_bag, hpat.string_type)
 def lower_open_bag(context, builder, sig, args):
@@ -134,3 +142,17 @@ def lower_read_images_inner(context, builder, sig, args):
                             lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="read_images")
     return builder.call(fn, [ builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag])
+
+@lower_builtin(read_ros_images_inner_parallel, types.Array, bag_file_type, types.intp, types.intp)
+def lower_read_images_inner(context, builder, sig, args):
+    bag = args[1]
+    out = make_array(sig.args[0])(context, builder, args[0])
+
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(),
+                            lir.IntType(8).as_pointer(),
+                            lir.IntType(64),
+                            lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="read_images_parallel")
+    return builder.call(fn, [ builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag, args[2], args[3]])
+

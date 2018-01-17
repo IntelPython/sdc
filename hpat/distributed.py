@@ -402,6 +402,24 @@ class DistributedPass(object):
             out += f_block.body[:-2]
             out[-1].target = assign.target
 
+        if (self._is_ros_read_image_call(func_var)
+                and self._is_1D_arr(rhs.args[0].name)):
+            arr = rhs.args[0].name
+            assert len(self._array_starts[arr]) == 4, "only 4D arrs in ros"
+            start_var = self._array_starts[arr][0]
+            count_var = self._array_counts[arr][0]
+            rhs.args += [start_var, count_var]
+            def f(arr, bag, start, count):  # pragma: no cover
+                return hpat.ros.read_ros_images_inner_parallel(arr, bag,
+                                                            start, count)
+
+            #import hpat.ros
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+            (self.typemap[arr], hpat.ros.bag_file_type, types.intp, types.intp),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-2]
+
         if call_list == ['astype']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
@@ -1419,6 +1437,12 @@ class DistributedPass(object):
         if func_var not in self._call_table:  # pragma: no cover
             return False
         return hpat.config._has_pyarrow and (self._call_table[func_var]==[hpat.parquet_pio.read_parquet_str])
+
+    def _is_ros_read_image_call(self, func_var):
+        if func_var not in self._call_table:  # pragma: no cover
+            return False
+        return hpat.config._has_ros and (self._call_table[func_var] == ['read_ros_images_inner', 'ros', hpat])
+
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:  # pragma: no cover
