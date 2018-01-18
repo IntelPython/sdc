@@ -502,6 +502,14 @@ class DistributedPass(object):
             dist_assign = ir.Assign(dist_call, err_var, loc)
             return out+[dist_func_assign, dist_assign]
 
+        # sum over the first axis is distributed, A.sum(0)
+        if call_list == ['sum', np] and len(rhs.args) == 2:
+            axis_def = guard(get_definition, self.func_ir, rhs.args[1])
+            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
+                reduce_op = Reduce_Type.Sum
+                reduce_var = assign.target
+                return out + self._gen_reduce(reduce_var, reduce_op, scope, loc)
+
         if call_list == ['quantile', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
                         or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name

@@ -224,6 +224,13 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, in_arr, array_dists)
             return
 
+        # sum over the first axis is distributed, A.sum(0)
+        if call_list == ['sum', np] and len(args) == 2:
+            axis_def = guard(get_definition, self.func_ir, args[1])
+            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
+                array_dists[lhs] = Distribution.REP
+                return
+
         if self._is_call(func_var, ['dot', np]):
             arg0 = args[0].name
             arg1 = args[1].name
