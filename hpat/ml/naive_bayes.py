@@ -84,10 +84,13 @@ class MultinomialNBAttribute(AttributeTemplate):
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import daal_wrapper
-ll.add_symbol('mnb_train', daal_wrapper.mnb_train)
-ll.add_symbol('mnb_predict', daal_wrapper.mnb_predict)
-ll.add_symbol('dtor_mnb', daal_wrapper.dtor_mnb)
+try:
+    import daal_wrapper
+    ll.add_symbol('mnb_train', daal_wrapper.mnb_train)
+    ll.add_symbol('mnb_predict', daal_wrapper.mnb_predict)
+    ll.add_symbol('dtor_mnb', daal_wrapper.dtor_mnb)
+except ImportError:
+    print("daal import error")
 
 @lower_builtin(MultinomialNB, types.intp)
 def impl_mnb_constructor(context, builder, sig, args):

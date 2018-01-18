@@ -84,10 +84,13 @@ class SVCAttribute(AttributeTemplate):
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import daal_wrapper
-ll.add_symbol('svc_train', daal_wrapper.svc_train)
-ll.add_symbol('svc_predict', daal_wrapper.svc_predict)
-ll.add_symbol('dtor_svc', daal_wrapper.dtor_svc)
+try:
+    import daal_wrapper
+    ll.add_symbol('svc_train', daal_wrapper.svc_train)
+    ll.add_symbol('svc_predict', daal_wrapper.svc_predict)
+    ll.add_symbol('dtor_svc', daal_wrapper.dtor_svc)
+except ImportError:
+    print("daal import error")
 
 @lower_builtin(SVC, types.intp)
 def impl_svc_constructor(context, builder, sig, args):
