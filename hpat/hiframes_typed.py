@@ -154,18 +154,24 @@ class HiFramesTyped(object):
         if (rhs.op == 'call'
                 and rhs.func.name in call_table
                 and call_table[rhs.func.name] == ['empty_like', np]):
-            in_arr= rhs.args[0]
-            def f(A):  # pragma: no cover
-                c = len(A)
-            f_block = compile_to_numba_ir(f, {}, self.typingctx, (self.typemap[in_arr.name],),
+            in_arr = rhs.args[0]
+
+            if self.typemap[in_arr.name].ndim == 1:
+                # generate simpler len() for 1D case
+                def f(_in_arr):  # pragma: no cover
+                    _alloc_size = len(_in_arr)
+                    _out_arr = np.empty(_alloc_size, _in_arr.dtype)
+            else:
+                def f(_in_arr):  # pragma: no cover
+                    _alloc_size = _in_arr.shape
+                    _out_arr = np.empty(_alloc_size, _in_arr.dtype)
+
+            f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (self.typemap[in_arr.name],),
                                 self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_arr])
             nodes = f_block.body[:-3]  # remove none return
-            size_var = nodes[-1].target
-            alloc_nodes = mk_alloc(self.typemap, self.calltypes, assign.target,
-                            size_var,
-                            self.typemap[in_arr.name].dtype, in_arr.scope, in_arr.loc)
-            return nodes + alloc_nodes
+            nodes[-1].target = assign.target
+            return nodes
         return None
 
     def _handle_str_contains(self, lhs, rhs, assign, call_table):
