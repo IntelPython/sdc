@@ -160,7 +160,8 @@ class DistributedAnalysis(object):
         #         parfor_dists[parfor.id] = Distribution.OneD
 
         # run analysis recursively on parfor body
-        if self.second_pass and out_dist==Distribution.OneD:
+        if self.second_pass and out_dist in [Distribution.OneD,
+                                                Distribution.OneD_Var]:
             self.in_parallel_parfor = True
         blocks = wrap_parfor_blocks(parfor)
         for b in blocks.values():
