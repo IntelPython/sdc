@@ -2,6 +2,7 @@
 #include "mpi.h"
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 #include <Python.h>
 
 int hpat_dist_get_rank();
@@ -302,6 +303,11 @@ int hpat_dist_wait(int req, bool cond)
 MPI_Datatype get_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
+    if (typ_enum < 0 || typ_enum > 6)
+    {
+        std::cerr << "Invalid MPI_Type" << "\n";
+        return MPI_LONG_LONG_INT;
+    }
     MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
             MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE,
             MPI_UNSIGNED_LONG_LONG};
@@ -312,8 +318,14 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
     // XXX: LONG is used for int64, which doesn't work on Windows
+    // XXX: LONG is used for uint64
+    if (typ_enum < 0 || typ_enum > 6)
+    {
+        std::cerr << "Invalid MPI_Type" << "\n";
+        return 8;
+    }
     MPI_Datatype types_list[] = {MPI_UNDEFINED, MPI_UNDEFINED,
-            MPI_2INT, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT};
+            MPI_2INT, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT, MPI_LONG_INT};
     return types_list[typ_enum];
 }
 
@@ -321,6 +333,11 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
 MPI_Op get_MPI_op(int op_enum)
 {
     // printf("op type enum:%d\n", op_enum);
+    if (op_enum < 0 || op_enum > 5)
+    {
+        std::cerr << "Invalid MPI_Op" << "\n";
+        return MPI_SUM;
+    }
     MPI_Op ops_list[] = {MPI_SUM, MPI_PROD, MPI_MIN, MPI_MAX, MPI_MINLOC,
             MPI_MAXLOC};
 
@@ -329,7 +346,12 @@ MPI_Op get_MPI_op(int op_enum)
 
 int get_elem_size(int type_enum)
 {
-    int types_sizes[] = {1,1,4,8,4,8};
+    if (type_enum < 0 || type_enum > 6)
+    {
+        std::cerr << "Invalid MPI_Type" << "\n";
+        return 8;
+    }
+    int types_sizes[] = {1,1,4,8,4,8,8};
     return types_sizes[type_enum];
 }
 
