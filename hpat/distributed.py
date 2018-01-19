@@ -663,7 +663,7 @@ class DistributedPass(object):
             if self.typemap[index_var.name] == types.intp:
                 sub_nodes = self._get_ind_sub(index_var, self._array_starts[arr.name][0])
                 out = sub_nodes
-                node.index = sub_nodes[-1].target
+                _set_getsetitem_index(node, sub_nodes[-1].target)
             else:
                 assert index_var.name in self._tuple_table
                 index_list = self._tuple_table[index_var.name]
@@ -676,7 +676,7 @@ class DistributedPass(object):
                 tuple_call = ir.Expr.build_tuple(new_index_list, loc)
                 tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
                 out.append(tuple_assign)
-                node.index = tuple_var
+                _set_getsetitem_index(node, tuple_var)
 
             out.append(full_node)
 
@@ -1493,6 +1493,17 @@ def _find_first_print(body):
         if isinstance(inst, ir.Print):
             return i
     return -1
+
+def _set_getsetitem_index(node, new_ind):
+    if ((isinstance(node, ir.Expr) and node.op == 'static_getitem')
+            or isinstance(node, ir.StaticSetItem)):
+        node.index_var = new_ind
+        node.index = None
+        return
+
+    assert ((isinstance(node, ir.Expr) and node.op == 'getitem')
+            or isinstance(node, ir.SetItem))
+    node.index = new_ind
 
 def dprint(*s):  # pragma: no cover
     if config.DEBUG_ARRAY_OPT==1:
