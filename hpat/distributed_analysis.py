@@ -37,7 +37,7 @@ class DistributedAnalysis(object):
         self._parallel_accesses = set()
         self._T_arrs = set()
         self.second_pass = False
-        self.in_parallel_parfor = False
+        self.in_parallel_parfor = -1
 
     def run(self):
         blocks = self.func_ir.blocks
@@ -125,7 +125,7 @@ class DistributedAnalysis(object):
         # analyze init block first to see array definitions
         self._analyze_block(parfor.init_block, array_dists, parfor_dists)
         out_dist = Distribution.OneD
-        if self.in_parallel_parfor:
+        if self.in_parallel_parfor != -1:
             out_dist = Distribution.REP
 
         parfor_arrs = set() # arrays this parfor accesses in parallel
@@ -162,12 +162,13 @@ class DistributedAnalysis(object):
         # run analysis recursively on parfor body
         if self.second_pass and out_dist in [Distribution.OneD,
                                                 Distribution.OneD_Var]:
-            self.in_parallel_parfor = True
+            self.in_parallel_parfor = parfor.id
         blocks = wrap_parfor_blocks(parfor)
         for b in blocks.values():
             self._analyze_block(b, array_dists, parfor_dists)
         unwrap_parfor_blocks(parfor)
-        self.in_parallel_parfor = False
+        if self.in_parallel_parfor == parfor.id:
+            self.in_parallel_parfor = -1
         return
 
     def _analyze_call(self, lhs, func_var, args, array_dists):
