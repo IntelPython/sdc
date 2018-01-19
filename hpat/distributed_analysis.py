@@ -325,7 +325,8 @@ class DistributedAnalysis(object):
             index_var = rhs.index
 
         if (rhs.value.name, index_var.name) in self._parallel_accesses:
-            #self._set_REP([inst.target], array_dists)
+            # XXX: is this always valid? should be done second pass?
+            self._set_REP([inst.target], array_dists)
             return
 
         # in multi-dimensional case, we only consider first dimension
