@@ -668,7 +668,8 @@ class DistributedPass(object):
             # see if size_var is a 1D_Var array's shape
             # it is already the local size, no need to transform
             var_def = guard(get_definition, self.func_ir, size_var)
-            oned_var_varnames = set(v.name for v in self.oneDVar_len_vars.values())
+            oned_var_varnames = set(v for v in self._dist_analysis.array_dists
+                      if self._dist_analysis.array_dists[v] == Distribution.OneD_Var)
             if (isinstance(var_def, ir.Expr) and var_def.op == 'getattr'
                     and var_def.attr == 'shape' and var_def.value.name in oned_var_varnames):
                 return out, size_var
