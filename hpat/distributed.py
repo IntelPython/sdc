@@ -65,7 +65,9 @@ class DistributedPass(object):
         self._array_sizes = {}
         self._stencil_left_border = {}
         self._stencil_right_border = {}
-        # save output of converted 1DVar array len() variables to recover 1DVar parfors
+        # save output of converted 1DVar array len() variables
+        # which are global sizes, in order to recover local
+        # size for 1DVar allocs and parfors
         self.oneDVar_len_vars = {}
 
     def run(self):
@@ -147,7 +149,9 @@ class DistributedPass(object):
                                     arr_var = namevar_table[arr]
                                     new_body += self._gen_1D_Var_len(arr_var)
                                     new_body[-1].target = inst.target
-                                    # save output of converted 1DVar array len() variables to recover 1DVar parfors
+                                    # save output of converted 1DVar array len() variables
+                                    # which are global sizes, in order to recover local
+                                    # size for 1DVar allocs and parfors
                                     self.oneDVar_len_vars[inst.target.name] = arr_var
                                     continue
                             # last dimension of transposed arrays is partitioned
@@ -344,6 +348,14 @@ class DistributedPass(object):
         if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
             size_var = rhs.args[0]
             out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
+            rhs.args = list(rhs.args)  # empty_inferred is tuple for some reason
+            rhs.args[0] = new_size_var
+            out.append(assign)
+
+        # fix 1D_Var allocs in case global len of another 1DVar is used
+        if self._is_1D_Var_arr(lhs) and is_alloc_call(func_var, self._call_table):
+            size_var = rhs.args[0]
+            out, new_size_var = self._fix_1D_Var_alloc(size_var, lhs, scope, loc)
             rhs.args = list(rhs.args)  # empty_inferred is tuple for some reason
             rhs.args[0] = new_size_var
             out.append(assign)
@@ -600,7 +612,7 @@ class DistributedPass(object):
         if isinstance(size_var, ir.Var):
             # size should be either int or tuple of ints
             assert size_var.name in self._tuple_table
-            size_list = self._tuple_table[size_var.name]
+            size_list = self._get_tuple_varlist(size_var, out)  # self._tuple_table[size_var.name]
             size_list = [ir_utils.convert_size_to_var(s, self.typemap, scope, loc, out)
                          for s in size_list]
         # tuple of int vars
@@ -627,6 +639,71 @@ class DistributedPass(object):
         self._array_counts[lhs] = new_size_list
         new_size_var = tuple_var
         return out, new_size_var
+
+
+    def _fix_1D_Var_alloc(self, size_var, lhs, scope, loc):
+        """ OneD_Var allocs use sizes of other OneD_var variables,
+        so find the local size of those variables (since we transform
+        to use global size)
+        """
+        out = []
+        new_size_var = None
+
+        # size is single int var
+        if isinstance(size_var, ir.Var) and self.typemap[size_var.name]==types.intp:
+            assert size_var.name in self.oneDVar_len_vars, "invalid 1DVar alloc"
+            arr_var = self.oneDVar_len_vars[size_var.name]
+            def f(oneD_var_arr):  # pragma: no cover
+                arr_len = len(oneD_var_arr)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                            (self.typemap[arr_var.name],),
+                            self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [arr_var])
+            out = f_block.body[:-3]  # remove none return
+            new_size_var = out[-1].target
+            return out, new_size_var
+
+        # tuple variable of ints
+        if isinstance(size_var, ir.Var):
+            # see if size_var is a 1D_Var array's shape
+            # it is already the local size, no need to transform
+            var_def = guard(get_definition, self.func_ir, size_var)
+            oned_var_varnames = set(v.name for v in self.oneDVar_len_vars.values())
+            if (isinstance(var_def, ir.Expr) and var_def.op == 'getattr'
+                    and var_def.attr == 'shape' and var_def.value.name in oned_var_varnames):
+                return out, size_var
+            # size should be either int or tuple of ints
+            #assert size_var.name in self._tuple_table
+            size_list = self._get_tuple_varlist(size_var, out)  #self._tuple_table[size_var.name]
+            size_list = [ir_utils.convert_size_to_var(s, self.typemap, scope, loc, out)
+                         for s in size_list]
+        # tuple of int vars
+        else:
+            assert isinstance(size_var, (tuple, list))
+            size_list = list(size_var)
+
+        arr_var = self.oneDVar_len_vars[size_list[0].name]
+        def f(oneD_var_arr):  # pragma: no cover
+            arr_len = len(oneD_var_arr)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                        (self.typemap[arr_var.name],),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr_var])
+        nodes = f_block.body[:-3]  # remove none return
+        new_size_var = nodes[-1].target
+        out += nodes
+
+        ndims = len(size_list)
+        new_size_list = copy.copy(size_list)
+        new_size_list[0] = new_size_var
+        tuple_var = ir.Var(scope, mk_unique_var("$tuple_var"), loc)
+        self.typemap[tuple_var.name] = types.containers.UniTuple(
+                    types.intp, ndims)
+        tuple_call = ir.Expr.build_tuple(new_size_list, loc)
+        tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
+        out.append(tuple_assign)
+        self._tuple_table[tuple_var.name] = new_size_list
+        return out, tuple_var
 
     def _run_array_size(self, lhs, arr):
         # get total size by multiplying all dimension sizes
@@ -1434,6 +1511,34 @@ class DistributedPass(object):
         nodes[-1].target = reduce_var
         return nodes
 
+    def _get_tuple_varlist(self, tup_var, out):
+        """ get the list of variables that hold values in the tuple variable.
+        add node to out if code generation needed.
+        """
+        if tup_var.name in self._tuple_table:
+            return self._tuple_table[tup_var.name]
+        assert isinstance(self.typemap[tup_var.name], types.UniTuple)
+        ndims = self.typemap[tup_var.name].count
+        f_text = "def f(tup_var):\n"
+        for i in range(ndims):
+            f_text += "  val{} = tup_var[{}]\n".format(i, i)
+        loc_vars = {}
+        exec(f_text, {}, loc_vars)
+        f = loc_vars['f']
+        f_block = compile_to_numba_ir(f, {},
+                self.typingctx, (self.typemap[tup_var.name],),
+                self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [tup_var])
+        nodes = f_block.body[:-3]
+        vals_list = []
+        for stmt in nodes:
+            assert isinstance(stmt, ir.Assign)
+            rhs = stmt.value
+            assert isinstance(rhs, (ir.Var, ir.Const, ir.Expr))
+            if isinstance(rhs, ir.Expr):
+                assert rhs.op == 'static_getitem'
+                vals_list.append(stmt.target)
+        return vals_list
 
     def _isarray(self, varname):
         return (varname in self.typemap
