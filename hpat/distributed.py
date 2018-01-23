@@ -131,8 +131,8 @@ class DistributedPass(object):
                             new_body += self._run_call(inst, blocks[label].body)
                             continue
                         if (rhs.op=='getattr'
-                                and (self._is_1D_arr(rhs.value.name))
-                                    #TODO: or self._is_1D_Var_arr(rhs.value.name))
+                                and (self._is_1D_arr(rhs.value.name)
+                                    or self._is_1D_Var_arr(rhs.value.name))
                                 and rhs.attr=='size'):
                             new_body += self._run_array_size(inst.target, rhs.value)
                             continue
@@ -340,9 +340,16 @@ class DistributedPass(object):
             return out
         call_list = self._call_table[func_var]
 
+        # len(A) if A is 1D
         if self._is_call(func_var, [len]) and rhs.args and self._is_1D_arr(rhs.args[0].name):
             arr = rhs.args[0].name
             assign.value = self._array_sizes[arr][0]
+
+        # len(A) if A is 1D_Var
+        if self._is_call(func_var, [len]) and rhs.args and self._is_1D_Var_arr(rhs.args[0].name):
+            arr_var = rhs.args[0]
+            out = self._gen_1D_Var_len(arr_var)
+            out[-1].target = assign.target
 
         # divide 1D alloc
         if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
