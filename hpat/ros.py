@@ -6,21 +6,31 @@ from numba.extending import models, register_model, lower_builtin
 import hpat
 import numpy as np
 
-def read_ros_images():
-    return 0
+def read_ros_images(f_name):
+    # implementation to enable regular python
+    def f(file_name):  # pragma: no cover
+        bag = hpat.ros.open_bag(file_name)
+        num_msgs = hpat.ros.get_msg_count(bag)
+        m,n = hpat.ros.get_image_dims(bag)
+        # hpat.cprint(num_msgs, m, n)
+        A = np.empty((num_msgs, m, n, 3), dtype=np.uint8)
+        s = hpat.ros.read_ros_images_inner(A, bag)
+        return A
+
+    return hpat.jit(f)(f_name)
 
 # inner functions
 
-def open_bag():
+def open_bag(file_name):
     return 0
 
-def get_msg_count():
+def get_msg_count(bag):
     return 0
 
-def get_image_dims():
+def get_image_dims(bag):
     return 0
 
-def read_ros_images_inner():
+def read_ros_images_inner(A, bag):
     return 0
 
 def read_ros_images_inner_parallel():
@@ -31,11 +41,11 @@ def _handle_read_images(lhs, rhs):
     fname = rhs.args[0]
     def f(file_name):  # pragma: no cover
         bag = hpat.ros.open_bag(file_name)
-        num_msgs = hpat.ros.get_msg_count(bag)
-        m,n = hpat.ros.get_image_dims(bag)
+        _num_msgs = hpat.ros.get_msg_count(bag)
+        _ros_m,_ros_n = hpat.ros.get_image_dims(bag)
         # hpat.cprint(num_msgs, m, n)
-        A = np.empty((num_msgs, m, n, 3), dtype=np.uint8)
-        s = hpat.ros.read_ros_images_inner(A, bag)
+        _in_ros_arr = np.empty((_num_msgs, _ros_m, _ros_n, 3), dtype=np.uint8)
+        _ret = hpat.ros.read_ros_images_inner(_in_ros_arr, bag)
 
     f_block = compile_to_numba_ir(f, {'np': np, 'hpat': hpat}).blocks.popitem()[1]
     replace_arg_nodes(f_block, [fname])
@@ -155,4 +165,3 @@ def lower_read_images_inner(context, builder, sig, args):
                             lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="read_images_parallel")
     return builder.call(fn, [ builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag, args[2], args[3]])
-

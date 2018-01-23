@@ -3,6 +3,7 @@ from math import sqrt
 import hpat
 import hpat.ros
 from hpat import prange, stencil
+import time
 
 @stencil
 def gaussian_blur(a):
@@ -14,6 +15,7 @@ def gaussian_blur(a):
 
 @hpat.jit
 def read_example():
+    t1 = time.time()
     A = hpat.ros.read_ros_images("image_test.bag")
     # crop out dashboard
     B = A[:,:-50,:,:]
@@ -47,6 +49,8 @@ def read_example():
             else:
                 centroids[i] = np.random.randint(0, 255, (dh, dw, dc)).astype(np.uint8)
 
+    t2 = time.time()
+    print("Exec time: ", t2-t1)
     return centroids
 
 print(read_example().sum())
