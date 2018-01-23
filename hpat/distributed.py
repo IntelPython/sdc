@@ -350,6 +350,7 @@ class DistributedPass(object):
             arr_var = rhs.args[0]
             out = self._gen_1D_Var_len(arr_var)
             out[-1].target = assign.target
+            self.oneDVar_len_vars[assign.target.name] = arr_var
 
         # divide 1D alloc
         if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
@@ -617,8 +618,22 @@ class DistributedPass(object):
 
         # tuple variable of ints
         if isinstance(size_var, ir.Var):
+            # see if size_var is a 1D array's shape
+            # it is already the local size, no need to transform
+            var_def = guard(get_definition, self.func_ir, size_var)
+            oned_varnames = set(v for v in self._dist_analysis.array_dists
+                      if self._dist_analysis.array_dists[v] == Distribution.OneD)
+            if (isinstance(var_def, ir.Expr) and var_def.op == 'getattr'
+                    and var_def.attr == 'shape' and var_def.value.name in oned_varnames):
+                prev_arr = var_def.value.name
+                self._array_starts[lhs] = self._array_starts[prev_arr]
+                self._array_counts[lhs] = self._array_counts[prev_arr]
+                self._array_sizes[lhs] = self._array_sizes[prev_arr]
+                return out, size_var
+
             # size should be either int or tuple of ints
-            assert size_var.name in self._tuple_table
+            #assert size_var.name in self._tuple_table
+            #import pdb; pdb.set_trace()
             size_list = self._get_tuple_varlist(size_var, out)  # self._tuple_table[size_var.name]
             size_list = [ir_utils.convert_size_to_var(s, self.typemap, scope, loc, out)
                          for s in size_list]
@@ -1546,6 +1561,7 @@ class DistributedPass(object):
             if isinstance(rhs, ir.Expr):
                 assert rhs.op == 'static_getitem'
                 vals_list.append(stmt.target)
+        out += nodes
         return vals_list
 
     def _isarray(self, varname):
