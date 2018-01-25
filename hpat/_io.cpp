@@ -4,19 +4,19 @@
 #include <string>
 #include <iostream>
 
-int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
+hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
 int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
 int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_close(hid_t file_id);
-int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
+hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
-int hpat_h5_create_group(hid_t file_id, char* group_name);
+hid_t hpat_h5_create_group(hid_t file_id, char* group_name);
 int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
-int h5g_get_num_objs(hid_t file_id);
+int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int ind);
 
 PyMODINIT_FUNC PyInit_hio(void) {
@@ -50,7 +50,7 @@ PyMODINIT_FUNC PyInit_hio(void) {
     return m;
 }
 
-int hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
+hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
 {
     // printf("h5_open file_name: %s mode:%s\n", file_name, mode);
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -196,7 +196,7 @@ int hpat_h5_close(hid_t file_id)
     return 0;
 }
 
-int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
+hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum)
 {
     // printf("dset_name:%s ndims:%d size:%d typ:%d\n", dset_name, ndims, counts[0], typ_enum);
@@ -212,7 +212,7 @@ int hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     return dataset_id;
 }
 
-int hpat_h5_create_group(hid_t file_id, char* group_name)
+hid_t hpat_h5_create_group(hid_t file_id, char* group_name)
 {
     // printf("group_name:%s\n", group_name);
     // fflush(stdout);
@@ -254,13 +254,13 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     return ret;
 }
 
-int h5g_get_num_objs(hid_t file_id)
+int64_t h5g_get_num_objs(hid_t file_id)
 {
     H5G_info_t group_info;
 	herr_t err;
     err = H5Gget_info(file_id, &group_info);
     // printf("num links:%lld\n", group_info.nlinks);
-    return group_info.nlinks;
+    return (int64_t)group_info.nlinks;
 }
 
 void* h5g_get_objname_by_idx(hid_t file_id, int ind)

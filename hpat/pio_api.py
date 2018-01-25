@@ -10,12 +10,21 @@ class H5FileType(types.Opaque):
         super(H5FileType, self).__init__(name='H5FileType')
 
 h5file_type = H5FileType()
+
+h5file_data_type = types.int64
+
+# hid_t is 32bit in 1.8 but 64bit in 1.10
+if h5py.version.hdf5_version_tuple[1] == 8:
+    h5file_data_type = types.int32
+else:
+    assert h5py.version.hdf5_version_tuple[1] == 10
+
 # TODO: create similar types for groups and datasets
 
 @register_model(H5FileType)
 class H5FileModel(models.IntegerModel):
     def __init__(self, dmm, fe_type):
-        super(H5FileModel, self).__init__(dmm, types.int32)
+        super(H5FileModel, self).__init__(dmm, h5file_data_type)
 
 # type for list of names
 string_list_type = types.containers.List(string_type)
@@ -93,14 +102,14 @@ class H5CreateDSet(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==4
-        return signature(types.int32, *args)
+        return signature(h5file_type, *args)
 
 @infer_global(h5create_group)
 class H5CreateGroup(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==2
-        return signature(types.int32, *args)
+        return signature(h5file_type, *args)
 
 @infer_global(h5write)
 class H5Write(AbstractTemplate):
@@ -114,7 +123,7 @@ class H5GgetNobj(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args)==1
-        return signature(types.int32, *args)
+        return signature(types.int64, *args)
 
 @infer_global(h5g_get_objname_by_idx)
 class H5GgetObjNameByIdx(AbstractTemplate):

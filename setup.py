@@ -48,7 +48,7 @@ if platform.system() == 'Windows':
 
 ext_io = Extension(name="hio",
                              libraries = ['hdf5'] + MPI_LIBS,
-                             include_dirs = [HDF5_DIR+'/include/'],
+                             include_dirs = [HDF5_DIR+'/include/', PREFIX_DIR+'/include/'],
                              library_dirs = [HDF5_DIR+'/lib/'],
                              extra_compile_args = H5_COMPILE_FLAGS,
                              sources=["hpat/_io.cpp"]
