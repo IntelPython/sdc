@@ -12,7 +12,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             find_callname, guard, require, get_definition)
 
 import hpat
-from hpat import hiframes_api, utils, parquet_pio, config, hiframes_filter
+from hpat import hiframes_api, utils, parquet_pio, config, hiframes_filter, hiframes_join
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import numpy as np
 import math
@@ -107,6 +107,9 @@ class HiFrames(object):
                 if res is not None:
                     return res
                 res = self._handle_pq_table(assign.target, rhs)
+                if res is not None:
+                    return res
+                res = self._handle_merge(assign.target, rhs)
                 if res is not None:
                     return res
                 res = self._handle_ros(assign.target, rhs)
@@ -223,6 +226,39 @@ class HiFrames(object):
             self.df_vars[lhs.name] = self._process_df_build_map(col_items)
             self._update_df_cols()
             return nodes
+        return None
+
+    def _handle_merge(self, lhs, rhs):
+        if guard(find_callname, self.func_ir, rhs) == ('merge',
+                                                        'pandas'):
+            if len(rhs.args) < 2:
+                raise ValueError("left and right arguments required for merge")
+            left_df = rhs.args[0]
+            right_df = rhs.args[1]
+            kws = dict(rhs.kws)
+            if 'on' in kws:
+                left_on = get_constant(self.func_ir, kws['on'], None)
+                right_on = left_on
+            else:  # pragma: no cover
+                if 'left_on' not in kws or 'right_on' not in kws:
+                    raise ValueError("merge 'on' or 'left_on'/'right_on'"
+                                     "arguments required")
+                left_on = get_constant(self.func_ir, kws['left_on'], None)
+                right_on = get_constant(self.func_ir, kws['right_on'], None)
+            if left_on is None or right_on is None:
+                raise ValueError("merge key values should be constant strings")
+            scope = lhs.scope
+            loc = lhs.loc
+            self.df_vars[lhs.name] = {}
+            # add columns from left to output
+            for col, _ in self.df_vars[left_df.name].items():
+                self.df_vars[lhs.name][col] = ir.Var(scope, mk_unique_var(col), loc)
+            # add columns from right to output
+            for col, _ in self.df_vars[right_df.name].items():
+                self.df_vars[lhs.name][col] = ir.Var(scope, mk_unique_var(col), loc)
+            self._update_df_cols()
+            return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
+                                    left_on, right_on, self.df_vars, lhs.loc)]
         return None
 
     def _handle_ros(self, lhs, rhs):

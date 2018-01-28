@@ -150,7 +150,7 @@ def visit_vars_filter(filter_node, callback, cbdata):
         filter_node.df_out_vars[col_name] = visit_vars_inner(filter_node.df_out_vars[col_name], callback, cbdata)
 
 
-# add call to visit parfor variable
+# add call to visit filter variable
 ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, typemap):
