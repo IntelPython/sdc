@@ -12,7 +12,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             find_callname, guard, require, get_definition)
 
 import hpat
-from hpat import hiframes_api, utils, parquet_pio, config
+from hpat import hiframes_api, utils, parquet_pio, config, hiframes_filter
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import numpy as np
 import math
@@ -142,7 +142,7 @@ class HiFrames(object):
                     self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
                                                                             loc)
                 self._update_df_cols()
-                return [hiframes_api.Filter(lhs, rhs.value.name, rhs.index,
+                return [hiframes_filter.Filter(lhs, rhs.value.name, rhs.index,
                                                         self.df_vars, rhs.loc)]
 
             # df.loc or df.iloc
