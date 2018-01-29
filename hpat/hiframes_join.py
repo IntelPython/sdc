@@ -34,7 +34,7 @@ class Join(ir.Stmt):
         df_left_str = "{}{{{}}}".format(self.left_df, in_cols)
 
         in_cols = ""
-        for (c, v) in self.left_vars.items():
+        for (c, v) in self.right_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_right_str = "{}{{{}}}".format(self.right_df, in_cols)
         return "join [{}={}]: {} , {}, {}".format(self.left_key,
