@@ -60,6 +60,13 @@ ext_hdist = Extension(name="hdist",
                              include_dirs=[PREFIX_DIR+'/include/'],
                              )
 
+ext_chiframes = Extension(name="chiframes",
+                             libraries = MPI_LIBS,
+                             sources=["hpat/_hiframes.cpp"],
+                             include_dirs=[PREFIX_DIR+'/include/'],
+                             )
+
+
 ext_dict = Extension(name="hdict_ext",
                              sources=["hpat/_dict_ext.cpp"]
                              )
@@ -99,7 +106,7 @@ ext_ros = Extension(name="ros_cpp",
                              sources=["hpat/_ros.cpp"]
                              )
 
-_ext_mods = [ext_hdist, ext_dict, ext_str, ext_quantile]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile]
 
 if _has_h5py:
     _ext_mods.append(ext_io)

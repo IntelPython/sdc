@@ -222,7 +222,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
                 t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
         (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
                 t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
-        print(t1_recv_size, t2_recv_size)
+        hpat.cprint(t1_recv_size, t2_recv_size)
         #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
         #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
 
@@ -274,6 +274,8 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.arrayobj import make_array
 from hpat.distributed_lower import _h5_typ_table
+import chiframes
+ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
 
 @lower_builtin(get_sendrecv_counts, types.Array)
 def lower_get_sendrecv_counts(context, builder, sig, args):
@@ -289,6 +291,8 @@ def lower_get_sendrecv_counts(context, builder, sig, args):
     # XXX: assuming key arr is 1D
     assert key_arr.shape.type.count == 1
     arr_len = builder.extract_value(key_arr.shape, 0)
+    # TODO: extend to other key types
+    assert sig.args[0].dtype == types.intp
     key_typ_enum = _h5_typ_table[sig.args[0].dtype]
     key_typ_arg = builder.load(cgutils.alloca_once_value(builder,
                                 lir.Constant(lir.IntType(32), key_typ_enum)))
