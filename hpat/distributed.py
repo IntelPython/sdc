@@ -114,7 +114,7 @@ class DistributedPass(object):
             for inst in blocks[label].body:
                 if type(inst) in distributed_run_extensions:
                     f = distributed_run_extensions[type(inst)]
-                    new_body += f(inst, self.typemap, self.calltypes)
+                    new_body += f(inst, self.typemap, self.calltypes, self.typingctx)
                     continue
                 if isinstance(inst, Parfor):
                     new_body += self._run_parfor(inst, namevar_table)

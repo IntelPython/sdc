@@ -1,9 +1,10 @@
 from __future__ import print_function, division, absolute_import
 
 import numba
-from numba import typeinfer, ir, ir_utils, config
-from numba.ir_utils import visit_vars_inner, replace_vars_inner
-from numba.typing import signature
+from numba import typeinfer, ir, ir_utils, config, types
+from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+    compile_to_numba_ir, replace_arg_nodes)
+import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_arr_ext import string_array_type
@@ -110,18 +111,6 @@ def join_distributed_analysis(join_node, array_dists):
 
 distributed_analysis.distributed_analysis_extensions[Join] = join_distributed_analysis
 
-def join_distributed_run(join_node, typemap, calltypes):
-    # TODO: rebalance if output distributions are 1D instead of 1D_Var
-    loc = join_node.loc
-
-    out = []
-    # TODO: implement
-
-    return out
-
-distributed.distributed_run_extensions[Join] = join_distributed_run
-
-
 def join_typeinfer(join_node, typeinferer):
     # TODO: consider keys with same name, cols with suffix
     for col_name, col_var in (list(join_node.left_vars.items())
@@ -224,3 +213,97 @@ def apply_copies_join(join_node, var_dict, name_var_table, ext_func, ext_data,
     return
 
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
+
+def join_distributed_run(join_node, typemap, calltypes, typingctx):
+    # TODO: rebalance if output distributions are 1D instead of 1D_Var
+    loc = join_node.loc
+    def f(t1_key, t2_key):
+        (t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp,
+                t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
+        (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
+                t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
+        print(t1_recv_size, t2_recv_size)
+        #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
+        #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
+
+    left_key_var = join_node.left_vars[join_node.left_key]
+    right_key_var = join_node.right_vars[join_node.right_key]
+
+    f_block = compile_to_numba_ir(f,
+            {'hpat': hpat}, typingctx,
+            (typemap[left_key_var.name], typemap[right_key_var.name],),
+            typemap, calltypes).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [left_key_var, right_key_var])
+    nodes = f_block.body[:-3]
+    # XXX: create dummy output arrays to allow testing for now
+    from numba.ir_utils import mk_alloc
+    for _, col_var in join_node.df_out_vars.items():
+        nodes += mk_alloc(typemap, calltypes, col_var, (0,), typemap[col_var.name].dtype, col_var.scope, col_var.loc)
+    return nodes
+
+distributed.distributed_run_extensions[Join] = join_distributed_run
+
+
+from numba.typing.templates import (signature, AbstractTemplate, infer_global)
+from numba.extending import (register_model, models, lower_builtin)
+from numba import cgutils
+
+# a native buffer pointer managed explicity (e.g. deleted manually)
+class CBufferType(types.Opaque):
+    def __init__(self):
+        super(CBufferType, self).__init__(name='CBufferType')
+
+c_buffer_type = CBufferType()
+
+register_model(CBufferType)(models.OpaqueModel)
+
+
+def get_sendrecv_counts():
+    return 0
+
+@infer_global(get_sendrecv_counts)
+class SendRecvCountTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        out_typ = types.Tuple([c_buffer_type, c_buffer_type, c_buffer_type,
+                                                    c_buffer_type, types.intp])
+        return signature(out_typ, *args)
+
+from llvmlite import ir as lir
+import llvmlite.binding as ll
+from numba.targets.arrayobj import make_array
+from hpat.distributed_lower import _h5_typ_table
+
+@lower_builtin(get_sendrecv_counts, types.Array)
+def lower_get_sendrecv_counts(context, builder, sig, args):
+    # prepare buffer args
+    pointer_to_cbuffer_typ = lir.IntType(8).as_pointer().as_pointer()
+    send_counts = cgutils.alloca_once(builder, lir.IntType(8).as_pointer())
+    recv_counts = cgutils.alloca_once(builder, lir.IntType(8).as_pointer())
+    send_disp = cgutils.alloca_once(builder, lir.IntType(8).as_pointer())
+    recv_disp = cgutils.alloca_once(builder, lir.IntType(8).as_pointer())
+
+    # prepare key array args
+    key_arr = make_array(sig.args[0])(context, builder, args[0])
+    # XXX: assuming key arr is 1D
+    assert key_arr.shape.type.count == 1
+    arr_len = builder.extract_value(key_arr.shape, 0)
+    key_typ_enum = _h5_typ_table[sig.args[0].dtype]
+    key_typ_arg = builder.load(cgutils.alloca_once_value(builder,
+                                lir.Constant(lir.IntType(32), key_typ_enum)))
+    key_arr_data = builder.bitcast(key_arr.data, lir.IntType(8).as_pointer())
+
+    call_args = [send_counts, recv_counts, send_disp, recv_disp, arr_len,
+                                                    key_typ_arg, key_arr_data]
+
+    fnty = lir.FunctionType(lir.IntType(64), [pointer_to_cbuffer_typ] * 4
+            + [lir.IntType(64), lir.IntType(32), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty,
+                                                name="get_join_sendrecv_counts")
+    total_size = builder.call(fn, call_args)
+    items = [builder.load(send_counts), builder.load(recv_counts),
+        builder.load(send_disp), builder.load(recv_disp), total_size]
+    out_tuple_typ = types.Tuple([c_buffer_type, c_buffer_type, c_buffer_type,
+                                                c_buffer_type, types.intp])
+    return context.make_tuple(builder, out_tuple_typ, items)
