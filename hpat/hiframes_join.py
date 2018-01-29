@@ -156,10 +156,18 @@ def remove_dead_join(join_node, lives, arg_aliases, alias_map, typemap):
     # if an output column is dead, the related input column is not needed
     # anymore in the join
     dead_cols = []
+    left_key_dead = False
+    right_key_dead = False
+    # TODO: remove output of dead keys
 
     for col_name, col_var in join_node.df_out_vars.items():
         if col_var.name not in lives:
-            dead_cols.append(col_name)
+            if col_name == join_node.left_key:
+                left_key_dead = True
+            elif col_name == join_node.right_key:
+                right_key_dead = True
+            else:
+                dead_cols.append(col_name)
 
     for cname in dead_cols:
         assert cname in join_node.left_vars or cname in join_node.right_vars
