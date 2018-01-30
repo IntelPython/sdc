@@ -1,7 +1,7 @@
 #include "mpi.h"
 #include <iostream>
 #include <Python.h>
-
+#include "_hpat_sort.h"
 
 int64_t get_join_sendrecv_counts(int **p_send_counts, int **p_recv_counts,
                                 int **p_send_disp, int **p_recv_disp,

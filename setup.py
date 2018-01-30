@@ -63,6 +63,7 @@ ext_hdist = Extension(name="hdist",
 ext_chiframes = Extension(name="chiframes",
                              libraries = MPI_LIBS,
                              sources=["hpat/_hiframes.cpp"],
+                             depends=["hpat/_hpat_sort.h"],
                              include_dirs=[PREFIX_DIR+'/include/'],
                              )
 
