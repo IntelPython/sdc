@@ -28,6 +28,9 @@ int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int
 int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_wait(int req, bool cond);
+
+void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
+                int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
 int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
@@ -83,6 +86,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_item_pointer)));
     PyObject_SetAttrString(m, "hpat_get_dummy_ptr",
                             PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
+    PyObject_SetAttrString(m, "c_alltoallv",
+                            PyLong_FromVoidPtr((void*)(&c_alltoallv)));
     return m;
 }
 
@@ -361,4 +366,13 @@ int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count)
     if (ind >= start && ind < start+count)
         return ind-start;
     return -1;
+}
+
+
+void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
+                int* recv_counts, int* send_disp, int* recv_disp, int typ_enum)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
+    MPI_Alltoallv(send_data, send_counts, send_disp, mpi_typ,
+        recv_data, recv_counts, recv_disp, mpi_typ, MPI_COMM_WORLD);
 }

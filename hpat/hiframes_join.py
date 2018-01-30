@@ -8,6 +8,7 @@ import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_arr_ext import string_array_type
+import numpy as np
 
 class Join(ir.Stmt):
     def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, loc):
@@ -217,16 +218,19 @@ ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
 def join_distributed_run(join_node, typemap, calltypes, typingctx):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
+    # get column variables
     left_key_var = join_node.left_vars[join_node.left_key]
     right_key_var = join_node.right_vars[join_node.right_key]
     left_other_col_vars = [v for (n, v) in join_node.left_vars.items()
                                             if n != join_node.left_key]
     right_other_col_vars = [v for (n, v) in join_node.right_vars.items()
                                             if n != join_node.right_key]
+    # get column types
     left_other_col_typ = [typemap[v.name] for v in left_other_col_vars]
     right_other_col_typ = [typemap[v.name] for v in right_other_col_vars]
     arg_typs = tuple([typemap[left_key_var.name], typemap[right_key_var.name]]
                                 + left_other_col_typ + right_other_col_typ)
+    # arg names of non-key columns
     left_other_names = ["t1_c"+str(i) for i in range(len(left_other_col_vars))]
     right_other_names = ["t2_c"+str(i) for i in range(len(right_other_col_vars))]
     func_text = """def f(t1_key, t2_key,{}{}{}):
@@ -252,12 +256,12 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     left_recv_names = ",".join(["recv_"+v for v in left_arg_names])
     func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
             + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
-                left_arg_names, left_send_names, left_recv_names))
+                ",".join(left_arg_names), left_send_names, left_recv_names))
     right_send_names = ",".join(["send_"+v for v in right_arg_names])
     right_recv_names = ",".join(["recv_"+v for v in right_arg_names])
-    func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
+    func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
             + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
-                right_arg_names, right_send_names, right_recv_names))
+                ",".join(right_arg_names), right_send_names, right_recv_names))
 
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
     #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
@@ -267,7 +271,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     f = loc_vars['f']
 
     f_block = compile_to_numba_ir(f,
-            {'hpat': hpat}, typingctx, arg_typs,
+            {'hpat': hpat, 'np': np}, typingctx, arg_typs,
             typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
                                     + left_other_col_vars+right_other_col_vars)
@@ -282,7 +286,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
 distributed.distributed_run_extensions[Join] = join_distributed_run
 
 
-from numba.typing.templates import (signature, AbstractTemplate, infer_global)
+from numba.typing.templates import (signature, AbstractTemplate, infer_global, infer)
 from numba.extending import (register_model, models, lower_builtin)
 from numba import cgutils
 
@@ -299,6 +303,9 @@ register_model(CBufferType)(models.OpaqueModel)
 def get_sendrecv_counts():
     return 0
 
+def shuffle_data():
+    return 0
+
 @infer_global(get_sendrecv_counts)
 class SendRecvCountTyper(AbstractTemplate):
     def generic(self, args, kws):
@@ -308,12 +315,20 @@ class SendRecvCountTyper(AbstractTemplate):
                                                     c_buffer_type, types.intp])
         return signature(out_typ, *args)
 
+@infer_global(shuffle_data)
+class ShuffleTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.int32, *args)
+
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.arrayobj import make_array
 from hpat.distributed_lower import _h5_typ_table
 import chiframes
 ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
+import hdist
+ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
 
 @lower_builtin(get_sendrecv_counts, types.Array)
 def lower_get_sendrecv_counts(context, builder, sig, args):
@@ -349,3 +364,74 @@ def lower_get_sendrecv_counts(context, builder, sig, args):
     out_tuple_typ = types.Tuple([c_buffer_type, c_buffer_type, c_buffer_type,
                                                 c_buffer_type, types.intp])
     return context.make_tuple(builder, out_tuple_typ, items)
+
+@lower_builtin(shuffle_data, c_buffer_type, c_buffer_type, c_buffer_type,
+                        c_buffer_type, types.VarArg(types.Any))
+def lower_shuffle(context, builder, sig, args):
+    # assuming there are 4 buffer arguments, column vars, send arrs, recv arrs
+    assert (len(args) - 4) % 3 == 0
+    num_cols = (len(args) - 4) // 3
+    send_counts, recv_counts, send_disp, recv_disp = args[:4]
+    col_names = ["c"+str(i) for i in range(num_cols)]
+    send_names = ["send_c"+str(i) for i in range(num_cols)]
+    # create send buffer building function
+    func_text = "def f(send_disp, {}, {}):\n".format(",".join(col_names), ",".join(send_names))
+    func_text += "    n_pes = hpat.distributed_api.get_size()\n"
+    func_text += "    tmp_count = np.zeros(n_pes, dtype=np.int64)\n"
+    func_text += "    for i in range(len(c0)):\n"
+    func_text += "        node_id = c0[i] % n_pes\n"
+    func_text += "        ind = send_disp[node_id] + tmp_count[node_id]\n"
+    func_text += "        send_c0[ind] = c0[i]\n"
+    for i in range(1, num_cols):
+        func_text += "        send_c{}[ind] = c{}[i]\n".format(i, i)
+    func_text += "        tmp_count[node_id] = tmp_count[node_id] + 1\n"
+    #func_text += "        hpat.cprint(node_id)\n"
+
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
+    f = loc_vars['f']
+    f_args = [send_disp]+args[4:4+2*num_cols]
+    f_sig = signature(types.void, *((c_buffer_type,)+sig.args[4:4+2*num_cols]))
+    context.compile_internal(builder, f, f_sig, f_args)
+    # generate alltoallv calls
+    for i in range(0, num_cols):
+        arr_typ = sig.args[4+i]
+        send_arg = args[4+num_cols+i]
+        recv_arg = args[4+2*num_cols+i]
+        gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
+                                            recv_counts, send_disp, recv_disp)
+
+    return lir.Constant(lir.IntType(32), 0)
+
+def gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
+                                            recv_counts, send_disp, recv_disp):
+    #
+    typ_enum = _h5_typ_table[arr_typ.dtype]
+    typ_arg = builder.load(cgutils.alloca_once_value(builder,
+                                lir.Constant(lir.IntType(32), typ_enum)))
+    send_data = make_array(arr_typ)(context, builder, send_arg).data
+    recv_data = make_array(arr_typ)(context, builder, recv_arg).data
+    send_data = builder.bitcast(send_data, lir.IntType(8).as_pointer())
+    recv_data = builder.bitcast(recv_data, lir.IntType(8).as_pointer())
+
+    call_args = [send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_arg]
+
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()]*6 + [lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="c_alltoallv")
+    builder.call(fn, call_args)
+
+@infer
+class GetItemCBuf(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        c_buff, idx = args
+        if isinstance(c_buff, CBufferType):
+            if isinstance(idx, types.Integer):
+                return signature(types.int32, c_buff, idx)
+
+
+@lower_builtin('getitem', c_buffer_type, types.intp)
+def c_buffer_type_getitem(context, builder, sig, args):
+    base_ptr = builder.bitcast(args[0], lir.IntType(32).as_pointer())
+    return builder.load(builder.gep(base_ptr, [args[1]], inbounds=True))
