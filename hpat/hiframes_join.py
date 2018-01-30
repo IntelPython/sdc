@@ -217,23 +217,61 @@ ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
 def join_distributed_run(join_node, typemap, calltypes, typingctx):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
-    def f(t1_key, t2_key):
-        (t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp,
-                t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
-        (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
-                t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
-        hpat.cprint(t1_recv_size, t2_recv_size)
-        #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
-        #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
-
     left_key_var = join_node.left_vars[join_node.left_key]
     right_key_var = join_node.right_vars[join_node.right_key]
+    left_other_col_vars = [v for (n, v) in join_node.left_vars.items()
+                                            if n != join_node.left_key]
+    right_other_col_vars = [v for (n, v) in join_node.right_vars.items()
+                                            if n != join_node.right_key]
+    left_other_col_typ = [typemap[v.name] for v in left_other_col_vars]
+    right_other_col_typ = [typemap[v.name] for v in right_other_col_vars]
+    arg_typs = tuple([typemap[left_key_var.name], typemap[right_key_var.name]]
+                                + left_other_col_typ + right_other_col_typ)
+    left_other_names = ["t1_c"+str(i) for i in range(len(left_other_col_vars))]
+    right_other_names = ["t2_c"+str(i) for i in range(len(right_other_col_vars))]
+    func_text = """def f(t1_key, t2_key,{}{}{}):
+    (t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp,
+        t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
+    (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
+        t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
+    hpat.cprint(t1_recv_size, t2_recv_size)\n""".format(",".join(left_other_names),
+                ("," if len(left_other_names) != 0 else ""),
+                ",".join(right_other_names))
+    # prepare for shuffle
+    left_arg_names = ['t1_key'] + left_other_names
+    right_arg_names = ['t2_key'] + right_other_names
+    # allocate send/recv buffers
+    for a in left_arg_names:
+        func_text += "    send_{} = np.empty_like({})\n".format(a, a)
+        func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(a, a)
+
+    for a in right_arg_names:
+        func_text += "    send_{} = np.empty_like({})\n".format(a, a)
+        func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(a, a)
+    left_send_names = ",".join(["send_"+v for v in left_arg_names])
+    left_recv_names = ",".join(["recv_"+v for v in left_arg_names])
+    func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
+            + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
+                left_arg_names, left_send_names, left_recv_names))
+    right_send_names = ",".join(["send_"+v for v in right_arg_names])
+    right_recv_names = ",".join(["recv_"+v for v in right_arg_names])
+    func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
+            + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
+                right_arg_names, right_send_names, right_recv_names))
+
+    #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
+    #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
 
     f_block = compile_to_numba_ir(f,
-            {'hpat': hpat}, typingctx,
-            (typemap[left_key_var.name], typemap[right_key_var.name],),
+            {'hpat': hpat}, typingctx, arg_typs,
             typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [left_key_var, right_key_var])
+    replace_arg_nodes(f_block, [left_key_var, right_key_var]
+                                    + left_other_col_vars+right_other_col_vars)
+
     nodes = f_block.body[:-3]
     # XXX: create dummy output arrays to allow testing for now
     from numba.ir_utils import mk_alloc
