@@ -221,9 +221,9 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     # get column variables
     left_key_var = join_node.left_vars[join_node.left_key]
     right_key_var = join_node.right_vars[join_node.right_key]
-    left_other_col_vars = [v for (n, v) in join_node.left_vars.items()
+    left_other_col_vars = [v for (n, v) in sorted(join_node.left_vars.items())
                                             if n != join_node.left_key]
-    right_other_col_vars = [v for (n, v) in join_node.right_vars.items()
+    right_other_col_vars = [v for (n, v) in sorted(join_node.right_vars.items())
                                             if n != join_node.right_key]
     # get column types
     left_other_col_typ = [typemap[v.name] for v in left_other_col_vars]
@@ -262,7 +262,21 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
             + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
                 ",".join(right_arg_names), right_send_names, right_recv_names))
+    func_text += "    hpat.hiframes_join.sort({})\n".format(left_recv_names)
     func_text += "    hpat.hiframes_join.sort({})\n".format(right_recv_names)
+
+    # align output variables for local merge
+    # add keys first (TODO: remove dead keys)
+    merge_out = [join_node.df_out_vars[join_node.left_key]]
+    merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
+                                            if n != join_node.left_key]
+    merge_out.append(join_node.df_out_vars[join_node.right_key])
+    merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
+                                            if n != join_node.right_key]
+    out_names = ["t3_c"+str(i) for i in range(len(merge_out))]
+
+    func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(",".join(out_names), len(left_arg_names), left_recv_names, right_recv_names)
+
     #func_text += "    print(recv_t2_c0)\n"
     #func_text += "    hpat.cprint(recv_t2_c0[0])"
 
@@ -312,6 +326,9 @@ def shuffle_data():
 def sort():
     return 0
 
+def local_merge():
+    return 0
+
 @infer_global(get_sendrecv_counts)
 class SendRecvCountTyper(AbstractTemplate):
     def generic(self, args, kws):
@@ -332,6 +349,15 @@ class ShuffleTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.int32, *args)
+
+@infer_global(local_merge)
+class LocalMergeTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        out_typ = types.Tuple(args[1:])
+        return signature(out_typ, *args)
+
+LocalMergeTyper.support_literals = True
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -457,6 +483,75 @@ def lower_sort(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="timsort")
     builder.call(fn, call_args)
     return lir.Constant(lir.IntType(32), 0)
+
+@lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
+def lower_local_merge(context, builder, sig, args):
+    #
+    num_left_cols = sig.args[0].value
+    num_right_cols = len(args) - num_left_cols - 1
+    left_other_names = ["t1_c"+str(i) for i in range(num_left_cols-1)]
+    right_other_names = ["t2_c"+str(i) for i in range(num_right_cols-1)]
+
+    # create merge function
+    func_text = "def f(left_key, right_key, {}{} {}):\n".format(
+                            ",".join(left_other_names),
+                            ("," if len(left_other_names) != 0 else ""),
+                            ",".join(right_other_names))
+    # initialize output arrays with a heuristic starting size
+    func_text += "    init_size = 100 + min(len(left_key), len(right_key)) // 10 + 1\n"
+    func_text += "    out_left_key = np.empty(init_size, left_key.dtype)\n"
+    func_text += "    out_right_key = np.empty(init_size, right_key.dtype)\n"
+    for v in (left_other_names + right_other_names):
+        func_text += "    out_{} = np.empty(init_size, {}.dtype)\n".format(v, v)
+    func_text += "    out_ind = 0\n"
+    func_text += "    left_ind = 0\n"
+    func_text += "    right_ind = 0\n"
+    func_text += "    while left_ind < len(left_key) and right_ind < len(right_key):\n"
+    func_text += "        if left_key[left_ind] == right_key[right_ind]:\n"
+    func_text += _set_merge_output("            ", left_other_names, right_other_names, "left_ind", "right_ind")
+    func_text += "            left_run = left_ind + 1\n"
+    func_text += "            while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:\n"
+    func_text += _set_merge_output("                ", left_other_names, right_other_names, "left_run", "right_ind")
+    func_text += "                left_run += 1\n"
+    func_text += "            right_run = right_ind + 1\n"
+    func_text += "            while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:\n"
+    func_text += _set_merge_output("                ", left_other_names, right_other_names, "left_ind", "right_run")
+    func_text += "                right_run += 1\n"
+    func_text += "            left_ind += 1\n"
+    func_text += "            right_ind += 1\n"
+    func_text += "        elif left_key[left_ind] < right_key[right_ind]:\n"
+    func_text += "            left_ind += 1\n"
+    func_text += "        else:\n"
+    func_text += "            right_ind += 1\n"
+    # return output
+    out_left_other_names =  ["out_"+v for v in left_other_names]
+    out_right_other_names =  ["out_"+v for v in right_other_names]
+    func_text += "    return out_left_key,{}{} out_right_key,{}\n".format(
+                                ",".join(out_left_other_names),
+                                ("," if len(out_left_other_names) != 0 else ""),
+                                ",".join(out_right_other_names))
+
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
+    f = loc_vars['f']
+    # args: left key, right key, left other cols, right other cols
+    f_args = [args[1], args[num_left_cols+1]] + args[2:num_left_cols+1] + args[num_left_cols+2:]
+    f_sig = signature(sig.return_type, *sig.args[1:])
+    return context.compile_internal(builder, f, f_sig, f_args)
+
+def _set_merge_output(indent, left_other_names, right_other_names, left_ind, right_ind):
+    func_text = indent + _set_expand_arr("out_left_key", "left_key[{}]".format(left_ind), "out_ind")
+    func_text += indent + _set_expand_arr("out_right_key", "right_key[{}]".format(right_ind), "out_ind")
+    for v in left_other_names:
+        func_text += indent + _set_expand_arr("out_"+v, v+"[{}]".format(left_ind), "out_ind")
+    for v in right_other_names:
+        func_text += indent + _set_expand_arr("out_"+v, v+"[{}]".format(right_ind), "out_ind")
+    func_text += indent + "out_ind += 1\n"
+    return func_text
+
+def _set_expand_arr(out, val, ind):
+    # XXX expand array
+    return "{}[{}] = {}\n".format(out, ind, val)
 
 @infer
 class GetItemCBuf(AbstractTemplate):
