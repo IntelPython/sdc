@@ -238,7 +238,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
         t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
     (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
         t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
-    hpat.cprint(t1_recv_size, t2_recv_size)\n""".format(",".join(left_other_names),
+    #hpat.cprint(t1_recv_size, t2_recv_size)\n""".format(",".join(left_other_names),
                 ("," if len(left_other_names) != 0 else ""),
                 ",".join(right_other_names))
     # prepare for shuffle
@@ -262,6 +262,9 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
             + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
                 ",".join(right_arg_names), right_send_names, right_recv_names))
+    func_text += "    hpat.hiframes_join.sort({})\n".format(right_recv_names)
+    #func_text += "    print(recv_t2_c0)\n"
+    #func_text += "    hpat.cprint(recv_t2_c0[0])"
 
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
     #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
@@ -274,7 +277,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
             {'hpat': hpat, 'np': np}, typingctx, arg_typs,
             typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
-                                    + left_other_col_vars+right_other_col_vars)
+                                + left_other_col_vars + right_other_col_vars)
 
     nodes = f_block.body[:-3]
     # XXX: create dummy output arrays to allow testing for now
@@ -306,6 +309,9 @@ def get_sendrecv_counts():
 def shuffle_data():
     return 0
 
+def sort():
+    return 0
+
 @infer_global(get_sendrecv_counts)
 class SendRecvCountTyper(AbstractTemplate):
     def generic(self, args, kws):
@@ -321,12 +327,19 @@ class ShuffleTyper(AbstractTemplate):
         assert not kws
         return signature(types.int32, *args)
 
+@infer_global(sort)
+class ShuffleTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.int32, *args)
+
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.arrayobj import make_array
 from hpat.distributed_lower import _h5_typ_table
 import chiframes
 ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
+ll.add_symbol('timsort', chiframes.timsort)
 import hdist
 ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
 
@@ -419,6 +432,31 @@ def gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()]*6 + [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="c_alltoallv")
     builder.call(fn, call_args)
+
+@lower_builtin(sort, types.VarArg(types.Any))
+def lower_sort(context, builder, sig, args):
+    #
+    key_arr = make_array(sig.args[0])(context, builder, args[0])
+    key_data = builder.bitcast(key_arr.data, lir.IntType(8).as_pointer())
+    # XXX: assuming key arr is 1D
+    assert key_arr.shape.type.count == 1
+    arr_len = builder.extract_value(key_arr.shape, 0)
+    num_other_cols = len(args) - 1
+    # build array of other column arrays arg
+    other_arrs = cgutils.alloca_once(builder, lir.IntType(8).as_pointer(), num_other_cols)
+    for i in range(num_other_cols):
+        ptr = cgutils.gep_inbounds(builder, other_arrs, i)
+        arr = make_array(sig.args[i+1])(context, builder, args[i+1])
+        arr_data = builder.bitcast(arr.data, lir.IntType(8).as_pointer())
+        builder.store(arr_data, ptr)
+
+    call_args = [key_data, arr_len, other_arrs,
+                                lir.Constant(lir.IntType(64), num_other_cols)]
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
+        lir.IntType(64), lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="timsort")
+    builder.call(fn, call_args)
+    return lir.Constant(lir.IntType(32), 0)
 
 @infer
 class GetItemCBuf(AbstractTemplate):

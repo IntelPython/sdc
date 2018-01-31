@@ -18,6 +18,8 @@ PyMODINIT_FUNC PyInit_chiframes(void) {
 
     PyObject_SetAttrString(m, "get_join_sendrecv_counts",
                         PyLong_FromVoidPtr((void*)(&get_join_sendrecv_counts)));
+    PyObject_SetAttrString(m, "timsort",
+                        PyLong_FromVoidPtr((void*)(&__hpat_timsort)));
 
     return m;
 }
