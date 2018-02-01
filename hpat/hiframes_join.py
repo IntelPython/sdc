@@ -497,11 +497,11 @@ def lower_local_merge(context, builder, sig, args):
                             ("," if len(left_other_names) != 0 else ""),
                             ",".join(right_other_names))
     # initialize output arrays with a heuristic starting size
-    func_text += "    init_size = 100 + min(len(left_key), len(right_key)) // 10 + 1\n"
-    func_text += "    out_left_key = np.empty(init_size, left_key.dtype)\n"
-    func_text += "    out_right_key = np.empty(init_size, right_key.dtype)\n"
+    func_text += "    curr_size = 101 + min(len(left_key), len(right_key)) // 10\n"
+    func_text += "    out_left_key = np.empty(curr_size, left_key.dtype)\n"
+    func_text += "    out_right_key = np.empty(curr_size, right_key.dtype)\n"
     for v in (left_other_names + right_other_names):
-        func_text += "    out_{} = np.empty(init_size, {}.dtype)\n".format(v, v)
+        func_text += "    out_{} = np.empty(curr_size, {}.dtype)\n".format(v, v)
     func_text += "    out_ind = 0\n"
     func_text += "    left_ind = 0\n"
     func_text += "    right_ind = 0\n"
@@ -544,18 +544,26 @@ def lower_local_merge(context, builder, sig, args):
     return context.compile_internal(builder, f, f_sig, f_args)
 
 def _set_merge_output(indent, left_other_names, right_other_names, left_ind, right_ind):
-    func_text = indent + _set_expand_arr("out_left_key", "left_key[{}]".format(left_ind), "out_ind")
-    func_text += indent + _set_expand_arr("out_right_key", "right_key[{}]".format(right_ind), "out_ind")
+    func_text = ""
+    #func_text += indent + "hpat.cprint({}[-1])\n".format(out)
+    func_text += indent + "if out_ind >= curr_size:\n"
+    func_text += indent + "    new_size = 2 * curr_size\n"
+    for v in ['left_key', 'right_key'] + right_other_names + left_other_names:
+        out = "out_" + v
+        func_text += indent + "    new_{} = np.empty(new_size, {}.dtype)\n".format(out, out)
+        func_text += indent + "    new_{}[:curr_size] = {}\n".format(out, out)
+        func_text += indent + "    {} = new_{}\n".format(out, out)
+    func_text += indent + "    curr_size = new_size\n"
+
+    func_text += indent + "{}[out_ind] = {}\n".format("out_left_key", "left_key[{}]".format(left_ind))
+    func_text += indent + "{}[out_ind] = {}\n".format("out_right_key", "right_key[{}]".format(left_ind))
+
     for v in left_other_names:
-        func_text += indent + _set_expand_arr("out_"+v, v+"[{}]".format(left_ind), "out_ind")
+        func_text += indent + "{}[out_ind] = {}\n".format("out_"+v, v+"[{}]".format(left_ind))
     for v in right_other_names:
-        func_text += indent + _set_expand_arr("out_"+v, v+"[{}]".format(right_ind), "out_ind")
+        func_text += indent + "{}[out_ind] = {}\n".format("out_"+v, v+"[{}]".format(right_ind))
     func_text += indent + "out_ind += 1\n"
     return func_text
-
-def _set_expand_arr(out, val, ind):
-    # XXX expand array
-    return "{}[{}] = {}\n".format(out, ind, val)
 
 @infer
 class GetItemCBuf(AbstractTemplate):
