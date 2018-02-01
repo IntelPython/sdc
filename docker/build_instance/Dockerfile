@@ -3,18 +3,18 @@ FROM ubuntu:16.04
 WORKDIR /root
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
-ENV http_proxy http://proxy-chain.intel.com:911
-ENV https_proxy http://proxy-chain.intel.com:911
+#ENV http_proxy http://proxy-chain.intel.com:911
+#ENV https_proxy http://proxy-chain.intel.com:911
 
 RUN apt-get update
-RUN apt-get install -y wget bzip2 llvm-4.0 git vim make
+RUN apt-get install -y wget bzip2 git vim make
 RUN wget -q https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
 RUN bash Anaconda3-5.0.1-Linux-x86_64.sh -b
 ENV PATH="/root/anaconda3/bin/:${PATH}"
 
 RUN conda create -y -n HPAT
 RUN source activate HPAT && \
-    conda install -y numpy scipy pandas llvmlite=0.20 python=3.6 &&\
+    conda install -y numpy scipy pandas llvmlite python=3.6 &&\
     conda install pyarrow=0.8.* mpich -c conda-forge
 
 RUN echo "export PATH=/root/anaconda3/bin/:${PATH}" >> /root/.bashrc

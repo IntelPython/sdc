@@ -21,7 +21,7 @@ requirements:
     - pkgconfig
     - six
     - mpich # [not win]
-    - hdf5-parallel
+    - hdf5
   run:
     - python
     - numpy
@@ -29,7 +29,7 @@ requirements:
     - pkgconfig
     - six
     - mpich # [not win]
-    - hdf5-parallel
+    - hdf5
 
 test:
   imports:

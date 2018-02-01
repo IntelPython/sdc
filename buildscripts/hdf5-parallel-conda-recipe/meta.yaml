@@ -1,13 +1,17 @@
+{% set version = "1.10.1" %}
+{% set maj_min_ver = ".".join(version.split(".")[:2]) %}
+
 package:
-  name: hdf5-parallel
-  version: "1.8.19"
+  name: hdf5
+  version: {{ version }}
 
 source:
-   fn: hdf5-1.8.19.tar.gz
-   url: https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.19/src/hdf5-1.8.19.tar.gz
+  fn: hdf5-{{ version }}.tar.gz
+  url: https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-{{ maj_min_ver }}/hdf5-{{ version }}/src/hdf5-{{ version }}.tar.gz
+  sha256: 048a9d149fb99aaa1680a712963f5a78e9c43b588d0e79d55e06760ec377c172
 
 build:
-  number: 0
+  number: 2
 
 requirements:
   build:

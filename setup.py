@@ -122,7 +122,7 @@ if _has_ros:
     _ext_mods.append(ext_ros)
 
 setup(name='hpat',
-      version='0.1.0',
+      version='0.2.0',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[

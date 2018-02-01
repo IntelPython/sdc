@@ -21,7 +21,7 @@ requirements:
     - pyarrow 0.8.*
     - boost
     - numba
-    - hdf5-parallel
+    - hdf5
     - h5py
     - daal-devel
     - hpat-parquet-reader
@@ -35,7 +35,7 @@ requirements:
     - pyarrow 0.8.*
     - boost
     - numba
-    - hdf5-parallel
+    - hdf5
     - h5py
     - hpat-parquet-reader
 
