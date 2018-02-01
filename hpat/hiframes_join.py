@@ -215,7 +215,14 @@ def apply_copies_join(join_node, var_dict, name_var_table, ext_func, ext_data,
 
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
 
-def join_distributed_run(join_node, typemap, calltypes, typingctx):
+def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
+    parallel = True
+    for v in (list(join_node.left_vars.values())
+                            + list(join_node.right_vars.values())
+                            + list(join_node.df_out_vars.values())):
+        if (array_dists[v.name] != distributed.Distribution.OneD
+                and array_dists[v.name] != distributed.Distribution.OneD_Var):
+            parallel = False
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     # get column variables
@@ -233,38 +240,50 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
     # arg names of non-key columns
     left_other_names = ["t1_c"+str(i) for i in range(len(left_other_col_vars))]
     right_other_names = ["t2_c"+str(i) for i in range(len(right_other_col_vars))]
-    func_text = """def f(t1_key, t2_key,{}{}{}):
-    (t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp,
-        t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)
-    (t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp,
-        t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)
-    #hpat.cprint(t1_recv_size, t2_recv_size)\n""".format(",".join(left_other_names),
-                ("," if len(left_other_names) != 0 else ""),
-                ",".join(right_other_names))
-    # prepare for shuffle
+    # all arg names
     left_arg_names = ['t1_key'] + left_other_names
     right_arg_names = ['t2_key'] + right_other_names
-    # allocate send/recv buffers
-    for a in left_arg_names:
-        func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-        func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(a, a)
 
-    for a in right_arg_names:
-        func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-        func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(a, a)
-    left_send_names = ",".join(["send_"+v for v in left_arg_names])
-    left_recv_names = ",".join(["recv_"+v for v in left_arg_names])
-    func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
-            + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
-                ",".join(left_arg_names), left_send_names, left_recv_names))
-    right_send_names = ",".join(["send_"+v for v in right_arg_names])
-    right_recv_names = ",".join(["recv_"+v for v in right_arg_names])
-    func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
-            + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
-                ",".join(right_arg_names), right_send_names, right_recv_names))
-    func_text += "    hpat.hiframes_join.sort({})\n".format(left_recv_names)
-    func_text += "    hpat.hiframes_join.sort({})\n".format(right_recv_names)
-    #func_text += "    print(recv_t1_key)\n"
+    func_text = "def f(t1_key, t2_key,{}{}{}):\n".format(
+                ",".join(left_other_names),
+                ("," if len(left_other_names) != 0 else ""),
+                ",".join(right_other_names))
+
+    if parallel:
+        # get send/recv counts
+        func_text += "    (t1_send_counts, t1_recv_counts, t1_send_disp,\n"
+        func_text += "     t1_recv_disp, t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)\n"
+        func_text += "    (t2_send_counts, t2_recv_counts, t2_send_disp,\n"
+        func_text += "     t2_recv_disp, t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)\n"
+        #func_text += "    hpat.cprint(t1_recv_size, t2_recv_size)\n"
+
+        # prepare for shuffle
+        # allocate send/recv buffers
+        for a in left_arg_names:
+            func_text += "    send_{} = np.empty_like({})\n".format(a, a)
+            func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(a, a)
+
+        for a in right_arg_names:
+            func_text += "    send_{} = np.empty_like({})\n".format(a, a)
+            func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(a, a)
+        left_send_names = ",".join(["send_"+v for v in left_arg_names])
+        left_recv_names = ",".join(["recv_"+v for v in left_arg_names])
+        func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
+                + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
+                    ",".join(left_arg_names), left_send_names, left_recv_names))
+        right_send_names = ",".join(["send_"+v for v in right_arg_names])
+        right_recv_names = ",".join(["recv_"+v for v in right_arg_names])
+        func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
+                + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
+                    ",".join(right_arg_names), right_send_names, right_recv_names))
+        local_left_data = left_recv_names
+        local_right_data = right_recv_names
+    else:
+        local_left_data = left_arg_names
+        local_right_data = right_arg_names
+
+    func_text += "    hpat.hiframes_join.sort({})\n".format(local_left_data)
+    func_text += "    hpat.hiframes_join.sort({})\n".format(local_right_data)
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
@@ -280,6 +299,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
                                     ",".join(out_names), len(left_arg_names),
                                     left_recv_names, right_recv_names)
 
+    # TODO: delete buffers
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
     #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
 
