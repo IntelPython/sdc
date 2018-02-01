@@ -292,6 +292,36 @@ class TestHiFrames(unittest.TestCase):
         self.assertTrue(isinstance(two, list))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    def test_join1(self):
+        def test_impl(n):
+            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
+            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
+            return df3.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        n = 11111
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    def test_join1_seq(self):
+        def test_impl(n):
+            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
+            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
+            return df3.B
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
+        self.assertEqual(count_array_OneDs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 0)
+        n = 11111
+        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
