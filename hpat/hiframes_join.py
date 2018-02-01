@@ -279,8 +279,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
         local_left_data = left_recv_names
         local_right_data = right_recv_names
     else:
-        local_left_data = left_arg_names
-        local_right_data = right_arg_names
+        local_left_data = ",".join(left_arg_names)
+        local_right_data = ",".join(right_arg_names)
 
     func_text += "    hpat.hiframes_join.sort({})\n".format(local_left_data)
     func_text += "    hpat.hiframes_join.sort({})\n".format(local_right_data)
@@ -297,7 +297,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
 
     func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
                                     ",".join(out_names), len(left_arg_names),
-                                    left_recv_names, right_recv_names)
+                                    local_left_data, local_right_data)
 
     # TODO: delete buffers
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
