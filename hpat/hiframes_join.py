@@ -223,11 +223,19 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
+        if (typemap[v.name] != types.Array(types.intp, 1, 'C')
+                and typemap[v.name] != types.Array(types.float64, 1, 'C')):
+            raise ValueError("Only int64 and float64 columns are currently supported in join")
+
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     # get column variables
     left_key_var = join_node.left_vars[join_node.left_key]
     right_key_var = join_node.right_vars[join_node.right_key]
+    if (typemap[left_key_var.name] != types.Array(types.intp, 1, 'C')
+            or typemap[right_key_var.name] != types.Array(types.intp, 1, 'C')):
+        raise ValueError("Only int64 keys are currently supported in join")
+
     left_other_col_vars = [v for (n, v) in sorted(join_node.left_vars.items())
                                             if n != join_node.left_key]
     right_other_col_vars = [v for (n, v) in sorted(join_node.right_vars.items())
