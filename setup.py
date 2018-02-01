@@ -74,8 +74,11 @@ ext_dict = Extension(name="hdict_ext",
 
 ext_str = Extension(name="hstr_ext",
                              sources=["hpat/_str_ext.cpp"],
+                             #include_dirs=[PREFIX_DIR+'/include/'],
+                             #libraries=['boost_regex'],
                              extra_compile_args=['-std=c++11'],
                              extra_link_args=['-std=c++11'],
+                             #language="c++"
                              )
 
 ext_quantile = Extension(name="quantile_alg",

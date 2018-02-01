@@ -2,8 +2,14 @@
 #include <string>
 #include <iostream>
 #include <vector>
-#include <regex>
 
+#include <regex>
+using std::regex;
+using std::regex_search;
+
+// #include <boost/regex.hpp>
+// using boost::regex;
+// using boost::regex_search;
 
 struct str_arr_payload {
     int64_t size;
@@ -33,7 +39,7 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_str(std::string* str);
 void print_int(int64_t val);
 void* compile_regex(std::string* pat);
-bool str_contains_regex(std::string* str, std::regex* e);
+bool str_contains_regex(std::string* str, regex* e);
 bool str_contains_noregex(std::string* str, std::string* pat);
 
 void* str_from_int32(int in);
@@ -244,14 +250,20 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index)
 
 void* compile_regex(std::string* pat)
 {
-    return new std::regex(*pat);
+    // printf("compiling\n");
+    // regex rr2("3");
+    // printf("1 compiling\n");
+    // regex * rr = new regex(*pat);
+    // printf("done compiling\n");
+    return new regex(*pat);
 }
 
-bool str_contains_regex(std::string* str, std::regex* e)
+bool str_contains_regex(std::string* str, regex* e)
 {
-    // std::regex e(*pat);
-    // return std::regex_search(*str, e, std::regex_constants::match_any);
-    return std::regex_search(*str, *e);
+    // printf("regex matching\n");
+    // regex e(*pat);
+    // return regex_search(*str, e, regex_constants::match_any);
+    return regex_search(*str, *e);
 }
 
 bool str_contains_noregex(std::string* str, std::string* pat)
