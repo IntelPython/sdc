@@ -264,6 +264,7 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
                 ",".join(right_arg_names), right_send_names, right_recv_names))
     func_text += "    hpat.hiframes_join.sort({})\n".format(left_recv_names)
     func_text += "    hpat.hiframes_join.sort({})\n".format(right_recv_names)
+    #func_text += "    print(recv_t1_key)\n"
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
@@ -275,10 +276,9 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
                                             if n != join_node.right_key]
     out_names = ["t3_c"+str(i) for i in range(len(merge_out))]
 
-    func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(",".join(out_names), len(left_arg_names), left_recv_names, right_recv_names)
-
-    #func_text += "    print(recv_t2_c0)\n"
-    #func_text += "    hpat.cprint(recv_t2_c0[0])"
+    func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
+                                    ",".join(out_names), len(left_arg_names),
+                                    left_recv_names, right_recv_names)
 
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
     #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
@@ -294,10 +294,9 @@ def join_distributed_run(join_node, typemap, calltypes, typingctx):
                                 + left_other_col_vars + right_other_col_vars)
 
     nodes = f_block.body[:-3]
-    # XXX: create dummy output arrays to allow testing for now
-    from numba.ir_utils import mk_alloc
-    for _, col_var in join_node.df_out_vars.items():
-        nodes += mk_alloc(typemap, calltypes, col_var, (0,), typemap[col_var.name].dtype, col_var.scope, col_var.loc)
+    for i in range(len(merge_out)):
+        nodes[-len(merge_out)+i].target = merge_out[i]
+
     return nodes
 
 distributed.distributed_run_extensions[Join] = join_distributed_run
@@ -523,6 +522,11 @@ def lower_local_merge(context, builder, sig, args):
     func_text += "            left_ind += 1\n"
     func_text += "        else:\n"
     func_text += "            right_ind += 1\n"
+    # shrink to size
+    func_text += "    out_left_key = out_left_key[:out_ind]\n"
+    func_text += "    out_right_key = out_right_key[:out_ind]\n"
+    for v in (left_other_names + right_other_names):
+        func_text += "    out_{} = out_{}[:out_ind]\n".format(v, v)
     # return output
     out_left_other_names =  ["out_"+v for v in left_other_names]
     out_right_other_names =  ["out_"+v for v in right_other_names]
