@@ -225,6 +225,26 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, in_arr, array_dists)
             return
 
+        if call_list == ['concatenate', np]:
+            assert len(args) == 1
+            tup_def = guard(get_definition, self.func_ir, args[0])
+            assert isinstance(tup_def, ir.Expr) and tup_def.op == 'build_tuple'
+            in_arrs = tup_def.items
+            # input arrays have same distribution
+            in_dist = Distribution.OneD
+            for v in in_arrs:
+                in_dist = Distribution(min(in_dist.value, array_dists[v.name].value))
+            # OneD_Var since sum of block sizes might not be exactly 1D
+            out_dist = Distribution.OneD_Var
+            out_dist = Distribution(min(out_dist.value, in_dist.value))
+            array_dists[lhs] = out_dist
+            # output can cause input REP
+            if out_dist != Distribution.OneD_Var:
+                in_dist = out_dist
+            for v in in_arrs:
+                array_dists[v.name] = in_dist
+            return
+
         # sum over the first axis is distributed, A.sum(0)
         if call_list == ['sum', np] and len(args) == 2:
             axis_def = guard(get_definition, self.func_ir, args[1])
