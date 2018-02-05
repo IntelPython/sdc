@@ -104,9 +104,12 @@ def join_distributed_analysis(join_node, array_dists):
 
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
-        for _, col_var in (list(join_node.left_vars.items())
-                            +list(join_node.right_vars.items())):
-            array_dists[col_var.name] = out_dist
+        in_dist = out_dist
+
+    # assign input distributions
+    for _, col_var in (list(join_node.left_vars.items())
+                        +list(join_node.right_vars.items())):
+        array_dists[col_var.name] = in_dist
 
     return
 
