@@ -40,9 +40,15 @@ def get_definitions(blocks, definitions=None):
     return definitions
 
 def is_alloc_call(func_var, call_table):
+    """
+    return trie of func_var represents an array creation call
+    """
     assert func_var in call_table
-    return call_table[func_var] in [['empty', np],
-                                    [numba.unsafe.ndarray.empty_inferred]]
+    call_list = call_table[func_var]
+    return ((len(call_list) == 2 and call_list[1] == np
+                and call_list[0] in ['empty', 'zeros', 'ones', 'full'])
+            or call_list == [numba.unsafe.ndarray.empty_inferred])
+
 
 def cprint(*s):
     print(*s)
