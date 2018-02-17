@@ -2,6 +2,10 @@
 HPAT
 *****
 
+.. image:: https://badges.gitter.im/IntelLabs/hpat.svg
+   :alt: Join the chat at https://gitter.im/IntelLabs/hpat
+   :target: https://gitter.im/IntelLabs/hpat?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
 .. image:: https://travis-ci.org/IntelLabs/hpat.svg?branch=master
     :target: https://travis-ci.org/IntelLabs/hpat
 
