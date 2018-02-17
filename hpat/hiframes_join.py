@@ -3,12 +3,13 @@ from __future__ import print_function, division, absolute_import
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
-    compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes)
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_arr_ext import string_array_type
 import numpy as np
+
 
 class Join(ir.Stmt):
     def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, loc):
@@ -40,7 +41,8 @@ class Join(ir.Stmt):
             in_cols += "'{}':{}, ".format(c, v.name)
         df_right_str = "{}{{{}}}".format(self.right_df, in_cols)
         return "join [{}={}]: {} , {}, {}".format(self.left_key,
-            self.right_key, df_out_str, df_left_str, df_right_str)
+                                                  self.right_key, df_out_str, df_left_str, df_right_str)
+
 
 def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
     post = []
@@ -50,7 +52,7 @@ def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
     # arrays of left_df and right_df have same size in first dimension
     all_shapes = []
     for _, col_var in (list(join_node.left_vars.items())
-                        +list(join_node.right_vars.items())):
+                       + list(join_node.right_vars.items())):
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
@@ -68,7 +70,8 @@ def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
-        (shape, c_post) = array_analysis._gen_shape_call(equiv_set, col_var, typ.ndim, None)
+        (shape, c_post) = array_analysis._gen_shape_call(
+            equiv_set, col_var, typ.ndim, None)
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
@@ -79,23 +82,26 @@ def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
 
     return [], post
 
+
 numba.array_analysis.array_analysis_extensions[Join] = join_array_analysis
+
 
 def join_distributed_analysis(join_node, array_dists):
 
     # input columns have same distribution
     in_dist = Distribution.OneD
     for _, col_var in (list(join_node.left_vars.items())
-                        +list(join_node.right_vars.items())):
-        in_dist = Distribution(min(in_dist.value, array_dists[col_var.name].value))
-
+                       + list(join_node.right_vars.items())):
+        in_dist = Distribution(
+            min(in_dist.value, array_dists[col_var.name].value))
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
     for _, col_var in join_node.df_out_vars.items():
         # output dist might not be assigned yet
         if col_var.name in array_dists:
-            out_dist = Distribution(min(out_dist.value, array_dists[col_var.name].value))
+            out_dist = Distribution(
+                min(out_dist.value, array_dists[col_var.name].value))
 
     # out dist should meet input dist (e.g. REP in causes REP out)
     out_dist = Distribution(min(out_dist.value, in_dist.value))
@@ -108,21 +114,24 @@ def join_distributed_analysis(join_node, array_dists):
 
     # assign input distributions
     for _, col_var in (list(join_node.left_vars.items())
-                        +list(join_node.right_vars.items())):
+                       + list(join_node.right_vars.items())):
         array_dists[col_var.name] = in_dist
 
     return
 
+
 distributed_analysis.distributed_analysis_extensions[Join] = join_distributed_analysis
+
 
 def join_typeinfer(join_node, typeinferer):
     # TODO: consider keys with same name, cols with suffix
     for col_name, col_var in (list(join_node.left_vars.items())
-                        +list(join_node.right_vars.items())):
+                              + list(join_node.right_vars.items())):
         out_col_var = join_node.df_out_vars[col_name]
         typeinferer.constraints.append(typeinfer.Propagate(dst=out_col_var.name,
-                                              src=col_var.name, loc=join_node.loc))
+                                                           src=col_var.name, loc=join_node.loc))
     return
+
 
 typeinfer.typeinfer_extensions[Join] = join_typeinfer
 
@@ -134,16 +143,21 @@ def visit_vars_join(join_node, callback, cbdata):
 
     # left
     for col_name in list(join_node.left_vars.keys()):
-        join_node.left_vars[col_name] = visit_vars_inner(join_node.left_vars[col_name], callback, cbdata)
+        join_node.left_vars[col_name] = visit_vars_inner(
+            join_node.left_vars[col_name], callback, cbdata)
     # right
     for col_name in list(join_node.right_vars.keys()):
-        join_node.right_vars[col_name] = visit_vars_inner(join_node.right_vars[col_name], callback, cbdata)
+        join_node.right_vars[col_name] = visit_vars_inner(
+            join_node.right_vars[col_name], callback, cbdata)
     # output
     for col_name in list(join_node.df_out_vars.keys()):
-        join_node.df_out_vars[col_name] = visit_vars_inner(join_node.df_out_vars[col_name], callback, cbdata)
+        join_node.df_out_vars[col_name] = visit_vars_inner(
+            join_node.df_out_vars[col_name], callback, cbdata)
+
 
 # add call to visit Join variable
 ir_utils.visit_vars_extensions[Join] = visit_vars_join
+
 
 def remove_dead_join(join_node, lives, arg_aliases, alias_map, typemap):
     # if an output column is dead, the related input column is not needed
@@ -174,7 +188,9 @@ def remove_dead_join(join_node, lives, arg_aliases, alias_map, typemap):
 
     return join_node
 
+
 ir_utils.remove_dead_extensions[Join] = remove_dead_join
+
 
 def join_usedefs(join_node, use_set=None, def_set=None):
     if use_set is None:
@@ -191,44 +207,54 @@ def join_usedefs(join_node, use_set=None, def_set=None):
 
     return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
+
 numba.analysis.ir_extension_usedefs[Join] = join_usedefs
+
 
 def get_copies_join(join_node, typemap):
     # join doesn't generate copies, it just kills the output columns
     kill_set = set(v.name for v in join_node.df_out_vars.values())
     return set(), kill_set
 
+
 ir_utils.copy_propagate_extensions[Join] = get_copies_join
 
+
 def apply_copies_join(join_node, var_dict, name_var_table, ext_func, ext_data,
-                        typemap, calltypes, save_copies):
+                      typemap, calltypes, save_copies):
     """apply copy propagate in join node"""
 
     # left
     for col_name in list(join_node.left_vars.keys()):
-        join_node.left_vars[col_name] = replace_vars_inner(join_node.left_vars[col_name], var_dict)
+        join_node.left_vars[col_name] = replace_vars_inner(
+            join_node.left_vars[col_name], var_dict)
     # right
     for col_name in list(join_node.right_vars.keys()):
-        join_node.right_vars[col_name] = replace_vars_inner(join_node.right_vars[col_name], var_dict)
+        join_node.right_vars[col_name] = replace_vars_inner(
+            join_node.right_vars[col_name], var_dict)
     # output
     for col_name in list(join_node.df_out_vars.keys()):
-        join_node.df_out_vars[col_name] = replace_vars_inner(join_node.df_out_vars[col_name], var_dict)
+        join_node.df_out_vars[col_name] = replace_vars_inner(
+            join_node.df_out_vars[col_name], var_dict)
 
     return
 
+
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
+
 
 def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
     parallel = True
     for v in (list(join_node.left_vars.values())
-                            + list(join_node.right_vars.values())
-                            + list(join_node.df_out_vars.values())):
+              + list(join_node.right_vars.values())
+              + list(join_node.df_out_vars.values())):
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
         if (typemap[v.name] != types.Array(types.intp, 1, 'C')
                 and typemap[v.name] != types.Array(types.float64, 1, 'C')):
-            raise ValueError("Only int64 and float64 columns are currently supported in join")
+            raise ValueError(
+                "Only int64 and float64 columns are currently supported in join")
 
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
@@ -240,17 +266,19 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
         raise ValueError("Only int64 keys are currently supported in join")
 
     left_other_col_vars = [v for (n, v) in sorted(join_node.left_vars.items())
-                                            if n != join_node.left_key]
+                           if n != join_node.left_key]
     right_other_col_vars = [v for (n, v) in sorted(join_node.right_vars.items())
-                                            if n != join_node.right_key]
+                            if n != join_node.right_key]
     # get column types
     left_other_col_typ = [typemap[v.name] for v in left_other_col_vars]
     right_other_col_typ = [typemap[v.name] for v in right_other_col_vars]
     arg_typs = tuple([typemap[left_key_var.name], typemap[right_key_var.name]]
-                                + left_other_col_typ + right_other_col_typ)
+                     + left_other_col_typ + right_other_col_typ)
     # arg names of non-key columns
-    left_other_names = ["t1_c"+str(i) for i in range(len(left_other_col_vars))]
-    right_other_names = ["t2_c"+str(i) for i in range(len(right_other_col_vars))]
+    left_other_names = ["t1_c" + str(i)
+                        for i in range(len(left_other_col_vars))]
+    right_other_names = ["t2_c" + str(i)
+                         for i in range(len(right_other_col_vars))]
     # all arg names
     left_arg_names = ['t1_key'] + left_other_names
     right_arg_names = ['t2_key'] + right_other_names
@@ -272,21 +300,23 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
         # allocate send/recv buffers
         for a in left_arg_names:
             func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-            func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(a, a)
+            func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(
+                a, a)
 
         for a in right_arg_names:
             func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-            func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(a, a)
-        left_send_names = ",".join(["send_"+v for v in left_arg_names])
-        left_recv_names = ",".join(["recv_"+v for v in left_arg_names])
+            func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(
+                a, a)
+        left_send_names = ",".join(["send_" + v for v in left_arg_names])
+        left_recv_names = ",".join(["recv_" + v for v in left_arg_names])
         func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
-                + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
-                    ",".join(left_arg_names), left_send_names, left_recv_names))
-        right_send_names = ",".join(["send_"+v for v in right_arg_names])
-        right_recv_names = ",".join(["recv_"+v for v in right_arg_names])
+                      + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
+                          ",".join(left_arg_names), left_send_names, left_recv_names))
+        right_send_names = ",".join(["send_" + v for v in right_arg_names])
+        right_recv_names = ",".join(["recv_" + v for v in right_arg_names])
         func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
-                + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
-                    ",".join(right_arg_names), right_send_names, right_recv_names))
+                      + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
+                          ",".join(right_arg_names), right_send_names, right_recv_names))
         local_left_data = left_recv_names
         local_right_data = right_recv_names
     else:
@@ -300,15 +330,15 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
     # add keys first (TODO: remove dead keys)
     merge_out = [join_node.df_out_vars[join_node.left_key]]
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
-                                            if n != join_node.left_key]
+                  if n != join_node.left_key]
     merge_out.append(join_node.df_out_vars[join_node.right_key])
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
-                                            if n != join_node.right_key]
-    out_names = ["t3_c"+str(i) for i in range(len(merge_out))]
+                  if n != join_node.right_key]
+    out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
     func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
-                                    ",".join(out_names), len(left_arg_names),
-                                    local_left_data, local_right_data)
+        ",".join(out_names), len(left_arg_names),
+        local_left_data, local_right_data)
 
     # TODO: delete buffers
     #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
@@ -319,28 +349,33 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
     f = loc_vars['f']
 
     f_block = compile_to_numba_ir(f,
-            {'hpat': hpat, 'np': np}, typingctx, arg_typs,
-            typemap, calltypes).blocks.popitem()[1]
+                                  {'hpat': hpat, 'np': np}, typingctx, arg_typs,
+                                  typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
-                                + left_other_col_vars + right_other_col_vars)
+                      + left_other_col_vars + right_other_col_vars)
 
     nodes = f_block.body[:-3]
     for i in range(len(merge_out)):
-        nodes[-len(merge_out)+i].target = merge_out[i]
+        nodes[-len(merge_out) + i].target = merge_out[i]
 
     return nodes
+
 
 distributed.distributed_run_extensions[Join] = join_distributed_run
 
 
-from numba.typing.templates import (signature, AbstractTemplate, infer_global, infer)
+from numba.typing.templates import (
+    signature, AbstractTemplate, infer_global, infer)
 from numba.extending import (register_model, models, lower_builtin)
 from numba import cgutils
 
 # a native buffer pointer managed explicity (e.g. deleted manually)
+
+
 class CBufferType(types.Opaque):
     def __init__(self):
         super(CBufferType, self).__init__(name='CBufferType')
+
 
 c_buffer_type = CBufferType()
 
@@ -350,14 +385,18 @@ register_model(CBufferType)(models.OpaqueModel)
 def get_sendrecv_counts():
     return 0
 
+
 def shuffle_data():
     return 0
+
 
 def sort():
     return 0
 
+
 def local_merge():
     return 0
+
 
 @infer_global(get_sendrecv_counts)
 class SendRecvCountTyper(AbstractTemplate):
@@ -365,8 +404,9 @@ class SendRecvCountTyper(AbstractTemplate):
         assert not kws
         assert len(args) == 1
         out_typ = types.Tuple([c_buffer_type, c_buffer_type, c_buffer_type,
-                                                    c_buffer_type, types.intp])
+                               c_buffer_type, types.intp])
         return signature(out_typ, *args)
+
 
 @infer_global(shuffle_data)
 class ShuffleTyper(AbstractTemplate):
@@ -374,11 +414,13 @@ class ShuffleTyper(AbstractTemplate):
         assert not kws
         return signature(types.int32, *args)
 
+
 @infer_global(sort)
 class ShuffleTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.int32, *args)
+
 
 @infer_global(local_merge)
 class LocalMergeTyper(AbstractTemplate):
@@ -386,6 +428,7 @@ class LocalMergeTyper(AbstractTemplate):
         assert not kws
         out_typ = types.Tuple(args[1:])
         return signature(out_typ, *args)
+
 
 LocalMergeTyper.support_literals = True
 
@@ -398,6 +441,7 @@ ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
 ll.add_symbol('timsort', chiframes.timsort)
 import hdist
 ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
+
 
 @lower_builtin(get_sendrecv_counts, types.Array)
 def lower_get_sendrecv_counts(context, builder, sig, args):
@@ -417,34 +461,36 @@ def lower_get_sendrecv_counts(context, builder, sig, args):
     assert sig.args[0].dtype == types.intp
     key_typ_enum = _h5_typ_table[sig.args[0].dtype]
     key_typ_arg = builder.load(cgutils.alloca_once_value(builder,
-                                lir.Constant(lir.IntType(32), key_typ_enum)))
+                                                         lir.Constant(lir.IntType(32), key_typ_enum)))
     key_arr_data = builder.bitcast(key_arr.data, lir.IntType(8).as_pointer())
 
     call_args = [send_counts, recv_counts, send_disp, recv_disp, arr_len,
-                                                    key_typ_arg, key_arr_data]
+                 key_typ_arg, key_arr_data]
 
     fnty = lir.FunctionType(lir.IntType(64), [pointer_to_cbuffer_typ] * 4
-            + [lir.IntType(64), lir.IntType(32), lir.IntType(8).as_pointer()])
+                            + [lir.IntType(64), lir.IntType(32), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty,
-                                                name="get_join_sendrecv_counts")
+                                               name="get_join_sendrecv_counts")
     total_size = builder.call(fn, call_args)
     items = [builder.load(send_counts), builder.load(recv_counts),
-        builder.load(send_disp), builder.load(recv_disp), total_size]
+             builder.load(send_disp), builder.load(recv_disp), total_size]
     out_tuple_typ = types.Tuple([c_buffer_type, c_buffer_type, c_buffer_type,
-                                                c_buffer_type, types.intp])
+                                 c_buffer_type, types.intp])
     return context.make_tuple(builder, out_tuple_typ, items)
 
+
 @lower_builtin(shuffle_data, c_buffer_type, c_buffer_type, c_buffer_type,
-                        c_buffer_type, types.VarArg(types.Any))
+               c_buffer_type, types.VarArg(types.Any))
 def lower_shuffle(context, builder, sig, args):
     # assuming there are 4 buffer arguments, column vars, send arrs, recv arrs
     assert (len(args) - 4) % 3 == 0
     num_cols = (len(args) - 4) // 3
     send_counts, recv_counts, send_disp, recv_disp = args[:4]
-    col_names = ["c"+str(i) for i in range(num_cols)]
-    send_names = ["send_c"+str(i) for i in range(num_cols)]
+    col_names = ["c" + str(i) for i in range(num_cols)]
+    send_names = ["send_c" + str(i) for i in range(num_cols)]
     # create send buffer building function
-    func_text = "def f(send_disp, {}, {}):\n".format(",".join(col_names), ",".join(send_names))
+    func_text = "def f(send_disp, {}, {}):\n".format(
+        ",".join(col_names), ",".join(send_names))
     func_text += "    n_pes = hpat.distributed_api.get_size()\n"
     func_text += "    tmp_count = np.zeros(n_pes, dtype=np.int64)\n"
     func_text += "    for i in range(len(c0)):\n"
@@ -459,35 +505,40 @@ def lower_shuffle(context, builder, sig, args):
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
     f = loc_vars['f']
-    f_args = [send_disp]+args[4:4+2*num_cols]
-    f_sig = signature(types.void, *((c_buffer_type,)+sig.args[4:4+2*num_cols]))
+    f_args = [send_disp] + args[4:4 + 2 * num_cols]
+    f_sig = signature(types.void, *((c_buffer_type,) +
+                                    sig.args[4:4 + 2 * num_cols]))
     context.compile_internal(builder, f, f_sig, f_args)
     # generate alltoallv calls
     for i in range(0, num_cols):
-        arr_typ = sig.args[4+i]
-        send_arg = args[4+num_cols+i]
-        recv_arg = args[4+2*num_cols+i]
+        arr_typ = sig.args[4 + i]
+        send_arg = args[4 + num_cols + i]
+        recv_arg = args[4 + 2 * num_cols + i]
         gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
-                                            recv_counts, send_disp, recv_disp)
+                      recv_counts, send_disp, recv_disp)
 
     return lir.Constant(lir.IntType(32), 0)
 
+
 def gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
-                                            recv_counts, send_disp, recv_disp):
+                  recv_counts, send_disp, recv_disp):
     #
     typ_enum = _h5_typ_table[arr_typ.dtype]
     typ_arg = builder.load(cgutils.alloca_once_value(builder,
-                                lir.Constant(lir.IntType(32), typ_enum)))
+                                                     lir.Constant(lir.IntType(32), typ_enum)))
     send_data = make_array(arr_typ)(context, builder, send_arg).data
     recv_data = make_array(arr_typ)(context, builder, recv_arg).data
     send_data = builder.bitcast(send_data, lir.IntType(8).as_pointer())
     recv_data = builder.bitcast(recv_data, lir.IntType(8).as_pointer())
 
-    call_args = [send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_arg]
+    call_args = [send_data, recv_data, send_counts,
+                 recv_counts, send_disp, recv_disp, typ_arg]
 
-    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()]*6 + [lir.IntType(32)])
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
+        8).as_pointer()] * 6 + [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="c_alltoallv")
     builder.call(fn, call_args)
+
 
 @lower_builtin(sort, types.VarArg(types.Any))
 def lower_sort(context, builder, sig, args):
@@ -499,34 +550,36 @@ def lower_sort(context, builder, sig, args):
     arr_len = builder.extract_value(key_arr.shape, 0)
     num_other_cols = len(args) - 1
     # build array of other column arrays arg
-    other_arrs = cgutils.alloca_once(builder, lir.IntType(8).as_pointer(), num_other_cols)
+    other_arrs = cgutils.alloca_once(
+        builder, lir.IntType(8).as_pointer(), num_other_cols)
     for i in range(num_other_cols):
         ptr = cgutils.gep_inbounds(builder, other_arrs, i)
-        arr = make_array(sig.args[i+1])(context, builder, args[i+1])
+        arr = make_array(sig.args[i + 1])(context, builder, args[i + 1])
         arr_data = builder.bitcast(arr.data, lir.IntType(8).as_pointer())
         builder.store(arr_data, ptr)
 
     call_args = [key_data, arr_len, other_arrs,
-                                lir.Constant(lir.IntType(64), num_other_cols)]
+                 lir.Constant(lir.IntType(64), num_other_cols)]
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
-        lir.IntType(64), lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64)])
+                                             lir.IntType(64), lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="timsort")
     builder.call(fn, call_args)
     return lir.Constant(lir.IntType(32), 0)
+
 
 @lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
 def lower_local_merge(context, builder, sig, args):
     #
     num_left_cols = sig.args[0].value
     num_right_cols = len(args) - num_left_cols - 1
-    left_other_names = ["t1_c"+str(i) for i in range(num_left_cols-1)]
-    right_other_names = ["t2_c"+str(i) for i in range(num_right_cols-1)]
+    left_other_names = ["t1_c" + str(i) for i in range(num_left_cols - 1)]
+    right_other_names = ["t2_c" + str(i) for i in range(num_right_cols - 1)]
 
     # create merge function
     func_text = "def f(left_key, right_key, {}{} {}):\n".format(
-                            ",".join(left_other_names),
-                            ("," if len(left_other_names) != 0 else ""),
-                            ",".join(right_other_names))
+        ",".join(left_other_names),
+        ("," if len(left_other_names) != 0 else ""),
+        ",".join(right_other_names))
     # initialize output arrays with a heuristic starting size
     func_text += "    curr_size = 101 + min(len(left_key), len(right_key)) // 10\n"
     func_text += "    out_left_key = np.empty(curr_size, left_key.dtype)\n"
@@ -538,14 +591,17 @@ def lower_local_merge(context, builder, sig, args):
     func_text += "    right_ind = 0\n"
     func_text += "    while left_ind < len(left_key) and right_ind < len(right_key):\n"
     func_text += "        if left_key[left_ind] == right_key[right_ind]:\n"
-    func_text += _set_merge_output("            ", left_other_names, right_other_names, "left_ind", "right_ind")
+    func_text += _set_merge_output("            ", left_other_names,
+                                   right_other_names, "left_ind", "right_ind")
     func_text += "            left_run = left_ind + 1\n"
     func_text += "            while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:\n"
-    func_text += _set_merge_output("                ", left_other_names, right_other_names, "left_run", "right_ind")
+    func_text += _set_merge_output("                ", left_other_names,
+                                   right_other_names, "left_run", "right_ind")
     func_text += "                left_run += 1\n"
     func_text += "            right_run = right_ind + 1\n"
     func_text += "            while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:\n"
-    func_text += _set_merge_output("                ", left_other_names, right_other_names, "left_ind", "right_run")
+    func_text += _set_merge_output("                ", left_other_names,
+                                   right_other_names, "left_ind", "right_run")
     func_text += "                right_run += 1\n"
     func_text += "            left_ind += 1\n"
     func_text += "            right_ind += 1\n"
@@ -559,20 +615,22 @@ def lower_local_merge(context, builder, sig, args):
     for v in (left_other_names + right_other_names):
         func_text += "    out_{} = out_{}[:out_ind]\n".format(v, v)
     # return output
-    out_left_other_names =  ["out_"+v for v in left_other_names]
-    out_right_other_names =  ["out_"+v for v in right_other_names]
+    out_left_other_names = ["out_" + v for v in left_other_names]
+    out_right_other_names = ["out_" + v for v in right_other_names]
     func_text += "    return out_left_key,{}{} out_right_key,{}\n".format(
-                                ",".join(out_left_other_names),
-                                ("," if len(out_left_other_names) != 0 else ""),
-                                ",".join(out_right_other_names))
+        ",".join(out_left_other_names),
+        ("," if len(out_left_other_names) != 0 else ""),
+        ",".join(out_right_other_names))
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
     f = loc_vars['f']
     # args: left key, right key, left other cols, right other cols
-    f_args = [args[1], args[num_left_cols+1]] + args[2:num_left_cols+1] + args[num_left_cols+2:]
+    f_args = [args[1], args[num_left_cols + 1]] + \
+        args[2:num_left_cols + 1] + args[num_left_cols + 2:]
     f_sig = signature(sig.return_type, *sig.args[1:])
     return context.compile_internal(builder, f, f_sig, f_args)
+
 
 def _set_merge_output(indent, left_other_names, right_other_names, left_ind, right_ind):
     func_text = ""
@@ -581,20 +639,30 @@ def _set_merge_output(indent, left_other_names, right_other_names, left_ind, rig
     func_text += indent + "    new_size = 2 * curr_size\n"
     for v in ['left_key', 'right_key'] + right_other_names + left_other_names:
         out = "out_" + v
-        func_text += indent + "    new_{} = np.empty(new_size, {}.dtype)\n".format(out, out)
+        func_text += indent + \
+            "    new_{} = np.empty(new_size, {}.dtype)\n".format(out, out)
         func_text += indent + "    new_{}[:curr_size] = {}\n".format(out, out)
         func_text += indent + "    {} = new_{}\n".format(out, out)
     func_text += indent + "    curr_size = new_size\n"
 
-    func_text += indent + "{}[out_ind] = {}\n".format("out_left_key", "left_key[{}]".format(left_ind))
-    func_text += indent + "{}[out_ind] = {}\n".format("out_right_key", "right_key[{}]".format(left_ind))
+    func_text += indent + \
+        "{}[out_ind] = {}\n".format(
+            "out_left_key", "left_key[{}]".format(left_ind))
+    func_text += indent + \
+        "{}[out_ind] = {}\n".format(
+            "out_right_key", "right_key[{}]".format(left_ind))
 
     for v in left_other_names:
-        func_text += indent + "{}[out_ind] = {}\n".format("out_"+v, v+"[{}]".format(left_ind))
+        func_text += indent + \
+            "{}[out_ind] = {}\n".format(
+                "out_" + v, v + "[{}]".format(left_ind))
     for v in right_other_names:
-        func_text += indent + "{}[out_ind] = {}\n".format("out_"+v, v+"[{}]".format(right_ind))
+        func_text += indent + \
+            "{}[out_ind] = {}\n".format(
+                "out_" + v, v + "[{}]".format(right_ind))
     func_text += indent + "out_ind += 1\n"
     return func_text
+
 
 @infer
 class GetItemCBuf(AbstractTemplate):
