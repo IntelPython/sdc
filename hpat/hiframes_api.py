@@ -8,6 +8,9 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 
+from numba.targets.imputils import lower_builtin, impl_ret_untracked
+import numpy as np
+
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
 #
@@ -21,37 +24,49 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 #         #assert not args
 #         return signature(ary.copy(layout='C'), types.intp)
 
+
 def count(A):  # pragma: no cover
     return 0
+
 
 def fillna(A):  # pragma: no cover
     return 0
 
+
 def column_sum(A):  # pragma: no cover
     return 0
+
 
 def var(A):  # pragma: no cover
     return 0
 
+
 def std(A):  # pragma: no cover
     return 0
+
 
 def mean(A):  # pragma: no cover
     return 0
 
+
 def quantile(A, q):  # pragma: no cover
     return 0
+
 
 def quantile_parallel(A, q):  # pragma: no cover
     return 0
 
+
 def str_contains_regex(str_arr, pat):  # pragma: no cover
-    return 0;
+    return 0
+
 
 def str_contains_noregex(str_arr, pat):  # pragma: no cover
-    return 0;
+    return 0
+
 
 from numba.typing.arraydecl import _expand_integer
+
 
 @infer_global(count)
 class CountTyper(AbstractTemplate):
@@ -60,6 +75,7 @@ class CountTyper(AbstractTemplate):
         assert len(args) == 1
         return signature(types.intp, *args)
 
+
 @infer_global(fillna)
 class FillNaType(AbstractTemplate):
     def generic(self, args, kws):
@@ -67,6 +83,7 @@ class FillNaType(AbstractTemplate):
         assert len(args) == 3
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
+
 
 @infer_global(column_sum)
 class SumType(AbstractTemplate):
@@ -89,6 +106,7 @@ class VarDdof1Type(AbstractTemplate):
             return signature(types.float64, *args)
         return signature(args[0].dtype, *args)
 
+
 @infer_global(quantile)
 @infer_global(quantile_parallel)
 class QuantileType(AbstractTemplate):
@@ -96,6 +114,7 @@ class QuantileType(AbstractTemplate):
         assert not kws
         assert len(args) in [2, 3]
         return signature(types.float64, *args)
+
 
 @infer_global(str_contains_regex)
 @infer_global(str_contains_noregex)
@@ -140,12 +159,11 @@ class ContainsType(AbstractTemplate):
 #
 # numba.typing.arraydecl.ArrayAttribute.resolve_var = array_attribute_attachment
 
-from numba.targets.imputils import lower_builtin, impl_ret_untracked
-import numpy as np
 
 @lower_builtin(mean, types.Array)
 def lower_column_mean_impl(context, builder, sig, args):
     zero = sig.return_type(0)
+
     def array_mean_impl(arr):  # pragma: no cover
         count = 0
         s = zero
@@ -156,7 +174,7 @@ def lower_column_mean_impl(context, builder, sig, args):
         if not count:
             s = np.nan
         else:
-            s = s/count
+            s = s / count
         return s
 
     res = context.compile_internal(builder, array_mean_impl, sig, args,
@@ -176,10 +194,11 @@ def array_var(context, builder, sig, args):
         ssd = 0
         for v in np.nditer(arr):
             ssd += (v.item() - m) ** 2
-        return ssd / (arr.size-1)  # ddof=1 in pandas
+        return ssd / (arr.size - 1)  # ddof=1 in pandas
 
     res = context.compile_internal(builder, array_var_impl, sig, args)
     return impl_ret_untracked(context, builder, sig.return_type, res)
+
 
 @lower_builtin(std, types.Array)
 def array_std(context, builder, sig, args):
@@ -187,6 +206,7 @@ def array_std(context, builder, sig, args):
         return var(arry) ** 0.5
     res = context.compile_internal(builder, array_std_impl, sig, args)
     return impl_ret_untracked(context, builder, sig.return_type, res)
+
 
 from llvmlite import ir as lir
 import quantile_alg
@@ -203,7 +223,8 @@ def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
     typ_enum = _h5_typ_table[sig.args[0].dtype]
-    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    typ_arg = cgutils.alloca_once_value(
+        builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1
 
     arr = make_array(sig.args[0])(context, builder, args[0])
@@ -216,11 +237,11 @@ def lower_dist_quantile(context, builder, sig, args):
         total_size = local_size
 
     call_args = [builder.bitcast(arr.data, lir.IntType(8).as_pointer()),
-                local_size, total_size, args[1], builder.load(typ_arg)]
+                 local_size, total_size, args[1], builder.load(typ_arg)]
 
     # array, size, total_size, quantile, type enum
     arg_typs = [lir.IntType(8).as_pointer(), lir.IntType(64), lir.IntType(64),
-                                            lir.DoubleType(), lir.IntType(32)]
+                lir.DoubleType(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.DoubleType(), arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="quantile_parallel")
     return builder.call(fn, call_args)
@@ -229,17 +250,20 @@ def lower_dist_quantile(context, builder, sig, args):
 def fix_df_array(c):  # pragma: no cover
     return c
 
+
 def fix_rolling_array(c):  # pragma: no cover
     return c
 
+
 from numba.extending import overload
+
 
 @overload(fix_df_array)
 def fix_df_array_overload(column):
     # convert list of numbers/bools to numpy array
     if (isinstance(column, types.List)
             and (isinstance(column.dtype, types.Number)
-            or column.dtype==types.boolean)):
+                 or column.dtype == types.boolean)):
         def fix_df_array_impl(column):  # pragma: no cover
             return np.array(column)
         return fix_df_array_impl
@@ -250,9 +274,11 @@ def fix_df_array_overload(column):
         return fix_df_array_impl
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
+
     def fix_df_array_impl(column):  # pragma: no cover
         return column
     return fix_df_array_impl
+
 
 @overload(fix_rolling_array)
 def fix_rolling_array_overload(column):
