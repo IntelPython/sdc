@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import
 import numba
 from numba import ir, ir_utils, types
 from numba import compiler as numba_compiler
+from numba.targets.registry import CPUDispatcher
 
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
@@ -12,7 +13,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             find_callname, guard, require, get_definition)
 
 import hpat
-from hpat import hiframes_api, utils, parquet_pio, config, hiframes_filter, hiframes_join
+from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
+                  hiframes_join)
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 import numpy as np
 import math
@@ -29,8 +31,7 @@ def remove_hiframes(rhs, lives, call_list):
     if len(call_list) == 1 and call_list[0] in [min, max, abs]:
         return True
     # used in stencil generation of rolling
-    if (len(call_list) == 1 and isinstance(call_list[0],
-                                           numba.targets.registry.CPUDispatcher)
+    if (len(call_list) == 1 and isinstance(call_list[0], CPUDispatcher)
             and call_list[0].py_func == numba.stencilparfor._compute_last_ind):
         return True
     # used in stencil generation of rolling
@@ -79,7 +80,8 @@ class HiFrames(object):
             new_body = []
             for inst in self.func_ir.blocks[label].body:
                 # df['col'] = arr
-                if isinstance(inst, ir.StaticSetItem) and inst.target.name in self.df_vars:
+                if (isinstance(inst, ir.StaticSetItem)
+                        and inst.target.name in self.df_vars):
                     df_name = inst.target.name
                     self.df_vars[df_name][inst.index] = inst.value
                     self._update_df_cols()
@@ -97,7 +99,7 @@ class HiFrames(object):
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         self.func_ir.df_cols = self.df_cols
-        #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
         if numba.config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
             print("df_vars: ", self.df_vars)
@@ -158,7 +160,8 @@ class HiFrames(object):
                                                self.df_vars, rhs.loc)]
 
             # df.loc or df.iloc
-            if rhs.op == 'getattr' and rhs.value.name in self.df_vars and rhs.attr in ['loc', 'iloc']:
+            if (rhs.op == 'getattr' and rhs.value.name in self.df_vars
+                    and rhs.attr in ['loc', 'iloc']):
                 # FIXME: treat iloc and loc as regular df variables so getitem
                 # turns them into filter. Only boolean array is supported
                 self.df_vars[lhs] = self.df_vars[rhs.value.name]
@@ -204,7 +207,8 @@ class HiFrames(object):
                 raise ValueError(
                     "Invalid DataFrame() arguments (one expected)")
             arg_def = guard(get_definition, self.func_ir, rhs.args[0])
-            if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':  # pragma: no cover
+            if (not isinstance(arg_def, ir.Expr)
+                    or arg_def.op != 'build_map'):  # pragma: no cover
                 raise ValueError(
                     "Invalid DataFrame() arguments (map expected)")
             out, items = self._fix_df_arrays(arg_def.items)
@@ -330,7 +334,7 @@ class HiFrames(object):
                     f = loc_vars['f']
 
                     f_block = compile_to_numba_ir(f,
-                                                  {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                                {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                     replace_arg_nodes(f_block, args)
                     nodes += f_block.body[:-3]
                     done_cols[c] = nodes[-1].target
@@ -400,7 +404,8 @@ class HiFrames(object):
                 and func_def.attr in df_col_funcs):
             func_name = func_def.attr
             col_var = func_def.value
-            return self._gen_column_call(lhs, rhs.args, col_var, func_name, dict(rhs.kws))
+            return self._gen_column_call(lhs, rhs.args, col_var, func_name,
+                                         dict(rhs.kws))
         return None
 
     def _handle_rolling_setup(self, lhs, rhs):
@@ -450,7 +455,8 @@ class HiFrames(object):
             func_name = func_def.attr
             self.df_cols.add(lhs.name)  # output is Series
             return self._gen_rolling_call(rhs.args,
-                                          *self.rolling_calls[func_def.value.name] + [func_name, lhs])
+                                    *self.rolling_calls[func_def.value.name]
+                                    + [func_name, lhs])
         return None
 
     def _handle_str_contains(self, lhs, rhs):
@@ -708,8 +714,8 @@ class HiFrames(object):
                 ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
             win_size = win_size_var
 
-        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(win_size,
-                                                                        func, center)
+        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(
+            win_size, func, center)
 
         init_nodes += option_nodes
         other_args = [win_size]
@@ -718,7 +724,8 @@ class HiFrames(object):
         options = {'neighborhood': win_tuple}
         fir_globals = self.func_ir.func_id.func.__globals__
         stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func,
-                                         index_offsets, fir_globals, other_args, options)
+                                         index_offsets, fir_globals, other_args,
+                                         options)
 
         def f(A, w):  # pragma: no cover
             A[0:w - 1] = np.nan
@@ -841,7 +848,8 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
     kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
     if not isinstance(kernel_func, ir.Expr):
         kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
-                                            kernel_func.__closure__, kernel_func.__defaults__, loc)
+                                            kernel_func.__closure__,
+                                            kernel_func.__defaults__, loc)
     stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
 
     def f(A, B, f):  # pragma: no cover
@@ -867,7 +875,7 @@ def remove_none_return_from_block(last_block):
     last_block.body.pop()
     assert (isinstance(last_block.body[-1], ir.Assign)
             and isinstance(last_block.body[-1].value, ir.Const)
-            and last_block.body[-1].value.value == None)
+            and last_block.body[-1].value.value is None)
     last_block.body.pop()
 
 
