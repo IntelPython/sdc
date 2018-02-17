@@ -12,8 +12,10 @@ from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.str_arr_ext import string_array_type, StringArrayType
 
+
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
+
     def __init__(self, func_ir, typingctx, typemap, calltypes):
         self.func_ir = func_ir
         self.typingctx = typingctx
@@ -34,12 +36,12 @@ class HiFramesTyped(object):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
                         label = include_new_blocks(blocks, out_nodes, label,
-                                                                    new_body)
+                                                   new_body)
                         new_body = []
                     if isinstance(out_nodes, tuple):
                         gen_blocks, post_nodes = out_nodes
                         label = include_new_blocks(blocks, gen_blocks, label,
-                                                                    new_body)
+                                                   new_body)
                         new_body = post_nodes
                 else:
                     new_body.append(inst)
@@ -85,7 +87,7 @@ class HiFramesTyped(object):
         if (rhs.op == 'binop'
                 and rhs.fn in ['==', '!=']
                 and (self.typemap[rhs.lhs.name] == string_array_type
-                or self.typemap[rhs.rhs.name] == string_array_type)):
+                     or self.typemap[rhs.rhs.name] == string_array_type)):
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             arg1_access = 'A'
@@ -101,14 +103,15 @@ class HiFramesTyped(object):
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
-                                                                    arg2_access)
+                                                        arg2_access)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
             f_blocks = compile_to_numba_ir(f,
-                    {'numba': numba, 'np': np}, self.typingctx,
-                    (self.typemap[arg1.name], self.typemap[arg2.name]),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np}, self.typingctx,
+                                           (self.typemap[arg1.name],
+                                            self.typemap[arg2.name]),
+                                           self.typemap, self.calltypes).blocks
             replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
             # replace == expression with result of parfor (S)
             # S is target of last statement in 1st block of f
@@ -122,16 +125,16 @@ class HiFramesTyped(object):
         if (rhs.op == 'call'
                 and rhs.func.name in call_table
                 and call_table[rhs.func.name] ==
-                            ['fix_df_array', 'hiframes_api', hpat]
+            ['fix_df_array', 'hiframes_api', hpat]
                 and isinstance(self.typemap[rhs.args[0].name],
-                                    (types.Array, StringArrayType))):
+                               (types.Array, StringArrayType))):
             assign.value = rhs.args[0]
             return [assign]
         # arr = fix_rolling_array(col) -> arr=col if col is float array
         if (rhs.op == 'call'
                 and rhs.func.name in call_table
                 and call_table[rhs.func.name] ==
-                            ['fix_rolling_array', 'hiframes_api', hpat]):
+                ['fix_rolling_array', 'hiframes_api', hpat]):
             in_arr = rhs.args[0]
             if isinstance(self.typemap[in_arr.name].dtype, types.Float):
                 assign.value = rhs.args[0]
@@ -140,9 +143,9 @@ class HiFramesTyped(object):
                 def f(column):  # pragma: no cover
                     a = column.astype(np.float64)
                 f_block = compile_to_numba_ir(f,
-                        {'hpat': hpat, 'np': np}, self.typingctx,
-                        (self.typemap[in_arr.name],),
-                        self.typemap, self.calltypes).blocks.popitem()[1]
+                                              {'hpat': hpat, 'np': np}, self.typingctx,
+                                              (self.typemap[in_arr.name],),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [in_arr])
                 nodes = f_block.body[:-3]
                 nodes[-1].target = assign.target
@@ -167,7 +170,7 @@ class HiFramesTyped(object):
                     _out_arr = np.empty(_alloc_size, _in_arr.dtype)
 
             f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (self.typemap[in_arr.name],),
-                                self.typemap, self.calltypes).blocks.popitem()[1]
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_arr])
             nodes = f_block.body[:-3]  # remove none return
             nodes[-1].target = assign.target
@@ -197,9 +200,11 @@ class HiFramesTyped(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
         f_blocks = compile_to_numba_ir(f,
-                {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
-                (self.typemap[str_arr.name], self.typemap[pat.name]),
-                self.typemap, self.calltypes).blocks
+                                       {'numba': numba, 'np': np,
+                                           'hpat': hpat}, self.typingctx,
+                                       (self.typemap[str_arr.name],
+                                        self.typemap[pat.name]),
+                                       self.typemap, self.calltypes).blocks
         replace_arg_nodes(f_blocks[min(f_blocks.keys())], [str_arr, pat])
         # replace call with result of parfor (S)
         # S is target of last statement in 1st block of f
@@ -210,7 +215,7 @@ class HiFramesTyped(object):
         # find df['col2'] = df['col1'][arr]
         # since columns should have the same size, output is filled with NaNs
         # TODO: check for float, make sure col1 and col2 are in the same df
-        if (rhs.op=='getitem'
+        if (rhs.op == 'getitem'
                 and rhs.value.name in self.df_cols
                 and lhs_name in self.df_cols
                 and self.is_bool_arr(rhs.index.name)):
@@ -218,15 +223,16 @@ class HiFramesTyped(object):
             in_arr = rhs.value
             index_var = rhs.index
             f_blocks = compile_to_numba_ir(_column_filter_impl_float,
-                    {'numba': numba, 'np': np}, self.typingctx,
-                    (self.typemap[lhs.name], self.typemap[in_arr.name],
-                    self.typemap[index_var.name]),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np}, self.typingctx,
+                                           (self.typemap[lhs.name], self.typemap[in_arr.name],
+                                               self.typemap[index_var.name]),
+                                           self.typemap, self.calltypes).blocks
             first_block = min(f_blocks.keys())
             replace_arg_nodes(f_blocks[first_block], [lhs, in_arr, index_var])
             alloc_nodes = gen_np_call('empty_like', np.empty_like, lhs, [in_arr],
-                        self.typingctx, self.typemap, self.calltypes)
-            f_blocks[first_block].body = alloc_nodes + f_blocks[first_block].body
+                                      self.typingctx, self.typemap, self.calltypes)
+            f_blocks[first_block].body = alloc_nodes + \
+                f_blocks[first_block].body
             return f_blocks
 
     def _handle_df_col_calls(self, lhs_name, rhs, assign):
@@ -234,9 +240,10 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('count', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_count_impl,
-                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
-                    (self.typemap[in_arr.name],),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np,
+                                               'hpat': hpat}, self.typingctx,
+                                           (self.typemap[in_arr.name],),
+                                           self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
             last_block = topo_order[-1]
@@ -250,10 +257,10 @@ class HiFramesTyped(object):
             in_arr = rhs.args[1]
             val = rhs.args[2]
             f_blocks = compile_to_numba_ir(_column_fillna_impl,
-                    {'numba': numba, 'np': np}, self.typingctx,
-                    (self.typemap[out_arr.name], self.typemap[in_arr.name],
-                    self.typemap[val.name]),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np}, self.typingctx,
+                                           (self.typemap[out_arr.name], self.typemap[in_arr.name],
+                                               self.typemap[val.name]),
+                                           self.typemap, self.calltypes).blocks
             first_block = min(f_blocks.keys())
             replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
             return f_blocks
@@ -261,9 +268,10 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('column_sum', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_sum_impl,
-                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
-                    (self.typemap[in_arr.name],),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np,
+                                               'hpat': hpat}, self.typingctx,
+                                           (self.typemap[in_arr.name],),
+                                           self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
             last_block = topo_order[-1]
@@ -275,9 +283,10 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('mean', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_mean_impl,
-                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
-                    (self.typemap[in_arr.name],),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np,
+                                               'hpat': hpat}, self.typingctx,
+                                           (self.typemap[in_arr.name],),
+                                           self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
             last_block = topo_order[-1]
@@ -289,9 +298,10 @@ class HiFramesTyped(object):
         if guard(find_callname, self.func_ir, rhs) == ('var', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_var_impl,
-                    {'numba': numba, 'np': np, 'hpat': hpat}, self.typingctx,
-                    (self.typemap[in_arr.name],),
-                    self.typemap, self.calltypes).blocks
+                                           {'numba': numba, 'np': np,
+                                               'hpat': hpat}, self.typingctx,
+                                           (self.typemap[in_arr.name],),
+                                           self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
             last_block = topo_order[-1]
@@ -304,9 +314,11 @@ class HiFramesTyped(object):
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
-        return isinstance(typ, types.npytypes.Array) and typ.dtype==types.bool_
+        return isinstance(typ, types.npytypes.Array) and typ.dtype == types.bool_
 
 # float columns can have regular np.nan
+
+
 def _column_filter_impl_float(A, B, ind):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = 0
@@ -315,6 +327,7 @@ def _column_filter_impl_float(A, B, ind):  # pragma: no cover
         else:
             s = np.nan
         A[i] = s
+
 
 def _column_count_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
@@ -326,6 +339,7 @@ def _column_count_impl(A):  # pragma: no cover
 
     res = count
 
+
 def _column_fillna_impl(A, B, fill):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
@@ -333,11 +347,13 @@ def _column_fillna_impl(A, B, fill):  # pragma: no cover
             s = fill
         A[i] = s
 
+
 @numba.njit
 def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
         s = np.nan
     return s
+
 
 def _column_sum_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
@@ -351,13 +367,15 @@ def _column_sum_impl(A):  # pragma: no cover
 
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
 
+
 @numba.njit
 def _mean_handle_nan(s, count):  # pragma: no cover
     if not count:
         s = np.nan
     else:
-        s = s/count
+        s = s / count
     return s
+
 
 def _column_mean_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
@@ -371,13 +389,15 @@ def _column_mean_impl(A):  # pragma: no cover
 
     res = hpat.hiframes_typed._mean_handle_nan(s, count)
 
+
 @numba.njit
 def _var_handle_nan(s, count):  # pragma: no cover
     if count <= 1:
         s = np.nan
     else:
-        s = s/(count-1)
+        s = s / (count - 1)
     return s
+
 
 def _column_var_impl(A):  # pragma: no cover
     count_m = 0
@@ -394,7 +414,7 @@ def _column_var_impl(A):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
         if not np.isnan(val):
-            s += (val-m)**2
+            s += (val - m)**2
             count += 1
 
     res = hpat.hiframes_typed._var_handle_nan(s, count)
