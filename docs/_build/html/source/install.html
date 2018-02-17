@@ -42,11 +42,20 @@
             
   <div class="section" id="installing-hpat">
 <span id="install"></span><h1>Installing HPAT<a class="headerlink" href="#installing-hpat" title="Permalink to this headline">¶</a></h1>
-<p>HPAT can be installed in <a class="reference external" href="https://www.anaconda.com/download/">Anaconda</a> environment easily:</p>
+<p>HPAT can be installed in <a class="reference external" href="https://www.anaconda.com/download/">Anaconda</a> environment
+easily. On Linux/Mac:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">HPAT</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.6</span>
 <span class="n">source</span> <span class="n">activate</span> <span class="n">HPAT</span>
 <span class="n">conda</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">pandas</span>
 <span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span><span class="o">=</span><span class="mf">0.8</span><span class="o">.*</span> <span class="n">mpich</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">hpat</span> <span class="o">-</span><span class="n">c</span> <span class="n">ehsantn</span>
+</pre></div>
+</div>
+<p>On Windows:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">HPAT</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.6</span>
+<span class="n">activate</span> <span class="n">HPAT</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">pandas</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">pyarrow</span><span class="o">=</span><span class="mf">0.7</span><span class="o">.*</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
 <span class="n">conda</span> <span class="n">install</span> <span class="n">hpat</span> <span class="o">-</span><span class="n">c</span> <span class="n">ehsantn</span>
 </pre></div>
 </div>

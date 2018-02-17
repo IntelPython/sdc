@@ -39,7 +39,7 @@ installed separately instead of `mpich`. The rest is the same::
     conda create -n HPAT python=3.6
     activate HPAT
     conda install numpy scipy pandas
-    conda install pyarrow=0.8.* -c conda-forge
+    conda install pyarrow=0.7.* -c conda-forge
     conda install hpat -c ehsantn
 
 Docker Container
