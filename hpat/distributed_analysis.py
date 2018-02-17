@@ -14,6 +14,8 @@ import hpat
 from hpat.utils import get_definitions, is_alloc_call, is_whole_slice
 
 from enum import Enum
+
+
 class Distribution(Enum):
     REP = 1
     Thread = 2
@@ -21,18 +23,21 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
-_dist_analysis_result = namedtuple('dist_analysis_result', 'array_dists,parfor_dists')
+
+_dist_analysis_result = namedtuple(
+    'dist_analysis_result', 'array_dists,parfor_dists')
 
 distributed_analysis_extensions = {}
 
 
 class DistributedAnalysis(object):
     """analyze program for to distributed transfromation"""
+
     def __init__(self, func_ir, typemap, calltypes):
         self.func_ir = func_ir
         self.typemap = typemap
         self.calltypes = calltypes
-        self._call_table,_ = get_call_table(func_ir.blocks)
+        self._call_table, _ = get_call_table(func_ir.blocks)
         self._tuple_table = get_tuple_table(func_ir.blocks)
         self._parallel_accesses = set()
         self._T_arrs = set()
@@ -44,17 +49,19 @@ class DistributedAnalysis(object):
         array_dists = {}
         parfor_dists = {}
         topo_order = find_topo_order(blocks)
-        self._run_analysis(self.func_ir.blocks, topo_order, array_dists, parfor_dists)
+        self._run_analysis(self.func_ir.blocks, topo_order,
+                           array_dists, parfor_dists)
         self.second_pass = True
-        self._run_analysis(self.func_ir.blocks, topo_order, array_dists, parfor_dists)
+        self._run_analysis(self.func_ir.blocks, topo_order,
+                           array_dists, parfor_dists)
 
         return _dist_analysis_result(array_dists=array_dists, parfor_dists=parfor_dists)
 
     def _run_analysis(self, blocks, topo_order, array_dists, parfor_dists):
         save_array_dists = {}
-        save_parfor_dists = {1:1} # dummy value
+        save_parfor_dists = {1: 1}  # dummy value
         # fixed-point iteration
-        while array_dists!=save_array_dists or parfor_dists!=save_parfor_dists:
+        while array_dists != save_array_dists or parfor_dists != save_parfor_dists:
             save_array_dists = copy.copy(array_dists)
             save_parfor_dists = copy.copy(parfor_dists)
             for label in topo_order:
@@ -79,7 +86,7 @@ class DistributedAnalysis(object):
         lhs = inst.target.name
         rhs = inst.value
         # treat return casts like assignments
-        if isinstance(rhs, ir.Expr) and rhs.op=='cast':
+        if isinstance(rhs, ir.Expr) and rhs.op == 'cast':
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and self._isarray(lhs):
@@ -100,8 +107,8 @@ class DistributedAnalysis(object):
             # parallel arrays can be packed and unpacked from tuples
             # e.g. boolean array index in test_getitem_multidim
             return
-        elif (isinstance(rhs, ir.Expr) and rhs.op=='getattr' and rhs.attr=='T'
-                    and self._isarray(lhs)):
+        elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr' and rhs.attr == 'T'
+              and self._isarray(lhs)):
             # array and its transpose have same distributions
             arr = rhs.value.name
             self._meet_array_dists(lhs, arr, array_dists)
@@ -110,9 +117,9 @@ class DistributedAnalysis(object):
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
-                                            'itemsize','astype', 'reshape']):
-            pass # X.shape doesn't affect X distribution
-        elif isinstance(rhs, ir.Expr) and rhs.op=='call':
+                                 'itemsize', 'astype', 'reshape']):
+            pass  # X.shape doesn't affect X distribution
+        elif isinstance(rhs, ir.Expr) and rhs.op == 'call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
         else:
             self._set_REP(inst.list_vars(), array_dists)
@@ -128,27 +135,28 @@ class DistributedAnalysis(object):
         if self.in_parallel_parfor != -1:
             out_dist = Distribution.REP
 
-        parfor_arrs = set() # arrays this parfor accesses in parallel
+        parfor_arrs = set()  # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
         stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
-        for (arr,index) in array_accesses:
-            if index==par_index_var or index in stencil_accesses:
+        for (arr, index) in array_accesses:
+            if index == par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
-                self._parallel_accesses.add((arr,index))
+                self._parallel_accesses.add((arr, index))
             if index in self._tuple_table:
                 index_tuple = [(var.name if isinstance(var, ir.Var) else var)
-                    for var in self._tuple_table[index]]
-                if index_tuple[0]==par_index_var:
+                               for var in self._tuple_table[index]]
+                if index_tuple[0] == par_index_var:
                     parfor_arrs.add(arr)
-                    self._parallel_accesses.add((arr,index))
+                    self._parallel_accesses.add((arr, index))
                 if par_index_var in index_tuple[1:]:
                     out_dist = Distribution.REP
             # TODO: check for index dependency
 
         for arr in parfor_arrs:
             if arr in array_dists:
-                out_dist = Distribution(min(out_dist.value, array_dists[arr].value))
+                out_dist = Distribution(
+                    min(out_dist.value, array_dists[arr].value))
         parfor_dists[parfor.id] = out_dist
         for arr in parfor_arrs:
             if arr in array_dists:
@@ -161,7 +169,7 @@ class DistributedAnalysis(object):
 
         # run analysis recursively on parfor body
         if self.second_pass and out_dist in [Distribution.OneD,
-                                                Distribution.OneD_Var]:
+                                             Distribution.OneD_Var]:
             self.in_parallel_parfor = parfor.id
         blocks = wrap_parfor_blocks(parfor)
         for b in blocks.values():
@@ -189,7 +197,7 @@ class DistributedAnalysis(object):
         if call_list == ['astype'] or call_list == ['reshape']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                                        and self._isarray(call_def.value.name)):
+                    and self._isarray(call_def.value.name)):
                 in_arr_name = call_def.value.name
                 self._meet_array_dists(lhs, in_arr_name, array_dists)
                 return
@@ -199,7 +207,7 @@ class DistributedAnalysis(object):
             return
 
         if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
-                or self._is_call(func_var, ['h5write', hpat.pio_api])):
+                                      or self._is_call(func_var, ['h5write', hpat.pio_api])):
             return
 
         if call_list == ['quantile', 'hiframes_api', hpat]:
@@ -209,18 +217,18 @@ class DistributedAnalysis(object):
         if hpat.config._has_ros and call_list == ['read_ros_images_inner', 'ros', hpat]:
             return
 
-        if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet]:
+        if hpat.config._has_pyarrow and call_list == [hpat.parquet_pio.read_parquet]:
             return
 
-        if hpat.config._has_pyarrow and call_list==[hpat.parquet_pio.read_parquet_str]:
+        if hpat.config._has_pyarrow and call_list == [hpat.parquet_pio.read_parquet_str]:
             # string read creates array in output
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if (len(call_list)==2 and call_list[1]==np
+        if (len(call_list) == 2 and call_list[1] == np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
-                    'zeros_like', 'ones_like', 'full_like', 'copy']):
+                                     'zeros_like', 'ones_like', 'full_like', 'copy']):
             in_arr = args[0].name
             self._meet_array_dists(lhs, in_arr, array_dists)
             return
@@ -233,7 +241,8 @@ class DistributedAnalysis(object):
             # input arrays have same distribution
             in_dist = Distribution.OneD
             for v in in_arrs:
-                in_dist = Distribution(min(in_dist.value, array_dists[v.name].value))
+                in_dist = Distribution(
+                    min(in_dist.value, array_dists[v.name].value))
             # OneD_Var since sum of block sizes might not be exactly 1D
             out_dist = Distribution.OneD_Var
             out_dist = Distribution(min(out_dist.value, in_dist.value))
@@ -262,14 +271,14 @@ class DistributedAnalysis(object):
             # Fortran layout is caused by X.T and means transpose
             t0 = arg0 in self._T_arrs
             t1 = arg1 in self._T_arrs
-            if ndim0==1 and ndim1==1:
+            if ndim0 == 1 and ndim1 == 1:
                 # vector dot, both vectors should have same layout
                 new_dist = Distribution(min(array_dists[arg0].value,
-                                                    array_dists[arg1].value))
+                                            array_dists[arg1].value))
                 array_dists[arg0] = new_dist
                 array_dists[arg1] = new_dist
                 return
-            if ndim0==2 and ndim1==1 and not t0:
+            if ndim0 == 2 and ndim1 == 1 and not t0:
                 # special case were arg1 vector is treated as column vector
                 # samples dot weights: np.dot(X,w)
                 # w is always REP
@@ -280,7 +289,7 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, arg0, array_dists)
                 dprint("dot case 1 Xw:", arg0, arg1)
                 return
-            if ndim0==1 and ndim1==2 and not t1:
+            if ndim0 == 1 and ndim1 == 2 and not t1:
                 # reduction across samples np.dot(Y,X)
                 # lhs is always REP
                 array_dists[lhs] = Distribution.REP
@@ -288,7 +297,7 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(arg0, arg1, array_dists)
                 dprint("dot case 2 YX:", arg0, arg1)
                 return
-            if ndim0==2 and ndim1==2 and t0 and not t1:
+            if ndim0 == 2 and ndim1 == 2 and t0 and not t1:
                 # reduction across samples np.dot(X.T,Y)
                 # lhs is always REP
                 array_dists[lhs] = Distribution.REP
@@ -296,7 +305,7 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(arg0, arg1, array_dists)
                 dprint("dot case 3 XtY:", arg0, arg1)
                 return
-            if ndim0==2 and ndim1==2 and not t0 and not t1:
+            if ndim0 == 2 and ndim1 == 2 and not t0 and not t1:
                 # samples dot weights: np.dot(X,w)
                 # w is always REP
                 array_dists[arg1] = Distribution.REP
@@ -307,7 +316,8 @@ class DistributedAnalysis(object):
         if call_list == ['train']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
-                self._meet_array_dists(args[0].name, args[1].name, array_dists, Distribution.Thread)
+                self._meet_array_dists(
+                    args[0].name, args[1].name, array_dists, Distribution.Thread)
                 return
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(args[0].name, args[1].name, array_dists)
@@ -316,7 +326,8 @@ class DistributedAnalysis(object):
         if call_list == ['predict']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
-                self._meet_array_dists(lhs, args[0].name, array_dists, Distribution.Thread)
+                self._meet_array_dists(
+                    lhs, args[0].name, array_dists, Distribution.Thread)
                 return
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(lhs, args[0].name, array_dists)
@@ -366,12 +377,12 @@ class DistributedAnalysis(object):
 
         # array selection with boolean index
         if (is_array(index_var.name, self.typemap)
-                    and self.typemap[index_var.name].dtype == types.boolean):
+                and self.typemap[index_var.name].dtype == types.boolean):
             # input array and bool index have the same distribution
             new_dist = self._meet_array_dists(index_var.name, rhs.value.name,
-                                                                    array_dists)
+                                              array_dists)
             array_dists[lhs] = Distribution(min(Distribution.OneD_Var.value,
-                                                                new_dist.value))
+                                                new_dist.value))
             return
 
         if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
@@ -400,7 +411,8 @@ class DistributedAnalysis(object):
 
         if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
             # for example: X[:,3] = A
-            self._meet_array_dists(inst.target.name, inst.value.name, array_dists)
+            self._meet_array_dists(
+                inst.target.name, inst.value.name, array_dists)
             return
 
         self._set_REP([inst.value], array_dists)
@@ -414,7 +426,7 @@ class DistributedAnalysis(object):
             array_dists[arr2] = top_dist
 
         new_dist = Distribution(min(array_dists[arr1].value,
-                                            array_dists[arr2].value))
+                                    array_dists[arr2].value))
         new_dist = Distribution(min(new_dist.value, top_dist.value))
         array_dists[arr1] = new_dist
         array_dists[arr2] = new_dist
@@ -429,18 +441,19 @@ class DistributedAnalysis(object):
 
     def _isarray(self, varname):
         return (varname in self.typemap
-            and isinstance(self.typemap[varname], numba.types.npytypes.Array))
+                and isinstance(self.typemap[varname], numba.types.npytypes.Array))
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
             return False
-        return self._call_table[func_var]==call_list
+        return self._call_table[func_var] == call_list
 
 
 def is_array(varname, typemap):
-    #return True
+    # return True
     return (varname in typemap
-        and isinstance(typemap[varname], numba.types.npytypes.Array))
+            and isinstance(typemap[varname], numba.types.npytypes.Array))
+
 
 def get_stencil_accesses(parfor, typemap):
     # if a parfor has stencil pattern, see which accesses depend on loop index
@@ -473,6 +486,7 @@ def get_stencil_accesses(parfor, typemap):
 
     return stencil_accesses, neighborhood
 
+
 def vars_dependent(defs, var1, var2):
     # see if var1 depends on var2 based on definitions in defs
     if len(defs[var1.name]) != 1:
@@ -487,6 +501,7 @@ def vars_dependent(defs, var1, var2):
                 return True
     return False
 
+
 def dprint(*s):
-    if numba.config.DEBUG_ARRAY_OPT==1:
+    if numba.config.DEBUG_ARRAY_OPT == 1:
         print(*s)
