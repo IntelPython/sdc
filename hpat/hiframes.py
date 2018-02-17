@@ -20,8 +20,9 @@ from hpat.parquet_pio import ParquetHandler
 
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
-                                                'quantile', 'count', 'describe']
+                'quantile', 'count', 'describe']
 LARGE_WIN_SIZE = 10
+
 
 def remove_hiframes(rhs, lives, call_list):
     # used in stencil generation of rolling
@@ -29,7 +30,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     # used in stencil generation of rolling
     if (len(call_list) == 1 and isinstance(call_list[0],
-            numba.targets.registry.CPUDispatcher)
+                                           numba.targets.registry.CPUDispatcher)
             and call_list[0].py_func == numba.stencilparfor._compute_last_ind):
         return True
     # used in stencil generation of rolling
@@ -40,14 +41,17 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
             call_list[0]
-                in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
+            in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
         return True
     return False
 
+
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
+
 
 class HiFrames(object):
     """analyze and transform hiframes calls"""
+
     def __init__(self, func_ir, typingctx, args, _locals):
         self.func_ir = func_ir
         self.typingctx = typingctx
@@ -64,7 +68,8 @@ class HiFrames(object):
         self.df_cols = set()
         self.arrow_tables = {}
         self.reverse_copies = {}
-        self.pq_handler = ParquetHandler(func_ir, typingctx, args, _locals, self.reverse_copies)
+        self.pq_handler = ParquetHandler(
+            func_ir, typingctx, args, _locals, self.reverse_copies)
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
@@ -83,7 +88,8 @@ class HiFrames(object):
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
-                        label = include_new_blocks(self.func_ir.blocks, out_nodes, label, new_body)
+                        label = include_new_blocks(
+                            self.func_ir.blocks, out_nodes, label, new_body)
                         new_body = []
                 else:
                     new_body.append(inst)
@@ -93,7 +99,7 @@ class HiFrames(object):
         self.func_ir.df_cols = self.df_cols
         #remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
-        if numba.config.DEBUG_ARRAY_OPT==1:  # pragma: no cover
+        if numba.config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
             print("df_vars: ", self.df_vars)
         return
 
@@ -102,7 +108,7 @@ class HiFrames(object):
         rhs = assign.value
 
         if isinstance(rhs, ir.Expr):
-            if rhs.op=='call':
+            if rhs.op == 'call':
                 res = self._handle_pd_DataFrame(assign.target, rhs)
                 if res is not None:
                     return res
@@ -133,7 +139,7 @@ class HiFrames(object):
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
-                                            and isinstance(rhs.index, str)):
+                    and isinstance(rhs.index, str)):
                 df = rhs.value.name
                 assign.value = self.df_vars[df][rhs.index]
                 self.df_cols.add(lhs)  # save lhs as column
@@ -146,13 +152,13 @@ class HiFrames(object):
                 self.df_vars[lhs] = {}
                 for col, _ in self.df_vars[rhs.value.name].items():
                     self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
-                                                                            loc)
+                                                    loc)
                 self._update_df_cols()
                 return [hiframes_filter.Filter(lhs, rhs.value.name, rhs.index,
-                                                        self.df_vars, rhs.loc)]
+                                               self.df_vars, rhs.loc)]
 
             # df.loc or df.iloc
-            if rhs.op=='getattr' and rhs.value.name in self.df_vars and rhs.attr in ['loc', 'iloc']:
+            if rhs.op == 'getattr' and rhs.value.name in self.df_vars and rhs.attr in ['loc', 'iloc']:
                 # FIXME: treat iloc and loc as regular df variables so getitem
                 # turns them into filter. Only boolean array is supported
                 self.df_vars[lhs] = self.df_vars[rhs.value.name]
@@ -162,7 +168,7 @@ class HiFrames(object):
             #     self.col_filters.add(assign)
 
             # d = df.column
-            if rhs.op=='getattr' and rhs.value.name in self.df_vars:
+            if rhs.op == 'getattr' and rhs.value.name in self.df_vars:
                 df = rhs.value.name
                 df_cols = self.df_vars[df]
                 assert rhs.attr in df_cols
@@ -170,8 +176,8 @@ class HiFrames(object):
                 self.df_cols.add(lhs)  # save lhs as column
 
             # c = df.column.values
-            if (rhs.op=='getattr' and rhs.value.name in self.df_cols and
-                        rhs.attr == 'values'):
+            if (rhs.op == 'getattr' and rhs.value.name in self.df_cols and
+                    rhs.attr == 'values'):
                 # simply return the column
                 # output is array so it's not added to df_cols
                 assign.value = rhs.value
@@ -195,10 +201,12 @@ class HiFrames(object):
     def _handle_pd_DataFrame(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('DataFrame', 'pandas'):
             if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError("Invalid DataFrame() arguments (one expected)")
+                raise ValueError(
+                    "Invalid DataFrame() arguments (one expected)")
             arg_def = guard(get_definition, self.func_ir, rhs.args[0])
             if not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map':  # pragma: no cover
-                raise ValueError("Invalid DataFrame() arguments (map expected)")
+                raise ValueError(
+                    "Invalid DataFrame() arguments (map expected)")
             out, items = self._fix_df_arrays(arg_def.items)
             self.df_vars[lhs.name] = self._process_df_build_map(items)
             self._update_df_cols()
@@ -208,7 +216,7 @@ class HiFrames(object):
 
     def _handle_pq_table(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('read_table',
-                                                        'pyarrow.parquet'):
+                                                       'pyarrow.parquet'):
             if len(rhs.args) != 1:  # pragma: no cover
                 raise ValueError("Invalid read_table() arguments")
             self.arrow_tables[lhs.name] = rhs.args[0]
@@ -225,7 +233,7 @@ class HiFrames(object):
                 and func_def.attr == 'to_pandas'):
 
             col_items, nodes = self.pq_handler.gen_parquet_read(
-                            self.arrow_tables[func_def.value.name], lhs)
+                self.arrow_tables[func_def.value.name], lhs)
             self.df_vars[lhs.name] = self._process_df_build_map(col_items)
             self._update_df_cols()
             return nodes
@@ -233,7 +241,7 @@ class HiFrames(object):
 
     def _handle_merge(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('merge',
-                                                        'pandas'):
+                                                       'pandas'):
             if len(rhs.args) < 2:
                 raise ValueError("left and right arguments required for merge")
             left_df = rhs.args[0]
@@ -255,20 +263,23 @@ class HiFrames(object):
             self.df_vars[lhs.name] = {}
             # add columns from left to output
             for col, _ in self.df_vars[left_df.name].items():
-                self.df_vars[lhs.name][col] = ir.Var(scope, mk_unique_var(col), loc)
+                self.df_vars[lhs.name][col] = ir.Var(
+                    scope, mk_unique_var(col), loc)
             # add columns from right to output
             for col, _ in self.df_vars[right_df.name].items():
-                self.df_vars[lhs.name][col] = ir.Var(scope, mk_unique_var(col), loc)
+                self.df_vars[lhs.name][col] = ir.Var(
+                    scope, mk_unique_var(col), loc)
             self._update_df_cols()
             return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
-                                    left_on, right_on, self.df_vars, lhs.loc)]
+                                       left_on, right_on, self.df_vars, lhs.loc)]
         return None
 
     def _handle_concat(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('concat',
-                                                        'pandas'):
+                                                       'pandas'):
             if len(rhs.args) != 1 or len(rhs.kws) != 0:
-                raise ValueError("only a list/tuple argument is supported in concat")
+                raise ValueError(
+                    "only a list/tuple argument is supported in concat")
             df_list = guard(get_definition, self.func_ir, rhs.args[0])
             assert isinstance(df_list, ir.Expr) and df_list.op == 'build_list'
 
@@ -276,15 +287,15 @@ class HiFrames(object):
             done_cols = {}
             i = 0
             for df in df_list.items:
-                for (c,v) in self.df_vars[df.name].items():
+                for (c, v) in self.df_vars[df.name].items():
                     if c in done_cols:
                         continue
                     # arguments to the generated function
                     args = [v]
                     # names of arguments to the generated function
-                    arg_names = ['_hpat_c'+str(i)]
+                    arg_names = ['_hpat_c' + str(i)]
                     # arguments to the concatenate function
-                    conc_arg_names = ['_hpat_c'+str(i)]
+                    conc_arg_names = ['_hpat_c' + str(i)]
                     allocs = ""
                     i += 1
                     for other_df in df_list.items:
@@ -292,31 +303,34 @@ class HiFrames(object):
                             continue
                         if c in self.df_vars[other_df.name]:
                             args.append(self.df_vars[other_df.name][c])
-                            arg_names.append('_hpat_c'+str(i))
-                            conc_arg_names.append('_hpat_c'+str(i))
+                            arg_names.append('_hpat_c' + str(i))
+                            conc_arg_names.append('_hpat_c' + str(i))
                             i += 1
                         else:
                             # use a df column for length
-                            len_arg = list(self.df_vars[other_df.name].values())[0]
-                            len_name = '_hpat_len'+str(i)
+                            len_arg = list(
+                                self.df_vars[other_df.name].values())[0]
+                            len_name = '_hpat_len' + str(i)
                             args.append(len_arg)
                             arg_names.append(len_name)
                             i += 1
-                            out_name = '_hpat_out'+str(i)
+                            out_name = '_hpat_out' + str(i)
                             conc_arg_names.append(out_name)
                             i += 1
                             # TODO: fix type
-                            allocs += "    {} = np.full(len({}), np.nan)\n".format(out_name, len_name)
+                            allocs += "    {} = np.full(len({}), np.nan)\n".format(
+                                out_name, len_name)
 
                     func_text = "def f({}):\n".format(",".join(arg_names))
                     func_text += allocs
-                    func_text += "    s = np.concatenate(({}))\n".format(",".join(conc_arg_names))
+                    func_text += "    s = np.concatenate(({}))\n".format(
+                        ",".join(conc_arg_names))
                     loc_vars = {}
                     exec(func_text, {}, loc_vars)
                     f = loc_vars['f']
 
                     f_block = compile_to_numba_ir(f,
-                            {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                                                  {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                     replace_arg_nodes(f_block, args)
                     nodes += f_block.body[:-3]
                     done_cols[c] = nodes[-1].target
@@ -324,10 +338,9 @@ class HiFrames(object):
             self._update_df_cols()
             return nodes
 
-
     def _handle_ros(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('read_ros_images',
-                                                        'hpat.ros'):
+                                                       'hpat.ros'):
             if len(rhs.args) != 1:  # pragma: no cover
                 raise ValueError("Invalid read_ros_images() arguments")
             import hpat.ros
@@ -340,9 +353,11 @@ class HiFrames(object):
         for item in items_list:
             col_varname = item[0]
             col_arr = item[1]
+
             def f(arr):  # pragma: no cover
                 df_arr = hpat.hiframes_api.fix_df_array(arr)
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [col_arr])
             nodes += f_block.body[:-3]  # remove none return
             new_col_arr = nodes[-1].target
@@ -358,7 +373,8 @@ class HiFrames(object):
             else:
                 col_name = get_constant(self.func_ir, col_var)
                 if col_name is NOT_CONSTANT:  # pragma: no cover
-                    raise ValueError("data frame column names should be constant")
+                    raise ValueError(
+                        "data frame column names should be constant")
             df_cols[col_name] = item[1]
         return df_cols
 
@@ -410,9 +426,9 @@ class HiFrames(object):
                 window = kws['window']
             else:  # pragma: no cover
                 raise ValueError("window argument to rolling() required")
-            window =  get_constant(self.func_ir, window, window)
+            window = get_constant(self.func_ir, window, window)
             if 'center' in kws:
-                center =  get_constant(self.func_ir, kws['center'], center)
+                center = get_constant(self.func_ir, kws['center'], center)
             self.rolling_calls[lhs.name] = [func_def.value, window, center]
             return []  # remove
         return None
@@ -431,10 +447,10 @@ class HiFrames(object):
         # df.column.rolling(3).sum()
         if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
                 and func_def.value.name in self.rolling_calls):
-            func_name =  func_def.attr
+            func_name = func_def.attr
             self.df_cols.add(lhs.name)  # output is Series
             return self._gen_rolling_call(rhs.args,
-                *self.rolling_calls[func_def.value.name]+[func_name, lhs])
+                                          *self.rolling_calls[func_def.value.name] + [func_name, lhs])
         return None
 
     def _handle_str_contains(self, lhs, rhs):
@@ -482,7 +498,7 @@ class HiFrames(object):
 
     def _gen_column_call(self, out_var, args, col_var, func, kws):
         if func in ['fillna', 'pct_change', 'shift']:
-            self.df_cols.add(out_var.name) # output is Series except sum
+            self.df_cols.add(out_var.name)  # output is Series except sum
         if func == 'count':
             return self._gen_col_count(out_var, args, col_var)
         if func == 'fillna':
@@ -511,7 +527,7 @@ class HiFrames(object):
                 shift_const = get_constant(self.func_ir, args[0])
                 assert shift_const is not NOT_CONSTANT
             func_text = 'def g(a):\n  return (a[0]-a[{}])/a[{}]\n'.format(
-                                                    -shift_const, -shift_const)
+                -shift_const, -shift_const)
         else:
             assert func == 'shift'
             shift_const = get_constant(self.func_ir, args[0])
@@ -524,7 +540,8 @@ class HiFrames(object):
 
         index_offsets = [0]
         fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func, index_offsets, fir_globals)
+        stencil_nodes = gen_stencil_call(
+            col_var, out_var, kernel_func, index_offsets, fir_globals)
 
         border_text = 'def f(A):\n  A[0:{}] = np.nan\n'.format(shift_const)
         loc_vars = {}
@@ -536,7 +553,7 @@ class HiFrames(object):
         replace_arg_nodes(block, [out_var])
         setitem_nodes = block.body[:-3]  # remove none return
 
-        return stencil_nodes+setitem_nodes
+        return stencil_nodes + setitem_nodes
 
     def _gen_col_count(self, out_var, args, col_var):
         def f(A):  # pragma: no cover
@@ -552,7 +569,7 @@ class HiFrames(object):
         inplace = False
         if 'inplace' in kws:
             inplace = get_constant(self.func_ir, kws['inplace'])
-            if inplace==NOT_CONSTANT:  # pragma: no cover
+            if inplace == NOT_CONSTANT:  # pragma: no cover
                 raise ValueError("inplace arg to fillna should be constant")
 
         if inplace:
@@ -562,6 +579,7 @@ class HiFrames(object):
             alloc_nodes = gen_empty_like(col_var, out_var)
 
         val = args[0]
+
         def f(A, B, fill):  # pragma: no cover
             hpat.hiframes_api.fillna(A, B, fill)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
@@ -635,16 +653,17 @@ class HiFrames(object):
             q25 = hpat.hiframes_api.quantile(A, .25)
             q50 = hpat.hiframes_api.quantile(A, .5)
             q75 = hpat.hiframes_api.quantile(A, .75)
-            s = "count    "+str(a_count)+"\n"\
-                "mean     "+str(a_mean)+"\n"\
-                "std      "+str(a_std)+"\n"\
-                "min      "+str(a_min)+"\n"\
-                "25%      "+str(q25)+"\n"\
-                "50%      "+str(q50)+"\n"\
-                "75%      "+str(q75)+"\n"\
-                "max      "+str(a_max)+"\n"
+            s = "count    " + str(a_count) + "\n"\
+                "mean     " + str(a_mean) + "\n"\
+                "std      " + str(a_std) + "\n"\
+                "min      " + str(a_min) + "\n"\
+                "25%      " + str(q25) + "\n"\
+                "50%      " + str(q50) + "\n"\
+                "75%      " + str(q75) + "\n"\
+                "max      " + str(a_max) + "\n"
 
-        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = out_var
@@ -660,16 +679,19 @@ class HiFrames(object):
         elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
             if len(args) != 0:  # pragma: no cover
                 raise ValueError("No argument expected for rolling {}".format(
-                                                                        func))
+                    func))
             g_pack = "np"
             if func in ['std', 'var', 'mean']:
                 g_pack = "hpat.hiframes_api"
             if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
                 # unroll if size is less than 5
-                kernel_args = ','.join(['a[{}]'.format(-i) for i in range(win_size)])
-                kernel_expr = '{}.{}(np.array([{}]))'.format(g_pack, func, kernel_args)
+                kernel_args = ','.join(['a[{}]'.format(-i)
+                                        for i in range(win_size)])
+                kernel_expr = '{}.{}(np.array([{}]))'.format(
+                    g_pack, func, kernel_args)
                 if func == 'sum':  # simplify sum
-                    kernel_expr = '+'.join(['a[{}]'.format(-i) for i in range(win_size)])
+                    kernel_expr = '+'.join(['a[{}]'.format(-i)
+                                            for i in range(win_size)])
             else:
                 kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
             func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
@@ -683,11 +705,11 @@ class HiFrames(object):
         if isinstance(win_size, int):
             win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
             init_nodes.append(
-                        ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
+                ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
             win_size = win_size_var
 
         index_offsets, win_tuple, option_nodes = self._gen_rolling_init(win_size,
-                                                                func, center)
+                                                                        func, center)
 
         init_nodes += option_nodes
         other_args = [win_size]
@@ -696,21 +718,21 @@ class HiFrames(object):
         options = {'neighborhood': win_tuple}
         fir_globals = self.func_ir.func_id.func.__globals__
         stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func,
-                                    index_offsets, fir_globals, other_args, options)
-
+                                         index_offsets, fir_globals, other_args, options)
 
         def f(A, w):  # pragma: no cover
-            A[0:w-1] = np.nan
+            A[0:w - 1] = np.nan
         f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [out_var, win_size])
         setitem_nodes = f_block.body[:-3]  # remove none return
 
         if center:
             def f1(A, w):  # pragma: no cover
-                A[0:w//2] = np.nan
+                A[0:w // 2] = np.nan
+
             def f2(A, w):  # pragma: no cover
                 n = len(A)
-                A[n-(w//2):n] = np.nan
+                A[n - (w // 2):n] = np.nan
             f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [out_var, win_size])
             setitem_nodes1 = f_block.body[:-3]  # remove none return
@@ -734,7 +756,6 @@ class HiFrames(object):
         new_col_var = nodes[-1].target
         return new_col_var, nodes
 
-
     def _gen_rolling_init(self, win_size, func, center):
         nodes = []
         right_length = 0
@@ -744,7 +765,7 @@ class HiFrames(object):
         nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
 
         def f(w):  # pragma: no cover
-            return -w+1
+            return -w + 1
         f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [win_size])
         nodes.extend(f_block.body[:-2])  # remove none return
@@ -752,18 +773,18 @@ class HiFrames(object):
 
         if center:
             def f(w):  # pragma: no cover
-                return -(w//2)
+                return -(w // 2)
             f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [win_size])
             nodes.extend(f_block.body[:-2])  # remove none return
             left_length = nodes[-1].target
+
             def f(w):  # pragma: no cover
-                return (w//2)
+                return (w // 2)
             f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [win_size])
             nodes.extend(f_block.body[:-2])  # remove none return
             right_length = nodes[-1].target
-
 
         def f(a, b):  # pragma: no cover
             return ((a, b),)
@@ -786,6 +807,7 @@ class HiFrames(object):
 
         return index_offsets, win_tuple, nodes
 
+
 def gen_empty_like(in_arr, out_arr):
     scope = in_arr.scope
     loc = in_arr.loc
@@ -802,8 +824,9 @@ def gen_empty_like(in_arr, out_arr):
     alloc_assign = ir.Assign(alloc_call, out_arr, loc)
     return [g_np_assign, attr_assign, alloc_assign]
 
+
 def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
-                                                other_args=None, options=None):
+                     other_args=None, options=None):
     if other_args is None:
         other_args = []
     if options is None:
@@ -818,7 +841,7 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
     kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
     if not isinstance(kernel_func, ir.Expr):
         kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
-                    kernel_func.__closure__, kernel_func.__defaults__, loc)
+                                            kernel_func.__closure__, kernel_func.__defaults__, loc)
     stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
 
     def f(A, B, f):  # pragma: no cover
@@ -839,16 +862,17 @@ def remove_none_return_from_block(last_block):
     assert isinstance(last_block.body[-1], ir.Return)
     last_block.body.pop()
     assert (isinstance(last_block.body[-1], ir.Assign)
-        and isinstance(last_block.body[-1].value, ir.Expr)
-        and last_block.body[-1].value.op == 'cast')
+            and isinstance(last_block.body[-1].value, ir.Expr)
+            and last_block.body[-1].value.op == 'cast')
     last_block.body.pop()
     assert (isinstance(last_block.body[-1], ir.Assign)
-        and isinstance(last_block.body[-1].value, ir.Const)
-        and last_block.body[-1].value.value == None)
+            and isinstance(last_block.body[-1].value, ir.Const)
+            and last_block.body[-1].value.value == None)
     last_block.body.pop()
 
+
 def include_new_blocks(blocks, new_blocks, label, new_body):
-    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label+1)
+    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
     blocks.update(inner_blocks)
     ir_utils._max_label = max(blocks.keys())
     scope = blocks[label].scope
@@ -862,5 +886,5 @@ def include_new_blocks(blocks, new_blocks, label, new_body):
     label = ir_utils.next_label()
     blocks[label] = ir.Block(scope, loc)
     inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
-    #new_body.clear()
+    # new_body.clear()
     return label
