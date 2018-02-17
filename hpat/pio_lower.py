@@ -28,6 +28,7 @@ if h5py.version.hdf5_version_tuple[1] == 8:
 else:
     assert h5py.version.hdf5_version_tuple[1] == 10
 
+
 @lower_builtin(h5py.File, StringType, StringType, types.int64)
 def h5_open(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -35,9 +36,11 @@ def h5_open(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
     val1 = builder.call(fn, [args[0]])
     val2 = builder.call(fn, [args[1]])
-    fnty = lir.FunctionType(h5file_lir_type, [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fnty = lir.FunctionType(h5file_lir_type, [lir.IntType(
+        8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
     return builder.call(fn, [val1, val2, args[2]])
+
 
 @lower_builtin(pio_api.h5size, h5file_type, StringType, types.int32)
 def h5_size(context, builder, sig, args):
@@ -45,13 +48,15 @@ def h5_size(context, builder, sig, args):
                             [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
     val2 = builder.call(fn, [args[1]])
-    fnty = lir.FunctionType(lir.IntType(64), [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32)])
+    fnty = lir.FunctionType(lir.IntType(
+        64), [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_size")
     return builder.call(fn, [args[0], val2, args[2]])
 
+
 @lower_builtin(pio_api.h5read, h5file_type, StringType, types.int32,
-    types.containers.UniTuple, types.containers.UniTuple, types.int64,
-    types.npytypes.Array)
+               types.containers.UniTuple, types.containers.UniTuple, types.int64,
+               types.npytypes.Array)
 def h5_read(context, builder, sig, args):
     # insert the dset_name string arg
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -60,8 +65,8 @@ def h5_read(context, builder, sig, args):
     val2 = builder.call(fn, [args[1]])
     # extra last arg type for type enum
     arg_typs = [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32),
-        lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
-        lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
+                lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
+                lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
 
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_read")
@@ -73,14 +78,17 @@ def h5_read(context, builder, sig, args):
     builder.store(args[4], size_ptr)
     # store an int to specify data type
     typ_enum = _h5_typ_table[sig.args[6].dtype]
-    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    typ_arg = cgutils.alloca_once_value(
+        builder, lir.Constant(lir.IntType(32), typ_enum))
     call_args = [args[0], val2, args[2],
-        builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
-        builder.bitcast(size_ptr, lir.IntType(64).as_pointer()), args[5],
-        builder.bitcast(out.data, lir.IntType(8).as_pointer()),
-        builder.load(typ_arg)]
+                 builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
+                 builder.bitcast(size_ptr, lir.IntType(
+                     64).as_pointer()), args[5],
+                 builder.bitcast(out.data, lir.IntType(8).as_pointer()),
+                 builder.load(typ_arg)]
 
     return builder.call(fn, call_args)
+
 
 @lower_builtin(pio_api.h5close, h5file_type)
 def h5_close(context, builder, sig, args):
@@ -88,8 +96,9 @@ def h5_close(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_close")
     return builder.call(fn, args)
 
+
 @lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
-    types.containers.UniTuple, StringType)
+               types.containers.UniTuple, StringType)
 def h5_create_dset(context, builder, sig, args):
     # insert the dset_name string arg
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -99,11 +108,12 @@ def h5_create_dset(context, builder, sig, args):
 
     # extra last arg type for type enum
     arg_typs = [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32),
-        lir.IntType(64).as_pointer(),
-        lir.IntType(32)]
+                lir.IntType(64).as_pointer(),
+                lir.IntType(32)]
     fnty = lir.FunctionType(h5file_lir_type, arg_typs)
 
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_create_dset")
+    fn = builder.module.get_or_insert_function(
+        fnty, name="hpat_h5_create_dset")
 
     ndims = sig.args[2].count
     ndims_arg = lir.Constant(lir.IntType(32), ndims)
@@ -113,14 +123,16 @@ def h5_create_dset(context, builder, sig, args):
     builder.store(args[2], count_ptr)
 
     t_fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(8).as_pointer()])
-    t_fn = builder.module.get_or_insert_function(t_fnty, name="hpat_h5_get_type_enum")
+    t_fn = builder.module.get_or_insert_function(
+        t_fnty, name="hpat_h5_get_type_enum")
     typ_arg = builder.call(t_fn, [args[3]])
 
     call_args = [args[0], val2, ndims_arg,
-        builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
-        typ_arg]
+                 builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
+                 typ_arg]
 
     return builder.call(fn, call_args)
+
 
 @lower_builtin(pio_api.h5create_group, h5file_type, StringType)
 def h5_create_group(context, builder, sig, args):
@@ -131,9 +143,10 @@ def h5_create_group(context, builder, sig, args):
     val2 = builder.call(fn, [args[1]])
 
     fnty = lir.FunctionType(h5file_lir_type,
-                                [h5file_lir_type, lir.IntType(8).as_pointer()])
+                            [h5file_lir_type, lir.IntType(8).as_pointer()])
 
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_create_group")
+    fn = builder.module.get_or_insert_function(
+        fnty, name="hpat_h5_create_group")
     return builder.call(fn, [args[0], val2])
 
 # _h5_str_typ_table = {
@@ -145,14 +158,15 @@ def h5_create_group(context, builder, sig, args):
 #     'f8':5
 #     }
 
+
 @lower_builtin(pio_api.h5write, h5file_type, h5file_type, types.int32,
-        types.containers.UniTuple, types.containers.UniTuple, types.int64,
-        types.npytypes.Array)
+               types.containers.UniTuple, types.containers.UniTuple, types.int64,
+               types.npytypes.Array)
 def h5_write(context, builder, sig, args):
     # extra last arg type for type enum
     arg_typs = [h5file_lir_type, h5file_lir_type, lir.IntType(32),
-        lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
-        lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
+                lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
+                lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
 
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_write")
@@ -164,14 +178,17 @@ def h5_write(context, builder, sig, args):
     builder.store(args[4], size_ptr)
     # store an int to specify data type
     typ_enum = _h5_typ_table[sig.args[6].dtype]
-    typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32), typ_enum))
+    typ_arg = cgutils.alloca_once_value(
+        builder, lir.Constant(lir.IntType(32), typ_enum))
     call_args = [args[0], args[1], args[2],
-        builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
-        builder.bitcast(size_ptr, lir.IntType(64).as_pointer()), args[5],
-        builder.bitcast(out.data, lir.IntType(8).as_pointer()),
-        builder.load(typ_arg)]
+                 builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
+                 builder.bitcast(size_ptr, lir.IntType(
+                     64).as_pointer()), args[5],
+                 builder.bitcast(out.data, lir.IntType(8).as_pointer()),
+                 builder.load(typ_arg)]
 
     return builder.call(fn, call_args)
+
 
 @lower_builtin("h5file.keys", pio_api.h5file_type)
 def lower_dict_get(context, builder, sig, args):
@@ -186,6 +203,7 @@ def lower_dict_get(context, builder, sig, args):
     res = context.compile_internal(builder, h5f_keys_imp, sig, args)
     return res
 
+
 @lower_builtin(pio_api.h5g_get_num_objs, h5file_type)
 def h5g_get_num_objs_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
@@ -193,9 +211,11 @@ def h5g_get_num_objs_lower(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="h5g_get_num_objs")
     return builder.call(fn, args)
 
+
 @lower_builtin(pio_api.h5g_get_objname_by_idx, h5file_type, types.int32)
 def h5g_get_objname_by_idx_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [h5file_lir_type, lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="h5g_get_objname_by_idx")
+    fn = builder.module.get_or_insert_function(
+        fnty, name="h5g_get_objname_by_idx")
     return builder.call(fn, args)
