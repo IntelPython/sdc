@@ -3,10 +3,11 @@ import hpat
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
 from numba.extending import (typeof_impl, type_callable, models, register_model,
-                                make_attribute_wrapper, lower_builtin, box, lower_getattr)
+                             make_attribute_wrapper, lower_builtin, box, lower_getattr)
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+
 
 class StringArray(object):
     def __init__(self, offsets, data, size):
@@ -17,12 +18,15 @@ class StringArray(object):
     def __repr__(self):
         return 'StringArray({}, {}, {})'.format(self.offsets, self.data, self.size)
 
+
 class StringArrayType(types.Type):
     def __init__(self):
         super(StringArrayType, self).__init__(
-                                    name='StringArrayType()')
+            name='StringArrayType()')
+
 
 string_array_type = StringArrayType()
+
 
 @typeof_impl.register(StringArray)
 def typeof_string_array(val, c):
@@ -34,16 +38,19 @@ def typeof_string_array(val, c):
 #         return string_array_type
 #     return typer
 
+
 @type_callable(StringArray)
 def type_string_array_call2(context):
     def typer(string_list=None):
         return string_array_type
     return typer
 
+
 class StringArrayPayloadType(types.Type):
     def __init__(self):
         super(StringArrayPayloadType, self).__init__(
-                                    name='StringArrayPayloadType()')
+            name='StringArrayPayloadType()')
+
 
 @register_model(StringArrayPayloadType)
 class StringArrayPayloadModel(models.StructModel):
@@ -52,8 +59,9 @@ class StringArrayPayloadModel(models.StructModel):
             ('size', types.intp),
             ('offsets', types.Opaque('offsets')),
             ('data', hpat.str_ext.string_type),
-            ]
+        ]
         models.StructModel.__init__(self, dmm, fe_type, members)
+
 
 @register_model(StringArrayType)
 class StringArrayModel(models.StructModel):
@@ -61,8 +69,9 @@ class StringArrayModel(models.StructModel):
         dtype = StringArrayPayloadType()
         members = [
             ('meminfo', types.MemInfoPointer(dtype)),
-            ]
+        ]
         models.StructModel.__init__(self, dmm, fe_type, members)
+
 
 @infer
 class GetItemStringArray(AbstractTemplate):
@@ -87,11 +96,12 @@ class CmpOpEqStringArray(AbstractTemplate):
         assert not kws
         [va, vb] = args
         # if one of the inputs is string array
-        if va==string_array_type or vb==string_array_type:
+        if va == string_array_type or vb == string_array_type:
             # inputs should be either string array or string
             assert va == string_array_type or va == string_type
             assert vb == string_array_type or vb == string_type
             return signature(types.Array(types.boolean, 1, 'C'), va, vb)
+
 
 @infer
 class CmpOpNEqStringArray(CmpOpEqStringArray):
@@ -102,6 +112,7 @@ class CmpOpNEqStringArray(CmpOpEqStringArray):
 #     def generic(self, args, kws):
 #         if not kws and len(args)==1 and args[0]==string_array_type:
 #             return signature(types.intp, *args)
+
 
 make_attribute_wrapper(StringArrayPayloadType, 'size', 'size')
 make_attribute_wrapper(StringArrayPayloadType, 'offsets', 'offsets')
@@ -115,6 +126,7 @@ class StrArrayAttribute(AttributeTemplate):
     def resolve_size(self, ctflags):
         return types.intp
 
+
 @lower_getattr(string_array_type, 'size')
 def str_arr_size_impl(context, builder, typ, val):
     dtype = StringArrayPayloadType()
@@ -122,10 +134,10 @@ def str_arr_size_impl(context, builder, typ, val):
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     # cgutils.printf(builder, "data [%p]\n", data_pointer)
     data_pointer = builder.bitcast(data_pointer,
-                                    context.get_data_type(dtype).as_pointer())
+                                   context.get_data_type(dtype).as_pointer())
 
-
-    string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+    string_array = cgutils.create_struct_proxy(dtype)(
+        context, builder, builder.load(data_pointer))
     attrval = string_array.size
     attrty = types.intp
     return impl_ret_borrowed(context, builder, attrty, attrval)
@@ -139,7 +151,9 @@ def str_arr_size_impl(context, builder, typ, val):
 #     string_array.data = data
 #     return string_array._getvalue()
 
+
 from numba.extending import overload
+
 
 @overload(len)
 def str_arr_len_overload(str_arr):
@@ -147,6 +161,7 @@ def str_arr_len_overload(str_arr):
         def str_arr_len(s):
             return s.size
         return str_arr_len
+
 
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
@@ -162,6 +177,7 @@ ll.add_symbol('print_int', hstr_ext.print_int)
 import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 
+
 def construct_string_array(context, builder):
     typ = string_array_type
     dtype = StringArrayPayloadType()
@@ -171,8 +187,9 @@ def construct_string_array(context, builder):
     llvoidptr = context.get_value_type(types.voidptr)
     llsize = context.get_value_type(types.uintp)
     dtor_ftype = lir.FunctionType(lir.VoidType(),
-                                     [llvoidptr, llsize, llvoidptr])
-    dtor_fn = builder.module.get_or_insert_function(dtor_ftype, name="dtor_string_array")
+                                  [llvoidptr, llsize, llvoidptr])
+    dtor_fn = builder.module.get_or_insert_function(
+        dtor_ftype, name="dtor_string_array")
 
     meminfo = context.nrt.meminfo_alloc_dtor(
         builder,
@@ -184,7 +201,7 @@ def construct_string_array(context, builder):
                                    alloc_type.as_pointer())
 
     # Nullify all data
-    #builder.store( cgutils.get_null_value(alloc_type),
+    # builder.store( cgutils.get_null_value(alloc_type),
     #             data_pointer)
     return meminfo, data_pointer
 
@@ -210,7 +227,7 @@ def impl_string_array_single(context, builder, sig, args):
     string_list = ListInstance(context, builder, sig.args[0], args[0])
 
     # get total size of string buffer
-    fnty = lir.FunctionType( lir.IntType(64),
+    fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer()])
     fn_len = builder.module.get_or_insert_function(fnty, name="get_str_len")
     zero = context.get_constant(types.intp, 0)
@@ -221,33 +238,34 @@ def impl_string_array_single(context, builder, sig, args):
     with cgutils.for_range(builder, string_list.size) as loop:
         str_value = string_list.getitem(loop.index)
         str_len = builder.call(fn_len, [str_value])
-        builder.store(builder.add(builder.load(total_size), str_len), total_size)
+        builder.store(builder.add(builder.load(
+            total_size), str_len), total_size)
 
     # allocate string array
-    fnty = lir.FunctionType( lir.VoidType(),
+    fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(8).as_pointer().as_pointer(),
-                            lir.IntType(8).as_pointer().as_pointer(),
-                            lir.IntType(64),
-                            lir.IntType(64)])
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(64),
+                             lir.IntType(64)])
     fn_alloc = builder.module.get_or_insert_function(fnty,
-                                                name="allocate_string_array")
+                                                     name="allocate_string_array")
     builder.call(fn_alloc, [string_array._get_ptr_by_name('offsets'),
                             string_array._get_ptr_by_name('data'),
                             string_list.size, builder.load(total_size)])
 
     # set string array values
-    fnty = lir.FunctionType( lir.VoidType(),
+    fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(8).as_pointer(),
-                            lir.IntType(8).as_pointer(),
-                            lir.IntType(8).as_pointer(),
-                            lir.IntType(64)])
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
     fn_setitem = builder.module.get_or_insert_function(fnty,
-                                                name="setitem_string_array")
+                                                       name="setitem_string_array")
 
     with cgutils.for_range(builder, string_list.size) as loop:
         str_value = string_list.getitem(loop.index)
         builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                        str_value, loop.index])
+                                  str_value, loop.index])
 
     builder.store(string_array._getvalue(),
                   data_pointer)
@@ -257,6 +275,7 @@ def impl_string_array_single(context, builder, sig, args):
     #context.nrt.decref(builder, ty, ret)
 
     return impl_ret_new_ref(context, builder, typ, ret)
+
 
 @box(StringArrayType)
 def box_str(typ, val, c):
@@ -268,10 +287,10 @@ def box_str(typ, val, c):
     data_pointer = c.context.nrt.meminfo_data(c.builder, inst_struct.meminfo)
     # cgutils.printf(builder, "data [%p]\n", data_pointer)
     data_pointer = c.builder.bitcast(data_pointer,
-                                    c.context.get_data_type(dtype).as_pointer())
+                                     c.context.get_data_type(dtype).as_pointer())
 
-
-    string_array = cgutils.create_struct_proxy(dtype)(c.context, c.builder, c.builder.load(data_pointer))
+    string_array = cgutils.create_struct_proxy(dtype)(
+        c.context, c.builder, c.builder.load(data_pointer))
 
     # fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(64)])
     # fn_print_int = c.builder.module.get_or_insert_function(fnty,
@@ -282,16 +301,16 @@ def box_str(typ, val, c):
     res = cgutils.alloca_once(c.builder, lir.IntType(8).as_pointer())
     c.builder.store(string_list, res)
 
-    fnty = lir.FunctionType( lir.IntType(8).as_pointer(),
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(),
-                            lir.IntType(8).as_pointer(),
-                            lir.IntType(64)])
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
     fn_getitem = c.builder.module.get_or_insert_function(fnty,
-                                                name="getitem_string_array")
+                                                         name="getitem_string_array")
 
     with cgutils.for_range(c.builder, string_array.size) as loop:
         c_str = c.builder.call(fn_getitem, [string_array.offsets,
-                                    string_array.data, loop.index])
+                                            string_array.data, loop.index])
         pystr = c.pyapi.string_from_string(c_str)
         c.pyapi.list_setitem(string_list, loop.index, pystr)
 
@@ -308,15 +327,15 @@ def lower_string_arr_getitem(context, builder, sig, args):
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     # cgutils.printf(builder, "data [%p]\n", data_pointer)
     data_pointer = builder.bitcast(data_pointer,
-                                    context.get_data_type(dtype).as_pointer())
+                                   context.get_data_type(dtype).as_pointer())
 
-
-    string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
-    fnty = lir.FunctionType( lir.IntType(8).as_pointer(),
+    string_array = cgutils.create_struct_proxy(dtype)(
+        context, builder, builder.load(data_pointer))
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(),
-                            lir.IntType(8).as_pointer(),
-                            lir.IntType(64)])
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
     fn_getitem = builder.module.get_or_insert_function(fnty,
-                                                name="getitem_string_array_std")
+                                                       name="getitem_string_array_std")
     return builder.call(fn_getitem, [string_array.offsets,
-                                string_array.data, args[1]])
+                                     string_array.data, args[1]])
