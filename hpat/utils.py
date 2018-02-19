@@ -9,10 +9,14 @@ import collections
 import numpy as np
 
 # sentinel value representing non-constant values
+
+
 class NotConstant:
     pass
 
+
 NOT_CONSTANT = NotConstant()
+
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
@@ -39,6 +43,7 @@ def get_definitions(blocks, definitions=None):
                 unwrap_parfor_blocks(inst)
     return definitions
 
+
 def is_alloc_call(func_var, call_table):
     """
     return trie of func_var represents an array creation call
@@ -46,18 +51,20 @@ def is_alloc_call(func_var, call_table):
     assert func_var in call_table
     call_list = call_table[func_var]
     return ((len(call_list) == 2 and call_list[1] == np
-                and call_list[0] in ['empty', 'zeros', 'ones', 'full'])
+             and call_list[0] in ['empty', 'zeros', 'ones', 'full'])
             or call_list == [numba.unsafe.ndarray.empty_inferred])
 
 
 def cprint(*s):
     print(*s)
 
+
 @infer_global(cprint)
 class CprintInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.none, *args)
+
 
 typ_to_format = {
     types.int32: 'd',
@@ -79,7 +86,8 @@ def cprint_lower(context, builder, sig, args):
     for i, val in enumerate(args):
         typ = sig.args[i]
         if typ == string_type:
-            fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
+            fnty = lir.FunctionType(
+                lir.VoidType(), [lir.IntType(8).as_pointer()])
             fn = builder.module.get_or_insert_function(fnty, name="print_str")
             builder.call(fn, [val])
             cgutils.printf(builder, " ")
@@ -88,6 +96,7 @@ def cprint_lower(context, builder, sig, args):
         cgutils.printf(builder, "%{} ".format(format_str), val)
     cgutils.printf(builder, "\n")
     return context.get_dummy_value()
+
 
 def print_dist(d):
     from hpat.distributed_analysis import Distribution
@@ -101,6 +110,7 @@ def print_dist(d):
         return "Multi-thread"
     if d == Distribution.TwoD:
         return "2D_Block"
+
 
 def distribution_report():
     import hpat.distributed
@@ -118,7 +128,7 @@ def is_whole_slice(typemap, func_ir, var):
     """ return True if var can be determined to be a whole slice """
     require(typemap[var.name] == types.slice2_type)
     call_expr = get_definition(func_ir, var)
-    require(isinstance(call_expr, ir.Expr) and call_expr.op=='call')
+    require(isinstance(call_expr, ir.Expr) and call_expr.op == 'call')
     assert len(call_expr.args) == 2
     assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
     arg0_def = get_definition(func_ir, call_expr.args[0])
