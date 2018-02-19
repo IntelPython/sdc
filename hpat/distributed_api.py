@@ -79,6 +79,14 @@ def dist_setitem(arr, index, val):  # pragma: no cover
 def dist_time():  # pragma: no cover
     return time.time()
 
+def dist_return(A):  # pragma: no cover
+    return A
+
+from numba.extending import overload
+
+@overload(dist_return)
+def dist_return_overload(column):
+    return dist_return
 
 def irecv():  # pragma: no cover
     return 0

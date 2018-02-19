@@ -214,6 +214,14 @@ class DistributedAnalysis(object):
             # quantile doesn't affect input's distribution
             return
 
+        if call_list == ['dist_return', 'distributed_api', hpat]:
+            arr_name = args[0].name
+            assert arr_name in array_dists, "array distribution not found"
+            if array_dists[arr_name] == Distribution.REP:
+                raise ValueError("distributed return of array {} not valid"
+                                 " since it is replicated")
+            return
+
         if hpat.config._has_ros and call_list == ['read_ros_images_inner', 'ros', hpat]:
             return
 

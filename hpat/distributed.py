@@ -583,6 +583,10 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
+        if call_list == ['dist_return', 'distributed_api', hpat]:
+            assign.value = rhs.args[0]
+            return [assign]
+
         if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name
             arg1 = rhs.args[1].name
