@@ -13,6 +13,7 @@ class TestBasic(unittest.TestCase):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
             X = f['points'][:]
+            f.close()
             return X
 
         hpat_func = hpat.jit(test_impl)
@@ -23,6 +24,7 @@ class TestBasic(unittest.TestCase):
             f = h5py.File("lr.hdf5", "r")
             X = f['points'][:]
             Y = f['responses'][:]
+            f.close()
             return X.sum() + Y.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -48,6 +50,7 @@ class TestBasic(unittest.TestCase):
         f = h5py.File("lr_w.hdf5", "r")
         X = f['points'][:]
         Y = f['responses'][:]
+        f.close()
         np.testing.assert_almost_equal(X, np.ones((N,D)))
         np.testing.assert_almost_equal(Y, np.arange(N)+1.0)
         f.close()
