@@ -1,43 +1,52 @@
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
-                            NativeValue, lower_builtin, lower_cast)
+                             NativeValue, lower_builtin, lower_cast)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
-        ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
+                                    ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+
 
 class StringType(types.Opaque):
     def __init__(self):
         super(StringType, self).__init__(name='StringType')
 
+
 string_type = StringType()
+
 
 @typeof_impl.register(str)
 def _typeof_str(val, c):
     return string_type
 
+
 register_model(StringType)(models.OpaqueModel)
+
 
 @infer
 class StringAdd(ConcreteTemplate):
     key = "+"
     cases = [signature(string_type, string_type, string_type)]
 
+
 @infer
 class StringOpEq(AbstractTemplate):
     key = '=='
+
     def generic(self, args, kws):
         assert not kws
         (arg1, arg2) = args
         if isinstance(arg1, StringType) and isinstance(arg2, StringType):
             return signature(types.boolean, arg1, arg2)
 
+
 @infer
 class StringOpNotEq(StringOpEq):
     key = '!='
+
 
 @infer_getattr
 class StringAttribute(AttributeTemplate):
@@ -49,6 +58,7 @@ class StringAttribute(AttributeTemplate):
         assert len(args) == 1
         return signature(types.List(string_type), *args)
 
+
 @infer
 class GetItemString(AbstractTemplate):
     key = "getitem"
@@ -59,11 +69,13 @@ class GetItemString(AbstractTemplate):
                 and isinstance(args[1], types.Integer)):
             return signature(args[0], *args)
 
+
 @infer_global(len)
 class LenStringArray(AbstractTemplate):
     def generic(self, args, kws):
         if not kws and len(args) == 1 and args[0] == string_type:
             return signature(types.intp, *args)
+
 
 @infer_global(int)
 class StrToInt(AbstractTemplate):
@@ -73,6 +85,7 @@ class StrToInt(AbstractTemplate):
         if isinstance(arg, StringType):
             return signature(types.intp, arg)
 
+
 @infer_global(float)
 class StrToFloat(AbstractTemplate):
     def generic(self, args, kws):
@@ -81,6 +94,7 @@ class StrToFloat(AbstractTemplate):
         if isinstance(arg, StringType):
             return signature(types.float64, arg)
 
+
 @infer_global(str)
 class StrConstInfer(AbstractTemplate):
     def generic(self, args, kws):
@@ -88,16 +102,20 @@ class StrConstInfer(AbstractTemplate):
         assert len(args) == 1
         return signature(string_type, *args)
 
+
 class RegexType(types.Opaque):
     def __init__(self):
         super(RegexType, self).__init__(name='RegexType')
+
 
 regex_type = RegexType()
 
 register_model(RegexType)(models.OpaqueModel)
 
+
 def compile_regex(pat):
     return 0
+
 
 @infer_global(compile_regex)
 class CompileRegexInfer(AbstractTemplate):
@@ -106,11 +124,14 @@ class CompileRegexInfer(AbstractTemplate):
         assert len(args) == 1
         return signature(regex_type, *args)
 
+
 def contains_regex(str, pat):
     return False
 
+
 def contains_noregex(str, pat):
     return False
+
 
 @infer_global(contains_regex)
 @infer_global(contains_noregex)
@@ -119,6 +140,7 @@ class ContainsInfer(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         return signature(types.boolean, *args)
+
 
 import hstr_ext
 ll.add_symbol('init_string', hstr_ext.init_string)
@@ -139,6 +161,7 @@ ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
 ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
 ll.add_symbol('str_from_float64', hstr_ext.str_from_float64)
 
+
 @unbox(StringType)
 def unbox_string(typ, obj, c):
     """
@@ -152,6 +175,7 @@ def unbox_string(typ, obj, c):
 
     return NativeValue(ret, is_error=c.builder.not_(ok))
 
+
 @box(StringType)
 def box_str(typ, val, c):
     """
@@ -163,6 +187,7 @@ def box_str(typ, val, c):
     pystr = c.pyapi.string_from_string(c_str)
     return pystr
 
+
 @lower_constant(StringType)
 def const_string(context, builder, ty, pyval):
     cstr = context.insert_const_string(builder.module, pyval)
@@ -173,63 +198,71 @@ def const_string(context, builder, ty, pyval):
     ret = builder.call(fn, [cstr])
     return ret
 
+
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):
     in_typ = sig.args[0]
     ll_in_typ = context.get_value_type(sig.args[0])
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
-    fn = builder.module.get_or_insert_function(fnty, name="str_from_"+str(in_typ))
+    fn = builder.module.get_or_insert_function(
+        fnty, name="str_from_" + str(in_typ))
     return builder.call(fn, args)
+
 
 @lower_builtin("+", string_type, string_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_concat")
     return builder.call(fn, args)
+
 
 @lower_builtin('==', string_type, string_type)
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
-                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.call(fn, args)
+
 
 @lower_builtin('!=', string_type, string_type)
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
-                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
+
 
 @lower_builtin("str.split", string_type, string_type)
 def string_split_impl(context, builder, sig, args):
     nitems = cgutils.alloca_once(builder, lir.IntType(64))
     # input str, sep, size pointer
     fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
-                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(),
-                lir.IntType(64).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(),
+                             lir.IntType(64).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_split")
-    ptr = builder.call(fn, args+[nitems])
+    ptr = builder.call(fn, args + [nitems])
     size = builder.load(nitems)
     # TODO: use ptr instead of allocating and copying, use NRT_MemInfo_new
     # TODO: deallocate ptr
     _list = numba.targets.listobj.ListInstance.allocate(context, builder,
-                                    sig.return_type, size)
+                                                        sig.return_type, size)
     _list.size = size
     with cgutils.for_range(builder, size) as loop:
         value = builder.load(cgutils.gep_inbounds(builder, ptr, loop.index))
         _list.setitem(loop.index, value)
     return impl_ret_new_ref(context, builder, sig.return_type, _list.value)
 
+
 @lower_builtin('getitem', StringType, types.Integer)
 def getitem_string(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                    [lir.IntType(8).as_pointer(), lir.IntType(64)])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="str_substr_int")
     # TODO: handle reference counting
-    #return impl_ret_new_ref(builder.call(fn, args))
+    # return impl_ret_new_ref(builder.call(fn, args))
     return (builder.call(fn, args))
+
 
 @lower_cast(StringType, types.int64)
 def cast_str_to_int64(context, builder, fromty, toty, val):
@@ -237,36 +270,42 @@ def cast_str_to_int64(context, builder, fromty, toty, val):
     fn = builder.module.get_or_insert_function(fnty, name="str_to_int64")
     return builder.call(fn, (val,))
 
+
 @lower_cast(StringType, types.float64)
 def cast_str_to_float64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.DoubleType(), [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_to_float64")
     return builder.call(fn, (val,))
 
+
 @lower_builtin(len, StringType)
 def len_string(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
-                    [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
     return (builder.call(fn, args))
+
 
 @lower_builtin(compile_regex, string_type)
 def lower_compile_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                    [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="compile_regex")
     return builder.call(fn, args)
+
 
 @lower_builtin(contains_regex, string_type, regex_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
-                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
     return builder.call(fn, args)
+
 
 @lower_builtin(contains_noregex, string_type, string_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
-                [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_contains_noregex")
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(
+        fnty, name="str_contains_noregex")
     return builder.call(fn, args)
