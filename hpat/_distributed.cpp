@@ -37,6 +37,10 @@ void* hpat_get_dummy_ptr() {
     return hpat_dummy_ptr;
 }
 
+size_t get_mpi_req_num_bytes() {
+    return sizeof(MPI_Request);
+}
+
 PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -88,6 +92,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
     PyObject_SetAttrString(m, "c_alltoallv",
                             PyLong_FromVoidPtr((void*)(&c_alltoallv)));
+    PyObject_SetAttrString(m, "mpi_req_num_bytes",
+                            PyLong_FromSize_t(get_mpi_req_num_bytes()));
     return m;
 }
 

@@ -32,8 +32,8 @@ ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 
-# TODO: get size dynamically from C code
-mpi_req_llvm_type = lir.IntType(64)
+# get size dynamically from C code
+mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
 
 _h5_typ_table = {
     types.int8: 0,

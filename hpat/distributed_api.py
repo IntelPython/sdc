@@ -5,8 +5,9 @@ import time
 
 from enum import Enum
 
-# TODO: get size dynamically from C code
-mpi_req_numba_type = types.int64
+# get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
+import hdist
+mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.mpi_req_num_bytes))
 
 class Reduce_Type(Enum):
     Sum = 0
