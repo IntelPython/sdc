@@ -343,3 +343,33 @@ def _root_rank_select(old_val, new_val):  # pragma: no cover
     if distributed_api.get_rank() == 0:
         return old_val
     return new_val
+
+########### finalize MPI when exiting ####################
+
+def hpat_finalize():
+    return 0
+
+from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing import signature
+
+@infer_global(hpat_finalize)
+class FinalizeInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 0
+        return signature(types.int32, *args)
+
+ll.add_symbol('hpat_finalize', hdist.hpat_finalize)
+
+@lower_builtin(hpat_finalize)
+def lower_hpat_finalize(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32), [])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_finalize")
+    return builder.call(fn, args)
+
+@numba.njit
+def call_finalize():
+    hpat_finalize()
+
+import atexit
+atexit.register(call_finalize)
