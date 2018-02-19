@@ -5,6 +5,8 @@ import time
 
 from enum import Enum
 
+# TODO: get size dynamically from C code
+mpi_req_numba_type = types.int64
 
 class Reduce_Type(Enum):
     Sum = 0
@@ -192,7 +194,7 @@ class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 5
-        return signature(types.int32, *args)
+        return signature(mpi_req_numba_type, *args)
 
 
 @infer_global(wait)

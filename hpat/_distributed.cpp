@@ -25,9 +25,9 @@ float hpat_dist_exscan_f4(float value);
 double hpat_dist_exscan_f8(double value);
 
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int type_enum);
-int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
-int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
-int hpat_dist_wait(int req, bool cond);
+MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
+MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
+int hpat_dist_wait(MPI_Request req, bool cond);
 
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
@@ -107,6 +107,7 @@ int hpat_dist_get_size()
 {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    // printf("r size:%d\n", sizeof(MPI_Request));
     // printf("mpi_size:%d\n", size);
     return size;
 }
@@ -162,7 +163,7 @@ void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op_enum, int type_enum)
 {
     // printf("reduce value: %d\n", value);
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
-    MPI_Datatype mpi_op = get_MPI_op(op_enum);
+    MPI_Op mpi_op = get_MPI_op(op_enum);
 
     // argmax and argmin need special handling
     if (mpi_op==MPI_MAXLOC || mpi_op==MPI_MINLOC)
@@ -217,7 +218,7 @@ int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int
     for(i=1; i<ndims; i++)
         total_size *= (int)shapes[i];
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
-    MPI_Datatype mpi_op = get_MPI_op(op_enum);
+    MPI_Op mpi_op = get_MPI_op(op_enum);
     int elem_size = get_elem_size(type_enum);
     void* res_buf = malloc(total_size*elem_size);
     MPI_Allreduce(out, res_buf, total_size, mpi_typ, mpi_op, MPI_COMM_WORLD);
@@ -259,9 +260,9 @@ double hpat_dist_exscan_f8(double value)
     return out;
 }
 
-int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
+MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    MPI_Request mpi_req_recv = -1;
+    MPI_Request mpi_req_recv;
     // printf("irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
     if(cond)
@@ -274,9 +275,9 @@ int hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool co
     return mpi_req_recv;
 }
 
-int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond)
+MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    MPI_Request mpi_req_recv = -1;
+    MPI_Request mpi_req_recv;
     // printf("isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
     if(cond)
@@ -289,7 +290,7 @@ int hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool co
     return mpi_req_recv;
 }
 
-int hpat_dist_wait(int req, bool cond)
+int hpat_dist_wait(MPI_Request req, bool cond)
 {
     if (cond)
         MPI_Wait(&req, MPI_STATUS_IGNORE);
@@ -327,9 +328,9 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
     if (typ_enum < 0 || typ_enum > 6)
     {
         std::cerr << "Invalid MPI_Type" << "\n";
-        return 8;
+        return MPI_DATATYPE_NULL;
     }
-    MPI_Datatype types_list[] = {MPI_UNDEFINED, MPI_UNDEFINED,
+    MPI_Datatype types_list[] = {MPI_DATATYPE_NULL, MPI_DATATYPE_NULL,
             MPI_2INT, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT, MPI_LONG_INT};
     return types_list[typ_enum];
 }

@@ -7,6 +7,7 @@ from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
+from hpat.distributed_api import mpi_req_numba_type
 import time
 from llvmlite import ir as lir
 import hdist
@@ -31,6 +32,8 @@ ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 
+# TODO: get size dynamically from C code
+mpi_req_llvm_type = lir.IntType(64)
 
 _h5_typ_table = {
     types.int8: 0,
@@ -236,7 +239,7 @@ def lower_dist_irecv(context, builder, sig, args):
                 lir.IntType(32), lir.IntType(
                     32), lir.IntType(32), lir.IntType(32),
                 lir.IntType(1)]
-    fnty = lir.FunctionType(lir.IntType(32), arg_typs)
+    fnty = lir.FunctionType(mpi_req_llvm_type, arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_irecv")
     return builder.call(fn, call_args)
 
@@ -261,14 +264,14 @@ def lower_dist_isend(context, builder, sig, args):
                 lir.IntType(32), lir.IntType(
                     32), lir.IntType(32), lir.IntType(32),
                 lir.IntType(1)]
-    fnty = lir.FunctionType(lir.IntType(32), arg_typs)
+    fnty = lir.FunctionType(mpi_req_llvm_type, arg_typs)
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_isend")
     return builder.call(fn, call_args)
 
 
-@lower_builtin(distributed_api.wait, types.int32, types.boolean)
+@lower_builtin(distributed_api.wait, mpi_req_numba_type, types.boolean)
 def lower_dist_wait(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(32), [lir.IntType(32), lir.IntType(1)])
+    fnty = lir.FunctionType(lir.IntType(32), [mpi_req_llvm_type, lir.IntType(1)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
 

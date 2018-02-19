@@ -1290,7 +1290,7 @@ class DistributedPass(object):
         out.append(ir.Assign(wait_attr_call, wait_attr_var, loc))
         wait_call = ir.Expr.call(wait_attr_var, [req, wait_cond], (), loc)
         self.calltypes[wait_call] = self.typemap[wait_attr_var.name].get_call_type(
-            self.typingctx, [types.int32, types.boolean], {})
+            self.typingctx, [distributed_api.mpi_req_numba_type, types.boolean], {})
         out.append(ir.Assign(wait_call, wait_err, loc))
 
     def _gen_stencil_comm(self, buff, size, out, is_left, is_send):
@@ -1330,7 +1330,7 @@ class DistributedPass(object):
 
         # comm_req = irecv()
         comm_req = ir.Var(scope, mk_unique_var("comm_req"), loc)
-        self.typemap[comm_req.name] = types.int32
+        self.typemap[comm_req.name] = distributed_api.mpi_req_numba_type
         # attr call: icomm_attr = getattr(g_dist_var, irecv)
         icomm_attr_call = ir.Expr.getattr(self._g_dist_var, comm_name, loc)
         icomm_attr_var = ir.Var(scope, mk_unique_var(
