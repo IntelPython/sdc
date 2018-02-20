@@ -446,6 +446,12 @@ class DistributedAnalysis(object):
             if self._isarray(varname):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
+            # handle tuples of arrays
+            var_def = guard(get_definition, self.func_ir, var)
+            if (var_def is not None and isinstance(var_def, ir.Expr)
+                    and var_def.op == 'build_tuple'):
+                tuple_vars = var_def.items
+                self._set_REP(tuple_vars, array_dists)
 
     def _isarray(self, varname):
         return (varname in self.typemap
