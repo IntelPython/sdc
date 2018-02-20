@@ -170,5 +170,24 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_dist_return_tuple(self):
+        def test_impl(N):
+            A = np.arange(N);
+            B = np.arange(N)+1.5;
+            return A, B
+
+        hpat_func = hpat.jit(locals={'A:return': 'distributed',
+                                     'B:return': 'distributed'})(test_impl)
+        n = 128
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1.0)  # run to compile
+        np.testing.assert_allclose(
+            dist_sum((hpat_func(n)[0] + hpat_func(n)[1]).sum()),
+                    (test_impl(n)[0] + test_impl(n)[1]).sum())
+        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
 if __name__ == "__main__":
     unittest.main()
