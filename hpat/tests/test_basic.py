@@ -156,13 +156,17 @@ class TestBasic(unittest.TestCase):
 
     def test_dist_return(self):
         def test_impl(N):
-            A = np.ones(N);
+            A = np.arange(N);
             return A
 
         hpat_func = hpat.jit(locals={'A:return': 'distributed'})(test_impl)
         n = 128
-        n_pes = hpat.jit(lambda: hpat.distributed_api.get_size())()
-        np.testing.assert_allclose(hpat_func(n).sum() * n_pes, test_impl(n).sum())
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1)  # run to compile
+        np.testing.assert_allclose(
+            dist_sum(hpat_func(n).sum()), test_impl(n).sum())
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
