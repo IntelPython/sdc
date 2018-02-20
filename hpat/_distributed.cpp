@@ -397,4 +397,5 @@ int hpat_finalize()
         // printf("finalizing\n");
         MPI_Finalize();
     }
+    return 0;
 }
