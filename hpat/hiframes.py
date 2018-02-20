@@ -784,7 +784,8 @@ class HiFrames(object):
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
         scope = cast.value.scope
         loc = cast.loc
-        if cast.value.name in dist_returns:
+        # using split('.') since the variable might be renamed (e.g. A.2)
+        if cast.value.name.split('.')[0] in dist_returns:
             nodes = self._gen_replace_dist_return(cast.value)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
@@ -800,7 +801,7 @@ class HiFrames(object):
             nodes = []
             new_var_list = []
             for v in cast_def.items:
-                if v.name in dist_returns:
+                if v.name.split('.')[0] in dist_returns:
                     nodes += self._gen_replace_dist_return(v)
                     new_var_list.append(nodes[-1].target)
                 else:
