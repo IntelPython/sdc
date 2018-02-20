@@ -93,6 +93,9 @@ class HiFrames(object):
                         label = include_new_blocks(
                             self.func_ir.blocks, out_nodes, label, new_body)
                         new_body = []
+                elif isinstance(inst, ir.Return):
+                    nodes = self._run_return(inst)
+                    new_body += nodes
                 else:
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
@@ -762,6 +765,37 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         new_col_var = nodes[-1].target
         return new_col_var, nodes
+
+    def _run_return(self, ret_node):
+        # e.g. {"A:return":"distributed"} -> "A"
+        dist_returns = [var_name.split(":")[0]
+                    for (var_name, flag) in self.locals.items()
+                    if var_name.endswith(":return") and flag == 'distributed']
+        for v in dist_returns:
+            self.locals.pop(v + ":return")
+        nodes = [ret_node]
+        # shortcut if no dist return
+        if len(dist_returns) == 0:
+            return nodes
+        cast = guard(get_definition, self.func_ir, ret_node.value)
+        assert cast is not None, "return cast not found"
+        assert isinstance(cast, ir.Expr) and cast.op == 'cast'
+        if cast.value.name in dist_returns:
+            scope = cast.value.scope
+            loc = cast.loc
+            def f(_dist_arr):  # pragma: no cover
+                _d_arr = hpat.distributed_api.dist_return(_dist_arr)
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [cast.value])
+            nodes = f_block.body[:-3]  # remove none return
+            new_arr = nodes[-1].target
+            new_cast = ir.Expr.cast(new_arr, loc)
+            new_out = ir.Var(scope, mk_unique_var("dist_return"), loc)
+            nodes.append(ir.Assign(new_cast, new_out, loc))
+            ret_node.value = new_out
+            nodes.append(ret_node)
+        return nodes
 
     def _gen_rolling_init(self, win_size, func, center):
         nodes = []
