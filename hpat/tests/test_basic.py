@@ -5,7 +5,8 @@ import itertools
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                        count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs,
+                                   count_array_OneD_Vars, dist_IR_contains)
 
 
 class TestBasic(unittest.TestCase):
@@ -188,6 +189,17 @@ class TestBasic(unittest.TestCase):
                     (test_impl(n)[0] + test_impl(n)[1]).sum())
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
+
+    def test_dist_input(self):
+        def test_impl(A):
+            return len(A)
+
+        hpat_func = hpat.jit(locals={'A:input': 'distributed'})(test_impl)
+        n = 128
+        arr = np.ones(n)
+        n_pes = hpat.jit(lambda: hpat.distributed_api.get_size())()
+        np.testing.assert_allclose(hpat_func(arr) / n_pes, test_impl(arr))
+        self.assertEqual(count_array_OneD_Vars(), 1)
 
 if __name__ == "__main__":
     unittest.main()
