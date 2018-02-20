@@ -28,7 +28,7 @@ LARGE_WIN_SIZE = 10
 
 def remove_hiframes(rhs, lives, call_list):
     # used in stencil generation of rolling
-    if len(call_list) == 1 and call_list[0] in [min, max, abs]:
+    if len(call_list) == 1 and call_list[0] in [int, min, max, abs]:
         return True
     # used in stencil generation of rolling
     if (len(call_list) == 1 and isinstance(call_list[0], CPUDispatcher)
@@ -43,6 +43,8 @@ def remove_hiframes(rhs, lives, call_list):
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
             call_list[0]
             in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
+        return True
+    if call_list == ['dist_return', 'distributed_api', hpat]:
         return True
     return False
 
