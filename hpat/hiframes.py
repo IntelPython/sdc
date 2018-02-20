@@ -768,9 +768,9 @@ class HiFrames(object):
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"
-        dist_returns = [var_name.split(":")[0]
+        dist_returns = set(var_name.split(":")[0]
                     for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":return") and flag == 'distributed']
+                    if var_name.endswith(":return") and flag == 'distributed')
         for v in dist_returns:
             self.locals.pop(v + ":return")
         nodes = [ret_node]
@@ -780,22 +780,47 @@ class HiFrames(object):
         cast = guard(get_definition, self.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
+        scope = cast.value.scope
+        loc = cast.loc
         if cast.value.name in dist_returns:
-            scope = cast.value.scope
-            loc = cast.loc
-            def f(_dist_arr):  # pragma: no cover
-                _d_arr = hpat.distributed_api.dist_return(_dist_arr)
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [cast.value])
-            nodes = f_block.body[:-3]  # remove none return
+            nodes = self._gen_replace_dist_return(cast.value)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
             new_out = ir.Var(scope, mk_unique_var("dist_return"), loc)
             nodes.append(ir.Assign(new_cast, new_out, loc))
             ret_node.value = new_out
             nodes.append(ret_node)
+            return nodes
+
+        cast_def = guard(get_definition, self.func_ir, cast.value)
+        if (cast_def is not None and isinstance(cast_def, ir.Expr)
+                and cast_def.op == 'build_tuple'):
+            nodes = []
+            new_var_list = []
+            for v in cast_def.items:
+                if v.name in dist_returns:
+                    nodes += self._gen_replace_dist_return(v)
+                    new_var_list.append(nodes[-1].target)
+                else:
+                    new_var_list.append(v)
+            new_tuple_node = ir.Expr.build_tuple(new_var_list, loc)
+            new_tuple_var = ir.Var(scope, mk_unique_var("dist_return_tp"), loc)
+            nodes.append(ir.Assign(new_tuple_node, new_tuple_var, loc))
+            new_cast = ir.Expr.cast(new_tuple_var, loc)
+            new_out = ir.Var(scope, mk_unique_var("dist_return"), loc)
+            nodes.append(ir.Assign(new_cast, new_out, loc))
+            ret_node.value = new_out
+            nodes.append(ret_node)
+
         return nodes
+
+    def _gen_replace_dist_return(self, var):
+        def f(_dist_arr):  # pragma: no cover
+            _d_arr = hpat.distributed_api.dist_return(_dist_arr)
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [var])
+        return f_block.body[:-3]  # remove none return
 
     def _gen_rolling_init(self, win_size, func, center):
         nodes = []
