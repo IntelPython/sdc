@@ -191,6 +191,9 @@ class HiFrames(object):
                 assign.value = rhs.value
                 return [assign]
 
+        if isinstance(rhs, ir.Arg):
+            return self._run_arg(assign)
+
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
@@ -767,6 +770,32 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         new_col_var = nodes[-1].target
         return new_col_var, nodes
+
+    def _run_arg(self, arg_assign):
+        # e.g. {"A:return":"distributed"} -> "A"
+        dist_inputs = set(var_name.split(":")[0]
+                    for (var_name, flag) in self.locals.items()
+                    if var_name.endswith(":input") and flag == 'distributed')
+        arg_name = arg_assign.value.name
+        if arg_name in dist_inputs:
+            self.locals.pop(arg_name + ":input")
+            nodes = [arg_assign]
+            in_arr = arg_assign.target
+            scope = in_arr.scope
+            loc = in_arr.loc
+            # replace assign target with tmp
+            in_arr_tmp = ir.Var(scope, mk_unique_var("dist_input"), loc)
+            arg_assign.target = in_arr_tmp
+            def f(_dist_arr):  # pragma: no cover
+                _d_arr = hpat.distributed_api.dist_input(_dist_arr)
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr_tmp])
+            nodes += f_block.body[:-3]  # remove none return
+            nodes[-1].target = in_arr
+            return nodes
+
+        return [arg_assign]
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"

@@ -82,9 +82,13 @@ def dist_time():  # pragma: no cover
 def dist_return(A):  # pragma: no cover
     return A
 
+def dist_input(A):  # pragma: no cover
+    return A
+
 from numba.extending import overload
 
 @overload(dist_return)
+@overload(dist_input)
 def dist_return_overload(column):
     return dist_return
 

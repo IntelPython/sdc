@@ -222,6 +222,11 @@ class DistributedAnalysis(object):
                                  " since it is replicated")
             return
 
+        if call_list == ['dist_input', 'distributed_api', hpat]:
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+            return
+
         if hpat.config._has_ros and call_list == ['read_ros_images_inner', 'ros', hpat]:
             return
 
