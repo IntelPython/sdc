@@ -28,7 +28,7 @@ class TestBasic(unittest.TestCase):
             return X.sum() + Y.sum()
 
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        np.testing.assert_almost_equal(hpat_func(), test_impl(), decimal=2)
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
