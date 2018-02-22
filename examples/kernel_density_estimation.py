@@ -9,6 +9,7 @@ import time
 def kde():
     f = h5py.File("kde.hdf5", "r")
     X = f['points'][:]
+    f.close()
     b = 0.5
     points = np.array([-1.0, 2.0, 5.0])
     N = points.shape[0]

@@ -9,6 +9,7 @@ import hpat
 def kmeans(numCenter, numIter):
     f = h5py.File("lr.hdf5", "r")
     A = f['points'][:]
+    f.close()
     N, D = A.shape
 
     centroids = np.random.ranf((numCenter, D))

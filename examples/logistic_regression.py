@@ -9,6 +9,7 @@ def logistic_regression(iterations):
     f = h5py.File("lr.hdf5", "r")
     X = f['points'][:]
     Y = f['responses'][:]
+    f.close()
     D = X.shape[1]
     w = np.ones(D)-0.5
     t1 = time.time()

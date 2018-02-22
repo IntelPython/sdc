@@ -59,6 +59,7 @@ def intraday_mean_revert():
             res[-n_days:] = df['Rets'].fillna(0)
         all_res += res
 
+    f.close()
     print(all_res.mean())
     print("execution time:", time.time()-t1)
 

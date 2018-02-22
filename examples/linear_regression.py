@@ -9,6 +9,7 @@ def linear_regression(iterations):
     f = h5py.File("lir.hdf5", "r")
     X = f['points'][:]
     Y = f['responses'][:]
+    f.close()
     N,D = X.shape
     p = Y.shape[1]
     alphaN = 0.01/N
