@@ -17,7 +17,7 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
 int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
 int64_t h5g_get_num_objs(hid_t file_id);
-void* h5g_get_objname_by_idx(hid_t file_id, int ind);
+void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -263,7 +263,7 @@ int64_t h5g_get_num_objs(hid_t file_id)
     return (int64_t)group_info.nlinks;
 }
 
-void* h5g_get_objname_by_idx(hid_t file_id, int ind)
+void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
 {
 	herr_t err;
     // first call gets size:

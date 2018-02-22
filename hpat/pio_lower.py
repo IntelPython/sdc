@@ -212,10 +212,10 @@ def h5g_get_num_objs_lower(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(pio_api.h5g_get_objname_by_idx, h5file_type, types.int32)
+@lower_builtin(pio_api.h5g_get_objname_by_idx, h5file_type, types.int64)
 def h5g_get_objname_by_idx_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [h5file_lir_type, lir.IntType(32)])
+                            [h5file_lir_type, lir.IntType(64)])
     fn = builder.module.get_or_insert_function(
         fnty, name="h5g_get_objname_by_idx")
     return builder.call(fn, args)
