@@ -26,7 +26,7 @@ conda create -n $CONDA_ENV -q -y python=$PYTHON numpy=$NUMPY scipy pandas boost 
 source activate $CONDA_ENV
 $CONDA_INSTALL pyarrow=0.8.* mpich -c conda-forge
 $CONDA_INSTALL h5py llvmlite -c ehsantn
-$CONDA_INSTALL daal-devel -c intel
+$CONDA_INSTALL daal-devel daal-include daal -c intel --no-deps
 $CONDA_INSTALL tbb -c conda-forge
 
 # install compilers
