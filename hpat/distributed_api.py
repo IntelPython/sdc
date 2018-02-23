@@ -1,5 +1,5 @@
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
 from numba.extending import models, register_model
 import time
@@ -266,3 +266,13 @@ class DistCommReqAlloc(AbstractTemplate):
         assert not kws
         assert len(args) == 1 and args[0] == types.int32
         return signature(req_array_type, *args)
+
+@infer
+class SetItemReqArray(AbstractTemplate):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        [ary, idx, val] = args
+        if isinstance(ary, ReqArrayType) and idx == types.intp and val == mpi_req_numba_type:
+            return signature(types.none, *args)

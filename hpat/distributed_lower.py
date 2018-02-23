@@ -7,7 +7,7 @@ from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
-from hpat.distributed_api import mpi_req_numba_type
+from hpat.distributed_api import mpi_req_numba_type, ReqArrayType
 import time
 from llvmlite import ir as lir
 import hdist
@@ -33,6 +33,7 @@ ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 ll.add_symbol('allgather', hdist.allgather)
 ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
+ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -377,6 +378,15 @@ def lower_dist_allgather(context, builder, sig, args):
 def lower_dist_comm_req_alloc(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="comm_req_alloc")
+    return builder.call(fn, args)
+
+@lower_builtin('setitem', ReqArrayType, types.intp, mpi_req_numba_type)
+def setitem_req_array(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
+                                             lir.IntType(64),
+                                             mpi_req_llvm_type])
+    fn = builder.module.get_or_insert_function(
+        fnty, name="req_array_setitem")
     return builder.call(fn, args)
 
 # @lower_builtin(distributed_api.dist_setitem, types.Array, types.Any, types.Any,
