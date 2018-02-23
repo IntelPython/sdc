@@ -615,7 +615,7 @@ class DistributedPass(object):
             self._array_sizes[lhs][0] = total_length
 
             def f(arr, count):  # pragma: no cover
-                b_arr = hpat.hiframes_api.rebalance_array_parallel(arr, count)
+                b_arr = hpat.distributed_api.rebalance_array_parallel(arr, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
                                           (self.typemap[arr.name], types.intp),
