@@ -332,10 +332,11 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
                     if all_diffs[i] == 0: break
     hpat.distributed_api.waitall(comm_req_ind, comm_reqs)
     hpat.distributed_api.comm_req_dealloc(comm_reqs)
+    return out_arr
     """.format(alloc_text)
 
     loc = {}
-    exec(func_text, {'hpat': hpat}, loc)
+    exec(func_text, {'hpat': hpat, 'np': np}, loc)
     rebalance_impl = loc['f']
 
     res = context.compile_internal(builder, rebalance_impl, sig, args)
