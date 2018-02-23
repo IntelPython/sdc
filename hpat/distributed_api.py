@@ -1,6 +1,7 @@
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
+from numba.extending import models, register_model
 import time
 
 from enum import Enum
@@ -246,3 +247,22 @@ class DistWait(AbstractTemplate):
 #         assert not kws
 #         assert len(args)==5
 #         return signature(types.int32, *args)
+
+
+class ReqArrayType(types.Type):
+    def __init__(self):
+        super(ReqArrayType, self).__init__(
+            name='ReqArrayType()')
+
+req_array_type = ReqArrayType()
+register_model(ReqArrayType)(models.OpaqueModel)
+
+def comm_req_alloc():
+    return 0
+
+@infer_global(comm_req_alloc)
+class DistCommReqAlloc(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1 and args[0] == types.int32
+        return signature(req_array_type, *args)

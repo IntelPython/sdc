@@ -32,6 +32,7 @@ ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 ll.add_symbol('allgather', hdist.allgather)
+ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -371,6 +372,12 @@ def lower_dist_allgather(context, builder, sig, args):
     builder.call(fn, call_args)
     return context.get_dummy_value()
 
+
+@lower_builtin(distributed_api.comm_req_alloc, types.int32)
+def lower_dist_comm_req_alloc(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="comm_req_alloc")
+    return builder.call(fn, args)
 
 # @lower_builtin(distributed_api.dist_setitem, types.Array, types.Any, types.Any,
 #     types.intp, types.intp)
