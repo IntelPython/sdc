@@ -2,6 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import types as pytypes  # avoid confusion with numba.types
 import copy
+import warnings
 import numba
 from numba import (ir, types, typing, config, numpy_support,
                    ir_utils, postproc)
@@ -590,6 +591,39 @@ class DistributedPass(object):
         if call_list == ['dist_input', 'distributed_api', hpat]:
             assign.value = rhs.args[0]
             return [assign]
+
+        if call_list == ['rebalance_array', 'distributed_api', hpat]:
+            if not self._is_1D_Var_arr(rhs.args[0].name):
+                warnings.warn("array {} is not 1D_Block_Var".format(rhs.args[0].name))
+                return out
+
+            arr = rhs.args[0]
+            ndim = self.typemap[arr.name].ndim
+            out = self._gen_1D_Var_len(arr)
+            total_length = out[-1].target
+            div_nodes, start_var, count_var = self._gen_1D_div(total_length, scope, loc,
+                                                         "$rebalance", "get_node_portion",
+                                                         distributed_api.get_node_portion)
+            out += div_nodes
+
+            # XXX: get sizes in lower dimensions
+            self._array_starts[lhs] = [-1]*ndim
+            self._array_counts[lhs] = [-1]*ndim
+            self._array_sizes[lhs] = [-1]*ndim
+            self._array_starts[lhs][0] = start_var
+            self._array_counts[lhs][0] = count_var
+            self._array_sizes[lhs][0] = total_length
+
+            def f(arr, count):  # pragma: no cover
+                b_arr = hpat.hiframes_api.rebalance_array_parallel(arr, count)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (self.typemap[arr.name], types.intp),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [arr, count_var])
+            out += f_block.body[:-3]
+            out[-1].target = assign.target
+            return out
 
         if self._is_call(func_var, ['dot', np]):
             arg0 = rhs.args[0].name

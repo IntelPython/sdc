@@ -85,8 +85,12 @@ def dist_return(A):  # pragma: no cover
 def dist_input(A):  # pragma: no cover
     return A
 
+def rebalance_array(A):
+    return A
+
 from numba.extending import overload
 
+@overload(rebalance_array)
 @overload(dist_return)
 @overload(dist_input)
 def dist_return_overload(column):
