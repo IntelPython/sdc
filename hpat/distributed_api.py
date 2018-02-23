@@ -75,6 +75,8 @@ def dist_exscan(value):  # pragma: no cover
 def dist_setitem(arr, index, val):  # pragma: no cover
     return 0
 
+def allgather(arr, val):  # pragma: no cover
+    arr[0] = val
 
 def dist_time():  # pragma: no cover
     return time.time()
@@ -109,6 +111,13 @@ def isend():  # pragma: no cover
 
 def wait():  # pragma: no cover
     return 0
+
+@infer_global(allgather)
+class DistAllgather(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2  # array and val
+        return signature(types.none, *args)
 
 @infer_global(rebalance_array_parallel)
 class DistRebalanceParallel(AbstractTemplate):

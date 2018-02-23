@@ -32,6 +32,7 @@ int hpat_dist_wait(MPI_Request req, bool cond);
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
 int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
+void allgather(void* out_data, int size, void* in_data, int type_enum);
 int hpat_finalize();
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
@@ -93,6 +94,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
     PyObject_SetAttrString(m, "c_alltoallv",
                             PyLong_FromVoidPtr((void*)(&c_alltoallv)));
+    PyObject_SetAttrString(m, "allgather",
+                            PyLong_FromVoidPtr((void*)(&allgather)));
     PyObject_SetAttrString(m, "hpat_finalize",
                             PyLong_FromVoidPtr((void*)(&hpat_finalize)));
 
@@ -306,6 +309,13 @@ int hpat_dist_wait(MPI_Request req, bool cond)
     if (cond)
         MPI_Wait(&req, MPI_STATUS_IGNORE);
     return 0;
+}
+
+void allgather(void* out_data, int size, void* in_data, int type_enum)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+    MPI_Allgather(in_data, size, mpi_typ, out_data, size, mpi_typ, MPI_COMM_WORLD);
+    return;
 }
 
 // _h5_typ_table = {

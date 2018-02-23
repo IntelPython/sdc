@@ -31,6 +31,7 @@ ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
 ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
+ll.add_symbol('allgather', hdist.allgather)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -341,6 +342,34 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
 
     res = context.compile_internal(builder, rebalance_impl, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
+@lower_builtin(distributed_api.allgather, types.Array, types.Any)
+def lower_dist_allgather(context, builder, sig, args):
+    arr_typ = sig.args[0]
+    val_typ = sig.args[1]
+    assert val_typ == arr_typ.dtype
+
+    # type enum arg
+    assert val_typ in _h5_typ_table, "invalid allgather type"
+    typ_enum = _h5_typ_table[val_typ]
+    typ_arg = context.get_constant(types.int32, typ_enum)
+
+    # size arg is 1 for now
+    size_arg = context.get_constant(types.int32, 1)
+
+    val_ptr = cgutils.alloca_once_value(builder, args[1])
+
+    out = make_array(sig.args[0])(context, builder, args[0])
+
+    call_args = [builder.bitcast(out.data, lir.IntType(8).as_pointer()),
+                 size_arg, val_ptr, typ_arg]
+
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
+                            lir.IntType(32), val_ptr.type, lir.IntType(32)])
+    fn = builder.module.get_or_insert_function(fnty, name="allgather")
+    builder.call(fn, call_args)
+    return context.get_dummy_value()
 
 
 # @lower_builtin(distributed_api.dist_setitem, types.Array, types.Any, types.Any,
