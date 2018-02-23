@@ -275,6 +275,73 @@ def lower_dist_wait(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
 
+@lower_builtin(distributed_api.rebalance_array_parallel, types.Array, types.intp)
+def lower_dist_rebalance_array_parallel(context, builder, sig, args):
+
+    arr_typ = sig.args[0]
+    ndim = arr_typ.ndim
+    # TODO: support string type
+
+    shape_tup = ",".join(["count"]
+                    + ["in_arr.shape[{}]".format(i) for i in range(1, ndim)])
+    alloc_text = "np.empty(({}), in_arr.dtype)".format(shape_tup)
+
+    func_text = """def f(in_arr, count):
+    n_pes = hpat.distributed_api.get_size()
+    my_rank = hpat.distributed_api.get_rank()
+    out_arr = {}
+    # copy old data
+    old_len = len(in_arr)
+    out_ind = 0
+    for i in range(min(old_len, count)):
+        out_arr[i] = in_arr[i]
+        out_ind += 1
+    # get diff data for all procs
+    my_diff = old_len - count
+    all_diffs = np.empty(n_pes, np.int64)
+    hpat.distributed_api.allgather(all_diffs, my_diff)
+    # alloc comm requests
+    comm_req_ind = 0
+    comm_reqs = hpat.distributed_api.comm_req_alloc(n_pes)
+    req_ind = 0
+    # for each potential receiver
+    for i in range(n_pes):
+        # if receiver
+        if all_diffs[i] < 0:
+            # for each potential sender
+            for j in range(n_pes):
+                # if sender
+                if all_diffs[j] > 0:
+                    send_size = min(all_diffs[j], -all_diffs[i])
+                    # if I'm receiver
+                    if my_rank == i:
+                        comm_reqs[comm_req_ind] = hpat.distributed_api.irecv(
+                            out_arr[out_ind:(out_ind+send_size)], j, 9)
+                        comm_req_ind += 1
+                        out_ind += send_size
+                    # if I'm sender
+                    if my_rank == j:
+                        comm_reqs[comm_req_ind] = hpat.distributed_api.isend(
+                            in_arr[out_ind:(out_ind+send_size)], i, 9)
+                        comm_req_ind += 1
+                        out_ind += send_size
+                    # update sender and receivers remaining counts
+                    all_diffs[i] += send_size
+                    all_diffs[j] -= send_size
+                    # if receiver is done, stop sender search
+                    if all_diffs[i] == 0: break
+    hpat.distributed_api.waitall(comm_req_ind, comm_reqs)
+    hpat.distributed_api.comm_req_dealloc(comm_reqs)
+    """.format(alloc_text)
+
+    loc = {}
+    exec(func_text, {'hpat': hpat}, loc)
+    rebalance_impl = loc['f']
+
+    res = context.compile_internal(builder, rebalance_impl, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
 # @lower_builtin(distributed_api.dist_setitem, types.Array, types.Any, types.Any,
 #     types.intp, types.intp)
 # def dist_setitem_array(context, builder, sig, args):

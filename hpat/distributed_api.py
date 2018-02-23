@@ -88,6 +88,9 @@ def dist_input(A):  # pragma: no cover
 def rebalance_array(A):
     return A
 
+def rebalance_array_parallel(A):
+    return A
+
 from numba.extending import overload
 
 @overload(rebalance_array)
@@ -106,6 +109,13 @@ def isend():  # pragma: no cover
 
 def wait():  # pragma: no cover
     return 0
+
+@infer_global(rebalance_array_parallel)
+class DistRebalanceParallel(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2  # array and count
+        return signature(args[0], *args)
 
 
 @infer_global(get_rank)
