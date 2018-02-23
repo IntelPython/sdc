@@ -227,6 +227,16 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD_Var
             return
 
+        if call_list == ['rebalance_array', 'distributed_api', hpat]:
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            in_arr = args[0].name
+            if array_dists[in_arr] == Distribution.OneD_Var:
+                array_dists[lhs] = Distribution.OneD
+            else:
+                self._meet_array_dists(lhs, in_arr, array_dists)
+            return
+
         if hpat.config._has_ros and call_list == ['read_ros_images_inner', 'ros', hpat]:
             return
 
