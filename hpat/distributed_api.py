@@ -113,6 +113,9 @@ def isend():  # pragma: no cover
 def wait():  # pragma: no cover
     return 0
 
+def waitall():  # pragma: no cover
+    return 0
+
 @infer_global(allgather)
 class DistAllgather(AbstractTemplate):
     def generic(self, args, kws):
@@ -240,6 +243,13 @@ class DistWait(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         return signature(types.int32, *args)
+
+@infer_global(waitall)
+class DistWait(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2 and args == (types.int32, req_array_type)
+        return signature(types.none, *args)
 
 # @infer_global(dist_setitem)
 # class DistSetitem(AbstractTemplate):

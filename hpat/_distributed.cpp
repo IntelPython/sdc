@@ -28,6 +28,7 @@ int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_wait(MPI_Request req, bool cond);
+void hpat_dist_waitall(int size, MPI_Request *req);
 
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
@@ -103,6 +104,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&comm_req_alloc)));
     PyObject_SetAttrString(m, "req_array_setitem",
                             PyLong_FromVoidPtr((void*)(&req_array_setitem)));
+    PyObject_SetAttrString(m, "hpat_dist_waitall",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_waitall)));
 
     PyObject_SetAttrString(m, "hpat_finalize",
                             PyLong_FromVoidPtr((void*)(&hpat_finalize)));
@@ -329,6 +332,12 @@ void allgather(void* out_data, int size, void* in_data, int type_enum)
 void req_array_setitem(MPI_Request * req_arr, int64_t ind, MPI_Request req)
 {
     req_arr[ind] = req;
+    return;
+}
+
+void hpat_dist_waitall(int size, MPI_Request *req_arr)
+{
+    MPI_Waitall(size, req_arr, MPI_STATUSES_IGNORE);
     return;
 }
 

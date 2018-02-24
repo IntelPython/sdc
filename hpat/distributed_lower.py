@@ -7,7 +7,7 @@ from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
-from hpat.distributed_api import mpi_req_numba_type, ReqArrayType
+from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
 import time
 from llvmlite import ir as lir
 import hdist
@@ -34,6 +34,7 @@ ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 ll.add_symbol('allgather', hdist.allgather)
 ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
 ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
+ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -288,6 +289,14 @@ def lower_dist_wait(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
 
+@lower_builtin(distributed_api.waitall, types.int32, req_array_type)
+def lower_dist_waitall(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(32), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_waitall")
+    builder.call(fn, args)
+    return context.get_dummy_value()
+
 @lower_builtin(distributed_api.rebalance_array_parallel, types.Array, types.intp)
 def lower_dist_rebalance_array_parallel(context, builder, sig, args):
 
@@ -345,7 +354,7 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
                     all_diffs[j] -= send_size
                     # if receiver is done, stop sender search
                     if all_diffs[i] == 0: break
-    hpat.distributed_api.waitall(comm_req_ind, comm_reqs)
+    hpat.distributed_api.waitall(np.int32(comm_req_ind), comm_reqs)
     hpat.distributed_api.comm_req_dealloc(comm_reqs)
     return out_arr
     """.format(alloc_text)
