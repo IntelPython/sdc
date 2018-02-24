@@ -251,20 +251,25 @@ def lower_dist_irecv(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_irecv")
     return builder.call(fn, call_args)
 
-
+# array, size, pe, tag, cond
+@lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32,
+                types.int32, types.int32)
 @lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32,
                types.int32, types.int32, types.boolean)
 def lower_dist_isend(context, builder, sig, args):
     # store an int to specify data type
     typ_enum = _h5_typ_table[sig.args[0].dtype]
-    typ_arg = cgutils.alloca_once_value(
-        builder, lir.Constant(lir.IntType(32), typ_enum))
-
+    typ_arg = context.get_constant(types.int32, typ_enum)
     out = make_array(sig.args[0])(context, builder, args[0])
 
+    if len(args) == 4:
+        cond_arg = context.get_constant(types.boolean, True)
+    else:
+        cond_arg = args[4]
+
     call_args = [builder.bitcast(out.data, lir.IntType(8).as_pointer()),
-                 args[1], builder.load(typ_arg),
-                 args[2], args[3], args[4]]
+                 args[1], typ_arg,
+                 args[2], args[3], cond_arg]
 
     # array, size, extra arg type for type enum
     # pe, tag, cond
@@ -325,14 +330,14 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
                     if my_rank == i:
                         buff = out_arr[out_ind:(out_ind+send_size)]
                         comm_reqs[comm_req_ind] = hpat.distributed_api.irecv(
-                            buff, np.int32(buff.size), j, np.int32(9))
+                            buff, np.int32(buff.size), np.int32(j), np.int32(9))
                         comm_req_ind += 1
                         out_ind += send_size
                     # if I'm sender
                     if my_rank == j:
                         buff = in_arr[out_ind:(out_ind+send_size)]
                         comm_reqs[comm_req_ind] = hpat.distributed_api.isend(
-                            buff, np.int32(buff.size), i, np.int32(9))
+                            buff, np.int32(buff.size), np.int32(i), np.int32(9))
                         comm_req_ind += 1
                         out_ind += send_size
                     # update sender and receivers remaining counts
