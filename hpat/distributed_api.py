@@ -270,12 +270,22 @@ register_model(ReqArrayType)(models.OpaqueModel)
 def comm_req_alloc():
     return 0
 
+def comm_req_dealloc():
+    return 0
+
 @infer_global(comm_req_alloc)
 class DistCommReqAlloc(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1 and args[0] == types.int32
         return signature(req_array_type, *args)
+
+@infer_global(comm_req_dealloc)
+class DistCommReqDeAlloc(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1 and args[0] == req_array_type
+        return signature(types.none, *args)
 
 @infer
 class SetItemReqArray(AbstractTemplate):

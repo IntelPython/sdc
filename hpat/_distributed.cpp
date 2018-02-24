@@ -35,6 +35,7 @@ void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
 int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
 void allgather(void* out_data, int size, void* in_data, int type_enum);
 MPI_Request *comm_req_alloc(int size);
+void comm_req_dealloc(MPI_Request *req_arr);
 void req_array_setitem(MPI_Request * req_arr, int64_t ind, MPI_Request req);
 
 int hpat_finalize();
@@ -106,6 +107,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&req_array_setitem)));
     PyObject_SetAttrString(m, "hpat_dist_waitall",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_waitall)));
+    PyObject_SetAttrString(m, "comm_req_dealloc",
+                            PyLong_FromVoidPtr((void*)(&comm_req_dealloc)));
 
     PyObject_SetAttrString(m, "hpat_finalize",
                             PyLong_FromVoidPtr((void*)(&hpat_finalize)));
@@ -426,6 +429,11 @@ MPI_Request *comm_req_alloc(int size)
 {
     // printf("req alloc %d\n", size);
     return new MPI_Request[size];
+}
+
+void comm_req_dealloc(MPI_Request *req_arr)
+{
+    delete[] req_arr;
 }
 
 int hpat_finalize()

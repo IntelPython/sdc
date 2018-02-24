@@ -33,6 +33,7 @@ ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 ll.add_symbol('allgather', hdist.allgather)
 ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
+ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
 ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
 ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
 
@@ -400,6 +401,14 @@ def lower_dist_comm_req_alloc(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="comm_req_alloc")
     return builder.call(fn, args)
+
+@lower_builtin(distributed_api.comm_req_dealloc, req_array_type)
+def lower_dist_comm_req_dealloc(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="comm_req_dealloc")
+    builder.call(fn, args)
+    return context.get_dummy_value()
+
 
 @lower_builtin('setitem', ReqArrayType, types.intp, mpi_req_numba_type)
 def setitem_req_array(context, builder, sig, args):
