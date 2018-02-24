@@ -230,7 +230,7 @@ class DistCumsumprod(AbstractTemplate):
 class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 5
+        assert len(args) in [4, 5]
         return signature(mpi_req_numba_type, *args)
 
 
