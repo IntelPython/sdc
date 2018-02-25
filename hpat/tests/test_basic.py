@@ -201,5 +201,18 @@ class TestBasic(unittest.TestCase):
         np.testing.assert_allclose(hpat_func(arr) / n_pes, test_impl(arr))
         self.assertEqual(count_array_OneD_Vars(), 1)
 
+    def test_rebalance(self):
+        def test_impl(N):
+            A = np.arange(n)
+            B = A[A>10]
+            C = hpat.distributed_api.rebalance_array(B)
+            return C.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_OneDs(), 3)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
 if __name__ == "__main__":
     unittest.main()
