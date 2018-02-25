@@ -34,15 +34,17 @@ def get_definitions(blocks, definitions=None):
     if definitions is None:
         definitions = collections.defaultdict(list)
     for block in blocks.values():
-        for inst in block.body:
-            if isinstance(inst, ir.Assign):
-                definitions[inst.target.name].append(inst.value)
-            if isinstance(inst, numba.parfor.Parfor):
-                parfor_blocks = wrap_parfor_blocks(inst)
-                get_definitions(parfor_blocks, definitions)
-                unwrap_parfor_blocks(inst)
+        update_node_definitions(block.body, definitions)
     return definitions
 
+def update_node_definitions(nodes, definitions):
+    for inst in nodes:
+        if isinstance(inst, ir.Assign):
+            definitions[inst.target.name].append(inst.value)
+        if isinstance(inst, numba.parfor.Parfor):
+            parfor_blocks = wrap_parfor_blocks(inst)
+            get_definitions(parfor_blocks, definitions)
+            unwrap_parfor_blocks(inst)
 
 def is_alloc_call(func_var, call_table):
     """

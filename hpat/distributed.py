@@ -77,7 +77,7 @@ class DistributedPass(object):
         dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
                                                  self.calltypes, self.typingctx)
         self._dist_analysis = dist_analysis_pass.run()
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+
         self._call_table, _ = get_call_table(self.func_ir.blocks)
         self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._T_arrs = dist_analysis_pass._T_arrs

@@ -12,7 +12,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
-from hpat.utils import get_definitions, is_alloc_call, is_whole_slice
+from hpat.utils import get_definitions, is_alloc_call, is_whole_slice, update_node_definitions
 
 from enum import Enum
 
@@ -526,13 +526,14 @@ class DistributedAnalysis(object):
                     self._gen_rebalances(rebalance_arrs, inst.loop_body)
                 if isinstance(inst, ir.Assign) and inst.target.name in rebalance_arrs:
                     out_arr = inst.target
+                    self.func_ir._definitions[out_arr.name].remove(inst.value)
                     # hold inst results in tmp array
                     tmp_arr = ir.Var(out_arr.scope,
                                      mk_unique_var("rebalance_tmp"),
                                      out_arr.loc)
                     self.typemap[tmp_arr.name] = self.typemap[out_arr.name]
                     inst.target = tmp_arr
-                    new_body.append(inst)
+                    nodes = [inst]
 
                     def f(in_arr):  # pragma: no cover
                         out_a = hpat.distributed_api.rebalance_array(in_arr)
@@ -540,8 +541,10 @@ class DistributedAnalysis(object):
                                                   (self.typemap[tmp_arr.name],),
                                                   self.typemap, self.calltypes).blocks.popitem()[1]
                     replace_arg_nodes(f_block, [tmp_arr])
-                    new_body += f_block.body[:-3]  # remove none return
-                    new_body[-1].target = out_arr
+                    nodes += f_block.body[:-3]  # remove none return
+                    nodes[-1].target = out_arr
+                    update_node_definitions(nodes, self.func_ir._definitions)
+                    new_body += nodes
                 else:
                     new_body.append(inst)
 
