@@ -214,5 +214,21 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 2)
 
+    def test_rebalance_loop(self):
+        def test_impl(N):
+            A = np.arange(n)
+            B = A[A>10]
+            s = 0
+            for i in range(3):
+                s += B.sum()
+            return s
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_OneDs(), 4)
+        self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
+
 if __name__ == "__main__":
     unittest.main()
