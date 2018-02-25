@@ -48,9 +48,6 @@ class DistributedPass(object):
         self.typemap = typemap
         self.calltypes = calltypes
 
-        self._call_table, _ = get_call_table(func_ir.blocks)
-        self._tuple_table = get_tuple_table(func_ir.blocks)
-
         self._dist_analysis = None
         self._T_arrs = None  # set of transposed arrays (taken from analysis)
 
@@ -78,8 +75,11 @@ class DistributedPass(object):
         dprint_func_ir(self.func_ir, "starting distributed pass")
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
-                                                 self.calltypes)
+                                                 self.calltypes, self.typingctx)
         self._dist_analysis = dist_analysis_pass.run()
+        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self._call_table, _ = get_call_table(self.func_ir.blocks)
+        self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._T_arrs = dist_analysis_pass._T_arrs
         self._parallel_accesses = dist_analysis_pass._parallel_accesses
         if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover

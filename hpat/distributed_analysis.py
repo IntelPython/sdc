@@ -5,7 +5,8 @@ import copy
 import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (get_call_table, get_tuple_table, find_topo_order,
-                            guard, get_definition, require, find_callname)
+                            guard, get_definition, require, find_callname,
+                            mk_unique_var, compile_to_numba_ir, replace_arg_nodes)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -33,18 +34,22 @@ distributed_analysis_extensions = {}
 class DistributedAnalysis(object):
     """analyze program for to distributed transfromation"""
 
-    def __init__(self, func_ir, typemap, calltypes):
+    def __init__(self, func_ir, typemap, calltypes, typingctx):
         self.func_ir = func_ir
         self.typemap = typemap
         self.calltypes = calltypes
-        self._call_table, _ = get_call_table(func_ir.blocks)
-        self._tuple_table = get_tuple_table(func_ir.blocks)
+        self.typingctx = typingctx
+
+    def _init_run(self):
+        self._call_table, _ = get_call_table(self.func_ir.blocks)
+        self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._parallel_accesses = set()
         self._T_arrs = set()
         self.second_pass = False
         self.in_parallel_parfor = -1
 
     def run(self):
+        self._init_run()
         blocks = self.func_ir.blocks
         array_dists = {}
         parfor_dists = {}
@@ -54,6 +59,11 @@ class DistributedAnalysis(object):
         self.second_pass = True
         self._run_analysis(self.func_ir.blocks, topo_order,
                            array_dists, parfor_dists)
+        # rebalance arrays if necessary
+        if Distribution.OneD_Var in array_dists.values():
+            changed = self._rebalance_arrs(array_dists, parfor_dists)
+            if changed:
+                return self.run()
 
         return _dist_analysis_result(array_dists=array_dists, parfor_dists=parfor_dists)
 
@@ -477,12 +487,80 @@ class DistributedAnalysis(object):
             return False
         return self._call_table[func_var] == call_list
 
+    def _rebalance_arrs(self, array_dists, parfor_dists):
+        # rebalance an array if it is accessed in a parfor that has output
+        # arrays or is in a loop
+
+        # find sequential loop bodies
+        cfg = numba.analysis.compute_cfg_from_blocks(self.func_ir.blocks)
+        loop_bodies = set()
+        for loop in cfg.loops().values():
+            loop_bodies |= loop.body
+
+        rebalance_arrs = set()
+
+        for label, block in self.func_ir.blocks.items():
+            for inst in block.body:
+                if (isinstance(inst, Parfor)
+                        and parfor_dists[inst.id] == Distribution.OneD_Var):
+                    array_accesses = ir_utils.get_array_accesses(inst.loop_body)
+                    onedv_arrs = set(arr for (arr, ind) in array_accesses
+                                 if arr in array_dists and array_dists[arr] == Distribution.OneD_Var)
+                    if (label in loop_bodies
+                            or _arrays_written(onedv_arrs, inst.loop_body)):
+                        rebalance_arrs |= onedv_arrs
+
+        if len(rebalance_arrs) != 0:
+            self._gen_rebalances(rebalance_arrs, self.func_ir.blocks)
+            return True
+
+        return False
+
+    def _gen_rebalances(self, rebalance_arrs, blocks):
+        #
+        for block in blocks.values():
+            new_body = []
+            for inst in block.body:
+                if isinstance(inst, Parfor):
+                    self._gen_rebalances(rebalance_arrs, {0: inst.init_block})
+                    self._gen_rebalances(rebalance_arrs, inst.loop_body)
+                if isinstance(inst, ir.Assign) and inst.target.name in rebalance_arrs:
+                    out_arr = inst.target
+                    # hold inst results in tmp array
+                    tmp_arr = ir.Var(out_arr.scope,
+                                     mk_unique_var("rebalance_tmp"),
+                                     out_arr.loc)
+                    self.typemap[tmp_arr.name] = self.typemap[out_arr.name]
+                    inst.target = tmp_arr
+                    new_body.append(inst)
+
+                    def f(in_arr):  # pragma: no cover
+                        out_a = hpat.distributed_api.rebalance_array(in_arr)
+                    f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                                  (self.typemap[tmp_arr.name],),
+                                                  self.typemap, self.calltypes).blocks.popitem()[1]
+                    replace_arg_nodes(f_block, [tmp_arr])
+                    new_body += f_block.body[:-3]  # remove none return
+                    new_body[-1].target = out_arr
+                else:
+                    new_body.append(inst)
+
+            block.body = new_body
 
 def is_array(varname, typemap):
     # return True
     return (varname in typemap
             and isinstance(typemap[varname], numba.types.npytypes.Array))
 
+def _arrays_written(arrs, blocks):
+    for block in blocks.values():
+        for inst in block.body:
+            if isinstance(inst, Parfor) and _arrays_written(arrs, inst.loop_body):
+                return True
+            if (isinstance(inst, (ir.SetItem, ir.StaticSetItem))
+                    and inst.target.name in arrs):
+                return True
+    return False
 
 def get_stencil_accesses(parfor, typemap):
     # if a parfor has stencil pattern, see which accesses depend on loop index
