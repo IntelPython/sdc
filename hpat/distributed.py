@@ -77,6 +77,7 @@ class DistributedPass(object):
         dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
                                                  self.calltypes, self.typingctx)
         self._dist_analysis = dist_analysis_pass.run()
+        # dprint_func_ir(self.func_ir, "after analysis distributed")
 
         self._call_table, _ = get_call_table(self.func_ir.blocks)
         self._tuple_table = get_tuple_table(self.func_ir.blocks)
@@ -594,7 +595,14 @@ class DistributedPass(object):
 
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
             if not self._is_1D_Var_arr(rhs.args[0].name):
-                warnings.warn("array {} is not 1D_Block_Var".format(rhs.args[0].name))
+                if self._is_1D_arr(rhs.args[0].name):
+                    in_1d_arr = rhs.args[0].name
+                    self._array_starts[lhs] = self._array_starts[in_1d_arr]
+                    self._array_counts[lhs] = self._array_counts[in_1d_arr]
+                    self._array_sizes[lhs] = self._array_sizes[in_1d_arr]
+                else:
+                    warnings.warn("array {} is not 1D_Block_Var".format(
+                                    rhs.args[0].name))
                 return out
 
             arr = rhs.args[0]
