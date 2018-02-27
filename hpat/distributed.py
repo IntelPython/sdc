@@ -634,41 +634,7 @@ class DistributedPass(object):
             return out
 
         if self._is_call(func_var, ['dot', np]):
-            arg0 = rhs.args[0].name
-            arg1 = rhs.args[1].name
-            ndim0 = self.typemap[arg0].ndim
-            ndim1 = self.typemap[arg1].ndim
-            # Fortran layout is caused by X.T and means transpose
-            t0 = arg0 in self._T_arrs
-            t1 = arg1 in self._T_arrs
-
-            # reduction across dataset
-            if self._is_1D_arr(arg0) and self._is_1D_arr(arg1):
-                dprint("run dot dist reduce:", arg0, arg1)
-                reduce_op = Reduce_Type.Sum
-                reduce_var = assign.target
-                out += self._gen_reduce(reduce_var, reduce_op, scope, loc)
-
-            # assign starts/counts/sizes data structures for output array
-            if ndim0 == 2 and ndim1 == 1 and not t0 and self._is_1D_arr(arg0):
-                # special case were arg1 vector is treated as column vector
-                # samples dot weights: np.dot(X,w)
-                # output is 1D array same size as dim 0 of X
-                assert self.typemap[lhs].ndim == 1
-                assert self._is_1D_arr(lhs)
-                self._array_starts[lhs] = [self._array_starts[arg0][0]]
-                self._array_counts[lhs] = [self._array_counts[arg0][0]]
-                self._array_sizes[lhs] = [self._array_sizes[rhs.name][0]]
-                dprint("run dot case 1 Xw:", arg0, arg1)
-            if ndim0 == 2 and ndim1 == 2 and not t0 and not t1:
-                # samples dot weights: np.dot(X,w)
-                assert self._is_1D_arr(lhs)
-                # first dimension is same as X
-                # second dimension not needed
-                self._array_starts[lhs] = [self._array_starts[arg0][0], -1]
-                self._array_counts[lhs] = [self._array_counts[arg0][0], -1]
-                self._array_sizes[lhs] = [self._array_sizes[arg0][0], -1]
-                dprint("run dot case 4 Xw:", arg0, arg1)
+            return self._run_call_np_dot(lhs, assign, rhs.args, block_body)
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
         if call_list == ['predict']:
@@ -679,6 +645,46 @@ class DistributedPass(object):
                 self._array_starts[lhs] = [self._array_starts[in_arr][0]]
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
+
+        return out
+
+    def _run_call_np_dot(self, lhs, assign, args, block_body):
+        out = [assign]
+        arg0 = args[0].name
+        arg1 = args[1].name
+        ndim0 = self.typemap[arg0].ndim
+        ndim1 = self.typemap[arg1].ndim
+        t0 = arg0 in self._T_arrs
+        t1 = arg1 in self._T_arrs
+
+        # reduction across dataset
+        if self._is_1D_arr(arg0) and self._is_1D_arr(arg1):
+            dprint("run dot dist reduce:", arg0, arg1)
+            reduce_op = Reduce_Type.Sum
+            reduce_var = assign.target
+            out += self._gen_reduce(reduce_var, reduce_op, reduce_var.scope,
+                                    reduce_var.loc)
+
+        # assign starts/counts/sizes data structures for output array
+        if ndim0 == 2 and ndim1 == 1 and not t0 and self._is_1D_arr(arg0):
+            # special case were arg1 vector is treated as column vector
+            # samples dot weights: np.dot(X,w)
+            # output is 1D array same size as dim 0 of X
+            assert self.typemap[lhs].ndim == 1
+            assert self._is_1D_arr(lhs)
+            self._array_starts[lhs] = [self._array_starts[arg0][0]]
+            self._array_counts[lhs] = [self._array_counts[arg0][0]]
+            self._array_sizes[lhs] = [self._array_sizes[arg0][0]]
+            dprint("run dot case 1 Xw:", arg0, arg1)
+        if ndim0 == 2 and ndim1 == 2 and not t0 and not t1:
+            # samples dot weights: np.dot(X,w)
+            assert self._is_1D_arr(lhs)
+            # first dimension is same as X
+            # second dimension not needed
+            self._array_starts[lhs] = [self._array_starts[arg0][0], -1]
+            self._array_counts[lhs] = [self._array_counts[arg0][0], -1]
+            self._array_sizes[lhs] = [self._array_sizes[arg0][0], -1]
+            dprint("run dot case 4 Xw:", arg0, arg1)
 
         return out
 
