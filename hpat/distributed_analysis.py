@@ -295,56 +295,8 @@ class DistributedAnalysis(object):
                 return
 
         if self._is_call(func_var, ['dot', np]):
-            arg0 = args[0].name
-            arg1 = args[1].name
-            ndim0 = self.typemap[arg0].ndim
-            ndim1 = self.typemap[arg1].ndim
-            dist0 = array_dists[arg0]
-            dist1 = array_dists[arg1]
-            # Fortran layout is caused by X.T and means transpose
-            t0 = arg0 in self._T_arrs
-            t1 = arg1 in self._T_arrs
-            if ndim0 == 1 and ndim1 == 1:
-                # vector dot, both vectors should have same layout
-                new_dist = Distribution(min(array_dists[arg0].value,
-                                            array_dists[arg1].value))
-                array_dists[arg0] = new_dist
-                array_dists[arg1] = new_dist
-                return
-            if ndim0 == 2 and ndim1 == 1 and not t0:
-                # special case were arg1 vector is treated as column vector
-                # samples dot weights: np.dot(X,w)
-                # w is always REP
-                array_dists[arg1] = Distribution.REP
-                if lhs not in array_dists:
-                    array_dists[lhs] = Distribution.OneD
-                # lhs and X have same distribution
-                self._meet_array_dists(lhs, arg0, array_dists)
-                dprint("dot case 1 Xw:", arg0, arg1)
-                return
-            if ndim0 == 1 and ndim1 == 2 and not t1:
-                # reduction across samples np.dot(Y,X)
-                # lhs is always REP
-                array_dists[lhs] = Distribution.REP
-                # Y and X have same distribution
-                self._meet_array_dists(arg0, arg1, array_dists)
-                dprint("dot case 2 YX:", arg0, arg1)
-                return
-            if ndim0 == 2 and ndim1 == 2 and t0 and not t1:
-                # reduction across samples np.dot(X.T,Y)
-                # lhs is always REP
-                array_dists[lhs] = Distribution.REP
-                # Y and X have same distribution
-                self._meet_array_dists(arg0, arg1, array_dists)
-                dprint("dot case 3 XtY:", arg0, arg1)
-                return
-            if ndim0 == 2 and ndim1 == 2 and not t0 and not t1:
-                # samples dot weights: np.dot(X,w)
-                # w is always REP
-                array_dists[arg1] = Distribution.REP
-                self._meet_array_dists(lhs, arg0, array_dists)
-                dprint("dot case 4 Xw:", arg0, arg1)
-                return
+            self._analyze_call_np_dot(lhs, args, array_dists)
+            return
 
         if call_list == ['train']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
@@ -367,6 +319,62 @@ class DistributedAnalysis(object):
                 return
 
         # set REP if not found
+        self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+
+    def _analyze_call_np_dot(self, lhs, args, array_dists):
+
+        arg0 = args[0].name
+        arg1 = args[1].name
+        ndim0 = self.typemap[arg0].ndim
+        ndim1 = self.typemap[arg1].ndim
+        dist0 = array_dists[arg0]
+        dist1 = array_dists[arg1]
+        # Fortran layout is caused by X.T and means transpose
+        t0 = arg0 in self._T_arrs
+        t1 = arg1 in self._T_arrs
+        if ndim0 == 1 and ndim1 == 1:
+            # vector dot, both vectors should have same layout
+            new_dist = Distribution(min(array_dists[arg0].value,
+                                        array_dists[arg1].value))
+            array_dists[arg0] = new_dist
+            array_dists[arg1] = new_dist
+            return
+        if ndim0 == 2 and ndim1 == 1 and not t0:
+            # special case were arg1 vector is treated as column vector
+            # samples dot weights: np.dot(X,w)
+            # w is always REP
+            array_dists[arg1] = Distribution.REP
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            # lhs and X have same distribution
+            self._meet_array_dists(lhs, arg0, array_dists)
+            dprint("dot case 1 Xw:", arg0, arg1)
+            return
+        if ndim0 == 1 and ndim1 == 2 and not t1:
+            # reduction across samples np.dot(Y,X)
+            # lhs is always REP
+            array_dists[lhs] = Distribution.REP
+            # Y and X have same distribution
+            self._meet_array_dists(arg0, arg1, array_dists)
+            dprint("dot case 2 YX:", arg0, arg1)
+            return
+        if ndim0 == 2 and ndim1 == 2 and t0 and not t1:
+            # reduction across samples np.dot(X.T,Y)
+            # lhs is always REP
+            array_dists[lhs] = Distribution.REP
+            # Y and X have same distribution
+            self._meet_array_dists(arg0, arg1, array_dists)
+            dprint("dot case 3 XtY:", arg0, arg1)
+            return
+        if ndim0 == 2 and ndim1 == 2 and not t0 and not t1:
+            # samples dot weights: np.dot(X,w)
+            # w is always REP
+            array_dists[arg1] = Distribution.REP
+            self._meet_array_dists(lhs, arg0, array_dists)
+            dprint("dot case 4 Xw:", arg0, arg1)
+            return
+
+        # set REP if no pattern matched
         self._analyze_call_set_REP(lhs, func_var, args, array_dists)
 
     def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
