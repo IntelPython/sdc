@@ -594,44 +594,7 @@ class DistributedPass(object):
             return [assign]
 
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
-            if not self._is_1D_Var_arr(rhs.args[0].name):
-                if self._is_1D_arr(rhs.args[0].name):
-                    in_1d_arr = rhs.args[0].name
-                    self._array_starts[lhs] = self._array_starts[in_1d_arr]
-                    self._array_counts[lhs] = self._array_counts[in_1d_arr]
-                    self._array_sizes[lhs] = self._array_sizes[in_1d_arr]
-                else:
-                    warnings.warn("array {} is not 1D_Block_Var".format(
-                                    rhs.args[0].name))
-                return out
-
-            arr = rhs.args[0]
-            ndim = self.typemap[arr.name].ndim
-            out = self._gen_1D_Var_len(arr)
-            total_length = out[-1].target
-            div_nodes, start_var, count_var = self._gen_1D_div(total_length, scope, loc,
-                                                         "$rebalance", "get_node_portion",
-                                                         distributed_api.get_node_portion)
-            out += div_nodes
-
-            # XXX: get sizes in lower dimensions
-            self._array_starts[lhs] = [-1]*ndim
-            self._array_counts[lhs] = [-1]*ndim
-            self._array_sizes[lhs] = [-1]*ndim
-            self._array_starts[lhs][0] = start_var
-            self._array_counts[lhs][0] = count_var
-            self._array_sizes[lhs][0] = total_length
-
-            def f(arr, count):  # pragma: no cover
-                b_arr = hpat.distributed_api.rebalance_array_parallel(arr, count)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr.name], types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [arr, count_var])
-            out += f_block.body[:-3]
-            out[-1].target = assign.target
-            return out
+            return self._run_call_rebalance_array(lhs, assign, rhs.args, block_body)
 
         if self._is_call(func_var, ['dot', np]):
             return self._run_call_np_dot(lhs, assign, rhs.args, block_body)
@@ -646,6 +609,47 @@ class DistributedPass(object):
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
+        return out
+
+    def _run_call_rebalance_array(self, lhs, assign, args, block_body):
+        out = [assign]
+        if not self._is_1D_Var_arr(args[0].name):
+            if self._is_1D_arr(args[0].name):
+                in_1d_arr = args[0].name
+                self._array_starts[lhs] = self._array_starts[in_1d_arr]
+                self._array_counts[lhs] = self._array_counts[in_1d_arr]
+                self._array_sizes[lhs] = self._array_sizes[in_1d_arr]
+            else:
+                warnings.warn("array {} is not 1D_Block_Var".format(
+                                args[0].name))
+            return out
+
+        arr = args[0]
+        ndim = self.typemap[arr.name].ndim
+        out = self._gen_1D_Var_len(arr)
+        total_length = out[-1].target
+        div_nodes, start_var, count_var = self._gen_1D_div(
+            total_length, arr.scope, arr.loc, "$rebalance", "get_node_portion",
+            distributed_api.get_node_portion)
+        out += div_nodes
+
+        # XXX: get sizes in lower dimensions
+        self._array_starts[lhs] = [-1]*ndim
+        self._array_counts[lhs] = [-1]*ndim
+        self._array_sizes[lhs] = [-1]*ndim
+        self._array_starts[lhs][0] = start_var
+        self._array_counts[lhs][0] = count_var
+        self._array_sizes[lhs][0] = total_length
+
+        def f(arr, count):  # pragma: no cover
+            b_arr = hpat.distributed_api.rebalance_array_parallel(arr, count)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                      (self.typemap[arr.name], types.intp),
+                                      self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr, count_var])
+        out += f_block.body[:-3]
+        out[-1].target = assign.target
         return out
 
     def _run_call_np_dot(self, lhs, assign, args, block_body):
