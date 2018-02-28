@@ -10,7 +10,7 @@ easily. On Linux/Mac::
     source activate HPAT
     conda install numpy scipy pandas
     conda install pyarrow=0.8.* mpich -c conda-forge
-    conda install hpat -c ehsantn
+    conda install hpat numba -c ehsantn
 
 On Windows::
 
@@ -18,7 +18,7 @@ On Windows::
     activate HPAT
     conda install numpy scipy pandas
     conda install pyarrow=0.7.* -c conda-forge
-    conda install hpat -c ehsantn
+    conda install hpat numba -c ehsantn
 
 Building HPAT from Source
 -------------------------
