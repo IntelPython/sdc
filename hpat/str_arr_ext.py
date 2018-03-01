@@ -7,7 +7,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-
+from glob import glob
 
 class StringArray(object):
     def __init__(self, offsets, data, size):
@@ -176,6 +176,7 @@ ll.add_symbol('print_int', hstr_ext.print_int)
 
 import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
+ll.add_symbol('c_glob', hstr_ext.c_glob)
 
 
 def construct_string_array(context, builder):
@@ -339,3 +340,43 @@ def lower_string_arr_getitem(context, builder, sig, args):
                                                        name="getitem_string_array_std")
     return builder.call(fn_getitem, [string_array.offsets,
                                      string_array.data, args[1]])
+
+
+#### glob support
+
+
+@infer_global(glob)
+class GlobInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        if not kws and len(args)==1 and args[0]==string_type:
+            return signature(string_array_type, *args)
+
+
+@lower_builtin(glob, string_type)
+def lower_glob(context, builder, sig, args):
+    path = args[0]
+    typ = sig.return_type
+    dtype = StringArrayPayloadType()
+    meminfo, data_pointer = construct_string_array(context, builder)
+    string_array = cgutils.create_struct_proxy(dtype)(context, builder)
+
+    # call glob in C
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(64).as_pointer(),
+                             lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="c_glob")
+    builder.call(fn, [string_array._get_ptr_by_name('offsets'),
+                            string_array._get_ptr_by_name('data'),
+                            string_array._get_ptr_by_name('size'),
+                            path])
+
+    builder.store(string_array._getvalue(),
+                  data_pointer)
+    inst_struct = context.make_helper(builder, typ)
+    inst_struct.meminfo = meminfo
+    ret = inst_struct._getvalue()
+    #context.nrt.decref(builder, ty, ret)
+
+    return impl_ret_new_ref(context, builder, typ, ret)

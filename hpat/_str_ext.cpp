@@ -11,6 +11,10 @@ using std::regex_search;
 // using boost::regex;
 // using boost::regex_search;
 
+#ifndef _WIN32
+#include <glob.h>
+#endif
+
 struct str_arr_payload {
     int64_t size;
     int32_t *offsets;
@@ -46,6 +50,9 @@ void* str_from_int32(int in);
 void* str_from_int64(int64_t in);
 void* str_from_float32(float in);
 void* str_from_float64(double in);
+void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
+                                                            std::string* path);
+
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -105,6 +112,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_from_float32)));
     PyObject_SetAttrString(m, "str_from_float64",
                             PyLong_FromVoidPtr((void*)(&str_from_float64)));
+    PyObject_SetAttrString(m, "c_glob",
+                            PyLong_FromVoidPtr((void*)(&c_glob)));
     return m;
 }
 
@@ -300,4 +309,50 @@ void* str_from_float32(float in)
 void* str_from_float64(double in)
 {
     return new std::string(std::to_string(in));
+}
+
+// glob support
+void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
+                                                            std::string* path)
+{
+    // std::cout << "glob: " << *path << std::endl;
+    *num_strings = 0;
+    #ifndef _WIN32
+    glob_t globBuf;
+    int ret = glob(path->c_str(), 0, 0, &globBuf);
+
+    if (ret!=0)
+    {
+        if (ret==GLOB_NOMATCH)
+        {
+            return;
+        }
+        // TODO: match errors, e.g. GLOB_ABORTED GLOB_NOMATCH GLOB_NOSPACE
+        std::cerr << "glob error" << '\n';
+        return;
+    }
+
+    *num_strings = globBuf.gl_pathc;
+    *offsets = new uint32_t[globBuf.gl_pathc+1];
+    size_t total_size = 0;
+
+    for (unsigned int i=0; i<globBuf.gl_pathc; i++)
+    {
+        (*offsets)[i] = (uint32_t)total_size;
+        size_t curr_size = strlen(globBuf.gl_pathv[i]);
+        total_size += curr_size;
+    }
+    (*offsets)[globBuf.gl_pathc] = (uint32_t) total_size;
+
+    *data = new char[total_size];
+    for (unsigned int i=0; i<globBuf.gl_pathc; i++)
+    {
+        strcpy(*data+(*offsets)[i], globBuf.gl_pathv[i]);
+    }
+    #else
+    // TODO: support glob on Windows
+    std::std::cerr << "no glob support on windows yet" << '\n';
+    #endif
+
+    return;
 }
