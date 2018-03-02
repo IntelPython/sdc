@@ -18,3 +18,11 @@ except ImportError:
     _has_ros = False
 else:
     _has_ros = True
+
+try:
+    import cv_wrapper
+except ImportError:
+    _has_opencv = False
+else:
+    _has_opencv = True
+    import hpat.cv_ext
