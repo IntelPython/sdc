@@ -45,9 +45,9 @@ if 'OPENCV_DIR' in os.environ:
     _has_opencv = True
     OPENCV_DIR = os.environ['OPENCV_DIR']
     # TODO: fix opencv link
-    import subprocess
-    p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
-    cv_link_args = p_cvconf.stdout.decode().split()
+    # import subprocess
+    # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
+    # cv_link_args = p_cvconf.stdout.decode().split()
 
 
 MPI_LIBS = ['mpi']
@@ -125,7 +125,9 @@ ext_ros = Extension(name="ros_cpp",
 
 ext_cv_wrapper = Extension(name="cv_wrapper",
                              include_dirs = [OPENCV_DIR+'/include'],
-                             extra_link_args = cv_link_args,
+                             libraries = ['opencv_core', 'opencv_imgproc',
+                                          'opencv_imgcodecs', 'opencv_highgui'],
+                             #extra_link_args = cv_link_args,
                              sources=["hpat/_cv.cpp"],
                              language="c++",
                              )
