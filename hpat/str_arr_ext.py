@@ -2,8 +2,8 @@ import numba
 import hpat
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
-from numba.extending import (typeof_impl, type_callable, models, register_model,
-                             make_attribute_wrapper, lower_builtin, box, lower_getattr)
+from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr)
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
@@ -56,7 +56,7 @@ class StringArrayPayloadType(types.Type):
 class StringArrayPayloadModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         members = [
-            ('size', types.intp),
+            ('size', types.int64),
             ('offsets', types.Opaque('offsets')),
             ('data', hpat.str_ext.string_type),
         ]
@@ -172,6 +172,7 @@ ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
 ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
+ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
 ll.add_symbol('print_int', hstr_ext.print_int)
 
 import hstr_ext
@@ -339,3 +340,51 @@ def lower_string_arr_getitem(context, builder, sig, args):
                                                        name="getitem_string_array_std")
     return builder.call(fn_getitem, [string_array.offsets,
                                      string_array.data, args[1]])
+
+
+
+
+import pandas
+
+@typeof_impl.register(pandas.Series)
+def typeof_pd_str_series(val, c):
+    return string_array_type
+
+
+@unbox(StringArrayType)
+def unbox_str(typ, val, c):
+    """
+    Unbox a Pandas String Series. We just redirect to StringArray implementation.
+    """
+    dtype = StringArrayPayloadType()
+    payload = cgutils.create_struct_proxy(dtype)(c.context, c.builder)
+
+    # function signature of string_array_from_sequence
+    # we use void* instead of PyObject*
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(8).as_pointer(),
+                             lir.IntType(64).as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),])
+    fn = c.builder.module.get_or_insert_function(fnty, name="string_array_from_sequence")
+    c.builder.call(fn, [val,
+                        payload._get_ptr_by_name('size'),
+                        payload._get_ptr_by_name('offsets'),
+                        payload._get_ptr_by_name('data'),])
+
+    # the raw data is now copied to payload
+    # The native representation is a proxy to the payload, we need to
+    # get a proxy and attach the payload and meminfo
+    meminfo, data_pointer = construct_string_array(c.context, c.builder)
+    c.builder.store(payload._getvalue(), data_pointer)
+    inst_struct = c.context.make_helper(c.builder, typ)
+    inst_struct.meminfo = meminfo
+
+    # FIXME how to check that the returned size is > 0?
+    is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+    return NativeValue(inst_struct._getvalue(), is_error=is_error)
+
+# zero = context.get_constant(types.intp, 0)
+# cond = builder.icmp_signed('>=', size, zero)
+# with cgutils.if_unlikely(builder, cond):
+# http://llvmlite.readthedocs.io/en/latest/user-guide/ir/ir-builder.html#comparisons

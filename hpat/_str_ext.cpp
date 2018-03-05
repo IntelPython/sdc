@@ -10,10 +10,10 @@ using std::regex_search;
 // #include <boost/regex.hpp>
 // using boost::regex;
 // using boost::regex_search;
-
+extern "C" {
 struct str_arr_payload {
     int64_t size;
-    int32_t *offsets;
+    uint32_t *offsets;
     char* data;
 };
 
@@ -29,6 +29,7 @@ void* str_substr_int(std::string* str, int64_t index);
 int64_t str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
 int64_t get_str_len(std::string* str);
+void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer);
 void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
                                                             int64_t total_size);
 
@@ -79,6 +80,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_to_float64)));
     PyObject_SetAttrString(m, "get_str_len",
                             PyLong_FromVoidPtr((void*)(&get_str_len)));
+    PyObject_SetAttrString(m, "string_array_from_sequence",
+                            PyLong_FromVoidPtr((void*)(&string_array_from_sequence)));
     PyObject_SetAttrString(m, "allocate_string_array",
                             PyLong_FromVoidPtr((void*)(&allocate_string_array)));
     PyObject_SetAttrString(m, "setitem_string_array",
@@ -300,4 +303,67 @@ void* str_from_float32(float in)
 void* str_from_float64(double in)
 {
     return new std::string(std::to_string(in));
+}
+
+#if PY_VERSION_HEX >= 0x03000000
+#define PyString_Check(name) PyUnicode_Check(name)
+#define PyString_AsString(str) PyUnicode_AsUTF8(str)
+#endif
+
+/// @brief create a concatenated string and offset table from a pandas series of strings
+/// @note strings in returned buffer will not be 0-terminated.
+/// @param[out] buffer newly allocated buffer with concatenated strings, or NULL
+/// @param[out] no_strings number of strings concatenated, value < 0 indicates an error
+/// @param[out] offset_table newly allocated array of no_strings+1 integers
+///                          first no_strings entries denote offsets, last entry indicates size of output array
+/// @param[in]  obj Python Sequence object, intended to be a pandas series of string
+void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return;}
+
+    auto gilstate = PyGILState_Ensure();
+
+    *no_strings = -1;
+    *offset_table = NULL;
+    *buffer = NULL;
+
+    CHECK(PySequence_Check(obj), "expecting a PySequence");
+    CHECK(no_strings && offset_table && buffer, "output arguments must not be NULL");
+
+    Py_ssize_t n = PyObject_Size(obj);
+    if(n == 0 ) {
+        // empty sequence, this is not an error, need to set size
+        PyGILState_Release(gilstate);
+        no_strings = 0;
+        return;
+    }
+
+    uint32_t * offsets = new uint32_t[n];
+    std::vector<const char *> tmp_store(n);
+    size_t len = 0;
+    for(Py_ssize_t i = 0; i < n; ++i) {
+        offsets[i] = len;
+        PyObject * s = PySequence_GetItem(obj, i);
+        CHECK(s, "getting element failed");
+        CHECK(PyString_Check(s), "expecting a string");
+        tmp_store[i] = PyString_AsString(s);
+        CHECK(tmp_store[i], "string conversion failed");
+        len += strlen(tmp_store[i]);
+        Py_DECREF(s);
+    }
+    offsets[n] = len;
+
+    char * outbuf = new char[len];
+    for(Py_ssize_t i = 0; i < n; ++i) {
+        memcpy(outbuf+offsets[i], tmp_store[i], offsets[i+1]-offsets[i]);
+    }
+
+    PyGILState_Release(gilstate);
+
+    *offset_table = offsets;
+    *no_strings = n;
+    *buffer = outbuf;
+
+    return;
+}
 }
