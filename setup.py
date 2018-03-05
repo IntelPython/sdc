@@ -37,6 +37,19 @@ _has_ros = False
 if 'ROS_PACKAGE_PATH' in os.environ:
     _has_ros = True
 
+
+_has_opencv = False
+OPENCV_DIR = ""
+
+if 'OPENCV_DIR' in os.environ:
+    _has_opencv = True
+    OPENCV_DIR = os.environ['OPENCV_DIR']
+    # TODO: fix opencv link
+    # import subprocess
+    # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
+    # cv_link_args = p_cvconf.stdout.decode().split()
+
+
 MPI_LIBS = ['mpi']
 H5_COMPILE_FLAGS = []
 if platform.system() == 'Windows':
@@ -110,6 +123,15 @@ ext_ros = Extension(name="ros_cpp",
                              sources=["hpat/_ros.cpp"]
                              )
 
+ext_cv_wrapper = Extension(name="cv_wrapper",
+                             include_dirs = [OPENCV_DIR+'/include'],
+                             libraries = ['opencv_core', 'opencv_imgproc',
+                                          'opencv_imgcodecs', 'opencv_highgui'],
+                             #extra_link_args = cv_link_args,
+                             sources=["hpat/_cv.cpp"],
+                             language="c++",
+                             )
+
 _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile]
 
 if _has_h5py:
@@ -120,6 +142,8 @@ if _has_daal:
     _ext_mods.append(ext_daal_wrapper)
 if _has_ros:
     _ext_mods.append(ext_ros)
+if _has_opencv:
+    _ext_mods.append(ext_cv_wrapper)
 
 setup(name='hpat',
       version='0.2.0',
