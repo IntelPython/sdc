@@ -16,7 +16,7 @@ using std::regex_search;
 #endif
 
 extern "C" {
-    
+
 struct str_arr_payload {
     int64_t size;
     uint32_t *offsets;
@@ -349,7 +349,7 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         return;
     }
 
-    uint32_t * offsets = new uint32_t[n];
+    uint32_t * offsets = new uint32_t[n+1];
     std::vector<const char *> tmp_store(n);
     size_t len = 0;
     for(Py_ssize_t i = 0; i < n; ++i) {
@@ -377,7 +377,7 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
 
     return;
 }
-    
+
 // glob support
 void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
                                                             std::string* path)
