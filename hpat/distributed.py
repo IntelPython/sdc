@@ -97,7 +97,7 @@ class DistributedPass(object):
             # parfor params need to be updated for multithread_mode since some
             # new variables like alloc_start are introduced by distributed pass
             # and are used in later parfors
-            parfor_ids = get_parfor_params(self.func_ir.blocks)
+            parfor_ids = get_parfor_params(self.func_ir.blocks, True)
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
