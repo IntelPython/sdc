@@ -99,8 +99,8 @@ ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     #include_dirs=[PREFIX_DIR+'/include/'],
                     #libraries=['boost_regex'],
-                    extra_compile_args=['-std=c++11 -g -O0'],
-                    extra_link_args=['-std=c++11 -g -O0'],
+                    extra_compile_args=['-std=c++11'],
+                    extra_link_args=['-std=c++11'],
                     **np_compile_args,
                     #language="c++"
 )
