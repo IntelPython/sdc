@@ -1,6 +1,8 @@
 import unittest
 import hpat
 import numpy as np
+import pandas as pd
+import gc
 from hpat.str_arr_ext import StringArray
 
 class TestString(unittest.TestCase):
@@ -83,7 +85,7 @@ class TestString(unittest.TestCase):
         def test_impl():
             return StringArray(['ABC', 'BB', 'CDEF'])
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(), ['ABC', 'BB', 'CDEF'])
+        self.assertTrue(np.array_equal(hpat_func(), ['ABC', 'BB', 'CDEF']))
 
     def test_string_array_comp(self):
         def test_impl():
@@ -92,6 +94,18 @@ class TestString(unittest.TestCase):
             return B.sum()
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), 1)
+
+    def test_string_series(self):
+        def test_impl(ds):
+            rs = ds == 'one'
+            return ds, rs
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1,2,3]*33, 'B': ['one', 'two', 'three']*33})
+        ds, rs = hpat_func(df.B)
+        gc.collect()
+        self.assertTrue(isinstance(ds, np.ndarray) and isinstance(rs, np.ndarray))
+        self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] == True and rs[2] == False)
+
 
 if __name__ == "__main__":
     unittest.main()
