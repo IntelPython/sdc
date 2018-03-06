@@ -1,6 +1,16 @@
 from setuptools import setup, Extension
 import platform, os
 
+# Note we don't import Numpy at the toplevel, since setup.py
+# should be able to run without Numpy for pip to discover the
+# build dependencies
+import numpy.distutils.misc_util as np_misc
+
+# Inject required options for extensions compiled against the Numpy
+# C API (include dirs, library dirs etc.)
+np_compile_args = np_misc.get_info('npymath')
+
+
 def readme():
     with open('README.rst') as f:
         return f.read()
@@ -86,13 +96,14 @@ ext_dict = Extension(name="hdict_ext",
                              )
 
 ext_str = Extension(name="hstr_ext",
-                             sources=["hpat/_str_ext.cpp"],
-                             #include_dirs=[PREFIX_DIR+'/include/'],
-                             #libraries=['boost_regex'],
-                             extra_compile_args=['-std=c++11'],
-                             extra_link_args=['-std=c++11'],
-                             #language="c++"
-                             )
+                    sources=["hpat/_str_ext.cpp"],
+                    #include_dirs=[PREFIX_DIR+'/include/'],
+                    #libraries=['boost_regex'],
+                    extra_compile_args=['-std=c++11'],
+                    extra_link_args=['-std=c++11'],
+                    **np_compile_args,
+                    #language="c++"
+)
 
 ext_quantile = Extension(name="quantile_alg",
                              libraries = MPI_LIBS,

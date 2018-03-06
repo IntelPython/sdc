@@ -289,7 +289,7 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         one, two, three = hpat_func()
         self.assertTrue(isinstance(one, np.ndarray))
-        self.assertTrue(isinstance(two, list))
+        self.assertTrue(isinstance(two,  np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
     def test_join1(self):

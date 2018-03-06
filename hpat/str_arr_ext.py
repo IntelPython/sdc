@@ -173,6 +173,7 @@ ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
 ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
 ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
+ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
 
 import hstr_ext
@@ -240,8 +241,7 @@ def impl_string_array_single(context, builder, sig, args):
     with cgutils.for_range(builder, string_list.size) as loop:
         str_value = string_list.getitem(loop.index)
         str_len = builder.call(fn_len, [str_value])
-        builder.store(builder.add(builder.load(
-            total_size), str_len), total_size)
+        builder.store(builder.add(builder.load(total_size), str_len), total_size)
 
     # allocate string array
     fnty = lir.FunctionType(lir.VoidType(),
@@ -288,36 +288,19 @@ def box_str(typ, val, c):
     inst_struct = c.context.make_helper(c.builder, typ, val)
     data_pointer = c.context.nrt.meminfo_data(c.builder, inst_struct.meminfo)
     # cgutils.printf(builder, "data [%p]\n", data_pointer)
-    data_pointer = c.builder.bitcast(data_pointer,
-                                     c.context.get_data_type(dtype).as_pointer())
+    data_pointer = c.builder.bitcast(data_pointer, c.context.get_data_type(dtype).as_pointer())
+    string_array = cgutils.create_struct_proxy(dtype)(c.context, c.builder, c.builder.load(data_pointer))
 
-    string_array = cgutils.create_struct_proxy(dtype)(
-        c.context, c.builder, c.builder.load(data_pointer))
-
-    # fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(64)])
-    # fn_print_int = c.builder.module.get_or_insert_function(fnty,
-    #                                             name="print_int")
-    # c.builder.call(fn_print_int, [string_array.size])
-
-    string_list = c.pyapi.list_new(string_array.size)
-    res = cgutils.alloca_once(c.builder, lir.IntType(8).as_pointer())
-    c.builder.store(string_list, res)
-
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer(),
+    fnty = lir.FunctionType(c.context.get_argument_type(types.pyobject), #lir.IntType(8).as_pointer(),
+                            [lir.IntType(64),
                              lir.IntType(8).as_pointer(),
-                             lir.IntType(64)])
-    fn_getitem = c.builder.module.get_or_insert_function(fnty,
-                                                         name="getitem_string_array")
+                             lir.IntType(8).as_pointer()])
+    fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
 
-    with cgutils.for_range(c.builder, string_array.size) as loop:
-        c_str = c.builder.call(fn_getitem, [string_array.offsets,
-                                            string_array.data, loop.index])
-        pystr = c.pyapi.string_from_string(c_str)
-        c.pyapi.list_setitem(string_list, loop.index, pystr)
+    arr = c.builder.call(fn_get, [string_array.size, string_array.offsets, string_array.data])
 
     c.context.nrt.decref(c.builder, typ, val)
-    return c.builder.load(res)
+    return arr #c.builder.load(arr)
 
 
 @lower_builtin('getitem', StringArrayType, types.Integer)
@@ -331,8 +314,7 @@ def lower_string_arr_getitem(context, builder, sig, args):
     data_pointer = builder.bitcast(data_pointer,
                                    context.get_data_type(dtype).as_pointer())
 
-    string_array = cgutils.create_struct_proxy(dtype)(
-        context, builder, builder.load(data_pointer))
+    string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(),
                              lir.IntType(8).as_pointer(),
@@ -342,11 +324,13 @@ def lower_string_arr_getitem(context, builder, sig, args):
     return builder.call(fn_getitem, [string_array.offsets,
                                      string_array.data, args[1]])
 
+
 import pandas
 
 @typeof_impl.register(pandas.Series)
 def typeof_pd_str_series(val, c):
-    return string_array_type
+    if isinstance(val[0], str):  # and isinstance(val[-1], str):
+        return string_array_type
 
 
 @unbox(StringArrayType)

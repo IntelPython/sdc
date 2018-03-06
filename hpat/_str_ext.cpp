@@ -1,7 +1,10 @@
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
 #include <string>
 #include <iostream>
 #include <vector>
+
 
 #include <regex>
 using std::regex;
@@ -36,6 +39,7 @@ int64_t str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
 int64_t get_str_len(std::string* str);
 void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer);
+void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, char * buffer);
 void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
                                                             int64_t total_size);
 
@@ -65,6 +69,9 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
     if (m == NULL)
         return NULL;
 
+    // init numpy
+    import_array();
+
     PyObject_SetAttrString(m, "init_string",
                             PyLong_FromVoidPtr((void*)(&init_string)));
     PyObject_SetAttrString(m, "init_string_const",
@@ -91,6 +98,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&get_str_len)));
     PyObject_SetAttrString(m, "string_array_from_sequence",
                             PyLong_FromVoidPtr((void*)(&string_array_from_sequence)));
+    PyObject_SetAttrString(m, "np_array_from_string_array",
+                            PyLong_FromVoidPtr((void*)(&np_array_from_string_array)));
     PyObject_SetAttrString(m, "allocate_string_array",
                             PyLong_FromVoidPtr((void*)(&allocate_string_array)));
     PyObject_SetAttrString(m, "setitem_string_array",
@@ -319,6 +328,7 @@ void* str_from_float64(double in)
 #if PY_VERSION_HEX >= 0x03000000
 #define PyString_Check(name) PyUnicode_Check(name)
 #define PyString_AsString(str) PyUnicode_AsUTF8(str)
+#define PyString_FromStringAndSize(str, sz) PyUnicode_FromStringAndSize(str, sz)
 #endif
 
 /// @brief create a concatenated string and offset table from a pandas series of strings
@@ -376,6 +386,36 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
     *buffer = outbuf;
 
     return;
+#undef CHECK
+}
+
+/// @brief  From a StringArray create a numpy array of string objects
+/// @return numpy array of str objects
+/// @param[in] no_strings number of strings found in buffer
+/// @param[in] offset_table offsets for strings in buffer
+/// @param[in] buffer with concatenated strings (from StringArray)
+void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, char * buffer)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return NULL;}
+    auto gilstate = PyGILState_Ensure();
+
+    npy_intp dims[] = {no_strings};
+    PyObject* ret = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    CHECK(ret, "allocating numpy array failed");
+
+    for(int64_t i = 0; i < no_strings; ++i) {
+        PyObject * s = PyString_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
+        CHECK(s, "creating Python string/unicode object failed");
+        auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
+        CHECK(p, "getting offset in numpy array failed");
+        int err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        CHECK(err==0, "setting item in numpy array failed");
+        Py_DECREF(s);
+    }
+
+    PyGILState_Release(gilstate);
+    return ret;
+#undef CHECK
 }
 
 // glob support
