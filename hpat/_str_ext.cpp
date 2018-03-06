@@ -386,24 +386,36 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
     *buffer = outbuf;
 
     return;
+#undef CHECK
 }
 
+/// @brief  From a StringArray create a numpy array of string objects
+/// @return numpy array of str objects
+/// @param[in] no_strings number of strings found in buffer
+/// @param[in] offset_table offsets for strings in buffer
+/// @param[in] buffer with concatenated strings (from StringArray)
 void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, char * buffer)
 {
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return NULL;}
     auto gilstate = PyGILState_Ensure();
 
     npy_intp dims[] = {no_strings};
     PyObject* ret = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    CHECK(ret, "allocating numpy array failed");
 
     for(int64_t i = 0; i < no_strings; ++i) {
         PyObject * s = PyString_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
+        CHECK(s, "creating Python string/unicode object failed");
         auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
-        PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        CHECK(p, "getting offset in numpy array failed");
+        int err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        CHECK(err==0, "setting item in numpy array failed");
         Py_DECREF(s);
     }
 
     PyGILState_Release(gilstate);
     return ret;
+#undef CHECK
 }
 
 // glob support
