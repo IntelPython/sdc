@@ -36,6 +36,7 @@ such as Numba and LLVM on Ubuntu Linux::
     conda install pyarrow=0.8.* mpich -c conda-forge
     conda install h5py llvmlite -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
+    git clone https://github.com/IntelLabs/hpat
     mkdir req_install
     pushd req_install
     git clone https://github.com/IntelLabs/numba
