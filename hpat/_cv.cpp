@@ -9,6 +9,8 @@ void* cv_imread(int64_t *shapes, uint8_t **data, std::string* file_name);
 void cv_resize(int64_t new_rows, int64_t new_cols, uint8_t *data,
                 uint8_t *in_data, int64_t rows, int64_t cols);
 void cv_mat_release(cv::Mat *img);
+void cv_delete_buf(void *data);
+void* cv_imdecode(int64_t *out_shapes, void* in_data, int64_t in_size, int64_t flags);
 
 PyMODINIT_FUNC PyInit_cv_wrapper(void) {
     PyObject *m;
@@ -22,8 +24,12 @@ PyMODINIT_FUNC PyInit_cv_wrapper(void) {
                             PyLong_FromVoidPtr((void*)(&cv_imread)));
     PyObject_SetAttrString(m, "cv_mat_release",
                             PyLong_FromVoidPtr((void*)(&cv_mat_release)));
+    PyObject_SetAttrString(m, "cv_delete_buf",
+                            PyLong_FromVoidPtr((void*)(&cv_delete_buf)));
     PyObject_SetAttrString(m, "cv_resize",
                             PyLong_FromVoidPtr((void*)(&cv_resize)));
+    PyObject_SetAttrString(m, "cv_imdecode",
+                            PyLong_FromVoidPtr((void*)(&cv_imdecode)));
     return m;
 }
 
@@ -79,5 +85,23 @@ void cv_resize(int64_t new_rows, int64_t new_cols, uint8_t *data,
 void cv_mat_release(cv::Mat *img)
 {
     delete img;
+    return;
+}
+
+void* cv_imdecode(int64_t *out_shapes, void* in_data, int64_t in_size, int64_t flags)
+{
+    //
+    cv::Mat in_mat = cv::Mat(1, (int)in_size, CV_8UC1, in_data);
+    cv::Mat image;
+    image = cv::imdecode(in_mat, (int)flags);
+    out_shapes[0] = (int64_t) image.size[0];
+    out_shapes[1] = (int64_t) image.size[1];
+    image.addref();
+    return image.data;
+}
+
+void cv_delete_buf(void *data)
+{
+    delete data;
     return;
 }
