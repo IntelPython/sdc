@@ -238,6 +238,11 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD_Var
             return
 
+        if call_list == ['threaded_input', 'distributed_api', hpat]:
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.Thread
+            return
+
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD

@@ -773,21 +773,28 @@ class HiFrames(object):
 
     def _run_arg(self, arg_assign):
         # e.g. {"A:return":"distributed"} -> "A"
-        dist_inputs = set(var_name.split(":")[0]
+        flagged_inputs = { var_name.split(":")[0]: flag
                     for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":input") and flag == 'distributed')
+                    if var_name.endswith(":input") }
         arg_name = arg_assign.value.name
-        if arg_name in dist_inputs:
+        if arg_name in flagged_inputs.keys():
             self.locals.pop(arg_name + ":input")
+            flag = flagged_inputs[arg_name]
             nodes = [arg_assign]
             in_arr = arg_assign.target
             scope = in_arr.scope
             loc = in_arr.loc
             # replace assign target with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var("dist_input"), loc)
+            in_arr_tmp = ir.Var(scope, mk_unique_var(flag + "_input"), loc)
             arg_assign.target = in_arr_tmp
-            def f(_dist_arr):  # pragma: no cover
-                _d_arr = hpat.distributed_api.dist_input(_dist_arr)
+            if flag == 'distributed':
+                def f(_dist_arr):  # pragma: no cover
+                    _d_arr = hpat.distributed_api.dist_input(_dist_arr)
+            elif flag == 'threaded':
+                def f(_thread_arr):  # pragma: no cover
+                    _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
+            else:
+                raise ValueError("Invalid input flag")
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_arr_tmp])

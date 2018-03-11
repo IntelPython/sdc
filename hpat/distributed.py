@@ -594,6 +594,10 @@ class DistributedPass(object):
             assign.value = rhs.args[0]
             return [assign]
 
+        if call_list == ['threaded_input', 'distributed_api', hpat]:
+            assign.value = rhs.args[0]
+            return [assign]
+
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
             return self._run_call_rebalance_array(lhs, assign, rhs.args, block_body)
 
