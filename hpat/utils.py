@@ -7,6 +7,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 import collections
 import numpy as np
+from hpat.str_arr_ext import string_array_type
 
 # sentinel value representing non-constant values
 
@@ -138,3 +139,12 @@ def is_whole_slice(typemap, func_ir, var):
     require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
     require(isinstance(arg1_def, ir.Const) and arg1_def.value == None)
     return True
+
+def is_array(typemap, varname):
+    return (varname in typemap
+            and (is_np_array(typemap, varname)
+                or typemap[varname] == string_array_type))
+
+def is_np_array(typemap, varname):
+    return (varname in typemap
+            and isinstance(typemap[varname], types.Array))

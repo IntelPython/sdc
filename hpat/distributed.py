@@ -29,7 +29,8 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-from hpat.utils import get_definitions, is_alloc_call, is_whole_slice
+from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice,
+                        is_array, is_np_array)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -480,7 +481,7 @@ class DistributedPass(object):
         if call_list == ['astype']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                and self._isarray(call_def.value.name)
+                and is_array(self.typemap, call_def.value.name)
                     and not self._is_REP(call_def.value.name)):
                 in_arr_name = call_def.value.name
                 self._array_starts[lhs] = self._array_starts[in_arr_name]
@@ -491,7 +492,7 @@ class DistributedPass(object):
         if call_list == ['reshape']:  # A.reshape
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                and self._isarray(call_def.value.name)
+                and is_array(self.typemap, call_def.value.name)
                     and not self._is_REP(call_def.value.name)):
                 if len(rhs.args) == 1:
                     size_var = rhs.args[0]
@@ -1625,7 +1626,7 @@ class DistributedPass(object):
         """
         red_var_typ = self.typemap[reduce_var.name]
         el_typ = red_var_typ
-        if self._isarray(reduce_var.name):
+        if is_np_array(self.typemap, reduce_var.name):
             el_typ = red_var_typ.dtype
         init_val = None
         pre_init_val = ""
@@ -1646,9 +1647,8 @@ class DistributedPass(object):
             return []
 
         assert init_val is not None
-        #import pdb; pdb.set_trace()
 
-        if self._isarray(reduce_var.name):
+        if is_np_array(self.typemap, reduce_var.name):
             pre_init_val = "v = np.full_like(s, {}, s.dtype)".format(init_val)
             init_val = "v"
 
@@ -1695,10 +1695,6 @@ class DistributedPass(object):
                 vals_list.append(stmt.target)
         out += nodes
         return vals_list
-
-    def _isarray(self, varname):
-        return (varname in self.typemap
-                and isinstance(self.typemap[varname], types.npytypes.Array))
 
     def _get_arr_ndim(self, arrname):
         if self.typemap[arrname] == string_array_type:

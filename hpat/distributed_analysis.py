@@ -12,7 +12,8 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
-from hpat.utils import get_definitions, is_alloc_call, is_whole_slice, update_node_definitions
+from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice,
+                        update_node_definitions, is_array, is_np_array)
 
 from enum import Enum
 
@@ -99,10 +100,10 @@ class DistributedAnalysis(object):
         if isinstance(rhs, ir.Expr) and rhs.op == 'cast':
             rhs = rhs.value
 
-        if isinstance(rhs, ir.Var) and self._isarray(lhs):
+        if isinstance(rhs, ir.Var) and is_array(self.typemap, lhs):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
-        elif self._isarray(lhs) and isinstance(rhs, ir.Expr) and rhs.op == 'inplace_binop':
+        elif is_array(self.typemap, lhs) and isinstance(rhs, ir.Expr) and rhs.op == 'inplace_binop':
             # distributions of all 3 variables should meet (lhs, arg1, arg2)
             arg1 = rhs.lhs.name
             arg2 = rhs.rhs.name
@@ -118,7 +119,7 @@ class DistributedAnalysis(object):
             # e.g. boolean array index in test_getitem_multidim
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr' and rhs.attr == 'T'
-              and self._isarray(lhs)):
+              and is_array(self.typemap, lhs)):
             # array and its transpose have same distributions
             arr = rhs.value.name
             self._meet_array_dists(lhs, arr, array_dists)
@@ -207,7 +208,7 @@ class DistributedAnalysis(object):
         if call_list == ['astype'] or call_list == ['reshape']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                    and self._isarray(call_def.value.name)):
+                    and is_array(self.typemap, call_def.value.name)):
                 in_arr_name = call_def.value.name
                 self._meet_array_dists(lhs, in_arr_name, array_dists)
                 return
@@ -383,10 +384,10 @@ class DistributedAnalysis(object):
 
     def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
         for v in args:
-            if self._isarray(v.name):
+            if is_array(self.typemap, v.name):
                 dprint("dist setting call arg REP {}".format(v.name))
                 array_dists[v.name] = Distribution.REP
-        if self._isarray(lhs):
+        if is_array(self.typemap, lhs):
             dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
 
@@ -421,7 +422,7 @@ class DistributedAnalysis(object):
         assert isinstance(index_var, ir.Var)
 
         # array selection with boolean index
-        if (is_array(index_var.name, self.typemap)
+        if (is_np_array(self.typemap, index_var.name)
                 and self.typemap[index_var.name].dtype == types.boolean):
             # input array and bool index have the same distribution
             new_dist = self._meet_array_dists(index_var.name, rhs.value.name,
@@ -480,7 +481,7 @@ class DistributedAnalysis(object):
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
-            if self._isarray(varname):
+            if is_array(self.typemap, varname):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
@@ -489,10 +490,6 @@ class DistributedAnalysis(object):
                     and var_def.op == 'build_tuple'):
                 tuple_vars = var_def.items
                 self._set_REP(tuple_vars, array_dists)
-
-    def _isarray(self, varname):
-        return (varname in self.typemap
-                and isinstance(self.typemap[varname], numba.types.npytypes.Array))
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:
@@ -562,10 +559,6 @@ class DistributedAnalysis(object):
 
             block.body = new_body
 
-def is_array(varname, typemap):
-    # return True
-    return (varname in typemap
-            and isinstance(typemap[varname], numba.types.npytypes.Array))
 
 def _arrays_written(arrs, blocks):
     for block in blocks.values():
@@ -602,7 +595,7 @@ def get_stencil_accesses(parfor, typemap):
             if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
                 lhs = stmt.target.name
                 rhs = stmt.value
-                if (rhs.op == 'getitem' and is_array(rhs.value.name, typemap)
+                if (rhs.op == 'getitem' and is_array(typemap, rhs.value.name)
                         and vars_dependent(body_defs, rhs.index, par_index_var)):
                     stencil_accesses[rhs.index.name] = rhs.value.name
 
