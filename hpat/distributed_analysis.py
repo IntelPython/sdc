@@ -233,6 +233,15 @@ class DistributedAnalysis(object):
                                  " since it is replicated")
             return
 
+        if call_list == ['threaded_return', 'distributed_api', hpat]:
+            arr_name = args[0].name
+            assert arr_name in array_dists, "array distribution not found"
+            if array_dists[arr_name] == Distribution.REP:
+                raise ValueError("threaded return of array {} not valid"
+                                 " since it is replicated")
+            array_dists[arr_name] = Distribution.Thread
+            return
+
         if call_list == ['dist_input', 'distributed_api', hpat]:
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD_Var

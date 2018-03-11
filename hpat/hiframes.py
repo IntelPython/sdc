@@ -806,26 +806,28 @@ class HiFrames(object):
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"
-        dist_returns = set(var_name.split(":")[0]
+        flagged_returns = { var_name.split(":")[0]: flag
                     for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":return") and flag == 'distributed')
-        for v in dist_returns:
+                    if var_name.endswith(":return") }
+        for v in flagged_returns.keys():
             self.locals.pop(v + ":return")
         nodes = [ret_node]
         # shortcut if no dist return
-        if len(dist_returns) == 0:
+        if len(flagged_returns) == 0:
             return nodes
         cast = guard(get_definition, self.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
         scope = cast.value.scope
         loc = cast.loc
-        # using split('.') since the variable might be renamed (e.g. A.2)
-        if cast.value.name.split('.')[0] in dist_returns:
-            nodes = self._gen_replace_dist_return(cast.value)
+        # XXX: using split('.') since the variable might be renamed (e.g. A.2)
+        ret_name = cast.value.name.split('.')[0]
+        if ret_name in flagged_returns.keys():
+            flag = flagged_returns[ret_name]
+            nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
-            new_out = ir.Var(scope, mk_unique_var("dist_return"), loc)
+            new_out = ir.Var(scope, mk_unique_var(flag + "_return"), loc)
             nodes.append(ir.Assign(new_cast, new_out, loc))
             ret_node.value = new_out
             nodes.append(ret_node)
@@ -837,8 +839,10 @@ class HiFrames(object):
             nodes = []
             new_var_list = []
             for v in cast_def.items:
-                if v.name.split('.')[0] in dist_returns:
-                    nodes += self._gen_replace_dist_return(v)
+                vname = v.name.split('.')[0]
+                if vname in flagged_returns.keys():
+                    flag = flagged_returns[vname]
+                    nodes += self._gen_replace_dist_return(v, flag)
                     new_var_list.append(nodes[-1].target)
                 else:
                     new_var_list.append(v)
@@ -853,9 +857,15 @@ class HiFrames(object):
 
         return nodes
 
-    def _gen_replace_dist_return(self, var):
-        def f(_dist_arr):  # pragma: no cover
-            _d_arr = hpat.distributed_api.dist_return(_dist_arr)
+    def _gen_replace_dist_return(self, var, flag):
+        if flag == 'distributed':
+            def f(_dist_arr):  # pragma: no cover
+                _d_arr = hpat.distributed_api.dist_return(_dist_arr)
+        elif flag == 'threaded':
+            def f(_threaded_arr):  # pragma: no cover
+                _th_arr = hpat.distributed_api.threaded_return(_threaded_arr)
+        else:
+            raise ValueError("Invalid return flag {}".format(flag))
         f_block = compile_to_numba_ir(
             f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [var])
