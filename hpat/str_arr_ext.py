@@ -326,12 +326,17 @@ def lower_string_arr_getitem(context, builder, sig, args):
 
 
 import pandas
+import numpy as np
 
 @typeof_impl.register(pandas.Series)
 def typeof_pd_str_series(val, c):
     if isinstance(val[0], str):  # and isinstance(val[-1], str):
         return string_array_type
 
+@typeof_impl.register(np.ndarray)
+def typeof_np_string(val, c):
+    if val.ndim == 1 and isinstance(val[0], str):  # and isinstance(val[-1], str):
+        return string_array_type
 
 @unbox(StringArrayType)
 def unbox_str(typ, val, c):
