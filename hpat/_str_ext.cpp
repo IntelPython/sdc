@@ -387,6 +387,13 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         return;
     }
 
+    // if obj is a pd.Series, get the numpy array for better performance
+    // TODO: check actual Series class
+    if (PyObject_HasAttrString(obj, "values"))
+    {
+        obj = PyObject_GetAttrString(obj, "values");
+    }
+
     uint32_t * offsets = new uint32_t[n+1];
     std::vector<const char *> tmp_store(n);
     size_t len = 0;
