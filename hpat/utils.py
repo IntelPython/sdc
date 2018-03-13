@@ -80,11 +80,12 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hstr_ext
 ll.add_symbol('print_str', hstr_ext.print_str)
+ll.add_symbol('print_char', hstr_ext.print_char)
 
 
 @lower_builtin(cprint, types.VarArg(types.Any))
 def cprint_lower(context, builder, sig, args):
-    from hpat.str_ext import string_type
+    from hpat.str_ext import string_type, char_type
 
     for i, val in enumerate(args):
         typ = sig.args[i]
@@ -92,6 +93,13 @@ def cprint_lower(context, builder, sig, args):
             fnty = lir.FunctionType(
                 lir.VoidType(), [lir.IntType(8).as_pointer()])
             fn = builder.module.get_or_insert_function(fnty, name="print_str")
+            builder.call(fn, [val])
+            cgutils.printf(builder, " ")
+            continue
+        if typ == char_type:
+            fnty = lir.FunctionType(
+                lir.VoidType(), [lir.IntType(8)])
+            fn = builder.module.get_or_insert_function(fnty, name="print_char")
             builder.call(fn, [val])
             cgutils.printf(builder, " ")
             continue

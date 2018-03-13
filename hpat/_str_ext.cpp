@@ -31,6 +31,7 @@ void* init_string_const(char* in_str);
 void dtor_string(std::string** in_str, int64_t size, void* in);
 void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 const char* get_c_str(std::string* s);
+const char* get_char_ptr(char c);
 void* str_concat(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
@@ -48,10 +49,12 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_str(std::string* str);
+void print_char(char c);
 void print_int(int64_t val);
 void* compile_regex(std::string* pat);
 bool str_contains_regex(std::string* str, regex* e);
 bool str_contains_noregex(std::string* str, std::string* pat);
+char get_char_from_string(std::string* str, int64_t index);
 
 void* str_from_int32(int in);
 void* str_from_int64(int64_t in);
@@ -82,6 +85,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dtor_string_array)));
     PyObject_SetAttrString(m, "get_c_str",
                             PyLong_FromVoidPtr((void*)(&get_c_str)));
+    PyObject_SetAttrString(m, "get_char_ptr",
+                            PyLong_FromVoidPtr((void*)(&get_char_ptr)));
     PyObject_SetAttrString(m, "str_concat",
                             PyLong_FromVoidPtr((void*)(&str_concat)));
     PyObject_SetAttrString(m, "str_equal",
@@ -90,6 +95,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_split)));
     PyObject_SetAttrString(m, "str_substr_int",
                             PyLong_FromVoidPtr((void*)(&str_substr_int)));
+    PyObject_SetAttrString(m, "get_char_from_string",
+                            PyLong_FromVoidPtr((void*)(&get_char_from_string)));
     PyObject_SetAttrString(m, "str_to_int64",
                             PyLong_FromVoidPtr((void*)(&str_to_int64)));
     PyObject_SetAttrString(m, "str_to_float64",
@@ -110,6 +117,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&getitem_string_array_std)));
     PyObject_SetAttrString(m, "print_str",
                             PyLong_FromVoidPtr((void*)(&print_str)));
+    PyObject_SetAttrString(m, "print_char",
+                            PyLong_FromVoidPtr((void*)(&print_char)));
     PyObject_SetAttrString(m, "print_int",
                             PyLong_FromVoidPtr((void*)(&print_int)));
     PyObject_SetAttrString(m, "compile_regex",
@@ -166,6 +175,14 @@ const char* get_c_str(std::string* s)
     return s->c_str();
 }
 
+const char* get_char_ptr(char c)
+{
+    // printf("in get %s\n", s->c_str());
+    char *str = new char[1];
+    str[0] = c;
+    return str;
+}
+
 void* str_concat(std::string* s1, std::string* s2)
 {
     // printf("in concat %s %s\n", s1->c_str(), s2->c_str());
@@ -206,6 +223,11 @@ void* str_split(std::string* str, std::string* sep, int64_t *size)
 void* str_substr_int(std::string* str, int64_t index)
 {
     return new std::string(*str, index, 1);
+}
+
+char get_char_from_string(std::string* str, int64_t index)
+{
+    return str->at(index);
 }
 
 int64_t str_to_int64(std::string* str)
@@ -297,6 +319,12 @@ bool str_contains_noregex(std::string* str, std::string* pat)
 void print_str(std::string* str)
 {
     std::cout<< *str;
+    return;
+}
+
+void print_char(char c)
+{
+    std::cout << c;
     return;
 }
 
