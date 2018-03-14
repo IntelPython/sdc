@@ -2,6 +2,7 @@ import numba
 import hpat
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
+import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr)
 from numba import cgutils
@@ -337,6 +338,8 @@ def typeof_pd_str_series(val, c):
 def typeof_np_string(val, c):
     if val.ndim == 1 and isinstance(val[0], str):  # and isinstance(val[-1], str):
         return string_array_type
+    else:
+        return numba.typing.typeof._typeof_ndarray(val, c)
 
 @unbox(StringArrayType)
 def unbox_str(typ, val, c):
