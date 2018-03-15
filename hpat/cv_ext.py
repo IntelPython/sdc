@@ -122,8 +122,8 @@ def wrap_array(typingctx, data_ptr, shape_tup):
     """create an array from data_ptr with shape_tup as shape
     """
     assert isinstance(data_ptr, types.CPointer), "invalid data pointer"
-    assert ((isinstance(shape_tup, types.UniTuple)
-            and shape_tup.dtype == np.intp), "invalid shape tuple")
+    assert (isinstance(shape_tup, types.UniTuple)
+            and shape_tup.dtype == np.intp), "invalid shape tuple"
     dtype = data_ptr.dtype
     arr_typ = types.Array(dtype, shape_tup.count, 'C')
 
