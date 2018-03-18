@@ -51,7 +51,6 @@ def remove_hiframes(rhs, lives, call_list):
 
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
-
 class HiFrames(object):
     """analyze and transform hiframes calls"""
 
@@ -141,6 +140,9 @@ class HiFrames(object):
                 if res is not None:
                     return res
                 res = self._handle_str_contains(assign.target, rhs)
+                if res is not None:
+                    return res
+                res = hpat.io._handle_np_fromfile(self, assign.target, rhs)
                 if res is not None:
                     return res
 

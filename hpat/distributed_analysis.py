@@ -12,11 +12,11 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
 import numpy as np
 import hpat
+import hpat.io
 from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice,
                         update_node_definitions, is_array, is_np_array)
 
 from enum import Enum
-
 
 class Distribution(Enum):
     REP = 1
@@ -128,7 +128,7 @@ class DistributedAnalysis(object):
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
-                                 'itemsize', 'astype', 'reshape']):
+                                 'itemsize', 'astype', 'reshape', 'ctypes']):
             pass  # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op == 'call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
@@ -315,6 +315,9 @@ class DistributedAnalysis(object):
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
+
+        if call_list == [hpat.io.file_read]:
+            return
 
         # set REP if not found
         self._analyze_call_set_REP(lhs, func_var, args, array_dists)

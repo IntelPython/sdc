@@ -138,6 +138,14 @@ class DistributedPass(object):
                             new_body += self._run_call(inst,
                                                        blocks[label].body)
                             continue
+                        # we save array start/count for data pointer to enable
+                        # file read
+                        if (rhs.op == 'getattr' and rhs.attr == 'ctypes'
+                                and (self._is_1D_arr(rhs.value.name))):
+                            arr_name = rhs.value.name
+                            self._array_starts[lhs] = self._array_starts[arr_name]
+                            self._array_counts[lhs] = self._array_counts[arr_name]
+                            self._array_sizes[lhs] = self._array_sizes[arr_name]
                         if (rhs.op == 'getattr'
                                 and (self._is_1D_arr(rhs.value.name)
                                      or self._is_1D_Var_arr(rhs.value.name))
@@ -617,6 +625,24 @@ class DistributedPass(object):
                 self._array_starts[lhs] = [self._array_starts[in_arr][0]]
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
+
+        if call_list == [hpat.io.file_read] and rhs.args[1].name in self._array_starts:
+            _fname = rhs.args[0]
+            _data_ptr = rhs.args[1]
+            _start = self._array_starts[_data_ptr.name][0]
+            _count = self._array_counts[_data_ptr.name][0]
+
+            def f(fname, data_ptr, start, count):  # pragma: no cover
+                s = hpat.io.file_read_parallel(fname, data_ptr, start, count)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (self.typemap[_fname.name],
+                                          self.typemap[_data_ptr.name],
+                                           types.intp, types.intp),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [_fname, _data_ptr, _start, _count])
+            out = f_block.body[:-3]
+            out[-1].target = assign.target
 
         return out
 

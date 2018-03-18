@@ -23,8 +23,9 @@ int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
+void file_read_parallel(std::string* file_name, void* buff, int64_t start, int64_t count);
 
-#define MPI_ROOT 0
+#define ROOT 0
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -60,6 +61,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&get_file_size)));
     PyObject_SetAttrString(m, "file_read",
                             PyLong_FromVoidPtr((void*)(&file_read)));
+    PyObject_SetAttrString(m, "file_read_parallel",
+                            PyLong_FromVoidPtr((void*)(&file_read_parallel)));
     return m;
 }
 
@@ -298,7 +301,7 @@ uint64_t get_file_size(std::string* file_name)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     uint64_t f_size = 0;
 
-    if (f_size==MPI_ROOT)
+    if (rank==ROOT)
     {
         boost::filesystem::path f_path(*file_name);
         // TODO: throw FileNotFoundError
@@ -309,7 +312,7 @@ uint64_t get_file_size(std::string* file_name)
         }
         f_size = (uint64_t)boost::filesystem::file_size(f_path);
     }
-    MPI_Bcast(&f_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_ROOT, MPI_COMM_WORLD);
+    MPI_Bcast(&f_size, 1, MPI_UNSIGNED_LONG_LONG, ROOT, MPI_COMM_WORLD);
     return f_size;
 }
 
@@ -322,5 +325,22 @@ void file_read(std::string* file_name, void* buff, int64_t size)
         std::cerr << "File read error: " << *file_name << '\n';
     }
     fclose(fp);
+    return;
+}
+
+void file_read_parallel(std::string* file_name, void* buff, int64_t start, int64_t count)
+{
+
+    MPI_File fh;
+    int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name->c_str(),
+                             MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+    if (ierr!=0) std::cerr << "File open error: " << *file_name << '\n';
+
+    ierr = MPI_File_read_at_all(fh, (MPI_Offset)start, buff,
+                         (int)count, MPI_CHAR, MPI_STATUS_IGNORE);
+
+    if (ierr!=0) std::cerr << "File read error: " << *file_name << '\n';
+
+    MPI_File_close(&fh);
     return;
 }
