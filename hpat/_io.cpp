@@ -3,6 +3,9 @@
 #include <Python.h>
 #include <string>
 #include <iostream>
+#include <cstdio>
+
+#include <boost/filesystem.hpp>
 
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
 int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
@@ -18,6 +21,8 @@ int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
 int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
+uint64_t get_file_size(std::string* file_name);
+void file_read(std::string* file_name, void* buff, int64_t size);
 
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
@@ -47,6 +52,12 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&h5g_get_num_objs)));
     PyObject_SetAttrString(m, "h5g_get_objname_by_idx",
                             PyLong_FromVoidPtr((void*)(&h5g_get_objname_by_idx)));
+
+    // numpy read
+    PyObject_SetAttrString(m, "get_file_size",
+                            PyLong_FromVoidPtr((void*)(&get_file_size)));
+    PyObject_SetAttrString(m, "file_read",
+                            PyLong_FromVoidPtr((void*)(&file_read)));
     return m;
 }
 
@@ -277,4 +288,28 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
     std::string *outstr = new std::string(name);
     // std::cout<<"out: "<<*outstr<<std::endl;
     return outstr;
+}
+
+uint64_t get_file_size(std::string* file_name)
+{
+    boost::filesystem::path f_path(*file_name);
+    // TODO: throw FileNotFoundError
+    if (!boost::filesystem::exists(f_path))
+    {
+        std::cerr << "No such file or directory: " << *file_name << '\n';
+        return 0;
+    }
+    return (uint64_t)boost::filesystem::file_size(f_path);
+}
+
+void file_read(std::string* file_name, void* buff, int64_t size)
+{
+    FILE* fp = fopen(file_name->c_str(), "rb");
+    size_t ret_code = fread(buff, 1, (size_t)size, fp);
+    if (ret_code != (size_t)size)
+    {
+        std::cerr << "File read error: " << *file_name << '\n';
+    }
+    fclose(fp);
+    return;
 }

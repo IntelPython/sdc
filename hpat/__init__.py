@@ -10,7 +10,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from numba.types import List
 from hpat.utils import cprint, distribution_report
-
+import hpat.io
 multithread_mode = False
 
 
