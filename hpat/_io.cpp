@@ -24,6 +24,8 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
 
+#define MPI_ROOT 0
+
 PyMODINIT_FUNC PyInit_hio(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -292,14 +294,23 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
 
 uint64_t get_file_size(std::string* file_name)
 {
-    boost::filesystem::path f_path(*file_name);
-    // TODO: throw FileNotFoundError
-    if (!boost::filesystem::exists(f_path))
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    uint64_t f_size = 0;
+
+    if (f_size==MPI_ROOT)
     {
-        std::cerr << "No such file or directory: " << *file_name << '\n';
-        return 0;
+        boost::filesystem::path f_path(*file_name);
+        // TODO: throw FileNotFoundError
+        if (!boost::filesystem::exists(f_path))
+        {
+            std::cerr << "No such file or directory: " << *file_name << '\n';
+            return 0;
+        }
+        f_size = (uint64_t)boost::filesystem::file_size(f_path);
     }
-    return (uint64_t)boost::filesystem::file_size(f_path);
+    MPI_Bcast(&f_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_ROOT, MPI_COMM_WORLD);
+    return f_size;
 }
 
 void file_read(std::string* file_name, void* buff, int64_t size)
