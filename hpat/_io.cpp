@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 #include <cstdio>
-
+#include <climits>
 #include <boost/filesystem.hpp>
 
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
@@ -23,7 +23,7 @@ int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
-void file_read_parallel(std::string* file_name, void* buff, int64_t start, int64_t count);
+void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count);
 
 #define ROOT 0
 
@@ -328,13 +328,31 @@ void file_read(std::string* file_name, void* buff, int64_t size)
     return;
 }
 
-void file_read_parallel(std::string* file_name, void* buff, int64_t start, int64_t count)
+void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count)
 {
 
     MPI_File fh;
     int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name->c_str(),
                              MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
     if (ierr!=0) std::cerr << "File open error: " << *file_name << '\n';
+
+    // work around MPI count limit by using a large dtype
+    if (count>=(int64_t)INT_MAX)
+    {
+        #define LARGE_DTYPE_SIZE 1024
+        MPI_Datatype large_dtype;
+        MPI_Type_contiguous(LARGE_DTYPE_SIZE, MPI_CHAR, &large_dtype);
+        int read_size = (int) (count/LARGE_DTYPE_SIZE);
+
+        ierr = MPI_File_read_at_all(fh, (MPI_Offset)start, buff,
+                             read_size, large_dtype, MPI_STATUS_IGNORE);
+        if (ierr!=0) std::cerr << "File read error: " << *file_name << '\n';
+        int64_t left_over = count % LARGE_DTYPE_SIZE;
+        int64_t read_byte_size = count-left_over;
+        start += read_byte_size;
+        buff += read_byte_size;
+        count = read_byte_size;
+    }
 
     ierr = MPI_File_read_at_all(fh, (MPI_Offset)start, buff,
                          (int)count, MPI_CHAR, MPI_STATUS_IGNORE);
