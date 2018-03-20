@@ -106,6 +106,18 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_strided_getitem(self):
+        def test_impl(N):
+            A = np.ones(N)
+            B = A[::7]
+            return B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_assert(self):
         # make sure assert in an inlined function works
         def g(a):
