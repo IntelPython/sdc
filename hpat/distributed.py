@@ -29,7 +29,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice,
+from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice, get_slice_step,
                         is_array, is_np_array)
 from hpat.distributed_api import Reduce_Type
 
@@ -1005,6 +1005,35 @@ class DistributedPass(object):
                 self._array_starts[lhs] = [self._array_starts[arr.name][0]]
                 self._array_counts[lhs] = [self._array_counts[arr.name][0]]
                 self._array_sizes[lhs] = [self._array_sizes[arr.name][0]]
+
+            # strided whole slice
+            # e.g. A = X[::2,5]
+            elif guard(is_whole_slice, self.typemap, self.func_ir, index_var,
+                        accept_stride=True):
+                lhs = full_node.target
+                # FIXME: we use rebalance array to handle the output array
+                # TODO: convert to neighbor exchange
+                # on each processor, the slice has to start from an offset:
+                # |step-(start%step)|
+                in_arr = full_node.value.value
+                start = self._array_starts[in_arr.name][0]
+                step = get_slice_step(self.typemap, self.func_ir, index_var)
+
+                def f(A, start, step):
+                    offset = abs(step - (start % step)) % step
+                    B = A[offset::step]
+
+                f_block = compile_to_numba_ir(f, {}, self.typingctx,
+                                              (self.typemap[in_arr.name], types.intp, types.intp),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [in_arr, start, step])
+                out = f_block.body[:-3]  # remove none return
+                imb_arr = out[-1].target
+
+                # call rebalance
+                self._dist_analysis.array_dists[imb_arr.name] = Distribution.OneD_Var
+                out += self._run_call_rebalance_array(lhs.name, full_node, [imb_arr], None)
+                out[-1].target = lhs
 
         return out
 

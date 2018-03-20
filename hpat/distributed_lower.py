@@ -345,7 +345,7 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
                         out_ind += send_size
                     # if I'm sender
                     if my_rank == j:
-                        buff = in_arr[out_ind:(out_ind+send_size)]
+                        buff = np.ascontiguousarray(in_arr[out_ind:(out_ind+send_size)])
                         comm_reqs[comm_req_ind] = hpat.distributed_api.isend(
                             buff, np.int32(buff.size), np.int32(i), np.int32(9))
                         comm_req_ind += 1

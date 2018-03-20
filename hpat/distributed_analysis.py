@@ -448,8 +448,10 @@ class DistributedAnalysis(object):
                                                 new_dist.value))
             return
 
-        if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
-            # for example: A = X[:,3]
+        # whole slice or strided slice access
+        # for example: A = X[:,5], A = X[::2,5]
+        if guard(is_whole_slice, self.typemap, self.func_ir, index_var,
+                    accept_stride=True):
             self._meet_array_dists(lhs, rhs.value.name, array_dists)
             return
 
