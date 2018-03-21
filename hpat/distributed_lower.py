@@ -519,6 +519,20 @@ sig = types.void(
 
 oneD_reshape_shuffle = types.ExternalFunction("oneD_reshape_shuffle", sig)
 
+@numba.njit
+def dist_oneD_reshape_shuffle(lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size):  # pragma: no cover
+    c_in_arr = np.ascontiguousarray(in_arr)
+    in_lower_dims_size = get_tuple_prod(c_in_arr.shape[1:])
+    out_lower_dims_size = get_tuple_prod(lhs.shape[1:])
+    #print(c_in_arr)
+    # print(new_0dim_global_len, old_0dim_global_len, out_lower_dims_size, in_lower_dims_size)
+    oneD_reshape_shuffle(lhs.ctypes, c_in_arr.ctypes,
+                            new_0dim_global_len, old_0dim_global_len,
+                            dtype_size * out_lower_dims_size,
+                            dtype_size * in_lower_dims_size)
+    #print(in_arr)
+
+
 ########### finalize MPI when exiting ####################
 
 def hpat_finalize():

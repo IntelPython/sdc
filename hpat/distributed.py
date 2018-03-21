@@ -655,20 +655,13 @@ class DistributedPass(object):
                         new_local_shape_var, dtype, scope, loc)
 
         def f(lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size):  # pragma: no cover
-            c_in_arr = np.ascontiguousarray(in_arr)
-            in_lower_dims_size = get_tuple_prod(c_in_arr.shape[1:])
-            out_lower_dims_size = get_tuple_prod(lhs.shape[1:])
-            # print(new_0dim_global_len, old_0dim_global_len, out_lower_dims_size, in_lower_dims_size)
-            oneD_reshape_shuffle(lhs.ctypes, c_in_arr.ctypes,
-                                    new_0dim_global_len, old_0dim_global_len,
-                                    dtype_size * out_lower_dims_size,
-                                    dtype_size * in_lower_dims_size)
+            hpat.distributed_lower.dist_oneD_reshape_shuffle(
+                lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size)
 
-        f_block = compile_to_numba_ir(f, {'np': np,
-                                    'get_tuple_prod': distributed_lower.get_tuple_prod,
-                                    'oneD_reshape_shuffle': distributed_lower.oneD_reshape_shuffle},
+        f_block = compile_to_numba_ir(f, {'hpat': hpat},
                                     self.typingctx,
-                                   (self.typemap[lhs.name], self.typemap[in_arr.name], types.intp, types.intp, types.intp),
+                                   (self.typemap[lhs.name], self.typemap[in_arr.name],
+                                    types.intp, types.intp, types.intp),
                                    self.typemap, self.calltypes).blocks.popitem()[1]
 
         # get datatype size argument

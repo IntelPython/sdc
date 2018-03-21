@@ -508,6 +508,8 @@ void oneD_reshape_shuffle(char* output,
         }
     }
     // printf("rank:%d send %lld %lld recv %lld %lld\n", rank, send_counts[0], send_counts[1], recv_counts[0], recv_counts[1]);
+    // printf("send %d recv %d send_disp %d recv_disp %d\n", send_counts[0], recv_counts[0], send_disp[0], recv_disp[0]);
+    // printf("data %lld %lld\n", ((int64_t*)input)[0], ((int64_t*)input)[1]);
     MPI_Alltoallv(input, send_counts, send_disp, MPI_CHAR,
         output, recv_counts, recv_disp, MPI_CHAR, MPI_COMM_WORLD);
     return;
