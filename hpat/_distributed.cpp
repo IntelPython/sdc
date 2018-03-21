@@ -38,6 +38,12 @@ MPI_Request *comm_req_alloc(int size);
 void comm_req_dealloc(MPI_Request *req_arr);
 void req_array_setitem(MPI_Request * req_arr, int64_t ind, MPI_Request req);
 
+void oneD_reshape_shuffle(char* output,
+                          char* input,
+                          int64_t new_0dim_global_len,
+                          int64_t old_0dim_global_len,
+                          int64_t out_lower_dims_size,
+                          int64_t in_lower_dims_size);
 int hpat_finalize();
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
@@ -112,6 +118,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
 
     PyObject_SetAttrString(m, "hpat_finalize",
                             PyLong_FromVoidPtr((void*)(&hpat_finalize)));
+    PyObject_SetAttrString(m, "oneD_reshape_shuffle",
+                            PyLong_FromVoidPtr((void*)(&oneD_reshape_shuffle)));
 
     // add actual int value to module
     PyObject_SetAttrString(m, "mpi_req_num_bytes",
@@ -445,4 +453,62 @@ int hpat_finalize()
         MPI_Finalize();
     }
     return 0;
+}
+
+
+void oneD_reshape_shuffle(char* output,
+                          char* input,
+                          int64_t new_0dim_global_len,
+                          int64_t old_0dim_global_len,
+                          int64_t out_lower_dims_size,
+                          int64_t in_lower_dims_size)
+{
+    int num_pes = hpat_dist_get_size();
+    int rank = hpat_dist_get_rank();
+
+
+    int64_t my_old_start = in_lower_dims_size * hpat_dist_get_start(old_0dim_global_len, num_pes, rank);
+    int64_t my_new_start = out_lower_dims_size * hpat_dist_get_start(new_0dim_global_len, num_pes, rank);
+    int64_t my_old_end = in_lower_dims_size * hpat_dist_get_end(old_0dim_global_len, num_pes, rank);
+    int64_t my_new_end = out_lower_dims_size * hpat_dist_get_end(new_0dim_global_len, num_pes, rank);
+
+    int *send_counts = new int[num_pes];
+    int *recv_counts = new int[num_pes];
+    int *send_disp = new int[num_pes];
+    int *recv_disp = new int[num_pes];
+
+    int64_t curr_send_offset = 0;
+    int64_t curr_recv_offset = 0;
+
+    for(int i=0; i<num_pes; i++)
+    {
+        send_disp[i] = curr_send_offset;
+        recv_disp[i] = curr_recv_offset;
+
+        int64_t pe_old_start = in_lower_dims_size * hpat_dist_get_start(old_0dim_global_len, num_pes, i);
+        int64_t pe_new_start = out_lower_dims_size * hpat_dist_get_start(new_0dim_global_len, num_pes, i);
+        int64_t pe_old_end = in_lower_dims_size * hpat_dist_get_end(old_0dim_global_len, num_pes, i);
+        int64_t pe_new_end = out_lower_dims_size * hpat_dist_get_end(new_0dim_global_len, num_pes, i);
+
+        send_counts[i] = 0;
+        recv_counts[i] = 0;
+
+        // if sending to processor (interval overlap)
+        if (pe_new_end > my_old_start && pe_new_start < my_old_end)
+        {
+            send_counts[i] = std::min(my_old_end, pe_new_end) - std::max(my_old_start, pe_new_start);
+            curr_send_offset += send_counts[i];
+        }
+
+        // if receiving from processor (interval overlap)
+        if (my_new_end > pe_old_start && my_new_start < pe_old_end)
+        {
+            recv_counts[i] = std::min(pe_old_end, my_new_end) - std::max(pe_old_start, my_new_start);
+            curr_recv_offset += recv_counts[i];
+        }
+    }
+    // printf("rank:%d send %lld %lld recv %lld %lld\n", rank, send_counts[0], send_counts[1], recv_counts[0], recv_counts[1]);
+    MPI_Alltoallv(input, send_counts, send_disp, MPI_CHAR,
+        output, recv_counts, recv_disp, MPI_CHAR, MPI_COMM_WORLD);
+    return;
 }

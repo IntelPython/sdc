@@ -211,6 +211,9 @@ class DistributedAnalysis(object):
                     and is_array(self.typemap, call_def.value.name)):
                 in_arr_name = call_def.value.name
                 self._meet_array_dists(lhs, in_arr_name, array_dists)
+                # TODO: support 1D_Var reshape
+                if call_list == ['reshape'] and array_dists[lhs] == Distribution.OneD_Var:
+                    self._analyze_call_set_REP(lhs, func_var, args, array_dists)
                 return
 
         if self._is_call(func_var, ['ravel', np]):

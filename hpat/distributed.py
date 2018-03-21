@@ -500,21 +500,10 @@ class DistributedPass(object):
         if call_list == ['reshape']:  # A.reshape
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                and is_array(self.typemap, call_def.value.name)
-                    and not self._is_REP(call_def.value.name)):
-                if len(rhs.args) == 1:
-                    size_var = rhs.args[0]
-                else:
-                    # reshape can take list of ints
-                    size_var = rhs.args
-                # handle reshape like new allocation
-                out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
-                if len(rhs.args) == 1:
-                    rhs.args[0] = new_size_var
-                else:
+                    and is_array(self.typemap, call_def.value.name)
+                    and self._is_1D_arr(call_def.value.name)):
+                return self._run_reshape(assign, call_def.value, rhs.args)
 
-                    rhs.args[0] = self._tuple_table[new_size_var.name][0]
-                out.append(assign)
 
         # numba doesn't support np.reshape() form yet
         # if call_list == ['reshape', np]:
@@ -645,6 +634,59 @@ class DistributedPass(object):
             out[-1].target = assign.target
 
         return out
+
+    def _run_reshape(self, assign, in_arr, args):
+        lhs = assign.target
+        scope = assign.target.scope
+        loc = assign.target.loc
+        if len(args) == 1:
+            new_shape = args[0]
+        else:
+            # reshape can take list of ints
+            new_shape = args
+        # TODO: avoid alloc and copy if no communication necessary
+        # get new local shape in reshape and set start/count vars like new allocation
+        out, new_local_shape_var = self._run_alloc(new_shape, lhs.name, scope, loc)
+        # get actual tuple for mk_alloc
+        if len(args) != 1:
+            new_local_shape_var = tuple(self._tuple_table[new_local_shape_var.name])
+        dtype = self.typemap[in_arr.name].dtype
+        out += mk_alloc(self.typemap, self.calltypes, lhs,
+                        new_local_shape_var, dtype, scope, loc)
+
+        def f(lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size):  # pragma: no cover
+            c_in_arr = np.ascontiguousarray(in_arr)
+            in_lower_dims_size = get_tuple_prod(c_in_arr.shape[1:])
+            out_lower_dims_size = get_tuple_prod(lhs.shape[1:])
+            # print(new_0dim_global_len, old_0dim_global_len, out_lower_dims_size, in_lower_dims_size)
+            oneD_reshape_shuffle(lhs.ctypes, c_in_arr.ctypes,
+                                    new_0dim_global_len, old_0dim_global_len,
+                                    dtype_size * out_lower_dims_size,
+                                    dtype_size * in_lower_dims_size)
+
+        f_block = compile_to_numba_ir(f, {'np': np,
+                                    'get_tuple_prod': distributed_lower.get_tuple_prod,
+                                    'oneD_reshape_shuffle': distributed_lower.oneD_reshape_shuffle},
+                                    self.typingctx,
+                                   (self.typemap[lhs.name], self.typemap[in_arr.name], types.intp, types.intp, types.intp),
+                                   self.typemap, self.calltypes).blocks.popitem()[1]
+
+        # get datatype size argument
+        context = numba.targets.cpu.CPUContext(self.typingctx)
+        dtype_size = context.get_abi_sizeof(context.get_data_type(dtype))
+        dtype_size_var = ir.Var(scope, mk_unique_var("dtype_size"), loc)
+        self.typemap[dtype_size_var.name] = types.intp
+        out.append(
+            ir.Assign(ir.Const(dtype_size, loc), dtype_size_var, loc))
+        replace_arg_nodes(f_block, [lhs, in_arr, self._array_sizes[lhs.name][0], self._array_sizes[in_arr.name][0], dtype_size_var])
+        out += f_block.body[:-3]
+        return out
+        # if len(args) == 1:
+        #     args[0] = new_size_var
+        # else:
+        #     args[0] = self._tuple_table[new_size_var.name][0]
+        # out.append(assign)
+
 
     def _run_call_rebalance_array(self, lhs, assign, args, block_body):
         out = [assign]

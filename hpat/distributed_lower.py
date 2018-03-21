@@ -1,6 +1,7 @@
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
+from numba.extending import overload
 import numba.targets.arrayobj
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from numba.typing.builtins import IndexValueType
@@ -36,6 +37,7 @@ ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
 ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
 ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
 ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
+ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -487,6 +489,35 @@ def _root_rank_select(old_val, new_val):  # pragma: no cover
     if distributed_api.get_rank() == 0:
         return old_val
     return new_val
+
+def get_tuple_prod(t):
+    return np.prod(t)
+
+@overload(get_tuple_prod)
+def get_tuple_prod_overload(t):
+    # handle empty tuple seperately since empty getiter doesn't work
+    if t == numba.types.containers.Tuple(()):
+        return lambda a: 1
+
+    def get_tuple_prod_impl(t):
+        res = 1
+        for a in t:
+            res *= a
+        return res
+
+    return get_tuple_prod_impl
+
+
+sig = types.void(
+            types.voidptr,  # output array
+            types.voidptr,  # input array
+            types.intp,     # old_len
+            types.intp,     # new_len
+            types.intp,     # input lower_dim size in bytes
+            types.intp,     # output lower_dim size in bytes
+            )
+
+oneD_reshape_shuffle = types.ExternalFunction("oneD_reshape_shuffle", sig)
 
 ########### finalize MPI when exiting ####################
 
