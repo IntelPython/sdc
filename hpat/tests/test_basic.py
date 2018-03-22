@@ -242,5 +242,18 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_parfor_OneDs(), 2)
         self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
 
+    def test_transpose(self):
+        def test_impl(n):
+            A = np.ones((30, 40, 50))
+            B = A.transpose((0, 2, 1))
+            C = A.transpose(0, 2, 1)
+            return B.sum() + C.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 128
+        np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 if __name__ == "__main__":
     unittest.main()
