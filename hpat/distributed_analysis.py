@@ -13,10 +13,11 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice,
+from hpat.utils import (get_constant, get_definitions, is_alloc_call, is_whole_slice,
                         update_node_definitions, is_array, is_np_array)
 
 from enum import Enum
+
 
 class Distribution(Enum):
     REP = 1
@@ -128,7 +129,7 @@ class DistributedAnalysis(object):
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
-                                 'itemsize', 'astype', 'reshape', 'ctypes']):
+                                 'itemsize', 'astype', 'reshape', 'ctypes', 'transpose']):
             pass  # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op == 'call':
             self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
@@ -204,6 +205,23 @@ class DistributedAnalysis(object):
 
         if self._is_call(func_var, [len]):
             return
+
+        if call_list == ['transpose']:
+            call_def = guard(get_definition, self.func_ir, func_var)
+            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
+                    and is_array(self.typemap, call_def.value.name)):
+                if len(args) == 0:
+                    raise ValueError("Transpose with no arguments is not"
+                                     " supported")
+                in_arr_name = call_def.value.name
+                arg0 = guard(get_constant, self.func_ir, args[0])
+                if isinstance(arg0, tuple):
+                    arg0 = arg0[0]
+                if arg0 != 0:
+                    raise ValueError("Transpose with non-zero first argument"
+                                     " is not supported")
+                self._meet_array_dists(lhs, in_arr_name, array_dists)
+                return
 
         if call_list == ['astype'] or call_list == ['reshape']:
             call_def = guard(get_definition, self.func_ir, func_var)
