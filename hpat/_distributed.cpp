@@ -466,16 +466,16 @@ void oneD_reshape_shuffle(char* output,
     int num_pes = hpat_dist_get_size();
     int rank = hpat_dist_get_rank();
 
-
+    // get my old and new data interval and convert to byte offsets
     int64_t my_old_start = in_lower_dims_size * hpat_dist_get_start(old_0dim_global_len, num_pes, rank);
     int64_t my_new_start = out_lower_dims_size * hpat_dist_get_start(new_0dim_global_len, num_pes, rank);
     int64_t my_old_end = in_lower_dims_size * hpat_dist_get_end(old_0dim_global_len, num_pes, rank);
     int64_t my_new_end = out_lower_dims_size * hpat_dist_get_end(new_0dim_global_len, num_pes, rank);
 
-    int *send_counts = new int[num_pes];
-    int *recv_counts = new int[num_pes];
-    int *send_disp = new int[num_pes];
-    int *recv_disp = new int[num_pes];
+    int64_t *send_counts = new int64_t[num_pes];
+    int64_t *recv_counts = new int64_t[num_pes];
+    int64_t *send_disp = new int64_t[num_pes];
+    int64_t *recv_disp = new int64_t[num_pes];
 
     int64_t curr_send_offset = 0;
     int64_t curr_recv_offset = 0;
@@ -485,6 +485,7 @@ void oneD_reshape_shuffle(char* output,
         send_disp[i] = curr_send_offset;
         recv_disp[i] = curr_recv_offset;
 
+        // get pe's old and new data interval and convert to byte offsets
         int64_t pe_old_start = in_lower_dims_size * hpat_dist_get_start(old_0dim_global_len, num_pes, i);
         int64_t pe_new_start = out_lower_dims_size * hpat_dist_get_start(new_0dim_global_len, num_pes, i);
         int64_t pe_old_end = in_lower_dims_size * hpat_dist_get_end(old_0dim_global_len, num_pes, i);
@@ -510,7 +511,116 @@ void oneD_reshape_shuffle(char* output,
     // printf("rank:%d send %lld %lld recv %lld %lld\n", rank, send_counts[0], send_counts[1], recv_counts[0], recv_counts[1]);
     // printf("send %d recv %d send_disp %d recv_disp %d\n", send_counts[0], recv_counts[0], send_disp[0], recv_disp[0]);
     // printf("data %lld %lld\n", ((int64_t*)input)[0], ((int64_t*)input)[1]);
-    MPI_Alltoallv(input, send_counts, send_disp, MPI_CHAR,
-        output, recv_counts, recv_disp, MPI_CHAR, MPI_COMM_WORLD);
-    return;
+
+    // workaround MPI int limit if necessary
+    int *i_send_counts = new int[num_pes];
+    int *i_recv_counts = new int[num_pes];
+    int *i_send_disp = new int[num_pes];
+    int *i_recv_disp = new int[num_pes];
+    bool big_shuffle = false;
+
+    for(int i=0; i<num_pes; i++)
+    {
+        // any value doesn't fit in int
+        if (send_counts[i]>=(int64_t)INT_MAX
+            || recv_counts[i]>=(int64_t)INT_MAX
+            || send_disp[i]>=(int64_t)INT_MAX
+            || recv_disp[i]>=(int64_t)INT_MAX)
+        {
+            big_shuffle = true;
+            break;
+        }
+        i_send_counts[i] = (int) send_counts[i];
+        i_recv_counts[i] = (int) recv_counts[i];
+        i_send_disp[i] = (int) send_disp[i];
+        i_recv_disp[i] = (int) recv_disp[i];
+    }
+
+    if (!big_shuffle)
+    {
+        int ierr = MPI_Alltoallv(input, i_send_counts, i_send_disp, MPI_CHAR,
+            output, i_recv_counts, i_recv_disp, MPI_CHAR, MPI_COMM_WORLD);
+        if (ierr!=0) std::cerr << "small shuffle error: " << '\n';
+    }
+    else
+    {
+        // char err_string[MPI_MAX_ERROR_STRING];
+        // err_string[MPI_MAX_ERROR_STRING-1] = '\0';
+        // int err_len, err_class;
+        // MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+        int *l_send_counts = new int[num_pes];
+        int *l_recv_counts = new int[num_pes];
+        int *l_send_disp = new int[num_pes];
+        int *l_recv_disp = new int[num_pes];
+
+        int64_t *send_offset = new int64_t[num_pes];
+        int64_t *recv_offset = new int64_t[num_pes];
+
+        #define LARGE_DTYPE_SIZE 1024
+        MPI_Datatype large_dtype;
+        MPI_Type_contiguous(LARGE_DTYPE_SIZE, MPI_CHAR, &large_dtype);
+        MPI_Type_commit(&large_dtype);
+
+        for(int i=0; i<num_pes; i++)
+        {
+            // large values
+            i_send_counts[i] = (int) (send_counts[i]/LARGE_DTYPE_SIZE);
+            i_recv_counts[i] = (int) (recv_counts[i]/LARGE_DTYPE_SIZE);
+            i_send_disp[i] = (int) (send_disp[i]/LARGE_DTYPE_SIZE);
+            i_recv_disp[i] = (int) (recv_disp[i]/LARGE_DTYPE_SIZE);
+            // leftover values
+            l_send_counts[i] = (int) (send_counts[i] % LARGE_DTYPE_SIZE);
+            l_recv_counts[i] = (int) (recv_counts[i] % LARGE_DTYPE_SIZE);
+            l_send_disp[i] = (int) (send_disp[i] % LARGE_DTYPE_SIZE);
+            l_recv_disp[i] = (int) (recv_disp[i] % LARGE_DTYPE_SIZE);
+            // printf("pe %d rank %d send %d recv %d sdisp %d rdisp %d lsend %d lrecv %d lsdisp %d lrdisp %d\n", i, rank,
+            //         i_send_counts[i], i_recv_counts[i], i_send_disp[i], i_recv_disp[i],
+            //         l_send_counts[i], l_recv_counts[i], l_send_disp[i], l_recv_disp[i]);
+        }
+
+        int64_t curr_send_buff_offset = 0;
+        int64_t curr_recv_buff_offset = 0;
+        // compute buffer offsets
+        for(int i=0; i<num_pes; i++)
+        {
+            send_offset[i] = curr_send_buff_offset;
+            recv_offset[i] = curr_recv_buff_offset;
+            curr_send_buff_offset += send_counts[i];
+            curr_recv_buff_offset += recv_counts[i];
+            // printf("pe %d rank %d send offset %lld recv offset %lld\n", i, rank, send_offset[i], recv_offset[i]);
+        }
+
+        // XXX implement alltoallv manually
+        for(int i=0; i<num_pes; i++)
+        {
+            int TAG = 11; // arbitrary
+            int dest = (rank+i+num_pes) % num_pes;
+            int src = (rank-i+num_pes) % num_pes;
+            // printf("rank %d src %d dest %d\n", rank, src, dest);
+            // send big type
+            MPI_Sendrecv(input+send_offset[dest], i_send_counts[dest], large_dtype, dest, TAG,
+                        output+recv_offset[src], i_recv_counts[src], large_dtype, src, TAG,
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // send leftover
+            MPI_Sendrecv(input+send_offset[dest]+((int64_t)i_send_counts[dest])*LARGE_DTYPE_SIZE, l_send_counts[dest], MPI_CHAR, dest, TAG+1,
+                        output+recv_offset[src]+((int64_t)i_recv_counts[dest])*LARGE_DTYPE_SIZE, l_recv_counts[src], MPI_CHAR, src, TAG+1,
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+
+        // cleanup
+        MPI_Type_free(&large_dtype);
+        delete[] l_send_counts;
+        delete[] l_recv_counts;
+        delete[] l_send_disp;
+        delete[] l_recv_disp;
+        delete[] send_offset;
+        delete[] recv_offset;
+    }
+
+    // cleanup
+    delete[] send_counts;
+    delete[] recv_counts;
+    delete[] send_disp;
+    delete[] recv_disp;
 }
