@@ -771,7 +771,7 @@ class DistributedPass(object):
         new_size_var = None
 
         # size is single int var
-        if isinstance(size_var, ir.Var) and self.typemap[size_var.name] == types.intp:
+        if isinstance(size_var, ir.Var) and isinstance(self.typemap[size_var.name], types.Integer):
             self._array_sizes[lhs] = [size_var]
             out, start_var, end_var = self._gen_1D_div(size_var, scope, loc,
                                                        "$alloc", "get_node_portion", distributed_api.get_node_portion)
@@ -836,7 +836,7 @@ class DistributedPass(object):
         new_size_var = None
 
         # size is single int var
-        if isinstance(size_var, ir.Var) and self.typemap[size_var.name] == types.intp:
+        if isinstance(size_var, ir.Var) and isinstance(self.typemap[size_var.name], types.Integer):
             assert size_var.name in self.oneDVar_len_vars, "invalid 1DVar alloc"
             arr_var = self.oneDVar_len_vars[size_var.name]
 
@@ -927,7 +927,7 @@ class DistributedPass(object):
             #ndims = self._get_arr_ndim(arr.name)
             # if ndims==1:
             # multi-dimensional array could be indexed with 1D index
-            if self.typemap[index_var.name] == types.intp:
+            if isinstance(self.typemap[index_var.name], types.Integer):
                 sub_nodes = self._get_ind_sub(
                     index_var, self._array_starts[arr.name][0])
                 out = sub_nodes
@@ -966,7 +966,7 @@ class DistributedPass(object):
             start = self._array_starts[arr.name][0]
             count = self._array_counts[arr.name][0]
 
-            if self.typemap[index_var.name] == types.intp:
+            if isinstance(self.typemap[index_var.name], types.Integer):
                 def f(A, val, index, chunk_start, chunk_count):  # pragma: no cover
                     hpat.distributed_lower._set_if_in_range(
                         A, val, index, chunk_start, chunk_count)
