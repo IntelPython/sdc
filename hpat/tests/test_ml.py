@@ -26,8 +26,8 @@ class TestML(unittest.TestCase):
         n = 11
         d = 4
         np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
-        self.assertEqual(count_array_OneDs(), 4)
-        self.assertEqual(count_parfor_OneDs(), 3)
+        self.assertEqual(count_array_OneDs(), 5)
+        self.assertEqual(count_parfor_OneDs(), 5)
 
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
@@ -47,8 +47,8 @@ class TestML(unittest.TestCase):
         n = 11
         d = 4
         np.testing.assert_approx_equal(hpat_func(n, d), test_impl(n, d))
-        self.assertEqual(count_array_OneDs(), 6)
-        self.assertEqual(count_parfor_OneDs(), 4)
+        self.assertEqual(count_array_OneDs(), 7)
+        self.assertEqual(count_parfor_OneDs(), 8)
 
     def test_linear_regression(self):
         def test_impl(N, D):
@@ -107,7 +107,7 @@ class TestML(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 11
         np.testing.assert_allclose(hpat_func(1, 1, n, 2), test_impl(1, 1, n, 2))
-        self.assertEqual(count_array_OneDs(), 5)
+        self.assertEqual(count_array_OneDs(), 4)
         self.assertEqual(count_array_OneD_Vars(), 1)
         self.assertEqual(count_parfor_OneDs(), 5)
         self.assertEqual(count_parfor_OneD_Vars(), 1)
