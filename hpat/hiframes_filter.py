@@ -219,7 +219,7 @@ def get_copies_filter(filter_node, typemap):
 ir_utils.copy_propagate_extensions[Filter] = get_copies_filter
 
 
-def apply_copies_filter(filter_node, var_dict, name_var_table, ext_func, ext_data,
+def apply_copies_filter(filter_node, var_dict, name_var_table,
                         typemap, calltypes, save_copies):
     """apply copy propagate in filter node"""
     filter_node.bool_arr = replace_vars_inner(filter_node.bool_arr, var_dict)

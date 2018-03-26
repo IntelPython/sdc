@@ -220,7 +220,7 @@ def get_copies_join(join_node, typemap):
 ir_utils.copy_propagate_extensions[Join] = get_copies_join
 
 
-def apply_copies_join(join_node, var_dict, name_var_table, ext_func, ext_data,
+def apply_copies_join(join_node, var_dict, name_var_table,
                       typemap, calltypes, save_copies):
     """apply copy propagate in join node"""
 
