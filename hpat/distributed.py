@@ -486,6 +486,22 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
+        if call_list == ['transpose']:
+            call_def = guard(get_definition, self.func_ir, func_var)
+            in_arr_name = call_def.value.name
+            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
+                and is_array(self.typemap, in_arr_name)
+                    and not self._is_REP(in_arr_name)):
+                # Currently only 1D arrays are supported
+                assert self._is_1D_arr(in_arr_name)
+                ndim = self.typemap[in_arr_name].ndim
+                self._array_starts[lhs] = [-1]*ndim
+                self._array_counts[lhs] = [-1]*ndim
+                self._array_sizes[lhs] = [-1]*ndim
+                self._array_starts[lhs][0] = self._array_starts[in_arr_name][0]
+                self._array_counts[lhs][0] = self._array_counts[in_arr_name][0]
+                self._array_sizes[lhs][0] = self._array_sizes[in_arr_name][0]
+
         if call_list == ['astype']:
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
