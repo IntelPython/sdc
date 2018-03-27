@@ -306,6 +306,10 @@ class DistributedAnalysis(object):
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
+        if call_list == ['permutation', 'random', np]:
+            assert len(args) == 1
+            assert self.typemap[args[0].name] == types.int64
+
         # sum over the first axis is distributed, A.sum(0)
         if call_list == ['sum', np] and len(args) == 2:
             axis_def = guard(get_definition, self.func_ir, args[1])

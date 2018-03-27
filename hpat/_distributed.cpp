@@ -44,6 +44,9 @@ void oneD_reshape_shuffle(char* output,
                           int64_t old_0dim_global_len,
                           int64_t out_lower_dims_size,
                           int64_t in_lower_dims_size);
+
+void permutation_int(int64_t* output, int n);
+
 int hpat_finalize();
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
@@ -120,6 +123,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_finalize)));
     PyObject_SetAttrString(m, "oneD_reshape_shuffle",
                             PyLong_FromVoidPtr((void*)(&oneD_reshape_shuffle)));
+    PyObject_SetAttrString(m, "permutation_int",
+                            PyLong_FromVoidPtr((void*)(&permutation_int)));
 
     // add actual int value to module
     PyObject_SetAttrString(m, "mpi_req_num_bytes",
@@ -455,6 +460,10 @@ int hpat_finalize()
     return 0;
 }
 
+void permutation_int(int64_t* output, int n)
+{
+     MPI_Bcast(output, n, MPI_INT64_T, 0, MPI_COMM_WORLD);
+}
 
 void oneD_reshape_shuffle(char* output,
                           char* input,
