@@ -14,11 +14,11 @@ std::pair<T, T> get_lower_upper_kth_parallel(std::vector<T> &my_array,
         int64_t total_size, int myrank, int n_pes, int64_t k, int type_enum);
 
 template <class T>
-T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
-                            int myrank, int n_pes, int64_t k, int type_enum);
+double small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
+                              int myrank, int n_pes, int64_t k, int type_enum);
 
 template <class T>
-T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum);
+double get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum);
 
 double quantile_parallel(void* data, int64_t local_size, int64_t total_size, double quantile, int type_enum);
 double quantile_parallel_char(char* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
@@ -364,8 +364,8 @@ std::pair<T, T> get_lower_upper_kth_parallel(std::vector<T> &my_array,
 }
 
 template <class T>
-T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
-                                int myrank, int n_pes, int64_t k, int type_enum)
+double small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
+                              int myrank, int n_pes, int64_t k, int type_enum)
 {
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
     T res;
