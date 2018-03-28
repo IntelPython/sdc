@@ -512,7 +512,6 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_arr_name]
                 self._array_sizes[lhs] = self._array_sizes[in_arr_name]
 
-        # TODO: support reshape with communication
         if call_list == ['reshape']:  # A.reshape
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
