@@ -202,7 +202,7 @@ MPI_Datatype get_MPI_typ(int typ_enum)
 }
 
 template <class T>
-T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum)
+double get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum)
 {
     int64_t local_size = my_array.size();
     int64_t total_size;
