@@ -154,7 +154,7 @@ void* init_string_const(char* in_str)
 
 void dtor_string(std::string** in_str, int64_t size, void* info)
 {
-    printf("dtor size: %d\n", size); fflush(stdout);
+    printf("dtor size: %ld\n", size); fflush(stdout);
     // std::cout<<"del str: "<< (*in_str)->c_str() <<std::endl;
     // delete (*in_str);
     return;
