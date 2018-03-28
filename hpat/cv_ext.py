@@ -26,11 +26,11 @@ class ImreadInfer(AbstractTemplate):
         if not kws and len(args) == 1 and args[0] == string_type:
             return signature(types.Array(types.uint8, 3, 'C'), *args)
 
-@infer_global(cv2.resize, typing_key='cv2resize')
-class ImreadInfer(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args) == 2 and args[0] == types.Array(types.uint8, 3, 'C'):
-            return signature(types.Array(types.uint8, 3, 'C'), *args)
+# @infer_global(cv2.resize, typing_key='cv2resize')
+# class ImreadInfer(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args) == 2 and args[0] == types.Array(types.uint8, 3, 'C'):
+#             return signature(types.Array(types.uint8, 3, 'C'), *args)
 
 @lower_builtin('cv2imread', string_type)
 def lower_cv2_imread(context, builder, sig, args):
@@ -53,29 +53,29 @@ def lower_cv2_imread(context, builder, sig, args):
     return _image_to_array(context, builder, shapes_array, arrtype, data, img)
 
 
-@lower_builtin('cv2resize', types.Array, types.UniTuple)
-def lower_cv2_resize(context, builder, sig, args):
-    #
-    in_arrtype = sig.args[0]
-    in_array = context.make_array(in_arrtype)(context, builder, args[0])
-    in_shapes = cgutils.unpack_tuple(builder, in_array.shape)
-    # cgutils.printf(builder, "%lld\n", in_shapes[2])
-
-    new_sizes = cgutils.unpack_tuple(builder, args[1])
-
-    ary = _empty_nd_impl(context, builder, in_arrtype, [new_sizes[1], new_sizes[0], in_shapes[2]])
-
-    fnty = lir.FunctionType(lir.VoidType(),
-                            [lir.IntType(64), lir.IntType(64),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(64),
-                             lir.IntType(64)])
-    fn_resize = builder.module.get_or_insert_function(fnty, name="cv_resize")
-    img = builder.call(fn_resize, [new_sizes[1], new_sizes[0], ary.data, in_array.data,
-                                    in_shapes[0], in_shapes[1]])
-
-    return impl_ret_new_ref(context, builder, in_arrtype, ary._getvalue())
+# @lower_builtin('cv2resize', types.Array, types.UniTuple)
+# def lower_cv2_resize(context, builder, sig, args):
+#     #
+#     in_arrtype = sig.args[0]
+#     in_array = context.make_array(in_arrtype)(context, builder, args[0])
+#     in_shapes = cgutils.unpack_tuple(builder, in_array.shape)
+#     # cgutils.printf(builder, "%lld\n", in_shapes[2])
+#
+#     new_sizes = cgutils.unpack_tuple(builder, args[1])
+#
+#     ary = _empty_nd_impl(context, builder, in_arrtype, [new_sizes[1], new_sizes[0], in_shapes[2]])
+#
+#     fnty = lir.FunctionType(lir.VoidType(),
+#                             [lir.IntType(64), lir.IntType(64),
+#                              lir.IntType(8).as_pointer(),
+#                              lir.IntType(8).as_pointer(),
+#                              lir.IntType(64),
+#                              lir.IntType(64)])
+#     fn_resize = builder.module.get_or_insert_function(fnty, name="cv_resize")
+#     img = builder.call(fn_resize, [new_sizes[1], new_sizes[0], ary.data, in_array.data,
+#                                     in_shapes[0], in_shapes[1]])
+#
+#     return impl_ret_new_ref(context, builder, in_arrtype, ary._getvalue())
 
 
 def _image_to_array(context, builder, shapes_array, arrtype, data, img):
@@ -92,6 +92,38 @@ def _image_to_array(context, builder, shapes_array, arrtype, data, img):
 
     return impl_ret_new_ref(context, builder, arrtype, ary._getvalue())
 
+@overload(cv2.resize)
+def resize_overload(A_t, resize_shape_t):
+    n_channels = 3
+    if not (isinstance(A_t, types.Array)
+            and A_t.ndim == n_channels
+            and A_t.dtype == types.uint8
+            and resize_shape_t == types.UniTuple(types.int64, 2)):
+        raise ValueError("Unsupported cv2.resize() with types {} {}".format(
+                         A_t, resize_shape_t))
+
+    dtype = A_t.dtype
+    sig = types.void(
+                types.intp,             # new num rows
+                types.intp,             # new num cols
+                types.CPointer(dtype),  # output data
+                types.CPointer(dtype),  # input data
+                types.intp,             # num rows
+                types.intp,             # num cols
+                )
+    cv_resize = types.ExternalFunction("cv_resize", sig)
+
+    def resize_imp(in_arr, resize_shape):
+        A = np.ascontiguousarray(in_arr)
+        n_channels = A.shape[2]
+        # cv Size object has column first
+        B = np.empty((resize_shape[1], resize_shape[0], n_channels), A.dtype)
+
+        cv_resize(resize_shape[1], resize_shape[0], B.ctypes,
+                         A.ctypes, A.shape[0], A.shape[1])
+        return B
+
+    return resize_imp
 
 @overload(cv2.imdecode)
 def imdecode_overload(A_t, flags_t):
@@ -100,6 +132,7 @@ def imdecode_overload(A_t, flags_t):
             and A_t.dtype == types.uint8 and flags_t == types.intp):
         in_dtype = A_t.dtype
         out_dtype = A_t.dtype
+
         sig = types.CPointer(out_dtype)(
                     types.CPointer(types.intp), # output shape
                     types.CPointer(in_dtype),   # input array
@@ -107,6 +140,7 @@ def imdecode_overload(A_t, flags_t):
                     types.intp,                # flags
                     )
         cv_imdecode = types.ExternalFunction("cv_imdecode", sig)
+
         def imdecode_imp(A, flags):
             out_shape = np.empty(2, dtype=np.int64)
             data = cv_imdecode(out_shape.ctypes, A.ctypes, len(A), flags)
