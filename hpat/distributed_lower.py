@@ -38,6 +38,7 @@ ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
 ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
 ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
 ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
+ll.add_symbol('permutation_int', hdist.permutation_int)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -532,6 +533,11 @@ def dist_oneD_reshape_shuffle(lhs, in_arr, new_0dim_global_len, old_0dim_global_
                             dtype_size * in_lower_dims_size)
     #print(in_arr)
 
+permutation_int = types.ExternalFunction("permutation_int",
+                                         types.void(types.voidptr, types.intp))
+@numba.njit
+def dist_permutation_int(lhs, n):
+    permutation_int(lhs.ctypes, n)
 
 ########### finalize MPI when exiting ####################
 
