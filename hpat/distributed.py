@@ -910,6 +910,37 @@ class DistributedPass(object):
         self._tuple_table[tuple_var.name] = new_size_list
         return out, tuple_var
 
+    #new_body += self._run_1D_array_shape(
+    #                                inst.target, rhs.value)
+    # def _run_1D_array_shape(self, lhs, arr):
+    #     """return shape tuple with global size of 1D/1D_Var arrays
+    #     """
+    #     nodes = []
+    #     if self._is_1D_arr(arr.name):
+    #         dim1_size = self._array_sizes[arr.name][0]
+    #     else:
+    #         assert self._is_1D_Var_arr(arr.name)
+    #         nodes += self._gen_1D_Var_len(arr)
+    #         dim1_size = nodes[-1].target
+    #
+    #     ndim = self._get_arr_ndim(arr.name)
+    #
+    #     func_text = "def f(arr, dim1):\n"
+    #     func_text += "    s = (dim1, {})\n".format(
+    #         ",".join(["arr.shape[{}]".format(i) for i in range(1, ndim)]))
+    #     loc_vars = {}
+    #     exec(func_text, {}, loc_vars)
+    #     f = loc_vars['f']
+    #
+    #     f_ir = compile_to_numba_ir(f, {'np': np}, self.typingctx,
+    #                                (self.typemap[arr.name], types.intp),
+    #                                self.typemap, self.calltypes)
+    #     f_block = f_ir.blocks.popitem()[1]
+    #     replace_arg_nodes(f_block, [arr, dim1_size])
+    #     nodes += f_block.body[:-3]
+    #     nodes[-1].target = lhs
+    #     return nodes
+
     def _run_array_size(self, lhs, arr):
         # get total size by multiplying all dimension sizes
         nodes = []
