@@ -6,7 +6,8 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (get_call_table, get_tuple_table, find_topo_order,
                             guard, get_definition, require, find_callname,
-                            mk_unique_var, compile_to_numba_ir, replace_arg_nodes)
+                            mk_unique_var, compile_to_numba_ir, replace_arg_nodes,
+                            find_callname, build_definitions)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -43,6 +44,7 @@ class DistributedAnalysis(object):
         self.typingctx = typingctx
 
     def _init_run(self):
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         self._call_table, _ = get_call_table(self.func_ir.blocks)
         self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._parallel_accesses = set()
@@ -132,7 +134,7 @@ class DistributedAnalysis(object):
                                  'itemsize', 'astype', 'reshape', 'ctypes', 'transpose']):
             pass  # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op == 'call':
-            self._analyze_call(lhs, rhs.func.name, rhs.args, array_dists)
+            self._analyze_call(lhs, rhs, rhs.func.name, rhs.args, array_dists)
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
@@ -191,16 +193,28 @@ class DistributedAnalysis(object):
             self.in_parallel_parfor = -1
         return
 
-    def _analyze_call(self, lhs, func_var, args, array_dists):
+    def _analyze_call(self, lhs, rhs, func_var, args, array_dists):
         if func_var not in self._call_table or not self._call_table[func_var]:
-            self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+            self._analyze_call_set_REP(lhs, args, array_dists)
             return
 
         call_list = self._call_table[func_var]
 
+        func_name = ""
+        func_mod = ""
+        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        if fdef is not None:
+            func_name, func_mod = fdef
+
+
         if is_alloc_call(func_var, self._call_table):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
+            return
+
+        # numpy direct functions
+        if isinstance(func_mod, str) and func_mod == 'numpy':
+            self._analyze_call_np(lhs, func_name, args, array_dists)
             return
 
         if self._is_call(func_var, [len]):
@@ -231,12 +245,8 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, in_arr_name, array_dists)
                 # TODO: support 1D_Var reshape
                 if call_list == ['reshape'] and array_dists[lhs] == Distribution.OneD_Var:
-                    self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+                    self._analyze_call_set_REP(lhs, args, array_dists)
                 return
-
-        if self._is_call(func_var, ['ravel', np]):
-            self._meet_array_dists(lhs, args[0].name, array_dists)
-            return
 
         if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
                                       or self._is_call(func_var, ['h5write', hpat.pio_api])):
@@ -295,31 +305,10 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if (len(call_list) == 2 and call_list[1] == np
-                and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
-                                     'zeros_like', 'ones_like', 'full_like', 'copy']):
-            in_arr = args[0].name
-            self._meet_array_dists(lhs, in_arr, array_dists)
-            return
-
-        if call_list == ['concatenate', np]:
-            self._analyze_call_np_concatenate(lhs, args, array_dists)
-            return
-
         if call_list == ['permutation', 'random', np]:
             assert len(args) == 1
             assert self.typemap[args[0].name] == types.int64
 
-        # sum over the first axis is distributed, A.sum(0)
-        if call_list == ['sum', np] and len(args) == 2:
-            axis_def = guard(get_definition, self.func_ir, args[1])
-            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
-                array_dists[lhs] = Distribution.REP
-                return
-
-        if self._is_call(func_var, ['dot', np]):
-            self._analyze_call_np_dot(lhs, args, array_dists)
-            return
 
         if call_list == ['train']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
@@ -345,7 +334,40 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists)
+
+    def _analyze_call_np(self, lhs, func_name, args, array_dists):
+        """analyze distributions of numpy functions (np.func_name)
+        """
+
+        if func_name == 'ravel':
+            self._meet_array_dists(lhs, args[0].name, array_dists)
+            return
+
+        if func_name == 'concatenate':
+            self._analyze_call_np_concatenate(lhs, args, array_dists)
+            return
+
+        # sum over the first axis is distributed, A.sum(0)
+        if func_name == 'sum' and len(args) == 2:
+            axis_def = guard(get_definition, self.func_ir, args[1])
+            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
+                array_dists[lhs] = Distribution.REP
+                return
+
+        if func_name == 'dot':
+            self._analyze_call_np_dot(lhs, args, array_dists)
+            return
+
+
+        if (func_name in ['cumsum', 'cumprod', 'empty_like',
+                          'zeros_like', 'ones_like', 'full_like', 'copy']):
+            in_arr = args[0].name
+            self._meet_array_dists(lhs, in_arr, array_dists)
+            return
+
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, args, array_dists)
 
     def _analyze_call_np_concatenate(self, lhs, args, array_dists):
         assert len(args) == 1
@@ -422,9 +444,9 @@ class DistributedAnalysis(object):
             return
 
         # set REP if no pattern matched
-        self._analyze_call_set_REP(lhs, func_var, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists)
 
-    def _analyze_call_set_REP(self, lhs, func_var, args, array_dists):
+    def _analyze_call_set_REP(self, lhs, args, array_dists):
         for v in args:
             if is_array(self.typemap, v.name):
                 dprint("dist setting call arg REP {}".format(v.name))
