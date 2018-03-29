@@ -90,6 +90,7 @@ template<class T>
 double quantile_parallel_float(T* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes)
 {
     std::vector<T> my_array(data, data + local_size);
+    // delete NaNs
     my_array.erase(std::remove_if(std::begin(my_array), std::end(my_array),
                                   [](T d) {return std::isnan(d);}), my_array.end());
     local_size = my_array.size();
