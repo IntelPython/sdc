@@ -512,6 +512,10 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_arr_name]
                 self._array_sizes[lhs] = self._array_sizes[in_arr_name]
 
+        if call_list == ['permutation', 'random', np]:
+            if self.typemap[rhs.args[0].name] == types.int64:
+                return self._run_permutation_int(assign, rhs.args)
+
         if call_list == ['reshape']:  # A.reshape
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
@@ -649,6 +653,22 @@ class DistributedPass(object):
             out[-1].target = assign.target
 
         return out
+
+    def _run_permutation_int(self, assign, args):
+        lhs = assign.target
+        n = args[0]
+
+        def f(lhs, n):
+            hpat.distributed_lower.dist_permutation_int(lhs, n)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat},
+                                      self.typingctx,
+                                      (self.typemap[lhs.name], types.intp),
+                                      self.typemap,
+                                      self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [lhs, n])
+        f_block.body = [assign] + f_block.body
+        return f_block.body[:-3]
 
     def _run_reshape(self, assign, in_arr, args):
         lhs = assign.target
