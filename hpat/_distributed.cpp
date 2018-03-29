@@ -303,7 +303,7 @@ double hpat_dist_exscan_f8(double value)
 
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    MPI_Request mpi_req_recv;
+    MPI_Request mpi_req_recv(MPI_REQUEST_NULL);
     // printf("irecv size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
     if(cond)
@@ -318,7 +318,7 @@ MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag,
 
 MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
-    MPI_Request mpi_req_recv;
+    MPI_Request mpi_req_recv(MPI_REQUEST_NULL);
     // printf("isend size:%d pe:%d tag:%d, cond:%d\n", size, pe, tag, cond);
     // fflush(stdout);
     if(cond)
