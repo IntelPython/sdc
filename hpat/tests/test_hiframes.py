@@ -128,6 +128,30 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_quantile_parallel_float_nan(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32)})
+            df.A[0:100] = np.nan
+            df.A[200:331] = np.nan
+            return df.A.quantile(.25)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_quantile_parallel_int(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(0, n, 1, np.int32)})
+            return df.A.quantile(.25)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_quantile_sequential(self):
         def test_impl(A):
             df = pd.DataFrame({'A': A})
