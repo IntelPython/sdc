@@ -106,7 +106,9 @@ class DistributedAnalysis(object):
         if isinstance(rhs, ir.Var) and is_array(self.typemap, lhs):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
-        elif is_array(self.typemap, lhs) and isinstance(rhs, ir.Expr) and rhs.op == 'inplace_binop':
+        elif (is_array(self.typemap, lhs)
+                and isinstance(rhs, ir.Expr)
+                and rhs.op == 'inplace_binop'):
             # distributions of all 3 variables should meet (lhs, arg1, arg2)
             arg1 = rhs.lhs.name
             arg2 = rhs.rhs.name
@@ -230,18 +232,18 @@ class DistributedAnalysis(object):
             assert self.typemap[args[0].name] == types.int64
 
         # len()
-        if func_name == "len" and func_mod in ('__builtin__', 'builtins'):
+        if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return
 
-        if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
-                                      or self._is_call(func_var, ['h5write', hpat.pio_api])):
+        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+                and func_name in ['h5read', 'h5write']):
             return
 
-        if call_list == ['quantile', 'hiframes_api', hpat]:
+        if fdef == ('quantile', 'hpat.hiframes_api'):
             # quantile doesn't affect input's distribution
             return
 
-        if call_list == ['dist_return', 'distributed_api', hpat]:
+        if fdef == ('dist_return', 'hpat.distributed_api'):
             arr_name = args[0].name
             assert arr_name in array_dists, "array distribution not found"
             if array_dists[arr_name] == Distribution.REP:
@@ -249,7 +251,7 @@ class DistributedAnalysis(object):
                                  " since it is replicated")
             return
 
-        if call_list == ['threaded_return', 'distributed_api', hpat]:
+        if fdef == ('threaded_return', 'hpat.distributed_api'):
             arr_name = args[0].name
             assert arr_name in array_dists, "array distribution not found"
             if array_dists[arr_name] == Distribution.REP:
@@ -258,17 +260,17 @@ class DistributedAnalysis(object):
             array_dists[arr_name] = Distribution.Thread
             return
 
-        if call_list == ['dist_input', 'distributed_api', hpat]:
+        if fdef == ('dist_input', 'hpat.distributed_api'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD_Var
             return
 
-        if call_list == ['threaded_input', 'distributed_api', hpat]:
+        if fdef == ('threaded_input', 'hpat.distributed_api'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.Thread
             return
 
-        if call_list == ['rebalance_array', 'distributed_api', hpat]:
+        if fdef == ('rebalance_array', 'hpat.distributed_api'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             in_arr = args[0].name
@@ -278,10 +280,10 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, in_arr, array_dists)
             return
 
-        if hpat.config._has_ros and call_list == ['read_ros_images_inner', 'ros', hpat]:
+        if hpat.config._has_ros and fdef == ('read_ros_images_inner', 'hpat.ros'):
             return
 
-        if hpat.config._has_pyarrow and call_list == [hpat.parquet_pio.read_parquet]:
+        if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.parquet_pio'):
             return
 
         if hpat.config._has_pyarrow and call_list == [hpat.parquet_pio.read_parquet_str]:
