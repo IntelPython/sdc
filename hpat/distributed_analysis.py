@@ -5,7 +5,7 @@ import warnings
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import (get_tuple_table, find_topo_order,
+from numba.ir_utils import (find_topo_order,
                             guard, get_definition, require, find_callname,
                             mk_unique_var, compile_to_numba_ir, replace_arg_nodes,
                             find_callname, build_definitions)
@@ -17,7 +17,7 @@ import hpat
 import hpat.io
 from hpat.utils import (get_constant, get_definitions, is_alloc_callname,
                         is_whole_slice, update_node_definitions, is_array,
-                        is_np_array)
+                        is_np_array, find_build_tuple)
 
 from enum import Enum
 
@@ -47,7 +47,6 @@ class DistributedAnalysis(object):
 
     def _init_run(self):
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._parallel_accesses = set()
         self._T_arrs = set()
         self.second_pass = False
@@ -160,9 +159,11 @@ class DistributedAnalysis(object):
             if index == par_index_var or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr, index))
-            if index in self._tuple_table:
-                index_tuple = [(var.name if isinstance(var, ir.Var) else var)
-                               for var in self._tuple_table[index]]
+
+            # multi-dim case
+            tup_list = guard(find_build_tuple, self.func_ir, index)
+            if tup_list is not None:
+                index_tuple = [var.name for var in tup_list]
                 if index_tuple[0] == par_index_var:
                     parfor_arrs.add(arr)
                     self._parallel_accesses.add((arr, index))
@@ -495,11 +496,11 @@ class DistributedAnalysis(object):
 
         # in multi-dimensional case, we only consider first dimension
         # TODO: extend to 2D distribution
-        if index_var.name in self._tuple_table:
-            inds = self._tuple_table[index_var.name]
-            index_var = inds[0]
+        tup_list = guard(find_build_tuple, self.func_ir, index_var)
+        if tup_list is not None:
+            index_var = tup_list[0]
             # rest of indices should be replicated if array
-            other_ind_vars = [v for v in inds[1:] if isinstance(v, ir.Var)]
+            other_ind_vars = tup_list[1:]
             self._set_REP(other_ind_vars, array_dists)
 
         if isinstance(index_var, int):
@@ -537,11 +538,11 @@ class DistributedAnalysis(object):
             # no parallel to parallel array set (TODO)
             return
 
-        if index_var.name in self._tuple_table:
-            inds = self._tuple_table[index_var.name]
-            index_var = inds[0]
+        tup_list = guard(find_build_tuple, self.func_ir, index_var)
+        if tup_list is not None:
+            index_var = tup_list[0]
             # rest of indices should be replicated if array
-            self._set_REP(inds[1:], array_dists)
+            self._set_REP(tup_list[1:], array_dists)
 
         if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
             # for example: X[:,3] = A

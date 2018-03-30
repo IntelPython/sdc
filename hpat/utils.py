@@ -66,6 +66,17 @@ def is_alloc_callname(func_name, mod_name):
         or (func_name == 'empty_inferred'
             and mod_name in ('numba.extending', 'numba.unsafe.ndarray')))
 
+def find_build_tuple(func_ir, var):
+    """Check if a variable is constructed via build_tuple
+    and return the sequence or raise GuardException otherwise.
+    """
+    # variable or variable name
+    require(isinstance(var, (ir.Var, str)))
+    var_def = get_definition(func_ir, var)
+    require(isinstance(var_def, ir.Expr))
+    require(var_def.op == 'build_tuple')
+    return var_def.items
+
 def cprint(*s):
     print(*s)
 
