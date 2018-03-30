@@ -18,7 +18,7 @@ requirements:
     - pandas
     - scipy
     - mpich # [not win]
-    - pyarrow 0.8.*
+    - pyarrow 0.9.*
     - boost
     - numba
     - hdf5
@@ -32,7 +32,7 @@ requirements:
     - pandas
     - scipy
     - mpich # [not win]
-    - pyarrow 0.8.*
+    - pyarrow 0.9.*
     - boost
     - numba
     - hdf5

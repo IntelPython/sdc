@@ -61,25 +61,26 @@ easily. On Linux/Mac:</p>
 </div>
 <div class="section" id="building-hpat-from-source">
 <h2>Building HPAT from Source<a class="headerlink" href="#building-hpat-from-source" title="Permalink to this headline">¶</a></h2>
-<p>We use <a class="reference external" href="https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh">Anaconda 5.0.1</a> distribution of
+<p>We use <a class="reference external" href="https://repo.continuum.io/archive/Anaconda3-5.1.0-Linux-x86_64.sh">Anaconda 5.1.0</a> distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba and LLVM on Ubuntu Linux:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span>wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 chmod +x miniconda.sh
 ./miniconda.sh -b
 export PATH=$HOME/miniconda3/bin:$PATH
-conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
+conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake llvmlite
 source activate HPAT
-conda install pyarrow=0.8.* mpich -c conda-forge
-conda install h5py llvmlite -c ehsantn
+conda install pyarrow=0.9.* mpich -c conda-forge
+conda install h5py -c ehsantn
 conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
 git clone https://github.com/IntelLabs/hpat
+cd hpat
 mkdir req_install
 pushd req_install
 git clone https://github.com/IntelLabs/numba
 pushd numba
 git checkout hpat_req
-python setup.py install
+python setup.py develop
 popd
 popd
 pushd parquet_reader
@@ -92,13 +93,22 @@ make install
 popd
 popd
 # build HPAT
-HDF5_DIR=$CONDA_PREFIX python setup.py install
+HDF5_DIR=$CONDA_PREFIX python setup.py develop
 </pre></div>
 </div>
 <p>A command line for running the Pi example on 4 cores:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">mpiexec</span> <span class="o">-</span><span class="n">n</span> <span class="mi">4</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">pi</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
+<p>Running unit tests:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">hpat</span><span class="o">/</span><span class="n">tests</span><span class="o">/</span><span class="n">gen_test_data</span><span class="o">.</span><span class="n">py</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">unittest</span>
+</pre></div>
+</div>
+<p>In case of issues, reinstalling in a new conda environment is recommended.
+Also, a common issue is <code class="docutils literal"><span class="pre">hdf5</span></code> package reverting to default instead of the
+parallel version installed from <code class="docutils literal"><span class="pre">ehsantn</span></code> channel. Use <code class="docutils literal"><span class="pre">conda</span> <span class="pre">list</span></code>
+to check the channel of <code class="docutils literal"><span class="pre">hdf5</span></code> package.</p>
 </div>
 <div class="section" id="building-from-source-on-windows">
 <h2>Building from Source on Windows<a class="headerlink" href="#building-from-source-on-windows" title="Permalink to this headline">¶</a></h2>

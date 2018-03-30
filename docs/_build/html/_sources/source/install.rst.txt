@@ -23,7 +23,7 @@ On Windows::
 Building HPAT from Source
 -------------------------
 
-We use `Anaconda 5.0.1 <https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh>`_ distribution of
+We use `Anaconda 5.1.0 <https://repo.continuum.io/archive/Anaconda3-5.1.0-Linux-x86_64.sh>`_ distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba and LLVM on Ubuntu Linux::
 
@@ -31,18 +31,19 @@ such as Numba and LLVM on Ubuntu Linux::
     chmod +x miniconda.sh
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
-    conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
+    conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake llvmlite
     source activate HPAT
-    conda install pyarrow=0.8.* mpich -c conda-forge
-    conda install h5py llvmlite -c ehsantn
+    conda install pyarrow=0.9.* mpich -c conda-forge
+    conda install h5py -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
     git clone https://github.com/IntelLabs/hpat
+    cd hpat
     mkdir req_install
     pushd req_install
     git clone https://github.com/IntelLabs/numba
     pushd numba
     git checkout hpat_req
-    python setup.py install
+    python setup.py develop
     popd
     popd
     pushd parquet_reader
@@ -55,12 +56,22 @@ such as Numba and LLVM on Ubuntu Linux::
     popd
     popd
     # build HPAT
-    HDF5_DIR=$CONDA_PREFIX python setup.py install
+    HDF5_DIR=$CONDA_PREFIX python setup.py develop
 
 
 A command line for running the Pi example on 4 cores::
 
     mpiexec -n 4 python examples/pi.py
+
+Running unit tests::
+
+    python hpat/tests/gen_test_data.py
+    python -m unittest
+
+In case of issues, reinstalling in a new conda environment is recommended.
+Also, a common issue is ``hdf5`` package reverting to default instead of the
+parallel version installed from ``ehsantn`` channel. Use ``conda list``
+to check the channel of ``hdf5`` package.
 
 Building from Source on Windows
 -------------------------------

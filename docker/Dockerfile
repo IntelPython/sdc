@@ -8,8 +8,8 @@ RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 RUN apt-get update
 RUN apt-get install -y wget bzip2 git vim
-RUN wget -q https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
-RUN bash Anaconda3-5.0.1-Linux-x86_64.sh -b
+RUN wget -q https://repo.continuum.io/archive/Anaconda3-5.1.0-Linux-x86_64.sh
+RUN bash Anaconda3-5.1.0-Linux-x86_64.sh -b
 ENV PATH="/root/anaconda3/bin/:${PATH}"
 
 RUN conda create -y -n HPAT
