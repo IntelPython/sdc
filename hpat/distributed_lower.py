@@ -567,4 +567,7 @@ def call_finalize():
     hpat_finalize()
 
 import atexit
+import sys
 atexit.register(call_finalize)
+# flush output before finalize
+atexit.register(sys.stdout.flush)
