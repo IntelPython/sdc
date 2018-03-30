@@ -220,10 +220,7 @@ class DistributedAnalysis(object):
             return
 
         # handle array.func calls
-        if isinstance(func_mod, ir.Var):
-            # currently, find_callname only handles array.func (TODO: extend)
-            assert is_array(self.typemap, func_mod.name), \
-                "array expected {}".format(self.typemap[func_mod.name])
+        if isinstance(func_mod, ir.Var) and is_array(self.typemap, func_mod.name):
             self._analyze_call_array(lhs, func_mod, func_name, args, array_dists)
             return
 
@@ -264,23 +261,21 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if call_list == ['train']:
-            getattr_call = guard(get_definition, self.func_ir, func_var)
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
+        if func_name == 'train' and isinstance(func_mod, ir.Var):
+            if self.typemap[func_mod.name] == hpat.ml.svc.svc_type:
                 self._meet_array_dists(
                     args[0].name, args[1].name, array_dists, Distribution.Thread)
                 return
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
+            if self.typemap[func_mod.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(args[0].name, args[1].name, array_dists)
                 return
 
-        if call_list == ['predict']:
-            getattr_call = guard(get_definition, self.func_ir, func_var)
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
+        if func_name == 'predict' and isinstance(func_mod, ir.Var):
+            if self.typemap[func_mod.name] == hpat.ml.svc.svc_type:
                 self._meet_array_dists(
                     lhs, args[0].name, array_dists, Distribution.Thread)
                 return
-            if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.naive_bayes.mnb_type:
+            if self.typemap[func_mod.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
