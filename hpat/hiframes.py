@@ -202,9 +202,9 @@ class HiFrames(object):
                 and func_mod.name in self.arrow_tables):
             return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod)
 
-        res = self._handle_merge(assign.target, rhs)
-        if res is not None:
-            return res
+        if fdef == ('merge', 'pandas'):
+            return self._handle_merge(assign, lhs, rhs)
+
         res = self._handle_concat(assign.target, rhs)
         if res is not None:
             return res
@@ -264,40 +264,39 @@ class HiFrames(object):
         self._update_df_cols()
         return nodes
 
-    def _handle_merge(self, lhs, rhs):
-        if guard(find_callname, self.func_ir, rhs) == ('merge',
-                                                       'pandas'):
-            if len(rhs.args) < 2:
-                raise ValueError("left and right arguments required for merge")
-            left_df = rhs.args[0]
-            right_df = rhs.args[1]
-            kws = dict(rhs.kws)
-            if 'on' in kws:
-                left_on = get_constant(self.func_ir, kws['on'], None)
-                right_on = left_on
-            else:  # pragma: no cover
-                if 'left_on' not in kws or 'right_on' not in kws:
-                    raise ValueError("merge 'on' or 'left_on'/'right_on'"
-                                     "arguments required")
-                left_on = get_constant(self.func_ir, kws['left_on'], None)
-                right_on = get_constant(self.func_ir, kws['right_on'], None)
-            if left_on is None or right_on is None:
-                raise ValueError("merge key values should be constant strings")
-            scope = lhs.scope
-            loc = lhs.loc
-            self.df_vars[lhs.name] = {}
-            # add columns from left to output
-            for col, _ in self.df_vars[left_df.name].items():
-                self.df_vars[lhs.name][col] = ir.Var(
-                    scope, mk_unique_var(col), loc)
-            # add columns from right to output
-            for col, _ in self.df_vars[right_df.name].items():
-                self.df_vars[lhs.name][col] = ir.Var(
-                    scope, mk_unique_var(col), loc)
-            self._update_df_cols()
-            return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
-                                       left_on, right_on, self.df_vars, lhs.loc)]
-        return None
+    def _handle_merge(self, assign, lhs, rhs):
+        """transform pd.merge() into a Join node
+        """
+        if len(rhs.args) < 2:
+            raise ValueError("left and right arguments required for merge")
+        left_df = rhs.args[0]
+        right_df = rhs.args[1]
+        kws = dict(rhs.kws)
+        if 'on' in kws:
+            left_on = get_constant(self.func_ir, kws['on'], None)
+            right_on = left_on
+        else:  # pragma: no cover
+            if 'left_on' not in kws or 'right_on' not in kws:
+                raise ValueError("merge 'on' or 'left_on'/'right_on'"
+                                 "arguments required")
+            left_on = get_constant(self.func_ir, kws['left_on'], None)
+            right_on = get_constant(self.func_ir, kws['right_on'], None)
+        if left_on is None or right_on is None:
+            raise ValueError("merge key values should be constant strings")
+        scope = lhs.scope
+        loc = lhs.loc
+        self.df_vars[lhs.name] = {}
+        # add columns from left to output
+        for col, _ in self.df_vars[left_df.name].items():
+            self.df_vars[lhs.name][col] = ir.Var(
+                scope, mk_unique_var(col), loc)
+        # add columns from right to output
+        for col, _ in self.df_vars[right_df.name].items():
+            self.df_vars[lhs.name][col] = ir.Var(
+                scope, mk_unique_var(col), loc)
+        self._update_df_cols()
+        return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
+                                   left_on, right_on, self.df_vars, lhs.loc)]
 
     def _handle_concat(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('concat',
