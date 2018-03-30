@@ -73,7 +73,7 @@ Here is a Pi calculation example in HPAT:
         print("Execution time:", time.time()-t1, "\nresult:", pi)
         return pi
 
-    calc_pi(200000000)
+    calc_pi(2 * 10**8)
 
 Save this in a file named `pi.py` and run (on 8 cores)::
 
