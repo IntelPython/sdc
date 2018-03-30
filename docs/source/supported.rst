@@ -282,6 +282,13 @@ example::
          X = f['points'][:]
          Y = f['responses'][:]
 
+Print
+-----
+
+Using ``print`` function is only supported for `REP` values. Print is called on
+one processor only since all processors have the same copy.
+
+
 Strings
 -------
 
