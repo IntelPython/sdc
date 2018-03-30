@@ -227,6 +227,11 @@ class DistributedAnalysis(object):
             self._analyze_call_array(lhs, func_mod, func_name, args, array_dists)
             return
 
+        # hpat.distributed_api functions
+        if isinstance(func_mod, str) and func_mod == 'hpat.distributed_api':
+            self._analyze_call_hpat_dist(lhs, func_name, args, array_dists)
+            return
+
         if fdef == ('permutation', 'np.random'):
             assert len(args) == 1
             assert self.typemap[args[0].name] == types.int64
@@ -243,41 +248,8 @@ class DistributedAnalysis(object):
             # quantile doesn't affect input's distribution
             return
 
-        if fdef == ('dist_return', 'hpat.distributed_api'):
-            arr_name = args[0].name
-            assert arr_name in array_dists, "array distribution not found"
-            if array_dists[arr_name] == Distribution.REP:
-                raise ValueError("distributed return of array {} not valid"
-                                 " since it is replicated")
-            return
-
-        if fdef == ('threaded_return', 'hpat.distributed_api'):
-            arr_name = args[0].name
-            assert arr_name in array_dists, "array distribution not found"
-            if array_dists[arr_name] == Distribution.REP:
-                raise ValueError("threaded return of array {} not valid"
-                                 " since it is replicated")
-            array_dists[arr_name] = Distribution.Thread
-            return
-
-        if fdef == ('dist_input', 'hpat.distributed_api'):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD_Var
-            return
-
-        if fdef == ('threaded_input', 'hpat.distributed_api'):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.Thread
-            return
-
-        if fdef == ('rebalance_array', 'hpat.distributed_api'):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            in_arr = args[0].name
-            if array_dists[in_arr] == Distribution.OneD_Var:
-                array_dists[lhs] = Distribution.OneD
-            else:
-                self._meet_array_dists(lhs, in_arr, array_dists)
+        # np.fromfile()
+        if fdef == ('file_read', 'hpat.io'):
             return
 
         if hpat.config._has_ros and fdef == ('read_ros_images_inner', 'hpat.ros'):
@@ -286,7 +258,7 @@ class DistributedAnalysis(object):
         if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.parquet_pio'):
             return
 
-        if hpat.config._has_pyarrow and call_list == [hpat.parquet_pio.read_parquet_str]:
+        if hpat.config._has_pyarrow and fdef == ('read_parquet_str', 'hpat.parquet_pio'):
             # string read creates array in output
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
@@ -312,11 +284,9 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
-        if call_list == [hpat.io.file_read]:
-            return
-
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists)
+
 
     def _analyze_call_np(self, lhs, func_name, args, array_dists):
         """analyze distributions of numpy functions (np.func_name)
@@ -351,6 +321,7 @@ class DistributedAnalysis(object):
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists)
 
+
     def _analyze_call_array(self, lhs, arr, func_name, args, array_dists):
         """analyze distributions of array functions (arr.func_name)
         """
@@ -374,6 +345,51 @@ class DistributedAnalysis(object):
             # TODO: support 1D_Var reshape
             if func_name == 'reshape' and array_dists[lhs] == Distribution.OneD_Var:
                 self._analyze_call_set_REP(lhs, args, array_dists)
+            return
+
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, args, array_dists)
+
+
+    def _analyze_call_hpat_dist(self, lhs, func_name, args, array_dists):
+        """analyze distributions of hpat distributed functions
+        (hpat.distributed_api.func_name)
+        """
+        if func_name == 'dist_return':
+            arr_name = args[0].name
+            assert arr_name in array_dists, "array distribution not found"
+            if array_dists[arr_name] == Distribution.REP:
+                raise ValueError("distributed return of array {} not valid"
+                                 " since it is replicated")
+            return
+
+        if func_name == 'threaded_return':
+            arr_name = args[0].name
+            assert arr_name in array_dists, "array distribution not found"
+            if array_dists[arr_name] == Distribution.REP:
+                raise ValueError("threaded return of array {} not valid"
+                                 " since it is replicated")
+            array_dists[arr_name] = Distribution.Thread
+            return
+
+        if func_name == 'dist_input':
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+            return
+
+        if func_name == 'threaded_input':
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.Thread
+            return
+
+        if func_name == 'rebalance_array':
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            in_arr = args[0].name
+            if array_dists[in_arr] == Distribution.OneD_Var:
+                array_dists[lhs] = Distribution.OneD
+            else:
+                self._meet_array_dists(lhs, in_arr, array_dists)
             return
 
         # set REP if not found
