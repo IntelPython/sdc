@@ -29,8 +29,8 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
-from hpat.utils import (get_definitions, is_alloc_call, is_whole_slice, get_slice_step,
-                        is_array, is_np_array)
+from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
+                        get_slice_step, is_array, is_np_array)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -367,6 +367,12 @@ class DistributedPass(object):
             return out
         call_list = self._call_table[func_var]
 
+        func_name = ""
+        func_mod = ""
+        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        if fdef is not None:
+            func_name, func_mod = fdef
+
         # len(A) if A is 1D
         if self._is_call(func_var, [len]) and rhs.args and self._is_1D_arr(rhs.args[0].name):
             arr = rhs.args[0].name
@@ -380,7 +386,7 @@ class DistributedPass(object):
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
         # divide 1D alloc
-        if self._is_1D_arr(lhs) and is_alloc_call(func_var, self._call_table):
+        if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
             size_var = rhs.args[0]
             out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
             # empty_inferred is tuple for some reason
@@ -389,7 +395,7 @@ class DistributedPass(object):
             out.append(assign)
 
         # fix 1D_Var allocs in case global len of another 1DVar is used
-        if self._is_1D_Var_arr(lhs) and is_alloc_call(func_var, self._call_table):
+        if self._is_1D_Var_arr(lhs) and is_alloc_callname(func_name, func_mod):
             size_var = rhs.args[0]
             out, new_size_var = self._fix_1D_Var_alloc(
                 size_var, lhs, scope, loc)

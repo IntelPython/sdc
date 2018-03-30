@@ -49,7 +49,7 @@ def update_node_definitions(nodes, definitions):
 
 def is_alloc_call(func_var, call_table):
     """
-    return trie of func_var represents an array creation call
+    return true if func_var represents an array creation call
     """
     assert func_var in call_table
     call_list = call_table[func_var]
@@ -57,6 +57,14 @@ def is_alloc_call(func_var, call_table):
              and call_list[0] in ['empty', 'zeros', 'ones', 'full'])
             or call_list == [numba.unsafe.ndarray.empty_inferred])
 
+def is_alloc_callname(func_name, mod_name):
+    """
+    return true if function represents an array creation call
+    """
+    return isinstance(mod_name, str) and ((mod_name == 'numpy'
+        and func_name in ('empty', 'zeros', 'ones', 'full'))
+        or (func_name == 'empty_inferred'
+            and mod_name in ('numba.extending', 'numba.unsafe.ndarray')))
 
 def cprint(*s):
     print(*s)

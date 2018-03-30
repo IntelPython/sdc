@@ -14,8 +14,9 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.utils import (get_constant, get_definitions, is_alloc_call, is_whole_slice,
-                        update_node_definitions, is_array, is_np_array)
+from hpat.utils import (get_constant, get_definitions, is_alloc_callname,
+                        is_whole_slice, update_node_definitions, is_array,
+                        is_np_array)
 
 from enum import Enum
 
@@ -208,8 +209,7 @@ class DistributedAnalysis(object):
         if fdef is not None:
             func_name, func_mod = fdef
 
-
-        if is_alloc_call(func_var, self._call_table):
+        if is_alloc_callname(func_name, func_mod):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
