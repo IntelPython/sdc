@@ -217,36 +217,21 @@ class DistributedAnalysis(object):
             self._analyze_call_np(lhs, func_name, args, array_dists)
             return
 
-        if self._is_call(func_var, [len]):
+        # handle array.func calls
+        if isinstance(func_mod, ir.Var):
+            # currently, find_callname only handles array.func (TODO: extend)
+            assert is_array(self.typemap, func_mod.name), \
+                "array expected {}".format(self.typemap[func_mod.name])
+            self._analyze_call_array(lhs, func_mod, func_name, args, array_dists)
             return
 
-        if call_list == ['transpose']:
-            call_def = guard(get_definition, self.func_ir, func_var)
-            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                    and is_array(self.typemap, call_def.value.name)):
-                if len(args) == 0:
-                    raise ValueError("Transpose with no arguments is not"
-                                     " supported")
-                in_arr_name = call_def.value.name
-                arg0 = guard(get_constant, self.func_ir, args[0])
-                if isinstance(arg0, tuple):
-                    arg0 = arg0[0]
-                if arg0 != 0:
-                    raise ValueError("Transpose with non-zero first argument"
-                                     " is not supported")
-                self._meet_array_dists(lhs, in_arr_name, array_dists)
-                return
+        if fdef == ('permutation', 'np.random'):
+            assert len(args) == 1
+            assert self.typemap[args[0].name] == types.int64
 
-        if call_list == ['astype'] or call_list == ['reshape']:
-            call_def = guard(get_definition, self.func_ir, func_var)
-            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                    and is_array(self.typemap, call_def.value.name)):
-                in_arr_name = call_def.value.name
-                self._meet_array_dists(lhs, in_arr_name, array_dists)
-                # TODO: support 1D_Var reshape
-                if call_list == ['reshape'] and array_dists[lhs] == Distribution.OneD_Var:
-                    self._analyze_call_set_REP(lhs, args, array_dists)
-                return
+        # len()
+        if func_name == "len" and func_mod in ('__builtin__', 'builtins'):
+            return
 
         if hpat.config._has_h5py and (self._is_call(func_var, ['h5read', hpat.pio_api])
                                       or self._is_call(func_var, ['h5write', hpat.pio_api])):
@@ -305,11 +290,6 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if call_list == ['permutation', 'random', np]:
-            assert len(args) == 1
-            assert self.typemap[args[0].name] == types.int64
-
-
         if call_list == ['train']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
             if getattr_call and self.typemap[getattr_call.value.name] == hpat.ml.svc.svc_type:
@@ -364,6 +344,34 @@ class DistributedAnalysis(object):
                           'zeros_like', 'ones_like', 'full_like', 'copy']):
             in_arr = args[0].name
             self._meet_array_dists(lhs, in_arr, array_dists)
+            return
+
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, args, array_dists)
+
+    def _analyze_call_array(self, lhs, arr, func_name, args, array_dists):
+        """analyze distributions of array functions (arr.func_name)
+        """
+        if func_name == 'transpose':
+            if len(args) == 0:
+                raise ValueError("Transpose with no arguments is not"
+                                 " supported")
+            in_arr_name = arr.name
+            arg0 = guard(get_constant, self.func_ir, args[0])
+            if isinstance(arg0, tuple):
+                arg0 = arg0[0]
+            if arg0 != 0:
+                raise ValueError("Transpose with non-zero first argument"
+                                 " is not supported")
+            self._meet_array_dists(lhs, in_arr_name, array_dists)
+            return
+
+        if func_name in ('astype', 'reshape'):
+            in_arr_name = arr.name
+            self._meet_array_dists(lhs, in_arr_name, array_dists)
+            # TODO: support 1D_Var reshape
+            if func_name == 'reshape' and array_dists[lhs] == Distribution.OneD_Var:
+                self._analyze_call_set_REP(lhs, args, array_dists)
             return
 
         # set REP if not found
