@@ -1,10 +1,11 @@
 from __future__ import print_function, division, absolute_import
 from collections import namedtuple
 import copy
+import warnings
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import (get_call_table, get_tuple_table, find_topo_order,
+from numba.ir_utils import (get_tuple_table, find_topo_order,
                             guard, get_definition, require, find_callname,
                             mk_unique_var, compile_to_numba_ir, replace_arg_nodes,
                             find_callname, build_definitions)
@@ -46,7 +47,6 @@ class DistributedAnalysis(object):
 
     def _init_run(self):
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        self._call_table, _ = get_call_table(self.func_ir.blocks)
         self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._parallel_accesses = set()
         self._T_arrs = set()
@@ -197,16 +197,17 @@ class DistributedAnalysis(object):
         return
 
     def _analyze_call(self, lhs, rhs, func_var, args, array_dists):
-        if func_var not in self._call_table or not self._call_table[func_var]:
-            self._analyze_call_set_REP(lhs, args, array_dists)
-            return
-
-        call_list = self._call_table[func_var]
-
+        """analyze array distributions in function calls
+        """
         func_name = ""
         func_mod = ""
         fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
-        if fdef is not None:
+        if fdef is None:
+            warnings.warn(
+                "function call couldn't be found for distributed analysis")
+            self._analyze_call_set_REP(lhs, args, array_dists)
+            return
+        else:
             func_name, func_mod = fdef
 
         if is_alloc_callname(func_name, func_mod):
@@ -578,10 +579,6 @@ class DistributedAnalysis(object):
                 tuple_vars = var_def.items
                 self._set_REP(tuple_vars, array_dists)
 
-    def _is_call(self, func_var, call_list):
-        if func_var not in self._call_table:
-            return False
-        return self._call_table[func_var] == call_list
 
     def _rebalance_arrs(self, array_dists, parfor_dists):
         # rebalance an array if it is accessed in a parfor that has output
