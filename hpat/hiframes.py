@@ -195,9 +195,13 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs)
 
-        res = self._handle_pq_table(assign.target, rhs)
-        if res is not None:
-            return res
+        if fdef == ('read_table', 'pyarrow.parquet'):
+            return self._handle_pq_read_table(assign, lhs, rhs)
+
+        if (func_name == 'to_pandas' and isinstance(func_mod, ir.Var)
+                and func_mod.name in self.arrow_tables):
+            return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod)
+
         res = self._handle_merge(assign.target, rhs)
         if res is not None:
             return res
@@ -247,30 +251,18 @@ class HiFrames(object):
         # remove DataFrame call
         return out
 
-    def _handle_pq_table(self, lhs, rhs):
-        if guard(find_callname, self.func_ir, rhs) == ('read_table',
-                                                       'pyarrow.parquet'):
-            if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError("Invalid read_table() arguments")
-            self.arrow_tables[lhs.name] = rhs.args[0]
-            return []
-        # match t.to_pandas()
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # rare case where function variable is assigned to a new variable
-        if isinstance(func_def, ir.Var):
-            rhs.func = func_def
-            return self._handle_pq_table(lhs, rhs)
-        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
-                and func_def.value.name in self.arrow_tables
-                and func_def.attr == 'to_pandas'):
+    def _handle_pq_read_table(self, assign, lhs, rhs):
+        if len(rhs.args) != 1:  # pragma: no cover
+            raise ValueError("Invalid read_table() arguments")
+        self.arrow_tables[lhs.name] = rhs.args[0]
+        return []
 
-            col_items, nodes = self.pq_handler.gen_parquet_read(
-                self.arrow_tables[func_def.value.name], lhs)
-            self.df_vars[lhs.name] = self._process_df_build_map(col_items)
-            self._update_df_cols()
-            return nodes
-        return None
+    def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var):
+        col_items, nodes = self.pq_handler.gen_parquet_read(
+            self.arrow_tables[t_var.name], lhs)
+        self.df_vars[lhs.name] = self._process_df_build_map(col_items)
+        self._update_df_cols()
+        return nodes
 
     def _handle_merge(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('merge',
