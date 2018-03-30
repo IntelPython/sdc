@@ -20,6 +20,34 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_set_column1(self):
+        # set existing column
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
+            df['A'] = np.arange(n)
+            return df.A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
+    def test_set_column2(self):
+        # create new column
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            df['C'] = np.arange(n)
+            return df.C.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
     def test_fillna(self):
         def test_impl():
             A = np.array([1., 2., 3.])
