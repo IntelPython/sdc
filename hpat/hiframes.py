@@ -115,36 +115,7 @@ class HiFrames(object):
 
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
-                res = self._handle_pd_DataFrame(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_pq_table(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_merge(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_concat(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_ros(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_column_call(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_rolling_setup(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_rolling_call(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = self._handle_str_contains(assign.target, rhs)
-                if res is not None:
-                    return res
-                res = hpat.io._handle_np_fromfile(self, assign.target, rhs)
-                if res is not None:
-                    return res
+                return self._run_call(assign)
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
@@ -203,6 +174,42 @@ class HiFrames(object):
             self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
+        return [assign]
+
+    def _run_call(self, assign):
+        lhs = assign.target.name
+        rhs = assign.value
+
+        res = self._handle_pd_DataFrame(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_pq_table(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_merge(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_concat(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_ros(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_column_call(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_rolling_setup(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_rolling_call(assign.target, rhs)
+        if res is not None:
+            return res
+        res = self._handle_str_contains(assign.target, rhs)
+        if res is not None:
+            return res
+        res = hpat.io._handle_np_fromfile(self, assign.target, rhs)
+        if res is not None:
+            return res
         return [assign]
 
     def _get_reverse_copies(self, body):
