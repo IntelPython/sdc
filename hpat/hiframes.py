@@ -177,12 +177,24 @@ class HiFrames(object):
         return [assign]
 
     def _run_call(self, assign):
-        lhs = assign.target.name
+        """handle calls and return new nodes if needed
+        """
+        lhs = assign.target
         rhs = assign.value
 
-        res = self._handle_pd_DataFrame(assign.target, rhs)
-        if res is not None:
-            return res
+        func_name = ""
+        func_mod = ""
+        fdef = guard(find_callname, self.func_ir, rhs)
+        if fdef is None:
+            warnings.warn(
+                "function call couldn't be found for initial analysis")
+            return [assign]
+        else:
+            func_name, func_mod = fdef
+
+        if fdef == ('DataFrame', 'pandas'):
+            return self._handle_pd_DataFrame(assign, lhs, rhs)
+
         res = self._handle_pq_table(assign.target, rhs)
         if res is not None:
             return res
@@ -218,22 +230,22 @@ class HiFrames(object):
                 self.reverse_copies[inst.value.name] = inst.target.name
         return
 
-    def _handle_pd_DataFrame(self, lhs, rhs):
-        if guard(find_callname, self.func_ir, rhs) == ('DataFrame', 'pandas'):
-            if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError(
-                    "Invalid DataFrame() arguments (one expected)")
-            arg_def = guard(get_definition, self.func_ir, rhs.args[0])
-            if (not isinstance(arg_def, ir.Expr)
-                    or arg_def.op != 'build_map'):  # pragma: no cover
-                raise ValueError(
-                    "Invalid DataFrame() arguments (map expected)")
-            out, items = self._fix_df_arrays(arg_def.items)
-            self.df_vars[lhs.name] = self._process_df_build_map(items)
-            self._update_df_cols()
-            # remove DataFrame call
-            return out
-        return None
+    def _handle_pd_DataFrame(self, assign, lhs, rhs):
+        """transform pd.DataFrame({'A': A}) call
+        """
+        if len(rhs.args) != 1:  # pragma: no cover
+            raise ValueError(
+                "Invalid DataFrame() arguments (one expected)")
+        arg_def = guard(get_definition, self.func_ir, rhs.args[0])
+        if (not isinstance(arg_def, ir.Expr)
+                or arg_def.op != 'build_map'):  # pragma: no cover
+            raise ValueError(
+                "Invalid DataFrame() arguments (map expected)")
+        out, items = self._fix_df_arrays(arg_def.items)
+        self.df_vars[lhs.name] = self._process_df_build_map(items)
+        self._update_df_cols()
+        # remove DataFrame call
+        return out
 
     def _handle_pq_table(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('read_table',
