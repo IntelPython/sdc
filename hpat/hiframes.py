@@ -205,9 +205,9 @@ class HiFrames(object):
         if fdef == ('merge', 'pandas'):
             return self._handle_merge(assign, lhs, rhs)
 
-        res = self._handle_concat(assign.target, rhs)
-        if res is not None:
-            return res
+        if fdef == ('concat', 'pandas'):
+            return self._handle_concat(assign, lhs, rhs)
+
         res = self._handle_ros(assign.target, rhs)
         if res is not None:
             return res
@@ -298,69 +298,68 @@ class HiFrames(object):
         return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
                                    left_on, right_on, self.df_vars, lhs.loc)]
 
-    def _handle_concat(self, lhs, rhs):
-        if guard(find_callname, self.func_ir, rhs) == ('concat',
-                                                       'pandas'):
-            if len(rhs.args) != 1 or len(rhs.kws) != 0:
-                raise ValueError(
-                    "only a list/tuple argument is supported in concat")
-            df_list = guard(get_definition, self.func_ir, rhs.args[0])
-            assert isinstance(df_list, ir.Expr) and df_list.op == 'build_list'
+    def _handle_concat(self, assign, lhs, rhs):
+        if len(rhs.args) != 1 or len(rhs.kws) != 0:
+            raise ValueError(
+                "only a list/tuple argument is supported in concat")
+        df_list = guard(get_definition, self.func_ir, rhs.args[0])
+        assert isinstance(df_list, ir.Expr) and df_list.op == 'build_list'
 
-            nodes = []
-            done_cols = {}
-            i = 0
-            for df in df_list.items:
-                for (c, v) in self.df_vars[df.name].items():
-                    if c in done_cols:
+        nodes = []
+        done_cols = {}
+        i = 0
+        for df in df_list.items:
+            for (c, v) in self.df_vars[df.name].items():
+                if c in done_cols:
+                    continue
+                # arguments to the generated function
+                args = [v]
+                # names of arguments to the generated function
+                arg_names = ['_hpat_c' + str(i)]
+                # arguments to the concatenate function
+                conc_arg_names = ['_hpat_c' + str(i)]
+                allocs = ""
+                i += 1
+                for other_df in df_list.items:
+                    if other_df.name == df.name:
                         continue
-                    # arguments to the generated function
-                    args = [v]
-                    # names of arguments to the generated function
-                    arg_names = ['_hpat_c' + str(i)]
-                    # arguments to the concatenate function
-                    conc_arg_names = ['_hpat_c' + str(i)]
-                    allocs = ""
-                    i += 1
-                    for other_df in df_list.items:
-                        if other_df.name == df.name:
-                            continue
-                        if c in self.df_vars[other_df.name]:
-                            args.append(self.df_vars[other_df.name][c])
-                            arg_names.append('_hpat_c' + str(i))
-                            conc_arg_names.append('_hpat_c' + str(i))
-                            i += 1
-                        else:
-                            # use a df column for length
-                            len_arg = list(
-                                self.df_vars[other_df.name].values())[0]
-                            len_name = '_hpat_len' + str(i)
-                            args.append(len_arg)
-                            arg_names.append(len_name)
-                            i += 1
-                            out_name = '_hpat_out' + str(i)
-                            conc_arg_names.append(out_name)
-                            i += 1
-                            # TODO: fix type
-                            allocs += "    {} = np.full(len({}), np.nan)\n".format(
-                                out_name, len_name)
+                    if c in self.df_vars[other_df.name]:
+                        args.append(self.df_vars[other_df.name][c])
+                        arg_names.append('_hpat_c' + str(i))
+                        conc_arg_names.append('_hpat_c' + str(i))
+                        i += 1
+                    else:
+                        # use a df column for length
+                        len_arg = list(
+                            self.df_vars[other_df.name].values())[0]
+                        len_name = '_hpat_len' + str(i)
+                        args.append(len_arg)
+                        arg_names.append(len_name)
+                        i += 1
+                        out_name = '_hpat_out' + str(i)
+                        conc_arg_names.append(out_name)
+                        i += 1
+                        # TODO: fix type
+                        allocs += "    {} = np.full(len({}), np.nan)\n".format(
+                            out_name, len_name)
 
-                    func_text = "def f({}):\n".format(",".join(arg_names))
-                    func_text += allocs
-                    func_text += "    s = np.concatenate(({}))\n".format(
-                        ",".join(conc_arg_names))
-                    loc_vars = {}
-                    exec(func_text, {}, loc_vars)
-                    f = loc_vars['f']
+                func_text = "def f({}):\n".format(",".join(arg_names))
+                func_text += allocs
+                func_text += "    s = np.concatenate(({}))\n".format(
+                    ",".join(conc_arg_names))
+                loc_vars = {}
+                exec(func_text, {}, loc_vars)
+                f = loc_vars['f']
 
-                    f_block = compile_to_numba_ir(f,
-                                {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                    replace_arg_nodes(f_block, args)
-                    nodes += f_block.body[:-3]
-                    done_cols[c] = nodes[-1].target
-            self.df_vars[lhs.name] = done_cols
-            self._update_df_cols()
-            return nodes
+                f_block = compile_to_numba_ir(f,
+                            {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                replace_arg_nodes(f_block, args)
+                nodes += f_block.body[:-3]
+                done_cols[c] = nodes[-1].target
+
+        self.df_vars[lhs.name] = done_cols
+        self._update_df_cols()
+        return nodes
 
     def _handle_ros(self, lhs, rhs):
         if guard(find_callname, self.func_ir, rhs) == ('read_ros_images',
