@@ -482,7 +482,7 @@ def _get_local_range(start, stop, chunk_start, chunk_count):  # pragma: no cover
 @numba.njit
 def _set_if_in_range(A, val, index, chunk_start, chunk_count):  # pragma: no cover
     if index >= chunk_start and index < chunk_start + chunk_count:
-        A[index] = val
+        A[index - chunk_start] = val
 
 
 @numba.njit
