@@ -1,4 +1,5 @@
 from __future__ import print_function, division, absolute_import
+import warnings
 
 import numba
 from numba import ir, ir_utils, types
@@ -155,6 +156,10 @@ class HiFrames(object):
                 assert rhs.attr in df_cols
                 assign.value = df_cols[rhs.attr]
                 self.df_cols.add(lhs)  # save lhs as column
+                # need to remove the lhs definition so that find_callname can
+                # match column function calls (i.e. A.f instead of df.A.f)
+                assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
+                self.func_ir._definitions[lhs] = [None]
 
             # c = df.column.values
             if (rhs.op == 'getattr' and rhs.value.name in self.df_cols and
@@ -208,21 +213,17 @@ class HiFrames(object):
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs)
 
-        res = self._handle_ros(assign.target, rhs)
-        if res is not None:
-            return res
-        res = self._handle_column_call(assign.target, rhs)
-        if res is not None:
-            return res
-        res = self._handle_rolling_setup(assign.target, rhs)
-        if res is not None:
-            return res
+        if fdef == ('read_ros_images', 'hpat.ros'):
+            return self._handle_ros(assign, lhs, rhs)
+
+        # df.column.shift(3)
+        if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
+            return self._handle_column_call(assign, lhs, rhs, func_mod, func_name)
+
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
             return res
-        res = self._handle_str_contains(assign.target, rhs)
-        if res is not None:
-            return res
+
         res = hpat.io._handle_np_fromfile(self, assign.target, rhs)
         if res is not None:
             return res
@@ -361,14 +362,11 @@ class HiFrames(object):
         self._update_df_cols()
         return nodes
 
-    def _handle_ros(self, lhs, rhs):
-        if guard(find_callname, self.func_ir, rhs) == ('read_ros_images',
-                                                       'hpat.ros'):
-            if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError("Invalid read_ros_images() arguments")
-            import hpat.ros
-            return hpat.ros._handle_read_images(lhs, rhs)
-        return None
+    def _handle_ros(self, assign, lhs, rhs):
+        if len(rhs.args) != 1:  # pragma: no cover
+            raise ValueError("Invalid read_ros_images() arguments")
+        import hpat.ros
+        return hpat.ros._handle_read_images(lhs, rhs)
 
     def _fix_df_arrays(self, items_list):
         nodes = []
@@ -407,55 +405,38 @@ class HiFrames(object):
                 self.df_cols.add(col_var.name)
         return
 
-    def _handle_column_call(self, lhs, rhs):
+    def _handle_column_call(self, assign, lhs, rhs, col_var, func_name):
         """
         Handle Series calls like:
           A = df.column.shift(3)
         """
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # rare case where function variable is assigned to a new variable
-        if isinstance(func_def, ir.Var):
-            rhs.func = func_def
-            return self._handle_column_call(lhs, rhs)
-        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
-                and func_def.value.name in self.df_cols
-                and func_def.attr in df_col_funcs):
-            func_name = func_def.attr
-            col_var = func_def.value
+        if func_name == 'rolling':
+            return self._handle_rolling_setup(assign, lhs, rhs, col_var)
+        if func_name == 'str.contains':
+            return self._handle_str_contains(assign, lhs, rhs, col_var)
+        if func_name in df_col_funcs:
             return self._gen_column_call(lhs, rhs.args, col_var, func_name,
                                          dict(rhs.kws))
-        return None
+        return [assign]
 
-    def _handle_rolling_setup(self, lhs, rhs):
+    def _handle_rolling_setup(self, assign, lhs, rhs, col_var):
         """
         Handle Series rolling calls like:
           r = df.column.rolling(3)
         """
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # rare case where function variable is assigned to a new variable
-        if isinstance(func_def, ir.Var):
-            rhs.func = func_def
-            return self._handle_rolling_setup(lhs, rhs)
-        # df.column.rolling
-        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
-                and func_def.value.name in self.df_cols
-                and func_def.attr == 'rolling'):
-            center = False
-            kws = dict(rhs.kws)
-            if rhs.args:
-                window = rhs.args[0]
-            elif 'window' in kws:
-                window = kws['window']
-            else:  # pragma: no cover
-                raise ValueError("window argument to rolling() required")
-            window = get_constant(self.func_ir, window, window)
-            if 'center' in kws:
-                center = get_constant(self.func_ir, kws['center'], center)
-            self.rolling_calls[lhs.name] = [func_def.value, window, center]
-            return []  # remove
-        return None
+        center = False
+        kws = dict(rhs.kws)
+        if rhs.args:
+            window = rhs.args[0]
+        elif 'window' in kws:
+            window = kws['window']
+        else:  # pragma: no cover
+            raise ValueError("window argument to rolling() required")
+        window = get_constant(self.func_ir, window, window)
+        if 'center' in kws:
+            center = get_constant(self.func_ir, kws['center'], center)
+        self.rolling_calls[lhs.name] = [col_var, window, center]
+        return []  # remove
 
     def _handle_rolling_call(self, lhs, rhs):
         """
@@ -464,10 +445,6 @@ class HiFrames(object):
         """
         func_def = guard(get_definition, self.func_ir, rhs.func)
         assert func_def is not None
-        # rare case where function variable is assigned to a new variable
-        if isinstance(func_def, ir.Var):
-            rhs.func = func_def
-            return self._handle_rolling_setup(lhs, rhs)
         # df.column.rolling(3).sum()
         if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
                 and func_def.value.name in self.rolling_calls):
@@ -478,20 +455,11 @@ class HiFrames(object):
                                     + [func_name, lhs])
         return None
 
-    def _handle_str_contains(self, lhs, rhs):
+    def _handle_str_contains(self, assign, lhs, rhs, str_col):
         """
         Handle string contains like:
           B = df.column.str.contains('oo*', regex=True)
         """
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # rare case where function variable is assigned to a new variable
-        if isinstance(func_def, ir.Var):
-            rhs.func = func_def
-            return self._handle_str_contains(lhs, rhs)
-        str_col = guard(self._get_str_contains_col, func_def)
-        if str_col is None:
-            return None
         kws = dict(rhs.kws)
         pat = rhs.args[0]
         regex = True  # default regex arg is True
