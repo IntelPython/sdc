@@ -120,6 +120,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    def test_df_apply(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
+            B = df.apply(lambda r: r.A + r.B, axis=1)
+            return df.B.sum()
+
+        n = 121
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
