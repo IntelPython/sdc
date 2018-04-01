@@ -110,6 +110,15 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    def test_column_map(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            df['B'] = df.A.map(lambda a: 2*a)
+            return df.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
