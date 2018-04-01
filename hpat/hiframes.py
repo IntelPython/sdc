@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 import warnings
+from collections import namedtuple
 
 import numba
 from numba import ir, ir_utils, types
@@ -153,10 +154,11 @@ class HiFrames(object):
             #     self.col_filters.add(assign)
 
             # d = df.column
-            if rhs.op == 'getattr' and rhs.value.name in self.df_vars:
+            if (rhs.op == 'getattr' and rhs.value.name in self.df_vars
+                    and rhs.attr in self.df_vars[rhs.value.name]):
                 df = rhs.value.name
                 df_cols = self.df_vars[df]
-                assert rhs.attr in df_cols
+                # assert rhs.attr in df_cols
                 assign.value = df_cols[rhs.attr]
                 self.df_cols.add(lhs)  # save lhs as column
                 # need to remove the lhs definition so that find_callname can
@@ -219,9 +221,15 @@ class HiFrames(object):
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
+
         # df.column.shift(3)
         if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
             return self._handle_column_call(assign, lhs, rhs, func_mod, func_name)
+
+        # df.apply(lambda a:..., axis=1)
+        if (isinstance(func_mod, ir.Var) and func_mod.name in self.df_vars
+                and func_name == 'apply'):
+            return self._handle_df_apply(assign, lhs, rhs, func_mod)
 
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
@@ -407,6 +415,64 @@ class HiFrames(object):
             for col_name, col_var in cols_map.items():
                 self.df_cols.add(col_var.name)
         return
+
+    def _handle_df_apply(self, assign, lhs, rhs, func_mod):
+        # check for axis=1
+        if not (len(rhs.kws) == 1 and rhs.kws[0][0] == 'axis'
+                and get_constant(self.func_ir, rhs.kws[0][1]) == 1):
+            raise ValueError("only apply() with axis=1 supported")
+
+        if len(rhs.args) != 1:
+            raise ValueError("lambda arg to apply() expected")
+
+        # get apply function
+        func = guard(get_definition, self.func_ir, rhs.args[0])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for apply not found")
+
+        col_names = self.df_vars[func_mod.name].keys()
+        Row = namedtuple(func_mod.name, col_names)
+        # TODO: handle non numpy alloc types
+        # prange func to inline
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(col_names))])
+        row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(col_names))])
+
+        func_text = "def f({}):\n".format(col_name_args)
+        func_text += "  n = len(c0)\n"
+        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
+        func_text += "  for i in numba.parfor.internal_prange(n):\n"
+        func_text += "     row = Row({})\n".format(row_args)
+        func_text += "     S[i] = map_func(row)\n"
+        func_text += "  ret = S\n"
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'Row': Row})
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        topo_order = find_topo_order(f_ir.blocks)
+
+        # find sentinel function and replace with user func
+        for l in topo_order:
+            block = f_ir.blocks[l]
+            for i, stmt in enumerate(block.body):
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'):
+                    fdef = guard(get_definition, f_ir, stmt.value.func)
+                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        inline_closure_call(f_ir, _globals, block, i, func)
+                        break
+
+        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
+        col_vars = list(self.df_vars[func_mod.name].values())
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
+        return f_ir.blocks
+
 
     def _handle_column_call(self, assign, lhs, rhs, col_var, func_name):
         """
