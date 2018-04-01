@@ -11,7 +11,10 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             get_name_var_table, replace_var_names,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes,
-                            find_callname, guard, require, get_definition)
+                            find_callname, guard, require, get_definition,
+                            build_definitions)
+
+from numba.inline_closurecall import inline_closure_call
 
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
@@ -410,14 +413,60 @@ class HiFrames(object):
         Handle Series calls like:
           A = df.column.shift(3)
         """
+        if func_name == 'map':
+            return self._handle_map(assign, lhs, rhs, col_var)
+
         if func_name == 'rolling':
             return self._handle_rolling_setup(assign, lhs, rhs, col_var)
+
         if func_name == 'str.contains':
             return self._handle_str_contains(assign, lhs, rhs, col_var)
+
         if func_name in df_col_funcs:
             return self._gen_column_call(lhs, rhs.args, col_var, func_name,
                                          dict(rhs.kws))
         return [assign]
+
+    def _handle_map(self, assign, lhs, rhs, col_var):
+        """translate df.A.map(lambda a:...) to prange()
+        """
+        # error checking: make sure there is function input only
+        if len(rhs.args) != 1:
+            raise ValueError("map expects 1 argument")
+        func = guard(get_definition, self.func_ir, rhs.args[0])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for map not found")
+
+        # TODO: handle non numpy alloc types
+        # prange func to inline
+        def f(A):
+            S = np.empty_like(A)
+            for i in numba.parfor.internal_prange(len(A)):
+                S[i] = map_func(A[i])
+            ret = S
+
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np})
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        topo_order = find_topo_order(f_ir.blocks)
+
+        # find sentinel function and replace with user func
+        for l in topo_order:
+            block = f_ir.blocks[l]
+            for i, stmt in enumerate(block.body):
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'):
+                    fdef = guard(get_definition, f_ir, stmt.value.func)
+                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        inline_closure_call(f_ir, _globals, block, i, func)
+                        break
+
+        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [col_var])
+        return f_ir.blocks
 
     def _handle_rolling_setup(self, assign, lhs, rhs, col_var):
         """
