@@ -413,7 +413,8 @@ class HiFrames(object):
         Handle Series calls like:
           A = df.column.shift(3)
         """
-        if func_name == 'map':
+        # TODO: handle map/apply differences
+        if func_name in ['map', 'apply']:
             return self._handle_map(assign, lhs, rhs, col_var)
 
         if func_name == 'rolling':
