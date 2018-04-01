@@ -116,8 +116,9 @@ class TestHiFrames(unittest.TestCase):
             df['B'] = df.A.map(lambda a: 2*a)
             return df.B.sum()
 
+        n = 121
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     def test_cumsum(self):
         def test_impl(n):
