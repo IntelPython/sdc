@@ -451,6 +451,11 @@ void comm_req_dealloc(MPI_Request *req_arr)
 
 int hpat_finalize()
 {
+    int is_initialized;
+    MPI_Initialized(&is_initialized);
+    if (!is_initialized) {
+        return 0;
+    }
     int is_finalized;
     MPI_Finalized(&is_finalized);
     if (!is_finalized) {
