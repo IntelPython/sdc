@@ -39,6 +39,7 @@ ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
 ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
 ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
 ll.add_symbol('permutation_int', hdist.permutation_int)
+ll.add_symbol('permutation_array_index', hdist.permutation_array_index)
 
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
@@ -539,6 +540,17 @@ permutation_int = types.ExternalFunction("permutation_int",
 @numba.njit
 def dist_permutation_int(lhs, n):
     permutation_int(lhs.ctypes, n)
+
+permutation_array_index = types.ExternalFunction("permutation_array_index",
+                                                 types.void(types.voidptr,
+                                                            types.voidptr,
+                                                            types.intp,
+                                                            types.voidptr,
+                                                            types.intp))
+@numba.njit
+def dist_permutation_array_index(lhs, rhs, lhs_len, idx, idx_len):
+    permutation_array_index(
+        lhs.ctypes, rhs.ctypes, lhs_len, idx.ctypes, idx_len)
 
 ########### finalize MPI when exiting ####################
 

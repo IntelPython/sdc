@@ -520,6 +520,7 @@ class DistributedPass(object):
 
         if call_list == ['permutation', 'random', np]:
             if self.typemap[rhs.args[0].name] == types.int64:
+                self._array_sizes[lhs] = [rhs.args[0]]
                 return self._run_permutation_int(assign, rhs.args)
 
         if call_list == ['reshape']:  # A.reshape
@@ -696,6 +697,30 @@ class DistributedPass(object):
                                       self.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [lhs, n])
         f_block.body = [assign] + f_block.body
+        return f_block.body[:-3]
+
+    def _run_permutation_array_index(self, lhs, rhs, idx):
+        scope, loc = lhs.scope, lhs.loc
+        alloc = mk_alloc(self.typemap, self.calltypes, lhs,
+                         tuple(self._array_sizes[lhs.name]),
+                         self.typemap[lhs.name].dtype, scope, loc)
+
+        def f(lhs, rhs, lhs_len, idx, idx_len):
+            hpat.distributed_lower.dist_permutation_array_index(
+                lhs, rhs, lhs_len, idx, idx_len)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat},
+                                      self.typingctx,
+                                      (self.typemap[lhs.name],
+                                       self.typemap[rhs.name],
+                                       types.intp,
+                                       self.typemap[idx.name],
+                                       types.intp),
+                                      self.typemap,
+                                      self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [lhs, rhs, self._array_sizes[lhs.name][0],
+                                    idx, self._array_sizes[idx.name][0]])
+        f_block.body = alloc + f_block.body
         return f_block.body[:-3]
 
     def _run_reshape(self, assign, in_arr, args):
@@ -1121,25 +1146,33 @@ class DistributedPass(object):
 
         elif self._is_1D_arr(arr.name) and node.op in ['getitem', 'static_getitem']:
             is_multi_dim = False
+            lhs = full_node.target
+
             # we only consider 1st dimension for multi-dim arrays
             if index_var.name in self._tuple_table:
                 inds = self._tuple_table[index_var.name]
                 index_var = inds[0]
                 is_multi_dim = True
 
+            arr_def = guard(get_definition, self.func_ir, index_var)
+            if (arr_def.op == 'call' and
+                    self._call_table[arr_def.func.name] == ['permutation', 'random', np]):
+                self._array_starts[lhs.name] = [self._array_starts[arr.name][0]]
+                self._array_counts[lhs.name] = [self._array_counts[arr.name][0]]
+                self._array_sizes[lhs.name] = [self._array_sizes[arr.name][0]]
+                out = self._run_permutation_array_index(lhs, arr, index_var)
+
             # no need for transformation for whole slices
             if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
                 # A = X[:,3]
-                lhs = full_node.target.name
-                self._array_starts[lhs] = [self._array_starts[arr.name][0]]
-                self._array_counts[lhs] = [self._array_counts[arr.name][0]]
-                self._array_sizes[lhs] = [self._array_sizes[arr.name][0]]
+                self._array_starts[lhs.name] = [self._array_starts[arr.name][0]]
+                self._array_counts[lhs.name] = [self._array_counts[arr.name][0]]
+                self._array_sizes[lhs.name] = [self._array_sizes[arr.name][0]]
 
             # strided whole slice
             # e.g. A = X[::2,5]
             elif guard(is_whole_slice, self.typemap, self.func_ir, index_var,
                         accept_stride=True):
-                lhs = full_node.target
                 # FIXME: we use rebalance array to handle the output array
                 # TODO: convert to neighbor exchange
                 # on each processor, the slice has to start from an offset:
