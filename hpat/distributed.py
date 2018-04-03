@@ -1155,12 +1155,13 @@ class DistributedPass(object):
                 is_multi_dim = True
 
             arr_def = guard(get_definition, self.func_ir, index_var)
-            if (arr_def.op == 'call' and
-                    self._call_table[arr_def.func.name] == ['permutation', 'random', np]):
-                self._array_starts[lhs.name] = [self._array_starts[arr.name][0]]
-                self._array_counts[lhs.name] = [self._array_counts[arr.name][0]]
-                self._array_sizes[lhs.name] = [self._array_sizes[arr.name][0]]
-                out = self._run_permutation_array_index(lhs, arr, index_var)
+            if isinstance(arr_def, ir.Expr) and arr_def.op == 'call':
+                fdef = guard(find_callname, self.func_ir, arr_def, self.typemap)
+                if fdef == ('permutation', 'numpy.random'):
+                    self._array_starts[lhs.name] = [self._array_starts[arr.name][0]]
+                    self._array_counts[lhs.name] = [self._array_counts[arr.name][0]]
+                    self._array_sizes[lhs.name] = [self._array_sizes[arr.name][0]]
+                    out = self._run_permutation_array_index(lhs, arr, index_var)
 
             # no need for transformation for whole slices
             if guard(is_whole_slice, self.typemap, self.func_ir, index_var):

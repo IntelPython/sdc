@@ -6,6 +6,7 @@
 #include <numeric>
 #include <stdbool.h>
 #include <vector>
+#include <tuple>
 
 int hpat_dist_get_rank();
 int hpat_dist_get_size();
@@ -178,12 +179,14 @@ int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id)
 
 int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id)
 {
+    return hpat_dist_get_end(total, num_pes, node_id) -
+        hpat_dist_get_start(total, num_pes, node_id);
+}
+
+int64_t index_rank(int64_t total, int num_pes, int index)
+{
     int64_t div_chunk = (int64_t)ceil(total/((double)num_pes));
-    int64_t start = std::min(total, node_id*div_chunk);
-    int64_t end = std::min(total, (node_id+1)*div_chunk);
-    int64_t portion = end-start;
-    // printf("rank %d portion:%lld\n", node_id, portion);
-    return portion;
+    return index / div_chunk;
 }
 
 double hpat_dist_get_time()
@@ -477,111 +480,75 @@ void permutation_int(int64_t* output, int n)
      MPI_Bcast(output, n, MPI_INT64_T, 0, MPI_COMM_WORLD);
 }
 
-std::vector<int> find_dest_ranks(int my_rank, int per_rank_size,
+std::vector<int> find_dest_ranks(int rank, int num_ranks,
                                  int64_t *idx, int idx_len)
 {
-    std::vector<int> dest_ranks;
-    for (int i = 0; i < idx_len; ++i) {
-        auto cur_rank = i / per_rank_size;
-        auto item_rank = idx[i] / per_rank_size;
-        if (item_rank == my_rank)
-            dest_ranks.push_back(cur_rank);
-    }
+    int chunk_size = hpat_dist_get_node_portion(idx_len, num_ranks, rank);
+    int begin = hpat_dist_get_start(idx_len, num_ranks, rank);
+    std::vector<int> dest_ranks(chunk_size);
+
+    for (int i = 0; i < idx_len; ++i)
+        if (rank == index_rank(idx_len, num_ranks, idx[i]))
+            dest_ranks[idx[i] - begin] = index_rank(idx_len, num_ranks, i);
     return dest_ranks;
 }
 
-// Returns the index array that would sort the array |v|; see numpy.argsort.
-std::vector<size_t> arg_sort(const std::vector<int>& v) {
-  std::vector<size_t> idx(v.size());
-  std::iota(idx.begin(), idx.end(), 0);
-  std::sort(idx.begin(), idx.end(),
-            [&v](int i1, int i2) {return v[i1] < v[i2];});
-  return idx;
-}
-
-// Assumes sorted |dest_ranks|.
 std::vector<int> find_send_counts(const std::vector<int>& dest_ranks,
                                   int num_ranks)
 {
     std::vector<int> send_counts(num_ranks);
-    int i = 0;
-    for (int j = 0; j < num_ranks; ++j)
-        for ( ; j == dest_ranks[i]; ++i)
-            ++send_counts[j];
+    for (auto dest : dest_ranks)
+        ++send_counts[dest];
     return send_counts;
 }
 
-std::vector<int> find_disps(const std::vector<int>& counts, int num_ranks) {
-    std::vector<int> disps(num_ranks);
-    for (int i = 1; i < num_ranks; ++i)
+std::vector<int> find_disps(const std::vector<int>& counts) {
+    std::vector<int> disps(counts.size());
+    for (size_t i = 1; i < disps.size(); ++i)
         disps[i] = disps[i-1] + counts[i-1];
     return disps;
 }
 
-std::vector<int> find_recv_counts(int rank, int per_rank_size,
-                                  int64_t *idx, int num_ranks)
+std::vector<int> find_recv_counts(int rank, int num_ranks,
+                                  int64_t *idx, int idx_len)
 {
-    int begin = rank * per_rank_size;
-    int end = begin + per_rank_size;
+    int begin = hpat_dist_get_start(idx_len, num_ranks, rank);
+    int end = hpat_dist_get_end(idx_len, num_ranks, rank);
     std::vector<int> recv_counts(num_ranks);
-    for (int i = begin; i < end; ++i) {
-        int item_rank = idx[i] / per_rank_size;
-        ++recv_counts[item_rank];
-    }
+    for (int i = begin; i < end; ++i)
+        ++recv_counts[index_rank(idx_len, num_ranks, idx[i])];
     return recv_counts;
 }
 
-// Applies the permutation index |idx| to the array |v|.  Adapted from:
-// https://blogs.msdn.microsoft.com/oldnewthing/20170102-00/?p=95095
-template<typename T>
-void apply_permutation(T *v, std::vector<size_t> idx) {
-  using std::swap;
-  for (size_t i = 0; i < idx.size(); ++i) {
-    auto current = i;
-    while (i != idx[current]) {
-      auto next = idx[current];
-      swap(v[current], v[next]);
-      idx[current] = current;
-      current = next;
-    }
-    idx[current] = current;
-  }
-}
-
-void permutation_array_index(
-    void *lhs, void *rhs, int64_t lhs_len, void *idx, int64_t idx_len)
+void permutation_array_index(void *lhs, void *rhs, int64_t lhs_len,
+                             void *idx, int64_t idx_len)
 {
     if (lhs_len != idx_len) {
         std::cerr << "Array length and permutation index length should match!\n";
         return;
     }
 
-    int num_ranks = hpat_dist_get_size();
-    if (idx_len % num_ranks) {
-        std::cerr << "Permutation index length should be evenly divisible by processor count\n";
-        return;
-    }
-
-    int per_rank_size = idx_len / num_ranks;
-    int rank = hpat_dist_get_rank();
-
     int64_t *ilhs = static_cast<int64_t*>(lhs);
     int64_t *irhs = static_cast<int64_t*>(rhs);
     int64_t *iidx = static_cast<int64_t*>(idx);
 
-    auto dest_ranks = find_dest_ranks(rank, per_rank_size, iidx, idx_len);
-    auto p = arg_sort(dest_ranks);
-    apply_permutation(irhs, p);
-    apply_permutation(dest_ranks.data(), p);
+    int num_ranks = hpat_dist_get_size();
+    int rank = hpat_dist_get_rank();
 
+    auto dest_ranks = find_dest_ranks(rank, num_ranks, iidx, idx_len);
     auto send_counts = find_send_counts(dest_ranks, num_ranks);
-    auto send_disps = find_disps(send_counts, num_ranks);
-    auto recv_counts = find_recv_counts(rank, per_rank_size, iidx, num_ranks);
-    auto recv_disps = find_disps(recv_counts, num_ranks);
+    auto send_disps = find_disps(send_counts);
+    auto recv_counts = find_recv_counts(rank, num_ranks, iidx, idx_len);
+    auto recv_disps = find_disps(recv_counts);
 
-    MPI_Alltoallv(irhs, send_counts.data(), send_disps.data(), MPI_INT64_T,
-                  ilhs, recv_counts.data(), recv_disps.data(), MPI_INT64_T,
-                  MPI_COMM_WORLD);
+    auto offsets = send_disps;
+    std::vector<int64_t> send_buf(dest_ranks.size());
+    for (size_t i = 0; i < dest_ranks.size(); ++i)
+        send_buf[offsets[dest_ranks[i]]++] = irhs[i];
+
+    MPI_Alltoallv(send_buf.data(), send_counts.data(), send_disps.data(),
+                  MPI_INT64_T, ilhs, recv_counts.data(), recv_disps.data(),
+                  MPI_INT64_T, MPI_COMM_WORLD);
 }
 
 void oneD_reshape_shuffle(char* output,

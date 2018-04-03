@@ -5,10 +5,9 @@ import warnings
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import (find_topo_order,
-                            guard, get_definition, require, find_callname,
-                            mk_unique_var, compile_to_numba_ir, replace_arg_nodes,
-                            find_callname, build_definitions)
+from numba.ir_utils import (find_topo_order, guard, get_definition, require,
+                            find_callname, mk_unique_var, compile_to_numba_ir,
+                            replace_arg_nodes, build_definitions)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -231,7 +230,7 @@ class DistributedAnalysis(object):
             self._analyze_call_hpat_dist(lhs, func_name, args, array_dists)
             return
 
-        if fdef == ('permutation', 'np.random'):
+        if fdef == ('permutation', 'numpy.random'):
             assert len(args) == 1
             assert self.typemap[args[0].name] == types.int64
 
@@ -521,10 +520,11 @@ class DistributedAnalysis(object):
         # array selection with permutation array index
         if is_np_array(self.typemap, index_var.name):
             arr_def = guard(get_definition, self.func_ir, index_var)
-            if (arr_def.op == 'call' and
-                    self._call_table[arr_def.func.name] == ['permutation', 'random', np]):
-                self._meet_array_dists(lhs, rhs.value.name, array_dists)
-                return
+            if isinstance(arr_def, ir.Expr) and arr_def.op == 'call':
+                fdef = guard(find_callname, self.func_ir, arr_def, self.typemap)
+                if fdef == ('permutation', 'numpy.random'):
+                    self._meet_array_dists(lhs, rhs.value.name, array_dists)
+                    return
 
         # whole slice or strided slice access
         # for example: A = X[:,5], A = X[::2,5]

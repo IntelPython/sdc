@@ -264,5 +264,16 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_permuted_array_indexing(self):
+        def test_impl(n):
+            A = np.arange(n)
+            B = np.random.permutation(n)
+            A = A[B]
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        for n in [11, 111, 128, 120]:
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+
 if __name__ == "__main__":
     unittest.main()
