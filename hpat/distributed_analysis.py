@@ -230,10 +230,6 @@ class DistributedAnalysis(object):
             self._analyze_call_hpat_dist(lhs, func_name, args, array_dists)
             return
 
-        if fdef == ('permutation', 'numpy.random'):
-            assert len(args) == 1
-            assert self.typemap[args[0].name] == types.int64
-
         # len()
         if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return

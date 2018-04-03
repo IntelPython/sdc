@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <vector>
 #include <tuple>
+#include <random>
 
 int hpat_dist_get_rank();
 int hpat_dist_get_size();
@@ -549,6 +550,9 @@ void permutation_array_index(void *lhs, void *rhs, int64_t lhs_len,
     MPI_Alltoallv(send_buf.data(), send_counts.data(), send_disps.data(),
                   MPI_INT64_T, ilhs, recv_counts.data(), recv_disps.data(),
                   MPI_INT64_T, MPI_COMM_WORLD);
+
+    std::mt19937 rng(0);
+    std::shuffle(ilhs, ilhs + dest_ranks.size(), rng);
 }
 
 void oneD_reshape_shuffle(char* output,

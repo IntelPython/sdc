@@ -702,7 +702,7 @@ class DistributedPass(object):
     def _run_permutation_array_index(self, lhs, rhs, idx):
         scope, loc = lhs.scope, lhs.loc
         alloc = mk_alloc(self.typemap, self.calltypes, lhs,
-                         tuple(self._array_sizes[lhs.name]),
+                         (self._array_counts[lhs.name][0],),
                          self.typemap[lhs.name].dtype, scope, loc)
 
         def f(lhs, rhs, lhs_len, idx, idx_len):
@@ -1158,9 +1158,9 @@ class DistributedPass(object):
             if isinstance(arr_def, ir.Expr) and arr_def.op == 'call':
                 fdef = guard(find_callname, self.func_ir, arr_def, self.typemap)
                 if fdef == ('permutation', 'numpy.random'):
-                    self._array_starts[lhs.name] = [self._array_starts[arr.name][0]]
-                    self._array_counts[lhs.name] = [self._array_counts[arr.name][0]]
-                    self._array_sizes[lhs.name] = [self._array_sizes[arr.name][0]]
+                    self._array_starts[lhs.name] = self._array_starts[arr.name]
+                    self._array_counts[lhs.name] = self._array_counts[arr.name]
+                    self._array_sizes[lhs.name] = self._array_sizes[arr.name]
                     out = self._run_permutation_array_index(lhs, arr, index_var)
 
             # no need for transformation for whole slices
