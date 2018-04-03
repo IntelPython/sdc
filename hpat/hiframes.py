@@ -231,6 +231,11 @@ class HiFrames(object):
                 and func_name == 'apply'):
             return self._handle_df_apply(assign, lhs, rhs, func_mod)
 
+        # df.describe()
+        if (isinstance(func_mod, ir.Var) and func_mod.name in self.df_vars
+                and func_name == 'describe'):
+            return self._handle_df_describe(assign, lhs, rhs, func_mod)
+
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
             return res
@@ -473,6 +478,63 @@ class HiFrames(object):
         replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
         return f_ir.blocks
 
+    def _handle_df_describe(self, assign, lhs, rhs, func_mod):
+        """translate df.describe() call with no input or just include='all'
+        """
+        # check for no arg or just include='all'
+        if not (len(rhs.args) == 0 and (len(rhs.kws) == 0 or (len(rhs.kws) == 1
+                and rhs.kws[0][0] == 'include'
+                and get_constant(self.func_ir, rhs.kws[0][1]) == 'all'))):
+            raise ValueError("only describe() with include='all' supported")
+
+        col_names = self.df_vars[func_mod.name].keys()
+        col_name_args = ["c"+str(i) for i in range(len(col_names))]
+        # TODO: pandas returns dataframe, maybe return namedtuple instread of
+        # string?
+
+        func_text = "def f({}):\n".format(', '.join(col_name_args))
+        # compute stat values
+        for c in col_name_args:
+            func_text += "  {}_count = hpat.hiframes_api.count({})\n".format(c, c)
+            func_text += "  {}_min = np.min({})\n".format(c, c)
+            func_text += "  {}_max = np.max({})\n".format(c, c)
+            func_text += "  {}_mean = hpat.hiframes_api.mean({})\n".format(c, c)
+            func_text += "  {}_std = hpat.hiframes_api.var({})**0.5\n".format(c, c)
+            func_text += "  {}_q25 = hpat.hiframes_api.quantile({}, .25)\n".format(c, c)
+            func_text += "  {}_q50 = hpat.hiframes_api.quantile({}, .5)\n".format(c, c)
+            func_text += "  {}_q75 = hpat.hiframes_api.quantile({}, .75)\n".format(c, c)
+
+
+        col_header = "      ".join([c for c in col_names])
+        func_text += "  res = '        {}\\n' + \\\n".format(col_header)
+        count_strs = "+ '          ' + ".join(["str({}_count)".format(c) for c in col_name_args])
+        func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
+        mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
+        func_text += "   'mean    ' + {} + '\\n' + \\\n".format(mean_strs)
+        std_strs = "+ '   ' + ".join(["str({}_std)".format(c) for c in col_name_args])
+        func_text += "   'std     ' + {} + '\\n' + \\\n".format(std_strs)
+        min_strs = "+ '   ' + ".join(["str({}_min)".format(c) for c in col_name_args])
+        func_text += "   'min     ' + {} + '\\n' + \\\n".format(min_strs)
+        q25_strs = "+ '   ' + ".join(["str({}_q25)".format(c) for c in col_name_args])
+        func_text += "   '25%     ' + {} + '\\n' + \\\n".format(q25_strs)
+        q50_strs = "+ '   ' + ".join(["str({}_q50)".format(c) for c in col_name_args])
+        func_text += "   '50%     ' + {} + '\\n' + \\\n".format(q50_strs)
+        q75_strs = "+ '   ' + ".join(["str({}_q75)".format(c) for c in col_name_args])
+        func_text += "   '75%     ' + {} + '\\n' + \\\n".format(q75_strs)
+        max_strs = "+ '   ' + ".join(["str({}_max)".format(c) for c in col_name_args])
+        func_text += "   'max     ' + {}\n".format(max_strs)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        col_vars = list(self.df_vars[func_mod.name].values())
+        replace_arg_nodes(f_block, col_vars)
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        return nodes
 
     def _handle_column_call(self, assign, lhs, rhs, col_var, func_name):
         """
@@ -762,6 +824,9 @@ class HiFrames(object):
             q25 = hpat.hiframes_api.quantile(A, .25)
             q50 = hpat.hiframes_api.quantile(A, .5)
             q75 = hpat.hiframes_api.quantile(A, .75)
+            # TODO: pandas returns dataframe, maybe return namedtuple instread of
+            # string?
+            # TODO: fix string formatting to match python/pandas
             s = "count    " + str(a_count) + "\n"\
                 "mean     " + str(a_mean) + "\n"\
                 "std      " + str(a_std) + "\n"\
