@@ -222,6 +222,20 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_df_describe(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
+                               'B': np.arange(n)})
+            #df.A[0:1] = np.nan
+            return df.describe()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        hpat_func(n)
+        # XXX: test actual output
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_str_contains_regex(self):
         def test_impl():
             A = StringArray(['ABC', 'BB', 'ADEF'])
