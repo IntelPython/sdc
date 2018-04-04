@@ -526,6 +526,8 @@ std::vector<int> find_recv_counts(int64_t rank, int64_t num_ranks,
     return recv_counts;
 }
 
+// Returns an |index_array| which would sort the array |v| of size |len| when
+// applied to it.  Identical to numpy.argsort.
 template<class T>
 std::vector<size_t> arg_sort(T *v, int64_t len) {
     std::vector<size_t> index_array(len);
@@ -535,6 +537,8 @@ std::vector<size_t> arg_sort(T *v, int64_t len) {
     return index_array;
 }
 
+// |v| is an array of elements of size |elem_size|.  This function swaps
+// elements located at indices |i1| and |i2|.
 void elem_swap(unsigned char *v, int64_t elem_size, size_t i1, size_t i2)
 {
     std::vector<unsigned char> tmp(elem_size);
@@ -545,6 +549,8 @@ void elem_swap(unsigned char *v, int64_t elem_size, size_t i1, size_t i2)
     std::copy(std::begin(tmp), std::end(tmp), i2_offset);
 }
 
+// Applies the permutation represented by |p| to the array |v| whose elements
+// are of size |elem_size|.
 void apply_permutation(unsigned char *v, int64_t elem_size,
                        std::vector<size_t>& p)
 {
@@ -561,6 +567,8 @@ void apply_permutation(unsigned char *v, int64_t elem_size,
     }
 }
 
+// Applies the permutation represented by |p| of size |p_len| to the array |rhs|
+// of elements of size |elem_size| and stores the result in |lhs|.
 void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
                              unsigned char *rhs, int64_t *p, int64_t p_len)
 {
