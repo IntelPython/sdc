@@ -699,28 +699,40 @@ class DistributedPass(object):
         f_block.body = [assign] + f_block.body
         return f_block.body[:-3]
 
+    # Returns an IR node that defines a variable holding the size of |dtype|.
+    def dtype_size_assign_ir(self, dtype, scope, loc):
+        context = numba.targets.cpu.CPUContext(self.typingctx)
+        dtype_size = context.get_abi_sizeof(context.get_data_type(dtype))
+        dtype_size_var = ir.Var(scope, mk_unique_var("dtype_size"), loc)
+        self.typemap[dtype_size_var.name] = types.intp
+        return ir.Assign(ir.Const(dtype_size, loc), dtype_size_var, loc)
+
     def _run_permutation_array_index(self, lhs, rhs, idx):
         scope, loc = lhs.scope, lhs.loc
-        alloc = mk_alloc(self.typemap, self.calltypes, lhs,
-                         (self._array_counts[lhs.name][0],),
-                         self.typemap[lhs.name].dtype, scope, loc)
+        dtype = self.typemap[lhs.name].dtype
+        out = mk_alloc(self.typemap, self.calltypes, lhs,
+                       (self._array_counts[lhs.name][0],), dtype, scope, loc)
 
-        def f(lhs, rhs, lhs_len, idx, idx_len):
+        def f(lhs, lhs_len, dtype_size, rhs, idx, idx_len):
             hpat.distributed_lower.dist_permutation_array_index(
-                lhs, rhs, lhs_len, idx, idx_len)
+                lhs, lhs_len, dtype_size, rhs, idx, idx_len)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat},
                                       self.typingctx,
                                       (self.typemap[lhs.name],
-                                       self.typemap[rhs.name],
                                        types.intp,
+                                       types.intp,
+                                       self.typemap[rhs.name],
                                        self.typemap[idx.name],
                                        types.intp),
                                       self.typemap,
                                       self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [lhs, rhs, self._array_sizes[lhs.name][0],
-                                    idx, self._array_sizes[idx.name][0]])
-        f_block.body = alloc + f_block.body
+        dtype_ir = self.dtype_size_assign_ir(dtype, scope, loc)
+        out.append(dtype_ir)
+        replace_arg_nodes(f_block, [lhs, self._array_sizes[lhs.name][0],
+                                    dtype_ir.target, rhs, idx,
+                                    self._array_sizes[idx.name][0]])
+        f_block.body = out + f_block.body
         return f_block.body[:-3]
 
     def _run_reshape(self, assign, in_arr, args):
@@ -751,15 +763,11 @@ class DistributedPass(object):
                                    (self.typemap[lhs.name], self.typemap[in_arr.name],
                                     types.intp, types.intp, types.intp),
                                    self.typemap, self.calltypes).blocks.popitem()[1]
-
-        # get datatype size argument
-        context = numba.targets.cpu.CPUContext(self.typingctx)
-        dtype_size = context.get_abi_sizeof(context.get_data_type(dtype))
-        dtype_size_var = ir.Var(scope, mk_unique_var("dtype_size"), loc)
-        self.typemap[dtype_size_var.name] = types.intp
-        out.append(
-            ir.Assign(ir.Const(dtype_size, loc), dtype_size_var, loc))
-        replace_arg_nodes(f_block, [lhs, in_arr, self._array_sizes[lhs.name][0], self._array_sizes[in_arr.name][0], dtype_size_var])
+        dtype_ir = self.dtype_size_assign_ir(dtype, scope, loc)
+        out.append(dtype_ir)
+        replace_arg_nodes(f_block, [lhs, in_arr, self._array_sizes[lhs.name][0],
+                                    self._array_sizes[in_arr.name][0],
+                                    dtype_ir.target])
         out += f_block.body[:-3]
         return out
         # if len(args) == 1:

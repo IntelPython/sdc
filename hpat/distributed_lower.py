@@ -543,14 +543,16 @@ def dist_permutation_int(lhs, n):
 
 permutation_array_index = types.ExternalFunction("permutation_array_index",
                                                  types.void(types.voidptr,
-                                                            types.voidptr,
                                                             types.intp,
+                                                            types.intp,
+                                                            types.voidptr,
                                                             types.voidptr,
                                                             types.intp))
 @numba.njit
-def dist_permutation_array_index(lhs, rhs, lhs_len, idx, idx_len):
-    permutation_array_index(
-        lhs.ctypes, rhs.ctypes, lhs_len, idx.ctypes, idx_len)
+def dist_permutation_array_index(lhs, lhs_len, lhs_elem_size, rhs,
+                                 p, p_len):
+    permutation_array_index(lhs.ctypes, lhs_len, lhs_elem_size, rhs.ctypes,
+                            p.ctypes, p_len)
 
 ########### finalize MPI when exiting ####################
 
