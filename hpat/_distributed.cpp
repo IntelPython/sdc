@@ -481,6 +481,11 @@ void permutation_int(int64_t* output, int n)
      MPI_Bcast(output, n, MPI_INT64_T, 0, MPI_COMM_WORLD);
 }
 
+// Given the permutation index |idx| and |rank|, and the number of ranks
+// |num_ranks|, finds the destination ranks of indices of the |rank|.  For
+// example, if |rank| is 1, |num_ranks| is 3, |idx_len| is 12 and |idx| is the
+// following array [ 9, 8, 6, 4, 11, 7, 2, 3, 5, 0, 1, 10], the function returns
+// [2, 0, 1, 0].
 std::vector<int> find_dest_ranks(int rank, int num_ranks,
                                  int64_t *idx, int idx_len)
 {
@@ -521,6 +526,30 @@ std::vector<int> find_recv_counts(int rank, int num_ranks,
     return recv_counts;
 }
 
+template<class T>
+std::vector<size_t> arg_sort(T *v, int64_t size) {
+  std::vector<size_t> idx(size);
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(),
+            [&v](int i1, int i2) {return v[i1] < v[i2];});
+  return idx;
+}
+
+void apply_permutation(int64_t *v, std::vector<size_t>& idx)
+{
+  using std::swap;
+  for (size_t i = 0; i < idx.size(); ++i) {
+    auto current = i;
+    while (i != idx[current]) {
+      auto next = idx[current];
+      swap(v[current], v[next]);
+      idx[current] = current;
+      current = next;
+    }
+    idx[current] = current;
+  }
+}
+
 void permutation_array_index(void *lhs, void *rhs, int64_t lhs_len,
                              void *idx, int64_t idx_len)
 {
@@ -551,8 +580,10 @@ void permutation_array_index(void *lhs, void *rhs, int64_t lhs_len,
                   MPI_INT64_T, ilhs, recv_counts.data(), recv_disps.data(),
                   MPI_INT64_T, MPI_COMM_WORLD);
 
-    std::mt19937 rng(0);
-    std::shuffle(ilhs, ilhs + dest_ranks.size(), rng);
+    auto begin = iidx + hpat_dist_get_start(idx_len, num_ranks, rank);
+    auto p1 = arg_sort(begin, send_buf.size());
+    auto p2 = arg_sort(p1.data(), p1.size());
+    apply_permutation(ilhs, p2);
 }
 
 void oneD_reshape_shuffle(char* output,
