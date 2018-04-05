@@ -4,12 +4,32 @@ import numpy as np
 import itertools
 import numba
 import hpat
+import random
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_array_OneD_Vars, dist_IR_contains)
 
+def get_np_state_ptr():
+    return numba._helperlib.rnd_get_np_state_ptr()
 
-class TestBasic(unittest.TestCase):
+def _copy_py_state(r, ptr):
+    """
+    Copy state of Python random *r* to Numba state *ptr*.
+    """
+    mt = r.getstate()[1]
+    ints, index = mt[:-1], mt[-1]
+    numba._helperlib.rnd_set_state(ptr, (index, list(ints)))
+    return ints, index
+
+class BaseTest(unittest.TestCase):
+
+    def _follow_cpython(self, ptr, seed=2):
+        r = random.Random(seed)
+        _copy_py_state(r, ptr)
+        return r
+
+
+class TestBasic(BaseTest):
     def test_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -265,15 +285,56 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_permuted_array_indexing(self):
-        def test_impl(n):
-            A = np.arange(n)
-            B = np.random.permutation(n)
-            A = A[B]
-            return A.sum()
 
-        hpat_func = hpat.jit(test_impl)
-        for n in [11, 111, 128, 120]:
-            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+        # Since Numba uses Python's PRNG for producing random numbers in NumPy,
+        # we cannot compare against NumPy.  Therefore, we implement permutation
+        # in Python.
+        def python_permutation(n, r):
+            arr = np.arange(n)
+            r.shuffle(arr)
+            return arr
+
+        def test_impl(n):
+            A, B = np.arange(n), np.arange(n)
+            P = np.random.permutation(n)
+            A, B = A[P], B[P]
+            return A, B
+
+        def python_impl(n, r):
+            A, B = np.arange(n), np.arange(n)
+            P = python_permutation(n, r)
+            A, B = A[P], B[P]
+            return A, B
+
+        # Ideally, in above functions we should just call np.random.seed() and
+        # they should be producing the same sequence of random numbers.
+        # However, since Numba's PRNG uses NumPy's initialization method for
+        # initializing PRNG, we cannot just call seed.  Instead, we resort to
+        # this hack that generates a Python Random object with a fixed seed and
+        # copies the state to Numba's internal NumPy PRNG state.  For details of
+        # this mess, see https://github.com/numba/numba/issues/2782.
+        r = self._follow_cpython(get_np_state_ptr())
+
+        hpat_func = hpat.jit(locals={'A:return': 'distributed',
+                                     'B:return': 'distributed'})(test_impl)
+        rank = hpat.jit(lambda: hpat.distributed_api.get_rank())()
+        num_ranks = hpat.jit(lambda: hpat.distributed_api.get_size())()
+
+        rank_begin_func = hpat.jit(
+            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_start(
+                arr_len, np.int32(num_ranks), np.int32(rank)))
+
+        rank_end_func = hpat.jit(
+            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_end(
+                arr_len, np.int32(num_ranks), np.int32(rank)))
+
+        for arr_len in [11, 111, 128, 120]:
+            begin = rank_begin_func(arr_len, num_ranks, rank)
+            end = rank_end_func(arr_len, num_ranks, rank)
+            hpat_A, hpat_B = hpat_func(arr_len)
+            python_A, python_B = python_impl(arr_len, r)
+            np.testing.assert_allclose(hpat_A, python_A[begin:end])
+            np.testing.assert_allclose(hpat_B, python_B[begin:end])
 
 if __name__ == "__main__":
     unittest.main()
