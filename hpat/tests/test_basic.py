@@ -220,7 +220,7 @@ class TestBasic(unittest.TestCase):
         arr = np.ones(n)
         n_pes = hpat.jit(lambda: hpat.distributed_api.get_size())()
         np.testing.assert_allclose(hpat_func(arr) / n_pes, test_impl(arr))
-        self.assertEqual(count_array_OneD_Vars(), 1)
+        self.assertEqual(count_array_OneDs(), 1)
 
     def test_rebalance(self):
         def test_impl(N):

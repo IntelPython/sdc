@@ -371,7 +371,7 @@ class DistributedAnalysis(object):
 
         if func_name == 'dist_input':
             if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD_Var
+                array_dists[lhs] = Distribution.OneD
             return
 
         if func_name == 'threaded_input':

@@ -617,8 +617,30 @@ class DistributedPass(object):
             return [assign]
 
         if call_list == ['dist_input', 'distributed_api', hpat]:
-            assign.value = rhs.args[0]
-            return [assign]
+            out = [assign]
+            arr = rhs.args[0]
+            # remove sentinel call
+            assign.value = arr
+
+            # gen len() using 1D_Var reduce approach.
+            # TODO: refactor to avoid reduction
+            ndim = self.typemap[arr.name].ndim
+            out += self._gen_1D_Var_len(arr)
+            total_length = out[-1].target
+            div_nodes, start_var, count_var = self._gen_1D_div(
+                total_length, arr.scope, arr.loc, "$input", "get_node_portion",
+                distributed_api.get_node_portion)
+            out += div_nodes
+
+            # XXX: get sizes in lower dimensions
+            self._array_starts[lhs] = [-1]*ndim
+            self._array_counts[lhs] = [-1]*ndim
+            self._array_sizes[lhs] = [-1]*ndim
+            self._array_starts[lhs][0] = start_var
+            self._array_counts[lhs][0] = count_var
+            self._array_sizes[lhs][0] = total_length
+
+            return out
 
         if call_list == ['threaded_input', 'distributed_api', hpat]:
             assign.value = rhs.args[0]
