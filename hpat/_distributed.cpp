@@ -602,9 +602,23 @@ void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
                   element_t, lhs, recv_counts.data(), recv_disps.data(),
                   element_t, MPI_COMM_WORLD);
 
+    // After MPI_Alltoallv returns, we receive our chunk of data that is sorted
+    // based on their ranks.  For the global data array and the permutation
+    // array are [a b c d e f g h] and [2 7 5 6 4 3 1 0] respectively.  The
+    // shuffling of data based on the permutation is [c h f g e d b a].
+    // Assuming there are two ranks each receiving 4 data items and we are ranks
+    // 0, after MPI_Alltoallv, we receive the following chunk [c f g h] which
+    // corresponds to the sorted chunk of our permutation, that is [2 5 6 7].
+    // In order to recover the original positions of [c f g h] we first argsort
+    // the our chunk of permutation array as below:
     auto begin = p + hpat_dist_get_start(p_len, num_ranks, rank);
     auto p1 = arg_sort(begin, dest_ranks.size());
+    // The result of this argsort, which is p1, is [0 2 3 1].  This tells us how
+    // the chunk we have received is different from the target permutation we
+    // want to achieve.  Hence, to achieve the target permutation, we need to
+    // sort our data based on p1.  That is, we need to argsort p1:
     auto p2 = arg_sort(p1.data(), dest_ranks.size());
+    // which gives us [0 3 1 2], and apply this to our received data chunk.
     apply_permutation(lhs, elem_size, p2);
 
     MPI_Type_free(&element_t);

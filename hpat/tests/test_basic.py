@@ -21,7 +21,28 @@ def _copy_py_state(r, ptr):
     numba._helperlib.rnd_set_state(ptr, (index, list(ints)))
     return ints, index
 
+
 class BaseTest(unittest.TestCase):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rank = hpat.jit(lambda: hpat.distributed_api.get_rank())()
+        self.num_ranks = hpat.jit(lambda: hpat.distributed_api.get_size())()
+
+    def _rank_begin(self, arr_len):
+        f = hpat.jit(
+            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_start(
+                arr_len, np.int32(num_ranks), np.int32(rank)))
+        return f(arr_len, self.num_ranks, self.rank)
+
+    def _rank_end(self, arr_len):
+        f = hpat.jit(
+            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_end(
+                arr_len, np.int32(num_ranks), np.int32(rank)))
+        return f(arr_len, self.num_ranks, self.rank)
+
+    def _rank_bounds(self, arr_len):
+        return self._rank_begin(arr_len), self._rank_end(arr_len)
 
     def _follow_cpython(self, ptr, seed=2):
         r = random.Random(seed)
@@ -238,8 +259,7 @@ class TestBasic(BaseTest):
         hpat_func = hpat.jit(locals={'A:input': 'distributed'})(test_impl)
         n = 128
         arr = np.ones(n)
-        n_pes = hpat.jit(lambda: hpat.distributed_api.get_size())()
-        np.testing.assert_allclose(hpat_func(arr) / n_pes, test_impl(arr))
+        np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
     def test_rebalance(self):
@@ -294,47 +314,87 @@ class TestBasic(BaseTest):
             r.shuffle(arr)
             return arr
 
-        def test_impl(n):
-            A, B = np.arange(n), np.arange(n)
-            P = np.random.permutation(n)
+        def test_one_dim(arr_len):
+            A = np.arange(arr_len)
+            B = np.copy(A)
+            P = np.random.permutation(arr_len)
             A, B = A[P], B[P]
             return A, B
 
-        def python_impl(n, r):
-            A, B = np.arange(n), np.arange(n)
-            P = python_permutation(n, r)
+        # Implementation that uses Python's PRNG for producing a permutation.
+        # We test against this function.
+        def python_one_dim(arr_len, r):
+            A = np.arange(arr_len)
+            B = np.copy(A)
+            P = python_permutation(arr_len, r)
             A, B = A[P], B[P]
             return A, B
 
-        # Ideally, in above functions we should just call np.random.seed() and
-        # they should be producing the same sequence of random numbers.
-        # However, since Numba's PRNG uses NumPy's initialization method for
-        # initializing PRNG, we cannot just call seed.  Instead, we resort to
-        # this hack that generates a Python Random object with a fixed seed and
-        # copies the state to Numba's internal NumPy PRNG state.  For details of
-        # this mess, see https://github.com/numba/numba/issues/2782.
+        # Ideally, in above *_impl functions we should just call
+        # np.random.seed() and they should produce the same sequence of random
+        # numbers.  However, since Numba's PRNG uses NumPy's initialization
+        # method for initializing PRNG, we cannot just set seed.  Instead, we
+        # resort to this hack that generates a Python Random object with a fixed
+        # seed and copies the state to Numba's internal NumPy PRNG state.  For
+        # details please see https://github.com/numba/numba/issues/2782.
         r = self._follow_cpython(get_np_state_ptr())
 
-        hpat_func = hpat.jit(locals={'A:return': 'distributed',
-                                     'B:return': 'distributed'})(test_impl)
-        rank = hpat.jit(lambda: hpat.distributed_api.get_rank())()
-        num_ranks = hpat.jit(lambda: hpat.distributed_api.get_size())()
+        hpat_func1 = hpat.jit(locals={'A:return': 'distributed',
+                                      'B:return': 'distributed'})(test_one_dim)
 
-        rank_begin_func = hpat.jit(
-            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_start(
-                arr_len, np.int32(num_ranks), np.int32(rank)))
-
-        rank_end_func = hpat.jit(
-            lambda arr_len, num_ranks, rank: hpat.distributed_api.get_end(
-                arr_len, np.int32(num_ranks), np.int32(rank)))
-
+        # Test one-dimensional array indexing.
         for arr_len in [11, 111, 128, 120]:
-            begin = rank_begin_func(arr_len, num_ranks, rank)
-            end = rank_end_func(arr_len, num_ranks, rank)
-            hpat_A, hpat_B = hpat_func(arr_len)
-            python_A, python_B = python_impl(arr_len, r)
-            np.testing.assert_allclose(hpat_A, python_A[begin:end])
-            np.testing.assert_allclose(hpat_B, python_B[begin:end])
+            hpat_A, hpat_B = hpat_func1(arr_len)
+            python_A, python_B = python_one_dim(arr_len, r)
+            rank_bounds = self._rank_bounds(arr_len)
+            np.testing.assert_allclose(hpat_A, python_A[slice(*rank_bounds)])
+            np.testing.assert_allclose(hpat_B, python_B[slice(*rank_bounds)])
+
+        # Test two-dimensional array indexing.  Like in one-dimensional case
+        # above, in addition to NumPy version that is compiled by Numba, we
+        # implement a Python version.
+        def test_two_dim(arr_len):
+            first_dim = arr_len // 2
+            A = np.arange(arr_len).reshape(first_dim, 2)
+            B = np.copy(A)
+            P = np.random.permutation(first_dim)
+            A, B = A[P], B[P]
+            return A, B
+
+        def python_two_dim(arr_len, r):
+            first_dim = arr_len // 2
+            A = np.arange(arr_len).reshape(first_dim, 2)
+            B = np.copy(A)
+            P = python_permutation(first_dim, r)
+            A, B = A[P], B[P]
+            return A, B
+
+        hpat_func2 = hpat.jit(locals={'A:return': 'distributed',
+                                      'B:return': 'distributed'})(test_two_dim)
+
+        for arr_len in [18, 66, 128]:
+            hpat_A, hpat_B = hpat_func2(arr_len)
+            python_A, python_B = python_two_dim(arr_len, r)
+            rank_bounds = self._rank_bounds(arr_len // 2)
+            np.testing.assert_allclose(hpat_A, python_A[slice(*rank_bounds)])
+            np.testing.assert_allclose(hpat_B, python_B[slice(*rank_bounds)])
+
+        # Test that the indexed array is not modified if it is not being
+        # assigned to.
+        def test_rhs(arr_len):
+            A = np.arange(arr_len)
+            B = np.copy(A)
+            P = np.random.permutation(arr_len)
+            C = A[P]
+            return A, B, C
+
+        hpat_func3 = hpat.jit(locals={'A:return': 'distributed',
+                                      'B:return': 'distributed',
+                                      'C:return': 'distributed'})(test_rhs)
+
+        for arr_len in [15, 23, 26]:
+            A, B, _ = hpat_func3(arr_len)
+            np.testing.assert_allclose(A, B)
 
 if __name__ == "__main__":
     unittest.main()
