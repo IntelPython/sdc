@@ -93,7 +93,8 @@ def dist_get_portion(context, builder, sig, args):
         fnty, name="hpat_dist_get_node_portion")
     return builder.call(fn, [args[0], args[1], args[2]])
 
-
+@lower_builtin(distributed_api.dist_reduce, types.int8, types.int32)
+@lower_builtin(distributed_api.dist_reduce, types.uint8, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.int64, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.int32, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.float32, types.int32)
