@@ -495,7 +495,7 @@ class HiFrames(object):
         func_text = "def f({}):\n".format(', '.join(col_name_args))
         # compute stat values
         for c in col_name_args:
-            func_text += "  {}_count = hpat.hiframes_api.count({})\n".format(c, c)
+            func_text += "  {}_count = np.float64(hpat.hiframes_api.count({}))\n".format(c, c)
             func_text += "  {}_min = np.min({})\n".format(c, c)
             func_text += "  {}_max = np.max({})\n".format(c, c)
             func_text += "  {}_mean = hpat.hiframes_api.mean({})\n".format(c, c)
@@ -507,7 +507,7 @@ class HiFrames(object):
 
         col_header = "      ".join([c for c in col_names])
         func_text += "  res = '        {}\\n' + \\\n".format(col_header)
-        count_strs = "+ '          ' + ".join(["str({}_count)".format(c) for c in col_name_args])
+        count_strs = "+ '   ' + ".join(["str({}_count)".format(c) for c in col_name_args])
         func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
         mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
         func_text += "   'mean    ' + {} + '\\n' + \\\n".format(mean_strs)
@@ -816,7 +816,7 @@ class HiFrames(object):
 
     def _gen_col_describe(self, out_var, args, col_var):
         def f(A):  # pragma: no cover
-            a_count = hpat.hiframes_api.count(A)
+            a_count = np.float64(hpat.hiframes_api.count(A))
             a_min = np.min(A)
             a_max = np.max(A)
             a_mean = hpat.hiframes_api.mean(A)
