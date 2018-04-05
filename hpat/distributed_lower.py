@@ -549,9 +549,11 @@ permutation_array_index = types.ExternalFunction("permutation_array_index",
                                                             types.voidptr,
                                                             types.intp))
 @numba.njit
-def dist_permutation_array_index(lhs, lhs_len, lhs_elem_size, rhs,
-                                 p, p_len):
-    permutation_array_index(lhs.ctypes, lhs_len, lhs_elem_size, rhs.ctypes,
+def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
+    c_rhs = np.ascontiguousarray(rhs)
+    lower_dims_size = get_tuple_prod(c_rhs.shape[1:])
+    elem_size = dtype_size * lower_dims_size
+    permutation_array_index(lhs.ctypes, lhs_len, elem_size, c_rhs.ctypes,
                             p.ctypes, p_len)
 
 ########### finalize MPI when exiting ####################

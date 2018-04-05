@@ -484,7 +484,7 @@ void permutation_int(int64_t* output, int n)
 // |num_ranks|, finds the destination ranks of indices of the |rank|.  For
 // example, if |rank| is 1, |num_ranks| is 3, |p_len| is 12, and |p| is the
 // following array [ 9, 8, 6, 4, 11, 7, 2, 3, 5, 0, 1, 10], the function returns
-// [2, 0, 1, 0].
+// [0, 2, 0, 1].
 std::vector<int64_t> find_dest_ranks(int64_t rank, int64_t num_ranks,
                                      int64_t *p, int64_t p_len)
 {
@@ -550,11 +550,11 @@ void elem_swap(unsigned char *v, int64_t elem_size, size_t i1, size_t i2)
 }
 
 // Applies the permutation represented by |p| to the array |v| whose elements
-// are of size |elem_size|.
+// are of size |elem_size| using O(1) space.  See the following URL for the
+// details: https://blogs.msdn.microsoft.com/oldnewthing/20170102-00/?p=95095.
 void apply_permutation(unsigned char *v, int64_t elem_size,
                        std::vector<size_t>& p)
 {
-    std::vector<unsigned char> tmp(elem_size);
     for (size_t i = 0; i < p.size(); ++i) {
         auto current = i;
         while (i != p[current]) {
