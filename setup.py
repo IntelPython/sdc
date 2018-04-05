@@ -81,6 +81,8 @@ ext_hdist = Extension(name="hdist",
                              libraries = MPI_LIBS,
                              sources=["hpat/_distributed.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
+                             extra_compile_args=['-std=c++11'],
+                             extra_link_args=['-std=c++11'],
                              )
 
 ext_chiframes = Extension(name="chiframes",

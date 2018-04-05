@@ -1,9 +1,13 @@
-#include <stdbool.h>
-#include "mpi.h"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
 #include <Python.h>
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <mpi.h>
+#include <numeric>
+#include <stdbool.h>
+#include <vector>
+#include <tuple>
+#include <random>
 
 int hpat_dist_get_rank();
 int hpat_dist_get_size();
@@ -46,7 +50,8 @@ void oneD_reshape_shuffle(char* output,
                           int64_t in_lower_dims_size);
 
 void permutation_int(int64_t* output, int n);
-
+void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
+                             unsigned char *rhs, int64_t *p, int64_t p_len);
 int hpat_finalize();
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
@@ -125,6 +130,9 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&oneD_reshape_shuffle)));
     PyObject_SetAttrString(m, "permutation_int",
                             PyLong_FromVoidPtr((void*)(&permutation_int)));
+    PyObject_SetAttrString(
+        m, "permutation_array_index",
+        PyLong_FromVoidPtr((void*)(&permutation_array_index)));
 
     // add actual int value to module
     PyObject_SetAttrString(m, "mpi_req_num_bytes",
@@ -171,12 +179,14 @@ int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id)
 
 int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id)
 {
+    return hpat_dist_get_end(total, num_pes, node_id) -
+        hpat_dist_get_start(total, num_pes, node_id);
+}
+
+int64_t index_rank(int64_t total, int num_pes, int index)
+{
     int64_t div_chunk = (int64_t)ceil(total/((double)num_pes));
-    int64_t start = std::min(total, node_id*div_chunk);
-    int64_t end = std::min(total, (node_id+1)*div_chunk);
-    int64_t portion = end-start;
-    // printf("rank %d portion:%lld\n", node_id, portion);
-    return portion;
+    return index / div_chunk;
 }
 
 double hpat_dist_get_time()
@@ -468,6 +478,150 @@ int hpat_finalize()
 void permutation_int(int64_t* output, int n)
 {
      MPI_Bcast(output, n, MPI_INT64_T, 0, MPI_COMM_WORLD);
+}
+
+// Given the permutation index |p| and |rank|, and the number of ranks
+// |num_ranks|, finds the destination ranks of indices of the |rank|.  For
+// example, if |rank| is 1, |num_ranks| is 3, |p_len| is 12, and |p| is the
+// following array [ 9, 8, 6, 4, 11, 7, 2, 3, 5, 0, 1, 10], the function returns
+// [0, 2, 0, 1].
+std::vector<int64_t> find_dest_ranks(int64_t rank, int64_t num_ranks,
+                                     int64_t *p, int64_t p_len)
+{
+    auto chunk_size = hpat_dist_get_node_portion(p_len, num_ranks, rank);
+    auto begin = hpat_dist_get_start(p_len, num_ranks, rank);
+    std::vector<int64_t> dest_ranks(chunk_size);
+
+    for (auto i = 0; i < p_len; ++i)
+        if (rank == index_rank(p_len, num_ranks, p[i]))
+            dest_ranks[p[i] - begin] = index_rank(p_len, num_ranks, i);
+    return dest_ranks;
+}
+
+std::vector<int> find_send_counts(const std::vector<int64_t>& dest_ranks,
+                                  int64_t num_ranks, int64_t elem_size)
+{
+    std::vector<int> send_counts(num_ranks);
+    for (auto dest : dest_ranks)
+        ++send_counts[dest];
+    return send_counts;
+}
+
+std::vector<int> find_disps(const std::vector<int>& counts) {
+    std::vector<int> disps(counts.size());
+    for (size_t i = 1; i < disps.size(); ++i)
+        disps[i] = disps[i-1] + counts[i-1];
+    return disps;
+}
+
+std::vector<int> find_recv_counts(int64_t rank, int64_t num_ranks,
+                                  int64_t *p, int64_t p_len,
+                                  int64_t elem_size)
+{
+    auto begin = hpat_dist_get_start(p_len, num_ranks, rank);
+    auto end = hpat_dist_get_end(p_len, num_ranks, rank);
+    std::vector<int> recv_counts(num_ranks);
+    for (auto i = begin; i < end; ++i)
+        ++recv_counts[index_rank(p_len, num_ranks, p[i])];
+    return recv_counts;
+}
+
+// Returns an |index_array| which would sort the array |v| of size |len| when
+// applied to it.  Identical to numpy.argsort.
+template<class T>
+std::vector<size_t> arg_sort(T *v, int64_t len) {
+    std::vector<size_t> index_array(len);
+    std::iota(index_array.begin(), index_array.end(), 0);
+    std::sort(index_array.begin(), index_array.end(),
+              [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+    return index_array;
+}
+
+// |v| is an array of elements of size |elem_size|.  This function swaps
+// elements located at indices |i1| and |i2|.
+void elem_swap(unsigned char *v, int64_t elem_size, size_t i1, size_t i2)
+{
+    std::vector<unsigned char> tmp(elem_size);
+    auto i1_offset = v + i1 * elem_size;
+    auto i2_offset = v + i2 * elem_size;
+    std::copy(i1_offset, i1_offset + elem_size, tmp.data());
+    std::copy(i2_offset, i2_offset + elem_size, i1_offset);
+    std::copy(std::begin(tmp), std::end(tmp), i2_offset);
+}
+
+// Applies the permutation represented by |p| to the array |v| whose elements
+// are of size |elem_size| using O(1) space.  See the following URL for the
+// details: https://blogs.msdn.microsoft.com/oldnewthing/20170102-00/?p=95095.
+void apply_permutation(unsigned char *v, int64_t elem_size,
+                       std::vector<size_t>& p)
+{
+    for (size_t i = 0; i < p.size(); ++i) {
+        auto current = i;
+        while (i != p[current]) {
+            auto next = p[current];
+            elem_swap(v, elem_size, next, current);
+            p[current] = current;
+            current = next;
+        }
+        p[current] = current;
+    }
+}
+
+// Applies the permutation represented by |p| of size |p_len| to the array |rhs|
+// of elements of size |elem_size| and stores the result in |lhs|.
+void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
+                             unsigned char *rhs, int64_t *p, int64_t p_len)
+{
+    if (len != p_len) {
+        std::cerr << "Array length and permutation index length should match!\n";
+        return;
+    }
+
+    MPI_Datatype element_t;
+    MPI_Type_contiguous(elem_size, MPI_UNSIGNED_CHAR, &element_t);
+    MPI_Type_commit(&element_t);
+
+    auto num_ranks = hpat_dist_get_size();
+    auto rank = hpat_dist_get_rank();
+    auto dest_ranks = find_dest_ranks(rank, num_ranks, p, p_len);
+    auto send_counts = find_send_counts(dest_ranks, num_ranks, elem_size);
+    auto send_disps = find_disps(send_counts);
+    auto recv_counts = find_recv_counts(rank, num_ranks, p, p_len, elem_size);
+    auto recv_disps = find_disps(recv_counts);
+
+    auto offsets = send_disps;
+    std::vector<unsigned char> send_buf(dest_ranks.size() * elem_size);
+    for (size_t i = 0; i < dest_ranks.size(); ++i) {
+        auto send_buf_offset = offsets[dest_ranks[i]]++ * elem_size;
+        auto *send_buf_begin = send_buf.data() + send_buf_offset;
+        auto *rhs_begin = rhs + i * elem_size;
+        std::copy(rhs_begin, rhs_begin + elem_size, send_buf_begin);
+    }
+
+    MPI_Alltoallv(send_buf.data(), send_counts.data(), send_disps.data(),
+                  element_t, lhs, recv_counts.data(), recv_disps.data(),
+                  element_t, MPI_COMM_WORLD);
+
+    // After MPI_Alltoallv returns, we receive our chunk of data that is sorted
+    // based on their ranks.  For the global data array and the permutation
+    // array are [a b c d e f g h] and [2 7 5 6 4 3 1 0] respectively.  The
+    // shuffling of data based on the permutation is [c h f g e d b a].
+    // Assuming there are two ranks each receiving 4 data items and we are ranks
+    // 0, after MPI_Alltoallv, we receive the following chunk [c f g h] which
+    // corresponds to the sorted chunk of our permutation, that is [2 5 6 7].
+    // In order to recover the original positions of [c f g h] we first argsort
+    // the our chunk of permutation array as below:
+    auto begin = p + hpat_dist_get_start(p_len, num_ranks, rank);
+    auto p1 = arg_sort(begin, dest_ranks.size());
+    // The result of this argsort, which is p1, is [0 2 3 1].  This tells us how
+    // the chunk we have received is different from the target permutation we
+    // want to achieve.  Hence, to achieve the target permutation, we need to
+    // sort our data based on p1.  That is, we need to argsort p1:
+    auto p2 = arg_sort(p1.data(), dest_ranks.size());
+    // which gives us [0 3 1 2], and apply this to our received data chunk.
+    apply_permutation(lhs, elem_size, p2);
+
+    MPI_Type_free(&element_t);
 }
 
 void oneD_reshape_shuffle(char* output,
