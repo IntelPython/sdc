@@ -577,6 +577,10 @@ void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
         return;
     }
 
+    MPI_Datatype element_t;
+    MPI_Type_contiguous(elem_size, MPI_UNSIGNED_CHAR, &element_t);
+    MPI_Type_commit(&element_t);
+
     auto num_ranks = hpat_dist_get_size();
     auto rank = hpat_dist_get_rank();
     auto dest_ranks = find_dest_ranks(rank, num_ranks, p, p_len);
@@ -595,13 +599,15 @@ void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
     }
 
     MPI_Alltoallv(send_buf.data(), send_counts.data(), send_disps.data(),
-                  MPI_INT64_T, lhs, recv_counts.data(), recv_disps.data(),
-                  MPI_INT64_T, MPI_COMM_WORLD);
+                  element_t, lhs, recv_counts.data(), recv_disps.data(),
+                  element_t, MPI_COMM_WORLD);
 
     auto begin = p + hpat_dist_get_start(p_len, num_ranks, rank);
     auto p1 = arg_sort(begin, dest_ranks.size());
     auto p2 = arg_sort(p1.data(), dest_ranks.size());
     apply_permutation(lhs, elem_size, p2);
+
+    MPI_Type_free(&element_t);
 }
 
 void oneD_reshape_shuffle(char* output,

@@ -711,7 +711,8 @@ class DistributedPass(object):
         scope, loc = lhs.scope, lhs.loc
         dtype = self.typemap[lhs.name].dtype
         out = mk_alloc(self.typemap, self.calltypes, lhs,
-                       (self._array_counts[lhs.name][0],), dtype, scope, loc)
+                       (self._array_counts[lhs.name][0],
+                        *self._array_sizes[lhs.name][1:]), dtype, scope, loc)
 
         def f(lhs, lhs_len, dtype_size, rhs, idx, idx_len):
             hpat.distributed_lower.dist_permutation_array_index(
