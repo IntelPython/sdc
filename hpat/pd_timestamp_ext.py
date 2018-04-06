@@ -13,7 +13,6 @@ from glob import glob
 import pandas as pd
 import numpy as np
 
-import pdb
 
 class PandasTimestampType(types.Type):
     def __init__(self):
@@ -120,21 +119,17 @@ timestamp_series_type = TimestampSeriesType()
 class TimestampSeriesModel(models.ArrayModel):
     pass
 
-def get_values(x):
-    print("get_values", x, type(x))
-    return x.values
-
 @unbox(TimestampSeriesType)
 def unbox_timestamp_series(typ, val, c):
-    print("unbox_timestamp_series", typ, type(val), c, type(c), c.pyapi, type(c.pyapi))
+    #print("unbox_timestamp_series", typ, type(val), c, type(c), c.pyapi, type(c.pyapi))
     getvalues = c.pyapi.object_getattr_string(val, "values")
     return unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), getvalues, c)
 
 @typeof_impl.register(pd.Series)
 def typeof_pd_timestamp_series(val, c):
-    print("typeof_pd_timestamp_series", type(val), c, type(c), val[0], type(val[0]), val.dtype, type(val.dtype))
+    #print("typeof_pd_timestamp_series", type(val), c, type(c), val[0], type(val[0]), val.dtype, type(val.dtype))
     if len(val) > 0 and isinstance(val[0], pd._libs.tslib.Timestamp):
-        print("found")
+        #print("found")
         return timestamp_series_type
 
 @infer
@@ -154,13 +149,12 @@ class GetItemStringArray(AbstractTemplate):
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-#import tsseries_ext
-#ll.add_symbol('getitem_timestamp_series', tsseries_ext.getitem_timestamp_series)
+import hdatetime_ext
+ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
 
 @lower_builtin('getitem', TimestampSeriesType, types.Integer)
 def lower_timestamp_series_getitem(context, builder, sig, args):
-    pdb.set_trace()
-    print("lower_timestamp_series_getitem", sig, type(sig), args, type(args), sig.return_type)
+    #print("lower_timestamp_series_getitem", sig, type(sig), args, type(args), sig.return_type)
     old_ret = sig.return_type
     sig.return_type = types.NPDatetime('ns')
     # If the return type is a view then just use standard array getitem.
@@ -172,5 +166,10 @@ def lower_timestamp_series_getitem(context, builder, sig, args):
         unconverted = getitem_arraynd_intp(context, builder, sig, args)
         sig.return_type = old_ret
         ret = context.make_helper(builder, pandas_timestamp_type)
+        resptr = builder.bitcast(ret._getpointer(), lir.IntType(8).as_pointer())
+        dt_to_datetime_fnty = lir.FunctionType(lir.VoidType(),
+                                               [lir.IntType(64), lir.IntType(8).as_pointer()])
+        dt_to_datetime_fn = builder.module.get_or_insert_function(dt_to_datetime_fnty, name="dt_to_timestamp")
+        builder.call(dt_to_datetime_fn, [unconverted, resptr])
         res = ret._getvalue()
         return impl_ret_untracked(context, builder, PandasTimestampType, res)
