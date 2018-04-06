@@ -11,6 +11,7 @@ from hpat.str_arr_ext import string_array_type
 from numba.types import List
 from hpat.utils import cprint, distribution_report
 import hpat.io
+import hpat.pd_timestamp_ext
 multithread_mode = False
 
 
