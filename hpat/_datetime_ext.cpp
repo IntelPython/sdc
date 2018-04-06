@@ -9,9 +9,9 @@
 #include <glob.h>
 #endif
 
-#include "np_datetime.h"
-
 extern "C" {
+
+#include "np_datetime.h"
 
 struct pd_timestamp {
     int64_t year;
