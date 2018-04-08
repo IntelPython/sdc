@@ -240,9 +240,9 @@ class HiFrames(object):
         if res is not None:
             return res
 
-        res = hpat.io._handle_np_fromfile(self, assign.target, rhs)
-        if res is not None:
-            return res
+        if fdef == ('fromfile', 'numpy'):
+            return hpat.io._handle_np_fromfile(assign, lhs, rhs)
+
         return [assign]
 
     def _get_reverse_copies(self, body):

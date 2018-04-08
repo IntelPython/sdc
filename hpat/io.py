@@ -35,38 +35,38 @@ file_read_parallel = types.ExternalFunction("file_read_parallel",
 #
 #     return fromfile_impl
 
-def _handle_np_fromfile(self, lhs, rhs):
-    if guard(find_callname, self.func_ir, rhs) == ('fromfile', 'numpy'):
-        # TODO: dtype in kws
-        if len(rhs.args) != 2:  # pragma: no cover
-            raise ValueError(
-                "np.fromfile(): file name and dtype expected")
+def _handle_np_fromfile(assign, lhs, rhs):
+    """translate np.fromfile() to native
+    """
+    # TODO: dtype in kws
+    if len(rhs.args) != 2:  # pragma: no cover
+        raise ValueError(
+            "np.fromfile(): file name and dtype expected")
 
-        # FIXME: import here since hio has hdf5 which might not be available
-        import hio
-        import llvmlite.binding as ll
-        ll.add_symbol('get_file_size', hio.get_file_size)
-        ll.add_symbol('file_read', hio.file_read)
-        ll.add_symbol('file_read_parallel', hio.file_read_parallel)
-        _fname = rhs.args[0]
-        _dtype = rhs.args[1]
+    # FIXME: import here since hio has hdf5 which might not be available
+    import hio
+    import llvmlite.binding as ll
+    ll.add_symbol('get_file_size', hio.get_file_size)
+    ll.add_symbol('file_read', hio.file_read)
+    ll.add_symbol('file_read_parallel', hio.file_read_parallel)
+    _fname = rhs.args[0]
+    _dtype = rhs.args[1]
 
-        def fromfile_impl(fname, dtype):
-            size = get_file_size(fname)
-            dtype_size = get_dtype_size(dtype)
-            A = np.empty(size//dtype_size, dtype=dtype)
-            file_read(fname, A.ctypes, size)
-            read_arr = A
+    def fromfile_impl(fname, dtype):
+        size = get_file_size(fname)
+        dtype_size = get_dtype_size(dtype)
+        A = np.empty(size//dtype_size, dtype=dtype)
+        file_read(fname, A.ctypes, size)
+        read_arr = A
 
-        f_block = compile_to_numba_ir(
-            fromfile_impl, {'np': np, 'get_file_size': get_file_size,
-            'file_read': file_read, 'get_dtype_size': get_dtype_size}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [_fname, _dtype])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+    f_block = compile_to_numba_ir(
+        fromfile_impl, {'np': np, 'get_file_size': get_file_size,
+        'file_read': file_read, 'get_dtype_size': get_dtype_size}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [_fname, _dtype])
+    nodes = f_block.body[:-3]  # remove none return
+    nodes[-1].target = lhs
+    return nodes
 
-    return None
 
 @intrinsic
 def get_dtype_size(typingctx, dtype):
