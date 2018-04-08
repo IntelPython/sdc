@@ -1,17 +1,19 @@
 import numpy as np
 from numba import types
-from numba.extending import overload, intrinsic
+from numba.extending import overload, intrinsic, overload_method
 from hpat.str_ext import string_type
 
 from numba.ir_utils import (compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard)
-
 
 get_file_size = types.ExternalFunction("get_file_size", types.int64(string_type))
 file_read = types.ExternalFunction("file_read",
                 types.void(string_type, types.voidptr, types.intp))
 file_read_parallel = types.ExternalFunction("file_read_parallel",
                 types.void(string_type, types.voidptr, types.intp, types.intp))
+
+file_write = types.ExternalFunction("file_write",
+                types.void(string_type, types.voidptr, types.intp))
 
 # @overload(np.fromfile)
 # def fromfile_overload(fname_t, dtype_t):
@@ -75,3 +77,17 @@ def get_dtype_size(typingctx, dtype):
         num_bytes = context.get_abi_sizeof(context.get_data_type(dtype.dtype))
         return context.get_constant(types.intp, num_bytes)
     return types.intp(dtype), codegen
+
+@overload_method(types.Array, 'tofile')
+def tofile_overload(arr_ty, fname_ty):
+    # FIXME: import here since hio has hdf5 which might not be available
+    import hio
+    import llvmlite.binding as ll
+    ll.add_symbol('file_write', hio.file_write)
+    if fname_ty == string_type:
+        def tofile_impl(arr, fname):
+            A = np.ascontiguousarray(arr)
+            dtype_size = get_dtype_size(A.dtype)
+            file_write(fname, A.ctypes, dtype_size * A.size)
+
+        return tofile_impl

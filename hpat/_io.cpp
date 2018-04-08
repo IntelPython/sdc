@@ -23,6 +23,7 @@ int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
+void file_write(std::string* file_name, void* buff, int64_t size);
 void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count);
 
 #define ROOT 0
@@ -61,6 +62,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&get_file_size)));
     PyObject_SetAttrString(m, "file_read",
                             PyLong_FromVoidPtr((void*)(&file_read)));
+    PyObject_SetAttrString(m, "file_write",
+                            PyLong_FromVoidPtr((void*)(&file_write)));
     PyObject_SetAttrString(m, "file_read_parallel",
                             PyLong_FromVoidPtr((void*)(&file_read_parallel)));
     return m;
@@ -323,6 +326,18 @@ void file_read(std::string* file_name, void* buff, int64_t size)
     if (ret_code != (size_t)size)
     {
         std::cerr << "File read error: " << *file_name << '\n';
+    }
+    fclose(fp);
+    return;
+}
+
+void file_write(std::string* file_name, void* buff, int64_t size)
+{
+    FILE* fp = fopen(file_name->c_str(), "wb");
+    size_t ret_code = fwrite(buff, 1, (size_t)size, fp);
+    if (ret_code != (size_t)size)
+    {
+        std::cerr << "File write error: " << *file_name << '\n';
     }
     fclose(fp);
     return;
