@@ -117,6 +117,6 @@ def file_write_parallel(fname, arr, start, count):
     A = np.ascontiguousarray(arr)
     dtype_size = get_dtype_size(A.dtype)
     elem_size = dtype_size * hpat.distributed_lower.get_tuple_prod(A.shape[1:])
-    # hpat.cprint(start, count , elem_size)
+    # hpat.cprint(start, count, elem_size)
     s = _file_write_parallel(fname, A.ctypes,
                 start, count, elem_size)

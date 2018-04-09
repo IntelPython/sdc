@@ -684,8 +684,7 @@ class DistributedPass(object):
         # TODO: refactor
         if call_list == ['tofile']:
             getattr_call = guard(get_definition, self.func_ir, func_var)
-            if (self._is_1D_arr(getattr_call.value.name)):
-                    #or self._is_1D_Var_arr(getattr_call.value.name)):
+            if self._is_1D_arr(getattr_call.value.name):
                 arr = getattr_call.value
                 _fname = rhs.args[0]
                 _start = self._array_starts[arr.name][0]
@@ -700,6 +699,23 @@ class DistributedPass(object):
                                                types.intp, types.intp),
                                               self.typemap, self.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [_fname, arr, _start, _count])
+                out = f_block.body[:-3]
+                out[-1].target = assign.target
+
+            if self._is_1D_Var_arr(getattr_call.value.name):
+                arr = getattr_call.value
+                _fname = rhs.args[0]
+
+                def f(fname, arr):  # pragma: no cover
+                    count = len(arr)
+                    start = hpat.distributed_api.dist_exscan(count)
+                    hpat.io.file_write_parallel(fname, arr, start, count)
+
+                f_block = compile_to_numba_ir(f, {'np': np, 'hpat': hpat}, self.typingctx,
+                                              (self.typemap[_fname.name],
+                                              self.typemap[arr.name]),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [_fname, arr])
                 out = f_block.body[:-3]
                 out[-1].target = assign.target
 
