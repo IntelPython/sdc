@@ -771,13 +771,15 @@ void oneD_reshape_shuffle(char* output,
             int src = (rank-i+num_pes) % num_pes;
             // printf("rank %d src %d dest %d\n", rank, src, dest);
             // send big type
-            MPI_Sendrecv(input+send_offset[dest], i_send_counts[dest], large_dtype, dest, TAG,
+            int ierr = MPI_Sendrecv(input+send_offset[dest], i_send_counts[dest], large_dtype, dest, TAG,
                         output+recv_offset[src], i_recv_counts[src], large_dtype, src, TAG,
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            if (ierr!=0) std::cerr << "large sendrecv error" << '\n';
             // send leftover
-            MPI_Sendrecv(input+send_offset[dest]+((int64_t)i_send_counts[dest])*LARGE_DTYPE_SIZE, l_send_counts[dest], MPI_CHAR, dest, TAG+1,
+            ierr = MPI_Sendrecv(input+send_offset[dest]+((int64_t)i_send_counts[dest])*LARGE_DTYPE_SIZE, l_send_counts[dest], MPI_CHAR, dest, TAG+1,
                         output+recv_offset[src]+((int64_t)i_recv_counts[dest])*LARGE_DTYPE_SIZE, l_recv_counts[src], MPI_CHAR, src, TAG+1,
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            if (ierr!=0) std::cerr << "small sendrecv error" << '\n';
         }
 
         // cleanup
