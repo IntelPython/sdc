@@ -1,5 +1,8 @@
 import numpy as np
-from numba import types
+import numba
+import hpat
+from numba import types, cgutils
+from numba.targets.arrayobj import make_array
 from numba.extending import overload, intrinsic, overload_method
 from hpat.str_ext import string_type
 
@@ -14,6 +17,10 @@ file_read_parallel = types.ExternalFunction("file_read_parallel",
 
 file_write = types.ExternalFunction("file_write",
                 types.void(string_type, types.voidptr, types.intp))
+
+_file_write_parallel = types.ExternalFunction("file_write_parallel",
+                types.void(string_type, types.voidptr, types.intp, types.intp,
+                types.intp))
 
 # @overload(np.fromfile)
 # def fromfile_overload(fname_t, dtype_t):
@@ -84,6 +91,7 @@ def tofile_overload(arr_ty, fname_ty):
     import hio
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
+    ll.add_symbol('file_write_parallel', hio.file_write_parallel)
     if fname_ty == string_type:
         def tofile_impl(arr, fname):
             A = np.ascontiguousarray(arr)
@@ -91,3 +99,24 @@ def tofile_overload(arr_ty, fname_ty):
             file_write(fname, A.ctypes, dtype_size * A.size)
 
         return tofile_impl
+
+# from llvmlite import ir as lir
+# @intrinsic
+# def print_array_ptr(typingctx, arr_ty):
+#     assert isinstance(arr_ty, types.Array)
+#     def codegen(context, builder, sig, args):
+#         out = make_array(sig.args[0])(context, builder, args[0])
+#         cgutils.printf(builder, "%p ", out.data)
+#         cgutils.printf(builder, "%lf ", builder.bitcast(out.data, lir.IntType(64).as_pointer()))
+#         return context.get_dummy_value()
+#     return types.void(arr_ty), codegen
+
+# TODO: fix A.ctype inlined case
+@numba.njit
+def file_write_parallel(fname, arr, start, count):
+    A = np.ascontiguousarray(arr)
+    dtype_size = get_dtype_size(A.dtype)
+    elem_size = dtype_size * hpat.distributed_lower.get_tuple_prod(A.shape[1:])
+    # hpat.cprint(start, count , elem_size)
+    s = _file_write_parallel(fname, A.ctypes,
+                start, count, elem_size)

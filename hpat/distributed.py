@@ -681,6 +681,28 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
+        # TODO: refactor
+        if call_list == ['tofile']:
+            getattr_call = guard(get_definition, self.func_ir, func_var)
+            if (self._is_1D_arr(getattr_call.value.name)):
+                    #or self._is_1D_Var_arr(getattr_call.value.name)):
+                arr = getattr_call.value
+                _fname = rhs.args[0]
+                _start = self._array_starts[arr.name][0]
+                _count = self._array_counts[arr.name][0]
+
+                def f(fname, arr, start, count):  # pragma: no cover
+                    hpat.io.file_write_parallel(fname, arr, start, count)
+
+                f_block = compile_to_numba_ir(f, {'np': np, 'hpat': hpat}, self.typingctx,
+                                              (self.typemap[_fname.name],
+                                              self.typemap[arr.name],
+                                               types.intp, types.intp),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [_fname, arr, _start, _count])
+                out = f_block.body[:-3]
+                out[-1].target = assign.target
+
         return out
 
     def _run_permutation_int(self, assign, args):

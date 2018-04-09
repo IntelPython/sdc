@@ -122,6 +122,9 @@ def cprint_lower(context, builder, sig, args):
             builder.call(fn, [val])
             cgutils.printf(builder, " ")
             continue
+        if isinstance(typ, types.ArrayCTypes):
+            cgutils.printf(builder, "%p ", val)
+            continue
         format_str = typ_to_format[typ]
         cgutils.printf(builder, "%{} ".format(format_str), val)
     cgutils.printf(builder, "\n")
