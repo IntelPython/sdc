@@ -8,8 +8,9 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 
-from numba.targets.imputils import lower_builtin, impl_ret_untracked
+from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
+from hpat.pd_timestamp_ext import timestamp_series_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -346,3 +347,19 @@ def fix_rolling_array_overload(column):
         def fix_rolling_array_impl(column):  # pragma: no cover
             return column
     return fix_rolling_array_impl
+
+# dummy function use to change type of timestamp series to array[dt64]
+def ts_series_to_arr_typ(A):
+    return A
+
+@infer_global(ts_series_to_arr_typ)
+class ContainsType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        assert args[0] == timestamp_series_type
+        return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
+
+@lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
+def lower_ts_series_to_arr_typ(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])

@@ -25,7 +25,7 @@ from hpat.hiframes_api import PandasDataFrameType
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
-
+from hpat.pd_timestamp_ext import timestamp_series_type
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
                 'quantile', 'count', 'describe']
@@ -957,18 +957,21 @@ class HiFrames(object):
         return new_col_var, nodes
 
     def _run_arg(self, arg_assign):
+        nodes = [arg_assign]
+        arg_name = arg_assign.value.name
+        arg_ind = arg_assign.value.index
+        arg_var = arg_assign.target
+        scope = arg_var.scope
+        loc = arg_var.loc
+
         # e.g. {"A:return":"distributed"} -> "A"
         flagged_inputs = { var_name.split(":")[0]: flag
                     for (var_name, flag) in self.locals.items()
                     if var_name.endswith(":input") }
-        arg_name = arg_assign.value.name
+
         if arg_name in flagged_inputs.keys():
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
-            nodes = [arg_assign]
-            in_arr = arg_assign.target
-            scope = in_arr.scope
-            loc = in_arr.loc
             # replace assign target with tmp
             in_arr_tmp = ir.Var(scope, mk_unique_var(flag + "_input"), loc)
             arg_assign.target = in_arr_tmp
@@ -984,10 +987,28 @@ class HiFrames(object):
                 f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_arr_tmp])
             nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = in_arr
-            return nodes
+            nodes[-1].target = arg_var
 
-        return [arg_assign]
+        # handle timestamp Series
+        # transform to array[dt64]
+        # could be combined with distributed/threaded input
+        if self.args[arg_ind] == timestamp_series_type:
+            # replace arg var with tmp
+            in_arr_tmp = ir.Var(scope, mk_unique_var("ts_series_input"), loc)
+            nodes[-1].target = in_arr_tmp
+
+            def f(_ts_series):  # pragma: no cover
+                _dt_arr = hpat.hiframes_api.ts_series_to_arr_typ(_ts_series)
+
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr_tmp])
+            nodes += f_block.body[:-3]  # remove none return
+            nodes[-1].target = arg_var
+            # remember that this variable is actually a Series
+            self.df_cols.add(arg_var.name)
+
+        return nodes
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"
