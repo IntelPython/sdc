@@ -254,6 +254,60 @@ def fix_df_array(c):  # pragma: no cover
 def fix_rolling_array(c):  # pragma: no cover
     return c
 
+import pandas as pd
+from numba.extending import typeof_impl, unbox, register_model, models, NativeValue
+from numba import numpy_support
+
+class PandasDataFrameType(types.Type):
+    def __init__(self, col_names, col_types):
+        self.col_names = col_names
+        self.col_types = col_types
+        super(PandasDataFrameType, self).__init__(
+            name='PandasDataFrameType({}, {})'.format(col_names, col_types))
+
+
+@typeof_impl.register(pd.DataFrame)
+def typeof_pd_dataframe(val, c):
+    col_names = val.columns.tolist()
+    # TODO: support other types like string and timestamp
+    col_types = [numpy_support.from_dtype(t) for t in val.dtypes.tolist()]
+    return PandasDataFrameType(col_names, col_types)
+
+register_model(PandasDataFrameType)(models.OpaqueModel)
+
+@unbox(PandasDataFrameType)
+def unbox_df(typ, val, c):
+    """unbox dataframe to an Opaque pointer
+    columns will be extracted later if necessary.
+    """
+    # XXX: refcount?
+    return NativeValue(val)
+
+def unbox_df_column(df, col_name, dtype):
+    return df[col_name]
+
+@infer_global(unbox_df_column)
+class UnBoxDfCol(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 3
+        df_typ, col_name_typ, dtype_typ = args[0], args[1], args[2]
+        # FIXME: last arg should be types.DType?
+        return signature(types.Array(dtype_typ.dtype, 1, 'C'), *args)
+
+from numba.targets.boxing import unbox_array
+
+@lower_builtin(unbox_df_column, PandasDataFrameType, StringType, types.Any)
+def lower_unbox_df_column(context, builder, sig, args):
+    # FIXME: last arg should be types.DType?
+    pyapi = context.get_python_api(builder)
+    c = numba.pythonapi._UnboxContext(context, builder, pyapi)
+    # TODO: refcount?
+    arr_obj = c.pyapi.object_getattr_string(args[0], "values")
+    dtype = sig.args[2].dtype
+    # TODO: error handling like Numba callwrappers.py
+    native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+    return native_val.value
 
 from numba.extending import overload
 
