@@ -52,6 +52,8 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['dist_return', 'distributed_api', hpat]:
         return True
+    if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
+        return True
     return False
 
 
