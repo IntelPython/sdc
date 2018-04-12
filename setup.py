@@ -5,12 +5,11 @@ import platform, os
 # should be able to run without Numpy for pip to discover the
 # build dependencies
 import numpy.distutils.misc_util as np_misc
-import copy
+#import copy
 
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
 np_compile_args = np_misc.get_info('npymath')
-print("np_compile_args", np_compile_args)
 
 
 def readme():
@@ -25,10 +24,9 @@ if 'HDF5_DIR' in os.environ:
     _has_h5py = True
     HDF5_DIR = os.environ['HDF5_DIR']
 
-PANDAS_DIR = ""
-if 'PANDAS_DIR' in os.environ:
-    PANDAS_DIR = os.environ['PANDAS_DIR']
-print("PANDAS_DIR", PANDAS_DIR)
+#PANDAS_DIR = ""
+#if 'PANDAS_DIR' in os.environ:
+#    PANDAS_DIR = os.environ['PANDAS_DIR']
 
 # package environment variable is PREFIX during build time
 if 'CONDA_BUILD' in os.environ:
@@ -36,7 +34,6 @@ if 'CONDA_BUILD' in os.environ:
 else:
     PREFIX_DIR = os.environ['CONDA_PREFIX']
 
-print("PREFIX_DIR", PREFIX_DIR)
 
 try:
     import pyarrow
@@ -116,18 +113,18 @@ ext_str = Extension(name="hstr_ext",
                     #language="c++"
 )
 
-dt_args = copy.copy(np_compile_args)
-dt_args['include_dirs'] = dt_args['include_dirs'] + [PANDAS_DIR+'/_libs/src/datetime/']
-dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
-dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
+#dt_args = copy.copy(np_compile_args)
+#dt_args['include_dirs'] = dt_args['include_dirs'] + [PANDAS_DIR+'/_libs/src/datetime/']
+#dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
+#dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
-ext_dt = Extension(name="hdatetime_ext",
-                    sources=["hpat/_datetime_ext.cpp"],
-                    extra_compile_args=['-std=c++11'],
-                    extra_link_args=['-std=c++11'],
-                    **dt_args,
+#ext_dt = Extension(name="hdatetime_ext",
+#                    sources=["hpat/_datetime_ext.cpp"],
+#                    extra_compile_args=['-std=c++11'],
+#                    extra_link_args=['-std=c++11'],
+#                    **dt_args,
                     #language="c++"
-)
+#)
 
 ext_quantile = Extension(name="quantile_alg",
                              libraries = MPI_LIBS,
@@ -167,7 +164,7 @@ ext_cv_wrapper = Extension(name="cv_wrapper",
                              language="c++",
                              )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile, ext_dt]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile]
 
 if _has_h5py:
     _ext_mods.append(ext_io)
