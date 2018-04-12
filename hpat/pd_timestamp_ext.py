@@ -11,7 +11,83 @@ from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, impl_ret
 from numba.targets.arrayobj import getitem_arraynd_intp
 import pandas as pd
 import numpy as np
+import datetime
 
+class DatetimeDateType(types.Type):
+    def __init__(self):
+        super(DatetimeDateType, self).__init__(
+            name='DatetimeDateType()')
+
+datetime_date_type = DatetimeDateType()
+
+@typeof_impl.register(datetime.date)
+def typeof_pd_timestamp(val, c):
+    return datetime_date_type
+
+
+@register_model(DatetimeDateType)
+class DatetimeDateModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [
+            ('year', types.int64),
+            ('month', types.int64),
+            ('day', types.int64),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+make_attribute_wrapper(DatetimeDateType, 'year', 'year')
+make_attribute_wrapper(DatetimeDateType, 'month', 'month')
+make_attribute_wrapper(DatetimeDateType, 'day', 'day')
+
+@unbox(DatetimeDateType)
+def unbox_datetime_date(typ, val, c):
+    year_obj = c.pyapi.object_getattr_string(val, "year")
+    month_obj = c.pyapi.object_getattr_string(val, "month")
+    day_obj = c.pyapi.object_getattr_string(val, "day")
+
+    dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder)
+    dt_date.year = c.pyapi.long_as_longlong(year_obj)
+    dt_date.month = c.pyapi.long_as_longlong(month_obj)
+    dt_date.day = c.pyapi.long_as_longlong(day_obj)
+
+    c.pyapi.decref(year_obj)
+    c.pyapi.decref(month_obj)
+    c.pyapi.decref(day_obj)
+
+    is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+    return NativeValue(dt_date._getvalue(), is_error=is_error)
+
+@box(DatetimeDateType)
+def box_datetime_date(typ, val, c):
+    dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
+    year_obj = c.pyapi.long_from_longlong(dt_date.year)
+    month_obj = c.pyapi.long_from_longlong(dt_date.month)
+    day_obj = c.pyapi.long_from_longlong(dt_date.day)
+    dt_obj = c.pyapi.unserialize(c.pyapi.serialize_object(datetime.date))
+    res = c.pyapi.call_function_objargs(dt_obj, (year_obj, month_obj, day_obj))
+    c.pyapi.decref(year_obj)
+    c.pyapi.decref(month_obj)
+    c.pyapi.decref(day_obj)
+    return res
+
+@type_callable(datetime.date)
+def type_timestamp(context):
+    def typer(year, month, day):
+        # TODO: check types
+        return datetime_date_type
+    return typer
+
+@lower_builtin(datetime.date, types.int64, types.int64, types.int64)
+def impl_ctor_timestamp(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day = args
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    ts.year = year
+    ts.month = month
+    ts.day = day
+    return ts._getvalue()
+
+#------------------------------------------------------------------------
 
 class PandasTimestampType(types.Type):
     def __init__(self):
@@ -62,10 +138,7 @@ def unbox_pandas_timestamp(typ, val, c):
     microsecond_obj = c.pyapi.object_getattr_string(val, "microsecond")
     nanosecond_obj = c.pyapi.object_getattr_string(val, "nanosecond")
 
-# long_from_signed_int
     pd_timestamp = cgutils.create_struct_proxy(typ)(c.context, c.builder)
-    #import pdb
-    #pdb.set_trace()
     pd_timestamp.year = c.pyapi.long_as_longlong(year_obj)
     pd_timestamp.month = c.pyapi.long_as_longlong(month_obj)
     pd_timestamp.day = c.pyapi.long_as_longlong(day_obj)
