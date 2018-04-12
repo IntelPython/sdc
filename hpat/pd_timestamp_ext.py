@@ -1,14 +1,13 @@
 import numba
-import hpat
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
-import numba.typing.typeof
+# from numba.typing.templates import AbstractTemplate, infer, signature
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr)
+                             make_attribute_wrapper, lower_builtin, box, unbox)
 from numba import cgutils
 from numba.targets.boxing import unbox_array
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, impl_ret_untracked
-from numba.targets.arrayobj import getitem_arraynd_intp
+#from numba.targets.imputils import impl_ret_untracked
+# from numba.targets.arrayobj import getitem_arraynd_intp
+
 import pandas as pd
 import numpy as np
 import datetime
@@ -126,6 +125,8 @@ make_attribute_wrapper(PandasTimestampType, 'minute', 'minute')
 make_attribute_wrapper(PandasTimestampType, 'second', 'second')
 make_attribute_wrapper(PandasTimestampType, 'microsecond', 'microsecond')
 make_attribute_wrapper(PandasTimestampType, 'nanosecond', 'nanosecond')
+
+# TODO: add boxing
 
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
