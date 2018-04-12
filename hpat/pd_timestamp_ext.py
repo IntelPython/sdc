@@ -180,11 +180,6 @@ def unbox_timestamp_series(typ, val, c):
     getvalues = c.pyapi.object_getattr_string(val, "values")
     return unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), getvalues, c)
 
-@typeof_impl.register(pd.Series)
-def typeof_pd_timestamp_series(val, c):
-    if len(val) > 0 and isinstance(val[0], pd.Timestamp):
-        return timestamp_series_type
-
 
 # XXX: code for timestamp series getitem in regular Numba
 

@@ -363,3 +363,11 @@ class ContainsType(AbstractTemplate):
 @lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+# register series types for import
+@typeof_impl.register(pd.Series)
+def typeof_pd_str_series(val, c):
+    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
+        return string_array_type
+    if len(val) > 0 and isinstance(val[0], pd.Timestamp):
+        return timestamp_series_type
