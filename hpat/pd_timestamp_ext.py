@@ -19,12 +19,11 @@ class PandasTimestampType(types.Type):
         super(PandasTimestampType, self).__init__(
             name='PandasTimestampType()')
 
-
 pandas_timestamp_type = PandasTimestampType()
-
 
 @typeof_impl.register(pd._libs.tslib.Timestamp)
 def typeof_pd_timestamp(val, c):
+    print("typeof_pd_timestamp")
     return pandas_timestamp_type
 
 field_typ1 = types.int64
@@ -37,8 +36,6 @@ field_typ2 = types.int64
 class PandasTimestampModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         members = [
-#            ('value', types.int64),
-#            ('nanosecond', types.int64),
             ('year', field_typ1),
             ('month', field_typ2),
             ('day', field_typ2),
@@ -47,12 +44,9 @@ class PandasTimestampModel(models.StructModel):
             ('second', field_typ2),
             ('microsecond', field_typ1),
             ('nanosecond', field_typ1),
-#            ('tz', field_typ),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
     
-#make_attribute_wrapper(PandasTimestampType, 'value', 'value')
-#make_attribute_wrapper(PandasTimestampType, 'nanosecond', 'nanosecond')
 make_attribute_wrapper(PandasTimestampType, 'year', 'year')
 make_attribute_wrapper(PandasTimestampType, 'month', 'month')
 make_attribute_wrapper(PandasTimestampType, 'day', 'day')
@@ -61,13 +55,6 @@ make_attribute_wrapper(PandasTimestampType, 'minute', 'minute')
 make_attribute_wrapper(PandasTimestampType, 'second', 'second')
 make_attribute_wrapper(PandasTimestampType, 'microsecond', 'microsecond')
 make_attribute_wrapper(PandasTimestampType, 'nanosecond', 'nanosecond')
-#make_attribute_wrapper(PandasTimestampType, 'tz', 'tz')
-
-#@overload_attribute(PandasTimestampType, "minute")
-#def get_minute(ts):
-#    def getter(ts):
-#        return ts
-#    return getter
 
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
@@ -79,10 +66,11 @@ def unbox_pandas_timestamp(typ, val, c):
     second_obj = c.pyapi.object_getattr_string(val, "second")
     microsecond_obj = c.pyapi.object_getattr_string(val, "microsecond")
     nanosecond_obj = c.pyapi.object_getattr_string(val, "nanosecond")
-#    tz_obj = c.pyapi.object_getattr_string(val, "tz")
 
 # long_from_signed_int
     pd_timestamp = cgutils.create_struct_proxy(typ)(c.context, c.builder)
+    import pdb
+    pdb.set_trace()
     pd_timestamp.year = c.pyapi.long_from_long(year_obj)
     pd_timestamp.month = c.pyapi.long_from_long(month_obj)
     pd_timestamp.day = c.pyapi.long_from_long(day_obj)
@@ -91,8 +79,6 @@ def unbox_pandas_timestamp(typ, val, c):
     pd_timestamp.second = c.pyapi.long_from_long(second_obj)
     pd_timestamp.microsecond = c.pyapi.long_from_long(microsecond_obj)
     pd_timestamp.nanosecond = c.pyapi.long_from_long(nanosecond_obj)
-    #pd_timestamp.tz = c.pyapi.long_from_long(tz_obj)
-#    pd_timestamp.tz = 0
 
     c.pyapi.decref(year_obj)
     c.pyapi.decref(month_obj)
@@ -102,10 +88,77 @@ def unbox_pandas_timestamp(typ, val, c):
     c.pyapi.decref(second_obj)
     c.pyapi.decref(microsecond_obj)
     c.pyapi.decref(nanosecond_obj)
-#    c.pyapi.decref(tz_obj)
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(pd_timestamp._getvalue(), is_error=is_error)
+
+@lower_builtin(pd._libs.tslib.Timestamp, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64)
+def impl_ctor_timestamp(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day, hour, minute, second, us, ns = args
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    ts.year = year
+    ts.month = month
+    ts.day = day
+    ts.hour = hour
+    ts.minute = minute
+    ts.second = second
+    ts.microsecond = us
+    ts.nanosecond = ns
+    return ts._getvalue()
+
+@numba.njit(nopython=True)
+def convert_datetime64_to_timestamp(dt64):
+    perday = 24 * 60 * 60 * 1000 * 1000 * 1000
+
+    if dt64 > 0:
+        in_day = dt64 % perday
+        dt64 = dt64 / perday
+    else:
+        in_day = (perday - 1) + (dt64 + 1) % perday
+        dt64 = dt64 / perday - (0 if (dt64 % perday == 0) else 1)
+
+    days400years = 146097
+    days = dt64 - 10957
+    if days >= 0:
+        year = 400 * (days / days400years)
+        days = days % days400years
+    else:
+        years = 400 * ((days - (days400years - 1)) / days400years)
+        days = days % days400years
+        if days < 0:
+            days += days400years
+
+    if days >= 366:
+        year += 100 * ((days - 1) / 36524)
+        days = (days - 1) % 36524
+        if days >= 365:
+            year += 4 * ((days + 1) / 1461)
+            days = (days + 1) % 1461
+            if days >= 366:
+                year += (days - 1) / 365
+                days = (days - 1) % 365
+
+    year = year + 2000
+    leapyear = (year % 400 == 0) or (year %4 == 0 and year %100 != 0)
+    month_len = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if leapyear:
+        month_len[1] = 29
+
+    for i in range(12):
+        if days < month_len[i]:
+            month = i + 1
+            day = days + 1
+            break
+        else:
+            days = days - month_len[i]
+
+    return pd._libs.tslib.Timestamp(year, month, day,
+                        in_day / (60 * 60 * 1000000000), #hour
+                        (in_day / (60 * 1000000000)) % 60, #minute
+                        (in_day / 1000000000) % 60, #second
+                        (in_day / 1000) % 1000000, #microsecond
+                        in_day % 1000) #nanosecond
 
 #----------------------------------------------------------------------------------------------
 
@@ -133,7 +186,7 @@ def typeof_pd_timestamp_series(val, c):
         return timestamp_series_type
 
 @infer
-class GetItemStringArray(AbstractTemplate):
+class GetItemTimestampSeries(AbstractTemplate):
     key = "getitem"
 
     def generic(self, args, kws):
