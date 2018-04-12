@@ -23,7 +23,6 @@ pandas_timestamp_type = PandasTimestampType()
 
 @typeof_impl.register(pd._libs.tslib.Timestamp)
 def typeof_pd_timestamp(val, c):
-    print("typeof_pd_timestamp")
     return pandas_timestamp_type
 
 field_typ1 = types.int64
@@ -69,8 +68,8 @@ def unbox_pandas_timestamp(typ, val, c):
 
 # long_from_signed_int
     pd_timestamp = cgutils.create_struct_proxy(typ)(c.context, c.builder)
-    import pdb
-    pdb.set_trace()
+    #import pdb
+    #pdb.set_trace()
     pd_timestamp.year = c.pyapi.long_from_long(year_obj)
     pd_timestamp.month = c.pyapi.long_from_long(month_obj)
     pd_timestamp.day = c.pyapi.long_from_long(day_obj)
@@ -91,6 +90,13 @@ def unbox_pandas_timestamp(typ, val, c):
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(pd_timestamp._getvalue(), is_error=is_error)
+
+@type_callable(pd.Timestamp)
+def type_timestamp(context):
+    def typer(year, month, day, hour, minute, second, us, ns):
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
 
 @lower_builtin(pd._libs.tslib.Timestamp, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64, types.int64)
 def impl_ctor_timestamp(context, builder, sig, args):
@@ -113,30 +119,30 @@ def convert_datetime64_to_timestamp(dt64):
 
     if dt64 > 0:
         in_day = dt64 % perday
-        dt64 = dt64 / perday
+        dt64 = dt64 // perday
     else:
         in_day = (perday - 1) + (dt64 + 1) % perday
-        dt64 = dt64 / perday - (0 if (dt64 % perday == 0) else 1)
+        dt64 = dt64 // perday - (0 if (dt64 % perday == 0) else 1)
 
     days400years = 146097
     days = dt64 - 10957
     if days >= 0:
-        year = 400 * (days / days400years)
+        year = 400 * (days // days400years)
         days = days % days400years
     else:
-        years = 400 * ((days - (days400years - 1)) / days400years)
+        years = 400 * ((days - (days400years - 1)) // days400years)
         days = days % days400years
         if days < 0:
             days += days400years
 
     if days >= 366:
-        year += 100 * ((days - 1) / 36524)
+        year += 100 * ((days - 1) // 36524)
         days = (days - 1) % 36524
         if days >= 365:
-            year += 4 * ((days + 1) / 1461)
+            year += 4 * ((days + 1) // 1461)
             days = (days + 1) % 1461
             if days >= 366:
-                year += (days - 1) / 365
+                year += (days - 1) // 365
                 days = (days - 1) % 365
 
     year = year + 2000
@@ -154,10 +160,10 @@ def convert_datetime64_to_timestamp(dt64):
             days = days - month_len[i]
 
     return pd._libs.tslib.Timestamp(year, month, day,
-                        in_day / (60 * 60 * 1000000000), #hour
-                        (in_day / (60 * 1000000000)) % 60, #minute
-                        (in_day / 1000000000) % 60, #second
-                        (in_day / 1000) % 1000000, #microsecond
+                        in_day // (60 * 60 * 1000000000), #hour
+                        (in_day // (60 * 1000000000)) % 60, #minute
+                        (in_day // 1000000000) % 60, #second
+                        (in_day // 1000) % 1000000, #microsecond
                         in_day % 1000) #nanosecond
 
 #----------------------------------------------------------------------------------------------
@@ -202,10 +208,10 @@ class GetItemTimestampSeries(AbstractTemplate):
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hdatetime_ext
-ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
+#import hdatetime_ext
+#ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
 
-@lower_builtin('getitem', TimestampSeriesType, types.Integer)
+#@lower_builtin('getitem', TimestampSeriesType, types.Integer)
 def lower_timestamp_series_getitem(context, builder, sig, args):
     #print("lower_timestamp_series_getitem", sig, type(sig), args, type(args), sig.return_type)
     old_ret = sig.return_type
