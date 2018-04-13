@@ -184,7 +184,7 @@ def impl_ctor_timestamp(context, builder, sig, args):
     ts.nanosecond = ns
     return ts._getvalue()
 
-@numba.njit(nopython=True)
+@numba.njit
 def convert_datetime64_to_timestamp(dt64):
     perday = 24 * 60 * 60 * 1000 * 1000 * 1000
 
