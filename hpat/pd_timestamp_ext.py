@@ -251,8 +251,10 @@ class TimestampSeriesModel(models.ArrayModel):
 
 @unbox(TimestampSeriesType)
 def unbox_timestamp_series(typ, val, c):
-    getvalues = c.pyapi.object_getattr_string(val, "values")
-    return unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), getvalues, c)
+    arr_obj = c.pyapi.object_getattr_string(val, "values")
+    native_val = unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), arr_obj, c)
+    c.pyapi.decref(arr_obj)
+    return native_val
 
 
 # XXX: code for timestamp series getitem in regular Numba
