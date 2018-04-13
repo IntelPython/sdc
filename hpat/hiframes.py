@@ -178,28 +178,6 @@ class HiFrames(object):
                 return [assign]
 
         if isinstance(rhs, ir.Arg):
-            # TODO: move to _run_arg after merge of datetime branch
-            if isinstance(self.args[rhs.index], PandasDataFrameType):
-                nodes = [assign]
-                df_typ = self.args[rhs.index]
-                df_var = assign.target
-                df_items = {}
-                for i, col in enumerate(df_typ.col_names):
-                    col_dtype = df_typ.col_types[i]  # FIXME: fix bool_
-                    func_text = "def f(_df):\n"
-                    func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, '{}', np.{})\n".format(col, col, col_dtype)
-                    loc_vars = {}
-                    exec(func_text, {}, loc_vars)
-                    f = loc_vars['f']
-                    f_block = compile_to_numba_ir(f,
-                                {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                    replace_arg_nodes(f_block, [df_var])
-                    nodes += f_block.body[:-3]
-                    df_items[col] = nodes[-1].target
-
-                self.df_vars[lhs] = df_items
-                self._update_df_cols()
-                return nodes
             return self._run_arg(assign)
 
         # handle copies lhs = f
@@ -1007,6 +985,27 @@ class HiFrames(object):
             nodes[-1].target = arg_var
             # remember that this variable is actually a Series
             self.df_cols.add(arg_var.name)
+
+        # input dataframe arg
+        # TODO: support distributed input
+        if isinstance(self.args[arg_ind], PandasDataFrameType):
+            df_typ = self.args[arg_ind]
+            df_items = {}
+            for i, col in enumerate(df_typ.col_names):
+                col_dtype = df_typ.col_types[i]  # FIXME: fix bool_
+                func_text = "def f(_df):\n"
+                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, '{}', np.{})\n".format(col, col, col_dtype)
+                loc_vars = {}
+                exec(func_text, {}, loc_vars)
+                f = loc_vars['f']
+                f_block = compile_to_numba_ir(f,
+                            {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [arg_var])
+                nodes += f_block.body[:-3]
+                df_items[col] = nodes[-1].target
+
+            self.df_vars[arg_var.name] = df_items
+            self._update_df_cols()
 
         return nodes
 
