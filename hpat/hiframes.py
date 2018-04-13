@@ -76,6 +76,10 @@ class HiFrames(object):
         self.df_vars = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
+        # keep track of series that are timestamp to replace getitem
+        # FIXME: this is possibly fragile, maybe replace all series getitems
+        # with a function and handle this after type inference
+        self.ts_series_vars = set()
         self.arrow_tables = {}
         self.reverse_copies = {}
         self.pq_handler = ParquetHandler(
@@ -177,6 +181,27 @@ class HiFrames(object):
                 assign.value = rhs.value
                 return [assign]
 
+            # replace getitems on timestamp series with function
+            # for proper type inference
+            if (rhs.op in ['getitem', 'static_getitem']
+                    and rhs.value.name in self.ts_series_vars):
+                if rhs.op == 'getitem':
+                    ind_var = rhs.index
+                else:
+                    ind_var = rhs.index_var
+                def f(_ts_series, _ind):  # pragma: no cover
+                    _val = hpat.hiframes_api.ts_series_getitem(_ts_series, _ind)
+
+                f_block = compile_to_numba_ir(
+                    f, {'hpat': hpat}).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [rhs.value, ind_var])
+                nodes = f_block.body[:-3]  # remove none return
+                nodes[-1].target = assign.target
+                # output could be series in case of slice index
+                # FIXME: this is fragile
+                self.ts_series_vars.add(lhs)
+                return nodes
+
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign)
 
@@ -187,6 +212,8 @@ class HiFrames(object):
             self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
+        if isinstance(rhs, ir.Var) and rhs.name in self.ts_series_vars:
+            self.ts_series_vars[lhs] = self.ts_series_vars[rhs.name]
         return [assign]
 
     def _run_call(self, assign):
@@ -985,6 +1012,7 @@ class HiFrames(object):
             nodes[-1].target = arg_var
             # remember that this variable is actually a Series
             self.df_cols.add(arg_var.name)
+            self.ts_series_vars.add(arg_var.name)
 
         # input dataframe arg
         # TODO: support distributed input

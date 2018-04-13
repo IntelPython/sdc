@@ -8,9 +8,10 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 
+from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import timestamp_series_type
+from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -361,7 +362,7 @@ def ts_series_to_arr_typ(A):
     return A
 
 @infer_global(ts_series_to_arr_typ)
-class ContainsType(AbstractTemplate):
+class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
@@ -371,6 +372,21 @@ class ContainsType(AbstractTemplate):
 @lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+def ts_series_getitem(arr, ind):
+    return arr[ind]
+
+@infer_global(ts_series_getitem)
+class TsSeriesGetItemType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        [ary, idx] = args
+        out = get_array_index_type(ary, idx)
+        # check result to be dt64 since it might be sliced array
+        # replace result with Timestamp
+        if out is not None and out.result == types.NPDatetime('ns'):
+            return signature(pandas_timestamp_type, ary, out.index)
+
 
 # register series types for import
 @typeof_impl.register(pd.Series)

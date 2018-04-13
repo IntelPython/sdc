@@ -236,6 +236,22 @@ class HiFramesTyped(object):
             return f_blocks
 
     def _handle_df_col_calls(self, lhs_name, rhs, assign):
+        if guard(find_callname, self.func_ir, rhs) == ('ts_series_getitem', 'hpat.hiframes_api'):
+            in_arr = rhs.args[0]
+            ind = rhs.args[1]
+            def f(_in_arr, _ind):
+                dt = _in_arr[_ind]
+                s = np.int64(dt)
+                res = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+
+            f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
+                                               'hpat': hpat}, self.typingctx,
+                                           (self.typemap[in_arr.name], types.intp),
+                                           self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr, ind])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = assign.target
+            return nodes
 
         if guard(find_callname, self.func_ir, rhs) == ('count', 'hpat.hiframes_api'):
             in_arr = rhs.args[0]
