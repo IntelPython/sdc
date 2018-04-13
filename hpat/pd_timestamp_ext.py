@@ -2,7 +2,7 @@ import numba
 from numba import types
 # from numba.typing.templates import AbstractTemplate, infer, signature
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox)
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_cast)
 from numba import cgutils
 from numba.targets.boxing import unbox_array
 #from numba.targets.imputils import impl_ret_untracked
@@ -183,6 +183,12 @@ def impl_ctor_timestamp(context, builder, sig, args):
     ts.microsecond = us
     ts.nanosecond = ns
     return ts._getvalue()
+
+
+@lower_cast(types.NPDatetime('ns'), types.int64)
+def dt64_to_integer(context, builder, fromty, toty, val):
+    # dt64 is stored as int64 so just return value
+    return val
 
 @numba.njit
 def convert_datetime64_to_timestamp(dt64):
