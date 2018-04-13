@@ -994,7 +994,7 @@ class HiFrames(object):
             for i, col in enumerate(df_typ.col_names):
                 col_dtype = df_typ.col_types[i]  # FIXME: fix bool_
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, '{}', np.{})\n".format(col, col, col_dtype)
+                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, {}, np.{})\n".format(col, i, col_dtype)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']

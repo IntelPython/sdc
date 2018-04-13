@@ -292,22 +292,30 @@ class UnBoxDfCol(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        df_typ, col_name_typ, dtype_typ = args[0], args[1], args[2]
+        df_typ, col_ind_const, dtype_typ = args[0], args[1], args[2]
         # FIXME: last arg should be types.DType?
         return signature(types.Array(dtype_typ.dtype, 1, 'C'), *args)
 
+UnBoxDfCol.support_literals = True
+
 from numba.targets.boxing import unbox_array
 
-@lower_builtin(unbox_df_column, PandasDataFrameType, StringType, types.Any)
+@lower_builtin(unbox_df_column, PandasDataFrameType, types.Const, types.Any)
 def lower_unbox_df_column(context, builder, sig, args):
     # FIXME: last arg should be types.DType?
     pyapi = context.get_python_api(builder)
     c = numba.pythonapi._UnboxContext(context, builder, pyapi)
-    # TODO: refcount?
-    arr_obj = c.pyapi.object_getattr_string(args[0], "values")
+
+    # TODO: refcounts?
+    col_ind = sig.args[1].value
+    col_name = sig.args[0].col_names[col_ind]
+    series_obj = c.pyapi.object_getattr_string(args[0], col_name)
+    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
     dtype = sig.args[2].dtype
     # TODO: error handling like Numba callwrappers.py
     native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+    c.pyapi.decref(series_obj)
+    c.pyapi.decref(arr_obj)
     return native_val.value
 
 from numba.extending import overload
