@@ -10,13 +10,13 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from numba.types import List
 from hpat.utils import cprint, distribution_report
+import hpat.compiler
 import hpat.io
 import hpat.pd_timestamp_ext
 multithread_mode = False
 
 
 def jit(signature_or_function=None, **options):
-    from .compiler import add_hpat_stages
     # set nopython by default
     if 'nopython' not in options:
         options['nopython'] = True
@@ -29,5 +29,7 @@ def jit(signature_or_function=None, **options):
                            'fusion':        True,
                            }
 
-    return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)
-    # return numba.jit(signature_or_function, pipeline_class=hpat.compiler.HPATPipeline, **options)
+    # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
+    # from .compiler import add_hpat_stages
+    # return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)
+    return numba.jit(signature_or_function, pipeline_class=hpat.compiler.HPATPipeline, **options)

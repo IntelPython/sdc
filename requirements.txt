@@ -1,4 +1,4 @@
 mpich
 scipy
 pandas
-numba
+numba>=0.38

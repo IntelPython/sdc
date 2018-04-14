@@ -31,21 +31,14 @@ such as Numba and LLVM on Ubuntu Linux::
     chmod +x miniconda.sh
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
-    conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake llvmlite
+    conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
     source activate HPAT
+    conda install -c numba numba=0.38.0rc1
     conda install pyarrow=0.9.* mpich -c conda-forge
     conda install h5py -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
     git clone https://github.com/IntelLabs/hpat
     cd hpat
-    mkdir req_install
-    pushd req_install
-    git clone https://github.com/IntelLabs/numba
-    pushd numba
-    git checkout hpat_req
-    python setup.py develop
-    popd
-    popd
     pushd parquet_reader
     mkdir build
     pushd build

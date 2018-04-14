@@ -14,97 +14,97 @@ from hpat import config
 if config._has_h5py:
     from hpat import pio
 
-
-def stage_io_pass(pipeline):
-    """
-    Convert IO calls
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    if config._has_h5py:
-        io_pass = pio.PIO(pipeline.func_ir, pipeline.locals)
-        io_pass.run()
-
-
-def stage_distributed_pass(pipeline):
-    """
-    parallelize for distributed-memory
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    dist_pass = DistributedPass(pipeline.func_ir, pipeline.typingctx,
-                                pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
-    dist_pass.run()
-
-
-def stage_df_pass(pipeline):
-    """
-    Convert DataFrame calls
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx,
-                       pipeline.args, pipeline.locals)
-    df_pass.run()
-
-
-def stage_df_typed_pass(pipeline):
-    """
-    Convert HiFrames after typing
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    df_pass = HiFramesTyped(pipeline.func_ir, pipeline.typingctx,
-                            pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
-    df_pass.run()
-
-
-def stage_inline_pass(pipeline):
-    """
-    Inline function calls (to enable distributed pass analysis)
-    """
-    # Ensure we have an IR and type information.
-    assert pipeline.func_ir
-    inline_calls(pipeline.func_ir)
-
-
-def stage_repeat_inline_closure(pipeline):
-    assert pipeline.func_ir
-    inline_pass = InlineClosureCallPass(
-        pipeline.func_ir, pipeline.flags.auto_parallel)
-    inline_pass.run()
-    post_proc = postproc.PostProcessor(pipeline.func_ir)
-    post_proc.run()
-
-
-def add_hpat_stages(pipeline_manager, pipeline):
-    pp = pipeline_manager.pipeline_stages['nopython']
-    new_pp = []
-    for (func, desc) in pp:
-        if desc == 'nopython frontend':
-            # before type inference: add inline calls pass,
-            # untyped hiframes pass, hdf5 io
-            # also repeat inline closure pass to inline df stencils
-            new_pp.append(
-                (lambda: stage_inline_pass(pipeline), "inline funcs"))
-            new_pp.append((lambda: stage_df_pass(
-                pipeline), "convert DataFrames"))
-            new_pp.append((lambda: stage_io_pass(
-                pipeline), "replace IO calls"))
-            new_pp.append((lambda: stage_repeat_inline_closure(
-                pipeline), "repeat inline closure"))
-        # need to handle string array exprs before nopython rewrites converts
-        # them to arrayexpr.
-        # since generic_rewrites has the same description, we check func name
-        if desc == 'nopython rewrites' and 'generic_rewrites' not in str(func):
-            new_pp.append((lambda: stage_df_typed_pass(
-                pipeline), "typed hiframes pass"))
-        if desc == 'nopython mode backend':
-            # distributed pass after parfor pass and before lowering
-            new_pp.append((lambda: stage_distributed_pass(
-                pipeline), "convert to distributed"))
-        new_pp.append((func, desc))
-    pipeline_manager.pipeline_stages['nopython'] = new_pp
+# this is for previous version of pipeline manipulation (numba hpat_req <0.38)
+# def stage_io_pass(pipeline):
+#     """
+#     Convert IO calls
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     if config._has_h5py:
+#         io_pass = pio.PIO(pipeline.func_ir, pipeline.locals)
+#         io_pass.run()
+#
+#
+# def stage_distributed_pass(pipeline):
+#     """
+#     parallelize for distributed-memory
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     dist_pass = DistributedPass(pipeline.func_ir, pipeline.typingctx,
+#                                 pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
+#     dist_pass.run()
+#
+#
+# def stage_df_pass(pipeline):
+#     """
+#     Convert DataFrame calls
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx,
+#                        pipeline.args, pipeline.locals)
+#     df_pass.run()
+#
+#
+# def stage_df_typed_pass(pipeline):
+#     """
+#     Convert HiFrames after typing
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     df_pass = HiFramesTyped(pipeline.func_ir, pipeline.typingctx,
+#                             pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
+#     df_pass.run()
+#
+#
+# def stage_inline_pass(pipeline):
+#     """
+#     Inline function calls (to enable distributed pass analysis)
+#     """
+#     # Ensure we have an IR and type information.
+#     assert pipeline.func_ir
+#     inline_calls(pipeline.func_ir)
+#
+#
+# def stage_repeat_inline_closure(pipeline):
+#     assert pipeline.func_ir
+#     inline_pass = InlineClosureCallPass(
+#         pipeline.func_ir, pipeline.flags.auto_parallel)
+#     inline_pass.run()
+#     post_proc = postproc.PostProcessor(pipeline.func_ir)
+#     post_proc.run()
+#
+#
+# def add_hpat_stages(pipeline_manager, pipeline):
+#     pp = pipeline_manager.pipeline_stages['nopython']
+#     new_pp = []
+#     for (func, desc) in pp:
+#         if desc == 'nopython frontend':
+#             # before type inference: add inline calls pass,
+#             # untyped hiframes pass, hdf5 io
+#             # also repeat inline closure pass to inline df stencils
+#             new_pp.append(
+#                 (lambda: stage_inline_pass(pipeline), "inline funcs"))
+#             new_pp.append((lambda: stage_df_pass(
+#                 pipeline), "convert DataFrames"))
+#             new_pp.append((lambda: stage_io_pass(
+#                 pipeline), "replace IO calls"))
+#             new_pp.append((lambda: stage_repeat_inline_closure(
+#                 pipeline), "repeat inline closure"))
+#         # need to handle string array exprs before nopython rewrites converts
+#         # them to arrayexpr.
+#         # since generic_rewrites has the same description, we check func name
+#         if desc == 'nopython rewrites' and 'generic_rewrites' not in str(func):
+#             new_pp.append((lambda: stage_df_typed_pass(
+#                 pipeline), "typed hiframes pass"))
+#         if desc == 'nopython mode backend':
+#             # distributed pass after parfor pass and before lowering
+#             new_pp.append((lambda: stage_distributed_pass(
+#                 pipeline), "convert to distributed"))
+#         new_pp.append((func, desc))
+#     pipeline_manager.pipeline_stages['nopython'] = new_pp
 
 
 def inline_calls(func_ir):
@@ -129,92 +129,92 @@ def inline_calls(func_ir):
                         break
 
 
-# class HPATPipeline(numba.compiler.BasePipeline):
-#     """HPAT compiler pipeline
-#     """
-#     def define_pipelines(self, pm):
-#         name = 'hpat'
-#         pm.create_pipeline(name)
-#         self.add_preprocessing_stage(pm)
-#         self.add_pre_typing_stage(pm)
-#         pm.add_stage(self.stage_inline_pass, "inline funcs")
-#         pm.add_stage(self.stage_df_pass, "convert DataFrames")
-#         pm.add_stage(self.stage_io_pass, "replace IO calls")
-#         # repeat inline closure pass to inline df stencils
-#         pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
-#         self.add_typing_stage(pm)
-#         # breakup optimization stage since df_typed needs to run before
-#         # rewrites
-#         # e.g. need to handle string array exprs before nopython rewrites
-#         # converts them to arrayexpr.
-#         # self.add_optimization_stage(pm)
-#         pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
-#         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
-#         if not self.flags.no_rewrites:
-#             pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
-#         if self.flags.auto_parallel.enabled:
-#             pm.add_stage(self.stage_parfor_pass, "convert to parfors")
-#         pm.add_stage(self.stage_distributed_pass, "convert to distributed")
-#         self.add_lowering_stage(pm)
-#         self.add_cleanup_stage(pm)
-#
-#     def stage_inline_pass(self):
-#         """
-#         Inline function calls (to enable distributed pass analysis)
-#         """
-#         # Ensure we have an IR and type information.
-#         assert self.func_ir
-#         inline_calls(self.func_ir)
-#
-#
-#     def stage_df_pass(self):
-#         """
-#         Convert DataFrame calls
-#         """
-#         # Ensure we have an IR and type information.
-#         assert self.func_ir
-#         df_pass = HiFrames(self.func_ir, self.typingctx,
-#                            self.args, self.locals)
-#         df_pass.run()
-#
-#
-#     def stage_io_pass(self):
-#         """
-#         Convert IO calls
-#         """
-#         # Ensure we have an IR and type information.
-#         assert self.func_ir
-#         if config._has_h5py:
-#             io_pass = pio.PIO(self.func_ir, self.locals)
-#             io_pass.run()
-#
-#
-#     def stage_repeat_inline_closure(self):
-#         assert self.func_ir
-#         inline_pass = InlineClosureCallPass(
-#             self.func_ir, self.flags.auto_parallel)
-#         inline_pass.run()
-#         post_proc = postproc.PostProcessor(self.func_ir)
-#         post_proc.run()
-#
-#
-#     def stage_distributed_pass(self):
-#         """
-#         parallelize for distributed-memory
-#         """
-#         # Ensure we have an IR and type information.
-#         assert self.func_ir
-#         dist_pass = DistributedPass(self.func_ir, self.typingctx,
-#                                     self.type_annotation.typemap, self.type_annotation.calltypes)
-#         dist_pass.run()
-#
-#
-#     def stage_df_typed_pass(self):
-#         """
-#         Convert HiFrames after typing
-#         """
-#         # Ensure we have an IR and type information.
-#         assert self.func_ir
-#         df_pass = HiFramesTyped(self.func_ir, self.typingctx,
-#                                 self.type_annotation.typemap, self.type_annotation.calltypes)
-#         df_pass.run()
+class HPATPipeline(numba.compiler.BasePipeline):
+    """HPAT compiler pipeline
+    """
+    def define_pipelines(self, pm):
+        name = 'hpat'
+        pm.create_pipeline(name)
+        self.add_preprocessing_stage(pm)
+        self.add_pre_typing_stage(pm)
+        pm.add_stage(self.stage_inline_pass, "inline funcs")
+        pm.add_stage(self.stage_df_pass, "convert DataFrames")
+        pm.add_stage(self.stage_io_pass, "replace IO calls")
+        # repeat inline closure pass to inline df stencils
+        pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
+        self.add_typing_stage(pm)
+        # breakup optimization stage since df_typed needs to run before
+        # rewrites
+        # e.g. need to handle string array exprs before nopython rewrites
+        # converts them to arrayexpr.
+        # self.add_optimization_stage(pm)
+        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
+        pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
+        if not self.flags.no_rewrites:
+            pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
+        if self.flags.auto_parallel.enabled:
+            pm.add_stage(self.stage_parfor_pass, "convert to parfors")
+        pm.add_stage(self.stage_distributed_pass, "convert to distributed")
+        self.add_lowering_stage(pm)
+        self.add_cleanup_stage(pm)
+
+    def stage_inline_pass(self):
+        """
+        Inline function calls (to enable distributed pass analysis)
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        inline_calls(self.func_ir)
+
+
+    def stage_df_pass(self):
+        """
+        Convert DataFrame calls
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        df_pass = HiFrames(self.func_ir, self.typingctx,
+                           self.args, self.locals)
+        df_pass.run()
+
+
+    def stage_io_pass(self):
+        """
+        Convert IO calls
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        if config._has_h5py:
+            io_pass = pio.PIO(self.func_ir, self.locals)
+            io_pass.run()
+
+
+    def stage_repeat_inline_closure(self):
+        assert self.func_ir
+        inline_pass = InlineClosureCallPass(
+            self.func_ir, self.flags.auto_parallel)
+        inline_pass.run()
+        post_proc = postproc.PostProcessor(self.func_ir)
+        post_proc.run()
+
+
+    def stage_distributed_pass(self):
+        """
+        parallelize for distributed-memory
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        dist_pass = DistributedPass(self.func_ir, self.typingctx,
+                                    self.type_annotation.typemap, self.type_annotation.calltypes)
+        dist_pass.run()
+
+
+    def stage_df_typed_pass(self):
+        """
+        Convert HiFrames after typing
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        df_pass = HiFramesTyped(self.func_ir, self.typingctx,
+                                self.type_annotation.typemap, self.type_annotation.calltypes)
+        df_pass.run()
