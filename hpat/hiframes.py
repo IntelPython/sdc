@@ -509,6 +509,7 @@ class HiFrames(object):
         row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(used_cols))])
 
         func_text = "def f({}):\n".format(col_name_args)
+        func_text += "  numba.parfor.init_prange()\n"
         func_text += "  n = len(c0)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
@@ -634,6 +635,7 @@ class HiFrames(object):
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
         def f(A):
+            numba.parfor.init_prange()
             n = len(A)
             S = numba.unsafe.ndarray.empty_inferred((n,))
             for i in numba.parfor.internal_prange(n):
@@ -642,6 +644,7 @@ class HiFrames(object):
 
         if col_var.name in self.ts_series_vars:
             def f(A):
+                numba.parfor.init_prange()
                 n = len(A)
                 S = numba.unsafe.ndarray.empty_inferred((n,))
                 for i in numba.parfor.internal_prange(n):
