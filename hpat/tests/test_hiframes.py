@@ -387,6 +387,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
+    def test_df_input2(self):
+        def test_impl(df):
+            C = df.B == 'two'
+            return C.sum()
+
+        n = 11
+        df = pd.DataFrame({'A': np.random.ranf(3*n), 'B': ['one', 'two', 'three']*n})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
+
     def test_join1(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})

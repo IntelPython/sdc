@@ -6,7 +6,7 @@ from numba import types
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
+from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
 
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
@@ -272,7 +272,7 @@ class PandasDataFrameType(types.Type):
 def typeof_pd_dataframe(val, c):
     col_names = val.columns.tolist()
     # TODO: support other types like string and timestamp
-    col_types = [numpy_support.from_dtype(t) for t in val.dtypes.tolist()]
+    col_types = get_hiframes_dtypes(val)
     return PandasDataFrameType(col_names, col_types)
 
 register_model(PandasDataFrameType)(models.OpaqueModel)
@@ -285,6 +285,29 @@ def unbox_df(typ, val, c):
     # XXX: refcount?
     return NativeValue(val)
 
+def get_hiframes_dtypes(df):
+    """get hiframe data types for a pandas dataframe
+    """
+    pd_typ_list = df.dtypes.tolist()
+    col_names = df.columns.tolist()
+    hi_typs = []
+    for cname, typ in zip(col_names, pd_typ_list):
+        if typ == np.dtype('O'):
+            # XXX assuming the whole column is strings if 1st val is string
+            first_val = df[cname][0]
+            if isinstance(first_val, str):
+                hi_typs.append(string_type)
+                continue
+            else:
+                raise ValueError("data type for column {} not supported".format(cname))
+        try:
+            t = numpy_support.from_dtype(typ)
+            hi_typs.append(t)
+        except NotImplementedError:
+            raise ValueError("data type for column {} not supported".format(cname))
+
+    return hi_typs
+
 def unbox_df_column(df, col_name, dtype):
     return df[col_name]
 
@@ -294,8 +317,17 @@ class UnBoxDfCol(AbstractTemplate):
         assert not kws
         assert len(args) == 3
         df_typ, col_ind_const, dtype_typ = args[0], args[1], args[2]
+        if isinstance(dtype_typ, types.Const):
+            if dtype_typ.value == 12:  # FIXME dtype for dt64
+                out_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+            elif dtype_typ.value == 11:  # FIXME dtype for str
+                out_typ = string_array_type
+            else:
+                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.value))
+        else:
+            out_typ = types.Array(dtype_typ.dtype, 1, 'C')
         # FIXME: last arg should be types.DType?
-        return signature(types.Array(dtype_typ.dtype, 1, 'C'), *args)
+        return signature(out_typ, *args)
 
 UnBoxDfCol.support_literals = True
 
@@ -312,9 +344,14 @@ def lower_unbox_df_column(context, builder, sig, args):
     col_name = sig.args[0].col_names[col_ind]
     series_obj = c.pyapi.object_getattr_string(args[0], col_name)
     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-    dtype = sig.args[2].dtype
-    # TODO: error handling like Numba callwrappers.py
-    native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+
+    if isinstance(sig.args[2], types.Const) and sig.args[2].value == 11:  # FIXME: str code
+        native_val = unbox_str_series(string_array_type, arr_obj, c)
+    else:
+        dtype = sig.args[2].dtype
+        # TODO: error handling like Numba callwrappers.py
+        native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+
     c.pyapi.decref(series_obj)
     c.pyapi.decref(arr_obj)
     return native_val.value

@@ -336,7 +336,7 @@ def typeof_np_string(val, c):
         return numba.typing.typeof._typeof_ndarray(val, c)
 
 @unbox(StringArrayType)
-def unbox_str(typ, val, c):
+def unbox_str_series(typ, val, c):
     """
     Unbox a Pandas String Series. We just redirect to StringArray implementation.
     """

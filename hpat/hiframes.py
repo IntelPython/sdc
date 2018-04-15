@@ -22,6 +22,9 @@ from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
                   hiframes_join)
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 from hpat.hiframes_api import PandasDataFrameType
+from hpat.str_ext import StringType, string_type
+from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
+
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
@@ -1020,9 +1023,18 @@ class HiFrames(object):
             df_typ = self.args[arg_ind]
             df_items = {}
             for i, col in enumerate(df_typ.col_names):
-                col_dtype = df_typ.col_types[i]  # FIXME: fix bool_
+                col_dtype = df_typ.col_types[i]
+                if col_dtype == string_type:
+                    alloc_dt = 11  # dummy string value
+                elif col_dtype == types.boolean:
+                    alloc_dt = "np.bool_"
+                elif col_dtype == types.NPDatetime('ns'):
+                    alloc_dt = 12  # XXX const code for dt64 since we can't init dt64 dtype
+                else:
+                    alloc_dt = "np.{}".format(col_dtype)
+
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, {}, np.{})\n".format(col, i, col_dtype)
+                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, {}, {})\n".format(col, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
