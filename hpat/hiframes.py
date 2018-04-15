@@ -600,16 +600,27 @@ class HiFrames(object):
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
 
-        # TODO: handle non numpy alloc types
+        # TODO: handle non numpy alloc types like string array
         # prange func to inline
         def f(A):
-            S = np.empty_like(A)
-            for i in numba.parfor.internal_prange(len(A)):
+            n = len(A)
+            S = numba.unsafe.ndarray.empty_inferred((n,))
+            for i in numba.parfor.internal_prange(n):
                 S[i] = map_func(A[i])
             ret = S
 
+        if col_var.name in self.ts_series_vars:
+            def f(A):
+                n = len(A)
+                S = numba.unsafe.ndarray.empty_inferred((n,))
+                for i in numba.parfor.internal_prange(n):
+                    t = hpat.hiframes_api.ts_series_getitem(A, i)
+                    S[i] = map_func(t)
+                ret = S
+
+        #import pdb; pdb.set_trace()
         _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np})
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
         topo_order = find_topo_order(f_ir.blocks)
