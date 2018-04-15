@@ -171,6 +171,8 @@ class HiFrames(object):
                 # assert rhs.attr in df_cols
                 assign.value = df_cols[rhs.attr]
                 self.df_cols.add(lhs)  # save lhs as column
+                if df_cols[rhs.attr].name in self.ts_series_vars:
+                    self.ts_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
@@ -618,7 +620,6 @@ class HiFrames(object):
                     S[i] = map_func(t)
                 ret = S
 
-        #import pdb; pdb.set_trace()
         _globals = self.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
         # fix definitions to enable finding sentinel
@@ -1053,6 +1054,9 @@ class HiFrames(object):
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [arg_var])
                 nodes += f_block.body[:-3]
+                #
+                if col_dtype == types.NPDatetime('ns'):
+                    self.ts_series_vars.add(nodes[-1].target.name)
                 df_items[col] = nodes[-1].target
 
             self.df_vars[arg_var.name] = df_items
