@@ -348,7 +348,10 @@ def lower_unbox_df_column(context, builder, sig, args):
     if isinstance(sig.args[2], types.Const) and sig.args[2].value == 11:  # FIXME: str code
         native_val = unbox_str_series(string_array_type, arr_obj, c)
     else:
-        dtype = sig.args[2].dtype
+        if isinstance(sig.args[2], types.Const) and sig.args[2].value == 12:  # FIXME: dt64 code
+            dtype = types.NPDatetime('ns')
+        else:
+            dtype = sig.args[2].dtype
         # TODO: error handling like Numba callwrappers.py
         native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
 
