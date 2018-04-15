@@ -471,12 +471,42 @@ class HiFrames(object):
                                 and func.op == 'make_function'):
             raise ValueError("lambda for apply not found")
 
+        _globals = self.func_ir.func_id.func.__globals__
         col_names = self.df_vars[func_mod.name].keys()
-        Row = namedtuple(func_mod.name, col_names)
+
+        # find columns that are actually used if possible
+        used_cols = []
+        lambda_ir = compile_to_numba_ir(func, _globals)
+        l_topo_order = find_topo_order(lambda_ir.blocks)
+        first_stmt = lambda_ir.blocks[l_topo_order[0]].body[0]
+        assert isinstance(first_stmt, ir.Assign) and isinstance(first_stmt.value, ir.Arg)
+        arg_var = first_stmt.target
+        use_all_cols = False
+        for bl in lambda_ir.blocks.values():
+            for stmt in bl.body:
+                vnames = [v.name for v in stmt.list_vars()]
+                if arg_var.name in vnames:
+                    if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Arg):
+                        continue
+                    if (isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr)
+                            and stmt.value.op == 'getattr'):
+                        assert stmt.value.attr in col_names
+                        used_cols.append(stmt.value.attr)
+                    else:
+                        # argument is used in some other form
+                        # be conservative and use all cols
+                        use_all_cols = True
+                        used_cols = col_names
+                        break
+
+            if use_all_cols:
+                break
+
+        Row = namedtuple(func_mod.name, used_cols)
         # TODO: handle non numpy alloc types
         # prange func to inline
-        col_name_args = ', '.join(["c"+str(i) for i in range(len(col_names))])
-        row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(col_names))])
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(used_cols))])
+        row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(used_cols))])
 
         func_text = "def f({}):\n".format(col_name_args)
         func_text += "  n = len(c0)\n"
@@ -490,7 +520,6 @@ class HiFrames(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        _globals = self.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'Row': Row})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
@@ -509,7 +538,7 @@ class HiFrames(object):
                         break
 
         f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        col_vars = list(self.df_vars[func_mod.name].values())
+        col_vars = [self.df_vars[func_mod.name][c] for c in used_cols]
         replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
         return f_ir.blocks
 
