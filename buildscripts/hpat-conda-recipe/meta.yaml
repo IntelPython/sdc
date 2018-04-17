@@ -14,13 +14,12 @@ requirements:
     - {{ compiler('cxx') }}
     - python 3.6.*
     - setuptools
-    - numpy
+    - numba 0.38.*
+    - numpy 1.14.*
     - pandas
-    - scipy
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost
-    - numba 0.38.*
     - hdf5
     - h5py
     - daal-devel
@@ -29,9 +28,8 @@ requirements:
 
   run:
     - python 3.6.*
-    - numpy
+    - numpy 1.14.*
     - pandas
-    - scipy
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost
