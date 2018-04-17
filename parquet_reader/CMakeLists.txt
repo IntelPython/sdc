@@ -8,15 +8,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(GNUInstallDirs)
 
-include_directories(${PREFIX}/include)
-link_directories(${PREFIX}/lib)
+#string(REPLACE "\\" "/" PQ_PREFIX ${PQ_PREFIX})
 
-set(HEADER_FILES ${PREFIX}/include/parquet/api/reader.h
-                ${PREFIX}/include/parquet/arrow/reader.h
-                ${PREFIX}/include/arrow/table.h
-                ${PREFIX}/include/arrow/io/hdfs.h)
+include_directories("${PQ_PREFIX}/include")
+link_directories("${PQ_PREFIX}/lib")
 
-add_library(${PROJECT_NAME} SHARED hpat_parquet_reader.cpp ${HEADER_FILES})
+# set(HEADER_FILES ${PQ_PREFIX}/include/parquet/api/reader.h
+#                 ${PQ_PREFIX}/include/parquet/arrow/reader.h
+#                 ${PQ_PREFIX}/include/arrow/table.h
+#                 ${PQ_PREFIX}/include/arrow/io/hdfs.h)
+
+
+add_library(${PROJECT_NAME} SHARED hpat_parquet_reader.cpp) # ${HEADER_FILES})
 target_compile_options(${PROJECT_NAME} PRIVATE -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11)
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11")
 
