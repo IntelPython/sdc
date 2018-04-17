@@ -1,4 +1,4 @@
-{% set version = "2.7.1" %}
+{% set version = "2.8.0rc1" %}
 
 package:
   name: h5py
@@ -16,7 +16,7 @@ requirements:
     - {{ compiler('cxx') }}
     - python 3.6.*
     - setuptools
-    - numpy 1.13.*
+    - numpy
     - cython
     - pkgconfig
     - six

@@ -14,27 +14,28 @@ requirements:
     - {{ compiler('cxx') }}
     - python 3.6.*
     - setuptools
-    - numpy 1.13.*
+    - numpy
     - pandas
     - scipy
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost
-    - numba
+    - numba 0.38.*
     - hdf5
     - h5py
     - daal-devel
+    - opencv
     - hpat-parquet-reader
 
   run:
     - python 3.6.*
-    - numpy 1.13.*
+    - numpy
     - pandas
     - scipy
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost
-    - numba
+    - numba 0.38.*
     - hdf5
     - h5py
     - hpat-parquet-reader
