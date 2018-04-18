@@ -12,10 +12,10 @@ RUN wget -q https://repo.continuum.io/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 RUN bash Anaconda3-5.1.0-Linux-x86_64.sh -b
 ENV PATH="/root/anaconda3/bin/:${PATH}"
 
-RUN conda create -y -n HPAT
+RUN conda create -y -y -n HPAT python=3.6 pandas
 RUN source activate HPAT && \
-    conda install -y numpy scipy pandas python=3.6 &&\
-    conda install -y pyarrow=0.8.* mpich -c conda-forge &&\
+    conda install -y numba -c numba &&\
+    conda install -y pyarrow mpich -c conda-forge &&\
     conda install -y hpat -c ehsantn
 
 RUN echo "export PATH=/root/anaconda3/bin/:${PATH}" >> /root/.bashrc
