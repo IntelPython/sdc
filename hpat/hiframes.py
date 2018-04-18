@@ -231,6 +231,10 @@ class HiFrames(object):
         func_mod = ""
         fdef = guard(find_callname, self.func_ir, rhs)
         if fdef is None:
+            # could be make_function from list comprehension which is ok
+            func_def = guard(get_definition, self.func_ir, rhs.func)
+            if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
+                return [assign]
             warnings.warn(
                 "function call couldn't be found for initial analysis")
             return [assign]
