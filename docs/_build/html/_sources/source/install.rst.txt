@@ -8,17 +8,19 @@ easily. On Linux/Mac::
 
     conda create -n HPAT python=3.6
     source activate HPAT
-    conda install numpy scipy pandas
-    conda install pyarrow=0.8.* mpich -c conda-forge
-    conda install hpat numba -c ehsantn
+    conda install pandas
+    conda install numba -c numba
+    conda install pyarrow mpich -c conda-forge
+    conda install hpat -c ehsantn
 
 On Windows::
 
     conda create -n HPAT python=3.6
     activate HPAT
-    conda install numpy scipy pandas
-    conda install pyarrow=0.7.* -c conda-forge
-    conda install hpat numba -c ehsantn
+    conda install pandas
+    conda install numba -c numba
+    conda install pyarrow -c conda-forge
+    conda install hpat -c ehsantn
 
 Building HPAT from Source
 -------------------------
