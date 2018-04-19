@@ -13,8 +13,8 @@
 #include <parquet_reader/hpat_parquet_reader.cpp>
 #else
 
-parquet type sizes (NOT arrow)
-boolean, int32, int64, int96, float, double
+// parquet type sizes (NOT arrow)
+// boolean, int32, int64, int96, float, double
 int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
 
 extern "C" {
