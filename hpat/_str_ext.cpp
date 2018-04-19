@@ -493,7 +493,7 @@ void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
     }
     #else
     // TODO: support glob on Windows
-    std::std::cerr << "no glob support on windows yet" << '\n';
+    std::cerr << "no glob support on windows yet" << '\n';
     #endif
 
     return;
