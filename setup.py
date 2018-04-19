@@ -11,6 +11,7 @@ import numpy.distutils.misc_util as np_misc
 # C API (include dirs, library dirs etc.)
 np_compile_args = np_misc.get_info('npymath')
 
+is_win = platform.system() == 'Windows'
 
 def readme():
     with open('README.rst') as f:
@@ -33,6 +34,9 @@ if 'CONDA_BUILD' in os.environ:
     PREFIX_DIR = os.environ['PREFIX']
 else:
     PREFIX_DIR = os.environ['CONDA_PREFIX']
+    # C libraries are in \Library on Windows
+    if is_win:
+        PREFIX_DIR += '\Library'
 
 
 try:
@@ -59,7 +63,7 @@ OPENCV_DIR = ""
 
 if 'OPENCV_DIR' in os.environ:
     _has_opencv = True
-    OPENCV_DIR = os.environ['OPENCV_DIR']
+    OPENCV_DIR = os.environ['OPENCV_DIR'].replace('"', '')
     # TODO: fix opencv link
     # import subprocess
     # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
@@ -68,7 +72,7 @@ if 'OPENCV_DIR' in os.environ:
 
 MPI_LIBS = ['mpi']
 H5_COMPILE_FLAGS = []
-if platform.system() == 'Windows':
+if is_win::
     # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
@@ -78,7 +82,7 @@ if platform.system() == 'Windows':
 ext_io = Extension(name="hio",
                              libraries = ['hdf5'] + MPI_LIBS + ['boost_filesystem'],
                              include_dirs = [HDF5_DIR+'/include/', PREFIX_DIR+'/include/'],
-                             library_dirs = [HDF5_DIR+'/lib/'],
+                             library_dirs = [HDF5_DIR+'/lib/' + PREFIX_DIR+'/lib/'],
                              extra_compile_args = H5_COMPILE_FLAGS,
                              sources=["hpat/_io.cpp"]
                              )
@@ -136,7 +140,7 @@ ext_quantile = Extension(name="quantile_alg",
 
 pq_libs = MPI_LIBS + ['boost_filesystem']
 
-if platform.system() == 'Windows':
+if is_win::
     pq_libs += ['arrow', 'parquet']
 else:
     # seperate parquet reader used due to ABI incompatibility of arrow
@@ -146,6 +150,7 @@ ext_parquet = Extension(name="parquet_cpp",
                              libraries = pq_libs,
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/', '.'],
+                             library_dirs = [PREFIX_DIR+'/lib/'],
                              extra_compile_args=['-std=c++11'],
                              extra_link_args=['-std=c++11'],
                              )
@@ -162,10 +167,15 @@ ext_ros = Extension(name="ros_cpp",
                              sources=["hpat/_ros.cpp"]
                              )
 
+cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
+# XXX cv lib file name needs version on Windows
+if is_win:
+    cv_libs = [l+'331' for l in cv_libs]
+
 ext_cv_wrapper = Extension(name="cv_wrapper",
                              include_dirs = [OPENCV_DIR+'/include'],
-                             libraries = ['opencv_core', 'opencv_imgproc',
-                                          'opencv_imgcodecs', 'opencv_highgui'],
+                             library_dirs = [os.path.join(OPENCV_DIR,'lib')],
+                             libraries = cv_libs,
                              #extra_link_args = cv_link_args,
                              sources=["hpat/_cv.cpp"],
                              language="c++",
