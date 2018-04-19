@@ -4,6 +4,8 @@
 #define  __HPAT_MIN_MERGE_SIZE 64
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
+#include <vector>
+
 typedef struct {
   uint64_t start;
   uint64_t length;
@@ -95,7 +97,7 @@ static void __hpat_binary_insertionsort_index(int64_t *comp_arr, const size_t st
       continue;
     }
     elem = comp_arr[ind_start];
-    int64_t temp_x[all_arrs_len];
+    std::vector<int64_t> temp_x(all_arrs_len);
     for (size_t k = 0 ; k < all_arrs_len ; k++){
       int64_t * cur_arr = all_arrs[k];
       temp_x[k]= cur_arr[ind_start];
@@ -245,13 +247,13 @@ static int __hpat_timsort_getrun(int64_t *comp_arr, const size_t size, __HPAT_TI
     run = size - *curr;
   }
   if (run > run_size) {
-    int64_t * temp_all_arrs[all_arrs_len];
+    std::vector<int64_t *> temp_all_arrs(all_arrs_len);
     // As we are starting from different index/start
     for (size_t k = 0 ; k < all_arrs_len; k++){
       int64_t * curr_arr = all_arrs[k];
       temp_all_arrs[k] = &curr_arr[*curr];
     }
-    __hpat_binary_insertionsort_index(&comp_arr[*curr], run_size, run, temp_all_arrs, all_arrs_len);
+    __hpat_binary_insertionsort_index(&comp_arr[*curr], run_size, run, temp_all_arrs.data(), all_arrs_len);
     run_size = run;
   }
   run_stack->_stack[run_stack->size].start = *curr;
@@ -351,7 +353,7 @@ static void __hpat_timsort_mergeleft_run(int64_t *comp_arr, const int64_t run1_l
   // Make temporary copy
   memcpy(temp_buffer, &comp_arr[stack_ptr], run1_len * sizeof(int64_t));
 
-  int64_t * temp_x[all_arrs_len];
+  std::vector<int64_t *> temp_x(all_arrs_len);
   for (size_t k = 0 ; k < all_arrs_len; k++){
     int64_t * curr_arr = all_arrs[k];
     temp_x[k] = (int64_t*)malloc(sizeof(int64_t)* min_len);
@@ -419,7 +421,7 @@ static void __hpat_timsort_mergeright_run(int64_t *comp_arr, const int64_t run1_
   // Make temporary copy
   memcpy(temp_buffer, &comp_arr[stack_ptr + run1_len], run2_len * sizeof(int64_t));
 
-  int64_t * temp_x[all_arrs_len];
+  std::vector<int64_t *> temp_x(all_arrs_len);
   for (size_t k = 0 ; k < all_arrs_len; k++){
     int64_t * curr_arr = all_arrs[k];
     temp_x[k] = (int64_t*)malloc(sizeof(int64_t)* min_len);
