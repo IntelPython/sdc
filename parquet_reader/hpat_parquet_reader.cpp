@@ -15,6 +15,9 @@
 using parquet::arrow::FileReader;
 using parquet::ParquetFileReader;
 
+
+extern "C" {
+
 int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx);
 int64_t pq_read_single_file(const char* file_name, int64_t column_idx, uint8_t *out,
                 int out_dtype);
@@ -27,6 +30,8 @@ int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
 int pq_read_string_parallel_single_file(const char* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
         std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+
+}  // extern "C"
 
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
                     int64_t rows_to_skip, int64_t rows_to_read, int dtype,
