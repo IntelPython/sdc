@@ -7,6 +7,17 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 
+// just include parquet reader on Windows since the GCC ABI change issue
+// doesn't exist, and VC linker removes unused lib symbols
+#ifdef _MSC_VER
+#include <parquet_reader/hpat_parquet_reader.cpp>
+#else
+
+parquet type sizes (NOT arrow)
+boolean, int32, int64, int96, float, double
+int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
+
+extern "C" {
 
 int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx);
 int64_t pq_read_single_file(const char* file_name, int64_t column_idx, uint8_t *out,
@@ -20,7 +31,9 @@ int pq_read_string_parallel_single_file(const char* file_name, int64_t column_id
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
         std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
 
+}  // extern "C"
 
+#endif  // _MSC_VER
 
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
 int64_t pq_read(std::string* file_name, int64_t column_idx,
@@ -31,11 +44,6 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data);
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
-
-
-// parquet type sizes (NOT arrow)
-// boolean, int32, int64, int96, float, double
-int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
 
 
 PyMODINIT_FUNC PyInit_parquet_cpp(void) {
