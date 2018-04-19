@@ -72,7 +72,7 @@ if 'OPENCV_DIR' in os.environ:
 
 MPI_LIBS = ['mpi']
 H5_COMPILE_FLAGS = []
-if is_win::
+if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
@@ -140,7 +140,7 @@ ext_quantile = Extension(name="quantile_alg",
 
 pq_libs = MPI_LIBS + ['boost_filesystem']
 
-if is_win::
+if is_win:
     pq_libs += ['arrow', 'parquet']
 else:
     # seperate parquet reader used due to ABI incompatibility of arrow

@@ -25,7 +25,7 @@ requirements:
     - hdf5
     - h5py
     - daal-devel
-    - opencv
+    - opencv 3.3.1
     - hpat-parquet-reader # [not win]
 
   run:
