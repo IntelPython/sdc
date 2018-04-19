@@ -134,11 +134,18 @@ ext_quantile = Extension(name="quantile_alg",
                              extra_link_args=['-std=c++11'],
                              )
 
+pq_libs = MPI_LIBS + ['boost_filesystem']
+
+if platform.system() == 'Windows':
+    pq_libs += ['arrow', 'parquet']
+else:
+    # seperate parquet reader used due to ABI incompatibility of arrow
+    pq_libs += ['hpat_parquet_reader']
+
 ext_parquet = Extension(name="parquet_cpp",
-                             libraries = MPI_LIBS + ['boost_filesystem',
-                                            'hpat_parquet_reader'],
+                             libraries = pq_libs,
                              sources=["hpat/_parquet.cpp"],
-                             include_dirs=[PREFIX_DIR+'/include/'],
+                             include_dirs=[PREFIX_DIR+'/include/', '.'],
                              extra_compile_args=['-std=c++11'],
                              extra_link_args=['-std=c++11'],
                              )
