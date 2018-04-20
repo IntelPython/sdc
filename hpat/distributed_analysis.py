@@ -285,6 +285,10 @@ class DistributedAnalysis(object):
         """analyze distributions of numpy functions (np.func_name)
         """
 
+        if func_name == 'ascontiguousarray':
+            self._meet_array_dists(lhs, args[0].name, array_dists)
+            return
+
         if func_name == 'ravel':
             self._meet_array_dists(lhs, args[0].name, array_dists)
             return
