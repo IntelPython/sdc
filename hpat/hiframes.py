@@ -133,45 +133,45 @@ class HiFrames(object):
                 return self._run_call(assign)
 
             # d = df['column']
-            if (rhs.op == 'static_getitem' and rhs.value.name in self.df_vars
+            if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
                     and isinstance(rhs.index, str)):
-                df = rhs.value.name
-                assign.value = self.df_vars[df][rhs.index]
+                assign.value = self._get_df_cols(rhs.value)[rhs.index]
                 self.df_cols.add(lhs)  # save lhs as column
 
             # df1 = df[df.A > .5]
-            if (rhs.op == 'getitem' and rhs.value.name in self.df_vars):
+            if rhs.op == 'getitem' and self._is_df_var(rhs.value):
                 # output df1 has same columns as df, create new vars
                 scope = assign.target.scope
                 loc = assign.target.loc
+                in_df_col_names = self._get_df_col_names(rhs.value)
                 self.df_vars[lhs] = {}
-                for col, _ in self.df_vars[rhs.value.name].items():
+                for col in in_df_col_names:
                     self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
                                                     loc)
                 self._update_df_cols()
-                return [hiframes_filter.Filter(lhs, rhs.value.name, rhs.index,
+                in_df = self._get_renamed_df(rhs.value)
+                return [hiframes_filter.Filter(lhs, in_df.name, rhs.index,
                                                self.df_vars, rhs.loc)]
 
             # df.loc or df.iloc
-            if (rhs.op == 'getattr' and rhs.value.name in self.df_vars
+            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
                     and rhs.attr in ['loc', 'iloc']):
                 # FIXME: treat iloc and loc as regular df variables so getitem
                 # turns them into filter. Only boolean array is supported
-                self.df_vars[lhs] = self.df_vars[rhs.value.name]
+                self.df_vars[lhs] = self._get_df_cols(rhs.value)
                 return []
 
             # if (rhs.op == 'getitem' and rhs.value.name in self.df_cols):
             #     self.col_filters.add(assign)
 
             # d = df.column
-            if (rhs.op == 'getattr' and rhs.value.name in self.df_vars
-                    and rhs.attr in self.df_vars[rhs.value.name]):
+            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
+                    and self._is_df_colname(rhs.value, rhs.attr)):
                 df = rhs.value.name
-                df_cols = self.df_vars[df]
-                # assert rhs.attr in df_cols
-                assign.value = df_cols[rhs.attr]
+                col_var = self._get_df_colvar(rhs.value, rhs.attr)
+                assign.value = col_var
                 self.df_cols.add(lhs)  # save lhs as column
-                if df_cols[rhs.attr].name in self.ts_series_vars:
+                if col_var.name in self.ts_series_vars:
                     self.ts_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
@@ -266,12 +266,12 @@ class HiFrames(object):
             return self._handle_column_call(assign, lhs, rhs, func_mod, func_name)
 
         # df.apply(lambda a:..., axis=1)
-        if (isinstance(func_mod, ir.Var) and func_mod.name in self.df_vars
+        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'apply'):
             return self._handle_df_apply(assign, lhs, rhs, func_mod)
 
         # df.describe()
-        if (isinstance(func_mod, ir.Var) and func_mod.name in self.df_vars
+        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'describe'):
             return self._handle_df_describe(assign, lhs, rhs, func_mod)
 
@@ -343,15 +343,18 @@ class HiFrames(object):
         loc = lhs.loc
         self.df_vars[lhs.name] = {}
         # add columns from left to output
-        for col, _ in self.df_vars[left_df.name].items():
+        left_colnames = self._get_df_col_names(left_df)
+        for col in left_colnames:
             self.df_vars[lhs.name][col] = ir.Var(
                 scope, mk_unique_var(col), loc)
         # add columns from right to output
-        for col, _ in self.df_vars[right_df.name].items():
+        right_colnames = self._get_df_col_names(right_df)
+        for col in right_colnames:
             self.df_vars[lhs.name][col] = ir.Var(
                 scope, mk_unique_var(col), loc)
         self._update_df_cols()
-        return [hiframes_join.Join(lhs.name, left_df.name, right_df.name,
+        return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
+                                   self._get_renamed_df(right_df).name,
                                    left_on, right_on, self.df_vars, lhs.loc)]
 
     def _handle_concat(self, assign, lhs, rhs):
@@ -365,7 +368,8 @@ class HiFrames(object):
         done_cols = {}
         i = 0
         for df in df_list.items:
-            for (c, v) in self.df_vars[df.name].items():
+            df_col_map = self._get_df_cols(df)
+            for (c, v) in df_col_map.items():
                 if c in done_cols:
                     continue
                 # arguments to the generated function
@@ -379,15 +383,15 @@ class HiFrames(object):
                 for other_df in df_list.items:
                     if other_df.name == df.name:
                         continue
-                    if c in self.df_vars[other_df.name]:
-                        args.append(self.df_vars[other_df.name][c])
+                    if self._is_df_colname(other_df, c):
+                        other_var = self._get_df_colvar(other_df, c)
+                        args.append(other_var)
                         arg_names.append('_hpat_c' + str(i))
                         conc_arg_names.append('_hpat_c' + str(i))
                         i += 1
                     else:
-                        # use a df column for length
-                        len_arg = list(
-                            self.df_vars[other_df.name].values())[0]
+                        # use a df column variable just for computing length
+                        len_arg = self._get_df_col_vars(other_df)[0]
                         len_name = '_hpat_len' + str(i)
                         args.append(len_arg)
                         arg_names.append(len_name)
@@ -476,7 +480,7 @@ class HiFrames(object):
             raise ValueError("lambda for apply not found")
 
         _globals = self.func_ir.func_id.func.__globals__
-        col_names = self.df_vars[func_mod.name].keys()
+        col_names = self._get_df_col_names(func_mod)
 
         # find columns that are actually used if possible
         used_cols = []
@@ -543,7 +547,8 @@ class HiFrames(object):
                         break
 
         f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        col_vars = [self.df_vars[func_mod.name][c] for c in used_cols]
+        df_col_map = self._get_df_cols(func_mod)
+        col_vars = [df_col_map[c] for c in used_cols]
         replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
         return f_ir.blocks
 
@@ -556,7 +561,7 @@ class HiFrames(object):
                 and get_constant(self.func_ir, rhs.kws[0][1]) == 'all'))):
             raise ValueError("only describe() with include='all' supported")
 
-        col_names = self.df_vars[func_mod.name].keys()
+        col_names = self._get_df_col_names(func_mod)
         col_name_args = ["c"+str(i) for i in range(len(col_names))]
         # TODO: pandas returns dataframe, maybe return namedtuple instread of
         # string?
@@ -599,7 +604,7 @@ class HiFrames(object):
 
         f_block = compile_to_numba_ir(
             f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-        col_vars = list(self.df_vars[func_mod.name].values())
+        col_vars = self._get_df_col_vars(func_mod)
         replace_arg_nodes(f_block, col_vars)
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
@@ -1217,6 +1222,44 @@ class HiFrames(object):
         index_offsets = nodes[-1].target
 
         return index_offsets, win_tuple, nodes
+
+    def _is_df_colname(self, df_var, cname):
+        """ is cname a column name in df_var
+        """
+        df_var_renamed = self._get_renamed_df(df_var)
+        return cname in self.df_vars[df_var_renamed.name]
+
+
+    def _is_df_var(self, var):
+        assert isinstance(var, ir.Var)
+        return (var.name in self.df_vars)
+
+    def _get_df_cols(self, df_var):
+        #
+        assert isinstance(df_var, ir.Var)
+        df_var_renamed = self._get_renamed_df(df_var)
+        return self.df_vars[df_var_renamed.name]
+
+    def _get_df_col_names(self, df_var):
+        assert isinstance(df_var, ir.Var)
+        df_var_renamed = self._get_renamed_df(df_var)
+        return list(self.df_vars[df_var_renamed.name].keys())
+
+    def _get_df_col_vars(self, df_var):
+        #
+        assert isinstance(df_var, ir.Var)
+        df_var_renamed = self._get_renamed_df(df_var)
+        return list(self.df_vars[df_var_renamed.name].values())
+
+    def _get_df_colvar(self, df_var, cname):
+        assert isinstance(df_var, ir.Var)
+        df_var_renamed = self._get_renamed_df(df_var)
+        return self.df_vars[df_var_renamed.name][cname]
+
+    def _get_renamed_df(self, df_var):
+        # XXX placeholder for df variable renaming
+        assert isinstance(df_var, ir.Var)
+        return df_var
 
 
 def gen_empty_like(in_arr, out_arr):
