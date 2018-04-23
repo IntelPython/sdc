@@ -243,6 +243,11 @@ def convert_datetime64_to_timestamp(dt64):
                         (in_day // 1000) % 1000000, #microsecond
                         in_day % 1000) #nanosecond
 
+# TODO: implement this
+@numba.njit
+def parse_datetime_str(str):
+    return 0
+
 #----------------------------------------------------------------------------------------------
 
 class TimestampSeriesType(types.Array):
