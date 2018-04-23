@@ -358,8 +358,15 @@ def set_df_col_lower(context, builder, sig, args):
     c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
     py_arr = box_array(arr_typ, args[2], c)
 
-    pyapi.object_setattr_string(args[0], col_name, py_arr)
-    c.pyapi.decref(py_arr)
+    # get column as string obj
+    cstr = context.insert_const_string(builder.module, col_name)
+    cstr_obj = pyapi.string_from_string(cstr)
+
+    # set column array
+    pyapi.object_setitem(args[0], cstr_obj, py_arr)
+
+    pyapi.decref(py_arr)
+    pyapi.decref(cstr_obj)
     return context.get_dummy_value()
 
 
