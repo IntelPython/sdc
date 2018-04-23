@@ -98,7 +98,8 @@ class HiFrames(object):
         for label in topo_order:
             self._get_reverse_copies(self.func_ir.blocks[label].body)
             new_body = []
-            for inst in self.func_ir.blocks[label].body:
+            old_body = self.func_ir.blocks[label].body
+            for inst in old_body:
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
@@ -108,8 +109,15 @@ class HiFrames(object):
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
+                        old_label = label
                         label = include_new_blocks(
                             self.func_ir.blocks, out_nodes, label, new_body)
+                        # cfg needs to be updated since label is updated
+                        # needed for set df column
+                        # new block will have the same jump as old block
+                        self.func_ir.blocks[label].body.append(old_body[-1])
+                        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+                        self.func_ir.blocks[label].body.pop()
                         new_body = []
                 elif isinstance(inst, ir.Return):
                     nodes = self._run_return(inst)
@@ -1228,7 +1236,7 @@ class HiFrames(object):
         df_label = self.df_labels[inst.target.name]
         # setting column possible only when it dominates the df creation to
         # keep schema consistent
-        if label not in cfg.backbone() and label not in cfg.post_dominators()[label]:
+        if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
             raise ValueError("setting dataframe columns inside conditionals and"
                              " loops not supported yet")
         if not isinstance(inst.index, str):
