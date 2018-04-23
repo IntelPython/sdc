@@ -1,7 +1,7 @@
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload)
-from numba.targets.imputils import lower_constant, impl_ret_new_ref
+from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
@@ -192,6 +192,7 @@ ll.add_symbol('init_string_const', hstr_ext.init_string_const)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
 ll.add_symbol('str_equal', hstr_ext.str_equal)
+ll.add_symbol('str_equal_cstr', hstr_ext.str_equal_cstr)
 ll.add_symbol('str_split', hstr_ext.str_split)
 ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
@@ -230,6 +231,23 @@ def box_str(typ, val, c):
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string(c_str)
     return pystr
+
+@lower_cast(StringType, types.Const)
+def string_type_to_const(context, builder, fromty, toty, val):
+    cstr = context.insert_const_string(builder.module, toty.value)
+    # check to make sure Const value matches stored string
+    # call str == cstr
+    fnty = lir.FunctionType(lir.IntType(1),
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_equal_cstr")
+    match = builder.call(fn, [val, cstr])
+    with cgutils.if_unlikely(builder, builder.not_(match)):
+        # Raise RuntimeError about the assumption violation
+        usermsg = "constant string assumption violated"
+        errmsg = "{}: expecting {}".format(usermsg, toty.value)
+        context.call_conv.return_user_exc(builder, RuntimeError, (errmsg,))
+
+    return impl_ret_untracked(context, builder, toty, cstr)
 
 
 @lower_constant(StringType)

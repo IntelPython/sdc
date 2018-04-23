@@ -34,6 +34,7 @@ const char* get_c_str(std::string* s);
 const char* get_char_ptr(char c);
 void* str_concat(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
+bool str_equal_cstr(std::string* s1, char* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
 void* str_substr_int(std::string* str, int64_t index);
 int64_t str_to_int64(std::string* str);
@@ -91,6 +92,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_concat)));
     PyObject_SetAttrString(m, "str_equal",
                             PyLong_FromVoidPtr((void*)(&str_equal)));
+    PyObject_SetAttrString(m, "str_equal_cstr",
+                            PyLong_FromVoidPtr((void*)(&str_equal_cstr)));
     PyObject_SetAttrString(m, "str_split",
                             PyLong_FromVoidPtr((void*)(&str_split)));
     PyObject_SetAttrString(m, "str_substr_int",
@@ -194,6 +197,12 @@ bool str_equal(std::string* s1, std::string* s2)
 {
     // printf("in str_equal %s %s\n", s1->c_str(), s2->c_str());
     return s1->compare(*s2)==0;
+}
+
+bool str_equal_cstr(std::string* s1, char* s2)
+{
+    // printf("in str_equal %s %s\n", s1->c_str(), s2->c_str());
+    return s1->compare(s2)==0;
 }
 
 void* str_split(std::string* str, std::string* sep, int64_t *size)
