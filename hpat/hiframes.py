@@ -144,11 +144,9 @@ class HiFrames(object):
                 scope = assign.target.scope
                 loc = assign.target.loc
                 in_df_col_names = self._get_df_col_names(rhs.value)
-                self.df_vars[lhs] = {}
-                for col in in_df_col_names:
-                    self.df_vars[lhs][col] = ir.Var(scope, mk_unique_var(col),
-                                                    loc)
-                self._update_df_cols()
+                df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
+                                for col in in_df_col_names}
+                self._create_df(lhs, df_col_map)
                 in_df = self._get_renamed_df(rhs.value)
                 return [hiframes_filter.Filter(lhs, in_df.name, rhs.index,
                                                self.df_vars, rhs.loc)]
@@ -302,8 +300,8 @@ class HiFrames(object):
             raise ValueError(
                 "Invalid DataFrame() arguments (map expected)")
         out, items = self._fix_df_arrays(arg_def.items)
-        self.df_vars[lhs.name] = self._process_df_build_map(items)
-        self._update_df_cols()
+        col_map = self._process_df_build_map(items)
+        self._create_df(lhs.name, col_map)
         # remove DataFrame call
         return out
 
@@ -316,8 +314,8 @@ class HiFrames(object):
     def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var):
         col_items, nodes = self.pq_handler.gen_parquet_read(
             self.arrow_tables[t_var.name], lhs)
-        self.df_vars[lhs.name] = self._process_df_build_map(col_items)
-        self._update_df_cols()
+        col_map = self._process_df_build_map(col_items)
+        self._create_df(lhs.name, col_map)
         return nodes
 
     def _handle_merge(self, assign, lhs, rhs):
@@ -341,18 +339,15 @@ class HiFrames(object):
             raise ValueError("merge key values should be constant strings")
         scope = lhs.scope
         loc = lhs.loc
-        self.df_vars[lhs.name] = {}
         # add columns from left to output
         left_colnames = self._get_df_col_names(left_df)
-        for col in left_colnames:
-            self.df_vars[lhs.name][col] = ir.Var(
-                scope, mk_unique_var(col), loc)
+        df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
+                                for col in left_colnames}
         # add columns from right to output
         right_colnames = self._get_df_col_names(right_df)
-        for col in right_colnames:
-            self.df_vars[lhs.name][col] = ir.Var(
-                scope, mk_unique_var(col), loc)
-        self._update_df_cols()
+        df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
+                                for col in right_colnames})
+        self._create_df(lhs.name, df_col_map)
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
                                    left_on, right_on, self.df_vars, lhs.loc)]
@@ -417,8 +412,7 @@ class HiFrames(object):
                 nodes += f_block.body[:-3]
                 done_cols[c] = nodes[-1].target
 
-        self.df_vars[lhs.name] = done_cols
-        self._update_df_cols()
+        self._create_df(lhs.name, done_cols)
         return nodes
 
     def _handle_ros(self, assign, lhs, rhs):
@@ -1100,8 +1094,7 @@ class HiFrames(object):
                     self.ts_series_vars.add(nodes[-1].target.name)
                 df_items[col] = nodes[-1].target
 
-            self.df_vars[arg_var.name] = df_items
-            self._update_df_cols()
+            self._create_df(arg_var.name, df_items)
 
         return nodes
 
@@ -1256,6 +1249,11 @@ class HiFrames(object):
             return nodes
 
         return []
+
+    def _create_df(self, df_varname, df_col_map):
+        #
+        self.df_vars[df_varname] = df_col_map
+        self._update_df_cols()
 
     def _is_df_colname(self, df_var, cname):
         """ is cname a column name in df_var
