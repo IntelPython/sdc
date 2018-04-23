@@ -48,6 +48,19 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 2)
 
+    def test_set_column_reflect(self):
+        def test_impl(df, arr):
+            df['C'] = arr
+            return
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        arr = np.random.ranf(n)
+        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+        hpat_func(df, arr)
+        self.assertIn('C', df)
+        np.testing.assert_almost_equal(df.C, arr)
+
     def test_fillna(self):
         def test_impl():
             A = np.array([1., 2., 3.])
