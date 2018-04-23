@@ -78,6 +78,8 @@ class HiFrames(object):
 
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
+        # df_var -> label where it is defined
+        self.df_labels = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
         # keep track of series that are timestamp to replace getitem
@@ -102,7 +104,7 @@ class HiFrames(object):
                         and self._is_df_var(inst.target)):
                     new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
-                    out_nodes = self._run_assign(inst)
+                    out_nodes = self._run_assign(inst, label)
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
@@ -124,13 +126,13 @@ class HiFrames(object):
             print("df_vars: ", self.df_vars)
         return
 
-    def _run_assign(self, assign):
+    def _run_assign(self, assign, label):
         lhs = assign.target.name
         rhs = assign.value
 
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
-                return self._run_call(assign)
+                return self._run_call(assign, label)
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -146,7 +148,7 @@ class HiFrames(object):
                 in_df_col_names = self._get_df_col_names(rhs.value)
                 df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in in_df_col_names}
-                self._create_df(lhs, df_col_map)
+                self._create_df(lhs, df_col_map, label)
                 in_df = self._get_renamed_df(rhs.value)
                 return [hiframes_filter.Filter(lhs, in_df.name, rhs.index,
                                                self.df_vars, rhs.loc)]
@@ -206,11 +208,13 @@ class HiFrames(object):
                 return nodes
 
         if isinstance(rhs, ir.Arg):
-            return self._run_arg(assign)
+            return self._run_arg(assign, label)
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
+        if isinstance(rhs, ir.Var) and rhs.name in self.df_labels:
+            self.df_labels[lhs] = self.df_labels[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
             self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
@@ -219,7 +223,7 @@ class HiFrames(object):
             self.ts_series_vars[lhs] = self.ts_series_vars[rhs.name]
         return [assign]
 
-    def _run_call(self, assign):
+    def _run_call(self, assign, label):
         """handle calls and return new nodes if needed
         """
         lhs = assign.target
@@ -240,20 +244,20 @@ class HiFrames(object):
             func_name, func_mod = fdef
 
         if fdef == ('DataFrame', 'pandas'):
-            return self._handle_pd_DataFrame(assign, lhs, rhs)
+            return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
         if fdef == ('read_table', 'pyarrow.parquet'):
             return self._handle_pq_read_table(assign, lhs, rhs)
 
         if (func_name == 'to_pandas' and isinstance(func_mod, ir.Var)
                 and func_mod.name in self.arrow_tables):
-            return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod)
+            return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod, label)
 
         if fdef == ('merge', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs)
+            return self._handle_merge(assign, lhs, rhs, label)
 
         if fdef == ('concat', 'pandas'):
-            return self._handle_concat(assign, lhs, rhs)
+            return self._handle_concat(assign, lhs, rhs, label)
 
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
@@ -288,7 +292,7 @@ class HiFrames(object):
                 self.reverse_copies[inst.value.name] = inst.target.name
         return
 
-    def _handle_pd_DataFrame(self, assign, lhs, rhs):
+    def _handle_pd_DataFrame(self, assign, lhs, rhs, label):
         """transform pd.DataFrame({'A': A}) call
         """
         if len(rhs.args) != 1:  # pragma: no cover
@@ -301,7 +305,7 @@ class HiFrames(object):
                 "Invalid DataFrame() arguments (map expected)")
         out, items = self._fix_df_arrays(arg_def.items)
         col_map = self._process_df_build_map(items)
-        self._create_df(lhs.name, col_map)
+        self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
         return out
 
@@ -311,14 +315,14 @@ class HiFrames(object):
         self.arrow_tables[lhs.name] = rhs.args[0]
         return []
 
-    def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var):
+    def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var, label):
         col_items, nodes = self.pq_handler.gen_parquet_read(
             self.arrow_tables[t_var.name], lhs)
         col_map = self._process_df_build_map(col_items)
-        self._create_df(lhs.name, col_map)
+        self._create_df(lhs.name, col_map, label)
         return nodes
 
-    def _handle_merge(self, assign, lhs, rhs):
+    def _handle_merge(self, assign, lhs, rhs, label):
         """transform pd.merge() into a Join node
         """
         if len(rhs.args) < 2:
@@ -347,12 +351,12 @@ class HiFrames(object):
         right_colnames = self._get_df_col_names(right_df)
         df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in right_colnames})
-        self._create_df(lhs.name, df_col_map)
+        self._create_df(lhs.name, df_col_map, label)
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
                                    left_on, right_on, self.df_vars, lhs.loc)]
 
-    def _handle_concat(self, assign, lhs, rhs):
+    def _handle_concat(self, assign, lhs, rhs, label):
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
             raise ValueError(
                 "only a list/tuple argument is supported in concat")
@@ -412,7 +416,7 @@ class HiFrames(object):
                 nodes += f_block.body[:-3]
                 done_cols[c] = nodes[-1].target
 
-        self._create_df(lhs.name, done_cols)
+        self._create_df(lhs.name, done_cols, label)
         return nodes
 
     def _handle_ros(self, assign, lhs, rhs):
@@ -1011,7 +1015,7 @@ class HiFrames(object):
         new_col_var = nodes[-1].target
         return new_col_var, nodes
 
-    def _run_arg(self, arg_assign):
+    def _run_arg(self, arg_assign, label):
         nodes = [arg_assign]
         arg_name = arg_assign.value.name
         arg_ind = arg_assign.value.index
@@ -1094,7 +1098,7 @@ class HiFrames(object):
                     self.ts_series_vars.add(nodes[-1].target.name)
                 df_items[col] = nodes[-1].target
 
-            self._create_df(arg_var.name, df_items)
+            self._create_df(arg_var.name, df_items, label)
 
         return nodes
 
@@ -1221,7 +1225,10 @@ class HiFrames(object):
         """
         # TODO: generalize to more cases
         # TODO: rename the dataframe variable to keep schema static
-        if label not in cfg.backbone():
+        df_label = self.df_labels[inst.target.name]
+        # setting column possible only when it dominates the df creation to
+        # keep schema consistent
+        if label not in cfg.backbone() and label not in cfg.post_dominators()[label]:
             raise ValueError("setting dataframe columns inside conditionals and"
                              " loops not supported yet")
         if not isinstance(inst.index, str):
@@ -1250,10 +1257,11 @@ class HiFrames(object):
 
         return []
 
-    def _create_df(self, df_varname, df_col_map):
+    def _create_df(self, df_varname, df_col_map, label):
         #
         self.df_vars[df_varname] = df_col_map
         self._update_df_cols()
+        self.df_labels[df_varname] = label
 
     def _is_df_colname(self, df_var, cname):
         """ is cname a column name in df_var
