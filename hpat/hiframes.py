@@ -13,9 +13,10 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition,
-                            build_definitions)
+                            build_definitions, replace_vars_stmt, replace_vars_inner)
 
 from numba.inline_closurecall import inline_closure_call
+from numba.analysis import compute_cfg_from_blocks
 
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
@@ -90,6 +91,7 @@ class HiFrames(object):
 
     def run(self):
         dprint_func_ir(self.func_ir, "starting hiframes")
+        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
         topo_order = find_topo_order(self.func_ir.blocks)
         for label in topo_order:
             self._get_reverse_copies(self.func_ir.blocks[label].body)
@@ -97,10 +99,8 @@ class HiFrames(object):
             for inst in self.func_ir.blocks[label].body:
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
-                        and inst.target.name in self.df_vars):
-                    df_name = inst.target.name
-                    self.df_vars[df_name][inst.index] = inst.value
-                    self._update_df_cols()
+                        and self._is_df_var(inst.target)):
+                    new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst)
                     if isinstance(out_nodes, list):
@@ -1223,6 +1223,40 @@ class HiFrames(object):
 
         return index_offsets, win_tuple, nodes
 
+    def _run_df_set_column(self, inst, label, cfg):
+        """handle setitem: df['col_name'] = arr
+        """
+        # TODO: generalize to more cases
+        # TODO: rename the dataframe variable to keep schema static
+        if label not in cfg.backbone():
+            raise ValueError("setting dataframe columns inside conditionals and"
+                             " loops not supported yet")
+        if not isinstance(inst.index, str):
+            raise ValueError("dataframe column name should be a string constant")
+
+        df_name = inst.target.name
+        self.df_vars[df_name][inst.index] = inst.value
+        self._update_df_cols()
+
+        # set dataframe column if it is input and needs to be reflected
+        df_def = guard(get_definition, self.func_ir, df_name)
+        if isinstance(df_def, ir.Arg):
+            # assign column name to variable
+            cname_var = ir.Var(inst.value.scope, mk_unique_var("$cname_const"), inst.loc)
+            nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
+
+            def f(_df, _cname, _arr):  # pragma: no cover
+                s = hpat.hiframes_api.set_df_col(_df, _cname, _arr)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [inst.target, cname_var, inst.value])
+            # copy propagate to enable string Const in typing and lowering
+            simple_block_copy_propagate(f_block)
+            nodes += f_block.body[:-3]  # remove none return
+            return nodes
+
+        return []
+
     def _is_df_colname(self, df_var, cname):
         """ is cname a column name in df_var
         """
@@ -1343,3 +1377,41 @@ def include_new_blocks(blocks, new_blocks, label, new_body):
     inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
     # new_body.clear()
     return label
+
+def simple_block_copy_propagate(block):
+    """simple copy propagate for a single block before typing, without Parfor"""
+
+    var_dict = {}
+    # assignments as dict to replace with latest value
+    for stmt in block.body:
+        # only rhs of assignments should be replaced
+        # e.g. if x=y is available, x in x=z shouldn't be replaced
+        if isinstance(stmt, ir.Assign):
+            stmt.value = replace_vars_inner(stmt.value, var_dict)
+        else:
+            replace_vars_stmt(stmt, var_dict)
+        if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Var):
+            lhs = stmt.target.name
+            rhs = stmt.value.name
+            # rhs could be replaced with lhs from previous copies
+            if lhs != rhs:
+                var_dict[lhs] = stmt.value
+                # a=b kills previous t=a
+                lhs_kill = []
+                for k, v in var_dict.items():
+                    if v.name == lhs:
+                        lhs_kill.append(k)
+                for k in lhs_kill:
+                    var_dict.pop(k, None)
+        if (isinstance(stmt, ir.Assign)
+                                    and not isinstance(stmt.value, ir.Var)):
+            lhs = stmt.target.name
+            var_dict.pop(lhs, None)
+            # previous t=a is killed if a is killed
+            lhs_kill = []
+            for k, v in var_dict.items():
+                if v.name == lhs:
+                    lhs_kill.append(k)
+            for k in lhs_kill:
+                var_dict.pop(k, None)
+    return

@@ -331,6 +331,38 @@ class UnBoxDfCol(AbstractTemplate):
 
 UnBoxDfCol.support_literals = True
 
+def set_df_col(df, cname, arr):
+    df[cname] = arr
+
+@infer_global(set_df_col)
+class SetDfColInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 3
+        assert isinstance(args[1], types.Const)
+        return signature(types.none, *args)
+
+SetDfColInfer.support_literals = True
+
+from numba.targets.boxing import box_array
+
+@lower_builtin(set_df_col, PandasDataFrameType, types.Const, types.Array)
+def set_df_col_lower(context, builder, sig, args):
+    #
+    col_name = sig.args[1].value
+    arr_typ = sig.args[2]
+
+    # get boxed array
+    pyapi = context.get_python_api(builder)
+    env_manager = context.get_env_manager(builder)
+    c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
+    py_arr = box_array(arr_typ, args[2], c)
+
+    pyapi.object_setattr_string(args[0], col_name, py_arr)
+    c.pyapi.decref(py_arr)
+    return context.get_dummy_value()
+
+
 from numba.targets.boxing import unbox_array
 
 @lower_builtin(unbox_df_column, PandasDataFrameType, types.Const, types.Any)
