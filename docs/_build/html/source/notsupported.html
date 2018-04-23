@@ -4,12 +4,20 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Not Supported Python Programs &#8212; HPAT 0.1 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
@@ -24,7 +32,8 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
-  </head><body>
+  </head>
+  <body>
   
 
     <div class="document">
@@ -42,18 +51,18 @@ to analyze the computations.</p>
 <h2>Type Stability<a class="headerlink" href="#type-stability" title="Permalink to this headline">¶</a></h2>
 <p>To enable type inference, the program should be <cite>type stable</cite>, which means every
 variable should have a single type. The example below is not type stable since
-variable <code class="docutils literal notranslate"><span class="pre">a</span></code> can be both a float and an array of floats:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
+variable <code class="docutils literal"><span class="pre">a</span></code> can be both a float and an array of floats:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
     <span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The use of <code class="docutils literal notranslate"><span class="pre">isinstance</span></code> operator of Python often means type instabillity and
+<p>The use of <code class="docutils literal"><span class="pre">isinstance</span></code> operator of Python often means type instabillity and
 is not supported.</p>
 <p>Similarly, function calls should also be deterministic. The below example is
-not supported since function <code class="docutils literal notranslate"><span class="pre">f</span></code> is not known in advance:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
+not supported since function <code class="docutils literal"><span class="pre">f</span></code> is not known in advance:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span>
@@ -95,14 +104,12 @@ not supported since function <code class="docutils literal notranslate"><span cl
    </div>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
-    <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -113,7 +120,7 @@ not supported since function <code class="docutils literal notranslate"><span cl
       &copy;2017, Ehsan Totoni.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.2</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
       
       |

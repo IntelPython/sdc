@@ -4,12 +4,20 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>User Guide &#8212; HPAT 0.1 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
@@ -24,7 +32,8 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
-  </head><body>
+  </head>
+  <body>
   
 
     <div class="document">
@@ -49,7 +58,7 @@ are <a class="reference external" href="http://www.numpy.org/">Numpy</a> arrays 
 pattern. Put simply, this means the compiler analyzes the program to
 determine whether each array should be distributed or not. This analysis uses
 the semantics of array operations as the program below demonstrates:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span> <span class="nf">example_1D</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="s2">&quot;data.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
     <span class="n">A</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">][:]</span>
@@ -90,7 +99,7 @@ This is called <cite>REP</cite> distribution for consistency.</p>
 <p>The distributions found by HPAT can be printed using the
 <cite>hpat.distribution_report()</cite> function. The distribution report for the above
 example code is as follows:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Array distributions:
+<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
     $A.23                1D_Block
 
 Parfor distributions:
@@ -107,7 +116,7 @@ the optimization passes. The report also suggests that there is a <cite>parfor</
 <p>The <cite>np.dot</cite> function has different distribution rules based on the number of
 dimensions and the distributions of its input arrays. The example below
 demonstrates two cases:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span> <span class="nf">example_dot</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
     <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
     <span class="n">Y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
@@ -120,7 +129,7 @@ demonstrates two cases:</p>
 </pre></div>
 </div>
 <p>Here is the output of <cite>hpat.distribution_report()</cite>:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Array distributions:
+<div class="highlight-default"><div class="highlight"><pre><span></span>Array distributions:
    $X.43                1D_Block
    $Y.45                1D_Block
    $w.44                REP
@@ -152,47 +161,47 @@ and parallelize.</p>
 <li><p class="first">Numpy <cite>element-wise</cite> array operations:</p>
 <blockquote>
 <div><ul class="simple">
-<li>Unary operators: <code class="docutils literal notranslate"><span class="pre">+</span></code> <code class="docutils literal notranslate"><span class="pre">-</span></code> <code class="docutils literal notranslate"><span class="pre">~</span></code></li>
-<li>Binary operators: <code class="docutils literal notranslate"><span class="pre">+</span></code> <code class="docutils literal notranslate"><span class="pre">-</span></code> <code class="docutils literal notranslate"><span class="pre">*</span></code> <code class="docutils literal notranslate"><span class="pre">/</span></code> <code class="docutils literal notranslate"><span class="pre">/?</span></code> <code class="docutils literal notranslate"><span class="pre">%</span></code> <code class="docutils literal notranslate"><span class="pre">|</span></code> <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> <code class="docutils literal notranslate"><span class="pre">^</span></code>
-<code class="docutils literal notranslate"><span class="pre">&lt;&lt;</span></code> <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> <code class="docutils literal notranslate"><span class="pre">**</span></code> <code class="docutils literal notranslate"><span class="pre">//</span></code></li>
-<li>Comparison operators: <code class="docutils literal notranslate"><span class="pre">==</span></code> <code class="docutils literal notranslate"><span class="pre">!=</span></code> <code class="docutils literal notranslate"><span class="pre">&lt;</span></code> <code class="docutils literal notranslate"><span class="pre">&lt;=</span></code> <code class="docutils literal notranslate"><span class="pre">&gt;</span></code> <code class="docutils literal notranslate"><span class="pre">&gt;=</span></code></li>
-<li>data-parallel math operations: <code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">subtract</span></code>, <code class="docutils literal notranslate"><span class="pre">multiply</span></code>,
-<code class="docutils literal notranslate"><span class="pre">divide</span></code>, <code class="docutils literal notranslate"><span class="pre">logaddexp</span></code>, <code class="docutils literal notranslate"><span class="pre">logaddexp2</span></code>, <code class="docutils literal notranslate"><span class="pre">true_divide</span></code>,
-<code class="docutils literal notranslate"><span class="pre">floor_divide</span></code>, <code class="docutils literal notranslate"><span class="pre">negative</span></code>, <code class="docutils literal notranslate"><span class="pre">power</span></code>, <code class="docutils literal notranslate"><span class="pre">remainder</span></code>,
-<code class="docutils literal notranslate"><span class="pre">mod</span></code>, <code class="docutils literal notranslate"><span class="pre">fmod</span></code>, <code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">absolute</span></code>, <code class="docutils literal notranslate"><span class="pre">fabs</span></code>, <code class="docutils literal notranslate"><span class="pre">rint</span></code>, <code class="docutils literal notranslate"><span class="pre">sign</span></code>,
-<code class="docutils literal notranslate"><span class="pre">conj</span></code>, <code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">exp2</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">log2</span></code>, <code class="docutils literal notranslate"><span class="pre">log10</span></code>, <code class="docutils literal notranslate"><span class="pre">expm1</span></code>,
-<code class="docutils literal notranslate"><span class="pre">log1p</span></code>, <code class="docutils literal notranslate"><span class="pre">sqrt</span></code>, <code class="docutils literal notranslate"><span class="pre">square</span></code>, <code class="docutils literal notranslate"><span class="pre">reciprocal</span></code>, <code class="docutils literal notranslate"><span class="pre">conjugate</span></code></li>
-<li>Trigonometric functions: <code class="docutils literal notranslate"><span class="pre">sin</span></code>, <code class="docutils literal notranslate"><span class="pre">cos</span></code>, <code class="docutils literal notranslate"><span class="pre">tan</span></code>, <code class="docutils literal notranslate"><span class="pre">arcsin</span></code>,
-<code class="docutils literal notranslate"><span class="pre">arccos</span></code>, <code class="docutils literal notranslate"><span class="pre">arctan</span></code>, <code class="docutils literal notranslate"><span class="pre">arctan2</span></code>, <code class="docutils literal notranslate"><span class="pre">hypot</span></code>, <code class="docutils literal notranslate"><span class="pre">sinh</span></code>, <code class="docutils literal notranslate"><span class="pre">cosh</span></code>,
-<code class="docutils literal notranslate"><span class="pre">tanh</span></code>, <code class="docutils literal notranslate"><span class="pre">arcsinh</span></code>, <code class="docutils literal notranslate"><span class="pre">arccosh</span></code>, <code class="docutils literal notranslate"><span class="pre">arctanh</span></code>, <code class="docutils literal notranslate"><span class="pre">deg2rad</span></code>,
-<code class="docutils literal notranslate"><span class="pre">rad2deg</span></code>, <code class="docutils literal notranslate"><span class="pre">degrees</span></code>, <code class="docutils literal notranslate"><span class="pre">radians</span></code></li>
-<li>Bit manipulation functions: <code class="docutils literal notranslate"><span class="pre">bitwise_and</span></code>, <code class="docutils literal notranslate"><span class="pre">bitwise_or</span></code>,
-<code class="docutils literal notranslate"><span class="pre">bitwise_xor</span></code>, <code class="docutils literal notranslate"><span class="pre">bitwise_not</span></code>, <code class="docutils literal notranslate"><span class="pre">invert</span></code>, <code class="docutils literal notranslate"><span class="pre">left_shift</span></code>,
-<code class="docutils literal notranslate"><span class="pre">right_shift</span></code></li>
+<li>Unary operators: <code class="docutils literal"><span class="pre">+</span></code> <code class="docutils literal"><span class="pre">-</span></code> <code class="docutils literal"><span class="pre">~</span></code></li>
+<li>Binary operators: <code class="docutils literal"><span class="pre">+</span></code> <code class="docutils literal"><span class="pre">-</span></code> <code class="docutils literal"><span class="pre">*</span></code> <code class="docutils literal"><span class="pre">/</span></code> <code class="docutils literal"><span class="pre">/?</span></code> <code class="docutils literal"><span class="pre">%</span></code> <code class="docutils literal"><span class="pre">|</span></code> <code class="docutils literal"><span class="pre">&gt;&gt;</span></code> <code class="docutils literal"><span class="pre">^</span></code>
+<code class="docutils literal"><span class="pre">&lt;&lt;</span></code> <code class="docutils literal"><span class="pre">&amp;</span></code> <code class="docutils literal"><span class="pre">**</span></code> <code class="docutils literal"><span class="pre">//</span></code></li>
+<li>Comparison operators: <code class="docutils literal"><span class="pre">==</span></code> <code class="docutils literal"><span class="pre">!=</span></code> <code class="docutils literal"><span class="pre">&lt;</span></code> <code class="docutils literal"><span class="pre">&lt;=</span></code> <code class="docutils literal"><span class="pre">&gt;</span></code> <code class="docutils literal"><span class="pre">&gt;=</span></code></li>
+<li>data-parallel math operations: <code class="docutils literal"><span class="pre">add</span></code>, <code class="docutils literal"><span class="pre">subtract</span></code>, <code class="docutils literal"><span class="pre">multiply</span></code>,
+<code class="docutils literal"><span class="pre">divide</span></code>, <code class="docutils literal"><span class="pre">logaddexp</span></code>, <code class="docutils literal"><span class="pre">logaddexp2</span></code>, <code class="docutils literal"><span class="pre">true_divide</span></code>,
+<code class="docutils literal"><span class="pre">floor_divide</span></code>, <code class="docutils literal"><span class="pre">negative</span></code>, <code class="docutils literal"><span class="pre">power</span></code>, <code class="docutils literal"><span class="pre">remainder</span></code>,
+<code class="docutils literal"><span class="pre">mod</span></code>, <code class="docutils literal"><span class="pre">fmod</span></code>, <code class="docutils literal"><span class="pre">abs</span></code>, <code class="docutils literal"><span class="pre">absolute</span></code>, <code class="docutils literal"><span class="pre">fabs</span></code>, <code class="docutils literal"><span class="pre">rint</span></code>, <code class="docutils literal"><span class="pre">sign</span></code>,
+<code class="docutils literal"><span class="pre">conj</span></code>, <code class="docutils literal"><span class="pre">exp</span></code>, <code class="docutils literal"><span class="pre">exp2</span></code>, <code class="docutils literal"><span class="pre">log</span></code>, <code class="docutils literal"><span class="pre">log2</span></code>, <code class="docutils literal"><span class="pre">log10</span></code>, <code class="docutils literal"><span class="pre">expm1</span></code>,
+<code class="docutils literal"><span class="pre">log1p</span></code>, <code class="docutils literal"><span class="pre">sqrt</span></code>, <code class="docutils literal"><span class="pre">square</span></code>, <code class="docutils literal"><span class="pre">reciprocal</span></code>, <code class="docutils literal"><span class="pre">conjugate</span></code></li>
+<li>Trigonometric functions: <code class="docutils literal"><span class="pre">sin</span></code>, <code class="docutils literal"><span class="pre">cos</span></code>, <code class="docutils literal"><span class="pre">tan</span></code>, <code class="docutils literal"><span class="pre">arcsin</span></code>,
+<code class="docutils literal"><span class="pre">arccos</span></code>, <code class="docutils literal"><span class="pre">arctan</span></code>, <code class="docutils literal"><span class="pre">arctan2</span></code>, <code class="docutils literal"><span class="pre">hypot</span></code>, <code class="docutils literal"><span class="pre">sinh</span></code>, <code class="docutils literal"><span class="pre">cosh</span></code>,
+<code class="docutils literal"><span class="pre">tanh</span></code>, <code class="docutils literal"><span class="pre">arcsinh</span></code>, <code class="docutils literal"><span class="pre">arccosh</span></code>, <code class="docutils literal"><span class="pre">arctanh</span></code>, <code class="docutils literal"><span class="pre">deg2rad</span></code>,
+<code class="docutils literal"><span class="pre">rad2deg</span></code>, <code class="docutils literal"><span class="pre">degrees</span></code>, <code class="docutils literal"><span class="pre">radians</span></code></li>
+<li>Bit manipulation functions: <code class="docutils literal"><span class="pre">bitwise_and</span></code>, <code class="docutils literal"><span class="pre">bitwise_or</span></code>,
+<code class="docutils literal"><span class="pre">bitwise_xor</span></code>, <code class="docutils literal"><span class="pre">bitwise_not</span></code>, <code class="docutils literal"><span class="pre">invert</span></code>, <code class="docutils literal"><span class="pre">left_shift</span></code>,
+<code class="docutils literal"><span class="pre">right_shift</span></code></li>
 </ul>
 </div></blockquote>
 </li>
-<li><p class="first">Numpy reduction functions <code class="docutils literal notranslate"><span class="pre">sum</span></code>, <code class="docutils literal notranslate"><span class="pre">prod</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">argmin</span></code>
-and <code class="docutils literal notranslate"><span class="pre">argmax</span></code>. Currently, <cite>int64</cite> data type is not supported for
-<code class="docutils literal notranslate"><span class="pre">argmin</span></code> and <code class="docutils literal notranslate"><span class="pre">argmax</span></code>.</p>
+<li><p class="first">Numpy reduction functions <code class="docutils literal"><span class="pre">sum</span></code>, <code class="docutils literal"><span class="pre">prod</span></code>, <code class="docutils literal"><span class="pre">min</span></code>, <code class="docutils literal"><span class="pre">max</span></code>, <code class="docutils literal"><span class="pre">argmin</span></code>
+and <code class="docutils literal"><span class="pre">argmax</span></code>. Currently, <cite>int64</cite> data type is not supported for
+<code class="docutils literal"><span class="pre">argmin</span></code> and <code class="docutils literal"><span class="pre">argmax</span></code>.</p>
 </li>
-<li><p class="first">Numpy array creation functions <code class="docutils literal notranslate"><span class="pre">empty</span></code>, <code class="docutils literal notranslate"><span class="pre">zeros</span></code>, <code class="docutils literal notranslate"><span class="pre">ones</span></code>,
-<code class="docutils literal notranslate"><span class="pre">empty_like</span></code>, <code class="docutils literal notranslate"><span class="pre">zeros_like</span></code>, <code class="docutils literal notranslate"><span class="pre">ones_like</span></code>, <code class="docutils literal notranslate"><span class="pre">full_like</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>,
-<code class="docutils literal notranslate"><span class="pre">arange</span></code> and <code class="docutils literal notranslate"><span class="pre">linspace</span></code>.</p>
+<li><p class="first">Numpy array creation functions <code class="docutils literal"><span class="pre">empty</span></code>, <code class="docutils literal"><span class="pre">zeros</span></code>, <code class="docutils literal"><span class="pre">ones</span></code>,
+<code class="docutils literal"><span class="pre">empty_like</span></code>, <code class="docutils literal"><span class="pre">zeros_like</span></code>, <code class="docutils literal"><span class="pre">ones_like</span></code>, <code class="docutils literal"><span class="pre">full_like</span></code>, <code class="docutils literal"><span class="pre">copy</span></code>,
+<code class="docutils literal"><span class="pre">arange</span></code> and <code class="docutils literal"><span class="pre">linspace</span></code>.</p>
 </li>
-<li><p class="first">Random number generator functions: <code class="docutils literal notranslate"><span class="pre">rand</span></code>, <code class="docutils literal notranslate"><span class="pre">randn</span></code>,
-<code class="docutils literal notranslate"><span class="pre">ranf</span></code>, <code class="docutils literal notranslate"><span class="pre">random_sample</span></code>, <code class="docutils literal notranslate"><span class="pre">sample</span></code>, <code class="docutils literal notranslate"><span class="pre">random</span></code>,
-<code class="docutils literal notranslate"><span class="pre">standard_normal</span></code>, <code class="docutils literal notranslate"><span class="pre">chisquare</span></code>, <code class="docutils literal notranslate"><span class="pre">weibull</span></code>, <code class="docutils literal notranslate"><span class="pre">power</span></code>, <code class="docutils literal notranslate"><span class="pre">geometric</span></code>,
-<code class="docutils literal notranslate"><span class="pre">exponential</span></code>, <code class="docutils literal notranslate"><span class="pre">poisson</span></code>, <code class="docutils literal notranslate"><span class="pre">rayleigh</span></code>, <code class="docutils literal notranslate"><span class="pre">normal</span></code>, <code class="docutils literal notranslate"><span class="pre">uniform</span></code>,
-<code class="docutils literal notranslate"><span class="pre">beta</span></code>, <code class="docutils literal notranslate"><span class="pre">binomial</span></code>, <code class="docutils literal notranslate"><span class="pre">f</span></code>, <code class="docutils literal notranslate"><span class="pre">gamma</span></code>, <code class="docutils literal notranslate"><span class="pre">lognormal</span></code>, <code class="docutils literal notranslate"><span class="pre">laplace</span></code>,
-<code class="docutils literal notranslate"><span class="pre">randint</span></code>, <code class="docutils literal notranslate"><span class="pre">triangular</span></code>.</p>
+<li><p class="first">Random number generator functions: <code class="docutils literal"><span class="pre">rand</span></code>, <code class="docutils literal"><span class="pre">randn</span></code>,
+<code class="docutils literal"><span class="pre">ranf</span></code>, <code class="docutils literal"><span class="pre">random_sample</span></code>, <code class="docutils literal"><span class="pre">sample</span></code>, <code class="docutils literal"><span class="pre">random</span></code>,
+<code class="docutils literal"><span class="pre">standard_normal</span></code>, <code class="docutils literal"><span class="pre">chisquare</span></code>, <code class="docutils literal"><span class="pre">weibull</span></code>, <code class="docutils literal"><span class="pre">power</span></code>, <code class="docutils literal"><span class="pre">geometric</span></code>,
+<code class="docutils literal"><span class="pre">exponential</span></code>, <code class="docutils literal"><span class="pre">poisson</span></code>, <code class="docutils literal"><span class="pre">rayleigh</span></code>, <code class="docutils literal"><span class="pre">normal</span></code>, <code class="docutils literal"><span class="pre">uniform</span></code>,
+<code class="docutils literal"><span class="pre">beta</span></code>, <code class="docutils literal"><span class="pre">binomial</span></code>, <code class="docutils literal"><span class="pre">f</span></code>, <code class="docutils literal"><span class="pre">gamma</span></code>, <code class="docutils literal"><span class="pre">lognormal</span></code>, <code class="docutils literal"><span class="pre">laplace</span></code>,
+<code class="docutils literal"><span class="pre">randint</span></code>, <code class="docutils literal"><span class="pre">triangular</span></code>.</p>
 </li>
 </ol>
 <ol class="arabic" start="4">
-<li><p class="first">Numpy <code class="docutils literal notranslate"><span class="pre">dot</span></code> function between a matrix and a vector, or two vectors.</p>
+<li><p class="first">Numpy <code class="docutils literal"><span class="pre">dot</span></code> function between a matrix and a vector, or two vectors.</p>
 </li>
 <li><p class="first">Numpy array comprehensions, such as:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)])</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)])</span>
 </pre></div>
 </div>
 </li>
@@ -205,11 +214,11 @@ dimensions of size 1 is not supported.</p>
 <h2>Explicit Parallel Loops<a class="headerlink" href="#explicit-parallel-loops" title="Permalink to this headline">¶</a></h2>
 <p>Sometimes explicit parallel loops are required since a program cannot be written
 in terms of data-parallel operators easily.
-In this case, one can use HPAT’s <code class="docutils literal notranslate"><span class="pre">prange</span></code> in place of <code class="docutils literal notranslate"><span class="pre">range</span></code> to specify
+In this case, one can use HPAT’s <code class="docutils literal"><span class="pre">prange</span></code> in place of <code class="docutils literal"><span class="pre">range</span></code> to specify
 that a loop can be parallelized. The user is required to make sure the
 loop does not have cross iteration dependencies except for supported reductions.</p>
 <p>The example below demonstrates a parallel loop with a reduction:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">hpat</span> <span class="k">import</span> <span class="n">jit</span><span class="p">,</span> <span class="n">prange</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">hpat</span> <span class="k">import</span> <span class="n">jit</span><span class="p">,</span> <span class="n">prange</span>
 <span class="nd">@jit</span>
 <span class="k">def</span> <span class="nf">prange_test</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
@@ -219,7 +228,7 @@ loop does not have cross iteration dependencies except for supported reductions.
     <span class="k">return</span> <span class="n">s</span>
 </pre></div>
 </div>
-<p>Currently, reductions using <code class="docutils literal notranslate"><span class="pre">+=</span></code>, <code class="docutils literal notranslate"><span class="pre">*=</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, and <code class="docutils literal notranslate"><span class="pre">max</span></code> operators are
+<p>Currently, reductions using <code class="docutils literal"><span class="pre">+=</span></code>, <code class="docutils literal"><span class="pre">*=</span></code>, <code class="docutils literal"><span class="pre">min</span></code>, and <code class="docutils literal"><span class="pre">max</span></code> operators are
 supported.</p>
 </div>
 <div class="section" id="supported-pandas-operations">
@@ -228,30 +237,30 @@ supported.</p>
 doesn’t support Pandas, only these operations can be used for both large and
 small datasets.</p>
 <ol class="arabic">
-<li><p class="first">HPAT supports Dataframe creation with the <code class="docutils literal notranslate"><span class="pre">DataFrame</span></code> constructor.
+<li><p class="first">HPAT supports Dataframe creation with the <code class="docutils literal"><span class="pre">DataFrame</span></code> constructor.
 Only a dictionary is supported as input. For example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)})</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">ranf</span><span class="p">(</span><span class="n">n</span><span class="p">)})</span>
 </pre></div>
 </div>
 </li>
-<li><p class="first">Accessing columns using both getitem (e.g. <code class="docutils literal notranslate"><span class="pre">df['A']</span></code>) and attribute
-(e.g. <code class="docutils literal notranslate"><span class="pre">df.A</span></code>) is supported.</p>
+<li><p class="first">Accessing columns using both getitem (e.g. <code class="docutils literal"><span class="pre">df['A']</span></code>) and attribute
+(e.g. <code class="docutils literal"><span class="pre">df.A</span></code>) is supported.</p>
 </li>
 <li><p class="first">Using columns similar to Numpy arrays and performing data-parallel operations
 listed previously is supported.</p>
 </li>
 <li><p class="first">Filtering data frames using boolean arrays is supported
-(e.g. <code class="docutils literal notranslate"><span class="pre">df[df.A</span> <span class="pre">&gt;</span> <span class="pre">.5]</span></code>).</p>
+(e.g. <code class="docutils literal"><span class="pre">df[df.A</span> <span class="pre">&gt;</span> <span class="pre">.5]</span></code>).</p>
 </li>
 <li><p class="first">Rolling window operations with <cite>window</cite> and <cite>center</cite> options are supported.
 Here are a few examples:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 <span class="n">df</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">2</span><span class="o">*</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
 </pre></div>
 </div>
 </li>
-<li><p class="first"><code class="docutils literal notranslate"><span class="pre">shift</span></code> operation (e.g. <code class="docutils literal notranslate"><span class="pre">df.A.shift(1)</span></code>) and <code class="docutils literal notranslate"><span class="pre">pct_change</span></code> operation
-(e.g. <code class="docutils literal notranslate"><span class="pre">df.A.pct_change()</span></code>) are supported.</p>
+<li><p class="first"><code class="docutils literal"><span class="pre">shift</span></code> operation (e.g. <code class="docutils literal"><span class="pre">df.A.shift(1)</span></code>) and <code class="docutils literal"><span class="pre">pct_change</span></code> operation
+(e.g. <code class="docutils literal"><span class="pre">df.A.pct_change()</span></code>) are supported.</p>
 </li>
 </ol>
 <p>DataFrame columns with integer data need special care. Pandas dynamically
@@ -267,7 +276,7 @@ conversion of integer data to floating point data if needed.</p>
 <a class="reference external" href="http://parquet.apache.org/">Parquet</a> formats.
 For HDF5, the syntax is the same as the <a class="reference external" href="http://www.h5py.org/">h5py</a> package.
 For example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span> <span class="nf">example</span><span class="p">():</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="s2">&quot;lr.hdf5&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
     <span class="n">X</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s1">&#39;points&#39;</span><span class="p">][:]</span>
@@ -275,7 +284,7 @@ For example:</p>
 </pre></div>
 </div>
 <p>For Parquet, the syntax is the same as <a class="reference external" href="https://arrow.apache.org/docs/python/">pyarrow</a>:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pyarrow.parquet</span> <span class="k">as</span> <span class="nn">pq</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pyarrow.parquet</span> <span class="k">as</span> <span class="nn">pq</span>
 <span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span> <span class="nf">kde</span><span class="p">():</span>
     <span class="n">t</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="s1">&#39;kde.parquet&#39;</span><span class="p">)</span>
@@ -290,7 +299,7 @@ string, HPAT tries to look at the file at compile time and recognize the types.
 Otherwise, the user is responsile for providing the types similar to
 <a class="reference external" href="http://numba.pydata.org/numba-doc/latest/reference/types.html">Numba’s typing syntax</a>. For
 example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="nb">locals</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;X&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:,:],</span> <span class="s1">&#39;Y&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:]})</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nd">@hpat</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="nb">locals</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;X&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:,:],</span> <span class="s1">&#39;Y&#39;</span><span class="p">:</span> <span class="n">hpat</span><span class="o">.</span><span class="n">float64</span><span class="p">[:]})</span>
 <span class="k">def</span> <span class="nf">example</span><span class="p">(</span><span class="n">file_name</span><span class="p">):</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
     <span class="n">X</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s1">&#39;points&#39;</span><span class="p">][:]</span>
@@ -300,16 +309,16 @@ example:</p>
 </div>
 <div class="section" id="print">
 <h2>Print<a class="headerlink" href="#print" title="Permalink to this headline">¶</a></h2>
-<p>Using <code class="docutils literal notranslate"><span class="pre">print</span></code> function is only supported for <cite>REP</cite> values. Print is called on
+<p>Using <code class="docutils literal"><span class="pre">print</span></code> function is only supported for <cite>REP</cite> values. Print is called on
 one processor only since all processors have the same copy.</p>
 </div>
 <div class="section" id="strings">
 <h2>Strings<a class="headerlink" href="#strings" title="Permalink to this headline">¶</a></h2>
 <p>Currently, HPAT provides basic ASCII string support. Constant strings, equality
-comparison of strings (<code class="docutils literal notranslate"><span class="pre">==</span></code> and <code class="docutils literal notranslate"><span class="pre">!=</span></code>), <code class="docutils literal notranslate"><span class="pre">split</span></code> function, extracting
-characters (e.g. <code class="docutils literal notranslate"><span class="pre">s[1]</span></code>), concatination, and convertion to <cite>int</cite> and <cite>float</cite>
+comparison of strings (<code class="docutils literal"><span class="pre">==</span></code> and <code class="docutils literal"><span class="pre">!=</span></code>), <code class="docutils literal"><span class="pre">split</span></code> function, extracting
+characters (e.g. <code class="docutils literal"><span class="pre">s[1]</span></code>), concatination, and convertion to <cite>int</cite> and <cite>float</cite>
 are supported. Here are some examples:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="s1">&#39;test_str&#39;</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="s1">&#39;test_str&#39;</span>
 <span class="n">flag</span> <span class="o">=</span> <span class="p">(</span><span class="n">s</span> <span class="o">==</span> <span class="s1">&#39;test_str&#39;</span><span class="p">)</span>
 <span class="n">flag</span> <span class="o">=</span> <span class="p">(</span><span class="n">s</span> <span class="o">!=</span> <span class="s1">&#39;test_str&#39;</span><span class="p">)</span>
 <span class="n">s_list</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
@@ -322,11 +331,11 @@ are supported. Here are some examples:</p>
 </div>
 <div class="section" id="dictionaries">
 <h2>Dictionaries<a class="headerlink" href="#dictionaries" title="Permalink to this headline">¶</a></h2>
-<p>HPAT supports basic integer dictionaries currently. <code class="docutils literal notranslate"><span class="pre">DictIntInt</span></code> is the type
-for dictionaries with 64-bit integer keys and values, while <code class="docutils literal notranslate"><span class="pre">DictInt32Int32</span></code>
-is for 32-bit integer ones. Getting and setting values, <code class="docutils literal notranslate"><span class="pre">pop</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code>
-operators, as well as <code class="docutils literal notranslate"><span class="pre">min</span></code> and <code class="docutils literal notranslate"><span class="pre">max</span></code> of keys is supported. For example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">d</span> <span class="o">=</span> <span class="n">DictIntInt</span><span class="p">()</span>
+<p>HPAT supports basic integer dictionaries currently. <code class="docutils literal"><span class="pre">DictIntInt</span></code> is the type
+for dictionaries with 64-bit integer keys and values, while <code class="docutils literal"><span class="pre">DictInt32Int32</span></code>
+is for 32-bit integer ones. Getting and setting values, <code class="docutils literal"><span class="pre">pop</span></code> and <code class="docutils literal"><span class="pre">get</span></code>
+operators, as well as <code class="docutils literal"><span class="pre">min</span></code> and <code class="docutils literal"><span class="pre">max</span></code> of keys is supported. For example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">d</span> <span class="o">=</span> <span class="n">DictIntInt</span><span class="p">()</span>
 <span class="n">d</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
 <span class="n">a</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
 <span class="n">b</span> <span class="o">=</span> <span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
@@ -381,14 +390,12 @@ operators, as well as <code class="docutils literal notranslate"><span class="pr
    </div>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
-    <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -399,7 +406,7 @@ operators, as well as <code class="docutils literal notranslate"><span class="pr
       &copy;2017, Ehsan Totoni.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.2</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
       
       |
