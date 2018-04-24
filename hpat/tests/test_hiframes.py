@@ -48,7 +48,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.skip("needs fix for array boxing")
     def test_set_column_reflect(self):
         def test_impl(df, arr):
             df['C'] = arr

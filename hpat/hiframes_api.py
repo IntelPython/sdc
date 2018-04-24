@@ -354,9 +354,12 @@ def set_df_col_lower(context, builder, sig, args):
 
     # get boxed array
     pyapi = context.get_python_api(builder)
+    gil_state = pyapi.gil_ensure()  # acquire GIL
     env_manager = context.get_env_manager(builder)
-    c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
-    py_arr = box_array(arr_typ, args[2], c)
+
+    if context.enable_nrt:
+        context.nrt.incref(builder, arr_typ, args[2])
+    py_arr = pyapi.from_native_value(arr_typ, args[2], env_manager)    # calls boxing
 
     # get column as string obj
     cstr = context.insert_const_string(builder.module, col_name)
@@ -367,6 +370,9 @@ def set_df_col_lower(context, builder, sig, args):
 
     pyapi.decref(py_arr)
     pyapi.decref(cstr_obj)
+
+    pyapi.gil_release(gil_state)    # release GIL
+
     return context.get_dummy_value()
 
 
