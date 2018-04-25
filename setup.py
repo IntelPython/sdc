@@ -69,6 +69,10 @@ if 'OPENCV_DIR' in os.environ:
     # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
     # cv_link_args = p_cvconf.stdout.decode().split()
 
+_has_xenon = False
+
+if 'HPAT_XE_SUPPORT' in os.environ and  os.environ['HPAT_XE_SUPPORT'] != "0":
+    _has_xenon = True
 
 MPI_LIBS = ['mpi']
 H5_COMPILE_FLAGS = []
@@ -180,6 +184,13 @@ ext_cv_wrapper = Extension(name="cv_wrapper",
                              sources=["hpat/_cv.cpp"],
                              language="c++",
                              )
+ext_xenon_wrapper = Extension(name="hxe_ext",
+                             #include_dirs = ['/usr/include'],
+                             include_dirs = ['.'],
+                             library_dirs = ['.'],
+                             libraries = ['xe'],
+                             sources=["hpat/_xe_wrapper.cpp"]
+                             )
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile]
 
@@ -193,6 +204,9 @@ if _has_ros:
     _ext_mods.append(ext_ros)
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
+
+if _has_xenon:
+    _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
       version='0.2.0',

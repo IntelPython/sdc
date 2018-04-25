@@ -292,6 +292,12 @@ class HiFrames(object):
         if fdef == ('fromfile', 'numpy'):
             return hpat.io._handle_np_fromfile(assign, lhs, rhs)
 
+        if fdef == ('read_xenon', 'hpat.xenon_ext'):
+            col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.func_ir)
+            col_map = self._process_df_build_map(col_items)
+            self._create_df(lhs.name, col_map, label)
+            return nodes
+
         return [assign]
 
     def _get_reverse_copies(self, body):

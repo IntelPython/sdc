@@ -26,3 +26,11 @@ except ImportError:
 else:
     _has_opencv = True
     import hpat.cv_ext
+
+try:
+    import hxe_ext
+except ImportError:
+    _has_xenon = False
+else:
+    _has_xenon = True
+    import hpat.xenon_ext
