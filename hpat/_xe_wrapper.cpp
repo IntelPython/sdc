@@ -1,3 +1,4 @@
+
 #include <Python.h>
 #include "xe.h"
 #include <iostream>
@@ -7,7 +8,10 @@ extern "C" {
 
 static PyObject* get_schema(PyObject *self, PyObject *args);
 int64_t get_column_size_xenon(std::string* dset, uint64_t col_id);
-void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, int xe_typ);
+void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums);
+
+int get_4byte_val(char* buf);
+int64_t get_8byte_val(char* buf);
 
 static PyMethodDef xe_wrapper_methods[] = {
     {
@@ -98,9 +102,14 @@ int64_t get_column_size_xenon(std::string* dset, uint64_t col_id)
 #undef CHECK
 }
 
-void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, int xe_typ)
+void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
+
+    // printf("read column %lld\n", col_id);
+    // for (uint64_t i = 0; i<6; i++)
+    //     printf("%lld ", xe_typ_enums[i]);
+    // printf("\n");
 
     const char* dset_name = dset->c_str();
 	xe_connection_t xe_connection;
@@ -117,11 +126,141 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, int xe_typ)
 	CHECK(!err, "Fail to stat dataset");
     CHECK(col_id < status.ncols, "invalid column number");
 
+    // _type_to_xe_dtype_number = {'int8': 0, 'int16': 1, 'int32': 2, 'int64': 3,
+    //                             'float32': 4, 'float64': 5, 'DECIMAL': 6,
+    //                              'bool_': 7, 'string': 8, 'BLOB': 9}
+
+    const int read_buf_size = 2000000;
+    char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
+    uint64_t nrows = 0, read_bytes = 0;
+    char * str;
+    int val_i32 = 0;
+    int val_i64 = 0;
+    int len = 0;
+
+    for (uint64_t sid = 0; sid < status.fanout; sid++) {
+        xe_rewind(xe_connection, xe_dataset, sid);
+
+        do {
+            char *buf = read_buf;
+            xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
+            for (uint64_t r = 0; r < nrows; r++) {
+                if (r==0 and sid==0) {
+                    for(int j =0; j< 30; j++) {
+                        // printf("%d %c\n", buf[j]);
+                    }
+                }
+                for (uint64_t c = 0; c < status.ncols; c++) {
+                    uint64_t tp_enum = xe_typ_enums[c];
+                    if (*buf) {
+                        buf++;
+                        switch (tp_enum) {
+                            case 0:  // int8
+                                if (c == col_id) {
+                                    *(arr+read_bytes) = *buf;
+                                    read_bytes++;
+                                }
+                                buf++;
+                                break;
+                            case 1:  // int16
+                                if (c == col_id) {
+                                    memcpy(arr+read_bytes, buf, 2*sizeof(char));
+                                    read_bytes += 2;
+                                }
+                                buf += 2;
+                                break;
+                            case 2:  // int32
+                                if (c == col_id) {
+                                    ((int*)(arr+read_bytes))[0] = get_4byte_val(buf);
+                                    read_bytes += 4;
+                                }
+                                buf += 4;
+                                break;
+                            case 3:  // int64
+                                if (c == col_id) {
+                                    memcpy(arr+read_bytes, buf, sizeof(int64_t));
+                                    read_bytes += 8;
+                                }
+                                buf += 8;
+                                break;
+                            case 4:  // float32
+                                if (c == col_id) {
+                                    memcpy(arr+read_bytes, buf, sizeof(float));
+                                    read_bytes += 4;
+                                }
+                                buf += 4;
+                                break;
+                            case 5:  // float64
+                                if (c == col_id) {
+                                    memcpy(arr+read_bytes, buf, sizeof(double));
+                                    read_bytes += 8;
+                                }
+                                buf += 8;
+                                break;
+                            case 6:  // decimal
+                                CHECK(false, "Decimal values not supported yet");
+                                break;
+                            case 7:  // bool
+                                break;
+                            case 8:  // string
+                                len = 0;
+                                for (int i = 0; i < 2; i++, buf++) {
+                                    len = (len << 8) + *buf;
+                                }
+                                str = (char *) malloc (len * sizeof(char));
+                                memcpy(str, buf, len);
+                                buf += len;
+                                // printf("%s,", str);
+                                break;
+                            case 9:  // blob
+                                CHECK(false, "Blob values not supported yet");
+                                break;
+                            default:
+                                CHECK(false, "Unknown type");
+                        }
+                    } else {
+                        // printf("null,");
+                        buf++;
+                    }
+                }
+                // printf ("\n");
+            }
+        } while (nrows);
+    }
+
+    delete[] read_buf;
     xe_close(xe_connection, xe_dataset);
     xe_disconnect(xe_connection);
 
     return;
 #undef CHECK
+}
+
+int16_t get_2byte_val(char* buf)
+{
+    int16_t val = 0;
+    for (int i = 0; i < 2; i++) {
+        val = (val << 8) + *(buf+i);
+    }
+    return val;
+}
+
+int get_4byte_val(char* buf)
+{
+    int val_i32 = 0;
+    for (int i = 0; i < 4; i++) {
+        val_i32 = (val_i32 << 8) + *(buf+i);
+    }
+    return val_i32;
+}
+
+int64_t get_8byte_val(char* buf)
+{
+    int64_t val_i64 = 0;
+    for (int i = 0; i < 8; i++) {
+        val_i64 = (val_i64 << 8) + *(buf+i);
+    }
+    return val_i64;
 }
 
 } // extern "C"

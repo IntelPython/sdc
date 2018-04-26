@@ -40,6 +40,9 @@ def _handle_read(assign, lhs, rhs, func_ir):
 
     col_names, col_types = get_dset_schema(dset_name)
 
+    xe_typs = [str(get_xe_typ_enum(c_type)) for c_type in col_types]
+    xe_typs_str = "np.array([" + ",".join(xe_typs) + "])"
+
     scope = dset_name_var.scope
     loc = dset_name_var.loc
 
@@ -54,7 +57,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
         cvar = ir.Var(scope, varname, loc)
         col_items.append((cname, cvar))
 
-        out_nodes += get_column_read_nodes(c_type, cvar, dset_name_var, i)
+        out_nodes += get_column_read_nodes(c_type, cvar, dset_name_var, i, xe_typs_str)
 
     return col_items, out_nodes
 
@@ -69,8 +72,15 @@ _xe_type_to_numba = {'BOOL': types.Array(types.boolean, 1, 'C'),
                      # TODO: handle decimal and blob types
                      }
 
-_type_to_xe_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
-                            'int96': 3, 'float32': 4, 'float64': 5}
+_type_to_xe_dtype_number = {'int8': 0, 'int16': 1, 'int32': 2, 'int64': 3,
+                            'float32': 4, 'float64': 5, 'DECIMAL': 6,
+                             'bool_': 7, 'string': 8, 'BLOB': 9}
+
+def get_xe_typ_enum(c_type):
+    if c_type == string_array_type:
+        return _type_to_xe_dtype_number['string']
+    assert isinstance(c_type, types.Array)
+    return _type_to_xe_dtype_number[get_element_type(c_type.dtype)]
 
 def get_dset_schema(dset_name):
     import hxe_ext
@@ -93,14 +103,15 @@ def get_dset_schema(dset_name):
     return col_names, col_types
 
 
-def get_column_read_nodes(c_type, cvar, dset_name, i):
+def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
 
     loc = cvar.loc
 
     func_text = ('def f(dset_name):\n  col_size = get_column_size_xenon(dset_name, {})\n'.
                  format(i))
-    func_text += '  print(col_size)\n'
-    # generate strings differently
+    # func_text += '  print(col_size)\n'
+    func_text += '  schema_arr = {}\n'.format(xe_typs_str)
+    # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
         func_text += '  column = 3#read_xenon_str(dset_name, {}, col_size)\n'.format(
@@ -109,8 +120,7 @@ def get_column_read_nodes(c_type, cvar, dset_name, i):
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
             el_type)
-        func_text += '  status = read_xenon_col(dset_name, {}, column.ctypes, np.int32({}))\n'.format(
-            i, _type_to_xe_dtype_number[el_type])
+        func_text += '  status = read_xenon_col(dset_name, {}, column.ctypes, schema_arr.ctypes)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -139,4 +149,4 @@ def get_element_type(dtype):
     return out
 
 get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(string_type, types.intp))
-read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.int32))
+read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
