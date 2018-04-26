@@ -344,6 +344,23 @@ inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_r
         }
     } else {
         // printf("null,");
+        // TODO: null values supported for float32 and float64 only
+        if (do_read) {
+            // float32
+            if (tp_enum==4)
+            {
+                // TODO: use NPY_NAN
+                *(float*)curr_arr = std::nanf("");
+                curr_arr += 4;
+            }
+            // float64
+            if (tp_enum==5)
+            {
+                // TODO: use NPY_NAN
+                *(double*)curr_arr = std::nan("");
+                curr_arr += 8;
+            }
+        }
         buf++;
     }
     return;
