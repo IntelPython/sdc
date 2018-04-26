@@ -15,9 +15,9 @@ void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* 
 void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
                                     uint8_t **out_data, uint64_t* xe_typ_enums);
 
-int16_t get_2byte_val(uint8_t* buf);
-int get_4byte_val(uint8_t* buf);
-int64_t get_8byte_val(uint8_t* buf);
+inline int16_t get_2byte_val(uint8_t* buf);
+inline int get_4byte_val(uint8_t* buf);
+inline int64_t get_8byte_val(uint8_t* buf);
 
 static PyMethodDef xe_wrapper_methods[] = {
     {
@@ -244,7 +244,7 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
 #undef CHECK
 }
 
-int16_t get_2byte_val(uint8_t* buf)
+inline int16_t get_2byte_val(uint8_t* buf)
 {
     int16_t val = 0;
     for (int i = 0; i < 2; i++) {
@@ -253,7 +253,7 @@ int16_t get_2byte_val(uint8_t* buf)
     return val;
 }
 
-int get_4byte_val(uint8_t* buf)
+inline int get_4byte_val(uint8_t* buf)
 {
     int val_i32 = 0;
     for (int i = 0; i < 4; i++) {
@@ -262,7 +262,7 @@ int get_4byte_val(uint8_t* buf)
     return val_i32;
 }
 
-int64_t get_8byte_val(uint8_t* buf)
+inline int64_t get_8byte_val(uint8_t* buf)
 {
     int64_t val_i64 = 0;
     for (int i = 0; i < 8; i++) {
@@ -325,6 +325,11 @@ inline void read_xe_row(uint8_t* &buf, uint8_t* &curr_arr, uint64_t tp_enum, boo
                 CHECK(false, "Decimal values not supported yet");
                 break;
             case 7:  // bool
+                if (do_read) {
+                    *curr_arr = *buf;
+                    curr_arr++;
+                }
+                buf++;
                 break;
             case 8:  // string
                 len = get_2byte_val(buf);
