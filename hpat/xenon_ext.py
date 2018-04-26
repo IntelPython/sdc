@@ -24,6 +24,19 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
+def remove_xenon(rhs, lives, call_list):
+    # the call is dead if the read array is dead
+    if call_list == [read_xenon_col] and rhs.args[2].name not in lives:
+        return True
+    if call_list == [get_column_size_xenon]:
+        return True
+    if call_list == [read_xenon_str]:
+        return True
+    return False
+
+
+numba.ir_utils.remove_call_handlers.append(remove_xenon)
+
 # TODO: implement in regular python
 def read_xenon():
     return
@@ -128,7 +141,7 @@ def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
             el_type)
-        func_text += '  status = read_xenon_col(dset_name, {}, column.ctypes, schema_arr.ctypes)\n'.format(i)
+        func_text += '  status = read_xenon_col(dset_name, {}, column, schema_arr.ctypes)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -157,7 +170,25 @@ def get_element_type(dtype):
     return out
 
 get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(string_type, types.intp))
-read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
+# read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
+
+# TODO: fix liveness/alias in Numba to be able to use arr.ctypes directly
+@intrinsic
+def read_xenon_col(typingctx, dset_tp, col_id_tp, column_tp, schema_arr_tp):
+    def codegen(context, builder, sig, args):
+        arr_info = context.make_array(column_tp)(context, builder, value=args[2])
+        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64).as_pointer()])
+
+        fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon")
+        res = builder.call(fn, [args[0], args[1],
+                                builder.bitcast(arr_info.data, lir.IntType(8).as_pointer()), ctinfo.data])
+        return context.get_dummy_value()
+    return signature(types.none, dset_tp, col_id_tp, column_tp, schema_arr_tp), codegen
 
 @intrinsic
 def read_xenon_str(typingctx, dset_tp, col_id_tp, size_tp, schema_arr_tp):
