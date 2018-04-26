@@ -3,6 +3,8 @@
 #include "xe.h"
 #include <iostream>
 
+inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len);
+
 extern "C" {
 
 
@@ -145,83 +147,10 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
             char *buf = read_buf;
             xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
             for (uint64_t r = 0; r < nrows; r++) {
-                if (r==0 and sid==0) {
-                    for(int j =0; j< 30; j++) {
-                        // printf("%d %c\n", buf[j]);
-                    }
-                }
                 for (uint64_t c = 0; c < status.ncols; c++) {
                     uint64_t tp_enum = xe_typ_enums[c];
-                    if (*buf) {
-                        buf++;
-                        switch (tp_enum) {
-                            case 0:  // int8
-                                if (c == col_id) {
-                                    *curr_arr = *buf;
-                                    curr_arr++;
-                                }
-                                buf++;
-                                break;
-                            case 1:  // int16
-                                if (c == col_id) {
-                                    *(int16_t*)curr_arr = get_2byte_val(buf);
-                                    curr_arr += 2;
-                                }
-                                buf += 2;
-                                break;
-                            case 2:  // int32
-                                if (c == col_id) {
-                                    *(int*)curr_arr = get_4byte_val(buf);
-                                    curr_arr += 4;
-                                }
-                                buf += 4;
-                                break;
-                            case 3:  // int64
-                                if (c == col_id) {
-                                    *(int64_t*)curr_arr = get_8byte_val(buf);
-                                    curr_arr += 8;
-                                }
-                                buf += 8;
-                                break;
-                            case 4:  // float32
-                                if (c == col_id) {
-                                    *(int*)curr_arr = get_4byte_val(buf);
-                                    curr_arr += 4;
-                                }
-                                buf += 4;
-                                break;
-                            case 5:  // float64
-                                if (c == col_id) {
-                                    *(int64_t*)curr_arr = get_8byte_val(buf);
-                                    curr_arr += 8;
-                                }
-                                buf += 8;
-                                break;
-                            case 6:  // decimal
-                                CHECK(false, "Decimal values not supported yet");
-                                break;
-                            case 7:  // bool
-                                break;
-                            case 8:  // string
-                                len = get_2byte_val(buf);
-                                buf += 2;
-                                str = (char *) malloc (len * sizeof(char));
-                                memcpy(str, buf, len);
-                                buf += len;
-                                // printf("%s,", str);
-                                break;
-                            case 9:  // blob
-                                CHECK(false, "Blob values not supported yet");
-                                break;
-                            default:
-                                CHECK(false, "Unknown type");
-                        }
-                    } else {
-                        // printf("null,");
-                        buf++;
-                    }
+                    read_xe_row(buf, curr_arr, tp_enum, col_id == c, len);
                 }
-                // printf ("\n");
             }
         } while (nrows);
     }
@@ -233,6 +162,7 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
     return;
 #undef CHECK
 }
+
 
 int16_t get_2byte_val(char* buf)
 {
@@ -262,3 +192,79 @@ int64_t get_8byte_val(char* buf)
 }
 
 } // extern "C"
+
+inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
+    char * str;
+    if (*buf) {
+        buf++;
+        switch (tp_enum) {
+            case 0:  // int8
+                if (do_read) {
+                    *curr_arr = *buf;
+                    curr_arr++;
+                }
+                buf++;
+                break;
+            case 1:  // int16
+                if (do_read) {
+                    *(int16_t*)curr_arr = get_2byte_val(buf);
+                    curr_arr += 2;
+                }
+                buf += 2;
+                break;
+            case 2:  // int32
+                if (do_read) {
+                    *(int*)curr_arr = get_4byte_val(buf);
+                    curr_arr += 4;
+                }
+                buf += 4;
+                break;
+            case 3:  // int64
+                if (do_read) {
+                    *(int64_t*)curr_arr = get_8byte_val(buf);
+                    curr_arr += 8;
+                }
+                buf += 8;
+                break;
+            case 4:  // float32
+                if (do_read) {
+                    *(int*)curr_arr = get_4byte_val(buf);
+                    curr_arr += 4;
+                }
+                buf += 4;
+                break;
+            case 5:  // float64
+                if (do_read) {
+                    *(int64_t*)curr_arr = get_8byte_val(buf);
+                    curr_arr += 8;
+                }
+                buf += 8;
+                break;
+            case 6:  // decimal
+                CHECK(false, "Decimal values not supported yet");
+                break;
+            case 7:  // bool
+                break;
+            case 8:  // string
+                len = get_2byte_val(buf);
+                buf += 2;
+                str = (char *) malloc (len * sizeof(char));
+                memcpy(str, buf, len);
+                buf += len;
+                // printf("%s,", str);
+                break;
+            case 9:  // blob
+                CHECK(false, "Blob values not supported yet");
+                break;
+            default:
+                CHECK(false, "Unknown type");
+        }
+    } else {
+        // printf("null,");
+        buf++;
+    }
+    return;
+#undef CHECK
+}
