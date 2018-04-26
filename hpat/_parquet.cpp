@@ -9,7 +9,7 @@
 
 // just include parquet reader on Windows since the GCC ABI change issue
 // doesn't exist, and VC linker removes unused lib symbols
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(BUILTIN_PARQUET_READER)
 #include <parquet_reader/hpat_parquet_reader.cpp>
 #else
 
