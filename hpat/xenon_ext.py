@@ -10,11 +10,18 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+from numba.targets.imputils import impl_ret_new_ref
+from numba.extending import lower_builtin, overload, intrinsic
+from numba.typing import signature
+from numba import cgutils
+from numba.targets.imputils import lower_builtin
+from numba.targets.arrayobj import make_array
 
 import numpy as np
 import hpat
 from hpat.utils import get_constant, NOT_CONSTANT
 from hpat.str_ext import string_type
+from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
 # TODO: implement in regular python
@@ -29,6 +36,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
     import hxe_ext
     ll.add_symbol('get_column_size_xenon', hxe_ext.get_column_size_xenon)
     ll.add_symbol('c_read_xenon', hxe_ext.read_xenon_col)
+    ll.add_symbol('c_read_xenon_col_str', hxe_ext.read_xenon_col_str)
 
     if len(rhs.args) != 1:
         raise ValueError("read_xenon expects one argument but received {}".format(len(rhs.args)))
@@ -114,7 +122,7 @@ def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = 3#read_xenon_str(dset_name, {}, col_size)\n'.format(
+        func_text += '  column = read_xenon_str(dset_name, {}, col_size, schema_arr.ctypes)\n'.format(
             i)
     else:
         el_type = get_element_type(c_type.dtype)
@@ -127,7 +135,7 @@ def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_xenon': get_column_size_xenon,
                                       'read_xenon_col': read_xenon_col,
-                                      #'read_xenon_str': read_xenon_str,
+                                      'read_xenon_str': read_xenon_str,
                                       'np': np,
                                       }).blocks.popitem()
 
@@ -150,3 +158,31 @@ def get_element_type(dtype):
 
 get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(string_type, types.intp))
 read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
+
+@intrinsic
+def read_xenon_str(typingctx, dset_tp, col_id_tp, size_tp, schema_arr_tp):
+    def codegen(context, builder, sig, args):
+        typ = sig.return_type
+        dtype = StringArrayPayloadType()
+        meminfo, data_pointer = construct_string_array(context, builder)
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder)
+        string_array.size = args[2]
+
+        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer(), lir.IntType(64),
+                                 lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(64).as_pointer()])
+
+        fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str")
+        res = builder.call(fn, [args[0], args[1],
+                                string_array._get_ptr_by_name('offsets'),
+                                string_array._get_ptr_by_name('data'), ctinfo.data])
+        builder.store(string_array._getvalue(),
+                      data_pointer)
+        inst_struct = context.make_helper(builder, typ)
+        inst_struct.meminfo = meminfo
+        ret = inst_struct._getvalue()
+        return impl_ret_new_ref(context, builder, typ, ret)
+    return signature(string_array_type, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen

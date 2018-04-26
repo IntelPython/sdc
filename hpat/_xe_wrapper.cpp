@@ -2,6 +2,7 @@
 #include <Python.h>
 #include "xe.h"
 #include <iostream>
+#include <vector>
 
 inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len);
 
@@ -11,6 +12,8 @@ extern "C" {
 static PyObject* get_schema(PyObject *self, PyObject *args);
 int64_t get_column_size_xenon(std::string* dset, uint64_t col_id);
 void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums);
+void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
+                                    uint8_t **out_data, uint64_t* xe_typ_enums);
 
 int16_t get_2byte_val(char* buf);
 int get_4byte_val(char* buf);
@@ -37,6 +40,8 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
                             PyLong_FromVoidPtr((void*)(&get_column_size_xenon)));
     PyObject_SetAttrString(m, "read_xenon_col",
                             PyLong_FromVoidPtr((void*)(&read_xenon_col)));
+    PyObject_SetAttrString(m, "read_xenon_col_str",
+                            PyLong_FromVoidPtr((void*)(&read_xenon_col_str)));
 
     return m;
 }
@@ -137,7 +142,6 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
     char *curr_arr = arr;
     char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
     uint64_t nrows = 0;
-    char * str;
     int len = 0;
 
     for (uint64_t sid = 0; sid < status.fanout; sid++) {
@@ -163,6 +167,82 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
 #undef CHECK
 }
 
+
+void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
+                                    uint8_t **out_data, uint64_t* xe_typ_enums)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
+
+    // printf("read column %lld\n", col_id);
+    // for (uint64_t i = 0; i<6; i++)
+    //     printf("%lld ", xe_typ_enums[i]);
+    // printf("\n");
+
+    const char* dset_name = dset->c_str();
+	xe_connection_t xe_connection;
+	xe_dataset_t	xe_dataset;
+	struct xe_status status;
+
+    xe_connection = xe_connect("localhost:41000");
+    CHECK(xe_connection, "Fail to connect to Xenon");
+
+    xe_dataset = xe_open(xe_connection, dset_name, 0, 0, XE_O_READONLY);
+	CHECK(xe_dataset, "Fail to open dataset");
+
+	int err = xe_status(xe_connection, xe_dataset, 0, &status);
+	CHECK(!err, "Fail to stat dataset");
+    CHECK(col_id < status.ncols, "invalid column number");
+
+    // _type_to_xe_dtype_number = {'int8': 0, 'int16': 1, 'int32': 2, 'int64': 3,
+    //                             'float32': 4, 'float64': 5, 'DECIMAL': 6,
+    //                              'bool_': 7, 'string': 8, 'BLOB': 9}
+
+    *out_offsets = new uint32_t[status.nrows+1];
+    uint32_t* curr_offset = *out_offsets;
+    uint32_t curr_len = 0;
+    std::vector<uint8_t> data_vec;
+
+    const int read_buf_size = 2000000;
+    char *data_arr = (char *) malloc(read_buf_size * sizeof(char));
+    char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
+    uint64_t nrows = 0;
+    int len = 0;
+
+    for (uint64_t sid = 0; sid < status.fanout; sid++) {
+        xe_rewind(xe_connection, xe_dataset, sid);
+
+        do {
+            char *buf = read_buf;
+            char * curr_arr = data_arr;
+            xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
+            for (uint64_t r = 0; r < nrows; r++) {
+                for (uint64_t c = 0; c < status.ncols; c++) {
+                    uint64_t tp_enum = xe_typ_enums[c];
+                    read_xe_row(buf, curr_arr, tp_enum, col_id == c, len);
+                    if (col_id == c) {
+                        *curr_offset = curr_len;
+                        curr_offset++;
+                        curr_len += len;
+                        data_vec.insert(data_vec.end(), curr_arr-len, curr_arr);
+                    }
+                }
+            }
+        } while (nrows);
+    }
+    *curr_offset = curr_len;
+
+    *out_data = new uint8_t[data_vec.size()];
+    memcpy(*out_data, data_vec.data(), data_vec.size());
+
+    delete[] data_arr;
+
+    delete[] read_buf;
+    xe_close(xe_connection, xe_dataset);
+    xe_disconnect(xe_connection);
+
+    return;
+#undef CHECK
+}
 
 int16_t get_2byte_val(char* buf)
 {
@@ -196,7 +276,6 @@ int64_t get_8byte_val(char* buf)
 inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
-    char * str;
     if (*buf) {
         buf++;
         switch (tp_enum) {
@@ -250,8 +329,10 @@ inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_r
             case 8:  // string
                 len = get_2byte_val(buf);
                 buf += 2;
-                str = (char *) malloc (len * sizeof(char));
-                memcpy(str, buf, len);
+                if (do_read) {
+                    memcpy(curr_arr, buf, len);
+                    curr_arr += len;
+                }
                 buf += len;
                 // printf("%s,", str);
                 break;
