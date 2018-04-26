@@ -4,20 +4,20 @@
 #include <iostream>
 #include <vector>
 
-inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len);
+inline void read_xe_row(uint8_t* &buf, uint8_t* &curr_arr, uint64_t tp_enum, bool do_read, int &len);
 
 extern "C" {
 
 
 static PyObject* get_schema(PyObject *self, PyObject *args);
 int64_t get_column_size_xenon(std::string* dset, uint64_t col_id);
-void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums);
+void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums);
 void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
                                     uint8_t **out_data, uint64_t* xe_typ_enums);
 
-int16_t get_2byte_val(char* buf);
-int get_4byte_val(char* buf);
-int64_t get_8byte_val(char* buf);
+int16_t get_2byte_val(uint8_t* buf);
+int get_4byte_val(uint8_t* buf);
+int64_t get_8byte_val(uint8_t* buf);
 
 static PyMethodDef xe_wrapper_methods[] = {
     {
@@ -52,7 +52,7 @@ static PyObject* get_schema(PyObject *self, PyObject *args) {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return NULL;}
 
     const char* dset_name;
-    char *read_schema = (char *) malloc(MAX_SCHEMA_LEN * sizeof(char));
+    char *read_schema = (char *) malloc(MAX_SCHEMA_LEN * sizeof(uint8_t));
     uint64_t fanout;
 
     CHECK(PyArg_ParseTuple(args, "s", &dset_name), "xenon dataset name expected");
@@ -110,7 +110,7 @@ int64_t get_column_size_xenon(std::string* dset, uint64_t col_id)
 #undef CHECK
 }
 
-void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums)
+void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
 
@@ -139,8 +139,8 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
     //                              'bool_': 7, 'string': 8, 'BLOB': 9}
 
     const int read_buf_size = 2000000;
-    char *curr_arr = arr;
-    char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
+    uint8_t *curr_arr = arr;
+    uint8_t *read_buf = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
     uint64_t nrows = 0;
     int len = 0;
 
@@ -148,7 +148,7 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
         xe_rewind(xe_connection, xe_dataset, sid);
 
         do {
-            char *buf = read_buf;
+            uint8_t *buf = read_buf;
             xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
             for (uint64_t r = 0; r < nrows; r++) {
                 for (uint64_t c = 0; c < status.ncols; c++) {
@@ -203,8 +203,8 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
     std::vector<uint8_t> data_vec;
 
     const int read_buf_size = 2000000;
-    char *data_arr = (char *) malloc(read_buf_size * sizeof(char));
-    char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
+    uint8_t *data_arr = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
+    uint8_t *read_buf = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
     uint64_t nrows = 0;
     int len = 0;
 
@@ -212,8 +212,8 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
         xe_rewind(xe_connection, xe_dataset, sid);
 
         do {
-            char *buf = read_buf;
-            char * curr_arr = data_arr;
+            uint8_t *buf = read_buf;
+            uint8_t * curr_arr = data_arr;
             xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
             for (uint64_t r = 0; r < nrows; r++) {
                 for (uint64_t c = 0; c < status.ncols; c++) {
@@ -244,7 +244,7 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
 #undef CHECK
 }
 
-int16_t get_2byte_val(char* buf)
+int16_t get_2byte_val(uint8_t* buf)
 {
     int16_t val = 0;
     for (int i = 0; i < 2; i++) {
@@ -253,7 +253,7 @@ int16_t get_2byte_val(char* buf)
     return val;
 }
 
-int get_4byte_val(char* buf)
+int get_4byte_val(uint8_t* buf)
 {
     int val_i32 = 0;
     for (int i = 0; i < 4; i++) {
@@ -262,7 +262,7 @@ int get_4byte_val(char* buf)
     return val_i32;
 }
 
-int64_t get_8byte_val(char* buf)
+int64_t get_8byte_val(uint8_t* buf)
 {
     int64_t val_i64 = 0;
     for (int i = 0; i < 8; i++) {
@@ -273,7 +273,7 @@ int64_t get_8byte_val(char* buf)
 
 } // extern "C"
 
-inline void read_xe_row(char* &buf, char* &curr_arr, uint64_t tp_enum, bool do_read, int &len)
+inline void read_xe_row(uint8_t* &buf, uint8_t* &curr_arr, uint64_t tp_enum, bool do_read, int &len)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
     if (*buf) {
