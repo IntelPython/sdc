@@ -10,6 +10,7 @@ static PyObject* get_schema(PyObject *self, PyObject *args);
 int64_t get_column_size_xenon(std::string* dset, uint64_t col_id);
 void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_typ_enums);
 
+int16_t get_2byte_val(char* buf);
 int get_4byte_val(char* buf);
 int64_t get_8byte_val(char* buf);
 
@@ -131,11 +132,10 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
     //                              'bool_': 7, 'string': 8, 'BLOB': 9}
 
     const int read_buf_size = 2000000;
+    char *curr_arr = arr;
     char *read_buf = (char *) malloc(read_buf_size * sizeof(char));
-    uint64_t nrows = 0, read_bytes = 0;
+    uint64_t nrows = 0;
     char * str;
-    int val_i32 = 0;
-    int val_i64 = 0;
     int len = 0;
 
     for (uint64_t sid = 0; sid < status.fanout; sid++) {
@@ -157,43 +157,43 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
                         switch (tp_enum) {
                             case 0:  // int8
                                 if (c == col_id) {
-                                    *(arr+read_bytes) = *buf;
-                                    read_bytes++;
+                                    *curr_arr = *buf;
+                                    curr_arr++;
                                 }
                                 buf++;
                                 break;
                             case 1:  // int16
                                 if (c == col_id) {
-                                    memcpy(arr+read_bytes, buf, 2*sizeof(char));
-                                    read_bytes += 2;
+                                    *(int16_t*)curr_arr = get_2byte_val(buf);
+                                    curr_arr += 2;
                                 }
                                 buf += 2;
                                 break;
                             case 2:  // int32
                                 if (c == col_id) {
-                                    ((int*)(arr+read_bytes))[0] = get_4byte_val(buf);
-                                    read_bytes += 4;
+                                    *(int*)curr_arr = get_4byte_val(buf);
+                                    curr_arr += 4;
                                 }
                                 buf += 4;
                                 break;
                             case 3:  // int64
                                 if (c == col_id) {
-                                    memcpy(arr+read_bytes, buf, sizeof(int64_t));
-                                    read_bytes += 8;
+                                    *(int64_t*)curr_arr = get_8byte_val(buf);
+                                    curr_arr += 8;
                                 }
                                 buf += 8;
                                 break;
                             case 4:  // float32
                                 if (c == col_id) {
-                                    memcpy(arr+read_bytes, buf, sizeof(float));
-                                    read_bytes += 4;
+                                    *(int*)curr_arr = get_4byte_val(buf);
+                                    curr_arr += 4;
                                 }
                                 buf += 4;
                                 break;
                             case 5:  // float64
                                 if (c == col_id) {
-                                    memcpy(arr+read_bytes, buf, sizeof(double));
-                                    read_bytes += 8;
+                                    *(int64_t*)curr_arr = get_8byte_val(buf);
+                                    curr_arr += 8;
                                 }
                                 buf += 8;
                                 break;
@@ -203,10 +203,8 @@ void read_xenon_col(std::string* dset, uint64_t col_id, char* arr, uint64_t* xe_
                             case 7:  // bool
                                 break;
                             case 8:  // string
-                                len = 0;
-                                for (int i = 0; i < 2; i++, buf++) {
-                                    len = (len << 8) + *buf;
-                                }
+                                len = get_2byte_val(buf);
+                                buf += 2;
                                 str = (char *) malloc (len * sizeof(char));
                                 memcpy(str, buf, len);
                                 buf += len;
