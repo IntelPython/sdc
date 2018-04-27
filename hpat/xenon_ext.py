@@ -11,7 +11,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.imputils import impl_ret_new_ref
-from numba.extending import lower_builtin, overload, intrinsic
+from numba.extending import lower_builtin, overload, intrinsic, register_model, models
 from numba.typing import signature
 from numba import cgutils
 from numba.targets.imputils import lower_builtin
@@ -26,7 +26,7 @@ from hpat.str_arr_ext import string_array_type
 
 def remove_xenon(rhs, lives, call_list):
     # the call is dead if the read array is dead
-    if call_list == [read_xenon_col] and rhs.args[2].name not in lives:
+    if call_list == [read_xenon_col] and rhs.args[3].name not in lives:
         return True
     if call_list == [get_column_size_xenon]:
         return True
@@ -50,6 +50,8 @@ def _handle_read(assign, lhs, rhs, func_ir):
     ll.add_symbol('get_column_size_xenon', hxe_ext.get_column_size_xenon)
     ll.add_symbol('c_read_xenon', hxe_ext.read_xenon_col)
     ll.add_symbol('c_read_xenon_col_str', hxe_ext.read_xenon_col_str)
+    ll.add_symbol('c_xe_connect', hxe_ext.c_xe_connect)
+    ll.add_symbol('c_xe_open', hxe_ext.c_xe_open)
 
     if len(rhs.args) != 1:
         raise ValueError("read_xenon expects one argument but received {}".format(len(rhs.args)))
@@ -59,7 +61,10 @@ def _handle_read(assign, lhs, rhs, func_ir):
     if dset_name is NOT_CONSTANT:
         raise ValueError("Xenon dataset should be a constant string")
 
-    col_names, col_types = get_dset_schema(dset_name)
+    if dset_name.count("/") != 1:
+        raise ValueError("invalid Xenon address {}".format(dset_name))
+    address, dset_name = dset_name.split("/")
+    col_names, col_types = get_dset_schema(address, dset_name)
 
     xe_typs = [str(get_xe_typ_enum(c_type)) for c_type in col_types]
     xe_typs_str = "np.array([" + ",".join(xe_typs) + "])"
@@ -67,7 +72,9 @@ def _handle_read(assign, lhs, rhs, func_ir):
     scope = dset_name_var.scope
     loc = dset_name_var.loc
 
-    out_nodes = []
+    out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
+
+
     col_items = []
     for i, cname in enumerate(col_names):
         # get column type from schema
@@ -78,7 +85,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
         cvar = ir.Var(scope, varname, loc)
         col_items.append((cname, cvar))
 
-        out_nodes += get_column_read_nodes(c_type, cvar, dset_name_var, i, xe_typs_str)
+        out_nodes += get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, xe_typs_str)
 
     return col_items, out_nodes
 
@@ -103,9 +110,9 @@ def get_xe_typ_enum(c_type):
     assert isinstance(c_type, types.Array)
     return _type_to_xe_dtype_number[get_element_type(c_type.dtype)]
 
-def get_dset_schema(dset_name):
+def get_dset_schema(address, dset_name):
     import hxe_ext
-    schema = hxe_ext.get_schema(dset_name)
+    schema = hxe_ext.get_schema(address, dset_name)
     print("schema", schema)
     # example: {first:CHAR,last:CHAR,age:I32,street:CHAR,state:CHAR,zip:I32}
     # remove braces
@@ -124,24 +131,24 @@ def get_dset_schema(dset_name):
     return col_names, col_types
 
 
-def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
+def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, xe_typs_str):
 
     loc = cvar.loc
 
-    func_text = ('def f(dset_name):\n  col_size = get_column_size_xenon(dset_name, {})\n'.
+    func_text = ('def f(xe_connect_var, xe_dset_var):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'.
                  format(i))
     # func_text += '  print(col_size)\n'
     func_text += '  schema_arr = {}\n'.format(xe_typs_str)
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_xenon_str(dset_name, {}, col_size, schema_arr.ctypes)\n'.format(
+        func_text += '  column = read_xenon_str(xe_connect_var, xe_dset_var, {}, col_size, schema_arr.ctypes)\n'.format(
             i)
     else:
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
             el_type)
-        func_text += '  status = read_xenon_col(dset_name, {}, column, schema_arr.ctypes)\n'.format(i)
+        func_text += '  status = read_xenon_col(xe_connect_var, xe_dset_var, {}, column, schema_arr.ctypes)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -152,7 +159,7 @@ def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
                                       'np': np,
                                       }).blocks.popitem()
 
-    replace_arg_nodes(f_block, [dset_name])
+    replace_arg_nodes(f_block, [xe_connect_var, xe_dset_var])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("column"):
@@ -162,6 +169,31 @@ def get_column_read_nodes(c_type, cvar, dset_name, i, xe_typs_str):
     out_nodes.append(assign)
     return out_nodes
 
+def gen_init_xenon(address, dset_name):
+    #
+    func_text = ('def f():\n  connect_t = c_xe_connect("{}")\n'.format(address))
+    func_text += '  dset_t = c_xe_open(connect_t, "{}")\n'.format(dset_name)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    init_func = loc_vars['f']
+    f_block = compile_to_numba_ir(init_func,
+                                         {'c_xe_connect': c_xe_connect,
+                                         'c_xe_open': c_xe_open}).blocks.popitem()[1]
+
+    connect_var = None
+    dset_t_var = None
+
+    out_nodes = f_block.body[:-3]
+    for stmt in reversed(out_nodes):
+        if stmt.target.name.startswith("connect_t"):
+             connect_var = stmt.target
+        if stmt.target.name.startswith("dset_t"):
+             dset_t_var = stmt.target
+
+    assert connect_var is not None and dset_t_var is not None
+    return out_nodes, connect_var, dset_t_var
+
 
 def get_element_type(dtype):
     out = repr(dtype)
@@ -169,45 +201,67 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
-get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(string_type, types.intp))
+class XeConnectType(types.Opaque):
+    def __init__(self):
+        super(XeConnectType, self).__init__(name='XeConnectType')
+
+xe_connect_type = XeConnectType()
+
+register_model(XeConnectType)(models.OpaqueModel)
+
+class XeDSetType(types.Opaque):
+    def __init__(self):
+        super(XeDSetType, self).__init__(name='XeDSetType')
+
+xe_dset_type = XeDSetType()
+
+register_model(XeDSetType)(models.OpaqueModel)
+
+get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(xe_connect_type, xe_dset_type, types.intp))
 # read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
+c_xe_connect = types.ExternalFunction("c_xe_connect", xe_connect_type(string_type))
+c_xe_open = types.ExternalFunction("c_xe_open", xe_dset_type(xe_connect_type, string_type))
+
 
 # TODO: fix liveness/alias in Numba to be able to use arr.ctypes directly
 @intrinsic
-def read_xenon_col(typingctx, dset_tp, col_id_tp, column_tp, schema_arr_tp):
+def read_xenon_col(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp):
     def codegen(context, builder, sig, args):
-        arr_info = context.make_array(column_tp)(context, builder, value=args[2])
-        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
+        arr_info = context.make_array(column_tp)(context, builder, value=args[3])
+        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[4])
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
                                  lir.IntType(64),
                                  lir.IntType(8).as_pointer(),
                                  lir.IntType(64).as_pointer()])
 
         fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon")
-        res = builder.call(fn, [args[0], args[1],
+        res = builder.call(fn, [args[0], args[1], args[2],
                                 builder.bitcast(arr_info.data, lir.IntType(8).as_pointer()), ctinfo.data])
         return context.get_dummy_value()
-    return signature(types.none, dset_tp, col_id_tp, column_tp, schema_arr_tp), codegen
+    return signature(types.none, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp), codegen
 
 @intrinsic
-def read_xenon_str(typingctx, dset_tp, col_id_tp, size_tp, schema_arr_tp):
+def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp):
     def codegen(context, builder, sig, args):
         typ = sig.return_type
         dtype = StringArrayPayloadType()
         meminfo, data_pointer = construct_string_array(context, builder)
         string_array = cgutils.create_struct_proxy(dtype)(context, builder)
-        string_array.size = args[2]
+        string_array.size = args[3]
 
-        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
+        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[4])
         fnty = lir.FunctionType(lir.VoidType(),
-                                [lir.IntType(8).as_pointer(), lir.IntType(64),
+                                [lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64),
                                  lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(64).as_pointer()])
 
         fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str")
-        res = builder.call(fn, [args[0], args[1],
+        res = builder.call(fn, [args[0], args[1], args[2],
                                 string_array._get_ptr_by_name('offsets'),
                                 string_array._get_ptr_by_name('data'), ctinfo.data])
         builder.store(string_array._getvalue(),
@@ -216,4 +270,4 @@ def read_xenon_str(typingctx, dset_tp, col_id_tp, size_tp, schema_arr_tp):
         inst_struct.meminfo = meminfo
         ret = inst_struct._getvalue()
         return impl_ret_new_ref(context, builder, typ, ret)
-    return signature(string_array_type, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen
+    return signature(string_array_type, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen

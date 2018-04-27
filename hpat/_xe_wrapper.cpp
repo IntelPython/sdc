@@ -10,10 +10,15 @@ extern "C" {
 
 
 static PyObject* get_schema(PyObject *self, PyObject *args);
-int64_t get_column_size_xenon(std::string* dset, uint64_t col_id);
-void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums);
-void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
-                                    uint8_t **out_data, uint64_t* xe_typ_enums);
+int64_t get_column_size_xenon(xe_connection_t xe_connection, xe_dataset_t xe_dataset, uint64_t col_id);
+void read_xenon_col(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                    uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums);
+void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                        uint64_t col_id, uint32_t **out_offsets,
+                        uint8_t **out_data, uint64_t* xe_typ_enums);
+
+xe_connection_t c_xe_connect(std::string* address);
+xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset);
 
 inline int16_t get_2byte_val(uint8_t* buf);
 inline int get_4byte_val(uint8_t* buf);
@@ -42,6 +47,10 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
                             PyLong_FromVoidPtr((void*)(&read_xenon_col)));
     PyObject_SetAttrString(m, "read_xenon_col_str",
                             PyLong_FromVoidPtr((void*)(&read_xenon_col_str)));
+    PyObject_SetAttrString(m, "c_xe_connect",
+                            PyLong_FromVoidPtr((void*)(&c_xe_connect)));
+    PyObject_SetAttrString(m, "c_xe_open",
+                            PyLong_FromVoidPtr((void*)(&c_xe_open)));
 
     return m;
 }
@@ -51,13 +60,14 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
 static PyObject* get_schema(PyObject *self, PyObject *args) {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return NULL;}
 
+    const char* address;
     const char* dset_name;
     char *read_schema = (char *) malloc(MAX_SCHEMA_LEN * sizeof(uint8_t));
     uint64_t fanout;
 
-    CHECK(PyArg_ParseTuple(args, "s", &dset_name), "xenon dataset name expected");
+    CHECK(PyArg_ParseTuple(args, "ss", &address, &dset_name), "xenon dataset name expected");
 
-    xe_connection_t xe_connection = xe_connect("localhost:41000");
+    xe_connection_t xe_connection = xe_connect(address);
 
 	if (!xe_connection) {
 		printf ("Fail to connect to Xenon.\n");
@@ -84,33 +94,22 @@ static PyObject* get_schema(PyObject *self, PyObject *args) {
 #undef CHECK
 }
 
-int64_t get_column_size_xenon(std::string* dset, uint64_t col_id)
+int64_t get_column_size_xenon(xe_connection_t xe_connection, xe_dataset_t xe_dataset, uint64_t col_id)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return -1;}
 
-    const char* dset_name = dset->c_str();
-	xe_connection_t xe_connection;
-	xe_dataset_t	xe_dataset;
 	struct xe_status status;
-
-    xe_connection = xe_connect("localhost:41000");
-    CHECK(xe_connection, "Fail to connect to Xenon");
-
-    xe_dataset = xe_open(xe_connection, dset_name, 0, 0, XE_O_READONLY);
-	CHECK(xe_dataset, "Fail to open dataset");
 
 	int err = xe_status(xe_connection, xe_dataset, 0, &status);
 	CHECK(!err, "Fail to stat dataset");
     CHECK(col_id < status.ncols, "invalid column number");
 
-    xe_close(xe_connection, xe_dataset);
-    xe_disconnect(xe_connection);
-
     return status.nrows;
 #undef CHECK
 }
 
-void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums)
+void read_xenon_col(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                    uint64_t col_id, uint8_t* arr, uint64_t* xe_typ_enums)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
 
@@ -119,16 +118,7 @@ void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* 
     //     printf("%lld ", xe_typ_enums[i]);
     // printf("\n");
 
-    const char* dset_name = dset->c_str();
-	xe_connection_t xe_connection;
-	xe_dataset_t	xe_dataset;
 	struct xe_status status;
-
-    xe_connection = xe_connect("localhost:41000");
-    CHECK(xe_connection, "Fail to connect to Xenon");
-
-    xe_dataset = xe_open(xe_connection, dset_name, 0, 0, XE_O_READONLY);
-	CHECK(xe_dataset, "Fail to open dataset");
 
 	int err = xe_status(xe_connection, xe_dataset, 0, &status);
 	CHECK(!err, "Fail to stat dataset");
@@ -160,16 +150,15 @@ void read_xenon_col(std::string* dset, uint64_t col_id, uint8_t* arr, uint64_t* 
     }
 
     delete[] read_buf;
-    xe_close(xe_connection, xe_dataset);
-    xe_disconnect(xe_connection);
 
     return;
 #undef CHECK
 }
 
 
-void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offsets,
-                                    uint8_t **out_data, uint64_t* xe_typ_enums)
+void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                        uint64_t col_id, uint32_t **out_offsets,
+                        uint8_t **out_data, uint64_t* xe_typ_enums)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
 
@@ -178,16 +167,7 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
     //     printf("%lld ", xe_typ_enums[i]);
     // printf("\n");
 
-    const char* dset_name = dset->c_str();
-	xe_connection_t xe_connection;
-	xe_dataset_t	xe_dataset;
 	struct xe_status status;
-
-    xe_connection = xe_connect("localhost:41000");
-    CHECK(xe_connection, "Fail to connect to Xenon");
-
-    xe_dataset = xe_open(xe_connection, dset_name, 0, 0, XE_O_READONLY);
-	CHECK(xe_dataset, "Fail to open dataset");
 
 	int err = xe_status(xe_connection, xe_dataset, 0, &status);
 	CHECK(!err, "Fail to stat dataset");
@@ -237,10 +217,25 @@ void read_xenon_col_str(std::string* dset, uint64_t col_id, uint32_t **out_offse
     delete[] data_arr;
 
     delete[] read_buf;
-    xe_close(xe_connection, xe_dataset);
-    xe_disconnect(xe_connection);
 
     return;
+#undef CHECK
+}
+
+xe_connection_t c_xe_connect(std::string* address)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return NULL;}
+    const char* addr = address->c_str();
+    xe_connection_t xe_connection = xe_connect(addr);
+    CHECK(xe_connection, "Fail to connect to Xenon");
+    return xe_connection;
+}
+xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset)
+{
+    const char* dset_name = dset->c_str();
+	xe_dataset_t xe_dataset = xe_open(xe_connect, dset_name, 0, 0, XE_O_READONLY);
+	CHECK(xe_dataset, "Fail to open dataset");
+    return xe_dataset;
 #undef CHECK
 }
 
