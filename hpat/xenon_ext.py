@@ -67,14 +67,21 @@ def _handle_read(assign, lhs, rhs, func_ir):
     address, dset_name = dset_name.split("/")
     col_names, col_types = get_dset_schema(address, dset_name)
 
+    out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
+
+    # generate array of schema types
     xe_typs = [str(get_xe_typ_enum(c_type)) for c_type in col_types]
     xe_typs_str = "np.array([" + ",".join(xe_typs) + "])"
+    func_text = 'def f():\n  schema_arr = {}\n'.format(xe_typs_str)
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    schm_func = loc_vars['f']
+    f_block = compile_to_numba_ir(schm_func, {'np': np,}).blocks.popitem()[1]
+    out_nodes += f_block.body[:-3]
+    schema_arr_var = out_nodes[-1].target
 
     scope = dset_name_var.scope
     loc = dset_name_var.loc
-
-    out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
-
 
     col_items = []
     for i, cname in enumerate(col_names):
@@ -86,7 +93,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
         cvar = ir.Var(scope, varname, loc)
         col_items.append((cname, cvar))
 
-        out_nodes += get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, xe_typs_str)
+        out_nodes += get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_arr_var)
 
     out_nodes += gen_close_xenon(xe_connect_var, xe_dset_var);
 
@@ -134,14 +141,13 @@ def get_dset_schema(address, dset_name):
     return col_names, col_types
 
 
-def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, xe_typs_str):
+def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_arr_var):
 
     loc = cvar.loc
 
-    func_text = ('def f(xe_connect_var, xe_dset_var):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'.
+    func_text = ('def f(xe_connect_var, xe_dset_var, schema_arr):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'.
                  format(i))
     # func_text += '  print(col_size)\n'
-    func_text += '  schema_arr = {}\n'.format(xe_typs_str)
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
@@ -162,7 +168,7 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, xe_typs_
                                       'np': np,
                                       }).blocks.popitem()
 
-    replace_arg_nodes(f_block, [xe_connect_var, xe_dset_var])
+    replace_arg_nodes(f_block, [xe_connect_var, xe_dset_var, schema_arr_var])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("column"):
