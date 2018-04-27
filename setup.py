@@ -143,7 +143,7 @@ ext_quantile = Extension(name="quantile_alg",
                              libraries = MPI_LIBS,
                              sources=["hpat/_quantile_alg.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/'],
-                             extra_compile_args=['-std=c++11 -DBUILTIN_PARQUET_READER'],
+                             extra_compile_args=['-std=c++11'],
                              extra_link_args=['-std=c++11'],
                              )
 
@@ -160,7 +160,7 @@ ext_parquet = Extension(name="parquet_cpp",
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/', '.'],
                              library_dirs = [PREFIX_DIR+'/lib/'],
-                             extra_compile_args=['-std=c++11'],
+                             extra_compile_args=['-std=c++11 -DBUILTIN_PARQUET_READER'],
                              extra_link_args=['-std=c++11'],
                              )
 
