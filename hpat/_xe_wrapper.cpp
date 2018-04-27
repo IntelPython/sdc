@@ -19,6 +19,7 @@ void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
 
 xe_connection_t c_xe_connect(std::string* address);
 xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset);
+void c_xe_close(xe_connection_t xe_connect, xe_dataset_t xe_dataset);
 
 inline int16_t get_2byte_val(uint8_t* buf);
 inline int get_4byte_val(uint8_t* buf);
@@ -51,6 +52,8 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
                             PyLong_FromVoidPtr((void*)(&c_xe_connect)));
     PyObject_SetAttrString(m, "c_xe_open",
                             PyLong_FromVoidPtr((void*)(&c_xe_open)));
+    PyObject_SetAttrString(m, "c_xe_close",
+                            PyLong_FromVoidPtr((void*)(&c_xe_close)));
 
     return m;
 }
@@ -230,6 +233,7 @@ xe_connection_t c_xe_connect(std::string* address)
     CHECK(xe_connection, "Fail to connect to Xenon");
     return xe_connection;
 }
+
 xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset)
 {
     const char* dset_name = dset->c_str();
@@ -237,6 +241,13 @@ xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset)
 	CHECK(xe_dataset, "Fail to open dataset");
     return xe_dataset;
 #undef CHECK
+}
+
+void c_xe_close(xe_connection_t xe_connect, xe_dataset_t xe_dataset)
+{
+    xe_close(xe_connect, xe_dataset);
+    xe_disconnect(xe_connect);
+    return;
 }
 
 inline int16_t get_2byte_val(uint8_t* buf)
