@@ -59,6 +59,7 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
 }
 
 #define MAX_SCHEMA_LEN 200
+#define READ_BUF_SIZE 2000000
 
 static PyObject* get_schema(PyObject *self, PyObject *args) {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return NULL;}
@@ -131,9 +132,8 @@ void read_xenon_col(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
     //                             'float32': 4, 'float64': 5, 'DECIMAL': 6,
     //                              'bool_': 7, 'string': 8, 'BLOB': 9}
 
-    const int read_buf_size = 2000000;
     uint8_t *curr_arr = arr;
-    uint8_t *read_buf = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
+    uint8_t *read_buf = (uint8_t *) malloc(READ_BUF_SIZE * sizeof(uint8_t));
     uint64_t nrows = 0;
     int len = 0;
 
@@ -142,7 +142,7 @@ void read_xenon_col(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
 
         do {
             uint8_t *buf = read_buf;
-            xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
+            xe_get(xe_connection, xe_dataset, sid, read_buf, READ_BUF_SIZE, &nrows);
             for (uint64_t r = 0; r < nrows; r++) {
                 for (uint64_t c = 0; c < status.ncols; c++) {
                     uint64_t tp_enum = xe_typ_enums[c];
@@ -185,9 +185,8 @@ void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
     uint32_t curr_len = 0;
     std::vector<uint8_t> data_vec;
 
-    const int read_buf_size = 2000000;
-    uint8_t *data_arr = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
-    uint8_t *read_buf = (uint8_t *) malloc(read_buf_size * sizeof(uint8_t));
+    uint8_t *data_arr = (uint8_t *) malloc(READ_BUF_SIZE * sizeof(uint8_t));
+    uint8_t *read_buf = (uint8_t *) malloc(READ_BUF_SIZE * sizeof(uint8_t));
     uint64_t nrows = 0;
     int len = 0;
 
@@ -197,7 +196,7 @@ void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
         do {
             uint8_t *buf = read_buf;
             uint8_t * curr_arr = data_arr;
-            xe_get(xe_connection, xe_dataset, sid, read_buf, read_buf_size, &nrows);
+            xe_get(xe_connection, xe_dataset, sid, read_buf, READ_BUF_SIZE, &nrows);
             for (uint64_t r = 0; r < nrows; r++) {
                 for (uint64_t c = 0; c < status.ncols; c++) {
                     uint64_t tp_enum = xe_typ_enums[c];
