@@ -26,11 +26,23 @@ class TestDate(unittest.TestCase):
         df = pd.DataFrame.from_dict(dfdict)
         hpat_func(df)
         df['std'] = pd.DatetimeIndex(df['orig'])
-        print("orig", df['orig'])
-        print("std", df['std'])
-        print("hpat", df['hpat'])
         allequal = (df['std'].equals(df['hpat']))
         self.assertTrue(allequal)
+
+    def test_extract(self):
+        def test_impl(s):
+            return s.month
+
+        hpat_func = hpat.jit(test_impl)
+        rows = 1
+        data = [datetime(2017, 4, 26).isoformat()]
+        dfdict = {'orig' : data}
+        df = pd.DataFrame.from_dict(dfdict)
+        df['std'] = pd.DatetimeIndex(df['orig'])
+        first = df['std'][0]
+        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(first.value)
+        month = hpat_func(ts)
+        self.assertEqual(month, 4)
 
 if __name__ == "__main__":
     unittest.main()
