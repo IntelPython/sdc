@@ -123,7 +123,7 @@ def get_xe_typ_enum(c_type):
 def get_dset_schema(address, dset_name):
     import hxe_ext
     schema = hxe_ext.get_schema(address, dset_name)
-    print("schema", schema)
+    # print("schema", schema)
     # example: {first:CHAR,last:CHAR,age:I32,street:CHAR,state:CHAR,zip:I32}
     # remove braces
     assert schema[0] == '{' and schema[-1] == '}'
