@@ -58,6 +58,8 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
         return True
+    if call_list == [list]:
+        return True
     return False
 
 
@@ -445,6 +447,9 @@ class HiFrames(object):
         for item in items_list:
             col_varname = item[0]
             col_arr = item[1]
+            # fix list(multi-dim arrays) (packing images)
+            # FIXME: does this break for list(other things)?
+            col_arr = self._fix_df_list_of_array(col_arr)
 
             def f(arr):  # pragma: no cover
                 df_arr = hpat.hiframes_api.fix_df_array(arr)
@@ -455,6 +460,12 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             new_list.append((col_varname, new_col_arr))
         return nodes, new_list
+
+    def _fix_df_list_of_array(self, col_arr):
+        list_call = guard(get_definition, self.func_ir, col_arr)
+        if guard(find_callname, self.func_ir, list_call) == ('list', 'builtins'):
+            return list_call.args[0]
+        return col_arr
 
     def _process_df_build_map(self, items_list):
         df_cols = {}

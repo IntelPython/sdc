@@ -423,9 +423,9 @@ def fix_df_array_overload(column):
         return fix_df_array_impl
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
-
     def fix_df_array_impl(column):  # pragma: no cover
         return column
+    # FIXME: np.array() for everything else?
     return fix_df_array_impl
 
 
@@ -480,3 +480,9 @@ def typeof_pd_str_series(val, c):
         return string_array_type
     if len(val) > 0 and isinstance(val[0], pd.Timestamp):
         return timestamp_series_type
+
+
+@overload(np.array)
+def np_array_array_overload(in_tp):
+    if isinstance(in_tp, types.Array):
+        return lambda a: a
