@@ -619,8 +619,11 @@ class DistributedPass(object):
             out[-1].target = assign.target
 
         if call_list == ['dist_return', 'distributed_api', hpat]:
-            assign.value = rhs.args[0]
-            return [assign]
+            # always rebalance returned distributed arrays
+            # TODO: need different flag for 1D_Var return (distributed_var)?
+            return self._run_call_rebalance_array(lhs, assign, rhs.args, block_body)
+            # assign.value = rhs.args[0]
+            # return [assign]
 
         if call_list == ['threaded_return', 'distributed_api', hpat]:
             assign.value = rhs.args[0]
