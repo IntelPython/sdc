@@ -297,6 +297,10 @@ class DistributedAnalysis(object):
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
+        if func_name == 'array' and is_array(self.typemap, args[0].name):
+            self._meet_array_dists(lhs, args[0].name, array_dists)
+            return
+
         # sum over the first axis is distributed, A.sum(0)
         if func_name == 'sum' and len(args) == 2:
             axis_def = guard(get_definition, self.func_ir, args[1])

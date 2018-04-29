@@ -539,6 +539,14 @@ class DistributedPass(object):
         #     rhs.args[1] = new_size_var
         #     out.append(assign)
 
+        if (call_list == ['array', np]
+                and is_array(self.typemap, rhs.args[0].name)
+                and self._is_1D_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         # output array has same properties (starts etc.) as input array
         if (len(call_list) == 2 and call_list[1] == np
                 and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
