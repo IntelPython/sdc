@@ -10,9 +10,9 @@ from numba.ir_utils import (compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard)
 
 get_file_size = types.ExternalFunction("get_file_size", types.int64(string_type))
-file_read = types.ExternalFunction("file_read",
+_file_read = types.ExternalFunction("file_read",
                 types.void(string_type, types.voidptr, types.intp))
-file_read_parallel = types.ExternalFunction("file_read_parallel",
+_file_read_parallel = types.ExternalFunction("file_read_parallel",
                 types.void(string_type, types.voidptr, types.intp, types.intp))
 
 file_write = types.ExternalFunction("file_write",
@@ -65,7 +65,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
         size = get_file_size(fname)
         dtype_size = get_dtype_size(dtype)
         A = np.empty(size//dtype_size, dtype=dtype)
-        file_read(fname, A.ctypes, size)
+        file_read(fname, A, size)
         read_arr = A
 
     f_block = compile_to_numba_ir(
@@ -120,3 +120,12 @@ def file_write_parallel(fname, arr, start, count):
     # hpat.cprint(start, count, elem_size)
     s = _file_write_parallel(fname, A.ctypes,
                 start, count, elem_size)
+
+@numba.njit
+def file_read_parallel(fname, arr, start, count):
+    dtype_size = get_dtype_size(arr.dtype)
+    _file_read_parallel(fname, arr.ctypes, start*dtype_size, count*dtype_size)
+
+@numba.njit
+def file_read(fname, arr, size):
+    _file_read(fname, arr.ctypes, size)
