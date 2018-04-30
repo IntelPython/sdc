@@ -22,8 +22,7 @@ class TestDate(unittest.TestCase):
         data = []
         for row in range(rows):
             data.append(datetime(2017, random.randint(1,12), random.randint(1,28)).isoformat())
-        dfdict = {'orig' : data}
-        df = pd.DataFrame.from_dict(dfdict)
+        df = pd.DataFrame({'orig' : data})
         hpat_func(df)
         df['std'] = pd.DatetimeIndex(df['orig'])
         allequal = (df['std'].equals(df['hpat']))
@@ -34,13 +33,7 @@ class TestDate(unittest.TestCase):
             return s.month
 
         hpat_func = hpat.jit(test_impl)
-        rows = 1
-        data = [datetime(2017, 4, 26).isoformat()]
-        dfdict = {'orig' : data}
-        df = pd.DataFrame.from_dict(dfdict)
-        df['std'] = pd.DatetimeIndex(df['orig'])
-        first = df['std'][0]
-        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(first.value)
+        ts = pd.Timestamp(datetime(2017, 4, 26).isoformat())
         month = hpat_func(ts)
         self.assertEqual(month, 4)
 
