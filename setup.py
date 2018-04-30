@@ -80,7 +80,7 @@ if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
-    H5_COMPILE_FLAGS = ['-DH5_BUILT_AS_DYNAMIC_LIB']
+    H5_COMPILE_FLAGS = ['-DH5_BUILT_AS_DYNAMIC_LIB', '-std=c++11']
 
 
 ext_io = Extension(name="hio",
@@ -88,7 +88,8 @@ ext_io = Extension(name="hio",
                              include_dirs = [HDF5_DIR+'/include/', PREFIX_DIR+'/include/'],
                              library_dirs = [HDF5_DIR+'/lib/' + PREFIX_DIR+'/lib/'],
                              extra_compile_args = H5_COMPILE_FLAGS,
-                             sources=["hpat/_io.cpp"]
+                             sources=["hpat/_io.cpp"],
+                             extra_link_args=['-std=c++11'],
                              )
 
 ext_hdist = Extension(name="hdist",
@@ -104,11 +105,15 @@ ext_chiframes = Extension(name="chiframes",
                              sources=["hpat/_hiframes.cpp"],
                              depends=["hpat/_hpat_sort.h"],
                              include_dirs=[PREFIX_DIR+'/include/'],
+                             extra_compile_args=['-std=c++11'],
+                             extra_link_args=['-std=c++11'],
                              )
 
 
 ext_dict = Extension(name="hdict_ext",
-                             sources=["hpat/_dict_ext.cpp"]
+                             sources=["hpat/_dict_ext.cpp"],
+                     extra_compile_args=['-std=c++11'],
+                     extra_link_args=['-std=c++11'],
                              )
 
 ext_str = Extension(name="hstr_ext",
@@ -142,20 +147,20 @@ ext_quantile = Extension(name="quantile_alg",
                              extra_link_args=['-std=c++11'],
                              )
 
-pq_libs = MPI_LIBS + ['boost_filesystem']
+pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
 
-if is_win:
-    pq_libs += ['arrow', 'parquet']
-else:
-    # seperate parquet reader used due to ABI incompatibility of arrow
-    pq_libs += ['hpat_parquet_reader']
+#if is_win:
+#    pq_libs += ['arrow', 'parquet']
+#else:
+#    # seperate parquet reader used due to ABI incompatibility of arrow
+#    pq_libs += ['hpat_parquet_reader']
 
 ext_parquet = Extension(name="parquet_cpp",
                              libraries = pq_libs,
                              sources=["hpat/_parquet.cpp"],
                              include_dirs=[PREFIX_DIR+'/include/', '.'],
                              library_dirs = [PREFIX_DIR+'/lib/'],
-                             extra_compile_args=['-std=c++11'],
+                             extra_compile_args=['-std=c++11 -DBUILTIN_PARQUET_READER'],
                              extra_link_args=['-std=c++11'],
                              )
 
@@ -198,8 +203,8 @@ if _has_h5py:
     _ext_mods.append(ext_io)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-if _has_daal:
-    _ext_mods.append(ext_daal_wrapper)
+#if _has_daal:
+#    _ext_mods.append(ext_daal_wrapper)
 if _has_ros:
     _ext_mods.append(ext_ros)
 if _has_opencv:

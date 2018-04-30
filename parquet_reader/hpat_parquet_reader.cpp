@@ -42,7 +42,7 @@ void pq_init_reader(const char* file_name,
 
 // parquet type sizes (NOT arrow)
 // boolean, int32, int64, int96, float, double
-int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
+static int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
 
 
 int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx)
