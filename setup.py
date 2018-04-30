@@ -74,6 +74,8 @@ _has_xenon = False
 if 'HPAT_XE_SUPPORT' in os.environ and  os.environ['HPAT_XE_SUPPORT'] != "0":
     _has_xenon = True
 
+ind = [PREFIX_DIR+'/include',]
+lid = [PREFIX_DIR+'/lib',]
 eca = ['-std=c++11', '-DUSE_BOOST_REGEX',]
 ela = ['-std=c++11',]
 
@@ -89,8 +91,8 @@ if is_win:
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp"],
                    libraries = ['hdf5'] + MPI_LIBS + ['boost_filesystem'],
-                   include_dirs = [HDF5_DIR+'/include/',],
-                   library_dirs = [HDF5_DIR+'/lib/',],
+                   include_dirs = [HDF5_DIR+'/include',] + ind,
+                   library_dirs = [HDF5_DIR+'/lib',] + lid,
                    extra_compile_args = eca + H5_COMPILE_FLAGS,
                    extra_link_args = ela,
 )
@@ -100,6 +102,8 @@ ext_hdist = Extension(name="hdist",
                       libraries = MPI_LIBS,
                       extra_compile_args = eca,
                       extra_link_args = ela,
+                      include_dirs = ind,
+                      library_dirs = lid,
 )
 
 ext_chiframes = Extension(name="chiframes",
@@ -108,6 +112,8 @@ ext_chiframes = Extension(name="chiframes",
                           depends=["hpat/_hpat_sort.h"],
                           extra_compile_args = eca,
                           extra_link_args = ela,
+                          include_dirs = ind,
+                          library_dirs = lid,
 )
 
 
@@ -115,14 +121,18 @@ ext_dict = Extension(name="hdict_ext",
                      sources=["hpat/_dict_ext.cpp"],
                      extra_compile_args = eca,
                      extra_link_args = ela,
+                     include_dirs = ind,
+                     library_dirs = lid,
 )
 
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
-                    libraries=['boost_regex'],
+                    libraries=['boost_regex'] + np_compile_args['libraries'],
                     extra_compile_args = eca,
                     extra_link_args = ela,
-                    **np_compile_args,
+                    include_dirs = np_compile_args['include_dirs'] + ind,
+                    library_dirs = np_compile_args['library_dirs'] + lid,
+                    define_macros = np_compile_args['define_macros'],
 )
 
 #dt_args = copy.copy(np_compile_args)
@@ -143,6 +153,8 @@ ext_quantile = Extension(name="quantile_alg",
                          libraries = MPI_LIBS,
                          extra_compile_args = eca,
                          extra_link_args = ela,
+                         include_dirs = ind,
+                         library_dirs = lid,
 )
 
 
@@ -151,9 +163,10 @@ pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
 ext_parquet = Extension(name="parquet_cpp",
                         sources=["hpat/_parquet.cpp"],
                         libraries = pq_libs,
-                        include_dirs=['.'],
+                        include_dirs = ['.'] + ind,
                         extra_compile_args = eca + ['-DBUILTIN_PARQUET_READER'],
                         extra_link_args = ela,
+                        library_dirs = lid,
 )
 
 #ext_daal_wrapper = Extension(name="daal_wrapper",
@@ -163,10 +176,11 @@ ext_parquet = Extension(name="parquet_cpp",
 #                             )
 
 ext_ros = Extension(name="ros_cpp",
-                    sources=["hpat/_ros.cpp"]
+                    sources=["hpat/_ros.cpp"],
                     include_dirs = ['/opt/ros/lunar/include', '/opt/ros/lunar/include/xmlrpcpp', PREFIX_DIR+'/include/', './ros_include'],
                     extra_compile_args = eca,
                     extra_link_args = ela  + '-rdynamic /opt/ros/lunar/lib/librosbag.so /opt/ros/lunar/lib/librosbag_storage.so -lboost_program_options /opt/ros/lunar/lib/libroslz4.so /opt/ros/lunar/lib/libtopic_tools.so /opt/ros/lunar/lib/libroscpp.so -lboost_filesystem -lboost_signals /opt/ros/lunar/lib/librosconsole.so /opt/ros/lunar/lib/librosconsole_log4cxx.so /opt/ros/lunar/lib/librosconsole_backend_interface.so -lboost_regex /opt/ros/lunar/lib/libroscpp_serialization.so /opt/ros/lunar/lib/librostime.so /opt/ros/lunar/lib/libxmlrpcpp.so /opt/ros/lunar/lib/libcpp_common.so -lboost_system -lboost_thread -lboost_chrono -lboost_date_time -lboost_atomic -lpthread -Wl,-rpath,/opt/ros/lunar/lib'.split(),
+                    library_dirs = lid,
 )
 
 cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
@@ -176,18 +190,18 @@ if is_win:
 
 ext_cv_wrapper = Extension(name="cv_wrapper",
                            sources=["hpat/_cv.cpp"],
-                           include_dirs = [OPENCV_DIR+'/include'],
-                           library_dirs = [os.path.join(OPENCV_DIR,'lib')],
+                           include_dirs = [OPENCV_DIR+'/include'] + ind,
+                           library_dirs = [os.path.join(OPENCV_DIR,'lib')] + lid,
                            libraries = cv_libs,
                            #extra_link_args = cv_link_args,
                            language="c++",
 )
 
 ext_xenon_wrapper = Extension(name="hxe_ext",
-                              sources=["hpat/_xe_wrapper.cpp"]
+                              sources=["hpat/_xe_wrapper.cpp"],
                               #include_dirs = ['/usr/include'],
-                              include_dirs = ['.'],
-                              library_dirs = ['.'],
+                              include_dirs = ['.'] + ind,
+                              library_dirs = ['.'] + lid,
                               libraries = ['xe'],
                               extra_compile_args = eca,
                               extra_link_args = ela,
