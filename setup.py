@@ -76,16 +76,16 @@ if 'HPAT_XE_SUPPORT' in os.environ and  os.environ['HPAT_XE_SUPPORT'] != "0":
 
 ind = [PREFIX_DIR+'/include',]
 lid = [PREFIX_DIR+'/lib',]
-eca = ['-std=c++11', '-DUSE_BOOST_REGEX',]
+eca = ['-std=c++11',]  # '-g', '-O0']
 ela = ['-std=c++11',]
 
 MPI_LIBS = ['mpi']
-H5_COMPILE_FLAGS = []
+H5_CPP_FLAGS = []
 if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
-    H5_COMPILE_FLAGS = ['-DH5_BUILT_AS_DYNAMIC_LIB',]
+    H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
 
 ext_io = Extension(name="hio",
@@ -93,7 +93,8 @@ ext_io = Extension(name="hio",
                    libraries = ['hdf5'] + MPI_LIBS + ['boost_filesystem'],
                    include_dirs = [HDF5_DIR+'/include',] + ind,
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
-                   extra_compile_args = eca + H5_COMPILE_FLAGS,
+                   define_macros = H5_CPP_FLAGS,
+                   extra_compile_args = eca,
                    extra_link_args = ela,
 )
 
@@ -128,11 +129,11 @@ ext_dict = Extension(name="hdict_ext",
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=['boost_regex'] + np_compile_args['libraries'],
+                    define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
                     extra_compile_args = eca,
                     extra_link_args = ela,
                     include_dirs = np_compile_args['include_dirs'] + ind,
                     library_dirs = np_compile_args['library_dirs'] + lid,
-                    define_macros = np_compile_args['define_macros'],
 )
 
 #dt_args = copy.copy(np_compile_args)
@@ -164,7 +165,8 @@ ext_parquet = Extension(name="parquet_cpp",
                         sources=["hpat/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
-                        extra_compile_args = eca + ['-DBUILTIN_PARQUET_READER'],
+                        define_macros = [('BUILTIN_PARQUET_READER', None)],
+                        extra_compile_args = eca,
                         extra_link_args = ela,
                         library_dirs = lid,
 )
