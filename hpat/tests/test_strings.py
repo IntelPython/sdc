@@ -79,6 +79,14 @@ class TestString(unittest.TestCase):
             # XXX: use startswith since hpat output can have extra characters
             self.assertTrue(h_res.startswith(py_res))
 
+    def test_regex(self):
+        def test_impl(_str, _pat):
+            return hpat.str_ext.contains_regex(_str, hpat.str_ext.compile_regex(_pat))
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func('What does the fox say', r'd.*(the |fox ){2}'), True)
+        self.assertEqual(hpat_func('What does the fox say', r'[kz]u*'), False)
+
+
     # string array tests
     def test_string_array_constructor(self):
         # create StringArray and return as list of strings
