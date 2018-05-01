@@ -256,6 +256,9 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        if fdef == ('DatetimeIndex', 'pandas'):
+            return self._handle_pd_DatetimeIndex(assign, lhs, rhs)
+
         if fdef == ('read_table', 'pyarrow.parquet'):
             return self._handle_pq_read_table(assign, lhs, rhs)
 
@@ -324,6 +327,31 @@ class HiFrames(object):
         self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
         return out
+
+    def _handle_pd_DatetimeIndex(self, assign, lhs, rhs):
+        """transform pd.DatetimeIndex() call with string array argument
+        """
+        if len(rhs.args) != 1:  # pragma: no cover
+            raise ValueError(
+                "Invalid DatetimeIndex() arguments (one expected)")
+
+        def f(str_arr):
+            numba.parfor.init_prange()
+            n = len(str_arr)
+            S = numba.unsafe.ndarray.empty_inferred((n,))
+            for i in numba.parfor.internal_prange(n):
+                S[i] = hpat.pd_timestamp_ext.parse_datetime_str(str_arr[i])
+            ret = S
+
+        f_ir = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba})
+        topo_order = find_topo_order(f_ir.blocks)
+        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [rhs.args[0]])
+        # FIXME: refactor
+        output_arr = f_ir.blocks[topo_order[-1]].body[-4].target
+        self.ts_series_vars.add(output_arr.name)
+        return f_ir.blocks
+
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover

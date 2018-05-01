@@ -1,16 +1,86 @@
 import numba
 from numba import types
-# from numba.typing.templates import AbstractTemplate, infer, signature
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_cast)
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_cast, overload_method)
 from numba import cgutils
 from numba.targets.boxing import unbox_array
-#from numba.targets.imputils import impl_ret_untracked
-# from numba.targets.arrayobj import getitem_arraynd_intp
+from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
+
+import numpy as np
+import ctypes
+import inspect
+import hpat.str_ext
+import hpat.utils
+from llvmlite import ir as lir
 
 import pandas as pd
-import numpy as np
+# TODO: make pandas optional, not import this file if no pandas
+# pandas_present = True
+# try:
+#     import pandas as pd
+# except ImportError:
+#     pandas_present = False
+
 import datetime
+import hdatetime_ext
+
+#--------------------------------------------------------------
+
+class PANDAS_DATETIMESTRUCT(ctypes.Structure):
+    _fields_ = [("year", ctypes.c_longlong),
+                ("month", ctypes.c_int),
+                ("day", ctypes.c_int),
+                ("hour", ctypes.c_int),
+                ("min", ctypes.c_int),
+                ("sec", ctypes.c_int),
+                ("us", ctypes.c_int),
+                ("ps", ctypes.c_int),
+                ("as", ctypes.c_int)]
+
+class PandasDtsType(types.Type):
+    def __init__(self):
+        super(PandasDtsType, self).__init__(
+            name='PandasDtsType()')
+
+pandas_dts_type = PandasDtsType()
+
+@typeof_impl.register(PANDAS_DATETIMESTRUCT)
+def typeof_pandas_dts(val, c):
+    return pandas_dts_type
+
+@register_model(PandasDtsType)
+class PandasDtsModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [
+                ("year", types.int64),
+                ("month", types.int32),
+                ("day", types.int32),
+                ("hour", types.int32),
+                ("min", types.int32),
+                ("sec", types.int32),
+                ("us", types.int32),
+                ("ps", types.int32),
+                ("as", types.int32),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+make_attribute_wrapper(PandasDtsType, 'year', 'year')
+make_attribute_wrapper(PandasDtsType, 'month', 'month')
+make_attribute_wrapper(PandasDtsType, 'day', 'day')
+
+@type_callable(PANDAS_DATETIMESTRUCT)
+def type_pandas_dts(context):
+    def typer():
+        return pandas_dts_type
+    return typer
+
+@lower_builtin(PANDAS_DATETIMESTRUCT)
+def impl_ctor_pandas_dts(context, builder, sig, args):
+    typ = sig.return_type
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    return ts._getvalue()
+
+#---------------------------------------------------------------
 
 class DatetimeDateType(types.Type):
     def __init__(self):
@@ -126,7 +196,11 @@ make_attribute_wrapper(PandasTimestampType, 'second', 'second')
 make_attribute_wrapper(PandasTimestampType, 'microsecond', 'microsecond')
 make_attribute_wrapper(PandasTimestampType, 'nanosecond', 'nanosecond')
 
-# TODO: add boxing
+@overload_method(PandasTimestampType, 'date')
+def overload_pd_timestamp_date(ptt):
+    def pd_timestamp_date_impl(ptt):
+        return datetime.date(ptt.year, ptt.month, ptt.day)
+    return pd_timestamp_date_impl
 
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
@@ -160,6 +234,30 @@ def unbox_pandas_timestamp(typ, val, c):
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(pd_timestamp._getvalue(), is_error=is_error)
+
+@box(PandasTimestampType)
+def box_pandas_timestamp(typ, val, c):
+    pdts = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
+    year_obj = c.pyapi.long_from_longlong(pdts.year)
+    month_obj = c.pyapi.long_from_longlong(pdts.month)
+    day_obj = c.pyapi.long_from_longlong(pdts.day)
+    hour_obj = c.pyapi.long_from_longlong(pdts.hour)
+    minute_obj = c.pyapi.long_from_longlong(pdts.minute)
+    second_obj = c.pyapi.long_from_longlong(pdts.second)
+    us_obj = c.pyapi.long_from_longlong(pdts.microsecond)
+    ns_obj = c.pyapi.long_from_longlong(pdts.nanosecond)
+
+    pdts_obj = c.pyapi.unserialize(c.pyapi.serialize_object(pd.Timestamp))
+    res = c.pyapi.call_function_objargs(pdts_obj, (year_obj, month_obj, day_obj, hour_obj, minute_obj, second_obj, us_obj, ns_obj))
+    c.pyapi.decref(year_obj)
+    c.pyapi.decref(month_obj)
+    c.pyapi.decref(day_obj)
+    c.pyapi.decref(hour_obj)
+    c.pyapi.decref(minute_obj)
+    c.pyapi.decref(second_obj)
+    c.pyapi.decref(us_obj)
+    c.pyapi.decref(ns_obj)
+    return res
 
 @type_callable(pd.Timestamp)
 def type_timestamp(context):
@@ -242,6 +340,90 @@ def convert_datetime64_to_timestamp(dt64):
                         (in_day // 1000000000) % 60, #second
                         (in_day // 1000) % 1000000, #microsecond
                         in_day % 1000) #nanosecond
+
+#-----------------------------------------------------------
+
+def myref(val):
+    pass
+
+@type_callable(myref)
+def type_myref(context):
+    def typer(val):
+        return types.voidptr
+    return typer
+
+def integer_to_dt64(val):
+    return np.datetime64(val)
+
+@type_callable(integer_to_dt64)
+def type_int_to_dt64(context):
+    def typer(val):
+        return types.NPDatetime('ns')
+    return typer
+
+@lower_builtin(integer_to_dt64, types.int64)
+def impl_int_to_dt64(context, builder, sig, args):
+    return args[0]
+
+@lower_builtin(myref, types.int32)
+@lower_builtin(myref, types.int64)
+def impl_myref_int32(context, builder, sig, args):
+    typ = types.voidptr
+    val = args[0]
+    assert isinstance(val, lir.instructions.LoadInstr)
+    return builder.bitcast(val.operands[0], lir.IntType(8).as_pointer())
+
+@lower_builtin(myref, PandasDtsType)
+def impl_myref_pandas_dts_type(context, builder, sig, args):
+    typ = types.voidptr
+    val = args[0]
+    assert isinstance(val, lir.instructions.LoadInstr)
+    return builder.bitcast(val.operands[0], lir.IntType(8).as_pointer())
+
+# tslib_so = inspect.getfile(pd._libs.tslib)
+# tslib_cdll = ctypes.CDLL(tslib_so)
+# func_parse_iso = tslib_cdll.parse_iso_8601_datetime
+# func_parse_iso.restype = ctypes.c_int32
+# func_parse_iso.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+# func_dts_to_dt = tslib_cdll.pandas_datetimestruct_to_datetime
+# func_dts_to_dt.restype = ctypes.c_int64
+# func_dts_to_dt.argtypes = [ctypes.c_int, ctypes.c_void_p]
+import llvmlite.binding as ll
+ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
+ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
+
+sig = types.intp(
+                types.voidptr,             # C str
+                types.intp,             # len(str)
+                types.voidptr,          # struct ptr
+                types.voidptr,  # int ptr
+                types.voidptr,  # int ptr
+                )
+parse_iso_8601_datetime = types.ExternalFunction("parse_iso_8601_datetime", sig)
+sig = types.intp(
+                types.intp,             # fr magic number
+                types.voidptr,          # struct ptr
+                types.voidptr,  # out int ptr
+                )
+convert_datetimestruct_to_datetime = types.ExternalFunction("convert_datetimestruct_to_datetime", sig)
+
+@numba.njit(locals={'arg1': numba.int32, 'arg3': numba.int32, 'arg4': numba.int32})
+def parse_datetime_str(str):
+    arg0 = hpat.str_ext.getpointer(str)
+    arg1 = len(str)
+    arg2 = PANDAS_DATETIMESTRUCT()
+    arg3 = np.int32(13)
+    arg4 = np.int32(13)
+    arg2ref = myref(arg2)
+    retval = parse_iso_8601_datetime(arg0, arg1, arg2ref, myref(arg3), myref(arg4))
+    out = 0
+    retval2 = convert_datetimestruct_to_datetime(10, arg2ref, myref(out))
+    return integer_to_dt64(out)
+
+#     retval = func_parse_iso(arg0, arg1, arg2ref, myref(arg3), myref(arg4))
+#     # "10" is magic enum value for PANDAS_FR_ns (nanosecond date time unit)
+# #        return func_dts_to_dt(10, arg2ref)
+#     return integer_to_dt64(func_dts_to_dt(10, arg2ref))
 
 #----------------------------------------------------------------------------------------------
 

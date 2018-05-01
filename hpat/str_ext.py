@@ -1,6 +1,7 @@
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
-                             NativeValue, lower_builtin, lower_cast, overload)
+                             NativeValue, lower_builtin, lower_cast, overload,
+                             type_callable)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
@@ -231,6 +232,24 @@ def box_str(typ, val, c):
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string(c_str)
     return pystr
+
+def getpointer(str):
+    pass
+
+@type_callable(getpointer)
+def type_string_getpointer(context):
+    def typer(val):
+        return types.voidptr
+    return typer
+
+@lower_builtin(getpointer, StringType)
+def getpointer_from_string(context, builder, sig, args):
+    val = args[0]
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
+    c_str = builder.call(fn, [val])
+    return c_str
 
 @lower_cast(StringType, types.Const)
 def string_type_to_const(context, builder, fromty, toty, val):
