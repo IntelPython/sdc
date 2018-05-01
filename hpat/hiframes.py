@@ -347,6 +347,9 @@ class HiFrames(object):
         topo_order = find_topo_order(f_ir.blocks)
         f_ir.blocks[topo_order[-1]].body[-4].target = lhs
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [rhs.args[0]])
+        # FIXME: refactor
+        output_arr = f_ir.blocks[topo_order[-1]].body[-4].target
+        self.ts_series_vars.add(output_arr.name)
         return f_ir.blocks
 
 
