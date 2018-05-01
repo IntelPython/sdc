@@ -22,6 +22,7 @@ import pandas as pd
 #     pandas_present = False
 
 import datetime
+import hdatetime_ext
 
 #--------------------------------------------------------------
 
@@ -361,6 +362,7 @@ def impl_int_to_dt64(context, builder, sig, args):
     return args[0]
 
 @lower_builtin(myref, types.int32)
+@lower_builtin(myref, types.int64)
 def impl_myref_int32(context, builder, sig, args):
     typ = types.voidptr
     val = args[0]
@@ -374,28 +376,50 @@ def impl_myref_pandas_dts_type(context, builder, sig, args):
     assert isinstance(val, lir.instructions.LoadInstr)
     return builder.bitcast(val.operands[0], lir.IntType(8).as_pointer())
 
-tslib_so = inspect.getfile(pd._libs.tslib)
-tslib_cdll = ctypes.CDLL(tslib_so)
-func_parse_iso = tslib_cdll.parse_iso_8601_datetime
-func_parse_iso.restype = ctypes.c_int32
-func_parse_iso.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-func_dts_to_dt = tslib_cdll.pandas_datetimestruct_to_datetime
-func_dts_to_dt.restype = ctypes.c_int64
-func_dts_to_dt.argtypes = [ctypes.c_int, ctypes.c_void_p]
+# tslib_so = inspect.getfile(pd._libs.tslib)
+# tslib_cdll = ctypes.CDLL(tslib_so)
+# func_parse_iso = tslib_cdll.parse_iso_8601_datetime
+# func_parse_iso.restype = ctypes.c_int32
+# func_parse_iso.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+# func_dts_to_dt = tslib_cdll.pandas_datetimestruct_to_datetime
+# func_dts_to_dt.restype = ctypes.c_int64
+# func_dts_to_dt.argtypes = [ctypes.c_int, ctypes.c_void_p]
+import llvmlite.binding as ll
+ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
+ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
+
+sig = types.intp(
+                types.voidptr,             # C str
+                types.intp,             # len(str)
+                types.voidptr,          # struct ptr
+                types.voidptr,  # int ptr
+                types.voidptr,  # int ptr
+                )
+parse_iso_8601_datetime = types.ExternalFunction("parse_iso_8601_datetime", sig)
+sig = types.intp(
+                types.intp,             # fr magic number
+                types.voidptr,          # struct ptr
+                types.voidptr,  # out int ptr
+                )
+convert_datetimestruct_to_datetime = types.ExternalFunction("convert_datetimestruct_to_datetime", sig)
 
 @numba.njit(locals={'arg1': numba.int32, 'arg3': numba.int32, 'arg4': numba.int32})
 def parse_datetime_str(str):
     arg0 = hpat.str_ext.getpointer(str)
     arg1 = len(str)
     arg2 = PANDAS_DATETIMESTRUCT()
-    arg3 = 13
-    arg4 = 13
+    arg3 = np.int32(13)
+    arg4 = np.int32(13)
     arg2ref = myref(arg2)
+    retval = parse_iso_8601_datetime(arg0, arg1, arg2ref, myref(arg3), myref(arg4))
+    out = 0
+    retval2 = convert_datetimestruct_to_datetime(10, arg2ref, myref(out))
+    return integer_to_dt64(out)
 
-    retval = func_parse_iso(arg0, arg1, arg2ref, myref(arg3), myref(arg4))
-    # "10" is magic enum value for PANDAS_FR_ns (nanosecond date time unit)
-#        return func_dts_to_dt(10, arg2ref)
-    return integer_to_dt64(func_dts_to_dt(10, arg2ref))
+#     retval = func_parse_iso(arg0, arg1, arg2ref, myref(arg3), myref(arg4))
+#     # "10" is magic enum value for PANDAS_FR_ns (nanosecond date time unit)
+# #        return func_dts_to_dt(10, arg2ref)
+#     return integer_to_dt64(func_dts_to_dt(10, arg2ref))
 
 #----------------------------------------------------------------------------------------------
 

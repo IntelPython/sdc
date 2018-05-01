@@ -126,13 +126,13 @@ ext_str = Extension(name="hstr_ext",
 #dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
 #dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
-#ext_dt = Extension(name="hdatetime_ext",
-#                    sources=["hpat/_datetime_ext.cpp"],
-#                    extra_compile_args=['-std=c++11'],
-#                    extra_link_args=['-std=c++11'],
-#                    **dt_args,
-                    #language="c++"
-#)
+ext_dt = Extension(name="hdatetime_ext",
+                   sources=["hpat/_datetime_ext.cpp"],
+                   extra_compile_args=['-std=c++11'],
+                   extra_link_args=['-std=c++11'],
+                   #**dt_args,
+                    language="c++"
+)
 
 ext_quantile = Extension(name="quantile_alg",
                              libraries = MPI_LIBS,
@@ -192,7 +192,7 @@ ext_xenon_wrapper = Extension(name="hxe_ext",
                              sources=["hpat/_xe_wrapper.cpp"]
                              )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile, ext_dt]
 
 if _has_h5py:
     _ext_mods.append(ext_io)
