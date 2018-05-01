@@ -1,7 +1,7 @@
 import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_cast)
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_cast, overload_method)
 from numba import cgutils
 from numba.targets.boxing import unbox_array
 from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
@@ -196,7 +196,11 @@ make_attribute_wrapper(PandasTimestampType, 'second', 'second')
 make_attribute_wrapper(PandasTimestampType, 'microsecond', 'microsecond')
 make_attribute_wrapper(PandasTimestampType, 'nanosecond', 'nanosecond')
 
-# TODO: add boxing
+@overload_method(PandasTimestampType, 'date')
+def overload_pd_timestamp_date(ptt):
+    def pd_timestamp_date_impl(ptt):
+        return datetime.date(ptt.year, ptt.month, ptt.day)
+    return pd_timestamp_date_impl
 
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
