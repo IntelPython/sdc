@@ -159,13 +159,20 @@ ext_quantile = Extension(name="quantile_alg",
 )
 
 
-pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
+# pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
+pq_libs = MPI_LIBS + ['boost_filesystem']
+
+if is_win:
+    pq_libs += ['arrow', 'parquet']
+else:
+    # seperate parquet reader used due to ABI incompatibility of arrow
+    pq_libs += ['hpat_parquet_reader']
 
 ext_parquet = Extension(name="parquet_cpp",
                         sources=["hpat/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
-                        define_macros = [('BUILTIN_PARQUET_READER', None)],
+                        # define_macros = [('BUILTIN_PARQUET_READER', None)],
                         extra_compile_args = eca,
                         extra_link_args = ela,
                         library_dirs = lid,
@@ -226,7 +233,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.3.0',
+      version='0.2.0',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[
