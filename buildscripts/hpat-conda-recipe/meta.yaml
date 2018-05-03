@@ -25,6 +25,7 @@ requirements:
     - hdf5
     - h5py
     - opencv 3.3.1
+    - hpat-parquet-reader # [not win]
 
   run:
     - python 3.6.*
@@ -36,6 +37,7 @@ requirements:
     - numba 0.38.*
     - hdf5
     - h5py
+    - hpat-parquet-reader # [not win]
 
 test:
   imports:
