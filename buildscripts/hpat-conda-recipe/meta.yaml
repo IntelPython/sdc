@@ -21,10 +21,9 @@ requirements:
     - pandas
     - mpich # [not win]
     - pyarrow 0.9.*
-    - boost
+    - boost-cpp
     - hdf5
     - h5py
-    - daal-devel
     - opencv 3.3.1
     - hpat-parquet-reader # [not win]
 
@@ -34,7 +33,7 @@ requirements:
     - pandas
     - mpich # [not win]
     - pyarrow 0.9.*
-    - boost
+    - boost-cpp
     - numba 0.38.*
     - hdf5
     - h5py
