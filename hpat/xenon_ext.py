@@ -54,20 +54,11 @@ def _handle_read(assign, lhs, rhs, func_ir):
     ll.add_symbol('c_xe_open', hxe_ext.c_xe_open)
     ll.add_symbol('c_xe_close', hxe_ext.c_xe_close)
 
-    if len(rhs.args) != 1:
-        raise ValueError("read_xenon expects one argument but received {}".format(len(rhs.args)))
+    if len(rhs.args) not in [1, 3]:
+        raise ValueError("read_xenon expects one or three argument but received {}".format(len(rhs.args)))
 
-    dset_name_var = rhs.args[0]
-    dset_name = get_constant(func_ir, dset_name_var)
-    if dset_name is NOT_CONSTANT:
-        raise ValueError("Xenon dataset should be a constant string")
-
-    if dset_name.count("/") != 1:
-        raise ValueError("invalid Xenon address {}".format(dset_name))
-    address, dset_name = dset_name.split("/")
-    col_names, col_types = get_dset_schema(address, dset_name)
-
-    out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
+    if len(rhs.args) == 1:
+        out_nodes, col_names, col_types, xe_connect_var, xe_dset_var = gen_xe_init_from_uri(func_ir, rhs.args[0])
 
     # generate array of schema types
     xe_typs = [str(get_xe_typ_enum(c_type)) for c_type in col_types]
@@ -80,8 +71,8 @@ def _handle_read(assign, lhs, rhs, func_ir):
     out_nodes += f_block.body[:-3]
     schema_arr_var = out_nodes[-1].target
 
-    scope = dset_name_var.scope
-    loc = dset_name_var.loc
+    scope = rhs.args[0].scope
+    loc = rhs.args[0].loc
 
     col_items = []
     for i, cname in enumerate(col_names):
@@ -119,6 +110,19 @@ def get_xe_typ_enum(c_type):
         return _type_to_xe_dtype_number['string']
     assert isinstance(c_type, types.Array)
     return _type_to_xe_dtype_number[get_element_type(c_type.dtype)]
+
+def gen_xe_init_from_uri(func_ir, dset_name_var):
+    dset_name = get_constant(func_ir, dset_name_var)
+    if dset_name is NOT_CONSTANT:
+        raise ValueError("Xenon dataset should be a constant string")
+
+    if dset_name.count("/") != 1:
+        raise ValueError("invalid Xenon address {}".format(dset_name))
+    address, dset_name = dset_name.split("/")
+    col_names, col_types = get_dset_schema(address, dset_name)
+
+    out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
+    return out_nodes, col_names, col_types, xe_connect_var, xe_dset_var
 
 def get_dset_schema(address, dset_name):
     import hxe_ext
