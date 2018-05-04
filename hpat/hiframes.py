@@ -231,7 +231,7 @@ class HiFrames(object):
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.ts_series_vars:
-            self.ts_series_vars[lhs] = self.ts_series_vars[rhs.name]
+            self.ts_series_vars.add(lhs)
         return [assign]
 
     def _run_call(self, assign, label):
