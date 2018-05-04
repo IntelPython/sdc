@@ -100,6 +100,7 @@ class HiFrames(object):
         for label in topo_order:
             self._get_reverse_copies(self.func_ir.blocks[label].body)
             new_body = []
+            self._working_body = new_body
             old_body = self.func_ir.blocks[label].body
             for inst in old_body:
                 # df['col'] = arr
@@ -278,7 +279,7 @@ class HiFrames(object):
 
         # df.column.shift(3)
         if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
-            return self._handle_column_call(assign, lhs, rhs, func_mod, func_name)
+            return self._handle_column_call(assign, lhs, rhs, func_mod, func_name, label)
 
         # df.apply(lambda a:..., axis=1)
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
@@ -661,14 +662,14 @@ class HiFrames(object):
         nodes[-1].target = lhs
         return nodes
 
-    def _handle_column_call(self, assign, lhs, rhs, col_var, func_name):
+    def _handle_column_call(self, assign, lhs, rhs, col_var, func_name, label):
         """
         Handle Series calls like:
           A = df.column.shift(3)
         """
         # TODO: handle map/apply differences
         if func_name in ['map', 'apply']:
-            return self._handle_map(assign, lhs, rhs, col_var)
+            return self._handle_map(assign, lhs, rhs, col_var, label)
 
         if func_name == 'rolling':
             return self._handle_rolling_setup(assign, lhs, rhs, col_var)
@@ -681,7 +682,7 @@ class HiFrames(object):
                                          dict(rhs.kws))
         return [assign]
 
-    def _handle_map(self, assign, lhs, rhs, col_var):
+    def _handle_map(self, assign, lhs, rhs, col_var, label):
         """translate df.A.map(lambda a:...) to prange()
         """
         # error checking: make sure there is function input only
@@ -691,6 +692,8 @@ class HiFrames(object):
         if func is None or not (isinstance(func, ir.Expr)
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
+
+        out_typ = self._get_map_output_typ(rhs, col_var, func, label)
 
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
@@ -733,6 +736,63 @@ class HiFrames(object):
         f_ir.blocks[topo_order[-1]].body[-4].target = lhs
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [col_var])
         return f_ir.blocks
+
+    def _get_map_output_typ(self, rhs, col_var, func, label):
+        # stich together all blocks before the current block for type inference
+        # XXX: does control flow affect type inference in Numba?
+        dummy_ir = self.func_ir.copy()
+        topo_order = find_topo_order(self.func_ir.blocks)
+        all_body = []
+        for l in topo_order:
+            if l == label:
+                break;
+            all_body += dummy_ir.blocks[l].body
+
+        # add nodes created for current block so far
+        all_body += self._working_body
+        dummy_ir.blocks = {0: ir.Block(col_var.scope, col_var.loc)}
+        dummy_ir.blocks[0].body = all_body
+
+        # add the map function to get the output type
+        def f(A):
+            return map_func(A[0])
+
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, {})
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        first_label = min(f_ir.blocks)
+        for i, stmt in enumerate(f_ir.blocks[first_label].body):
+            if (isinstance(stmt, ir.Assign)
+                    and isinstance(stmt.value, ir.Expr)
+                    and stmt.value.op == 'call'):
+                fdef = guard(get_definition, f_ir, stmt.value.func)
+                if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                    inline_closure_call(f_ir, _globals, f_ir.blocks[first_label], i, func)
+                    break
+
+        f_ir.blocks = ir_utils.simplify_CFG(f_ir.blocks)
+        f_topo_order = find_topo_order(f_ir.blocks)
+        output_var = f_ir.blocks[f_topo_order[-1]].body[-3].target
+        first_label = f_topo_order[0]
+        replace_arg_nodes(f_ir.blocks[first_label], [col_var])
+        assert first_label != topo_order[0]  #  TODO: check for 0 and handle
+        dummy_ir.blocks.update(f_ir.blocks)
+        dummy_ir.blocks[0].body.append(ir.Jump(first_label, col_var.loc))
+        # dead df code can cause type inference issues
+        remove_dead(dummy_ir.blocks, dummy_ir.arg_names)
+
+        # run type inference on the dummy IR
+        warnings = numba.errors.WarningsFixer(numba.errors.NumbaWarning)
+        infer = numba.typeinfer.TypeInferer(self.typingctx, dummy_ir, warnings)
+        for index, (name, ty) in enumerate(zip(dummy_ir.arg_names, self.args)):
+            infer.seed_argument(name, index, ty)
+        infer.build_constraint()
+        infer.propagate()
+        out_tp = infer.typevars[output_var.name].getone()
+        # typemap, restype, calltypes = numba.compiler.type_inference_stage(self.typingctx, dummy_ir, self.args, None)
+        return out_tp
+
 
     def _handle_rolling_setup(self, assign, lhs, rhs, col_var):
         """
