@@ -195,15 +195,15 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
 
 def gen_init_xenon(address, dset_name):
     # TODO: support non-constant address/dset_name
-    func_text = ('def f():\n  connect_t = c_xe_connect("{}")\n'.format(address))
-    func_text += '  dset_t = c_xe_open(connect_t, "{}")\n'.format(dset_name)
+    func_text = ('def f():\n  connect_t = xe_connect("{}")\n'.format(address))
+    func_text += '  dset_t = xe_open(connect_t, "{}")\n'.format(dset_name)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     init_func = loc_vars['f']
     f_block = compile_to_numba_ir(init_func,
-                                         {'c_xe_connect': c_xe_connect,
-                                         'c_xe_open': c_xe_open}).blocks.popitem()[1]
+                                         {'xe_connect': xe_connect,
+                                         'xe_open': xe_open}).blocks.popitem()[1]
 
     connect_var = None
     dset_t_var = None
@@ -221,10 +221,10 @@ def gen_init_xenon(address, dset_name):
 def gen_close_xenon(connect_var, dset_t_var):
     #
     def close_func(connect_var, dset_t_var):
-        s = c_xe_close(connect_var, dset_t_var)
+        s = xe_close(connect_var, dset_t_var)
 
     f_block = compile_to_numba_ir(close_func,
-                                         {'c_xe_close': c_xe_close}).blocks.popitem()[1]
+                                         {'xe_close': xe_close}).blocks.popitem()[1]
 
     replace_arg_nodes(f_block, [connect_var, dset_t_var])
     out_nodes = f_block.body[:-3]
@@ -255,9 +255,9 @@ register_model(XeDSetType)(models.OpaqueModel)
 
 get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(xe_connect_type, xe_dset_type, types.intp))
 # read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
-c_xe_connect = types.ExternalFunction("c_xe_connect", xe_connect_type(string_type))
-c_xe_open = types.ExternalFunction("c_xe_open", xe_dset_type(xe_connect_type, string_type))
-c_xe_close = types.ExternalFunction("c_xe_close", types.void(xe_connect_type, xe_dset_type))
+xe_connect = types.ExternalFunction("c_xe_connect", xe_connect_type(string_type))
+xe_open = types.ExternalFunction("c_xe_open", xe_dset_type(xe_connect_type, string_type))
+xe_close = types.ExternalFunction("c_xe_close", types.void(xe_connect_type, xe_dset_type))
 
 
 # TODO: fix liveness/alias in Numba to be able to use arr.ctypes directly

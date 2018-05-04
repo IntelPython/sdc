@@ -16,7 +16,7 @@ import hpat.pd_timestamp_ext
 import hpat.config
 
 if hpat.config._has_xenon:
-    from hpat.xenon_ext import read_xenon
+    from hpat.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
 
 multithread_mode = False
 
