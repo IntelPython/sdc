@@ -59,6 +59,15 @@ def _handle_read(assign, lhs, rhs, func_ir):
 
     if len(rhs.args) == 1:
         out_nodes, col_names, col_types, xe_connect_var, xe_dset_var = gen_xe_init_from_uri(func_ir, rhs.args[0])
+    else:
+        assert len(rhs.args) == 3
+        xe_connect_var = rhs.args[0]
+        xe_dset_var = rhs.args[1]
+        schema = get_constant(func_ir, rhs.args[2])
+        if schema is NOT_CONSTANT:
+            raise ValueError("Xenon schema should be a constant string")
+        col_names, col_types = parse_xe_schema(schema)
+        out_nodes = []
 
     # generate array of schema types
     xe_typs = [str(get_xe_typ_enum(c_type)) for c_type in col_types]
@@ -86,7 +95,9 @@ def _handle_read(assign, lhs, rhs, func_ir):
 
         out_nodes += get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_arr_var)
 
-    out_nodes += gen_close_xenon(xe_connect_var, xe_dset_var);
+    # we need to close in the URI case since we opened the connection/dataset
+    if len(rhs.args) == 1:
+        out_nodes += gen_close_xenon(xe_connect_var, xe_dset_var);
 
     return col_items, out_nodes
 
@@ -119,14 +130,14 @@ def gen_xe_init_from_uri(func_ir, dset_name_var):
     if dset_name.count("/") != 1:
         raise ValueError("invalid Xenon address {}".format(dset_name))
     address, dset_name = dset_name.split("/")
-    col_names, col_types = get_dset_schema(address, dset_name)
+    import hxe_ext
+    schema = hxe_ext.get_schema(address, dset_name)
+    col_names, col_types = parse_xe_schema(schema)
 
     out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
     return out_nodes, col_names, col_types, xe_connect_var, xe_dset_var
 
-def get_dset_schema(address, dset_name):
-    import hxe_ext
-    schema = hxe_ext.get_schema(address, dset_name)
+def parse_xe_schema(schema):
     # print("schema", schema)
     # example: {first:CHAR,last:CHAR,age:I32,street:CHAR,state:CHAR,zip:I32}
     # remove braces
