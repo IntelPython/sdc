@@ -49,6 +49,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
     import hxe_ext
     ll.add_symbol('get_column_size_xenon', hxe_ext.get_column_size_xenon)
     ll.add_symbol('c_read_xenon', hxe_ext.read_xenon_col)
+    ll.add_symbol('c_read_xenon_parallel', hxe_ext.read_xenon_col_parallel)
     ll.add_symbol('c_read_xenon_col_str', hxe_ext.read_xenon_col_str)
     ll.add_symbol('c_xe_connect', hxe_ext.c_xe_connect)
     ll.add_symbol('c_xe_open', hxe_ext.c_xe_open)
@@ -166,13 +167,13 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_xenon_str(xe_connect_var, xe_dset_var, {}, col_size, schema_arr.ctypes)\n'.format(
+        func_text += '  column = read_xenon_str(xe_connect_var, xe_dset_var, {}, col_size, schema_arr)\n'.format(
             i)
     else:
         el_type = get_element_type(c_type.dtype)
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
             el_type)
-        func_text += '  status = read_xenon_col(xe_connect_var, xe_dset_var, {}, column, schema_arr.ctypes)\n'.format(i)
+        func_text += '  status = read_xenon_col(xe_connect_var, xe_dset_var, {}, column, schema_arr)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -186,7 +187,7 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
     replace_arg_nodes(f_block, [xe_connect_var, xe_dset_var, schema_arr_var])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
-        if stmt.target.name.startswith("column"):
+        if isinstance(stmt, ir.Assign) and stmt.target.name.startswith("column"):
             assign = ir.Assign(stmt.target, cvar, loc)
             break
 
@@ -265,7 +266,7 @@ xe_close = types.ExternalFunction("c_xe_close", types.void(xe_connect_type, xe_d
 def read_xenon_col(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp):
     def codegen(context, builder, sig, args):
         arr_info = context.make_array(column_tp)(context, builder, value=args[3])
-        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[4])
+        ctinfo = context.make_array(schema_arr_tp)(context, builder, value=args[4])
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
                                  lir.IntType(8).as_pointer(),
@@ -278,6 +279,27 @@ def read_xenon_col(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_
                                 builder.bitcast(arr_info.data, lir.IntType(8).as_pointer()), ctinfo.data])
         return context.get_dummy_value()
     return signature(types.none, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp), codegen
+
+@intrinsic
+def read_xenon_col_parallel(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start_tp, count_tp):
+    def codegen(context, builder, sig, args):
+        arr_info = context.make_array(column_tp)(context, builder, value=args[3])
+        ctinfo = context.make_array(schema_arr_tp)(context, builder, value=args[4])
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(64)])
+
+        fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_parallel")
+        res = builder.call(fn, [args[0], args[1], args[2],
+                                builder.bitcast(arr_info.data, lir.IntType(8).as_pointer()), ctinfo.data,
+                                args[5], args[6]])
+        return context.get_dummy_value()
+    return signature(types.none, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start_tp, count_tp), codegen
 
 @intrinsic
 def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp):

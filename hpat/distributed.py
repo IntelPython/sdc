@@ -472,6 +472,24 @@ class DistributedPass(object):
             out += f_block.body[:-2]
             out[-1].target = assign.target
 
+        if hpat.config._has_xenon and (self._call_table[func_var] == [hpat.xenon_ext.read_xenon_col]
+                and self._is_1D_arr(rhs.args[3].name)):
+            arr = rhs.args[3].name
+            assert len(self._array_starts[arr]) == 1, "only 1D arrs in Xenon"
+            start_var = self._array_starts[arr][0]
+            count_var = self._array_counts[arr][0]
+            rhs.args += [start_var, count_var]
+
+            def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
+                return hpat.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (hpat.xenon_ext.xe_connect_type, hpat.xenon_ext.xe_dset_type, types.intp,
+                                           self.typemap[arr], self.typemap[rhs.args[4].name], types.intp, types.intp),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-2]
+
         if (self._is_ros_read_image_call(func_var)
                 and self._is_1D_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
