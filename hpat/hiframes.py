@@ -122,6 +122,7 @@ class HiFrames(object):
                         cfg = compute_cfg_from_blocks(self.func_ir.blocks)
                         self.func_ir.blocks[label].body.pop()
                         new_body = []
+                        self._working_body = new_body
                 elif isinstance(inst, ir.Return):
                     nodes = self._run_return(inst)
                     new_body += nodes
@@ -741,7 +742,8 @@ class HiFrames(object):
         # stich together all blocks before the current block for type inference
         # XXX: does control flow affect type inference in Numba?
         dummy_ir = self.func_ir.copy()
-        topo_order = find_topo_order(self.func_ir.blocks)
+        dummy_ir.blocks[label].body.append(ir.Return(0, col_var.loc))
+        topo_order = find_topo_order(dummy_ir.blocks)
         all_body = []
         for l in topo_order:
             if l == label:
@@ -756,9 +758,13 @@ class HiFrames(object):
         # add the map function to get the output type
         def f(A):
             return map_func(A[0])
+        if col_var.name in self.ts_series_vars:
+            def f(A):
+                t = hpat.hiframes_api.ts_series_getitem(A, 0)
+                return map_func(t)
 
         _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {})
+        f_ir = compile_to_numba_ir(f, {'hpat': hpat})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
         first_label = min(f_ir.blocks)
