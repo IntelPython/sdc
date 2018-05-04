@@ -19,6 +19,10 @@ void read_xenon_col_parallel(xe_connection_t xe_connection, xe_dataset_t xe_data
 void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
                         uint64_t col_id, uint32_t **out_offsets,
                         uint8_t **out_data, uint64_t* xe_typ_enums);
+void read_xenon_col_str_parallel(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                        uint64_t col_id, uint32_t **out_offsets,
+                        uint8_t **out_data, uint64_t* xe_typ_enums,
+                        uint64_t start, uint64_t count);
 
 xe_connection_t c_xe_connect(std::string* address);
 xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset);
@@ -53,6 +57,8 @@ PyMODINIT_FUNC PyInit_hxe_ext(void) {
                             PyLong_FromVoidPtr((void*)(&read_xenon_col_parallel)));
     PyObject_SetAttrString(m, "read_xenon_col_str",
                             PyLong_FromVoidPtr((void*)(&read_xenon_col_str)));
+    PyObject_SetAttrString(m, "read_xenon_col_str_parallel",
+                            PyLong_FromVoidPtr((void*)(&read_xenon_col_str_parallel)));
     PyObject_SetAttrString(m, "c_xe_connect",
                             PyLong_FromVoidPtr((void*)(&c_xe_connect)));
     PyObject_SetAttrString(m, "c_xe_open",
@@ -305,6 +311,116 @@ void read_xenon_col_str(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
     return;
 #undef CHECK
 }
+
+void read_xenon_col_str_parallel(xe_connection_t xe_connection, xe_dataset_t xe_dataset,
+                        uint64_t col_id, uint32_t **out_offsets,
+                        uint8_t **out_data, uint64_t* xe_typ_enums,
+                        uint64_t start, uint64_t count)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
+
+    // printf("read column %lld\n", col_id);
+    // for (uint64_t i = 0; i<6; i++)
+    //     printf("%lld ", xe_typ_enums[i]);
+    // printf("\n");
+
+    if (count==0) {
+        *out_offsets = NULL;
+        *out_data = NULL;
+        return;
+    }
+
+	struct xe_status status;
+
+	int err = xe_status(xe_connection, xe_dataset, 0, &status);
+	CHECK(!err, "Fail to stat dataset");
+    CHECK(col_id < status.ncols, "invalid column number");
+
+    // _type_to_xe_dtype_number = {'int8': 0, 'int16': 1, 'int32': 2, 'int64': 3,
+    //                             'float32': 4, 'float64': 5, 'DECIMAL': 6,
+    //                              'bool_': 7, 'string': 8, 'BLOB': 9}
+
+    *out_offsets = new uint32_t[count+1];
+    uint32_t* curr_offset = *out_offsets;
+    uint32_t curr_len = 0;
+    std::vector<uint8_t> data_vec;
+
+    uint8_t *data_arr = (uint8_t *) malloc(READ_BUF_SIZE * sizeof(uint8_t));
+    uint8_t *read_buf = (uint8_t *) malloc(READ_BUF_SIZE * sizeof(uint8_t));
+    uint64_t nrows = 0;
+    int len = 0;
+
+    int strand_ind = 0;
+    int64_t skipped_rows = 0;
+    int64_t read_rows = 0;
+
+    // skip whole strands if no need to read any rows
+    while (start-skipped_rows >= status.snrows)
+    {
+        skipped_rows += status.snrows;
+        strand_ind++;
+        err = xe_status(xe_connection, xe_dataset, strand_ind, &status);
+        CHECK(!err, "Fail to stat dataset");
+    }
+
+    while (read_rows<count)
+    {
+        err = xe_rewind(xe_connection, xe_dataset, strand_ind);
+        CHECK(!err, "Fail to rewind dataset");
+        int64_t rows_to_skip = start - skipped_rows;
+        int64_t rows_to_read = std::min(count-read_rows, status.snrows-rows_to_skip);
+        int64_t batch_ind = 0;
+
+        do {
+            uint8_t *buf = read_buf;
+            uint8_t * curr_arr = data_arr;
+            err = xe_get(xe_connection, xe_dataset, strand_ind, read_buf, READ_BUF_SIZE, &nrows);
+            CHECK(!err, "Fail to read dataset");
+            for (uint64_t r = batch_ind; r < batch_ind+nrows; r++) {
+                bool do_read = (r >= rows_to_skip) && (r<(rows_to_skip+rows_to_read));
+                for (uint64_t c = 0; c < status.ncols; c++) {
+                    uint64_t tp_enum = xe_typ_enums[c];
+                    read_xe_row(buf, curr_arr, tp_enum, (col_id == c) && do_read, len);
+                    if (col_id == c && do_read) {
+                        *curr_offset = curr_len;
+                        curr_offset++;
+                        curr_len += len;
+                        data_vec.insert(data_vec.end(), curr_arr-len, curr_arr);
+                    }
+                }
+            }
+            batch_ind += nrows;
+            if (batch_ind > (rows_to_skip+rows_to_read))
+                break;
+        } while (nrows);
+
+        skipped_rows += rows_to_skip;
+        read_rows += rows_to_read;
+
+        strand_ind++;
+        if (strand_ind<status.fanout)
+        {
+            err = xe_status(xe_connection, xe_dataset, strand_ind, &status);
+            CHECK(!err, "Fail to read dataset");
+        }
+        else
+            break;
+    }
+    CHECK(read_rows==count, "Xenon read incomplete");
+    *curr_offset = curr_len;
+
+    *out_data = new uint8_t[data_vec.size()];
+    memcpy(*out_data, data_vec.data(), data_vec.size());
+
+    delete[] data_arr;
+
+    delete[] read_buf;
+
+    return;
+#undef CHECK
+}
+
+
 
 xe_connection_t c_xe_connect(std::string* address)
 {

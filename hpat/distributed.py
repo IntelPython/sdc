@@ -490,6 +490,32 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
+        if hpat.config._has_xenon and (self._call_table[func_var] == [hpat.xenon_ext.read_xenon_str]
+                and self._is_1D_arr(lhs)):
+            arr = lhs
+            size_var = rhs.args[3]
+            assert self.typemap[size_var.name] == types.intp
+            self._array_sizes[arr] = [size_var]
+            out, start_var, count_var = self._gen_1D_div(size_var, scope, loc,
+                                                         "$alloc", "get_node_portion", distributed_api.get_node_portion)
+            self._array_starts[lhs] = [start_var]
+            self._array_counts[lhs] = [count_var]
+            rhs.args.remove(size_var)
+            rhs.args.append(start_var)
+            rhs.args.append(count_var)
+
+            def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
+                return hpat.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
+
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (hpat.xenon_ext.xe_connect_type, hpat.xenon_ext.xe_dset_type, types.intp,
+                                           self.typemap[rhs.args[3].name], types.intp, types.intp),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out += f_block.body[:-2]
+            out[-1].target = assign.target
+
         if (self._is_ros_read_image_call(func_var)
                 and self._is_1D_arr(rhs.args[0].name)):
             arr = rhs.args[0].name

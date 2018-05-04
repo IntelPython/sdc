@@ -51,6 +51,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
     ll.add_symbol('c_read_xenon', hxe_ext.read_xenon_col)
     ll.add_symbol('c_read_xenon_parallel', hxe_ext.read_xenon_col_parallel)
     ll.add_symbol('c_read_xenon_col_str', hxe_ext.read_xenon_col_str)
+    ll.add_symbol('c_read_xenon_col_str_parallel', hxe_ext.read_xenon_col_str_parallel)
     ll.add_symbol('c_xe_connect', hxe_ext.c_xe_connect)
     ll.add_symbol('c_xe_open', hxe_ext.c_xe_open)
     ll.add_symbol('c_xe_close', hxe_ext.c_xe_close)
@@ -330,3 +331,36 @@ def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_ar
         ret = inst_struct._getvalue()
         return impl_ret_new_ref(context, builder, typ, ret)
     return signature(string_array_type, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen
+
+@intrinsic
+def read_xenon_str_parallel(typingctx, connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):
+    def codegen(context, builder, sig, args):
+        typ = sig.return_type
+        dtype = StringArrayPayloadType()
+        meminfo, data_pointer = construct_string_array(context, builder)
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder)
+        string_array.size = args[4]
+
+        ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(64).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(64),])
+
+        fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str_parallel")
+        res = builder.call(fn, [args[0], args[1], args[2],
+                                string_array._get_ptr_by_name('offsets'),
+                                string_array._get_ptr_by_name('data'), ctinfo.data,
+                                args[4], args[5]])
+        builder.store(string_array._getvalue(),
+                      data_pointer)
+        inst_struct = context.make_helper(builder, typ)
+        inst_struct.meminfo = meminfo
+        ret = inst_struct._getvalue()
+        return impl_ret_new_ref(context, builder, typ, ret)
+    return signature(string_array_type, connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp), codegen

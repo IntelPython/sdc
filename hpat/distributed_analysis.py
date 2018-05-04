@@ -264,11 +264,12 @@ class DistributedAnalysis(object):
             array_dists[args[4].name] = Distribution.REP
             return
 
-        # if hpat.config._has_xenon and fdef == ('read_xenon_str', 'numba.extending'):
-        #     # string read creates array in output
-        #     if lhs not in array_dists:
-        #         array_dists[lhs] = Distribution.OneD
-        #     return
+        if hpat.config._has_xenon and fdef == ('read_xenon_str', 'numba.extending'):
+            array_dists[args[4].name] = Distribution.REP
+            # string read creates array in output
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            return
 
         if func_name == 'train' and isinstance(func_mod, ir.Var):
             if self.typemap[func_mod.name] == hpat.ml.svc.svc_type:
