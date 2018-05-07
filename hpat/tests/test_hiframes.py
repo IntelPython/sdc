@@ -133,6 +133,20 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    def test_column_map_arg(self):
+        def test_impl(df):
+            df['B'] = df.A.map(lambda a: 2*a)
+            return
+
+        n = 121
+        df1 = pd.DataFrame({'A': np.arange(n)})
+        df2 = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(df1)
+        self.assertTrue(hasattr(df1, 'B'))
+        test_impl(df2)
+        np.testing.assert_equal(df1.B.values, df2.B.values)
+
     def test_df_apply(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
