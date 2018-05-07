@@ -777,7 +777,8 @@ class HiFrames(object):
 
         f_ir.blocks = ir_utils.simplify_CFG(f_ir.blocks)
         f_topo_order = find_topo_order(f_ir.blocks)
-        output_var = f_ir.blocks[f_topo_order[-1]].body[-3].target
+        assert isinstance(f_ir.blocks[f_topo_order[-1]].body[-1], ir.Return)
+        output_var = f_ir.blocks[f_topo_order[-1]].body[-1].value
         first_label = f_topo_order[0]
         replace_arg_nodes(f_ir.blocks[first_label], [col_var])
         assert first_label != topo_order[0]  #  TODO: check for 0 and handle
