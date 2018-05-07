@@ -698,23 +698,21 @@ class HiFrames(object):
 
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
-        def f(A):
-            numba.parfor.init_prange()
-            n = len(A)
-            S = numba.unsafe.ndarray.empty_inferred((n,))
-            for i in numba.parfor.internal_prange(n):
-                S[i] = map_func(A[i])
-            ret = S
-
+        func_text = "def f(A):\n"
+        func_text += "  numba.parfor.init_prange()\n"
+        func_text += "  n = len(A)\n"
+        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
+        func_text += "  for i in numba.parfor.internal_prange(n):\n"
         if col_var.name in self.ts_series_vars:
-            def f(A):
-                numba.parfor.init_prange()
-                n = len(A)
-                S = numba.unsafe.ndarray.empty_inferred((n,))
-                for i in numba.parfor.internal_prange(n):
-                    t = hpat.hiframes_api.ts_series_getitem(A, i)
-                    S[i] = map_func(t)
-                ret = S
+            func_text += "    t = hpat.hiframes_api.ts_series_getitem(A, i)\n"
+        else:
+            func_text += "    t = A[i]\n"
+        func_text += "    S[i] = map_func(t)\n"
+        func_text += "  ret = S\n"
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
 
         _globals = self.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
