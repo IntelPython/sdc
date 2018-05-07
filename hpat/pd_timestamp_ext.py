@@ -119,7 +119,7 @@ if intdatetime:
     def datetime_get_year(context, builder, typ, val):
         return builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF))
 
-    @numba.njit(nopython=True)
+    @numba.njit
     def convert_datetime_date_array_to_native(x):
         return np.array([(val.day + (val.month << 16) + (val.year << 32)) for val in x], dtype=np.int64)
 
