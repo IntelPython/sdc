@@ -4,14 +4,16 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
                              lower_getattr, infer_getattr, overload_method, intrinsic)
 from numba import cgutils
+from numba.targets.arrayobj import make_array
 from numba.targets.boxing import unbox_array
-from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature
+from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
 
 import numpy as np
 import ctypes
 import inspect
 import hpat.str_ext
 import hpat.utils
+
 from llvmlite import ir as lir
 
 import pandas as pd
@@ -24,6 +26,10 @@ import pandas as pd
 
 import datetime
 import hdatetime_ext
+import llvmlite.binding as ll
+ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
+ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
+ll.add_symbol('np_datetime_date_array_from_packed_ints', hdatetime_ext.np_datetime_date_array_from_packed_ints)
 
 #--------------------------------------------------------------
 
@@ -182,6 +188,50 @@ if intdatetime:
         def codegen(context, builder, sig, args):
             return args[0]
         return signature(types.int64, datetime_date_type), codegen
+
+    def set_df_datetime_date(df, cname, arr):
+        df[cname] = arr
+
+    @infer_global(set_df_datetime_date)
+    class SetDfDTInfer(AbstractTemplate):
+        def generic(self, args, kws):
+            assert not kws
+            assert len(args) == 3
+            assert isinstance(args[1], types.Const)
+            return signature(types.none, *args)
+
+    SetDfDTInfer.support_literals = True
+
+    @lower_builtin(set_df_datetime_date, types.Any, types.Const, types.Array)
+    def set_df_datetime_date_lower(context, builder, sig, args):
+        #
+        col_name = sig.args[1].value
+        data_arr = make_array(sig.args[2])(context, builder, args[2])
+        num_elems = builder.extract_value(data_arr.shape, 0)
+
+        pyapi = context.get_python_api(builder)
+        gil_state = pyapi.gil_ensure()  # acquire GIL
+
+        dt_class = pyapi.unserialize(pyapi.serialize_object(datetime.date))
+
+        fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(64).as_pointer(), lir.IntType(64),
+                                                 lir.IntType(8).as_pointer()])
+        fn = builder.module.get_or_insert_function(fnty, name="np_datetime_date_array_from_packed_ints")
+        py_arr = builder.call(fn, [data_arr.data, num_elems, dt_class])
+
+        # get column as string obj
+        cstr = context.insert_const_string(builder.module, col_name)
+        cstr_obj = pyapi.string_from_string(cstr)
+
+        # set column array
+        pyapi.object_setitem(args[0], cstr_obj, py_arr)
+
+        pyapi.decref(py_arr)
+        pyapi.decref(cstr_obj)
+
+        pyapi.gil_release(gil_state)    # release GIL
+
+        return context.get_dummy_value()
 else:
     class DatetimeDateType(types.Type):
         def __init__(self):
@@ -489,9 +539,6 @@ def impl_myref_pandas_dts_type(context, builder, sig, args):
 # func_dts_to_dt = tslib_cdll.pandas_datetimestruct_to_datetime
 # func_dts_to_dt.restype = ctypes.c_int64
 # func_dts_to_dt.argtypes = [ctypes.c_int, ctypes.c_void_p]
-import llvmlite.binding as ll
-ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
-ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
 
 sig = types.intp(
                 types.voidptr,             # C str

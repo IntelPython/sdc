@@ -89,6 +89,9 @@ class HiFrames(object):
         # FIXME: this is possibly fragile, maybe replace all series getitems
         # with a function and handle this after type inference
         self.ts_series_vars = set()
+        # remember datetime.date series due to special boxing, getitem etc.
+        self.dt_date_series_vars  = set()
+
         self.arrow_tables = {}
         self.reverse_copies = {}
         self.pq_handler = ParquetHandler(
@@ -234,6 +237,8 @@ class HiFrames(object):
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.ts_series_vars:
             self.ts_series_vars.add(lhs)
+        if isinstance(rhs, ir.Var) and rhs.name in self.dt_date_series_vars:
+            self.dt_date_series_vars.add(lhs)
         return [assign]
 
     def _run_call(self, assign, label):
@@ -696,6 +701,9 @@ class HiFrames(object):
             raise ValueError("lambda for map not found")
 
         out_typ = self._get_map_output_typ(rhs, col_var, func, label)
+        # remember datetime.date series due to special boxing, getitem etc.
+        if out_typ == datetime_date_type:
+            self.dt_date_series_vars.add(lhs.name)
 
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
@@ -1367,12 +1375,17 @@ class HiFrames(object):
             # assign column name to variable
             cname_var = ir.Var(inst.value.scope, mk_unique_var("$cname_const"), inst.loc)
             nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
+            series_arr = inst.value
 
             def f(_df, _cname, _arr):  # pragma: no cover
                 s = hpat.hiframes_api.set_df_col(_df, _cname, _arr)
 
+            if series_arr.name in self.dt_date_series_vars:
+                def f(_df, _cname, _arr):  # pragma: no cover
+                    s = hpat.pd_timestamp_ext.set_df_datetime_date(_df, _cname, _arr)
+
             f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [inst.target, cname_var, inst.value])
+            replace_arg_nodes(f_block, [inst.target, cname_var, series_arr])
             # copy propagate to enable string Const in typing and lowering
             simple_block_copy_propagate(f_block)
             nodes += f_block.body[:-3]  # remove none return

@@ -1,4 +1,7 @@
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+#include <iostream>
 
 extern "C" {
 
@@ -19,9 +22,6 @@ extern "C" {
 
 // TODO: call Pandas C libs directly and remove copy paste
 
-typedef int64_t npy_int64;
-typedef int32_t npy_int32;
-typedef int64_t npy_datetime;
 
 typedef struct {
         npy_int64 year;
@@ -55,6 +55,9 @@ int convert_datetimestruct_to_datetime(PANDAS_DATETIMEUNIT base,
                                        const pandas_datetimestruct *dts,
                                        npy_datetime *out);
 
+void* np_datetime_date_array_from_packed_ints(uint64_t *dt_data,
+                                    int64_t n_elems, PyObject* dt_date_class);
+
 PyMODINIT_FUNC PyInit_hdatetime_ext(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -63,11 +66,14 @@ PyMODINIT_FUNC PyInit_hdatetime_ext(void) {
     if (m == NULL)
         return NULL;
 
-    // // init numpy
-    // import_array();
+    // init numpy
+    import_array();
     //
     // PyObject_SetAttrString(m, "dt_to_timestamp",
     //                         PyLong_FromVoidPtr((void*)(&dt_to_timestamp)));
+
+    PyObject_SetAttrString(m, "np_datetime_date_array_from_packed_ints",
+                             PyLong_FromVoidPtr((void*)(&np_datetime_date_array_from_packed_ints)));
 
     PyObject_SetAttrString(m, "parse_iso_8601_datetime",
                              PyLong_FromVoidPtr((void*)(&parse_iso_8601_datetime)));
@@ -89,6 +95,40 @@ PyMODINIT_FUNC PyInit_hdatetime_ext(void) {
 //     ts->microsecond = out.us;
 //     ts->nanosecond = out.ps * 1000;
 // }
+
+inline PyObject* py_datetime_date_from_packed_int(uint64_t dt, PyObject* dt_date_class)
+{
+    uint64_t year = dt >> 32;
+    uint64_t month = (dt >> 16) & 0xFFFF;
+    uint64_t day = dt & 0xFFFF;
+    return PyObject_CallFunction(dt_date_class, "iii", year, month, day);
+}
+
+// given an array of packed integers for datetime.date (pd_timestamp_ext format),
+// create and return a pd.Series of datetime.date() objects
+void* np_datetime_date_array_from_packed_ints(uint64_t *dt_data, int64_t n_elems, PyObject* dt_date_class)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return NULL;}
+    auto gilstate = PyGILState_Ensure();
+
+    npy_intp dims[] = {n_elems};
+    PyObject* ret = PyArray_SimpleNew(1, dims, NPY_OBJECT);
+    CHECK(ret, "allocating numpy array failed");
+
+    for(int64_t i = 0; i < n_elems; ++i) {
+        PyObject * s = py_datetime_date_from_packed_int(dt_data[i], dt_date_class);
+        CHECK(s, "creating Python datetime.date object failed");
+        auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
+        CHECK(p, "getting offset in numpy array failed");
+        int err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        CHECK(err==0, "setting item in numpy array failed");
+        Py_DECREF(s);
+    }
+
+    PyGILState_Release(gilstate);
+    return ret;
+#undef CHECK
+}
 
 // XXX copy paste from Pandas for parse_iso_8601_datetime
 

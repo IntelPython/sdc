@@ -143,10 +143,13 @@ ext_str = Extension(name="hstr_ext",
 
 ext_dt = Extension(name="hdatetime_ext",
                    sources=["hpat/_datetime_ext.cpp"],
+                   libraries=np_compile_args['libraries'],
+                   define_macros = np_compile_args['define_macros'],
                    extra_compile_args=['-std=c++11'],
                    extra_link_args=['-std=c++11'],
-                   #**dt_args,
-                    language="c++"
+                   include_dirs = np_compile_args['include_dirs'],
+                   library_dirs = np_compile_args['library_dirs'],
+                   language="c++"
 )
 
 ext_quantile = Extension(name="quantile_alg",
