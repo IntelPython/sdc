@@ -179,15 +179,19 @@ if intdatetime:
                                     builder.shl(month, lir.Constant(lir.IntType(64), 16))))
         return nopython_date
 
-    def datetime_date_to_int(dt):
-        return dt
-
     @intrinsic
     def datetime_date_to_int(typingctx, dt_date_tp):
         assert dt_date_tp == datetime_date_type
         def codegen(context, builder, sig, args):
             return args[0]
         return signature(types.int64, datetime_date_type), codegen
+
+    @intrinsic
+    def int_to_datetime_date(typingctx, dt_date_tp):
+        assert dt_date_tp == types.intp
+        def codegen(context, builder, sig, args):
+            return args[0]
+        return signature(datetime_date_type, types.int64), codegen
 
     def set_df_datetime_date(df, cname, arr):
         df[cname] = arr

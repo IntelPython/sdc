@@ -30,7 +30,7 @@ import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
-                                    datetime_date_to_int)
+                                    datetime_date_to_int, int_to_datetime_date)
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
                 'quantile', 'count', 'describe']
@@ -189,6 +189,8 @@ class HiFrames(object):
                 self.df_cols.add(lhs)  # save lhs as column
                 if col_var.name in self.ts_series_vars:
                     self.ts_series_vars.add(lhs)
+                if col_var.name in self.dt_date_series_vars:
+                    self.dt_date_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
@@ -221,6 +223,25 @@ class HiFrames(object):
                 # output could be series in case of slice index
                 # FIXME: this is fragile
                 self.ts_series_vars.add(lhs)
+                return nodes
+
+            if (rhs.op in ['getitem', 'static_getitem']
+                    and rhs.value.name in self.dt_date_series_vars):
+                if rhs.op == 'getitem':
+                    ind_var = rhs.index
+                else:
+                    ind_var = rhs.index_var
+                def f(_dt_series, _ind):  # pragma: no cover
+                    _val = hpat.pd_timestamp_ext.int_to_datetime_date(_dt_series[_ind])
+
+                f_block = compile_to_numba_ir(
+                    f, {'hpat': hpat}).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [rhs.value, ind_var])
+                nodes = f_block.body[:-3]  # remove none return
+                nodes[-1].target = assign.target
+                # output could be series in case of slice index
+                # FIXME: this is fragile
+                self.dt_date_series_vars.add(lhs)
                 return nodes
 
         if isinstance(rhs, ir.Arg):
@@ -714,6 +735,8 @@ class HiFrames(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         if col_var.name in self.ts_series_vars:
             func_text += "    t = hpat.hiframes_api.ts_series_getitem(A, i)\n"
+        elif col_var.name in self.dt_date_series_vars:
+            func_text += "    t = int_to_datetime_date(A[i])\n"
         else:
             func_text += "    t = A[i]\n"
         if out_typ == datetime_date_type:
@@ -728,7 +751,8 @@ class HiFrames(object):
 
         _globals = self.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat,
-            'datetime_date_to_int': datetime_date_to_int})
+            'datetime_date_to_int': datetime_date_to_int,
+            'int_to_datetime_date': int_to_datetime_date})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
         topo_order = find_topo_order(f_ir.blocks)
@@ -772,6 +796,10 @@ class HiFrames(object):
         if col_var.name in self.ts_series_vars:
             def f(A):
                 t = hpat.hiframes_api.ts_series_getitem(A, 0)
+                return map_func(t)
+        if col_var.name in self.dt_date_series_vars:
+            def f(A):
+                t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
                 return map_func(t)
 
         _globals = self.func_ir.func_id.func.__globals__
@@ -1198,6 +1226,8 @@ class HiFrames(object):
             # remember that this variable is actually a Series
             self.df_cols.add(arg_var.name)
             self.ts_series_vars.add(arg_var.name)
+
+        # TODO: handle datetime.date() series
 
         # input dataframe arg
         # TODO: support distributed input
