@@ -29,7 +29,8 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
-from hpat.pd_timestamp_ext import timestamp_series_type
+from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
+                                    datetime_date_to_int)
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
                 'quantile', 'count', 'describe']
@@ -707,7 +708,10 @@ class HiFrames(object):
             func_text += "    t = hpat.hiframes_api.ts_series_getitem(A, i)\n"
         else:
             func_text += "    t = A[i]\n"
-        func_text += "    S[i] = map_func(t)\n"
+        if out_typ == datetime_date_type:
+            func_text += "    S[i] = datetime_date_to_int(map_func(t))\n"
+        else:
+            func_text += "    S[i] = map_func(t)\n"
         func_text += "  ret = S\n"
 
         loc_vars = {}
@@ -715,7 +719,8 @@ class HiFrames(object):
         f = loc_vars['f']
 
         _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat,
+            'datetime_date_to_int': datetime_date_to_int})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
         topo_order = find_topo_order(f_ir.blocks)

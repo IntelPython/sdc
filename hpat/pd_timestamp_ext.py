@@ -2,10 +2,10 @@ import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
-                             lower_getattr, infer_getattr, overload_method)
+                             lower_getattr, infer_getattr, overload_method, intrinsic)
 from numba import cgutils
 from numba.targets.boxing import unbox_array
-from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
+from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature
 
 import numpy as np
 import ctypes
@@ -172,6 +172,16 @@ if intdatetime:
                         builder.add(builder.shl(year, lir.Constant(lir.IntType(64), 32)),
                                     builder.shl(month, lir.Constant(lir.IntType(64), 16))))
         return nopython_date
+
+    def datetime_date_to_int(dt):
+        return dt
+
+    @intrinsic
+    def datetime_date_to_int(typingctx, dt_date_tp):
+        assert dt_date_tp == datetime_date_type
+        def codegen(context, builder, sig, args):
+            return args[0]
+        return signature(types.int64, datetime_date_type), codegen
 else:
     class DatetimeDateType(types.Type):
         def __init__(self):
