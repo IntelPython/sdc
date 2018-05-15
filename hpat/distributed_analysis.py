@@ -243,6 +243,10 @@ class DistributedAnalysis(object):
             # quantile doesn't affect input's distribution
             return
 
+        if fdef == ('nunique', 'hpat.hiframes_api'):
+            # nunique doesn't affect input's distribution
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return

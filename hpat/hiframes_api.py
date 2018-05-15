@@ -14,6 +14,7 @@ from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
+import hpat
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -71,11 +72,31 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 def nunique(A):  # pragma: no cover
     return len(set(A))
 
+def nunique_parallel(A):  # pragma: no cover
+    return len(set(A))
+
 @overload(nunique)
 def nunique_overload(arr_typ):
+    # TODO: extend to other types
+    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for nunique"
     def nunique_seq(A):
         return len(set(A))
     return nunique_seq
+
+@overload(nunique_parallel)
+def nunique_overload_parallel(arr_typ):
+    # TODO: extend to other types
+    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for nunique"
+    sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+    def nunique_par(A):
+        uniq_A = np.array(set(A))
+        (send_counts, recv_counts, send_disp, recv_disp, recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
+        send_arr = np.empty_like(uniq_A)
+        recv_arr = np.empty(recv_size, uniq_A.dtype)
+        hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
+        loc_nuniq = len(set(recv_arr))
+        return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
+    return nunique_par
 
 from numba.typing.arraydecl import _expand_integer
 
@@ -495,3 +516,17 @@ def typeof_pd_str_series(val, c):
 def np_array_array_overload(in_tp):
     if isinstance(in_tp, types.Array):
         return lambda a: a
+
+    if isinstance(in_tp, types.containers.Set):
+        # TODO: naive implementation, data from set can probably
+        # be copied to array more efficienty
+        dtype = in_tp.dtype
+        def f(in_set):
+            n = len(in_set)
+            arr = np.empty(n, dtype)
+            i = 0
+            for a in in_set:
+                arr[i] = a
+                i += 1
+            return arr
+        return f
