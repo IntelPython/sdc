@@ -33,7 +33,7 @@ from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
-                'quantile', 'count', 'describe']
+                'quantile', 'count', 'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
 
@@ -927,6 +927,8 @@ class HiFrames(object):
             return self._gen_col_std(out_var, args, col_var)
         if func == 'quantile':
             return self._gen_col_quantile(out_var, args, col_var)
+        if func == 'nunique':
+            return self._gen_col_nunique(out_var, args, col_var)
         if func == 'describe':
             return self._gen_col_describe(out_var, args, col_var)
         else:
@@ -1053,6 +1055,16 @@ class HiFrames(object):
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var, args[0]])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+        return nodes
+
+    def _gen_col_nunique(self, out_var, args, col_var):
+        def f(A):  # pragma: no cover
+            s = hpat.hiframes_api.nunique(A)
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [col_var])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = out_var
         return nodes

@@ -5,6 +5,8 @@ from numba import ir, ir_utils
 from numba import types
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
+from numba.extending import overload
+
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
 
@@ -66,6 +68,14 @@ def str_contains_regex(str_arr, pat):  # pragma: no cover
 def str_contains_noregex(str_arr, pat):  # pragma: no cover
     return 0
 
+def nunique(A):  # pragma: no cover
+    return len(set(A))
+
+@overload(nunique)
+def nunique_overload(arr_typ):
+    def nunique_seq(A):
+        return len(set(A))
+    return nunique_seq
 
 from numba.typing.arraydecl import _expand_integer
 
@@ -404,7 +414,6 @@ def lower_unbox_df_column(context, builder, sig, args):
     c.pyapi.decref(arr_obj)
     return native_val.value
 
-from numba.extending import overload
 
 
 @overload(fix_df_array)
