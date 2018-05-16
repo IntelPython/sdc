@@ -126,6 +126,14 @@ ext_dict = Extension(name="hdict_ext",
                      library_dirs = lid,
 )
 
+ext_set = Extension(name="hset_ext",
+                     sources=["hpat/_set_ext.cpp"],
+                     extra_compile_args = eca,
+                     extra_link_args = ela,
+                     include_dirs = ind,
+                     library_dirs = lid,
+)
+
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=['boost_regex'] + np_compile_args['libraries'],
@@ -219,7 +227,7 @@ ext_xenon_wrapper = Extension(name="hxe_ext",
                               extra_link_args = ela,
 )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_str, ext_quantile, ext_dt]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt]
 
 if _has_h5py:
     _ext_mods.append(ext_io)

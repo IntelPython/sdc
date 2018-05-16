@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import
 import numba
 from numba import *
 import hpat.dict_ext
+import hpat.set_ext
 import hpat.distributed_api
 from hpat.distributed_api import dist_time
 from hpat.dict_ext import DictIntInt, DictInt32Int32, dict_int_int_type, dict_int32_int32_type
