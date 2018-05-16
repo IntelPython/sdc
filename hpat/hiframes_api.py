@@ -77,8 +77,7 @@ def nunique_parallel(A):  # pragma: no cover
 
 @overload(nunique)
 def nunique_overload(arr_typ):
-    # TODO: extend to other types
-    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for nunique"
+    # TODO: extend to other types like datetime?
     def nunique_seq(A):
         return len(set(A))
     return nunique_seq
@@ -86,7 +85,7 @@ def nunique_overload(arr_typ):
 @overload(nunique_parallel)
 def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
-    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for nunique"
+    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     def nunique_par(A):
         uniq_A = np.array(set(A))
