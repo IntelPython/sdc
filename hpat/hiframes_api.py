@@ -88,7 +88,7 @@ def nunique_overload_parallel(arr_typ):
     assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     def nunique_par(A):
-        uniq_A = np.array(set(A))
+        uniq_A = hpat.utils.to_array(set(A))
         (send_counts, recv_counts, send_disp, recv_disp, recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
         send_arr = np.empty_like(uniq_A)
         recv_arr = np.empty(recv_size, uniq_A.dtype)

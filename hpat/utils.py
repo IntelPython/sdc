@@ -5,6 +5,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
+from numba.extending import overload
 import collections
 import numpy as np
 from hpat.str_arr_ext import string_array_type
@@ -187,3 +188,20 @@ def is_array(typemap, varname):
 def is_np_array(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], types.Array))
+
+# converts an iterable to array, similar to np.array, but can support
+# other things like StringArray
+# TODO: other types like datetime?
+def to_array(A):
+    return np.array(A)
+
+@overload(to_array)
+def to_array_overload(in_typ):
+    # try regular np.array and return it if it works
+    def to_array_impl(A):
+        return np.array(A)
+    try:
+        numba.njit(to_array_impl).get_call_template((in_typ,), {})
+        return to_array_impl
+    except:
+        pass  # should be handled elsewhere (e.g. Set)
