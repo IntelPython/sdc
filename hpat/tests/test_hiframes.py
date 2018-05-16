@@ -247,6 +247,15 @@ class TestHiFrames(unittest.TestCase):
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    def test_nunique_str(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+
     def test_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
