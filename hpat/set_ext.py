@@ -13,15 +13,6 @@ ll.add_symbol('insert_set_string', hset_ext.insert_set_string)
 ll.add_symbol('len_set_string', hset_ext.len_set_string)
 
 
-init_set_string = types.ExternalFunction("init_set_string",
-                                         set_string_type())
-
-add_set_string = types.ExternalFunction("insert_set_string",
-                                    types.void(set_string_type, string_type))
-
-len_set_string = types.ExternalFunction("len_set_string",
-                                    types.intp(set_string_type))
-
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
 
@@ -52,7 +43,14 @@ class SetIterType(types.BaseContainerIterator):
 
 register_model(SetType)(models.OpaqueModel)
 
+init_set_string = types.ExternalFunction("init_set_string",
+                                         set_string_type())
 
+add_set_string = types.ExternalFunction("insert_set_string",
+                                    types.void(set_string_type, string_type))
+
+len_set_string = types.ExternalFunction("len_set_string",
+                                    types.intp(set_string_type))
 
 # TODO: box set(string)
 
