@@ -8,7 +8,7 @@ from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
-from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
+from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type, _h5_typ_table
 import time
 from llvmlite import ir as lir
 import hdist
@@ -44,15 +44,6 @@ ll.add_symbol('permutation_array_index', hdist.permutation_array_index)
 # get size dynamically from C code
 mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
 
-_h5_typ_table = {
-    types.int8: 0,
-    types.uint8: 1,
-    types.int32: 2,
-    types.int64: 3,
-    types.float32: 4,
-    types.float64: 5,
-    types.uint64: 6
-}
 
 
 @lower_builtin(distributed_api.get_rank)

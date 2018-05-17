@@ -36,6 +36,7 @@ void hpat_dist_waitall(int size, MPI_Request *req);
 
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
+void c_alltoall(void* send_data, void* recv_data, int count, int typ_enum);
 int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
 void allgather(void* out_data, int size, void* in_data, int type_enum);
 MPI_Request *comm_req_alloc(int size);
@@ -113,6 +114,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
     PyObject_SetAttrString(m, "c_alltoallv",
                             PyLong_FromVoidPtr((void*)(&c_alltoallv)));
+    PyObject_SetAttrString(m, "c_alltoall",
+                            PyLong_FromVoidPtr((void*)(&c_alltoall)));
     PyObject_SetAttrString(m, "allgather",
                             PyLong_FromVoidPtr((void*)(&allgather)));
     PyObject_SetAttrString(m, "comm_req_alloc",
@@ -446,6 +449,12 @@ void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
     MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
     MPI_Alltoallv(send_data, send_counts, send_disp, mpi_typ,
         recv_data, recv_counts, recv_disp, mpi_typ, MPI_COMM_WORLD);
+}
+
+void c_alltoall(void* send_data, void* recv_data, int count, int typ_enum)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
+    MPI_Alltoall(send_data, count, mpi_typ, recv_data, count, mpi_typ, MPI_COMM_WORLD);
 }
 
 MPI_Request *comm_req_alloc(int size)

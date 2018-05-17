@@ -1,8 +1,14 @@
+import numpy as np
+import numba
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
-from numba.extending import models, register_model
+from numba.extending import models, register_model, intrinsic, overload
 import time
+from llvmlite import ir as lir
+import hdist
+import llvmlite.binding as ll
+ll.add_symbol('c_alltoall', hdist.c_alltoall)
 
 from enum import Enum
 
@@ -18,6 +24,33 @@ class Reduce_Type(Enum):
     Argmin = 4
     Argmax = 5
 
+_h5_typ_table = {
+    types.int8: 0,
+    types.uint8: 1,
+    types.int32: 2,
+    types.int64: 3,
+    types.float32: 4,
+    types.float64: 5,
+    types.uint64: 6
+}
+
+def get_type_enum(arr):
+    return np.int32(-1)
+
+@overload(get_type_enum)
+def get_type_enum_overload(arr_typ):
+    typ_val = _h5_typ_table[arr_typ.dtype]
+    return lambda a: np.int32(typ_val)
+
+INT_MAX = np.iinfo(np.int32).max
+_alltoall = types.ExternalFunction("c_alltoall", types.void(types.voidptr, types.voidptr, types.int32, types.int32))
+
+@numba.njit
+def alltoall(send_arr, recv_arr, count):
+    # TODO: handle int64 counts
+    assert count < INT_MAX
+    type_enum = get_type_enum(send_arr)
+    _alltoall(send_arr.ctypes, recv_arr.ctypes, np.int32(count), type_enum)
 
 def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""
@@ -100,7 +133,6 @@ def rebalance_array(A):
 def rebalance_array_parallel(A):
     return A
 
-from numba.extending import overload
 
 @overload(rebalance_array)
 @overload(dist_return)

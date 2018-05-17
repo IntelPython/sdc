@@ -442,6 +442,17 @@ ll.add_symbol('timsort', chiframes.timsort)
 import hdist
 ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
 
+@numba.njit
+def send_recv_counts_new(key_arr):
+    n_pes = hpat.distributed_api.get_size()
+    send_counts = np.zeros(n_pes, np.int32)
+    recv_counts = np.empty(n_pes, np.int32)
+    for i in range(len(key_arr)):
+        node_id = hash(key_arr[i]) % n_pes
+        send_counts[node_id] += 1
+    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
+    return send_counts, recv_counts
+
 
 @lower_builtin(get_sendrecv_counts, types.Array)
 def lower_get_sendrecv_counts(context, builder, sig, args):
