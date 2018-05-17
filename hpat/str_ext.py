@@ -1,7 +1,7 @@
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
-                             type_callable)
+                             type_callable, overload_method)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
@@ -75,6 +75,12 @@ def box_char(typ, val, c):
 
 del_str = types.ExternalFunction("del_str", types.void(string_type))
 _hash_str = types.ExternalFunction("_hash_str", types.int64(string_type))
+get_char_ptr = types.ExternalFunction("get_char_ptr", types.voidptr(string_type))
+
+@overload_method(StringType, 'c_str')
+def str_c_str(str_typ):
+    return lambda s: get_char_ptr(s)
+
 
 @overload(hash)
 def hash_overload(str_typ):
