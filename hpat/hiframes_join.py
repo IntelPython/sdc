@@ -378,6 +378,7 @@ class CBufferType(types.Opaque):
 
 
 c_buffer_type = CBufferType()
+# ctypes_int32_typ = types.ArrayCTypes(types.Array(types.int32, 1, 'C'))
 
 register_model(CBufferType)(models.OpaqueModel)
 
@@ -454,6 +455,14 @@ def send_recv_counts_new(key_arr):
     return send_counts, recv_counts
 
 
+@numba.njit
+def calc_disp(arr):
+    disp = np.empty_like(arr)
+    disp[0] = 0
+    for i in range(1, len(arr)):
+        disp[i] = disp[i-1] + arr[i-1]
+    return disp
+
 @lower_builtin(get_sendrecv_counts, types.Array)
 def lower_get_sendrecv_counts(context, builder, sig, args):
     # prepare buffer args
@@ -489,6 +498,15 @@ def lower_get_sendrecv_counts(context, builder, sig, args):
                                  c_buffer_type, types.intp])
     return context.make_tuple(builder, out_tuple_typ, items)
 
+@lower_builtin(shuffle_data, types.Array, types.Array, types.Array,
+              types.Array, types.VarArg(types.Any))
+def lower_shuffle_arr(context, builder, sig, args):
+    args[0] = make_array(sig.args[0])(context, builder, args[0]).data
+    args[1] = make_array(sig.args[1])(context, builder, args[1]).data
+    args[2] = make_array(sig.args[2])(context, builder, args[2]).data
+    args[3] = make_array(sig.args[3])(context, builder, args[3]).data
+    sig.args = (c_buffer_type, c_buffer_type, c_buffer_type, c_buffer_type, *sig.args[4:])
+    return lower_shuffle(context, builder, sig, args)
 
 @lower_builtin(shuffle_data, c_buffer_type, c_buffer_type, c_buffer_type,
                c_buffer_type, types.VarArg(types.Any))
@@ -497,6 +515,12 @@ def lower_shuffle(context, builder, sig, args):
     assert (len(args) - 4) % 3 == 0
     num_cols = (len(args) - 4) // 3
     send_counts, recv_counts, send_disp, recv_disp = args[:4]
+
+    send_counts = builder.bitcast(send_counts, lir.IntType(8).as_pointer())
+    recv_counts = builder.bitcast(recv_counts, lir.IntType(8).as_pointer())
+    send_disp = builder.bitcast(send_disp, lir.IntType(8).as_pointer())
+    recv_disp = builder.bitcast(recv_disp, lir.IntType(8).as_pointer())
+
     col_names = ["c" + str(i) for i in range(num_cols)]
     send_names = ["send_c" + str(i) for i in range(num_cols)]
     # create send buffer building function

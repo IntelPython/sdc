@@ -89,7 +89,12 @@ def nunique_overload_parallel(arr_typ):
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     def nunique_par(A):
         uniq_A = hpat.utils.to_array(set(A))
-        (send_counts, recv_counts, send_disp, recv_disp, recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
+        send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
+        send_disp = hpat.hiframes_join.calc_disp(send_counts)
+        recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
+        recv_size = recv_counts.sum()
+        # (send_counts, recv_counts, send_disp, recv_disp,
+        #  recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
         send_arr = np.empty_like(uniq_A)
         recv_arr = np.empty(recv_size, uniq_A.dtype)
         hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
