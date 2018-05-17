@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
 import numpy as np
+import pyarrow.parquet as pq
 import hpat
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -255,6 +256,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+
+    def test_nunique_str_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return df.two.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
 
     def test_describe(self):
         def test_impl(n):
