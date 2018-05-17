@@ -4,7 +4,7 @@ from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
 import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr, intrinsic)
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr, intrinsic, overload_method)
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
@@ -73,6 +73,22 @@ class StringArrayModel(models.StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+@intrinsic
+def num_total_chars(typingctx, str_arr_typ):
+    def codegen(context, builder, sig, args):
+        in_str_arr, = args
+        dtype = StringArrayPayloadType()
+
+        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+        offset_ptr32 = builder.bitcast(string_array.offsets, lir.IntType(32).as_pointer())
+        return builder.load(builder.gep(offset_ptr32, [string_array.size]))
+
+    return types.uint32(string_array_type), codegen
 
 @infer
 class GetItemStringArray(AbstractTemplate):
