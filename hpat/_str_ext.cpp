@@ -49,6 +49,7 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
 
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
+void convert_len_arr_to_offset(uint32_t *offsets, int64_t num_strs);
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_str(std::string* str);
@@ -118,6 +119,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&allocate_string_array)));
     PyObject_SetAttrString(m, "setitem_string_array",
                             PyLong_FromVoidPtr((void*)(&setitem_string_array)));
+    PyObject_SetAttrString(m, "convert_len_arr_to_offset",
+                            PyLong_FromVoidPtr((void*)(&convert_len_arr_to_offset)));
     PyObject_SetAttrString(m, "getitem_string_array",
                             PyLong_FromVoidPtr((void*)(&getitem_string_array)));
     PyObject_SetAttrString(m, "getitem_string_array_std",
@@ -298,6 +301,18 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
     memcpy(&data[start], str->c_str(), len);
     offsets[index+1] = start+len;
     return;
+}
+
+void convert_len_arr_to_offset(uint32_t *offsets, int64_t num_strs)
+{
+    uint32_t curr_offset = 0;
+    for(int64_t i=0; i<num_strs; i++)
+    {
+        uint32_t val = offsets[i];
+        offsets[i] = curr_offset;
+        curr_offset += val;
+    }
+    offsets[num_strs] = curr_offset;
 }
 
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index)

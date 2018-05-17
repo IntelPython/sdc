@@ -87,6 +87,8 @@ def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     if arr_typ == string_array_type:
+        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
+        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
         def nunique_par_str(A):
             uniq_A = hpat.utils.to_array(set(A))
             n_strs = len(uniq_A)
@@ -125,10 +127,15 @@ def nunique_overload_parallel(arr_typ):
                 tmp_offset_chars[node_id] += len(str)
                 hpat.str_ext.del_str(str)
 
-            # hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
-            # loc_nuniq = len(set(recv_arr))
-            # return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
-            return 0
+            # shuffle len values
+            offset_ptr = hpat.str_arr_ext.get_offset_ptr(recv_arr)
+            c_alltoallv(send_arr_lens.ctypes, offset_ptr, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, int32_typ_enum)
+            data_ptr = hpat.str_arr_ext.get_data_ptr(recv_arr)
+            # shuffle char values
+            c_alltoallv(send_arr_chars.ctypes, data_ptr, send_chars_count.ctypes, recv_chars_count.ctypes, send_disp_chars.ctypes, recv_disp_chars.ctypes, char_typ_enum)
+            convert_len_arr_to_offset(offset_ptr, recv_size)
+            loc_nuniq = len(set(recv_arr))
+            return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
         return nunique_par_str
 
     assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
@@ -146,6 +153,9 @@ def nunique_overload_parallel(arr_typ):
         loc_nuniq = len(set(recv_arr))
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
     return nunique_par
+
+c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))
+convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 
 # TODO: refactor with join
 @numba.njit

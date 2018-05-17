@@ -225,6 +225,7 @@ ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
 ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
 ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
+ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
 
 import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
