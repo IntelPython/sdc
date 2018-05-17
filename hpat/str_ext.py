@@ -75,11 +75,11 @@ def box_char(typ, val, c):
 
 del_str = types.ExternalFunction("del_str", types.void(string_type))
 _hash_str = types.ExternalFunction("_hash_str", types.int64(string_type))
-get_char_ptr = types.ExternalFunction("get_char_ptr", types.voidptr(string_type))
+get_c_str = types.ExternalFunction("get_c_str", types.voidptr(string_type))
 
 @overload_method(StringType, 'c_str')
 def str_c_str(str_typ):
-    return lambda s: get_char_ptr(s)
+    return lambda s: get_c_str(s)
 
 
 @overload(hash)
