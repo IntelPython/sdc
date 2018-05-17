@@ -449,6 +449,7 @@ def send_recv_counts_new(key_arr):
     send_counts = np.zeros(n_pes, np.int32)
     recv_counts = np.empty(n_pes, np.int32)
     for i in range(len(key_arr)):
+        # TODO: delete string
         node_id = hash(key_arr[i]) % n_pes
         send_counts[node_id] += 1
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
