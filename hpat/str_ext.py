@@ -14,6 +14,7 @@ import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
 ll.add_symbol('del_str', hstr_ext.del_str)
+ll.add_symbol('_hash_str', hstr_ext.hash_str)
 
 class StringType(types.Opaque):
     def __init__(self):
@@ -73,6 +74,12 @@ def box_char(typ, val, c):
     return pystr
 
 del_str = types.ExternalFunction("del_str", types.void(string_type))
+_hash_str = types.ExternalFunction("_hash_str", types.int64(string_type))
+
+@overload(hash)
+def hash_overload(str_typ):
+    if str_typ == string_type:
+        return lambda s: _hash_str(s)
 
 @infer
 class StringAdd(ConcreteTemplate):
