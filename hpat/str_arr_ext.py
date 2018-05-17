@@ -4,7 +4,7 @@ from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
 import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr)
+                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr, intrinsic)
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
@@ -278,6 +278,40 @@ def impl_string_array_single(context, builder, sig, args):
     #context.nrt.decref(builder, ty, ret)
 
     return impl_ret_new_ref(context, builder, typ, ret)
+
+@intrinsic
+def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ):
+    assert num_strs_typ == types.intp and num_total_chars_typ == types.intp
+    def codegen(context, builder, sig, args):
+        num_strs, num_total_chars = args
+        dtype = StringArrayPayloadType()
+        meminfo, data_pointer = construct_string_array(context, builder)
+
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder)
+        string_array.size = num_strs
+
+        # allocate string array
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(64)])
+        fn_alloc = builder.module.get_or_insert_function(fnty,
+                                                         name="allocate_string_array")
+        builder.call(fn_alloc, [string_array._get_ptr_by_name('offsets'),
+                                string_array._get_ptr_by_name('data'),
+                                num_strs,
+                                num_total_chars])
+
+        builder.store(string_array._getvalue(), data_pointer)
+        inst_struct = context.make_helper(builder, string_array_type)
+        inst_struct.meminfo = meminfo
+        ret = inst_struct._getvalue()
+        #context.nrt.decref(builder, ty, ret)
+
+        return impl_ret_new_ref(context, builder, string_array_type, ret)
+
+    return string_array_type(types.intp, types.intp), codegen
 
 
 @box(StringArrayType)
