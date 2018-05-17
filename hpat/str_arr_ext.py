@@ -90,6 +90,39 @@ def num_total_chars(typingctx, str_arr_typ):
 
     return types.uint32(string_array_type), codegen
 
+
+@intrinsic
+def get_offset_ptr(typingctx, str_arr_typ):
+    def codegen(context, builder, sig, args):
+        in_str_arr, = args
+        dtype = StringArrayPayloadType()
+
+        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+        return string_array.offsets
+
+    return types.voidptr(string_array_type), codegen
+
+@intrinsic
+def get_data_ptr(typingctx, str_arr_typ):
+    def codegen(context, builder, sig, args):
+        in_str_arr, = args
+        dtype = StringArrayPayloadType()
+
+        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+        return string_array.data
+
+    return types.voidptr(string_array_type), codegen
+
 @infer
 class GetItemStringArray(AbstractTemplate):
     key = "getitem"
