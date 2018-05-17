@@ -13,6 +13,7 @@ import hpat
 import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
+ll.add_symbol('del_str', hstr_ext.del_str)
 
 class StringType(types.Opaque):
     def __init__(self):
@@ -70,6 +71,8 @@ def box_char(typ, val, c):
     pystr = c.pyapi.string_from_string_and_size(c_str, c.context.get_constant(types.intp, 1))
     # TODO: delete ptr
     return pystr
+
+del_str = types.ExternalFunction("del_str", types.void(string_type))
 
 @infer
 class StringAdd(ConcreteTemplate):

@@ -70,7 +70,7 @@ def init_set_string_array(in_typ):
             for i in range(n):
                 str = str_arr[i]
                 str_set.add(str)
-            #     hpat.str_ext.delete_str(str)
+                hpat.str_ext.del_str(str)
             return str_set
         return f
 

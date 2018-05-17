@@ -63,6 +63,7 @@ void* str_from_int32(int in);
 void* str_from_int64(int64_t in);
 void* str_from_float32(float in);
 void* str_from_float64(double in);
+void del_str(std::string* in_str);
 void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
                                                             std::string* path);
 
@@ -140,6 +141,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_from_float32)));
     PyObject_SetAttrString(m, "str_from_float64",
                             PyLong_FromVoidPtr((void*)(&str_from_float64)));
+    PyObject_SetAttrString(m, "del_str",
+                            PyLong_FromVoidPtr((void*)(&del_str)));
     PyObject_SetAttrString(m, "c_glob",
                             PyLong_FromVoidPtr((void*)(&c_glob)));
     return m;
@@ -162,6 +165,12 @@ void dtor_string(std::string** in_str, int64_t size, void* info)
     printf("dtor size: %ld\n", size); fflush(stdout);
     // std::cout<<"del str: "<< (*in_str)->c_str() <<std::endl;
     // delete (*in_str);
+    return;
+}
+
+void del_str(std::string* in_str)
+{
+    delete in_str;
     return;
 }
 
