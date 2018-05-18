@@ -434,8 +434,13 @@ class HiFrames(object):
             raise ValueError(
                 "only a list/tuple argument is supported in concat")
         df_list = guard(get_definition, self.func_ir, rhs.args[0])
-        assert isinstance(df_list, ir.Expr) and df_list.op in ['build_tuple',
-                                                               'build_list']
+        if not isinstance(df_list, ir.Expr) or not (df_list.op
+                                            in ['build_tuple', 'build_list']):
+            raise ValueError("pd.concat input should be constant list or tuple")
+
+        if len(df_list.items) == 0:
+            # copied error from pandas
+            raise ValueError("No objects to concatenate")
 
         nodes = []
         done_cols = {}
