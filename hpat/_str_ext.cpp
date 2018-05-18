@@ -49,6 +49,10 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
 
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
+void set_string_array_range(uint32_t *out_offsets, char *out_data,
+                            uint32_t *in_offsets, char *in_data,
+                            int64_t start_str_ind, int64_t start_chars_ind,
+                            int64_t num_strs, uint32_t num_chars);
 void convert_len_arr_to_offset(uint32_t *offsets, int64_t num_strs);
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
@@ -119,6 +123,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&allocate_string_array)));
     PyObject_SetAttrString(m, "setitem_string_array",
                             PyLong_FromVoidPtr((void*)(&setitem_string_array)));
+    PyObject_SetAttrString(m, "set_string_array_range",
+                            PyLong_FromVoidPtr((void*)(&set_string_array_range)));
     PyObject_SetAttrString(m, "convert_len_arr_to_offset",
                             PyLong_FromVoidPtr((void*)(&convert_len_arr_to_offset)));
     PyObject_SetAttrString(m, "getitem_string_array",
@@ -300,6 +306,29 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
     // std::cout << "start " << start << " len " << len << std::endl;
     memcpy(&data[start], str->c_str(), len);
     offsets[index+1] = start+len;
+    return;
+}
+
+void set_string_array_range(uint32_t *out_offsets, char *out_data,
+                            uint32_t *in_offsets, char *in_data,
+                            int64_t start_str_ind, int64_t start_chars_ind,
+                            int64_t num_strs, uint32_t num_chars)
+{
+    // printf("%d %d\n", start_str_ind, start_chars_ind); fflush(stdout);
+    uint32_t curr_offset = 0;
+    if (start_str_ind!=0)
+        curr_offset = out_offsets[start_str_ind];
+
+    // set offsets
+    for (size_t i=0; i<num_strs; i++)
+    {
+        out_offsets[start_str_ind+i] = curr_offset;
+        int32_t len = in_offsets[i+1]-in_offsets[i];
+        curr_offset += len;
+    }
+    out_offsets[start_str_ind+num_strs] = curr_offset;
+    // copy all chars
+    memcpy(out_data+start_chars_ind, in_data, num_chars);
     return;
 }
 

@@ -458,6 +458,7 @@ class HiFrames(object):
         return self._handle_concat_series(lhs, rhs)
 
     def _handle_concat_df(self, lhs, df_list, label):
+        # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
         done_cols = {}
         i = 0
@@ -515,9 +516,10 @@ class HiFrames(object):
         return nodes
 
     def _handle_concat_series(self, lhs, rhs):
+        # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            concat_arr = np.concatenate(arr_list)
-        f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
+            concat_arr = hpat.hiframes_api.concat(arr_list)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, rhs.args)
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs

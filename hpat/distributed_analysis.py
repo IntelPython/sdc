@@ -247,6 +247,11 @@ class DistributedAnalysis(object):
             # nunique doesn't affect input's distribution
             return
 
+        if fdef == ('concat', 'hpat.hiframes_api'):
+            # hiframes concat is similar to np.concatenate
+            self._analyze_call_np_concatenate(lhs, args, array_dists)
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return

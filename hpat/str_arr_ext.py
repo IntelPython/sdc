@@ -226,6 +226,7 @@ ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
 ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
 ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
+ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
 
 import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
@@ -363,6 +364,57 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ):
 
     return string_array_type(types.intp, types.intp), codegen
 
+@intrinsic
+def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_typ):
+    assert out_typ == string_array_type and in_typ == string_array_type
+    assert curr_str_typ == types.intp and curr_chars_typ == types.intp
+    def codegen(context, builder, sig, args):
+        out_arr, in_arr, curr_str_ind, curr_chars_ind = args
+        dtype = StringArrayPayloadType()
+
+        # get output struct
+        inst_struct = context.make_helper(builder, string_array_type, out_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        out_string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+
+        # get input struct
+        inst_struct = context.make_helper(builder, string_array_type, in_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        in_string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+
+        offset_ptr32 = builder.bitcast(in_string_array.offsets, lir.IntType(32).as_pointer())
+        in_num_chars = builder.load(builder.gep(offset_ptr32, [in_string_array.size]))
+
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(64),
+                                 lir.IntType(64),
+                                 lir.IntType(64),
+                                 lir.IntType(32),])
+        fn_alloc = builder.module.get_or_insert_function(fnty,
+                                                         name="set_string_array_range")
+        builder.call(fn_alloc, [out_string_array.offsets,
+                                out_string_array.data,
+                                in_string_array.offsets,
+                                in_string_array.data,
+                                curr_str_ind,
+                                curr_chars_ind,
+                                in_string_array.size,
+                                in_num_chars,
+                                ])
+
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type, types.intp, types.intp), codegen
 
 @box(StringArrayType)
 def box_str(typ, val, c):
