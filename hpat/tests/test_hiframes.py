@@ -499,6 +499,21 @@ class TestHiFrames(unittest.TestCase):
         n = 11111
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_concat_series(self):
+        def test_impl(n):
+            df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})
+            df2 = pd.DataFrame({'key2': n-np.arange(n), 'A': n+np.arange(n)+1.0})
+            A3 = pd.concat([df1.A, df2.A])
+            return A3.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        n = 11111
+        self.assertEqual(hpat_func(n), test_impl(n))
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
