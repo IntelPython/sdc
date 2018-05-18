@@ -434,7 +434,8 @@ class HiFrames(object):
             raise ValueError(
                 "only a list/tuple argument is supported in concat")
         df_list = guard(get_definition, self.func_ir, rhs.args[0])
-        assert isinstance(df_list, ir.Expr) and df_list.op == 'build_list'
+        assert isinstance(df_list, ir.Expr) and df_list.op in ['build_tuple',
+                                                               'build_list']
 
         nodes = []
         done_cols = {}
