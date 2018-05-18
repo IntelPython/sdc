@@ -81,6 +81,16 @@ ela = ['-std=c++11',]
 
 MPI_LIBS = ['mpi']
 H5_CPP_FLAGS = []
+
+use_impi = False
+if use_impi:
+    MPI_ROOT = os.environ['I_MPI_ROOT']
+    MPI_INC = MPI_ROOT+'/include64/'
+    MPI_LIBDIR = MPI_ROOT+'/lib64/'
+    MPI_LIBS = [ 'mpifort', 'mpi' , 'mpigi']
+    ind = [PREFIX_DIR+'/include', MPI_INC]
+    lid = [PREFIX_DIR+'/lib', MPI_LIBDIR]
+
 if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi', 'impicxx']
