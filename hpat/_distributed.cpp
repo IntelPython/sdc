@@ -54,6 +54,7 @@ void permutation_int(int64_t* output, int n);
 void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
                              unsigned char *rhs, int64_t *p, int64_t p_len);
 int hpat_finalize();
+void fix_i_malloc();
 int hpat_dummy_ptr[64];
 void* hpat_get_dummy_ptr() {
     return hpat_dummy_ptr;
@@ -136,6 +137,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
     PyObject_SetAttrString(
         m, "permutation_array_index",
         PyLong_FromVoidPtr((void*)(&permutation_array_index)));
+    PyObject_SetAttrString(m, "fix_i_malloc",
+                            PyLong_FromVoidPtr((void*)(&fix_i_malloc)));
 
     // add actual int value to module
     PyObject_SetAttrString(m, "mpi_req_num_bytes",
@@ -811,3 +814,18 @@ void oneD_reshape_shuffle(char* output,
     delete[] send_disp;
     delete[] recv_disp;
 }
+
+// fix for tensorflows MKL support that overwrites Intel mallocs,
+// which causes Intel MPI to crash.
+#ifdef I_MPI_VERSION
+#include "i_malloc.h"
+void fix_i_malloc()
+{
+    i_malloc = malloc;
+    i_calloc = calloc;
+    i_realloc = realloc;
+    i_free = free;
+}
+#else
+void fix_i_malloc() {}
+#endif
