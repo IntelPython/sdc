@@ -442,6 +442,22 @@ class HiFrames(object):
             # copied error from pandas
             raise ValueError("No objects to concatenate")
 
+        first_varname = df_list.items[0].name
+        # the inputs should be either dataframe or series
+        if not (first_varname in self.df_vars
+                or first_varname in self.df_cols):
+            raise ValueError("pd.concat input should be pd.Series or pd.DataFrame")
+
+        if first_varname in self.df_vars:
+            return self._handle_concat_df(lhs, df_list, label)
+        assert first_varname in self.df_cols
+        # XXX convert build_list to build_tuple since Numba doesn't handle list of
+        # arrays
+        if df_list.op == 'build_list':
+            df_list.op = 'build_tuple'
+        return self._handle_concat_series(lhs, rhs)
+
+    def _handle_concat_df(self, lhs, df_list, label):
         nodes = []
         done_cols = {}
         i = 0
@@ -496,6 +512,16 @@ class HiFrames(object):
                 done_cols[c] = nodes[-1].target
 
         self._create_df(lhs.name, done_cols, label)
+        return nodes
+
+    def _handle_concat_series(self, lhs, rhs):
+        def f(arr_list):  # pragma: no cover
+            concat_arr = np.concatenate(arr_list)
+        f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, rhs.args)
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        self.df_cols.add(lhs.name)
         return nodes
 
     def _handle_ros(self, assign, lhs, rhs):
