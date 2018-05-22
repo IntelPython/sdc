@@ -625,7 +625,8 @@ class HiFrames(object):
                 break
 
         # remove duplicates with set() since a column can be used multiple times
-        Row = namedtuple(func_mod.name, set(used_cols))
+        used_cols = set(used_cols)
+        Row = namedtuple(func_mod.name, used_cols)
         # TODO: handle non numpy alloc types
         # prange func to inline
         col_name_args = ', '.join(["c"+str(i) for i in range(len(used_cols))])
