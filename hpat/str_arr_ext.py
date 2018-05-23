@@ -1,12 +1,14 @@
+import numpy as np
 import numba
 import hpat
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
 import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox, lower_getattr, intrinsic, overload_method)
+                             make_attribute_wrapper, lower_builtin, box, unbox,
+                             lower_getattr, intrinsic, overload_method, overload)
 from numba import cgutils
-from hpat.str_ext import string_type
+from hpat.str_ext import string_type, del_str
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from glob import glob
 
@@ -73,6 +75,18 @@ class StringArrayModel(models.StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+# TODO: fix overload for things like 'getitem'
+# @overload('getitem')
+# def str_arr_getitem_bool_overload(str_arr_tp, bool_arr_tp):
+#     import pdb; pdb.set_trace()
+#     if str_arr_tp == string_array_type and bool_arr_tp == types.Array(types.bool_, 1, 'C'):
+#         def str_arr_bool_impl(str_arr, bool_arr):
+#             n = len(str_arr)
+#             if n!=len(bool_arr):
+#                 raise IndexError("boolean index did not match indexed array along dimension 0")
+#             return str_arr
+#         return str_arr_bool_impl
+
 @intrinsic
 def num_total_chars(typingctx, str_arr_typ):
     def codegen(context, builder, sig, args):
@@ -133,9 +147,10 @@ class GetItemStringArray(AbstractTemplate):
         if isinstance(ary, StringArrayType):
             if isinstance(idx, types.SliceType):
                 return signature(string_array_type, *args)
-            else:
-                assert isinstance(idx, types.Integer)
+            elif isinstance(idx, types.Integer):
                 return signature(string_type, *args)
+            elif idx == types.Array(types.bool_, 1, 'C'):
+                return signature(string_array_type, *args)
 
 
 @infer
@@ -202,8 +217,6 @@ def str_arr_size_impl(context, builder, typ, val):
 #     return string_array._getvalue()
 
 
-from numba.extending import overload
-
 
 @overload(len)
 def str_arr_len_overload(str_arr):
@@ -232,6 +245,8 @@ import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)
 
+setitem_string_array = types.ExternalFunction("setitem_string_array",
+            types.void(types.voidptr, types.voidptr, string_type, types.intp))
 
 def construct_string_array(context, builder):
     typ = string_array_type
@@ -461,8 +476,33 @@ def lower_string_arr_getitem(context, builder, sig, args):
     return builder.call(fn_getitem, [string_array.offsets,
                                      string_array.data, args[1]])
 
+@lower_builtin('getitem', StringArrayType, types.Array(types.bool_, 1, 'C'))
+def lower_string_arr_getitem_bool(context, builder, sig, args):
+    def str_arr_bool_impl(str_arr, bool_arr):
+        n = len(str_arr)
+        if n != len(bool_arr):
+            raise IndexError("boolean index did not match indexed array along dimension 0")
+        n_strs = 0
+        n_chars = 0
+        for i in range(n):
+            if bool_arr[i] == True:
+                # TODO: use get_cstr_and_len instead of getitem
+                str = str_arr[i]
+                n_strs += 1
+                n_chars += len(str)
+                del_str(str)
+        out_arr = pre_alloc_string_array(n_strs, n_chars)
+        str_ind = 0
+        for i in range(n):
+            if bool_arr[i] == True:
+                str = str_arr[i]
+                setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), str, str_ind)
+                str_ind += 1
+                del_str(str)
+        return out_arr
+    res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
+    return res
 
-import numpy as np
 
 @typeof_impl.register(np.ndarray)
 def typeof_np_string(val, c):
