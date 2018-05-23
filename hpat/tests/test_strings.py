@@ -114,6 +114,14 @@ class TestString(unittest.TestCase):
         self.assertTrue(isinstance(ds, np.ndarray) and isinstance(rs, np.ndarray))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] == True and rs[2] == False)
 
+    def test_string_array_bool_getitem(self):
+        def test_impl():
+            A = StringArray(['ABC', 'BB', 'CDEF'])
+            B = A=='ABC'
+            C = A[B]
+            return len(C) == 1 and C[0] == 'ABC'
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), True)
 
 if __name__ == "__main__":
     unittest.main()
