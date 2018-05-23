@@ -285,6 +285,9 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
+            return self._df_len(lhs, rhs.args[0])
+
         if fdef == ('DatetimeIndex', 'pandas'):
             return self._handle_pd_DatetimeIndex(assign, lhs, rhs)
 
@@ -381,6 +384,22 @@ class HiFrames(object):
         self.ts_series_vars.add(output_arr.name)
         return f_ir.blocks
 
+    def _df_len(self, lhs, df_var):
+        # run len on one of the columns
+        # FIXME: it could potentially avoid remove dead for the column if
+        # array analysis doesn't replace len() with it's size
+        df_arrs = list(self.df_vars[df_var.name].values())
+        # empty dataframe has 0 len
+        if len(df_arrs) == 0:
+            return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
+        arr = df_arrs[0]
+        def f(df_arr):  # pragma: no cover
+            df_len = len(df_arr)
+        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        return nodes
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
