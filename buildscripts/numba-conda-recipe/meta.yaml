@@ -45,8 +45,6 @@ test:
     - scipy
     - ipython
     - setuptools
-  files:
-    - mandel.py
   commands:
     # Check Numba executables are there
     - pycc -h
