@@ -1916,21 +1916,34 @@ class DistributedPass(object):
         return new_blocks
 
     def _file_open_set_parallel(self, file_varname):
-        for label, block in self.func_ir.blocks.items():
-            for stmt in block.body:
-                if (isinstance(stmt, ir.Assign)
-                        and stmt.target.name == file_varname):
-                    rhs = stmt.value
-                    assert isinstance(rhs, ir.Expr) and rhs.op == 'call'
-                    call_name = self._call_table[rhs.func.name][0]
-                    if call_name == 'h5create_group':
-                        # if read/write call is on a group, find its actual file
-                        f_varname = rhs.args[0].name
-                        self._file_open_set_parallel(f_varname)
-                        return
-                    else:
-                        assert call_name == 'File'
-                        rhs.args[2] = self._set1_var
+        file_var_def = get_definition(self.func_ir, file_varname)
+        assert isinstance(file_var_def, ir.Expr) and file_var_def.op == 'call'
+        fdef = find_callname(self.func_ir, file_var_def)
+        # TODO: add group unittest
+        if fdef == ('h5create_group', 'hpat.pio_api'):
+            # if read/write call is on a group, find its actual file
+            f_varname = file_var_def.args[0].name
+            self._file_open_set_parallel(f_varname)
+            return
+        else:
+            assert fdef == ('File', 'h5py')
+            file_var_def.args[2] = self._set1_var
+
+        # for label, block in self.func_ir.blocks.items():
+        #     for stmt in block.body:
+        #         if (isinstance(stmt, ir.Assign)
+        #                 and stmt.target.name == file_varname):
+        #             rhs = stmt.value
+        #             assert isinstance(rhs, ir.Expr) and rhs.op == 'call'
+        #             call_name = self._call_table[rhs.func.name][0]
+        #             if call_name == 'h5create_group':
+        #                 # if read/write call is on a group, find its actual file
+        #                 f_varname = rhs.args[0].name
+        #                 self._file_open_set_parallel(f_varname)
+        #                 return
+        #             else:
+        #                 assert call_name == 'File'
+        #                 rhs.args[2] = self._set1_var
 
     def _gen_barrier(self):
         def f():  # pragma: no cover
