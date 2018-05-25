@@ -11,14 +11,13 @@ import numpy as np
 from hpat.str_arr_ext import string_array_type
 
 # sentinel value representing non-constant values
-
-
 class NotConstant:
     pass
 
 
 NOT_CONSTANT = NotConstant()
 
+np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
@@ -63,7 +62,7 @@ def is_alloc_callname(func_name, mod_name):
     return true if function represents an array creation call
     """
     return isinstance(mod_name, str) and ((mod_name == 'numpy'
-        and func_name in ('empty', 'zeros', 'ones', 'full'))
+        and func_name in np_alloc_callnames)
         or (func_name == 'empty_inferred'
             and mod_name in ('numba.extending', 'numba.unsafe.ndarray')))
 

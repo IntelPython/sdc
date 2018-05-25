@@ -29,6 +29,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 import time
 # from mpi4py import MPI
+import hpat.utils
 from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
                         get_slice_step, is_array, is_np_array)
 from hpat.distributed_api import Reduce_Type
@@ -128,6 +129,7 @@ class DistributedPass(object):
                     new_body += self._run_parfor(inst, namevar_table)
                     # run dist pass recursively
                     p_blocks = wrap_parfor_blocks(inst)
+                    # build_definitions(p_blocks, self.func_ir._definitions)
                     self._run_dist_pass(p_blocks)
                     unwrap_parfor_blocks(inst)
                     continue
@@ -381,6 +383,36 @@ class DistributedPass(object):
             return out
         call_list = self._call_table[func_var]
 
+        # divide 1D alloc
+        # XXX allocs should be matched before going to _run_call_np
+        if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
+            size_var = rhs.args[0]
+            out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
+            # empty_inferred is tuple for some reason
+            rhs.args = list(rhs.args)
+            rhs.args[0] = new_size_var
+            out.append(assign)
+            return out
+
+        # fix 1D_Var allocs in case global len of another 1DVar is used
+        if self._is_1D_Var_arr(lhs) and is_alloc_callname(func_name, func_mod):
+            size_var = rhs.args[0]
+            out, new_size_var = self._fix_1D_Var_alloc(
+                size_var, lhs, scope, loc)
+            # empty_inferred is tuple for some reason
+            rhs.args = list(rhs.args)
+            rhs.args[0] = new_size_var
+            out.append(assign)
+            return out
+
+        # numpy direct functions
+        if isinstance(func_mod, str) and func_mod == 'numpy':
+            return self._run_call_np(lhs, func_name, assign, rhs.args)
+
+        if fdef == ('permutation', 'numpy.random'):
+            if self.typemap[rhs.args[0].name] == types.int64:
+                self._array_sizes[lhs] = [rhs.args[0]]
+                return self._run_permutation_int(assign, rhs.args)
 
         # len(A) if A is 1D
         if fdef == ('len', 'builtins') and rhs.args and self._is_1D_arr(rhs.args[0].name):
@@ -393,25 +425,6 @@ class DistributedPass(object):
             out = self._gen_1D_Var_len(arr_var)
             out[-1].target = assign.target
             self.oneDVar_len_vars[assign.target.name] = arr_var
-
-        # divide 1D alloc
-        if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
-            size_var = rhs.args[0]
-            out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
-            # empty_inferred is tuple for some reason
-            rhs.args = list(rhs.args)
-            rhs.args[0] = new_size_var
-            out.append(assign)
-
-        # fix 1D_Var allocs in case global len of another 1DVar is used
-        if self._is_1D_Var_arr(lhs) and is_alloc_callname(func_name, func_mod):
-            size_var = rhs.args[0]
-            out, new_size_var = self._fix_1D_Var_alloc(
-                size_var, lhs, scope, loc)
-            # empty_inferred is tuple for some reason
-            rhs.args = list(rhs.args)
-            rhs.args[0] = new_size_var
-            out.append(assign)
 
         if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
                 and func_name in ['h5read', 'h5write'])
@@ -576,11 +589,6 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_arr_name]
                 self._array_sizes[lhs] = self._array_sizes[in_arr_name]
 
-        if call_list == ['permutation', 'random', np]:
-            if self.typemap[rhs.args[0].name] == types.int64:
-                self._array_sizes[lhs] = [rhs.args[0]]
-                return self._run_permutation_int(assign, rhs.args)
-
         if call_list == ['reshape']:  # A.reshape
             call_def = guard(get_definition, self.func_ir, func_var)
             if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
@@ -588,71 +596,6 @@ class DistributedPass(object):
                     and self._is_1D_arr(call_def.value.name)):
                 return self._run_reshape(assign, call_def.value, rhs.args)
 
-
-        # numba doesn't support np.reshape() form yet
-        # if call_list == ['reshape', np]:
-        #     size_var = rhs.args[1]
-        #     # handle reshape like new allocation
-        #     out, new_size_var = self._run_alloc(size_var, lhs)
-        #     rhs.args[1] = new_size_var
-        #     out.append(assign)
-
-        if (call_list == ['array', np]
-                and is_array(self.typemap, rhs.args[0].name)
-                and self._is_1D_arr(rhs.args[0].name)):
-            in_arr = rhs.args[0].name
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
-
-        # output array has same properties (starts etc.) as input array
-        if (len(call_list) == 2 and call_list[1] == np
-                and call_list[0] in ['cumsum', 'cumprod', 'empty_like',
-                                     'zeros_like', 'ones_like', 'full_like',
-                                     'copy', 'ravel', 'ascontiguousarray']
-                and not self._is_REP(rhs.args[0].name)):
-            if call_list[0] == 'ravel':
-                assert self.typemap[rhs.args[0].name].ndim == 1, "only 1D ravel supported"
-            in_arr = rhs.args[0].name
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
-
-        if (len(call_list) == 2 and call_list[1] == np
-                and call_list[0] in ['cumsum', 'cumprod']
-                and self._is_1D_arr(rhs.args[0].name)):
-            in_arr = rhs.args[0].name
-            in_arr_var = rhs.args[0]
-            lhs_var = assign.target
-            # allocate output array
-            # TODO: compute inplace if input array is dead
-            out = mk_alloc(self.typemap, self.calltypes, lhs_var,
-                           tuple(self._array_sizes[in_arr]),
-                           self.typemap[in_arr].dtype, scope, loc)
-            # generate distributed call
-            dist_attr_var = ir.Var(scope, mk_unique_var("$dist_attr"), loc)
-            dist_func_name = "dist_" + call_list[0]
-            dist_func = getattr(distributed_api, dist_func_name)
-            dist_attr_call = ir.Expr.getattr(
-                self._g_dist_var, dist_func_name, loc)
-            self.typemap[dist_attr_var.name] = get_global_func_typ(dist_func)
-            dist_func_assign = ir.Assign(dist_attr_call, dist_attr_var, loc)
-            err_var = ir.Var(scope, mk_unique_var("$dist_err_var"), loc)
-            self.typemap[err_var.name] = types.int32
-            dist_call = ir.Expr.call(
-                dist_attr_var, [in_arr_var, lhs_var], (), loc)
-            self.calltypes[dist_call] = self.typemap[dist_attr_var.name].get_call_type(
-                self.typingctx, [self.typemap[in_arr], self.typemap[lhs]], {})
-            dist_assign = ir.Assign(dist_call, err_var, loc)
-            return out + [dist_func_assign, dist_assign]
-
-        # sum over the first axis is distributed, A.sum(0)
-        if call_list == ['sum', np] and len(rhs.args) == 2:
-            axis_def = guard(get_definition, self.func_ir, rhs.args[1])
-            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
-                reduce_op = Reduce_Type.Sum
-                reduce_var = assign.target
-                return out + self._gen_reduce(reduce_var, reduce_op, scope, loc)
 
         if call_list == ['quantile', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
@@ -734,8 +677,6 @@ class DistributedPass(object):
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
 
-        if self._is_call(func_var, ['dot', np]):
-            return self._run_call_np_dot(lhs, assign, rhs.args)
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
         if call_list == ['predict']:
@@ -777,7 +718,7 @@ class DistributedPass(object):
                 def f(fname, arr, start, count):  # pragma: no cover
                     hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'np': np, 'hpat': hpat}, self.typingctx,
+                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
                                               (self.typemap[_fname.name],
                                               self.typemap[arr.name],
                                                types.intp, types.intp),
@@ -795,13 +736,93 @@ class DistributedPass(object):
                     start = hpat.distributed_api.dist_exscan(count)
                     hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'np': np, 'hpat': hpat}, self.typingctx,
+                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
                                               (self.typemap[_fname.name],
                                               self.typemap[arr.name]),
                                               self.typemap, self.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [_fname, arr])
                 out = f_block.body[:-3]
                 out[-1].target = assign.target
+
+        return out
+
+    def _run_call_np(self, lhs, func_name, assign, args):
+        """transform np.func() calls
+        """
+        # allocs are handled separately
+        assert not ((self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs))
+                    and func_name in hpat.utils.np_alloc_callnames), (
+                    "allocation calls handled separately "
+                    "'empty', 'zeros', 'ones', 'full' etc.")
+        out = [assign]
+        scope = assign.target.scope
+        loc = assign.loc
+
+        # numba doesn't support np.reshape() form yet
+        # if call_list == ['reshape', np]:
+        #     size_var = args[1]
+        #     # handle reshape like new allocation
+        #     out, new_size_var = self._run_alloc(size_var, lhs)
+        #     args[1] = new_size_var
+        #     out.append(assign)
+
+        if (func_name == 'array'
+                and is_array(self.typemap, args[0].name)
+                and self._is_1D_arr(args[0].name)):
+            in_arr = args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
+        # output array has same properties (starts etc.) as input array
+        if (func_name in ['cumsum', 'cumprod', 'empty_like',
+                                     'zeros_like', 'ones_like', 'full_like',
+                                     'copy', 'ravel', 'ascontiguousarray']
+                and not self._is_REP(args[0].name)):
+            if func_name == 'ravel':
+                assert self.typemap[args[0].name].ndim == 1, "only 1D ravel supported"
+            in_arr = args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
+        if (func_name in ['cumsum', 'cumprod']
+                and self._is_1D_arr(args[0].name)):
+            in_arr = args[0].name
+            in_arr_var = args[0]
+            lhs_var = assign.target
+            # allocate output array
+            # TODO: compute inplace if input array is dead
+            out = mk_alloc(self.typemap, self.calltypes, lhs_var,
+                           tuple(self._array_sizes[in_arr]),
+                           self.typemap[in_arr].dtype, scope, loc)
+            # generate distributed call
+            dist_attr_var = ir.Var(scope, mk_unique_var("$dist_attr"), loc)
+            dist_func_name = "dist_" + func_name
+            dist_func = getattr(distributed_api, dist_func_name)
+            dist_attr_call = ir.Expr.getattr(
+                self._g_dist_var, dist_func_name, loc)
+            self.typemap[dist_attr_var.name] = get_global_func_typ(dist_func)
+            dist_func_assign = ir.Assign(dist_attr_call, dist_attr_var, loc)
+            err_var = ir.Var(scope, mk_unique_var("$dist_err_var"), loc)
+            self.typemap[err_var.name] = types.int32
+            dist_call = ir.Expr.call(
+                dist_attr_var, [in_arr_var, lhs_var], (), loc)
+            self.calltypes[dist_call] = self.typemap[dist_attr_var.name].get_call_type(
+                self.typingctx, [self.typemap[in_arr], self.typemap[lhs]], {})
+            dist_assign = ir.Assign(dist_call, err_var, loc)
+            return out + [dist_func_assign, dist_assign]
+
+        # sum over the first axis is distributed, A.sum(0)
+        if func_name == 'sum' and len(args) == 2:
+            axis_def = guard(get_definition, self.func_ir, args[1])
+            if isinstance(axis_def, ir.Const) and axis_def.value == 0:
+                reduce_op = Reduce_Type.Sum
+                reduce_var = assign.target
+                return out + self._gen_reduce(reduce_var, reduce_op, scope, loc)
+
+        if func_name == 'dot':
+            return self._run_call_np_dot(lhs, assign, args)
 
         return out
 
