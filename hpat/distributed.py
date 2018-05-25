@@ -30,7 +30,7 @@ from hpat.distributed_analysis import (Distribution,
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
-                        get_slice_step, is_array, is_np_array)
+                        get_slice_step, is_array, is_np_array, find_build_tuple)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -80,7 +80,6 @@ class DistributedPass(object):
         self._dist_analysis = dist_analysis_pass.run()
         # dprint_func_ir(self.func_ir, "after analysis distributed")
 
-        self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._T_arrs = dist_analysis_pass._T_arrs
         self._parallel_accesses = dist_analysis_pass._parallel_accesses
         if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
@@ -882,7 +881,9 @@ class DistributedPass(object):
         out, new_local_shape_var = self._run_alloc(new_shape, lhs.name, scope, loc)
         # get actual tuple for mk_alloc
         if len(args) != 1:
-            new_local_shape_var = tuple(self._tuple_table[new_local_shape_var.name])
+            sh_list = guard(find_build_tuple, self.func_ir, new_local_shape_var)
+            assert sh_list is not None, "invalid shape in reshape"
+            new_local_shape_var = tuple(sh_list)
         dtype = self.typemap[in_arr.name].dtype
         out += mk_alloc(self.typemap, self.calltypes, lhs,
                         new_local_shape_var, dtype, scope, loc)
@@ -1049,7 +1050,7 @@ class DistributedPass(object):
         tuple_call = ir.Expr.build_tuple(new_size_list, loc)
         tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
         out.append(tuple_assign)
-        self._tuple_table[tuple_var.name] = new_size_list
+        self.func_ir._definitions[tuple_var.name] = [tuple_call]
         self._array_starts[lhs] = [self._set0_var] * ndims
         self._array_starts[lhs][0] = start_var
         self._array_counts[lhs] = new_size_list
@@ -1121,7 +1122,7 @@ class DistributedPass(object):
         tuple_call = ir.Expr.build_tuple(new_size_list, loc)
         tuple_assign = ir.Assign(tuple_call, tuple_var, loc)
         out.append(tuple_assign)
-        self._tuple_table[tuple_var.name] = new_size_list
+        self.func_ir._definitions[tuple_var.name] = [tuple_call]
         return out, tuple_var
 
     #new_body += self._run_1D_array_shape(
@@ -1193,8 +1194,8 @@ class DistributedPass(object):
                 out = sub_nodes
                 _set_getsetitem_index(node, sub_nodes[-1].target)
             else:
-                assert index_var.name in self._tuple_table
-                index_list = self._tuple_table[index_var.name]
+                index_list = guard(find_build_tuple, self.func_ir, index_var)
+                assert index_list is not None
                 sub_nodes = self._get_ind_sub(
                     index_list[0], self._array_starts[arr.name][0])
                 out = sub_nodes
@@ -1212,8 +1213,8 @@ class DistributedPass(object):
         elif self._is_1D_arr(arr.name) and isinstance(node, (ir.StaticSetItem, ir.SetItem)):
             is_multi_dim = False
             # we only consider 1st dimension for multi-dim arrays
-            if index_var.name in self._tuple_table:
-                inds = self._tuple_table[index_var.name]
+            inds = guard(find_build_tuple, self.func_ir, index_var)
+            if inds is not None:
                 index_var = inds[0]
                 is_multi_dim = True
 
@@ -1290,8 +1291,8 @@ class DistributedPass(object):
             lhs = full_node.target
 
             # we only consider 1st dimension for multi-dim arrays
-            if index_var.name in self._tuple_table:
-                inds = self._tuple_table[index_var.name]
+            inds = guard(find_build_tuple, self.func_ir, index_var)
+            if inds is not None:
                 index_var = inds[0]
                 is_multi_dim = True
 
@@ -2049,8 +2050,9 @@ class DistributedPass(object):
         """ get the list of variables that hold values in the tuple variable.
         add node to out if code generation needed.
         """
-        if tup_var.name in self._tuple_table:
-            return self._tuple_table[tup_var.name]
+        t_list = guard(find_build_tuple, self.func_ir, tup_var)
+        if t_list is not None:
+            return t_list
         assert isinstance(self.typemap[tup_var.name], types.UniTuple)
         ndims = self.typemap[tup_var.name].count
         f_text = "def f(tup_var):\n"
