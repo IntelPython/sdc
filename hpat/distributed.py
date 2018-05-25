@@ -136,8 +136,7 @@ class DistributedPass(object):
                     rhs = inst.value
                     if isinstance(rhs, ir.Expr):
                         if rhs.op == 'call':
-                            new_body += self._run_call(inst,
-                                                       blocks[label].body)
+                            new_body += self._run_call(inst)
                             continue
                         # we save array start/count for data pointer to enable
                         # file read
@@ -356,7 +355,7 @@ class DistributedPass(object):
         out += [size_attr_assign, size_assign]
         first_block.body = out + first_block.body
 
-    def _run_call(self, assign, block_body):
+    def _run_call(self, assign):
         lhs = assign.target.name
         rhs = assign.value
         func_var = rhs.func.name
@@ -381,6 +380,7 @@ class DistributedPass(object):
         if func_var not in self._call_table or not self._call_table[func_var]:
             return out
         call_list = self._call_table[func_var]
+
 
         # len(A) if A is 1D
         if fdef == ('len', 'builtins') and rhs.args and self._is_1D_arr(rhs.args[0].name):
@@ -693,7 +693,7 @@ class DistributedPass(object):
         if call_list == ['dist_return', 'distributed_api', hpat]:
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
-            return self._run_call_rebalance_array(lhs, assign, rhs.args, block_body)
+            return self._run_call_rebalance_array(lhs, assign, rhs.args)
             # assign.value = rhs.args[0]
             # return [assign]
 
@@ -732,10 +732,10 @@ class DistributedPass(object):
             return [assign]
 
         if call_list == ['rebalance_array', 'distributed_api', hpat]:
-            return self._run_call_rebalance_array(lhs, assign, rhs.args, block_body)
+            return self._run_call_rebalance_array(lhs, assign, rhs.args)
 
         if self._is_call(func_var, ['dot', np]):
-            return self._run_call_np_dot(lhs, assign, rhs.args, block_body)
+            return self._run_call_np_dot(lhs, assign, rhs.args)
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
         if call_list == ['predict']:
@@ -900,7 +900,7 @@ class DistributedPass(object):
         # out.append(assign)
 
 
-    def _run_call_rebalance_array(self, lhs, assign, args, block_body):
+    def _run_call_rebalance_array(self, lhs, assign, args):
         out = [assign]
         if not self._is_1D_Var_arr(args[0].name):
             if self._is_1D_arr(args[0].name):
@@ -941,7 +941,7 @@ class DistributedPass(object):
         out[-1].target = assign.target
         return out
 
-    def _run_call_np_dot(self, lhs, assign, args, block_body):
+    def _run_call_np_dot(self, lhs, assign, args):
         out = [assign]
         arg0 = args[0].name
         arg1 = args[1].name
@@ -1326,7 +1326,7 @@ class DistributedPass(object):
 
                 # call rebalance
                 self._dist_analysis.array_dists[imb_arr.name] = Distribution.OneD_Var
-                out += self._run_call_rebalance_array(lhs.name, full_node, [imb_arr], None)
+                out += self._run_call_rebalance_array(lhs.name, full_node, [imb_arr])
                 out[-1].target = lhs
 
         return out
