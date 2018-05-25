@@ -484,7 +484,8 @@ class DistributedPass(object):
             out += f_block.body[:-2]
             out[-1].target = assign.target
 
-        if hpat.config._has_xenon and (self._call_table[func_var] == [hpat.xenon_ext.read_xenon_col]
+        # TODO: fix numba.extending
+        if hpat.config._has_xenon and (fdef == ('read_xenon_col', 'numba.extending')
                 and self._is_1D_arr(rhs.args[3].name)):
             arr = rhs.args[3].name
             assert len(self._array_starts[arr]) == 1, "only 1D arrs in Xenon"
@@ -502,7 +503,7 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
-        if hpat.config._has_xenon and (self._call_table[func_var] == [hpat.xenon_ext.read_xenon_str]
+        if hpat.config._has_xenon and (fdef == ('read_xenon_str', 'numba.extending')
                 and self._is_1D_arr(lhs)):
             arr = lhs
             size_var = rhs.args[3]
@@ -528,7 +529,8 @@ class DistributedPass(object):
             out += f_block.body[:-2]
             out[-1].target = assign.target
 
-        if (self._is_ros_read_image_call(func_var)
+        if (hpat.config._has_ros
+                and fdef == ('read_ros_images_inner', 'hpat.ros')
                 and self._is_1D_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
             assert len(self._array_starts[arr]) == 4, "only 4D arrs in ros"
@@ -2071,12 +2073,6 @@ class DistributedPass(object):
     def _is_REP(self, arr_name):
         return (arr_name not in self._dist_analysis.array_dists or
                 self._dist_analysis.array_dists[arr_name] == Distribution.REP)
-
-
-    def _is_ros_read_image_call(self, func_var):
-        if func_var not in self._call_table:  # pragma: no cover
-            return False
-        return hpat.config._has_ros and (self._call_table[func_var] == ['read_ros_images_inner', 'ros', hpat])
 
     def _is_call(self, func_var, call_list):
         if func_var not in self._call_table:  # pragma: no cover
