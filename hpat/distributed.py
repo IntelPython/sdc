@@ -12,7 +12,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             get_call_table, get_tuple_table, remove_dels,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
-                            find_callname)
+                            find_callname, build_definitions)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                           wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -88,6 +88,7 @@ class DistributedPass(object):
             print("distributions: ", self._dist_analysis)
 
         self._gen_dist_inits()
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         self.func_ir.blocks = self._run_dist_pass(self.func_ir.blocks)
         self.func_ir.blocks = self._dist_prints(self.func_ir.blocks)
         remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.typemap)
@@ -362,24 +363,32 @@ class DistributedPass(object):
         scope = assign.target.scope
         loc = assign.target.loc
         out = [assign]
+
+        func_name = ""
+        func_mod = ""
+        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        if fdef is None:
+            # FIXME: since parfors are transformed and then processed
+            # recursively, some funcs don't have definitions. The generated
+            # arrays should be assigned REP and the var definitions added.
+            # warnings.warn(
+            #     "function call couldn't be found for distributed pass")
+            return out
+        else:
+            func_name, func_mod = fdef
+
         # shortcut if we don't know the call
         if func_var not in self._call_table or not self._call_table[func_var]:
             return out
         call_list = self._call_table[func_var]
 
-        func_name = ""
-        func_mod = ""
-        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
-        if fdef is not None:
-            func_name, func_mod = fdef
-
         # len(A) if A is 1D
-        if self._is_call(func_var, [len]) and rhs.args and self._is_1D_arr(rhs.args[0].name):
+        if fdef == ('len', 'builtins') and rhs.args and self._is_1D_arr(rhs.args[0].name):
             arr = rhs.args[0].name
             assign.value = self._array_sizes[arr][0]
 
         # len(A) if A is 1D_Var
-        if self._is_call(func_var, [len]) and rhs.args and self._is_1D_Var_arr(rhs.args[0].name):
+        if fdef == ('len', 'builtins') and rhs.args and self._is_1D_Var_arr(rhs.args[0].name):
             arr_var = rhs.args[0]
             out = self._gen_1D_Var_len(arr_var)
             out[-1].target = assign.target
