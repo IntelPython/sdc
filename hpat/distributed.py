@@ -378,11 +378,6 @@ class DistributedPass(object):
         else:
             func_name, func_mod = fdef
 
-        # shortcut if we don't know the call
-        if func_var not in self._call_table or not self._call_table[func_var]:
-            return out
-        call_list = self._call_table[func_var]
-
         # divide 1D alloc
         # XXX allocs should be matched before going to _run_call_np
         if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
@@ -567,7 +562,7 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
-        if call_list == ['quantile', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
             if arr in self._array_sizes:
@@ -589,7 +584,7 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
-        if call_list == ['nunique', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('nunique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
 
@@ -603,18 +598,18 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
-        if call_list == ['dist_return', 'distributed_api', hpat]:
+        if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
             # assign.value = rhs.args[0]
             # return [assign]
 
-        if call_list == ['threaded_return', 'distributed_api', hpat]:
+        if fdef == ('threaded_return', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
             return [assign]
 
-        if call_list == ['dist_input', 'distributed_api', hpat]:
+        if fdef == ('dist_input', 'hpat.distributed_api'):
             out = [assign]
             arr = rhs.args[0]
             # remove sentinel call
@@ -640,16 +635,17 @@ class DistributedPass(object):
 
             return out
 
-        if call_list == ['threaded_input', 'distributed_api', hpat]:
+        if fdef == ('threaded_input', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
             return [assign]
 
-        if call_list == ['rebalance_array', 'distributed_api', hpat]:
+        if fdef == ('rebalance_array', 'hpat.distributed_api'):
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
 
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
-        if call_list == ['predict']:
+        # TODO: remove ml module and use new DAAL API
+        if func_name == 'predict':
             getattr_call = guard(get_definition, self.func_ir, func_var)
             if (getattr_call and self.typemap[getattr_call.value.name]
                     == hpat.ml.naive_bayes.mnb_type):
@@ -658,7 +654,7 @@ class DistributedPass(object):
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
-        if call_list == [hpat.io.file_read] and rhs.args[1].name in self._array_starts:
+        if fdef == ('file_read', 'hpat.io') and rhs.args[1].name in self._array_starts:
             _fname = rhs.args[0]
             _data_ptr = rhs.args[1]
             _start = self._array_starts[_data_ptr.name][0]
@@ -691,7 +687,7 @@ class DistributedPass(object):
         loc = assign.loc
 
         # numba doesn't support np.reshape() form yet
-        # if call_list == ['reshape', np]:
+        # if func_name == 'reshape':
         #     size_var = args[1]
         #     # handle reshape like new allocation
         #     out, new_size_var = self._run_alloc(size_var, lhs)
@@ -2089,11 +2085,6 @@ class DistributedPass(object):
     def _is_REP(self, arr_name):
         return (arr_name not in self._dist_analysis.array_dists or
                 self._dist_analysis.array_dists[arr_name] == Distribution.REP)
-
-    def _is_call(self, func_var, call_list):
-        if func_var not in self._call_table:  # pragma: no cover
-            return False
-        return self._call_table[func_var] == call_list
 
 
 def _find_first_print(body):
