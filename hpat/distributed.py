@@ -413,7 +413,8 @@ class DistributedPass(object):
             rhs.args[0] = new_size_var
             out.append(assign)
 
-        if (self._is_h5_read_write_call(func_var)
+        if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+                and func_name in ['h5read', 'h5write'])
                 and self._is_1D_arr(rhs.args[6].name)):
             arr = rhs.args[6].name
             ndims = len(self._array_starts[arr])
@@ -437,7 +438,8 @@ class DistributedPass(object):
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)
 
-        if (self._is_parquet_read_call(func_var)
+        if (hpat.config._has_pyarrow
+                and fdef == ('read_parquet', 'hpat.parquet_pio')
                 and self._is_1D_arr(rhs.args[2].name)):
             arr = rhs.args[2].name
             assert len(self._array_starts[arr]) == 1, "only 1D arrs in parquet"
@@ -456,7 +458,8 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
-        if (self._is_parquet_read_str_call(func_var)
+        if (hpat.config._has_pyarrow
+                and fdef == ('read_parquet_str', 'hpat.parquet_pio')
                 and self._is_1D_arr(lhs)):
             arr = lhs
             size_var = rhs.args[2]
@@ -2069,21 +2072,6 @@ class DistributedPass(object):
         return (arr_name not in self._dist_analysis.array_dists or
                 self._dist_analysis.array_dists[arr_name] == Distribution.REP)
 
-    def _is_h5_read_write_call(self, func_var):
-        if func_var not in self._call_table:  # pragma: no cover
-            return False
-        return hpat.config._has_h5py and (self._call_table[func_var] == ['h5read', hpat.pio_api]
-                                          or self._call_table[func_var] == ['h5write', hpat.pio_api])
-
-    def _is_parquet_read_call(self, func_var):
-        if func_var not in self._call_table:  # pragma: no cover
-            return False
-        return hpat.config._has_pyarrow and (self._call_table[func_var] == [hpat.parquet_pio.read_parquet])
-
-    def _is_parquet_read_str_call(self, func_var):
-        if func_var not in self._call_table:  # pragma: no cover
-            return False
-        return hpat.config._has_pyarrow and (self._call_table[func_var] == [hpat.parquet_pio.read_parquet_str])
 
     def _is_ros_read_image_call(self, func_var):
         if func_var not in self._call_table:  # pragma: no cover
