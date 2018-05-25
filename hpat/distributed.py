@@ -27,7 +27,6 @@ from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis,
                                        get_stencil_accesses)
-import time
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
@@ -81,7 +80,6 @@ class DistributedPass(object):
         self._dist_analysis = dist_analysis_pass.run()
         # dprint_func_ir(self.func_ir, "after analysis distributed")
 
-        self._call_table, _ = get_call_table(self.func_ir.blocks)
         self._tuple_table = get_tuple_table(self.func_ir.blocks)
         self._T_arrs = dist_analysis_pass._T_arrs
         self._parallel_accesses = dist_analysis_pass._parallel_accesses
