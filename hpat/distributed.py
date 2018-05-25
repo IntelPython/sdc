@@ -409,6 +409,10 @@ class DistributedPass(object):
         if isinstance(func_mod, str) and func_mod == 'numpy':
             return self._run_call_np(lhs, func_name, assign, rhs.args)
 
+        # array.func calls
+        if isinstance(func_mod, ir.Var) and is_np_array(self.typemap, func_mod.name):
+            return self._run_call_array(lhs, func_mod, func_name, assign, rhs.args)
+
         if fdef == ('permutation', 'numpy.random'):
             if self.typemap[rhs.args[0].name] == types.int64:
                 self._array_sizes[lhs] = [rhs.args[0]]
@@ -562,40 +566,6 @@ class DistributedPass(object):
                                           self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
-
-        if call_list == ['transpose']:
-            call_def = guard(get_definition, self.func_ir, func_var)
-            in_arr_name = call_def.value.name
-            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                and is_array(self.typemap, in_arr_name)
-                    and not self._is_REP(in_arr_name)):
-                # Currently only 1D arrays are supported
-                assert self._is_1D_arr(in_arr_name)
-                ndim = self.typemap[in_arr_name].ndim
-                self._array_starts[lhs] = [-1]*ndim
-                self._array_counts[lhs] = [-1]*ndim
-                self._array_sizes[lhs] = [-1]*ndim
-                self._array_starts[lhs][0] = self._array_starts[in_arr_name][0]
-                self._array_counts[lhs][0] = self._array_counts[in_arr_name][0]
-                self._array_sizes[lhs][0] = self._array_sizes[in_arr_name][0]
-
-        if call_list == ['astype']:
-            call_def = guard(get_definition, self.func_ir, func_var)
-            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                and is_array(self.typemap, call_def.value.name)
-                    and not self._is_REP(call_def.value.name)):
-                in_arr_name = call_def.value.name
-                self._array_starts[lhs] = self._array_starts[in_arr_name]
-                self._array_counts[lhs] = self._array_counts[in_arr_name]
-                self._array_sizes[lhs] = self._array_sizes[in_arr_name]
-
-        if call_list == ['reshape']:  # A.reshape
-            call_def = guard(get_definition, self.func_ir, func_var)
-            if (isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
-                    and is_array(self.typemap, call_def.value.name)
-                    and self._is_1D_arr(call_def.value.name)):
-                return self._run_reshape(assign, call_def.value, rhs.args)
-
 
         if call_list == ['quantile', 'hiframes_api', hpat] and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
@@ -825,6 +795,32 @@ class DistributedPass(object):
             return self._run_call_np_dot(lhs, assign, args)
 
         return out
+
+    def _run_call_array(self, lhs, arr, func_name, assign, args):
+        #
+        out = [assign]
+        if func_name == 'astype' and not self._is_REP(arr.name):
+            self._array_starts[lhs] = self._array_starts[arr.name]
+            self._array_counts[lhs] = self._array_counts[arr.name]
+            self._array_sizes[lhs] = self._array_sizes[arr.name]
+
+        if func_name == 'reshape' and self._is_1D_arr(arr.name):
+            return self._run_reshape(assign, arr, args)
+
+
+        if func_name == 'transpose' and not self._is_REP(arr.name):
+            # Currently only 1D arrays are supported
+            assert self._is_1D_arr(arr.name)
+            ndim = self.typemap[arr.name].ndim
+            self._array_starts[lhs] = [-1]*ndim
+            self._array_counts[lhs] = [-1]*ndim
+            self._array_sizes[lhs] = [-1]*ndim
+            self._array_starts[lhs][0] = self._array_starts[arr.name][0]
+            self._array_counts[lhs][0] = self._array_counts[arr.name][0]
+            self._array_sizes[lhs][0] = self._array_sizes[arr.name][0]
+
+        return out
+
 
     def _run_permutation_int(self, assign, args):
         lhs = assign.target
