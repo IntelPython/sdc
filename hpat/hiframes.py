@@ -20,7 +20,7 @@ from numba.analysis import compute_cfg_from_blocks
 
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
-                  hiframes_join)
+                  hiframes_join, hiframes_aggregate)
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import StringType, string_type
@@ -60,6 +60,8 @@ def remove_hiframes(rhs, lives, call_list):
     if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
         return True
     if call_list == [list]:
+        return True
+    if call_list == ['groupby']:
         return True
     return False
 
@@ -325,6 +327,12 @@ class HiFrames(object):
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
             return res
+
+        # groupby aggregate
+        # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+        if (func_name in ['agg', 'aggregate'] and isinstance(func_mod, ir.Var)
+                and self._is_groupby(func_mod)):
+            return self._handle_aggregate(lhs, rhs, func_mod, func_name)
 
         if fdef == ('fromfile', 'numpy'):
             return hpat.io._handle_np_fromfile(assign, lhs, rhs)
@@ -1152,6 +1160,55 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = out_var
         return nodes
+
+    def _is_groupby(self, agg_var):
+        """determines whether variable is coming from groupby() or groupby()[]
+        """
+        var_def = guard(get_definition, self.func_ir, agg_var)
+        # groupby()['B'] case
+        if (isinstance(var_def, ir.Expr)
+                and var_def.op in ['getitem', 'static_getitem']):
+            return self._is_groupby(var_def.value)
+        # groupby() called on column or df
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if (call_def is not None and call_def[0] == 'groupby'
+                and isinstance(call_def[1], ir.Var)
+                and (call_def[1].name in self.df_cols
+                or self._is_df_var(call_def[1]))):
+            return True
+        return False
+
+    def _handle_aggregate(self, lhs, rhs, agg_var, func_name):
+        # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+
+        # TODO: support aggregation functions sum, count, etc.
+        assert func_name in ['agg', 'aggregate'], "only groubpy agg for now"
+
+        # find selected output columns
+        # TODO: support other selection formats
+        select_def = guard(get_definition, self.func_ir, agg_var)
+        assert (isinstance(select_def, ir.Expr) and select_def.op == 'getitem')
+        agg_var = select_def.value
+        out_colname = ir_utils.find_const(self.func_ir, select_def.index)
+        assert isinstance(out_colname, str)
+
+        # find groupby key
+        groubpy_call = guard(get_definition, self.func_ir, agg_var)
+        assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
+        assert len(groubpy_call.args) == 1
+        key_colname = guard(ir_utils.find_const, self.func_ir,
+                                                        groubpy_call.args[0])
+
+        # find dataframe
+        call_def = guard(find_callname, self.func_ir, groubpy_call)
+        assert (call_def is not None and call_def[0] == 'groupby'
+                and isinstance(call_def[1], ir.Var)
+                and self._is_df_var(call_def[1]))
+        df_var = call_def[1]
+        return [hiframes_aggregate.Aggregate(
+            out_colname, df_var.name, key_colname, {out_colname: lhs},
+            self.df_vars[df_var.name], self.df_vars[df_var.name][key_colname],
+            lhs.loc)]
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
