@@ -50,3 +50,26 @@ def aggregate_typeinfer(aggregate_node, typeinferer):
 
 
 typeinfer.typeinfer_extensions[Aggregate] = aggregate_typeinfer
+
+def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, typemap):
+    #
+    import pdb; pdb.set_trace()
+    dead_cols = []
+
+    for col_name, col_var in aggregate_node.df_out_vars.items():
+        if col_var.name not in lives:
+            dead_cols.append(col_name)
+
+    for cname in dead_cols:
+        aggregate_node.df_in_vars.pop(cname)
+        aggregate_node.df_out_vars.pop(cname)
+
+    # TODO: test agg remove
+    # remove empty aggregate node
+    if len(aggregate_node.df_in_vars) == 0:
+        return None
+
+    return aggregate_node
+
+
+ir_utils.remove_dead_extensions[Aggregate] = remove_dead_aggregate
