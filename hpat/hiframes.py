@@ -332,7 +332,7 @@ class HiFrames(object):
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
         if (func_name in ['agg', 'aggregate'] and isinstance(func_mod, ir.Var)
                 and self._is_groupby(func_mod)):
-            return self._handle_aggregate(lhs, rhs, func_mod, func_name)
+            return self._handle_aggregate(lhs, rhs, func_mod, func_name, label)
 
         if fdef == ('fromfile', 'numpy'):
             return hpat.io._handle_np_fromfile(assign, lhs, rhs)
@@ -837,6 +837,21 @@ class HiFrames(object):
         return f_ir.blocks
 
     def _get_map_output_typ(self, col_var, func, label):
+        # wrapper function to get the output type
+        def f(A):
+            return map_func(A[0])
+        if col_var.name in self.ts_series_vars:
+            def f(A):
+                t = hpat.hiframes_api.ts_series_getitem(A, 0)
+                return map_func(t)
+        if col_var.name in self.dt_date_series_vars:
+            def f(A):
+                t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
+                return map_func(t)
+
+        return self._get_func_output_typ(col_var, func, f, label)
+
+    def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference
         # XXX: does control flow affect type inference in Numba?
         dummy_ir = self.func_ir.copy()
@@ -853,20 +868,8 @@ class HiFrames(object):
         dummy_ir.blocks = {0: ir.Block(col_var.scope, col_var.loc)}
         dummy_ir.blocks[0].body = all_body
 
-        # add the map function to get the output type
-        def f(A):
-            return map_func(A[0])
-        if col_var.name in self.ts_series_vars:
-            def f(A):
-                t = hpat.hiframes_api.ts_series_getitem(A, 0)
-                return map_func(t)
-        if col_var.name in self.dt_date_series_vars:
-            def f(A):
-                t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
-                return map_func(t)
-
         _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {'hpat': hpat})
+        f_ir = compile_to_numba_ir(wrapper_func, {'hpat': hpat})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
         first_label = min(f_ir.blocks)
@@ -1178,11 +1181,20 @@ class HiFrames(object):
             return True
         return False
 
-    def _handle_aggregate(self, lhs, rhs, agg_var, func_name):
+    def _handle_aggregate(self, lhs, rhs, agg_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
 
         # TODO: support aggregation functions sum, count, etc.
         assert func_name in ['agg', 'aggregate'], "only groubpy agg for now"
+
+        # error checking: make sure there is function input only
+        if len(rhs.args) != 1:
+            raise ValueError("agg expects 1 argument")
+        agg_func = guard(get_definition, self.func_ir, rhs.args[0])
+        if agg_func is None or not (isinstance(agg_func, ir.Expr)
+                                and agg_func.op == 'make_function'):
+            raise ValueError("lambda for map not found")
+
 
         # find selected output columns
         # TODO: support other selection formats
@@ -1205,10 +1217,17 @@ class HiFrames(object):
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1]))
         df_var = call_def[1]
+
+        # find output type
+        out_var = self.df_vars[df_var.name][out_colname]
+        def f(A):
+            return map_func(A)
+        out_typ = self._get_func_output_typ(out_var, agg_func, f, label)
+
         return [hiframes_aggregate.Aggregate(
             out_colname, df_var.name, key_colname, {out_colname: lhs},
             self.df_vars[df_var.name], self.df_vars[df_var.name][key_colname],
-            lhs.loc)]
+            agg_func, {out_colname: out_typ}, lhs.loc)]
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc

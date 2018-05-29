@@ -11,7 +11,7 @@ from hpat.str_arr_ext import string_array_type
 
 class Aggregate(ir.Stmt):
     def __init__(self, df_out, df_in, key_name, df_out_vars, df_in_vars,
-                                                                key_arr, loc):
+                                             key_arr, agg_func, out_typs, loc):
         # name of output dataframe (just for printing purposes)
         self.df_out = df_out
         # name of input dataframe (just for printing purposes)
@@ -22,6 +22,9 @@ class Aggregate(ir.Stmt):
         self.df_out_vars = df_out_vars
         self.df_in_vars = df_in_vars
         self.key_arr = key_arr
+
+        self.agg_func = agg_func
+        self.out_typs = out_typs
 
         self.loc = loc
 
@@ -36,3 +39,14 @@ class Aggregate(ir.Stmt):
         df_in_str = "{}{{{}}}".format(self.df_in, in_cols)
         return "aggregate: {} = {} [key: {}] ".format(df_out_str, df_in_str,
                                                     self.key_name)
+
+
+def aggregate_typeinfer(aggregate_node, typeinferer):
+    for out_name, out_var in aggregate_node.df_out_vars.items():
+        typ = aggregate_node.out_typs[out_name]
+        typeinferer.lock_type(out_var.name, typ, loc=aggregate_node.loc)
+
+    return
+
+
+typeinfer.typeinfer_extensions[Aggregate] = aggregate_typeinfer
