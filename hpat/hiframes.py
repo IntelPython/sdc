@@ -784,7 +784,7 @@ class HiFrames(object):
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
 
-        out_typ = self._get_map_output_typ(rhs, col_var, func, label)
+        out_typ = self._get_map_output_typ(col_var, func, label)
         # remember datetime.date series due to special boxing, getitem etc.
         if out_typ == datetime_date_type:
             self.dt_date_series_vars.add(lhs.name)
@@ -836,7 +836,7 @@ class HiFrames(object):
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [col_var])
         return f_ir.blocks
 
-    def _get_map_output_typ(self, rhs, col_var, func, label):
+    def _get_map_output_typ(self, col_var, func, label):
         # stich together all blocks before the current block for type inference
         # XXX: does control flow affect type inference in Numba?
         dummy_ir = self.func_ir.copy()
@@ -845,7 +845,7 @@ class HiFrames(object):
         all_body = []
         for l in topo_order:
             if l == label:
-                break;
+                break
             all_body += dummy_ir.blocks[l].body
 
         # add nodes created for current block so far
