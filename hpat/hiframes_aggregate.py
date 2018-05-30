@@ -1,11 +1,12 @@
 from __future__ import print_function, division, absolute_import
 
 import numba
-from numba import typeinfer, ir, ir_utils, config
+from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import visit_vars_inner, replace_vars_inner
 from numba.typing import signature
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 
@@ -44,7 +45,13 @@ class Aggregate(ir.Stmt):
 def aggregate_typeinfer(aggregate_node, typeinferer):
     for out_name, out_var in aggregate_node.df_out_vars.items():
         typ = aggregate_node.out_typs[out_name]
-        typeinferer.lock_type(out_var.name, typ, loc=aggregate_node.loc)
+        # TODO: are there other non-numpy array types?
+        if typ == string_type:
+            arr_type = string_array_type
+        else:
+            arr_type = types.Array(typ, 1, 'C')
+
+        typeinferer.lock_type(out_var.name, arr_type, loc=aggregate_node.loc)
 
     return
 
