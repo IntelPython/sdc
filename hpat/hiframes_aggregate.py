@@ -189,3 +189,43 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
 
 
 numba.array_analysis.array_analysis_extensions[Aggregate] = aggregate_array_analysis
+
+
+def aggregate_distributed_analysis(aggregate_node, array_dists):
+
+    # input columns have same distribution
+    in_dist = Distribution.OneD
+    for _, col_var in aggregate_node.df_in_vars.items():
+        in_dist = Distribution(
+            min(in_dist.value, array_dists[col_var.name].value))
+
+    # key arr
+    in_dist = Distribution(
+        min(in_dist.value, array_dists[aggregate_node.key_arr.name].value))
+    for _, col_var in aggregate_node.df_in_vars.items():
+        array_dists[col_var.name] = in_dist
+    array_dists[aggregate_node.key_arr.name] = in_dist
+
+    # output columns have same distribution
+    out_dist = Distribution.OneD_Var
+    for _, col_var in aggregate_node.df_out_vars.items():
+        # output dist might not be assigned yet
+        if col_var.name in array_dists:
+            out_dist = Distribution(
+                min(out_dist.value, array_dists[col_var.name].value))
+
+    # out dist should meet input dist (e.g. REP in causes REP out)
+    out_dist = Distribution(min(out_dist.value, in_dist.value))
+    for _, col_var in aggregate_node.df_out_vars.items():
+        array_dists[col_var.name] = out_dist
+
+    # output can cause input REP
+    if out_dist != Distribution.OneD_Var:
+        array_dists[aggregate_node.key_arr.name] = out_dist
+        for _, col_var in aggregate_node.df_in_vars.items():
+            array_dists[col_var.name] = out_dist
+
+    return
+
+
+distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
