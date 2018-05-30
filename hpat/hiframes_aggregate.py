@@ -91,3 +91,30 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, typemap
 
 
 ir_utils.remove_dead_extensions[Aggregate] = remove_dead_aggregate
+
+def get_copies_aggregate(aggregate_node, typemap):
+    # aggregate doesn't generate copies, it just kills the output columns
+    kill_set = set(v.name for v in aggregate_node.df_out_vars.values())
+    return set(), kill_set
+
+
+ir_utils.copy_propagate_extensions[Aggregate] = get_copies_aggregate
+
+
+def apply_copies_aggregate(aggregate_node, var_dict, name_var_table,
+                        typemap, calltypes, save_copies):
+    """apply copy propagate in aggregate node"""
+    aggregate_node.key_arr = replace_vars_inner(aggregate_node.key_arr,
+                                                                     var_dict)
+
+    for col_name in list(aggregate_node.df_in_vars.keys()):
+        aggregate_node.df_in_vars[col_name] = replace_vars_inner(
+            aggregate_node.df_in_vars[col_name], var_dict)
+    for col_name in list(aggregate_node.df_out_vars.keys()):
+        aggregate_node.df_out_vars[col_name] = replace_vars_inner(
+            aggregate_node.df_out_vars[col_name], var_dict)
+
+    return
+
+
+ir_utils.apply_copy_propagate_extensions[Aggregate] = apply_copies_aggregate
