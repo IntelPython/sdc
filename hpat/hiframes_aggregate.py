@@ -138,3 +138,47 @@ def visit_vars_aggregate(aggregate_node, callback, cbdata):
 
 # add call to visit aggregate variable
 ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
+
+
+def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
+                                                            array_analysis):
+    # empty aggregate nodes should be deleted in remove dead
+    assert len(aggregate_node.df_in_vars) > 0, ("empty aggregate in array"
+                                                                   "analysis")
+
+    # arrays of input df have same size in first dimension as key array
+    col_shape = equiv_set.get_shape(aggregate_node.key_arr)
+    all_shapes = [col_shape[0]]
+    for _, col_var in aggregate_node.df_in_vars.items():
+        typ = typemap[col_var.name]
+        if typ == string_array_type:
+            continue
+        col_shape = equiv_set.get_shape(col_var)
+        all_shapes.append(col_shape[0])
+
+    if len(all_shapes) > 1:
+        equiv_set.insert_equiv(*all_shapes)
+
+    # create correlations for output arrays
+    # arrays of output df have same size in first dimension
+    # gen size variable for an output column
+    post = []
+    all_shapes = []
+    for _, col_var in aggregate_node.df_out_vars.items():
+        typ = typemap[col_var.name]
+        if typ == string_array_type:
+            continue
+        (shape, c_post) = array_analysis._gen_shape_call(
+            equiv_set, col_var, typ.ndim, None)
+        equiv_set.insert_equiv(col_var, shape)
+        post.extend(c_post)
+        all_shapes.append(shape[0])
+        equiv_set.define(col_var)
+
+    if len(all_shapes) > 1:
+        equiv_set.insert_equiv(*all_shapes)
+
+    return [], post
+
+
+numba.array_analysis.array_analysis_extensions[Aggregate] = aggregate_array_analysis
