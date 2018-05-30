@@ -48,12 +48,30 @@ def aggregate_typeinfer(aggregate_node, typeinferer):
 
     return
 
-
 typeinfer.typeinfer_extensions[Aggregate] = aggregate_typeinfer
+
+
+def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
+    if use_set is None:
+        use_set = set()
+    if def_set is None:
+        def_set = set()
+
+    # key array and input columns are used
+    use_set.add(aggregate_node.key_arr.name)
+    use_set.update({v.name for v in aggregate_node.df_in_vars.values()})
+
+    # output columns are defined
+    def_set.update({v.name for v in aggregate_node.df_out_vars.values()})
+
+    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+
+
+numba.analysis.ir_extension_usedefs[Aggregate] = aggregate_usedefs
+
 
 def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, typemap):
     #
-    import pdb; pdb.set_trace()
     dead_cols = []
 
     for col_name, col_var in aggregate_node.df_out_vars.items():
