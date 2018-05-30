@@ -118,3 +118,23 @@ def apply_copies_aggregate(aggregate_node, var_dict, name_var_table,
 
 
 ir_utils.apply_copy_propagate_extensions[Aggregate] = apply_copies_aggregate
+
+
+def visit_vars_aggregate(aggregate_node, callback, cbdata):
+    if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
+        print("visiting aggregate vars for:", aggregate_node)
+        print("cbdata: ", sorted(cbdata.items()))
+
+    aggregate_node.key_arr = visit_vars_inner(
+        aggregate_node.key_arr, callback, cbdata)
+
+    for col_name in list(aggregate_node.df_in_vars.keys()):
+        aggregate_node.df_in_vars[col_name] = visit_vars_inner(
+            aggregate_node.df_in_vars[col_name], callback, cbdata)
+    for col_name in list(aggregate_node.df_out_vars.keys()):
+        aggregate_node.df_out_vars[col_name] = visit_vars_inner(
+            aggregate_node.df_out_vars[col_name], callback, cbdata)
+
+
+# add call to visit aggregate variable
+ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
