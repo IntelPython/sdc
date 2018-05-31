@@ -1,9 +1,12 @@
 from __future__ import print_function, division, absolute_import
 
+import numpy as np
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
-from numba.ir_utils import visit_vars_inner, replace_vars_inner
+from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+                            compile_to_numba_ir, replace_arg_nodes)
 from numba.typing import signature
+import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_ext import string_type
@@ -192,7 +195,6 @@ numba.array_analysis.array_analysis_extensions[Aggregate] = aggregate_array_anal
 
 
 def aggregate_distributed_analysis(aggregate_node, array_dists):
-
     # input columns have same distribution
     in_dist = Distribution.OneD
     for _, col_var in aggregate_node.df_in_vars.items():
@@ -229,3 +231,92 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
 
 
 distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
+
+
+def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
+    parallel = True
+    for v in (list(agg_node.df_in_vars.values())
+              + list(agg_node.df_out_vars.values()) + [agg_node.key_arr]):
+        if (array_dists[v.name] != distributed.Distribution.OneD
+                and array_dists[v.name] != distributed.Distribution.OneD_Var):
+            parallel = False
+        # TODO: check supported types
+        # if (typemap[v.name] != types.Array(types.intp, 1, 'C')
+        #         and typemap[v.name] != types.Array(types.float64, 1, 'C')):
+        #     raise ValueError(
+        #         "Only int64 and float64 columns are currently supported in aggregate")
+        # if (typemap[left_key_var.name] != types.Array(types.intp, 1, 'C')
+        #     or typemap[right_key_var.name] != types.Array(types.intp, 1, 'C')):
+        # raise ValueError("Only int64 keys are currently supported in aggregate")
+
+    # TODO: rebalance if output distributions are 1D instead of 1D_Var
+
+    # TODO: handle key column being part of output
+
+    # get column variables
+    in_col_vars = [v for (n, v) in sorted(agg_node.df_in_vars.items())]
+    # get column types
+    in_col_typ = [typemap[v.name] for v in in_col_vars]
+    arg_typs = tuple([typemap[agg_node.key_arr.name]] + in_col_typ)
+    # arg names
+    in_names = ["in_c" + str(i) for i in range(len(in_col_vars))]
+    # key and arg names
+    col_names = ['key_arr'] + in_names
+
+    func_text = "def f(key_arr, {}):\n".format(",".join(in_names))
+
+    if parallel:
+        # get send/recv counts
+        func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
+        func_text += "    n_uniq_keys = send_counts.sum()\n"
+        func_text += "    recv_size = recv_counts.sum()\n"
+        # func_text += "    hpat.cprint(n_uniq_keys, recv_size)\n"
+
+        # prepare for shuffle
+        # allocate send/recv buffers
+        for a in col_names:
+            func_text += "    send_{} = np.empty(n_uniq_keys, {}.dtype)\n".format(
+                a, a)
+            func_text += "    recv_{} = np.empty(recv_size, {}.dtype)\n".format(
+                a, a)
+
+    else:
+        assert False
+
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    f_block = compile_to_numba_ir(f,
+                                  {'hpat': hpat, 'np': np,
+                                  'agg_send_recv_counts': agg_send_recv_counts},
+                                  typingctx, arg_typs,
+                                  typemap, calltypes).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [agg_node.key_arr] + in_col_vars)
+    nodes = f_block.body[:-3]
+
+    # XXX dummy test code
+    nodes[-1].target = agg_node.df_out_vars['B']
+
+    return nodes
+
+
+distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
+
+@numba.njit
+def agg_send_recv_counts(key_arr):
+    n_pes = hpat.distributed_api.get_size()
+    send_counts = np.zeros(n_pes, np.int32)
+    recv_counts = np.empty(n_pes, np.int32)
+    # TODO: handle string
+    key_set = set()
+    for i in range(len(key_arr)):
+        k = key_arr[i]
+        if k not in key_set:
+            key_set.add(k)
+            node_id = hash(k) % n_pes
+            send_counts[node_id] += 1
+
+    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
+    return send_counts, recv_counts
