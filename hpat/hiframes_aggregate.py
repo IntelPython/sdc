@@ -41,8 +41,8 @@ class Aggregate(ir.Stmt):
         for (c, v) in self.df_in_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_in_str = "{}{{{}}}".format(self.df_in, in_cols)
-        return "aggregate: {} = {} [key: {}] ".format(df_out_str, df_in_str,
-                                                    self.key_name)
+        return "aggregate: {} = {} [key: {}:{}] ".format(df_out_str, df_in_str,
+                                            self.key_name, self.key_arr.name)
 
 
 def aggregate_typeinfer(aggregate_node, typeinferer):

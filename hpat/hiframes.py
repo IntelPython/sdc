@@ -1218,15 +1218,16 @@ class HiFrames(object):
                 and self._is_df_var(call_def[1]))
         df_var = call_def[1]
 
+        # TODO: handle more than one output column
         # find output type
-        out_var = self.df_vars[df_var.name][out_colname]
+        in_var = self.df_vars[df_var.name][out_colname]
         def f(A):
             return map_func(A)
-        out_typ = self._get_func_output_typ(out_var, agg_func, f, label)
+        out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
 
         return [hiframes_aggregate.Aggregate(
             out_colname, df_var.name, key_colname, {out_colname: lhs},
-            self.df_vars[df_var.name], self.df_vars[df_var.name][key_colname],
+            {out_colname: in_var}, self.df_vars[df_var.name][key_colname],
             agg_func, {out_colname: out_typ}, lhs.loc)]
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
