@@ -6,10 +6,12 @@ import numpy as np
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
-                            compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes,
+                            find_callname, guard)
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
+from hpat.utils import is_call
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_ext import string_type
@@ -348,9 +350,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     #
     print(func_text)
 
-    
-
-    f_blocks = compile_to_numba_ir(f,
+    f_ir = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
                                   'agg_send_recv_counts': agg_send_recv_counts,
                                   '__update_redvars': __update_redvars,
@@ -358,13 +358,41 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
                                   typingctx, arg_typs,
                                   typemap, calltypes)
 
-    replace_arg_nodes(f_blocks[0], [agg_node.key_arr] + in_col_vars)
-    nodes = f_blocks[0].body[:-3]
+    f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
+    topo_order = numba.ir_utils.find_topo_order(f_ir.blocks)
+    first_block = f_ir.blocks[topo_order[0]]
+    replace_arg_nodes(first_block, [agg_node.key_arr] + in_col_vars)
 
-    # XXX dummy test code
-    nodes[-1].target = agg_node.df_out_vars['B']
+    # find reduce variables from names and store in the same order
+    reduce_vars = [0] * len(agg_func_struct.vars)
+    for node in agg_func_struct.init:
+        if isinstance(node, ir.Assign) and node.target.name in agg_func_struct.vars:
+            var_ind = agg_func_struct.vars.index(node.target.name)
+            reduce_vars[var_ind] = node.target
+    assert 0 not in reduce_vars
 
-    return nodes
+    # add initialization code to first block
+    first_block.body = agg_func_struct.init + first_block.body
+
+    # replace init val sentinels
+    for l in topo_order:
+        block = f_ir.blocks[l]
+        for stmt in block.body:
+            if isinstance(stmt, ir.Assign) and stmt.target.name.startswith("_init_val_"):
+                first_dot = stmt.target.name.index(".")
+                var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
+                stmt.value = reduce_vars[var_ind]
+            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__update_redvars', 'hpat.hiframes_aggregate')):
+                print(guard(find_callname, f_ir, stmt.value))
+
+    return []
+    # nodes = f_blocks[0].body[:-2]
+
+    # # XXX dummy test code
+    # nodes[-1].target = agg_node.df_out_vars['B']
+
+    # return nodes
 
 
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
@@ -433,11 +461,16 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx):
             assert parfor_ind == -1, "only one parfor for aggregation function"
             parfor_ind = i
     parfor = block.body[parfor_ind]
+    numba.ir_utils.remove_dels({0: parfor.init_block})
     redvars, reddict = numba.parfor.get_parfor_reductions(
         parfor, parfor.params, pm.calltypes)
     var_types = [pm.typemap[v] for v in redvars]
     combine_nodes = reduce(lambda a,b: a+b, [r[1] for r in reddict.values()])
-    init_nodes = block.body[0:parfor_ind] + parfor.init_block.body
+
+    # ignore arg and size/shape nodes for input arr
+    assert (isinstance(block.body[0], ir.Assign)
+            and isinstance(block.body[0].value, ir.Arg)), "invalid agg func"
+    init_nodes = block.body[3:parfor_ind] + parfor.init_block.body
 
     arr_var = block.body[0].target
     input_var = ir.Var(arr_var.scope, "agg#input", arr_var.loc)
