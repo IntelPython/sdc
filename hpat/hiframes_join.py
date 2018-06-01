@@ -243,7 +243,7 @@ def apply_copies_join(join_node, var_dict, name_var_table,
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
 
 
-def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx):
+def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, targetctx):
     parallel = True
     for v in (list(join_node.left_vars.values())
               + list(join_node.right_vars.values())

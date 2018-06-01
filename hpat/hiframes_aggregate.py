@@ -4,7 +4,7 @@ from collections import namedtuple
 from functools import reduce
 import numpy as np
 import numba
-from numba import typeinfer, ir, ir_utils, config, types
+from numba import typeinfer, ir, ir_utils, config, types, compiler
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard)
@@ -259,7 +259,7 @@ class EvalDummyTyper(AbstractTemplate):
         # takse the output array as first argument to know the output dtype
         return signature(args[0].dtype, *args)
 
-def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
+def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx):
     parallel = True
     for v in (list(agg_node.df_in_vars.values())
               + list(agg_node.df_out_vars.values()) + [agg_node.key_arr]):
@@ -315,8 +315,8 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
         func_text += "    n_uniq_keys = len(set(key_arr))\n"
         for i, typ in enumerate(agg_func_struct.var_typs):
             func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
-            func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{})\n".format(
-                i, i)
+            func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
+                i, i, typ)
         # allocate output
         for i, col in enumerate(agg_node.df_in_vars.keys()):
             func_text += "    output_{} = np.empty(n_uniq_keys, np.{})\n".format(
@@ -339,8 +339,8 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
         func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
             in_names[0], redvar_arrnames)
         # get final output from reduce varis
-        func_text += "    for i in range(n_uniq_keys):\n"
-        func_text += "      output_0[i] = __eval_res(output_0, i, {})\n".format(
+        func_text += "    for j in range(n_uniq_keys):\n"
+        func_text += "      output_0[j] = __eval_res(output_0, j, {})\n".format(
                                                                redvar_arrnames)
         func_text += "    return output_0\n"
 
@@ -361,7 +361,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
     topo_order = numba.ir_utils.find_topo_order(f_ir.blocks)
     first_block = f_ir.blocks[topo_order[0]]
-    replace_arg_nodes(first_block, [agg_node.key_arr] + in_col_vars)
+
 
     # find reduce variables from names and store in the same order
     reduce_vars = [0] * len(agg_func_struct.vars)
@@ -372,7 +372,11 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     assert 0 not in reduce_vars
 
     # add initialization code to first block
-    first_block.body = agg_func_struct.init + first_block.body
+    # make sure arg nodes are in the beginning
+    arg_nodes = []
+    for i in range(len(col_names)):
+        arg_nodes.append(first_block.body[i])
+    first_block.body = arg_nodes + agg_func_struct.init + first_block.body[len(arg_nodes):]
 
     # replace init val sentinels
     for l in topo_order:
@@ -418,13 +422,38 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
                 break
 
 
-    return []
-    # nodes = f_blocks[0].body[:-2]
+    f_ir.dump()
+    # compile implementation to binary (Dispatcher)
+    return_typ = types.Array(list(agg_node.out_typs.values())[0], 1, 'C')
+    agg_impl_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            return_typ,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
 
-    # # XXX dummy test code
-    # nodes[-1].target = agg_node.df_out_vars['B']
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis.add_overload(agg_impl_func)
 
-    # return nodes
+    # create wrapper that calls the underlying implementation
+    wrapper_text = "def agg_wrapper(key_arr, {}):\n".format(",".join(in_names))
+    wrapper_text += "    out = agg_impl_func(key_arr, {})\n".format(",".join(in_names))
+    loc_vars = {}
+    exec(wrapper_text, {}, loc_vars)
+    agg_wrapper = loc_vars['agg_wrapper']
+
+    wrapper_block = compile_to_numba_ir(agg_wrapper,
+                                  {'agg_impl_func': imp_dis},
+                                  typingctx, arg_typs,
+                                  typemap, calltypes).blocks.popitem()[1]
+
+    replace_arg_nodes(wrapper_block, [agg_node.key_arr] + in_col_vars)
+    nodes = wrapper_block.body[:-3]
+    nodes[-1].target = list(agg_node.df_out_vars.values())[0]
+    return nodes
 
 
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
@@ -450,11 +479,11 @@ def agg_send_recv_counts(key_arr):
 def compile_to_optimized_ir(func, arg_typs, typingctx):
     # XXX are outside function's globals needed?
     f_ir = numba.ir_utils.get_ir_of_code({}, func.code)
-    typemap, return_type, calltypes = numba.compiler.type_inference_stage(
+    typemap, return_type, calltypes = compiler.type_inference_stage(
                 typingctx, f_ir, arg_typs, None)
 
     options = numba.targets.cpu.ParallelOptions(True)
-    flags = numba.compiler.Flags()
+    flags = compiler.Flags()
     targetctx = numba.targets.cpu.CPUContext(typingctx)
 
     DummyPipeline = namedtuple('DummyPipeline',

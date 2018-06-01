@@ -115,7 +115,7 @@ def filter_distributed_analysis(filter_node, array_dists):
 distributed_analysis.distributed_analysis_extensions[Filter] = filter_distributed_analysis
 
 
-def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx):
+def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = filter_node.loc
     bool_arr = filter_node.bool_arr
