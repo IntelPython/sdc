@@ -1,16 +1,22 @@
 from __future__ import print_function, division, absolute_import
 
+from collections import namedtuple
+from functools import reduce
 import numpy as np
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
+
+AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
+                            'input_var', 'update', 'combine', 'eval', 'pm'])
 
 
 class Aggregate(ir.Stmt):
@@ -232,6 +238,24 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
 
 distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
 
+def __update_redvars():
+    pass
+
+@infer_global(__update_redvars)
+class UpdateDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.void, *args)
+
+def __eval_res():
+    pass
+
+@infer_global(__eval_res)
+class EvalDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        # takse the output array as first argument to know the output dtype
+        return signature(args[0].dtype, *args)
 
 def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     parallel = True
@@ -259,9 +283,13 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     in_col_typ = [typemap[v.name] for v in in_col_vars]
     arg_typs = tuple([typemap[agg_node.key_arr.name]] + in_col_typ)
     # arg names
-    in_names = ["in_c" + str(i) for i in range(len(in_col_vars))]
+    in_names = ["in_c{}".format(i) for i in range(len(in_col_vars))]
     # key and arg names
     col_names = ['key_arr'] + in_names
+
+    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typ[0], typingctx)
+    typemap.update(agg_func_struct.pm.typemap)
+    calltypes.update(agg_func_struct.pm.calltypes)
 
     func_text = "def f(key_arr, {}):\n".format(",".join(in_names))
 
@@ -281,20 +309,57 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
                 a, a)
 
     else:
-        assert False
-
+        # allocate reduction var arrays
+        func_text += "    n_uniq_keys = len(set(key_arr))\n"
+        for i, typ in enumerate(agg_func_struct.var_typs):
+            func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
+            func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{})\n".format(
+                i, i)
+        # allocate output
+        for i, col in enumerate(agg_node.df_in_vars.keys()):
+            func_text += "    output_{} = np.empty(n_uniq_keys, np.{})\n".format(
+                                                    i, agg_node.out_typs[col])
+        # find write location
+        # TODO: non-int dict
+        func_text += "    key_write_map = hpat.DictIntInt()\n"
+        func_text += "    curr_write_ind = 0\n"
+        func_text += "    for i in range(len(key_arr)):\n"
+        func_text += "      k = key_arr[i]\n"
+        func_text += "      if k not in key_write_map:\n"
+        func_text += "        key_write_map[k] = curr_write_ind\n"
+        func_text += "        w_ind = curr_write_ind\n"
+        func_text += "        curr_write_ind += 1\n"
+        func_text += "      else:\n"
+        func_text += "        w_ind = key_write_map[k]\n"
+        # update reduce vars with input
+        redvar_arrnames = ",".join(["redvar_{}_arr".format(i)
+                                    for i in range(len(agg_func_struct.vars))])
+        func_text += "      __update_redvars(w_ind, {}, {})\n".format(
+            in_names[0], redvar_arrnames)
+        # get final output from reduce varis
+        func_text += "    for i in range(n_uniq_keys):\n"
+        func_text += "      output_0[i] = __eval_res(output_0, i, {})\n".format(
+                                                               redvar_arrnames)
+        func_text += "    return output_0\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     f = loc_vars['f']
+    #
+    print(func_text)
 
-    f_block = compile_to_numba_ir(f,
+    
+
+    f_blocks = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
-                                  'agg_send_recv_counts': agg_send_recv_counts},
+                                  'agg_send_recv_counts': agg_send_recv_counts,
+                                  '__update_redvars': __update_redvars,
+                                  '__eval_res': __eval_res},
                                   typingctx, arg_typs,
-                                  typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [agg_node.key_arr] + in_col_vars)
-    nodes = f_block.body[:-3]
+                                  typemap, calltypes)
+
+    replace_arg_nodes(f_blocks[0], [agg_node.key_arr] + in_col_vars)
+    nodes = f_blocks[0].body[:-3]
 
     # XXX dummy test code
     nodes[-1].target = agg_node.df_out_vars['B']
@@ -320,3 +385,67 @@ def agg_send_recv_counts(key_arr):
 
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     return send_counts, recv_counts
+
+
+def compile_to_optimized_ir(func, arg_typs, typingctx):
+    # XXX are outside function's globals needed?
+    f_ir = numba.ir_utils.get_ir_of_code({}, func.code)
+    typemap, return_type, calltypes = numba.compiler.type_inference_stage(
+                typingctx, f_ir, arg_typs, None)
+
+    options = numba.targets.cpu.ParallelOptions(True)
+    flags = numba.compiler.Flags()
+    targetctx = numba.targets.cpu.CPUContext(typingctx)
+
+    DummyPipeline = namedtuple('DummyPipeline',
+        ['typingctx', 'targetctx', 'args', 'func_ir', 'typemap', 'return_type',
+        'calltypes'])
+    pm = DummyPipeline(typingctx, targetctx, None, f_ir, typemap, return_type,
+                        calltypes)
+    preparfor_pass = numba.parfor.PreParforPass(
+            f_ir,
+            typemap,
+            calltypes, typingctx,
+            options
+            )
+    preparfor_pass.run()
+    numba.rewrites.rewrite_registry.apply('after-inference', pm, f_ir)
+    parfor_pass = numba.parfor.ParforPass(f_ir, typemap,
+    calltypes, return_type, typingctx,
+    options, flags)
+    parfor_pass.run()
+    numba.ir_utils.remove_dels(f_ir.blocks)
+    return f_ir, pm
+
+def get_agg_func_struct(agg_func, in_col_typ, typingctx):
+    """find initialization, update, combine and final evaluation code of the
+    aggregation function. Currently assuming that the function is single block
+    and has one parfor.
+    """
+    f_ir, pm = compile_to_optimized_ir(
+        agg_func, tuple([in_col_typ]), typingctx)
+    assert len(f_ir.blocks) == 1 and 0 in f_ir.blocks, ("only simple functions"
+                                  " with one block supported for aggregation")
+    block = f_ir.blocks[0]
+    parfor_ind = -1
+    for i, stmt in enumerate(block.body):
+        if isinstance(stmt, numba.parfor.Parfor):
+            assert parfor_ind == -1, "only one parfor for aggregation function"
+            parfor_ind = i
+    parfor = block.body[parfor_ind]
+    redvars, reddict = numba.parfor.get_parfor_reductions(
+        parfor, parfor.params, pm.calltypes)
+    var_types = [pm.typemap[v] for v in redvars]
+    combine_nodes = reduce(lambda a,b: a+b, [r[1] for r in reddict.values()])
+    init_nodes = block.body[0:parfor_ind] + parfor.init_block.body
+
+    arr_var = block.body[0].target
+    input_var = ir.Var(arr_var.scope, "agg#input", arr_var.loc)
+    for bl in parfor.loop_body.values():
+        for stmt in bl.body:
+            if numba.ir_utils.is_getitem(stmt) and stmt.value.value.name == arr_var.name:
+                stmt.target = input_var
+
+    eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
+    return AggFuncStruct(redvars, var_types, init_nodes, input_var, bl.body,
+                         combine_nodes, eval_nodes, pm)
