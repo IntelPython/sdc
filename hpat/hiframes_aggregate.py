@@ -7,11 +7,11 @@ import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
-                            find_callname, guard)
+                            replace_vars_stmt, find_callname, guard)
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
-from hpat.utils import is_call
+from hpat.utils import is_call, is_var_assign, is_assign
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.str_ext import string_type
@@ -336,7 +336,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
         # update reduce vars with input
         redvar_arrnames = ",".join(["redvar_{}_arr".format(i)
                                     for i in range(len(agg_func_struct.vars))])
-        func_text += "      __update_redvars(w_ind, {}, {})\n".format(
+        func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
             in_names[0], redvar_arrnames)
         # get final output from reduce varis
         func_text += "    for i in range(n_uniq_keys):\n"
@@ -377,14 +377,46 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx):
     # replace init val sentinels
     for l in topo_order:
         block = f_ir.blocks[l]
-        for stmt in block.body:
+        for i, stmt in enumerate(block.body):
             if isinstance(stmt, ir.Assign) and stmt.target.name.startswith("_init_val_"):
                 first_dot = stmt.target.name.index(".")
                 var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
                 stmt.value = reduce_vars[var_ind]
             if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__update_redvars', 'hpat.hiframes_aggregate')):
-                print(guard(find_callname, f_ir, stmt.value))
+                write_ind_var = stmt.value.args[0]
+                column_val = stmt.value.args[1]
+                replace_dict = {v:column_val for v in agg_func_struct.vars}
+                red_arrs = stmt.value.args[2:]
+                update_nodes = []
+                for inst in agg_func_struct.update:
+                    # replace agg#input with column array value
+                    if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
+                        inst.value = column_val
+                    # replace red_var assignment with red_arr[w_ind] setitem
+                    if is_assign(inst) and inst.target.name in agg_func_struct.vars:
+                        var_ind = agg_func_struct.vars.index(inst.target.name)
+                        arr = red_arrs[var_ind]
+                        setitem_node = ir.SetItem(arr, write_ind_var, inst.value, inst.loc)
+                        calltypes[setitem_node] = signature(
+                        types.none, typemap[arr.name], typemap[write_ind_var.name], typemap[inst.value.name])
+                        update_nodes.append(setitem_node)
+                        continue  # remove call
+
+                    # replace reduction vars with column input value
+                    replace_vars_stmt(inst, replace_dict)
+                    update_nodes.append(inst)
+
+                # add new update nodes
+                # assuming update sentinel is right before jump
+                # XXX can modify since iterator is terminated
+                assert i == len(block.body) - 2
+                jump_node = block.body.pop()
+                block.body.pop()  # remove update call
+                block.body += update_nodes
+                block.body.append(jump_node)
+                break
+
 
     return []
     # nodes = f_blocks[0].body[:-2]
@@ -477,7 +509,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx):
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
             if numba.ir_utils.is_getitem(stmt) and stmt.value.value.name == arr_var.name:
-                stmt.target = input_var
+                stmt.value = input_var
 
     eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
     return AggFuncStruct(redvars, var_types, init_nodes, input_var, bl.body,

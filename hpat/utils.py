@@ -210,3 +210,13 @@ def is_call(stmt):
     return (isinstance(stmt, ir.Assign)
             and isinstance(stmt.value, ir.Expr)
             and stmt.value.op == 'call')
+
+def is_var_assign(inst):
+    return isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var)
+
+def is_assign(inst):
+    return isinstance(inst, ir.Assign)
+
+def dump_node_list(node_list):
+    for n in node_list:
+        print("   ", n)
