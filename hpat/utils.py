@@ -204,3 +204,9 @@ def to_array_overload(in_typ):
         return to_array_impl
     except:
         pass  # should be handled elsewhere (e.g. Set)
+
+def is_call(stmt):
+    """true if stmt is a getitem or static_getitem assignment"""
+    return (isinstance(stmt, ir.Assign)
+            and isinstance(stmt.value, ir.Expr)
+            and stmt.value.op == 'call')
