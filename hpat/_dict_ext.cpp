@@ -12,6 +12,7 @@ int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index)
 void* dict_int_int_keys(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m);
 int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m);
+bool dict_int_int_in(std::unordered_map<int64_t, int64_t>* m, int64_t val);
 bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m);
 
 // -- int32 versions --
@@ -53,6 +54,8 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dict_int_int_min)));
     PyObject_SetAttrString(m, "dict_int_int_max",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_max)));
+    PyObject_SetAttrString(m, "dict_int_int_in",
+                            PyLong_FromVoidPtr((void*)(&dict_int_int_in)));
     PyObject_SetAttrString(m, "dict_int_int_not_empty",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_not_empty)));
     // ---- int32 versions ----
@@ -145,6 +148,11 @@ int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m)
             res = x.first;
     }
     return res;
+}
+
+bool dict_int_int_in(std::unordered_map<int64_t, int64_t>* m, int64_t val)
+{
+    return (m->find(val) != m->end());
 }
 
 bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m)
