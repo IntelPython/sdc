@@ -15,6 +15,7 @@ import hpat
 from hpat.utils import is_call, is_var_assign, is_assign
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
+from hpat.distributed_lower import _h5_typ_table
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
@@ -303,6 +304,8 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     if parallel:
         # get send/recv counts
         func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
+        func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
+        func_text += "    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
         func_text += "    n_uniq_keys = send_counts.sum()\n"
         func_text += "    recv_size = recv_counts.sum()\n"
         # func_text += "    hpat.cprint(n_uniq_keys, recv_size)\n"
@@ -315,12 +318,22 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
             func_text += "    recv_{} = np.empty(recv_size, {}.dtype)\n".format(
                 a, a)
 
-    else:
-        func_text += "    n_uniq_keys = len(set(key_arr))\n"
-        # allocate output
-        for i, col in enumerate(agg_node.df_in_vars.keys()):
-            func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
-                                                    i, agg_node.out_typs[col])
+        # call local aggregate
+        send_col_args = ", ".join(["send_{}".format(a) for a in in_names])
+        func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(
+            send_col_args, ", ".join(in_names))
+
+        # shuffle data
+        for i, a in enumerate(col_names):
+            func_text += "    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
+                a, a, _h5_typ_table[arg_typs[i].dtype])
+            func_text += "    {} = recv_{}\n".format(a, a)
+
+    func_text += "    n_uniq_keys = len(set(key_arr))\n"
+    # allocate output
+    for i, col in enumerate(agg_node.df_in_vars.keys()):
+        func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
+                                                i, agg_node.out_typs[col])
 
     func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(", ".join(out_names), ", ".join(in_names))
     func_text += "    c = out_c0\n"
@@ -337,7 +350,9 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     f_block = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
                                   'agg_send_recv_counts': agg_send_recv_counts,
-                                  '__agg_func': agg_impl},
+                                  '__agg_func': agg_impl,
+                                  'c_alltoallv': hpat.hiframes_api.c_alltoallv,
+                                  },
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
 
