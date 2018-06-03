@@ -327,20 +327,24 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         func_text += "    curr_write_ind = 0\n"
         func_text += "    for i in range(len(key_arr)):\n"
         func_text += "      k = key_arr[i]\n"
+        func_text += "      hpat.cprint('key:', k)\n"
         func_text += "      if k not in key_write_map:\n"
         func_text += "        key_write_map[k] = curr_write_ind\n"
         func_text += "        w_ind = curr_write_ind\n"
         func_text += "        curr_write_ind += 1\n"
         func_text += "      else:\n"
         func_text += "        w_ind = key_write_map[k]\n"
+        func_text += "      hpat.cprint(redvar_0_arr[0])\n"
         # update reduce vars with input
         redvar_arrnames = ",".join(["redvar_{}_arr".format(i)
                                     for i in range(len(agg_func_struct.vars))])
         func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
             in_names[0], redvar_arrnames)
         # get final output from reduce varis
+        redvar_arrnames = ",".join(["redvar_{}_arr[j]".format(i)
+                                    for i in range(len(agg_func_struct.vars))])
         func_text += "    for j in range(n_uniq_keys):\n"
-        func_text += "      output_0[j] = __eval_res(output_0, j, {})\n".format(
+        func_text += "      output_0[j] = __eval_res(output_0, {})\n".format(
                                                                redvar_arrnames)
         func_text += "    return output_0\n"
 
@@ -421,8 +425,31 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                 block.body.append(jump_node)
                 break
 
+            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__eval_res', 'hpat.hiframes_aggregate')):
+                #
+                red_vals = stmt.value.args[1:]
+                replace_dict = {}
+                for k, v in enumerate(agg_func_struct.vars):
+                    replace_dict[v] = red_vals[k]
+                for inst in agg_func_struct.eval:
+                    replace_vars_stmt(inst, replace_dict)
+                # add new eval nodes
+                # assuming eval sentinel is before setitem and jump
+                # XXX can modify since iterator is terminated
+                assert i == len(block.body) - 3
+                jump_node = block.body.pop()
+                setitem_node = block.body.pop()
+                agg_func_struct.eval[-1].target = setitem_node.value
+                block.body.pop()  # remove update call
+                block.body += agg_func_struct.eval
+                block.body.append(setitem_node)
+                block.body.append(jump_node)
+                break
+
 
     f_ir.dump()
+
     # compile implementation to binary (Dispatcher)
     return_typ = types.Array(list(agg_node.out_typs.values())[0], 1, 'C')
     agg_impl_func = compiler.compile_ir(
