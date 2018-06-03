@@ -280,21 +280,25 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     # TODO: handle key column being part of output
 
+    key_typ = typemap[agg_node.key_arr.name]
     # get column variables
     in_col_vars = [v for (n, v) in sorted(agg_node.df_in_vars.items())]
+    out_col_vars = [v for (n, v) in sorted(agg_node.df_out_vars.items())]
     # get column types
-    in_col_typ = [typemap[v.name] for v in in_col_vars]
-    arg_typs = tuple([typemap[agg_node.key_arr.name]] + in_col_typ)
+    in_col_typs = [typemap[v.name] for v in in_col_vars]
+    out_col_typs = [typemap[v.name] for v in out_col_vars]
+    arg_typs = tuple([key_typ] + in_col_typs)
     # arg names
     in_names = ["in_c{}".format(i) for i in range(len(in_col_vars))]
+    out_names = ["out_c{}".format(i) for i in range(len(out_col_vars))]
     # key and arg names
     col_names = ['key_arr'] + in_names
 
-    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typ[0], typingctx)
+    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx)
     typemap.update(agg_func_struct.pm.typemap)
     calltypes.update(agg_func_struct.pm.calltypes)
 
-    func_text = "def f(key_arr, {}):\n".format(",".join(in_names))
+    func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
 
     if parallel:
         # get send/recv counts
@@ -312,40 +316,83 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                 a, a)
 
     else:
-        # allocate reduction var arrays
         func_text += "    n_uniq_keys = len(set(key_arr))\n"
-        for i, typ in enumerate(agg_func_struct.var_typs):
-            func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
-            func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
-                i, i, typ)
         # allocate output
         for i, col in enumerate(agg_node.df_in_vars.keys()):
-            func_text += "    output_{} = np.empty(n_uniq_keys, np.{})\n".format(
+            func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
                                                     i, agg_node.out_typs[col])
-        # find write location
-        # TODO: non-int dict
-        func_text += "    key_write_map = hpat.DictIntInt()\n"
-        func_text += "    curr_write_ind = 0\n"
-        func_text += "    for i in range(len(key_arr)):\n"
-        func_text += "      k = key_arr[i]\n"
-        func_text += "      if k not in key_write_map:\n"
-        func_text += "        key_write_map[k] = curr_write_ind\n"
-        func_text += "        w_ind = curr_write_ind\n"
-        func_text += "        curr_write_ind += 1\n"
-        func_text += "      else:\n"
-        func_text += "        w_ind = key_write_map[k]\n"
-        # update reduce vars with input
-        redvar_arrnames = ",".join(["redvar_{}_arr".format(i)
-                                    for i in range(len(agg_func_struct.vars))])
-        func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
-            in_names[0], redvar_arrnames)
-        # get final output from reduce varis
-        redvar_arrnames = ",".join(["redvar_{}_arr[j]".format(i)
-                                    for i in range(len(agg_func_struct.vars))])
-        func_text += "    for j in range(n_uniq_keys):\n"
-        func_text += "      output_0[j] = __eval_res(output_0, {})\n".format(
-                                                               redvar_arrnames)
-        func_text += "    return output_0\n"
+
+    func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(", ".join(out_names), ", ".join(in_names))
+    func_text += "    c = out_c0\n"
+
+    # print(func_text)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
+                        out_col_typs, typingctx, typemap, calltypes, targetctx)
+
+    f_block = compile_to_numba_ir(f,
+                                  {'hpat': hpat, 'np': np,
+                                  'agg_send_recv_counts': agg_send_recv_counts,
+                                  '__agg_func': agg_impl},
+                                  typingctx, arg_typs,
+                                  typemap, calltypes).blocks.popitem()[1]
+
+    replace_arg_nodes(f_block, [agg_node.key_arr] + in_col_vars)
+    nodes = f_block.body[:-3]
+    nodes[-1].target = list(agg_node.df_out_vars.values())[0]
+    return nodes
+
+
+distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
+
+
+
+
+def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap, calltypes, targetctx):
+
+    arg_typs = tuple([types.intp, key_typ] + out_typs + in_typs)
+    num_cols = len(in_typs)
+    assert len(out_typs) == num_cols
+
+    # arg names
+    in_names = ["in_c{}".format(i) for i in range(num_cols)]
+    out_names = ["out_c{}".format(i) for i in range(num_cols)]
+
+    func_text = "def f(n_uniq_keys, key_arr, {}, {}):\n".format(", ".join(out_names), ", ".join(in_names))
+
+    # allocate reduction var arrays
+    for i, typ in enumerate(agg_func_struct.var_typs):
+        func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
+        func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
+            i, i, typ)
+
+    # find write location
+    # TODO: non-int dict
+    func_text += "    key_write_map = hpat.DictIntInt()\n"
+    func_text += "    curr_write_ind = 0\n"
+    func_text += "    for i in range(len(key_arr)):\n"
+    func_text += "      k = key_arr[i]\n"
+    func_text += "      if k not in key_write_map:\n"
+    func_text += "        key_write_map[k] = curr_write_ind\n"
+    func_text += "        w_ind = curr_write_ind\n"
+    func_text += "        curr_write_ind += 1\n"
+    func_text += "      else:\n"
+    func_text += "        w_ind = key_write_map[k]\n"
+    # update reduce vars with input
+    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
+                                for i in range(len(agg_func_struct.vars))])
+    func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
+        in_names[0], redvar_arrnames)
+    # get final output from reduce varis
+    redvar_arrnames = ", ".join(["redvar_{}_arr[j]".format(i)
+                                for i in range(len(agg_func_struct.vars))])
+    func_text += "    for j in range(n_uniq_keys):\n"
+    func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
+                                                            redvar_arrnames)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -355,7 +402,6 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     f_ir = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
-                                  'agg_send_recv_counts': agg_send_recv_counts,
                                   '__update_redvars': __update_redvars,
                                   '__eval_res': __eval_res},
                                   typingctx, arg_typs,
@@ -364,7 +410,6 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
     topo_order = numba.ir_utils.find_topo_order(f_ir.blocks)
     first_block = f_ir.blocks[topo_order[0]]
-
 
     # find reduce variables from names and store in the same order
     reduce_vars = [0] * len(agg_func_struct.vars)
@@ -377,7 +422,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     # add initialization code to first block
     # make sure arg nodes are in the beginning
     arg_nodes = []
-    for i in range(len(col_names)):
+    for i in range(len(arg_typs)):
         arg_nodes.append(first_block.body[i])
     first_block.body = arg_nodes + agg_func_struct.init + first_block.body[len(arg_nodes):]
 
@@ -460,42 +505,21 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                 block.body.append(jump_node)
                 break
 
-    # f_ir.dump()
-
     # compile implementation to binary (Dispatcher)
-    return_typ = types.Array(list(agg_node.out_typs.values())[0], 1, 'C')
     agg_impl_func = compiler.compile_ir(
             typingctx,
             targetctx,
             f_ir,
             arg_typs,
-            return_typ,
+            types.none,
             compiler.DEFAULT_FLAGS,
             {}
     )
 
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
     imp_dis.add_overload(agg_impl_func)
+    return imp_dis
 
-    # create wrapper that calls the underlying implementation
-    wrapper_text = "def agg_wrapper(key_arr, {}):\n".format(",".join(in_names))
-    wrapper_text += "    out = agg_impl_func(key_arr, {})\n".format(",".join(in_names))
-    loc_vars = {}
-    exec(wrapper_text, {}, loc_vars)
-    agg_wrapper = loc_vars['agg_wrapper']
-
-    wrapper_block = compile_to_numba_ir(agg_wrapper,
-                                  {'agg_impl_func': imp_dis},
-                                  typingctx, arg_typs,
-                                  typemap, calltypes).blocks.popitem()[1]
-
-    replace_arg_nodes(wrapper_block, [agg_node.key_arr] + in_col_vars)
-    nodes = wrapper_block.body[:-3]
-    nodes[-1].target = list(agg_node.df_out_vars.values())[0]
-    return nodes
-
-
-distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 @numba.njit
 def agg_send_recv_counts(key_arr):
