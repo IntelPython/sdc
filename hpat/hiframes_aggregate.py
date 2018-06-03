@@ -7,7 +7,8 @@ import numba
 from numba import typeinfer, ir, ir_utils, config, types, compiler
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
-                            replace_vars_stmt, find_callname, guard)
+                            replace_vars_stmt, find_callname, guard,
+                            mk_unique_var)
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
@@ -327,14 +328,12 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         func_text += "    curr_write_ind = 0\n"
         func_text += "    for i in range(len(key_arr)):\n"
         func_text += "      k = key_arr[i]\n"
-        func_text += "      hpat.cprint('key:', k)\n"
         func_text += "      if k not in key_write_map:\n"
         func_text += "        key_write_map[k] = curr_write_ind\n"
         func_text += "        w_ind = curr_write_ind\n"
         func_text += "        curr_write_ind += 1\n"
         func_text += "      else:\n"
         func_text += "        w_ind = key_write_map[k]\n"
-        func_text += "      hpat.cprint(redvar_0_arr[0])\n"
         # update reduce vars with input
         redvar_arrnames = ",".join(["redvar_{}_arr".format(i)
                                     for i in range(len(agg_func_struct.vars))])
@@ -352,7 +351,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     exec(func_text, {}, loc_vars)
     f = loc_vars['f']
     #
-    print(func_text)
+    # print(func_text)
 
     f_ir = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
@@ -394,9 +393,24 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                     == ('__update_redvars', 'hpat.hiframes_aggregate')):
                 write_ind_var = stmt.value.args[0]
                 column_val = stmt.value.args[1]
-                replace_dict = {v:column_val for v in agg_func_struct.vars}
                 red_arrs = stmt.value.args[2:]
+                # replace_dict = {v:column_val for v in agg_func_struct.vars}
                 update_nodes = []
+                red_vals = []
+                # generate getitem nodes for reduction arrays
+                for k, rarr in enumerate(red_arrs):
+                    val_typ = typemap[rarr.name].dtype
+                    getitem_call = ir.Expr.getitem(rarr, write_ind_var, rarr.loc)
+                    red_val = ir.Var(rarr.scope, mk_unique_var("#red_val{}".format(k)), rarr.loc)
+                    red_vals.append(red_val)
+                    typemap[red_val.name] = val_typ
+                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
+                                                            typemap[write_ind_var.name])
+                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
+                replace_dict = {}
+                for k, v in enumerate(agg_func_struct.vars):
+                    replace_dict[v] = red_vals[k]
+
                 for inst in agg_func_struct.update:
                     # replace agg#input with column array value
                     if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
@@ -427,7 +441,6 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
             if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__eval_res', 'hpat.hiframes_aggregate')):
-                #
                 red_vals = stmt.value.args[1:]
                 replace_dict = {}
                 for k, v in enumerate(agg_func_struct.vars):
@@ -447,8 +460,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                 block.body.append(jump_node)
                 break
 
-
-    f_ir.dump()
+    # f_ir.dump()
 
     # compile implementation to binary (Dispatcher)
     return_typ = types.Array(list(agg_node.out_typs.values())[0], 1, 'C')
