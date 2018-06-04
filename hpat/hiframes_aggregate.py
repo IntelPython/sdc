@@ -398,6 +398,9 @@ distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                         typemap, calltypes, targetctx, parallel_local=False, parallel_combine=False):
+    # has 3 modes: 1- aggregate input column to output (sequential case)
+    #              2- aggregate input column to reduce arrays for communication (parallel_local)
+    #              3- aggregate received reduce arrays to output (parallel_combine)
 
     # in combine phase after shuffle, inputs are reduce vars
     if parallel_combine:
@@ -405,6 +408,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     # no output columns in parallel-local computation (reduce arrs returned)
     if parallel_local:
+        assert not parallel_combine
         out_typs = []
 
     arg_typs = tuple([types.intp, key_typ] + out_typs + in_typs)
@@ -446,6 +450,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     redvar_access = ", ".join(["redvar_{}_arr[w_ind]".format(i)
                             for i in range(num_red_vars)])
+    # TODO: separate combine function which can have different input types
     # if parallel_combine:
     #     # combine reduce vars
     #     func_text += "      __combine_redvars(w_ind, i, {}, {})\n".format(
@@ -456,6 +461,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
         inarr_access = ", ".join(["{}[i]".format(a)
                                     for a in in_names])
     else:
+        # TODO: extend to multiple input
         inarr_access = ", ".join(["{}[i]".format(a)
                                     for a in in_names*num_red_vars])
     func_text += "      {} = __update_redvars({}, {})\n".format(
@@ -505,7 +511,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
         arg_nodes.append(first_block.body[i])
     first_block.body = arg_nodes + agg_func_struct.init + first_block.body[len(arg_nodes):]
 
-    # replace init val sentinels
+    # replace init and eval sentinels
+    # TODO: replace with functions
     for l in topo_order:
         block = f_ir.blocks[l]
         for i, stmt in enumerate(block.body):
@@ -513,119 +520,6 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                 first_dot = stmt.target.name.index(".")
                 var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
                 stmt.value = reduce_vars[var_ind]
-            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__update_redvars1', 'hpat.hiframes_aggregate')):
-                write_ind_var = stmt.value.args[0]
-                column_val = stmt.value.args[1]
-                red_arrs = stmt.value.args[2:]
-                # replace_dict = {v:column_val for v in agg_func_struct.vars}
-                update_nodes = []
-                red_vals = []
-                # generate getitem nodes for reduction arrays
-                for k, rarr in enumerate(red_arrs):
-                    val_typ = typemap[rarr.name].dtype
-                    getitem_call = ir.Expr.getitem(rarr, write_ind_var, rarr.loc)
-                    red_val = ir.Var(rarr.scope, mk_unique_var("#red_val{}".format(k)), rarr.loc)
-                    red_vals.append(red_val)
-                    typemap[red_val.name] = val_typ
-                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
-                                                            typemap[write_ind_var.name])
-                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
-                replace_dict = {}
-                for k, v in enumerate(agg_func_struct.vars):
-                    replace_dict[v] = red_vals[k]
-
-                for inst in copy.deepcopy(agg_func_struct.update):
-                    # replace agg#input with column array value
-                    if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
-                        inst.value = column_val
-                    # replace red_var assignment with red_arr[w_ind] setitem
-                    if is_assign(inst) and inst.target.name in agg_func_struct.vars:
-                        var_ind = agg_func_struct.vars.index(inst.target.name)
-                        arr = red_arrs[var_ind]
-                        setitem_node = ir.SetItem(arr, write_ind_var, inst.value, inst.loc)
-                        calltypes[setitem_node] = signature(
-                        types.none, typemap[arr.name], typemap[write_ind_var.name], typemap[inst.value.name])
-                        update_nodes.append(setitem_node)
-                        continue  # remove call
-
-                    # replace reduction vars with column input value
-                    replace_vars_stmt(inst, replace_dict)
-                    update_nodes.append(inst)
-
-                # add new update nodes
-                # assuming update sentinel is right before jump
-                # XXX can modify since iterator is terminated
-                assert i == len(block.body) - 2
-                jump_node = block.body.pop()
-                block.body.pop()  # remove update call
-                block.body += update_nodes
-                block.body.append(jump_node)
-                break
-
-            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__combine_redvars1', 'hpat.hiframes_aggregate')):
-                write_ind_var = stmt.value.args[0]
-                read_ind_var = stmt.value.args[1]
-                in_red_arrs = stmt.value.args[2:2+num_red_vars]
-                red_arrs = stmt.value.args[2+num_red_vars:]
-                # replace_dict = {v:column_val for v in agg_func_struct.vars}
-                update_nodes = []
-                red_vals = []
-                in_red_vals = []
-                # generate getitem nodes for reduction arrays
-                for k, rarr in enumerate(red_arrs):
-                    val_typ = typemap[rarr.name].dtype
-                    getitem_call = ir.Expr.getitem(rarr, write_ind_var, rarr.loc)
-                    red_val = ir.Var(rarr.scope, mk_unique_var("$red_val{}".format(k)), rarr.loc)
-                    red_vals.append(red_val)
-                    typemap[red_val.name] = val_typ
-                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
-                                                            typemap[write_ind_var.name])
-                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
-
-                # generate getitem nodes for input reduction arrays
-                for k, rarr in enumerate(in_red_arrs):
-                    val_typ = typemap[rarr.name].dtype
-                    getitem_call = ir.Expr.getitem(rarr, read_ind_var, rarr.loc)
-                    red_val = ir.Var(rarr.scope, mk_unique_var("$in_red_val{}".format(k)), rarr.loc)
-                    in_red_vals.append(red_val)
-                    typemap[red_val.name] = val_typ
-                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
-                                                            typemap[write_ind_var.name])
-                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
-
-                replace_dict = {}
-                for k, v in enumerate(agg_func_struct.vars):
-                    replace_dict[v] = in_red_vals[k]
-                    replace_dict[v+"#init"] = red_vals[k]
-
-                for inst in copy.deepcopy(agg_func_struct.update):
-                    if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
-                        inst.value = in_red_vals
-                    # replace red_var assignment with red_arr[w_ind] setitem
-                    if is_assign(inst) and inst.target.name in agg_func_struct.vars:
-                        var_ind = agg_func_struct.vars.index(inst.target.name)
-                        arr = red_arrs[var_ind]
-                        setitem_node = ir.SetItem(arr, write_ind_var, inst.value, inst.loc)
-                        calltypes[setitem_node] = signature(
-                        types.none, typemap[arr.name], typemap[write_ind_var.name], typemap[inst.value.name])
-                        update_nodes.append(setitem_node)
-                        continue  # remove call
-
-                    # replace reduction vars with column input value
-                    replace_vars_stmt(inst, replace_dict)
-                    update_nodes.append(inst)
-
-                # add new update nodes
-                # assuming update sentinel is right before jump
-                # XXX can modify since iterator is terminated
-                assert i == len(block.body) - 2
-                jump_node = block.body.pop()
-                block.body.pop()  # remove update call
-                block.body += update_nodes
-                block.body.append(jump_node)
-                break
 
             if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__eval_res', 'hpat.hiframes_aggregate')):
@@ -740,6 +634,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     assert (isinstance(block.body[0], ir.Assign)
             and isinstance(block.body[0].value, ir.Arg)), "invalid agg func"
     init_nodes = block.body[3:parfor_ind] + parfor.init_block.body
+    eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
     arr_var = block.body[0].target
 
     redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
@@ -747,18 +642,21 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     num_red_vars = len(redvars)
     var_types = [pm.typemap[v] for v in redvars]
 
+    # create input value variable for each reduction variable
     in_vars = []
-    red_ir_vars = [0]*num_red_vars
     for redvar in redvars:
         in_var = ir.Var(arr_var.scope, "${}#input".format(redvar), arr_var.loc)
         in_vars.append(in_var)
 
+    # replace X[i] with reduction input value
+    red_ir_vars = [0]*num_red_vars
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
             if numba.ir_utils.is_getitem(stmt) and stmt.value.value.name == arr_var.name:
                 redvar = var_to_redvar[stmt.target.name]
                 ind = redvars.index(redvar)
                 stmt.value = in_vars[ind]
+            # store reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 ind = redvars.index(stmt.target.name)
                 red_ir_vars[ind] = stmt.target
@@ -768,9 +666,6 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
 
     func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
     func_text += "    __update_redvars()\n"
-    # for i in range(num_red_vars):
-    #     func_text += "    u{} = v{}\n".format(i, i)
-
     func_text += "    return {}".format(", ".join(["v{}".format(i) for i in range(num_red_vars)]))
 
     loc_vars = {}
@@ -793,22 +688,26 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     new_body = []
     initial_assigns = []
 
+    # redvar_i = v_i
     for i in range(num_red_vars):
         arg_var = body[i].target
         node = ir.Assign(arg_var, red_ir_vars[i], arg_var.loc)
         initial_assigns.append(node)
 
+    # redvar_in_i = in_i
     for i in range(num_red_vars, 2*num_red_vars):
         arg_var = body[i].target
         node = ir.Assign(arg_var, in_vars[i-num_red_vars], arg_var.loc)
         initial_assigns.append(node)
 
+    # v_i = red_var_i
     after_assigns = []
     for i in range(num_red_vars):
         arg_var = body[i].target
         node = ir.Assign(red_ir_vars[i], arg_var, arg_var.loc)
         after_assigns.append(node)
 
+    # find sentinel and insert update body
     for stmt in f_ir.blocks[label].body:
         if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__update_redvars', 'hpat.hiframes_aggregate')):
@@ -834,7 +733,6 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
     imp_dis.add_overload(agg_impl_func)
 
-    eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
     return AggFuncStruct(redvars, var_types, init_nodes, imp_dis, eval_nodes, pm)
 
 
