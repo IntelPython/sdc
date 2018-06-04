@@ -1,14 +1,16 @@
 from __future__ import print_function, division, absolute_import
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from functools import reduce
+import copy
 import numpy as np
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, compiler
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
-                            mk_unique_var)
+                            mk_unique_var, find_topo_order)
+from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
@@ -20,7 +22,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
-                            'input_var', 'update', 'combine', 'eval', 'pm'])
+                                                    'update', 'eval', 'pm'])
 
 
 class Aggregate(ir.Stmt):
@@ -251,6 +253,15 @@ class UpdateDummyTyper(AbstractTemplate):
         assert not kws
         return signature(types.void, *args)
 
+def __combine_redvars():
+    pass
+
+@infer_global(__combine_redvars)
+class CombineDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.void, *args)
+
 def __eval_res():
     pass
 
@@ -295,9 +306,14 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     # key and arg names
     col_names = ['key_arr'] + in_names
 
-    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx)
+    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx, targetctx)
     typemap.update(agg_func_struct.pm.typemap)
     calltypes.update(agg_func_struct.pm.calltypes)
+
+    agg_func_struct_p = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx, targetctx)
+    typemap.update(agg_func_struct_p.pm.typemap)
+    calltypes.update(agg_func_struct_p.pm.calltypes)
+    num_red_vars = len(agg_func_struct.vars)
 
     func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
 
@@ -312,22 +328,26 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
         # prepare for shuffle
         # allocate send/recv buffers
-        for a in col_names:
-            func_text += "    send_{} = np.empty(n_uniq_keys, {}.dtype)\n".format(
-                a, a)
-            func_text += "    recv_{} = np.empty(recv_size, {}.dtype)\n".format(
-                a, a)
+        func_text += "    recv_key_arr = np.empty(recv_size, np.{})\n".format(key_typ.dtype)
+        for i in range(num_red_vars):
+            func_text += "    recv_{} = np.empty(recv_size, np.{})\n".format(
+                i, agg_func_struct_p.var_typs[i])
 
         # call local aggregate
-        send_col_args = ", ".join(["send_{}".format(a) for a in in_names])
-        func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(
+        send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
+        func_text += "    send_key_arr, {} = __agg_func_p(n_uniq_keys, key_arr, {})\n".format(
             send_col_args, ", ".join(in_names))
+        # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
 
         # shuffle data
-        for i, a in enumerate(col_names):
+        func_text += "    c_alltoallv(send_key_arr.ctypes, recv_key_arr.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
+            _h5_typ_table[key_typ.dtype])
+        for i, a in enumerate(agg_func_struct_p.var_typs):
             func_text += "    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
-                a, a, _h5_typ_table[arg_typs[i].dtype])
-            func_text += "    {} = recv_{}\n".format(a, a)
+                i, i, _h5_typ_table[a])
+        func_text += "    key_arr = recv_key_arr\n"
+        in_names = ["recv_{}".format(i) for i in range(num_red_vars)]
+        # func_text += "    hpat.cprint(len(key_arr), len(in_c0))\n"
 
     func_text += "    n_uniq_keys = len(set(key_arr))\n"
     # allocate output
@@ -344,13 +364,22 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     exec(func_text, {}, loc_vars)
     f = loc_vars['f']
 
-    agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
+    if parallel:
+        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
+           out_col_typs, typingctx, typemap, calltypes, targetctx, False, True)
+        agg_impl_p = gen_agg_func(agg_func_struct_p, key_typ, in_col_typs,
+                  out_col_typs, typingctx, typemap, calltypes, targetctx, True)
+    else:
+        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
                         out_col_typs, typingctx, typemap, calltypes, targetctx)
+        agg_impl_p = None
+
 
     f_block = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
                                   'agg_send_recv_counts': agg_send_recv_counts,
                                   '__agg_func': agg_impl,
+                                  '__agg_func_p': agg_impl_p,
                                   'c_alltoallv': hpat.hiframes_api.c_alltoallv,
                                   },
                                   typingctx, arg_typs,
@@ -367,23 +396,38 @@ distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 
 
-def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap, calltypes, targetctx):
+def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
+                        typemap, calltypes, targetctx, parallel_local=False, parallel_combine=False):
+
+    # in combine phase after shuffle, inputs are reduce vars
+    if parallel_combine:
+        in_typs = [types.Array(t, 1, 'C') for t in agg_func_struct.var_typs]
+
+    # no output columns in parallel-local computation (reduce arrs returned)
+    if parallel_local:
+        out_typs = []
 
     arg_typs = tuple([types.intp, key_typ] + out_typs + in_typs)
-    num_cols = len(in_typs)
-    assert len(out_typs) == num_cols
 
     # arg names
-    in_names = ["in_c{}".format(i) for i in range(num_cols)]
-    out_names = ["out_c{}".format(i) for i in range(num_cols)]
+    in_names = ["in_c{}".format(i) for i in range(len(in_typs))]
+    out_names = ["out_c{}".format(i) for i in range(len(out_typs))]
 
-    func_text = "def f(n_uniq_keys, key_arr, {}, {}):\n".format(", ".join(out_names), ", ".join(in_names))
+    num_red_vars = len(agg_func_struct.vars)
+    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
+                                    for i in range(num_red_vars)])
+
+    func_text = "def f(n_uniq_keys, key_arr, {}):\n".format(", ".join(out_names + in_names))
 
     # allocate reduction var arrays
     for i, typ in enumerate(agg_func_struct.var_typs):
         func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
         func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
             i, i, typ)
+
+    # key is returned in parallel local agg phase (TODO: avoid if key is output already)
+    if parallel_local:
+        func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(key_typ.dtype)
 
     # find write location
     # TODO: non-int dict
@@ -395,19 +439,38 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
     func_text += "        key_write_map[k] = curr_write_ind\n"
     func_text += "        w_ind = curr_write_ind\n"
     func_text += "        curr_write_ind += 1\n"
+    if parallel_local:
+        func_text += "        out_key[w_ind] = k\n"
     func_text += "      else:\n"
     func_text += "        w_ind = key_write_map[k]\n"
+
+    redvar_access = ", ".join(["redvar_{}_arr[w_ind]".format(i)
+                            for i in range(num_red_vars)])
+    # if parallel_combine:
+    #     # combine reduce vars
+    #     func_text += "      __combine_redvars(w_ind, i, {}, {})\n".format(
+    #         ", ".join(in_names), redvar_arrnames)
+    # else:
     # update reduce vars with input
-    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
-                                for i in range(len(agg_func_struct.vars))])
-    func_text += "      __update_redvars(w_ind, {}[i], {})\n".format(
-        in_names[0], redvar_arrnames)
-    # get final output from reduce varis
-    redvar_arrnames = ", ".join(["redvar_{}_arr[j]".format(i)
-                                for i in range(len(agg_func_struct.vars))])
-    func_text += "    for j in range(n_uniq_keys):\n"
-    func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
-                                                            redvar_arrnames)
+    if parallel_combine:
+        inarr_access = ", ".join(["{}[i]".format(a)
+                                    for a in in_names])
+    else:
+        inarr_access = ", ".join(["{}[i]".format(a)
+                                    for a in in_names*num_red_vars])
+    func_text += "      {} = __update_redvars({}, {})\n".format(
+        redvar_access, redvar_access, inarr_access)
+
+    if parallel_local:
+        # return out key array and reduce arrays for communication
+        func_text += "    return out_key, {}\n".format(redvar_arrnames)
+    else:
+        # get final output from reduce varis
+        redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
+                                    for i in range(num_red_vars)])
+        func_text += "    for j in range(n_uniq_keys):\n"
+        func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
+                                                                redvar_access)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -417,7 +480,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
 
     f_ir = compile_to_numba_ir(f,
                                   {'hpat': hpat, 'np': np,
-                                  '__update_redvars': __update_redvars,
+                                  '__update_redvars': agg_func_struct.update,
+                                  '__combine_redvars': __combine_redvars,
                                   '__eval_res': __eval_res},
                                   typingctx, arg_typs,
                                   typemap, calltypes)
@@ -427,7 +491,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
     first_block = f_ir.blocks[topo_order[0]]
 
     # find reduce variables from names and store in the same order
-    reduce_vars = [0] * len(agg_func_struct.vars)
+    reduce_vars = [0] * num_red_vars
     for node in agg_func_struct.init:
         if isinstance(node, ir.Assign) and node.target.name in agg_func_struct.vars:
             var_ind = agg_func_struct.vars.index(node.target.name)
@@ -450,7 +514,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
                 var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
                 stmt.value = reduce_vars[var_ind]
             if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__update_redvars', 'hpat.hiframes_aggregate')):
+                    == ('__update_redvars1', 'hpat.hiframes_aggregate')):
                 write_ind_var = stmt.value.args[0]
                 column_val = stmt.value.args[1]
                 red_arrs = stmt.value.args[2:]
@@ -471,10 +535,74 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
                 for k, v in enumerate(agg_func_struct.vars):
                     replace_dict[v] = red_vals[k]
 
-                for inst in agg_func_struct.update:
+                for inst in copy.deepcopy(agg_func_struct.update):
                     # replace agg#input with column array value
                     if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
                         inst.value = column_val
+                    # replace red_var assignment with red_arr[w_ind] setitem
+                    if is_assign(inst) and inst.target.name in agg_func_struct.vars:
+                        var_ind = agg_func_struct.vars.index(inst.target.name)
+                        arr = red_arrs[var_ind]
+                        setitem_node = ir.SetItem(arr, write_ind_var, inst.value, inst.loc)
+                        calltypes[setitem_node] = signature(
+                        types.none, typemap[arr.name], typemap[write_ind_var.name], typemap[inst.value.name])
+                        update_nodes.append(setitem_node)
+                        continue  # remove call
+
+                    # replace reduction vars with column input value
+                    replace_vars_stmt(inst, replace_dict)
+                    update_nodes.append(inst)
+
+                # add new update nodes
+                # assuming update sentinel is right before jump
+                # XXX can modify since iterator is terminated
+                assert i == len(block.body) - 2
+                jump_node = block.body.pop()
+                block.body.pop()  # remove update call
+                block.body += update_nodes
+                block.body.append(jump_node)
+                break
+
+            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__combine_redvars1', 'hpat.hiframes_aggregate')):
+                write_ind_var = stmt.value.args[0]
+                read_ind_var = stmt.value.args[1]
+                in_red_arrs = stmt.value.args[2:2+num_red_vars]
+                red_arrs = stmt.value.args[2+num_red_vars:]
+                # replace_dict = {v:column_val for v in agg_func_struct.vars}
+                update_nodes = []
+                red_vals = []
+                in_red_vals = []
+                # generate getitem nodes for reduction arrays
+                for k, rarr in enumerate(red_arrs):
+                    val_typ = typemap[rarr.name].dtype
+                    getitem_call = ir.Expr.getitem(rarr, write_ind_var, rarr.loc)
+                    red_val = ir.Var(rarr.scope, mk_unique_var("$red_val{}".format(k)), rarr.loc)
+                    red_vals.append(red_val)
+                    typemap[red_val.name] = val_typ
+                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
+                                                            typemap[write_ind_var.name])
+                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
+
+                # generate getitem nodes for input reduction arrays
+                for k, rarr in enumerate(in_red_arrs):
+                    val_typ = typemap[rarr.name].dtype
+                    getitem_call = ir.Expr.getitem(rarr, read_ind_var, rarr.loc)
+                    red_val = ir.Var(rarr.scope, mk_unique_var("$in_red_val{}".format(k)), rarr.loc)
+                    in_red_vals.append(red_val)
+                    typemap[red_val.name] = val_typ
+                    calltypes[getitem_call] = signature(val_typ, typemap[rarr.name],
+                                                            typemap[write_ind_var.name])
+                    update_nodes.append(ir.Assign(getitem_call, red_val, rarr.loc))
+
+                replace_dict = {}
+                for k, v in enumerate(agg_func_struct.vars):
+                    replace_dict[v] = in_red_vals[k]
+                    replace_dict[v+"#init"] = red_vals[k]
+
+                for inst in copy.deepcopy(agg_func_struct.update):
+                    if is_var_assign(inst) and inst.value.name == agg_func_struct.input_var.name:
+                        inst.value = in_red_vals
                     # replace red_var assignment with red_arr[w_ind] setitem
                     if is_assign(inst) and inst.target.name in agg_func_struct.vars:
                         var_ind = agg_func_struct.vars.index(inst.target.name)
@@ -520,13 +648,18 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx, typemap
                 block.body.append(jump_node)
                 break
 
+
+    return_typ = types.none
+    if parallel_local:
+        return_typ = typemap[f_ir.blocks[topo_order[-1]].body[-1].value.name]
+
     # compile implementation to binary (Dispatcher)
     agg_impl_func = compiler.compile_ir(
             typingctx,
             targetctx,
             f_ir,
             arg_typs,
-            types.none,
+            return_typ,
             compiler.DEFAULT_FLAGS,
             {}
     )
@@ -584,7 +717,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     numba.ir_utils.remove_dels(f_ir.blocks)
     return f_ir, pm
 
-def get_agg_func_struct(agg_func, in_col_typ, typingctx):
+def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     """find initialization, update, combine and final evaluation code of the
     aggregation function. Currently assuming that the function is single block
     and has one parfor.
@@ -599,25 +732,159 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx):
         if isinstance(stmt, numba.parfor.Parfor):
             assert parfor_ind == -1, "only one parfor for aggregation function"
             parfor_ind = i
+
     parfor = block.body[parfor_ind]
     numba.ir_utils.remove_dels({0: parfor.init_block})
-    redvars, reddict = numba.parfor.get_parfor_reductions(
-        parfor, parfor.params, pm.calltypes)
-    var_types = [pm.typemap[v] for v in redvars]
-    combine_nodes = reduce(lambda a,b: a+b, [r[1] for r in reddict.values()])
 
     # ignore arg and size/shape nodes for input arr
     assert (isinstance(block.body[0], ir.Assign)
             and isinstance(block.body[0].value, ir.Arg)), "invalid agg func"
     init_nodes = block.body[3:parfor_ind] + parfor.init_block.body
-
     arr_var = block.body[0].target
-    input_var = ir.Var(arr_var.scope, "agg#input", arr_var.loc)
+
+    redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
+                                                                pm.calltypes)
+    num_red_vars = len(redvars)
+    var_types = [pm.typemap[v] for v in redvars]
+
+    in_vars = []
+    red_ir_vars = [0]*num_red_vars
+    for redvar in redvars:
+        in_var = ir.Var(arr_var.scope, "${}#input".format(redvar), arr_var.loc)
+        in_vars.append(in_var)
+
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
             if numba.ir_utils.is_getitem(stmt) and stmt.value.value.name == arr_var.name:
-                stmt.value = input_var
+                redvar = var_to_redvar[stmt.target.name]
+                ind = redvars.index(redvar)
+                stmt.value = in_vars[ind]
+            if is_assign(stmt) and stmt.target.name in redvars:
+                ind = redvars.index(stmt.target.name)
+                red_ir_vars[ind] = stmt.target
+
+    redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
+    in_names = ["in{}".format(i) for i in range(num_red_vars)]
+
+    func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
+    func_text += "    __update_redvars()\n"
+    # for i in range(num_red_vars):
+    #     func_text += "    u{} = v{}\n".format(i, i)
+
+    func_text += "    return {}".format(", ".join(["v{}".format(i) for i in range(num_red_vars)]))
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    # XXX input column type can be different than reduction variable type
+    arg_typs = tuple(var_types + [in_col_typ.dtype]*num_red_vars)
+
+    f_ir = compile_to_numba_ir(f, {'__update_redvars': __update_redvars},  # TODO: add outside globals
+                                  typingctx, arg_typs,
+                                  pm.typemap, pm.calltypes)
+
+    f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
+
+
+    label = list(f_ir.blocks)[0]
+    body = f_ir.blocks[label].body
+    return_typ = pm.typemap[body[-1].value.name]
+    new_body = []
+    initial_assigns = []
+
+    for i in range(num_red_vars):
+        arg_var = body[i].target
+        node = ir.Assign(arg_var, red_ir_vars[i], arg_var.loc)
+        initial_assigns.append(node)
+
+    for i in range(num_red_vars, 2*num_red_vars):
+        arg_var = body[i].target
+        node = ir.Assign(arg_var, in_vars[i-num_red_vars], arg_var.loc)
+        initial_assigns.append(node)
+
+    after_assigns = []
+    for i in range(num_red_vars):
+        arg_var = body[i].target
+        node = ir.Assign(red_ir_vars[i], arg_var, arg_var.loc)
+        after_assigns.append(node)
+
+    for stmt in f_ir.blocks[label].body:
+        if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__update_redvars', 'hpat.hiframes_aggregate')):
+            new_body.extend(initial_assigns)
+            new_body.extend(bl.body)
+            new_body.extend(after_assigns)
+            continue
+        new_body.append(stmt)
+
+    f_ir.blocks[label].body = new_body
+
+    # compile implementation to binary (Dispatcher)
+    agg_impl_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            return_typ,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis.add_overload(agg_impl_func)
 
     eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
-    return AggFuncStruct(redvars, var_types, init_nodes, input_var, bl.body,
-                         combine_nodes, eval_nodes, pm)
+    return AggFuncStruct(redvars, var_types, init_nodes, imp_dis, eval_nodes, pm)
+
+
+# adapted from numba/parfor.py
+def get_parfor_reductions(parfor, parfor_params, calltypes,
+                    reduce_varnames=None, param_uses=None, var_to_param=None):
+    """find variables that are updated using their previous values and an array
+    item accessed with parfor index, e.g. s = s+A[i]
+    """
+    if reduce_varnames is None:
+        reduce_varnames = []
+
+    # for each param variable, find what other variables are used to update it
+    # also, keep the related nodes
+    if param_uses is None:
+        param_uses = defaultdict(list)
+    if var_to_param is None:
+        var_to_param = {}
+
+    blocks = wrap_parfor_blocks(parfor)
+    topo_order = find_topo_order(blocks)
+    topo_order = topo_order[1:]  # ignore init block
+    unwrap_parfor_blocks(parfor)
+
+    for label in reversed(topo_order):
+        for stmt in reversed(parfor.loop_body[label].body):
+            if (isinstance(stmt, ir.Assign)
+                    and (stmt.target.name in parfor_params
+                        or stmt.target.name in var_to_param)):
+                lhs = stmt.target.name
+                rhs = stmt.value
+                cur_param = lhs if lhs in parfor_params else var_to_param[lhs]
+                used_vars = []
+                if isinstance(rhs, ir.Var):
+                    used_vars = [rhs.name]
+                elif isinstance(rhs, ir.Expr):
+                    used_vars = [v.name for v in stmt.value.list_vars()]
+                param_uses[cur_param].extend(used_vars)
+                for v in used_vars:
+                    var_to_param[v] = cur_param
+            if isinstance(stmt, Parfor):
+                # recursive parfors can have reductions like test_prange8
+                get_parfor_reductions(stmt, parfor_params, calltypes,
+                    reduce_varnames, param_uses, var_to_param)
+
+    for param, used_vars in param_uses.items():
+        # a parameter is a reduction variable if its value is used to update it
+        # check reduce_varnames since recursive parfors might have processed
+        # param already
+        if param in used_vars and param not in reduce_varnames:
+            reduce_varnames.append(param)
+
+    return reduce_varnames, var_to_param
