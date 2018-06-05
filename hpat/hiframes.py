@@ -1224,6 +1224,7 @@ class HiFrames(object):
         def f(A):
             return map_func(A)
         out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
+        self.df_cols.add(lhs.name)
 
         return [hiframes_aggregate.Aggregate(
             out_colname, df_var.name, key_colname, {out_colname: lhs},
