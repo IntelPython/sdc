@@ -300,65 +300,11 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     in_col_typs = [typemap[v.name] for v in in_col_vars]
     out_col_typs = [typemap[v.name] for v in out_col_vars]
     arg_typs = tuple([key_typ] + in_col_typs)
-    # arg names
-    in_names = ["in_c{}".format(i) for i in range(len(in_col_vars))]
-    out_names = ["out_c{}".format(i) for i in range(len(out_col_vars))]
-    # key and arg names
-    col_names = ['key_arr'] + in_names
 
-    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx, targetctx)
+    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0],
+                                                          typingctx, targetctx)
     typemap.update(agg_func_struct.pm.typemap)
     calltypes.update(agg_func_struct.pm.calltypes)
-    num_red_vars = len(agg_func_struct.vars)
-
-    func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
-
-    if parallel:
-        # get send/recv counts
-        func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
-        func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
-        func_text += "    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
-        func_text += "    n_uniq_keys = send_counts.sum()\n"
-        func_text += "    recv_size = recv_counts.sum()\n"
-        # func_text += "    hpat.cprint(n_uniq_keys, recv_size)\n"
-
-        # prepare for shuffle
-        # allocate send/recv buffers
-        func_text += "    recv_key_arr = np.empty(recv_size, np.{})\n".format(key_typ.dtype)
-        for i in range(num_red_vars):
-            func_text += "    recv_{} = np.empty(recv_size, np.{})\n".format(
-                i, agg_func_struct.var_typs[i])
-
-        # call local aggregate
-        send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
-        func_text += "    send_key_arr, {} = __agg_func_p(n_uniq_keys, key_arr, {})\n".format(
-            send_col_args, ", ".join(in_names))
-        # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
-
-        # shuffle data
-        func_text += "    c_alltoallv(send_key_arr.ctypes, recv_key_arr.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
-            _h5_typ_table[key_typ.dtype])
-        for i, a in enumerate(agg_func_struct.var_typs):
-            func_text += "    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
-                i, i, _h5_typ_table[a])
-        func_text += "    key_arr = recv_key_arr\n"
-        in_names = ["recv_{}".format(i) for i in range(num_red_vars)]
-        # func_text += "    hpat.cprint(len(key_arr), len(in_c0))\n"
-
-    func_text += "    n_uniq_keys = len(set(key_arr))\n"
-    # allocate output
-    for i, col in enumerate(agg_node.df_in_vars.keys()):
-        func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
-                                                i, agg_node.out_typs[col])
-
-    func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(", ".join(out_names), ", ".join(in_names))
-    func_text += "    c = out_c0\n"
-
-    # print(func_text)
-
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
 
     if parallel:
         agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
@@ -370,8 +316,11 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                         out_col_typs, typingctx, typemap, calltypes, targetctx)
         agg_impl_p = None
 
+    top_level_func = gen_top_level_agg_func(
+        key_typ, agg_func_struct.var_typs, agg_node.out_typs,
+        agg_node.df_in_vars.keys(), agg_node.df_out_vars.keys(), parallel)
 
-    f_block = compile_to_numba_ir(f,
+    f_block = compile_to_numba_ir(top_level_func,
                                   {'hpat': hpat, 'np': np,
                                   'agg_send_recv_counts': agg_send_recv_counts,
                                   '__agg_func': agg_impl,
@@ -390,10 +339,76 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 
+def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
+                                                      out_col_names, parallel):
+    """create the top level aggregation function by generating text
+    """
+    num_red_vars = len(red_var_typs)
+
+    # arg names
+    in_names = ["in_c{}".format(i) for i in range(len(in_col_names))]
+    out_names = ["out_c{}".format(i) for i in range(len(out_col_names))]
+
+    func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
+
+    if parallel:
+        # get send/recv counts
+        func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
+        func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
+        func_text += "    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
+        func_text += "    n_uniq_keys = send_counts.sum()\n"
+        func_text += "    recv_size = recv_counts.sum()\n"
+        # func_text += "    hpat.cprint(n_uniq_keys, recv_size)\n"
+
+        # prepare for shuffle
+        # allocate send/recv buffers
+        func_text += "    recv_key_arr = np.empty(recv_size, np.{})\n".format(
+            key_typ.dtype)
+        for i in range(num_red_vars):
+            func_text += "    recv_{} = np.empty(recv_size, np.{})\n".format(
+                i, red_var_typs[i])
+
+        # call local aggregate
+        send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
+        func_text += "    send_key_arr, {} = __agg_func_p(n_uniq_keys, key_arr, {})\n".format(
+            send_col_args, ", ".join(in_names))
+        # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
+
+        # shuffle data
+        func_text += ("    c_alltoallv(send_key_arr.ctypes, "
+            "recv_key_arr.ctypes, send_counts.ctypes, recv_counts.ctypes, "
+            "send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n").format(
+            _h5_typ_table[key_typ.dtype])
+        for i, a in enumerate(red_var_typs):
+            func_text += ("    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, "
+            "send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, "
+            "recv_disp.ctypes, np.int32({}))\n").format(i, i, _h5_typ_table[a])
+
+        func_text += "    key_arr = recv_key_arr\n"
+        in_names = ["recv_{}".format(i) for i in range(num_red_vars)]
+        # func_text += "    hpat.cprint(len(key_arr), len(in_c0))\n"
+
+    func_text += "    n_uniq_keys = len(set(key_arr))\n"
+    # allocate output
+    for i, col in enumerate(in_col_names):
+        func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
+                                                i, out_typs[col])
+
+    func_text += "    __agg_func(n_uniq_keys, key_arr, {}, {})\n".format(
+        ", ".join(out_names), ", ".join(in_names))
+    func_text += "    c = out_c0\n"
+
+    # print(func_text)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+    return f
 
 
 def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
-                        typemap, calltypes, targetctx, parallel_local=False, parallel_combine=False):
+                 typemap, calltypes, targetctx, parallel_local=False,
+                 parallel_combine=False):
     # has 3 modes: 1- aggregate input column to output (sequential case)
     #              2- aggregate input column to reduce arrays for communication (parallel_local)
     #              3- aggregate received reduce arrays to output (parallel_combine)
@@ -417,7 +432,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
                                     for i in range(num_red_vars)])
 
-    func_text = "def f(n_uniq_keys, key_arr, {}):\n".format(", ".join(out_names + in_names))
+    func_text = "def f(n_uniq_keys, key_arr, {}):\n".format(", ".join(
+                                                        out_names + in_names))
 
     # allocate reduction var arrays
     for i, typ in enumerate(agg_func_struct.var_typs):
@@ -427,7 +443,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     # key is returned in parallel local agg phase (TODO: avoid if key is output already)
     if parallel_local:
-        func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(key_typ.dtype)
+        func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
+                                                                key_typ.dtype)
 
     # find write location
     # TODO: non-int dict
@@ -666,7 +683,8 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
 
     func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
     func_text += "    __update_redvars()\n"
-    func_text += "    return {}".format(", ".join(["v{}".format(i) for i in range(num_red_vars)]))
+    func_text += "    return {}".format(", ".join(["v{}".format(i)
+                                                for i in range(num_red_vars)]))
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
