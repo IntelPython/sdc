@@ -169,8 +169,14 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
                                                                    "analysis")
 
     # arrays of input df have same size in first dimension as key array
-    col_shape = equiv_set.get_shape(aggregate_node.key_arr)
-    all_shapes = [col_shape[0]]
+    # string array doesn't have shape in array analysis
+    key_typ = typemap[aggregate_node.key_arr.name]
+    if key_typ == string_array_type:
+        all_shapes = []
+    else:
+        col_shape = equiv_set.get_shape(aggregate_node.key_arr)
+        all_shapes = [col_shape[0]]
+
     for _, col_var in aggregate_node.df_in_vars.items():
         typ = typemap[col_var.name]
         if typ == string_array_type:
