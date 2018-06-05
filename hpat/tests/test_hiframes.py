@@ -548,6 +548,27 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_agg_seq(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1,1,1,1,2,2,2], 'B': [1,2,3,1,5,6,7]})
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_agg_parallel(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
