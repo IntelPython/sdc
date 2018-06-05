@@ -423,81 +423,13 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
         out_typs = []
 
     arg_typs = tuple([types.intp, key_typ] + out_typs + in_typs)
-
-    # arg names
-    in_names = ["in_c{}".format(i) for i in range(len(in_typs))]
-    out_names = ["out_c{}".format(i) for i in range(len(out_typs))]
-
     num_red_vars = len(agg_func_struct.vars)
-    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
-                                    for i in range(num_red_vars)])
 
-    func_text = "def f(n_uniq_keys, key_arr, {}):\n".format(", ".join(
-                                                        out_names + in_names))
+    iter_func = gen_agg_iter_func(
+        key_typ, agg_func_struct.var_typs, len(in_typs), len(out_typs),
+        num_red_vars, parallel_local, parallel_combine)
 
-    # allocate reduction var arrays
-    for i, typ in enumerate(agg_func_struct.var_typs):
-        func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
-        func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
-            i, i, typ)
-
-    # key is returned in parallel local agg phase (TODO: avoid if key is output already)
-    if parallel_local:
-        func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
-                                                                key_typ.dtype)
-
-    # find write location
-    # TODO: non-int dict
-    func_text += "    key_write_map = hpat.DictIntInt()\n"
-    func_text += "    curr_write_ind = 0\n"
-    func_text += "    for i in range(len(key_arr)):\n"
-    func_text += "      k = key_arr[i]\n"
-    func_text += "      if k not in key_write_map:\n"
-    func_text += "        key_write_map[k] = curr_write_ind\n"
-    func_text += "        w_ind = curr_write_ind\n"
-    func_text += "        curr_write_ind += 1\n"
-    if parallel_local:
-        func_text += "        out_key[w_ind] = k\n"
-    func_text += "      else:\n"
-    func_text += "        w_ind = key_write_map[k]\n"
-
-    redvar_access = ", ".join(["redvar_{}_arr[w_ind]".format(i)
-                            for i in range(num_red_vars)])
-    # TODO: separate combine function which can have different input types
-    # if parallel_combine:
-    #     # combine reduce vars
-    #     func_text += "      __combine_redvars(w_ind, i, {}, {})\n".format(
-    #         ", ".join(in_names), redvar_arrnames)
-    # else:
-    # update reduce vars with input
-    if parallel_combine:
-        inarr_access = ", ".join(["{}[i]".format(a)
-                                    for a in in_names])
-    else:
-        # TODO: extend to multiple input
-        inarr_access = ", ".join(["{}[i]".format(a)
-                                    for a in in_names*num_red_vars])
-    func_text += "      {} = __update_redvars({}, {})\n".format(
-        redvar_access, redvar_access, inarr_access)
-
-    if parallel_local:
-        # return out key array and reduce arrays for communication
-        func_text += "    return out_key, {}\n".format(redvar_arrnames)
-    else:
-        # get final output from reduce varis
-        redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
-                                    for i in range(num_red_vars)])
-        func_text += "    for j in range(n_uniq_keys):\n"
-        func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
-                                                                redvar_access)
-
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
-    #
-    # print(func_text)
-
-    f_ir = compile_to_numba_ir(f,
+    f_ir = compile_to_numba_ir(iter_func,
                                   {'hpat': hpat, 'np': np,
                                   '__update_redvars': agg_func_struct.update,
                                   '__combine_redvars': __combine_redvars,
@@ -575,10 +507,85 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
             {}
     )
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](iter_func)
     imp_dis.add_overload(agg_impl_func)
     return imp_dis
 
+def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
+                                             parallel_local, parallel_combine):
+    # arg names
+    in_names = ["in_c{}".format(i) for i in range(num_ins)]
+    out_names = ["out_c{}".format(i) for i in range(num_outs)]
+
+    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
+                                    for i in range(num_red_vars)])
+
+    func_text = "def f(n_uniq_keys, key_arr, {}):\n".format(", ".join(
+                                                        out_names + in_names))
+
+    # allocate reduction var arrays
+    for i, typ in enumerate(red_var_typs):
+        func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
+        func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
+            i, i, typ)
+
+    # key is returned in parallel local agg phase (TODO: avoid if key is output already)
+    if parallel_local:
+        func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
+                                                                key_typ.dtype)
+
+    # find write location
+    # TODO: non-int dict
+    func_text += "    key_write_map = hpat.DictIntInt()\n"
+    func_text += "    curr_write_ind = 0\n"
+    func_text += "    for i in range(len(key_arr)):\n"
+    func_text += "      k = key_arr[i]\n"
+    func_text += "      if k not in key_write_map:\n"
+    func_text += "        key_write_map[k] = curr_write_ind\n"
+    func_text += "        w_ind = curr_write_ind\n"
+    func_text += "        curr_write_ind += 1\n"
+    if parallel_local:
+        func_text += "        out_key[w_ind] = k\n"
+    func_text += "      else:\n"
+    func_text += "        w_ind = key_write_map[k]\n"
+
+    redvar_access = ", ".join(["redvar_{}_arr[w_ind]".format(i)
+                            for i in range(num_red_vars)])
+    # TODO: separate combine function which can have different input types
+    # if parallel_combine:
+    #     # combine reduce vars
+    #     func_text += "      __combine_redvars(w_ind, i, {}, {})\n".format(
+    #         ", ".join(in_names), redvar_arrnames)
+    # else:
+    # update reduce vars with input
+    if parallel_combine:
+        inarr_access = ", ".join(["{}[i]".format(a)
+                                    for a in in_names])
+    else:
+        # TODO: extend to multiple input
+        inarr_access = ", ".join(["{}[i]".format(a)
+                                    for a in in_names*num_red_vars])
+    func_text += "      {} = __update_redvars({}, {})\n".format(
+        redvar_access, redvar_access, inarr_access)
+
+    if parallel_local:
+        # return out key array and reduce arrays for communication
+        func_text += "    return out_key, {}\n".format(redvar_arrnames)
+    else:
+        # get final output from reduce varis
+        redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
+                                    for i in range(num_red_vars)])
+        func_text += "    for j in range(n_uniq_keys):\n"
+        func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
+                                                                redvar_access)
+
+    # print(func_text)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    return f
 
 @numba.njit
 def agg_send_recv_counts(key_arr):
