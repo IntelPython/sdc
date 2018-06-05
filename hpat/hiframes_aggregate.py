@@ -309,10 +309,6 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx, targetctx)
     typemap.update(agg_func_struct.pm.typemap)
     calltypes.update(agg_func_struct.pm.calltypes)
-
-    agg_func_struct_p = get_agg_func_struct(agg_node.agg_func, in_col_typs[0], typingctx, targetctx)
-    typemap.update(agg_func_struct_p.pm.typemap)
-    calltypes.update(agg_func_struct_p.pm.calltypes)
     num_red_vars = len(agg_func_struct.vars)
 
     func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
@@ -331,7 +327,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         func_text += "    recv_key_arr = np.empty(recv_size, np.{})\n".format(key_typ.dtype)
         for i in range(num_red_vars):
             func_text += "    recv_{} = np.empty(recv_size, np.{})\n".format(
-                i, agg_func_struct_p.var_typs[i])
+                i, agg_func_struct.var_typs[i])
 
         # call local aggregate
         send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
@@ -342,7 +338,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         # shuffle data
         func_text += "    c_alltoallv(send_key_arr.ctypes, recv_key_arr.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
             _h5_typ_table[key_typ.dtype])
-        for i, a in enumerate(agg_func_struct_p.var_typs):
+        for i, a in enumerate(agg_func_struct.var_typs):
             func_text += "    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n".format(
                 i, i, _h5_typ_table[a])
         func_text += "    key_arr = recv_key_arr\n"
@@ -367,7 +363,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     if parallel:
         agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
            out_col_typs, typingctx, typemap, calltypes, targetctx, False, True)
-        agg_impl_p = gen_agg_func(agg_func_struct_p, key_typ, in_col_typs,
+        agg_impl_p = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
                   out_col_typs, typingctx, typemap, calltypes, targetctx, True)
     else:
         agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
@@ -496,9 +492,13 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     topo_order = numba.ir_utils.find_topo_order(f_ir.blocks)
     first_block = f_ir.blocks[topo_order[0]]
 
+    # deep copy the nodes since they can be reused
+    init_nodes = copy.deepcopy(agg_func_struct.init)
+    eval_nodes = copy.deepcopy(agg_func_struct.eval)
+
     # find reduce variables from names and store in the same order
     reduce_vars = [0] * num_red_vars
-    for node in agg_func_struct.init:
+    for node in init_nodes:
         if isinstance(node, ir.Assign) and node.target.name in agg_func_struct.vars:
             var_ind = agg_func_struct.vars.index(node.target.name)
             reduce_vars[var_ind] = node.target
@@ -509,7 +509,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     arg_nodes = []
     for i in range(len(arg_typs)):
         arg_nodes.append(first_block.body[i])
-    first_block.body = arg_nodes + agg_func_struct.init + first_block.body[len(arg_nodes):]
+    first_block.body = arg_nodes + init_nodes + first_block.body[len(arg_nodes):]
 
     # replace init and eval sentinels
     # TODO: replace with functions
@@ -527,7 +527,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                 replace_dict = {}
                 for k, v in enumerate(agg_func_struct.vars):
                     replace_dict[v] = red_vals[k]
-                for inst in agg_func_struct.eval:
+                for inst in eval_nodes:
                     replace_vars_stmt(inst, replace_dict)
                 # add new eval nodes
                 # assuming eval sentinel is before setitem and jump
@@ -535,9 +535,9 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                 assert i == len(block.body) - 3
                 jump_node = block.body.pop()
                 setitem_node = block.body.pop()
-                agg_func_struct.eval[-1].target = setitem_node.value
+                eval_nodes[-1].target = setitem_node.value
                 block.body.pop()  # remove update call
-                block.body += agg_func_struct.eval
+                block.body += eval_nodes
                 block.body.append(setitem_node)
                 block.body.append(jump_node)
                 break
