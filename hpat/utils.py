@@ -220,3 +220,6 @@ def is_assign(inst):
 def dump_node_list(node_list):
     for n in node_list:
         print("   ", n)
+
+def debug_prints():
+    return numba.config.DEBUG_ARRAY_OPT == 1

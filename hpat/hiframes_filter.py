@@ -6,6 +6,7 @@ from numba.ir_utils import visit_vars_inner, replace_vars_inner
 from numba.typing import signature
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
+from hpat.utils import debug_prints
 from hpat.str_arr_ext import string_array_type
 
 
@@ -150,7 +151,7 @@ typeinfer.typeinfer_extensions[Filter] = filter_typeinfer
 
 
 def visit_vars_filter(filter_node, callback, cbdata):
-    if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
+    if debug_prints():  # pragma: no cover
         print("visiting filter vars for:", filter_node)
         print("cbdata: ", sorted(cbdata.items()))
 

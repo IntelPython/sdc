@@ -14,7 +14,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 import hpat
-from hpat.utils import is_call, is_var_assign, is_assign
+from hpat.utils import is_call, is_var_assign, is_assign, debug_prints
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.distributed_lower import _h5_typ_table
@@ -143,7 +143,7 @@ ir_utils.apply_copy_propagate_extensions[Aggregate] = apply_copies_aggregate
 
 
 def visit_vars_aggregate(aggregate_node, callback, cbdata):
-    if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
+    if debug_prints():  # pragma: no cover
         print("visiting aggregate vars for:", aggregate_node)
         print("cbdata: ", sorted(cbdata.items()))
 

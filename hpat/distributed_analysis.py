@@ -16,7 +16,7 @@ import hpat
 import hpat.io
 from hpat.utils import (get_constant, get_definitions, is_alloc_callname,
                         is_whole_slice, update_node_definitions, is_array,
-                        is_np_array, find_build_tuple)
+                        is_np_array, find_build_tuple, debug_prints)
 
 from enum import Enum
 
@@ -741,5 +741,5 @@ def vars_dependent(defs, var1, var2):
 
 
 def dprint(*s):
-    if numba.config.DEBUG_ARRAY_OPT == 1:
+    if debug_prints():
         print(*s)

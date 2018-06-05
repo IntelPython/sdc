@@ -30,7 +30,8 @@ from hpat.distributed_analysis import (Distribution,
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
-                        get_slice_step, is_array, is_np_array, find_build_tuple)
+                        get_slice_step, is_array, is_np_array, find_build_tuple,
+                        debug_prints)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -83,7 +84,7 @@ class DistributedPass(object):
 
         self._T_arrs = dist_analysis_pass._T_arrs
         self._parallel_accesses = dist_analysis_pass._parallel_accesses
-        if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
+        if debug_prints():  # pragma: no cover
             print("distributions: ", self._dist_analysis)
 
         self._gen_dist_inits()
@@ -1377,7 +1378,7 @@ class DistributedPass(object):
                     parfor, namevar_table)
                 parfor.init_block.body += init_reduce_nodes
                 out = prepend + out + reduce_nodes
-            if config.DEBUG_ARRAY_OPT == 1:  # pragma: no cover
+            if debug_prints():  # pragma: no cover
                 print("parfor " + str(parfor.id) + " not parallelized.")
             return out
 
@@ -2121,5 +2122,5 @@ def _set_getsetitem_index(node, new_ind):
 
 
 def dprint(*s):  # pragma: no cover
-    if config.DEBUG_ARRAY_OPT == 1:
+    if debug_prints():
         print(*s)

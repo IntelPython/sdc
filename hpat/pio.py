@@ -11,7 +11,7 @@ import numpy as np
 
 import hpat
 from hpat import pio_api, pio_lower, utils
-from hpat.utils import get_constant, NOT_CONSTANT, get_definitions
+from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
 import h5py
 
 
@@ -66,7 +66,7 @@ class PIO(object):
             pass
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after IO")
-        if config.DEBUG_ARRAY_OPT == 1:
+        if debug_prints():
             print("h5 files: ", self.h5_files)
             print("h5 dsets: ", self.h5_dsets)
 
