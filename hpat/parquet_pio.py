@@ -170,16 +170,10 @@ def parquet_file_schema(file_name):
     col_names = []
     col_types = []
 
-    if file_name.startswith("hdfs://"):
-        fs = pa.hdfs.connect()
-        _file = fs.open(file_name)
-        f = pq.ParquetDataset(_file)
-    else:
-        f = pq.ParquetDataset(file_name)
-
-    col_names = f.schema.names
+    pq_dataset = pq.ParquetDataset(file_name)
+    col_names = pq_dataset.schema.names
     num_cols = len(col_names)
-    col_types = [_pq_type_to_numba[f.schema.column(i).physical_type]
+    col_types = [_pq_type_to_numba[pq_dataset.schema.column(i).physical_type]
                  for i in range(num_cols)]
     # TODO: close file?
     return col_names, col_types
