@@ -21,7 +21,7 @@ bool dict_int_int_in(std::unordered_map<int64_t, int64_t>* m, int64_t val);
 bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m);
 
 // -- int32 versions --
-void* init_dict_int32_int32();
+// void* init_dict_int32_int32();
 void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value);
 void dict_int32_int32_print(std::unordered_map<int, int>* m);
 int dict_int32_int32_get(std::unordered_map<int, int>* m, int index, int default_val);
@@ -61,12 +61,16 @@ void BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ) \
 
 #define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
 
-#define DEC_DICT_MOD(key_typ, val_typ) DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ))
+#define DEC_DICT_MOD(key_typ, val_typ) \
+DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)) \
+DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ))
 
 
 DEF_DICT(int64, int64)
 DEF_DICT(StringType, int64)
-
+DEF_DICT(int32, int32)
+DEF_DICT(int32, int64)
+DEF_DICT(int64, int32)
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -78,6 +82,9 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
 
     DEC_DICT_MOD(int64, int64)
     DEC_DICT_MOD(StringType, int64)
+    DEC_DICT_MOD(int32, int32)
+    DEC_DICT_MOD(int32, int64)
+    DEC_DICT_MOD(int64, int32)
 
     DEC_MOD_METHOD(init_dict_int_int)
 
@@ -104,8 +111,8 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject_SetAttrString(m, "dict_int_int_not_empty",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_not_empty)));
     // ---- int32 versions ----
-    PyObject_SetAttrString(m, "init_dict_int32_int32",
-                            PyLong_FromVoidPtr((void*)(&init_dict_int32_int32)));
+    // PyObject_SetAttrString(m, "init_dict_int32_int32",
+    //                         PyLong_FromVoidPtr((void*)(&init_dict_int32_int32)));
     PyObject_SetAttrString(m, "dict_int32_int32_setitem",
                             PyLong_FromVoidPtr((void*)(&dict_int32_int32_setitem)));
     PyObject_SetAttrString(m, "dict_int32_int32_print",
@@ -207,10 +214,10 @@ bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m)
 
 
 // --------- int32 versions ------
-void* init_dict_int32_int32()
-{
-    return new std::unordered_map<int, int>();
-}
+// void* init_dict_int32_int32()
+// {
+//     return new std::unordered_map<int, int>();
+// }
 
 void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value)
 {

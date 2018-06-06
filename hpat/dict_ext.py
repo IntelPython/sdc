@@ -53,8 +53,8 @@ def typ_str_to_obj(typ_str):
         return "string_type"
     return "types.{}".format(typ_str)
 
-for key_typ in []:#elem_types:
-    for val_typ in []:#elem_types:
+for key_typ in [types.int64, types.int32]:#elem_types:
+    for val_typ in [types.int64, types.int32]:#elem_types:
         k_obj = typ_str_to_obj(key_typ)
         v_obj = typ_str_to_obj(val_typ)
         # create types
