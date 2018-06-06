@@ -5,10 +5,12 @@ from numba.typing.templates import (signature, AbstractTemplate, infer,
 from numba.extending import typeof_impl, lower_cast
 from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
-from numba.extending import lower_builtin, overload_method
+from numba.extending import lower_builtin, overload_method, overload
+from hpat.str_ext import string_type
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+import hdict_ext
 
 
 class DictType(types.Opaque):
@@ -28,6 +30,49 @@ class DictType(types.Opaque):
 
     def is_precise(self):
         return self.key_typ.is_precise() and self.val_typ.is_precise()
+
+elem_types = [
+    types.int8,
+    types.int16,
+    types.int32,
+    types.int64,
+    types.uint8,
+    types.uint16,
+    types.uint32,
+    types.uint64,
+    types.boolean,
+    types.float32,
+    types.float64,
+    string_type
+]
+
+def typ_str_to_obj(typ_str):
+    if typ_str == types.boolean:
+        return "types.boolean"
+    if typ_str == string_type:
+        return "string_type"
+    return "types.{}".format(typ_str)
+
+for key_typ in elem_types:
+    for val_typ in elem_types:
+        k_obj = typ_str_to_obj(key_typ)
+        v_obj = typ_str_to_obj(val_typ)
+        # create types
+        exec("dict_{}_{}_type = DictType({}, {})".format(key_typ, val_typ,
+                                                                k_obj, v_obj))
+        # init dict object
+        exec("ll.add_symbol('init_dict_{}_{}', hdict_ext.init_dict_{}_{})".format(
+            key_typ, val_typ, key_typ, val_typ))
+        exec("init_dict_{}_{} = types.ExternalFunction('init_dict_{}_{}', dict_{}_{}_type())".format(
+            key_typ, val_typ, key_typ, val_typ, key_typ, val_typ))
+
+
+# XXX: needs Numba #3014 resolved
+# @overload("in")
+# def in_dict(key_typ, dict_typ):
+#     def f(k, dict_int):
+#         return dict_int_int_in(dict_int, k)
+#     return f
 
 @infer
 class InDict(AbstractTemplate):
@@ -167,7 +212,6 @@ class MinMaxDict(AbstractTemplate):
             return signature(args[0].key_typ, *args)
 
 
-import hdict_ext
 ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
 ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
 ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
@@ -193,6 +237,8 @@ ll.add_symbol('dict_int32_int32_max', hdict_ext.dict_int32_int32_max)
 ll.add_symbol('dict_int32_int32_not_empty',
               hdict_ext.dict_int32_int32_not_empty)
 
+
+# dict_int_int_in = types.ExternalFunction("dict_int_int_in", types.boolean(dict_int_int_type, types.intp))
 
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):

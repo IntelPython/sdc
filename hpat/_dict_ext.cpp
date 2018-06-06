@@ -2,6 +2,9 @@
 #include <unordered_map>
 #include <iostream>
 #include <limits>
+#include <string>
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
 void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
@@ -27,6 +30,25 @@ int dict_int32_int32_min(std::unordered_map<int, int>* m);
 int dict_int32_int32_max(std::unordered_map<int, int>* m);
 bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
 
+#define StringType_t std::string
+#define bool_t bool
+
+#define C_TYPE(a) BOOST_PP_CAT(a,_t)
+
+
+#define DEF_DICT(key_typ, val_typ) \
+/* create dictionary */ \
+void* BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)() { \
+    return new std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>(); \
+}
+
+#define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
+
+#define DEC_DICT_MOD(key_typ, val_typ) DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ))
+
+
+DEF_DICT(int64, int64)
+DEF_DICT(StringType, int64)
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -36,8 +58,13 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     if (m == NULL)
         return NULL;
 
-    PyObject_SetAttrString(m, "init_dict_int_int",
-                            PyLong_FromVoidPtr((void*)(&init_dict_int_int)));
+    DEC_DICT_MOD(int64, int64)
+    DEC_DICT_MOD(StringType, int64)
+
+    DEC_MOD_METHOD(init_dict_int_int)
+
+    // PyObject_SetAttrString(m, "init_dict_int_int",
+    //                         PyLong_FromVoidPtr((void*)(&init_dict_int_int)));
     PyObject_SetAttrString(m, "dict_int_int_setitem",
                             PyLong_FromVoidPtr((void*)(&dict_int_int_setitem)));
     PyObject_SetAttrString(m, "dict_int_int_print",
