@@ -96,16 +96,19 @@ std::vector<std::string> get_dir_pq_files(boost::filesystem::path &f_path)
 
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 {
+    bool is_hdfs = file_name->find("hdfs://")==0;
+
     // TODO: run on rank 0 and broadcast
     boost::filesystem::path f_path(*file_name);
 
-    if (!boost::filesystem::exists(f_path))
+    // TODO: check HDFS file existence
+    if (!is_hdfs && !boost::filesystem::exists(f_path))
     {
         std::cerr << "pq get size - parquet file path does not exist: " << *file_name << '\n';
         return 0;
     }
 
-    if (boost::filesystem::is_directory(f_path))
+    if (!is_hdfs && boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
         int64_t ret = 0;
@@ -129,12 +132,17 @@ int64_t pq_read(std::string* file_name, int64_t column_idx,
                 uint8_t *out_data, int out_dtype)
 {
 
+    bool is_hdfs = file_name->find("hdfs://")==0;
+
+    // TODO: run on rank 0 and broadcast
     boost::filesystem::path f_path(*file_name);
 
-    if (!boost::filesystem::exists(f_path))
+    // TODO: check HDFS file existence
+    if (!is_hdfs && !boost::filesystem::exists(f_path))
         std::cerr << "parquet file path does not exist: " << *file_name << '\n';
 
-    if (boost::filesystem::is_directory(f_path))
+    // TODO: support HDFS directory
+    if (!is_hdfs && boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
         std::vector<std::string> all_files = get_dir_pq_files(f_path);
@@ -165,12 +173,16 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         return 0;
     }
 
+    bool is_hdfs = file_name->find("hdfs://")==0;
+
+    // TODO: run on rank 0 and broadcast
     boost::filesystem::path f_path(*file_name);
 
-    if (!boost::filesystem::exists(f_path))
+    // TODO: check HDFS file existence
+    if (!is_hdfs && !boost::filesystem::exists(f_path))
         std::cerr << "parquet file path does not exist: " << *file_name << '\n';
 
-    if (boost::filesystem::is_directory(f_path))
+    if (!is_hdfs && boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
         // TODO: get file sizes on root rank only
@@ -218,15 +230,19 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data)
 {
     // std::cout << "string read file" << *file_name << '\n';
+    bool is_hdfs = file_name->find("hdfs://")==0;
+
+    // TODO: run on rank 0 and broadcast
     boost::filesystem::path f_path(*file_name);
 
-    if (!boost::filesystem::exists(f_path))
+    // TODO: check HDFS file existence
+    if (!is_hdfs && !boost::filesystem::exists(f_path))
     {
         std::cerr << "parquet file path does not exist: " << *file_name << '\n';
         return 0;
     }
 
-    if (boost::filesystem::is_directory(f_path))
+    if (!is_hdfs && boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
         std::vector<std::string> all_files = get_dir_pq_files(f_path);
@@ -274,15 +290,19 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     // printf("read parquet parallel str file: %s column: %lld start: %lld count: %lld\n",
     //                                 file_name->c_str(), column_idx, start, count);
 
+    bool is_hdfs = file_name->find("hdfs://")==0;
+
+    // TODO: run on rank 0 and broadcast
     boost::filesystem::path f_path(*file_name);
 
-    if (!boost::filesystem::exists(f_path))
+    // TODO: check HDFS file existence
+    if (!is_hdfs && !boost::filesystem::exists(f_path))
     {
         std::cerr << "read parquet parallel str column - parquet file path does not exist: " << *file_name << '\n';
         return 0;
     }
 
-    if (boost::filesystem::is_directory(f_path))
+    if (!is_hdfs && boost::filesystem::is_directory(f_path))
     {
         // std::cout << "pq path is dir" << '\n';
         std::vector<std::string> all_files = get_dir_pq_files(f_path);
