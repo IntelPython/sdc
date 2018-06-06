@@ -53,8 +53,8 @@ def typ_str_to_obj(typ_str):
         return "string_type"
     return "types.{}".format(typ_str)
 
-for key_typ in elem_types:
-    for val_typ in elem_types:
+for key_typ in []:#elem_types:
+    for val_typ in []:#elem_types:
         k_obj = typ_str_to_obj(key_typ)
         v_obj = typ_str_to_obj(val_typ)
         # create types
@@ -65,11 +65,22 @@ for key_typ in elem_types:
             key_typ, val_typ, key_typ, val_typ))
         exec("init_dict_{}_{} = types.ExternalFunction('init_dict_{}_{}', dict_{}_{}_type())".format(
             key_typ, val_typ, key_typ, val_typ, key_typ, val_typ))
+        # setitem
+        exec("ll.add_symbol('dict_setitem_{}_{}', hdict_ext.dict_setitem_{}_{})".format(
+            key_typ, val_typ, key_typ, val_typ))
+
 
 
 # XXX: needs Numba #3014 resolved
 # @overload("in")
 # def in_dict(key_typ, dict_typ):
+#     def f(k, dict_int):
+#         return dict_int_int_in(dict_int, k)
+#     return f
+
+# XXX possible overload bug
+# @overload("setitem")
+# def setitem_dict(dict_typ, key_typ, val_typ):
 #     def f(k, dict_int):
 #         return dict_int_int_in(dict_int, k)
 #     return f
@@ -128,8 +139,7 @@ class SetItemDict(AbstractTemplate):
     def generic(self, args, kws):
         dict_t, idx, value = args
         if isinstance(dict_t, DictType):
-            if isinstance(idx, types.Integer):
-                return signature(types.none, dict_t, idx, dict_t.val_typ)
+            return signature(types.none, dict_t, dict_t.key_typ, dict_t.val_typ)
 
 
 @infer
@@ -247,12 +257,15 @@ def impl_dict_int_int(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-@lower_builtin('setitem', DictType, types.intp, types.intp)
+@lower_builtin('setitem', DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
-        8).as_pointer(), lir.IntType(64), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(
-        fnty, name="dict_int_int_setitem")
+    dict_typ, key_typ, val_typ = sig.args
+    fname = "dict_setitem_{}_{}".format(key_typ, val_typ)
+    fnty = lir.FunctionType(lir.VoidType(),
+        [lir.IntType(8).as_pointer(),
+        context.get_value_type(key_typ),
+        context.get_value_type(val_typ)])
+    fn = builder.module.get_or_insert_function(fnty, name=fname)
     return builder.call(fn, args)
 
 
@@ -339,13 +352,13 @@ def impl_dict_int32_int32(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-@lower_builtin('setitem', DictType, types.int32, types.int32)
-def setitem_dict_int32(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
-        8).as_pointer(), lir.IntType(32), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(
-        fnty, name="dict_int32_int32_setitem")
-    return builder.call(fn, args)
+# @lower_builtin('setitem', DictType, types.int32, types.int32)
+# def setitem_dict_int32(context, builder, sig, args):
+#     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
+#         8).as_pointer(), lir.IntType(32), lir.IntType(32)])
+#     fn = builder.module.get_or_insert_function(
+#         fnty, name="dict_int32_int32_setitem")
+#     return builder.call(fn, args)
 
 
 @lower_builtin("print_item", dict_int32_int32_type)

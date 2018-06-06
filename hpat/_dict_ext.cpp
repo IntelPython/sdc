@@ -5,6 +5,8 @@
 #include <string>
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cmath>
 
 void* init_dict_int_int();
 void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
@@ -35,11 +37,26 @@ bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
 
 #define C_TYPE(a) BOOST_PP_CAT(a,_t)
 
+#define SECOND(a, b, ...) b
+#define IS_PROBE(...) SECOND(__VA_ARGS__, 0)
+#define PROBE() ~, 1
+#define IS_STR(x) IS_PROBE(_IS_STR_ ## x)
+#define _IS_STR_StringType PROBE()
+
+#define IN_TYP(x) BOOST_PP_IIF(IS_STR(x), C_TYPE(x)*, C_TYPE(x))
+
+#define DE_PTR(x) BOOST_PP_IIF(IS_STR(x), *, )
 
 #define DEF_DICT(key_typ, val_typ) \
 /* create dictionary */ \
 void* BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)() { \
     return new std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>(); \
+} \
+/* setitem */ \
+void BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ) \
+(std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m, IN_TYP(key_typ) index, IN_TYP(val_typ) value) \
+{ \
+    (*m)[DE_PTR(key_typ)index] = DE_PTR(val_typ)value; \
 }
 
 #define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
@@ -49,6 +66,7 @@ void* BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)() { \
 
 DEF_DICT(int64, int64)
 DEF_DICT(StringType, int64)
+
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
