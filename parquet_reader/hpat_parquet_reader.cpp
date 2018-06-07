@@ -480,12 +480,31 @@ void pq_init_reader(const char* file_name,
     if (f_name.find("hdfs://")==0)
     {
         ::arrow::Status stat = ::arrow::io::HaveLibHdfs();
-        if (!stat.ok())
+        if (!stat.ok()) {
             std::cerr << "libhdfs not found" << '\n';
-            ::arrow::io::HdfsConnectionConfig hfs_config;
-        // TODO: extract localhost and port from path if available
-        hfs_config.host = std::string("default");
-        hfs_config.port = 0;
+            return;  // TODO: throw python exception
+        }
+        ::arrow::io::HdfsConnectionConfig hfs_config;
+
+        // TODO: parse URI properly
+        // remove hdfs://
+        f_name = f_name.substr(strlen("hdfs://"));
+        size_t col_char = f_name.find(':');
+        if (col_char!=std::string::npos)
+        {
+            hfs_config.host = f_name.substr(0, col_char);
+            size_t slash_char = f_name.find('/');
+            hfs_config.port = std::stoi(f_name.substr(col_char+1, slash_char-col_char-1));
+            f_name = f_name.substr(slash_char);
+            // std::cout << "host: " << hfs_config.host << std::endl;
+            // std::cout << "port: " << hfs_config.port << std::endl;
+            // std::cout << "file_name: " << f_name << std::endl;
+        }
+        else
+        {
+            hfs_config.host = std::string("default");
+            hfs_config.port = 0;
+        }
         hfs_config.driver = ::arrow::io::HdfsDriver::LIBHDFS;
         hfs_config.user = std::string("");
         hfs_config.kerb_ticket = std::string("");
