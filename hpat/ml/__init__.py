@@ -1,7 +1,3 @@
-from .svc import *
-from .naive_bayes import *
-
-__all__ = '''
-SVC
-MultinomialNB
-'''.split()
+from .svc import SVC
+from .naive_bayes import MultinomialNB
+from .d4p import *
