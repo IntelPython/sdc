@@ -28,6 +28,7 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
+from hpat.ml.d4p import algos as d4p_algos
 
 _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
@@ -297,6 +298,15 @@ class DistributedAnalysis(object):
             if self.typemap[func_mod.name] == hpat.ml.naive_bayes.mnb_type:
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
+
+        # daal4py
+        if func_name == 'compute' and isinstance(func_mod, ir.Var):
+            for algo in d4p_algos:
+                if algo.nbtype_algo == self.typemap[func_mod.name]: 
+                    for i in range(len(args)):
+                        array_dists[args[i].name] = algo.input_types[i][1]
+                    array_dists[lhs] = algo.result_dist
+                    return
 
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists)
