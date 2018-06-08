@@ -13,14 +13,18 @@ from numba.targets.arrayobj import _empty_nd_impl
 ##############################################################################
 ##############################################################################
 import daal4py
-
-# FIXME: this needs to become more generic, we need to find the actual so in the python root
-so = "/localdisk/work/fschlimb/miniconda3/envs/HPAT/lib/python3.6/site-packages/daal4py-0.2018.20180608-py3.6-linux-x86_64.egg/_daal4py.cpython-36m-x86_64-linux-gnu.so"
-
 import llvmlite.binding as ll
-# just load the whole thing
-ll.load_library_permanently(so)
 
+def open_daal4py():
+    import os
+    import glob
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(daal4py.__file__))), '_daal4py.c*')
+    lib = glob.glob(path)
+    assert len(lib) == 1
+
+    # just load the whole thing
+    ll.load_library_permanently(lib[0])
 
 ##############################################################################
 ##############################################################################
@@ -33,7 +37,7 @@ itable_type = types.Array(types.intc, 2, 'C')
 d4ptypes = {
     dtable_type: 0,
     ftable_type: 1,
-    itable_type: 2,    
+    itable_type: 2,
 }
 
 def get_lir_type(context, typ):
@@ -126,7 +130,7 @@ class algo_factory(object):
 
     def mk_ctor(self):
         """declare type and lowering code for constructing an algo object"""
-        
+
         @type_callable(self.algo)
         def ctor_decl(context):
             """declare numba type for constructing the algo object"""
@@ -136,7 +140,7 @@ class algo_factory(object):
                 # FIXME: keyword args
                 return self.nbtype_algo
             return typer
-        
+
         @lower_builtin(self.algo, *self.param_types)
         def ctor_impl(context, builder, sig, args):
             """
@@ -156,19 +160,19 @@ class algo_factory(object):
         algo_type = self.NbType_algo
         result_type = self.nbtype_res
         compute_name = '.'.join([self.algo.__module__.strip('_'), self.algo.__name__, 'compute'])
-        
+
         @infer_getattr
         class AlgoAttributes(AttributeTemplate):
             """declares numba signatures of attributes/methods of algo objects"""
             key = algo_type
-            
+
             @bound_function(compute_name)
             def resolve_compute(self, dict, args, kws):
                 # FIXME: keyword args
                 # FIXME: check args
                 return signature(result_type, *args)
 
-            
+
         @lower_builtin(compute_name, self.nbtype_algo, *[x[0] for x in self.input_types])
         def lower_compute(context, builder, sig, args):
             """lowers compute method algo objects"""
@@ -194,16 +198,16 @@ class algo_factory(object):
             # finally we call the function
             return builder.call(fn, c_args)
 
-        
+
     def add_attr(self, attr, attr_type, c_func):
         """
         Generate getter for attribute 'attr' on objects of numba result type.
         Calls c_func to retrieve the attribute from the given result object.
         Converts to ndarray if attr_type is Array
         """
-    
+
         is_array = isinstance(attr_type, types.Array)
-        
+
         @intrinsic
         def get_attr_impl(typingctx, obj):
             """
@@ -218,9 +222,9 @@ class algo_factory(object):
                 fn = builder.module.get_or_insert_function(fnty, name=c_func)
                 ptr = builder.call(fn, args)
                 return nt2nd(context, builder, ptr, sig.return_type) if is_array else ptr
-            
+
             return attr_type(obj), codegen
-    
+
         @overload_attribute(self.NbType_res, attr)
         def get_attr(res):
             """declaring getter for attribute 'attr' of objects of type 'NbType'"""
@@ -233,6 +237,10 @@ class algo_factory(object):
         for a in self.result_attrs:
             self.add_attr(a[0], a[1], 'get_' + self.c_name + '_Result_' + a[0])
 
+##############################################################################
+##############################################################################
+
+open_daal4py()
 
 ##############################################################################
 ##############################################################################
