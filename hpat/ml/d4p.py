@@ -81,7 +81,7 @@ def nt2nd(context, builder, ptr, ary_type):
 class algo_factory(object):
     """
     This factory class accepts a configuration for a daal4py algorithm
-    and provides all the numba/lowering stuff needed to be jitted.
+    and provides all the numba/lowering stuff needed to compile the given algo:
       - algo construction
       - algo computation
       - result attribute access
@@ -142,6 +142,8 @@ class algo_factory(object):
             """
             Lowers algo's constructor.
             We just call the C-function.
+            We need to add the extra boolean argument "distributed", it's not really used but
+            daal4py's code generation would become too complicated without.
             FIXME: keyword args
             """
             fls = context.get_constant(types.boolean, False)
@@ -235,6 +237,8 @@ class algo_factory(object):
 ##############################################################################
 ##############################################################################
 # algorithm configs
+# calling the factory for every algorithm.
+# See algo_factory.__init__ for arguments
 algos = [
     algo_factory(daal4py.kmeans_init,
                  'kmeans_init',
