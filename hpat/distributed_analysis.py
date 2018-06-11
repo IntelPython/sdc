@@ -306,12 +306,12 @@ class DistributedAnalysis(object):
             # every d4p algo gets executed by invoking "compute".
             # we need to find the algorithm that's currently called
             for algo in d4p_algos:
-                if algo.nbtype_algo == self.typemap[func_mod.name]:
+                if algo.all_nbtypes[algo.name] == self.typemap[func_mod.name]:
                     # handle all input arguments and set their distribution as given by the spec
                     for i in range(len(args)):
-                        array_dists[args[i].name] = algo.input_types[i][1]
+                        array_dists[args[i].name] = algo.spec.input_types[i][1]
                     # handle distribution of the result
-                    array_dists[lhs] = algo.result_dist
+                    array_dists[lhs] = algo.spec.result_dist
                     return
 
         # set REP if not found
