@@ -31,20 +31,22 @@ class DictType(types.Opaque):
     def is_precise(self):
         return self.key_typ.is_precise() and self.val_typ.is_precise()
 
-elem_types = [
-    types.int8,
-    types.int16,
-    types.int32,
-    types.int64,
-    types.uint8,
-    types.uint16,
-    types.uint32,
-    types.uint64,
-    types.boolean,
-    types.float32,
-    types.float64,
-    string_type
-]
+# elem_types = [
+#     types.int8,
+#     types.int16,
+#     types.int32,
+#     types.int64,
+#     types.uint8,
+#     types.uint16,
+#     types.uint32,
+#     types.uint64,
+#     types.boolean,
+#     types.float32,
+#     types.float64,
+#     string_type
+# ]
+
+elem_types = [types.int64, types.int32, string_type]
 
 def typ_str_to_obj(typ_str):
     if typ_str == types.boolean:
@@ -53,8 +55,8 @@ def typ_str_to_obj(typ_str):
         return "string_type"
     return "types.{}".format(typ_str)
 
-for key_typ in [types.int64, types.int32]:#elem_types:
-    for val_typ in [types.int64, types.int32]:#elem_types:
+for key_typ in elem_types:
+    for val_typ in elem_types:
         k_obj = typ_str_to_obj(key_typ)
         v_obj = typ_str_to_obj(val_typ)
         # create types

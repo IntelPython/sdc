@@ -6,6 +6,8 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/list/for_each_product.hpp>
+#include <boost/preprocessor/tuple/to_list.hpp>
 #include <cmath>
 
 void* init_dict_int_int();
@@ -47,6 +49,7 @@ bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
 
 #define DE_PTR(x) BOOST_PP_IIF(IS_STR(x), *, )
 
+// definition of dict functions
 #define DEF_DICT(key_typ, val_typ) \
 /* create dictionary */ \
 void* BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)() { \
@@ -59,18 +62,19 @@ void BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ) \
     (*m)[DE_PTR(key_typ)index] = DE_PTR(val_typ)value; \
 }
 
+// declaration of dict functions in python module
 #define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
 
 #define DEC_DICT_MOD(key_typ, val_typ) \
 DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)) \
 DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ))
 
+#define TYPES \
+   BOOST_PP_TUPLE_TO_LIST(3, (int32, int64, StringType))
 
-DEF_DICT(int64, int64)
-DEF_DICT(StringType, int64)
-DEF_DICT(int32, int32)
-DEF_DICT(int32, int64)
-DEF_DICT(int64, int32)
+#define APPLY_DEF_DICT(r, product) DEF_DICT product
+BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEF_DICT, 2, (TYPES, TYPES))
+
 
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
@@ -80,11 +84,9 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     if (m == NULL)
         return NULL;
 
-    DEC_DICT_MOD(int64, int64)
-    DEC_DICT_MOD(StringType, int64)
-    DEC_DICT_MOD(int32, int32)
-    DEC_DICT_MOD(int32, int64)
-    DEC_DICT_MOD(int64, int32)
+    #define APPLY_DEC_DICT_MOD(r, product) DEC_DICT_MOD product
+    BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEC_DICT_MOD, 2, (TYPES, TYPES))
+
 
     DEC_MOD_METHOD(init_dict_int_int)
 
