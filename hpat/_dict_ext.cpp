@@ -60,14 +60,22 @@ void BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ) \
 (std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m, IN_TYP(key_typ) index, IN_TYP(val_typ) value) \
 { \
     (*m)[DE_PTR(key_typ)index] = DE_PTR(val_typ)value; \
-}
+} \
+/* in */ \
+bool BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)\
+(IN_TYP(key_typ) val, std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m)\
+{ \
+    return (m->find(DE_PTR(key_typ)val) != m->end()); \
+} \
+/**/
 
 // declaration of dict functions in python module
 #define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
 
 #define DEC_DICT_MOD(key_typ, val_typ) \
 DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)) \
-DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ))
+DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ)) \
+DEC_MOD_METHOD(BOOST_PP_CAT(dict_in_##key_typ, _##val_typ))
 
 #define TYPES \
    BOOST_PP_TUPLE_TO_LIST(3, (int32, int64, StringType))

@@ -70,6 +70,9 @@ for key_typ in elem_types:
         # setitem
         exec("ll.add_symbol('dict_setitem_{}_{}', hdict_ext.dict_setitem_{}_{})".format(
             key_typ, val_typ, key_typ, val_typ))
+        # in
+        exec("ll.add_symbol('dict_in_{}_{}', hdict_ext.dict_in_{}_{})".format(
+            key_typ, val_typ, key_typ, val_typ))
 
 
 
@@ -329,12 +332,14 @@ def lower_dict_max(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_max")
     return builder.call(fn, args)
 
-@lower_builtin("in", types.int64, dict_int_int_type)
+@lower_builtin("in", types.Any, DictType)
 def lower_dict_in(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
-                                                lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_in")
-    return builder.call(fn, [args[1], args[0]])
+    key_typ, dict_typ = sig.args
+    fname = "dict_in_{}_{}".format(key_typ, dict_typ.val_typ)
+    fnty = lir.FunctionType(lir.IntType(1), [context.get_value_type(key_typ),
+                                                lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name=fname)
+    return builder.call(fn, args)
 
 
 @lower_cast(dict_int_int_type, types.boolean)
