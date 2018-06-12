@@ -50,6 +50,7 @@ bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
 #define IN_TYP(x) BOOST_PP_IIF(IS_STR(x), C_TYPE(x)*, C_TYPE(x))
 
 #define DE_PTR(x) BOOST_PP_IIF(IS_STR(x), *, )
+#define GET_PTR(x) BOOST_PP_IIF(IS_STR(x), &, )
 
 // definition of dict functions
 #define DEF_DICT(key_typ, val_typ) \
@@ -69,6 +70,12 @@ bool BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)\
 { \
     return (m->find(DE_PTR(key_typ)val) != m->end()); \
 } \
+/* getitem */ \
+IN_TYP(val_typ) BOOST_PP_CAT(dict_getitem_##key_typ, _##val_typ) \
+(std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m, IN_TYP(key_typ) index) \
+{ \
+    return GET_PTR(val_typ)m->at(DE_PTR(key_typ)index); \
+} \
 /**/
 
 // declaration of dict functions in python module
@@ -77,7 +84,9 @@ bool BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)\
 #define DEC_DICT_MOD(key_typ, val_typ) \
 DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)) \
 DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ)) \
-DEC_MOD_METHOD(BOOST_PP_CAT(dict_in_##key_typ, _##val_typ))
+DEC_MOD_METHOD(BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)) \
+DEC_MOD_METHOD(BOOST_PP_CAT(dict_getitem_##key_typ, _##val_typ)) \
+/**/
 
 #define TYPES \
    BOOST_PP_TUPLE_TO_LIST(12, (\

@@ -71,6 +71,8 @@ for key_typ in elem_types:
         # in
         exec("ll.add_symbol('dict_in_{}_{}', hdict_ext.dict_in_{}_{})".format(
             key_typ, val_typ, key_typ, val_typ))
+        exec("ll.add_symbol('dict_getitem_{}_{}', hdict_ext.dict_getitem_{}_{})".format(
+            key_typ, val_typ, key_typ, val_typ))
 
 
 
@@ -140,7 +142,7 @@ class SetItemDict(AbstractTemplate):
     key = "setitem"
 
     def generic(self, args, kws):
-        dict_t, idx, value = args
+        dict_t, _, _ = args
         if isinstance(dict_t, DictType):
             return signature(types.none, dict_t, dict_t.key_typ, dict_t.val_typ)
 
@@ -150,10 +152,9 @@ class GetItemDict(AbstractTemplate):
     key = "getitem"
 
     def generic(self, args, kws):
-        dict_t, idx = args
+        dict_t, _ = args
         if isinstance(dict_t, DictType):
-            if isinstance(idx, types.Integer):
-                return signature(dict_t.val_typ, dict_t, idx)
+            return signature(dict_t.val_typ, dict_t, dict_t.key_typ)
 
 
 @infer
@@ -262,7 +263,7 @@ def impl_dict_int_int(context, builder, sig, args):
 
 @lower_builtin('setitem', DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
-    dict_typ, key_typ, val_typ = sig.args
+    _, key_typ, val_typ = sig.args
     fname = "dict_setitem_{}_{}".format(key_typ, val_typ)
     fnty = lir.FunctionType(lir.VoidType(),
         [lir.IntType(8).as_pointer(),
@@ -291,15 +292,14 @@ def lower_dict_get(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_get")
     return builder.call(fn, args)
 
-
-@lower_builtin("getitem", DictType, types.intp)
+@lower_builtin("getitem", DictType, types.Any)
 def lower_dict_getitem(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(
-        64), [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(
-        fnty, name="dict_int_int_getitem")
+    dict_typ, key_typ = sig.args
+    fnty = lir.FunctionType(context.get_value_type(dict_typ.val_typ),
+        [lir.IntType(8).as_pointer(), context.get_value_type(key_typ)])
+    fname = "dict_getitem_{}_{}".format(key_typ, dict_typ.val_typ)
+    fn = builder.module.get_or_insert_function(fnty, name=fname)
     return builder.call(fn, args)
-
 
 @lower_builtin("dict.pop", DictType, types.intp)
 def lower_dict_pop(context, builder, sig, args):
