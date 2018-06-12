@@ -36,6 +36,8 @@ bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
 
 #define StringType_t std::string
 #define bool_t bool
+#define float32_t float
+#define float64_t double
 
 #define C_TYPE(a) BOOST_PP_CAT(a,_t)
 
@@ -78,7 +80,21 @@ DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ)) \
 DEC_MOD_METHOD(BOOST_PP_CAT(dict_in_##key_typ, _##val_typ))
 
 #define TYPES \
-   BOOST_PP_TUPLE_TO_LIST(3, (int32, int64, StringType))
+   BOOST_PP_TUPLE_TO_LIST(12, (\
+int8, \
+int16, \
+int32, \
+int64, \
+uint8, \
+uint16, \
+uint32, \
+uint64, \
+bool, \
+float32, \
+float64, \
+StringType \
+)) \
+/**/
 
 #define APPLY_DEF_DICT(r, product) DEF_DICT product
 BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEF_DICT, 2, (TYPES, TYPES))
