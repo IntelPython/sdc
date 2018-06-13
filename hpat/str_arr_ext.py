@@ -27,6 +27,10 @@ class StringArrayType(types.Type):
         super(StringArrayType, self).__init__(
             name='StringArrayType()')
 
+    @property
+    def dtype(self):
+        return string_type
+
 
 string_array_type = StringArrayType()
 

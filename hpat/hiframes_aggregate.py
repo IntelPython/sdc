@@ -542,7 +542,8 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
 
     # find write location
     # TODO: non-int dict
-    func_text += "    key_write_map = hpat.DictIntInt()\n"
+    func_text += "    key_write_map = hpat.dict_ext.init_dict_{}_int64()\n".format(
+                                                                 key_typ.dtype)
     func_text += "    curr_write_ind = 0\n"
     func_text += "    for i in range(len(key_arr)):\n"
     func_text += "      k = key_arr[i]\n"
