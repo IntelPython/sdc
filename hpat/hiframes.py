@@ -892,7 +892,7 @@ class HiFrames(object):
         dummy_ir.blocks.update(f_ir.blocks)
         dummy_ir.blocks[0].body.append(ir.Jump(first_label, col_var.loc))
         # dead df code can cause type inference issues
-        remove_dead(dummy_ir.blocks, dummy_ir.arg_names)
+        remove_dead(dummy_ir.blocks, dummy_ir.arg_names, dummy_ir)
 
         # run type inference on the dummy IR
         warnings = numba.errors.WarningsFixer(numba.errors.NumbaWarning)

@@ -35,7 +35,7 @@ such as Numba and LLVM on Ubuntu Linux::
     export PATH=$HOME/miniconda3/bin:$PATH
     conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
     source activate HPAT
-    conda install -c numba numba=0.38.0rc1
+    conda install -c numba numba
     conda install pyarrow=0.9.* mpich -c conda-forge
     conda install h5py -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64

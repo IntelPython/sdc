@@ -24,7 +24,7 @@ conda remove --all -q -y -n $CONDA_ENV
 
 conda create -n $CONDA_ENV -q -y python=$PYTHON numpy=$NUMPY scipy pandas boost cmake
 source activate $CONDA_ENV
-$CONDA_INSTALL -c numba numba=0.38.0rc1
+$CONDA_INSTALL -c numba numba
 $CONDA_INSTALL pyarrow=0.9.* mpich -c conda-forge
 $CONDA_INSTALL h5py -c ehsantn
 $CONDA_INSTALL daal-devel daal-include daal -c intel --no-deps

@@ -62,7 +62,7 @@ class PIO(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
-        while remove_dead(self.func_ir.blocks, self.func_ir.arg_names):
+        while remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir):
             pass
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after IO")

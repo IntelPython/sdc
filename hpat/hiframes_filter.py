@@ -170,7 +170,7 @@ def visit_vars_filter(filter_node, callback, cbdata):
 ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 
-def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, typemap):
+def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, func_ir, typemap):
     #
     dead_cols = []
 
