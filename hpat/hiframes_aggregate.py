@@ -397,7 +397,7 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
         if key_typ == string_array_type:
             send_col_args += ", send_key_arr_chars"
         func_text += ("    send_key_arr, {} = __agg_func_p(n_uniq_keys, "
-                                    "n_uniq_keys_char, key_arr, {})\n").format(
+                                    "n_uniq_keys_char, key_arr, {}, send_disp)\n").format(
             send_col_args, ", ".join(in_names))
         # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
 
@@ -426,7 +426,7 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
 
         func_text += "    key_arr = recv_key_arr\n"
         in_names = ["recv_{}".format(i) for i in range(num_red_vars)]
-        # func_text += "    hpat.cprint(len(key_arr), len(in_c0))\n"
+        # func_text += "    print(hpat.distributed_api.get_rank(), key_arr)\n"
 
     func_text += "    n_uniq_keys = len(set(key_arr))\n"
     # allocate output
@@ -463,6 +463,12 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
         out_typs = []
 
     arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs + in_typs)
+
+    if parallel_local:
+        # add send_disp arg
+        arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs
+                                + in_typs + [types.Array(types.int32, 1, 'C')])
+
     num_red_vars = len(agg_func_struct.vars)
 
     iter_func = gen_agg_iter_func(
@@ -560,8 +566,13 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
                                     for i in range(num_red_vars)])
 
-    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr, {}):\n".format(
-        ", ".join(out_names + in_names))
+    extra_args = ""
+    if parallel_local:
+        # needed due to alltoallv
+        extra_args = ", send_disp"
+
+    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr, {}{}):\n".format(
+        ", ".join(out_names + in_names), extra_args)
 
     # allocate reduction var arrays
     for i, typ in enumerate(red_var_typs):
@@ -576,6 +587,8 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         else:
             func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
                                                                 key_typ.dtype)
+        func_text += "    n_pes = hpat.distributed_api.get_size()\n"
+        func_text += "    tmp_offset = np.zeros(n_pes, dtype=np.int64)\n"
 
     # find write location
     # TODO: non-int dict
@@ -585,11 +598,20 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     func_text += "    for i in range(len(key_arr)):\n"
     func_text += "      k = key_arr[i]\n"
     func_text += "      if k not in key_write_map:\n"
-    func_text += "        key_write_map[k] = curr_write_ind\n"
-    func_text += "        w_ind = curr_write_ind\n"
-    func_text += "        curr_write_ind += 1\n"
+
+    if parallel_local:
+        # write to proper buffer location for alltoallv
+        func_text += "        node_id = hash(k) % n_pes\n"
+        func_text += "        w_ind = send_disp[node_id] + tmp_offset[node_id]\n"
+        func_text += "        tmp_offset[node_id] += 1\n"
+    else:
+        func_text += "        w_ind = curr_write_ind\n"
+        func_text += "        curr_write_ind += 1\n"
+    func_text += "        key_write_map[k] = w_ind\n"
+
     if parallel_local:
         func_text += "        out_key[w_ind] = k\n"
+
     func_text += "      else:\n"
     func_text += "        w_ind = key_write_map[k]\n"
 
