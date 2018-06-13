@@ -388,13 +388,13 @@ def lower_dict_get_int32(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin("getitem", DictType, types.int32)
-def lower_dict_getitem_int32(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(
-        32), [lir.IntType(8).as_pointer(), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(
-        fnty, name="dict_int32_int32_getitem")
-    return builder.call(fn, args)
+# @lower_builtin("getitem", DictType, types.int32)
+# def lower_dict_getitem_int32(context, builder, sig, args):
+#     fnty = lir.FunctionType(lir.IntType(
+#         32), [lir.IntType(8).as_pointer(), lir.IntType(32)])
+#     fn = builder.module.get_or_insert_function(
+#         fnty, name="dict_int32_int32_getitem")
+#     return builder.call(fn, args)
 
 
 @lower_builtin("dict.pop", DictType, types.int32)
