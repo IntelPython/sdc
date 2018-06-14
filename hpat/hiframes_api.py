@@ -74,9 +74,10 @@ def concat(arr_list):
 
 @overload(concat)
 def concat_overload(arr_list):
-    if not isinstance(arr_list, types.UniTuple):
-        raise ValueError("inputs to pd.concat should have the same type")
-    if arr_list.dtype == string_array_type:
+    # all string input case
+    # TODO: handle numerics to string casting case
+    if (isinstance(arr_list, types.UniTuple)
+            and arr_list.dtype == string_array_type):
         def string_concat_impl(in_arrs):
             # preallocate the output
             num_strs = 0
@@ -96,8 +97,9 @@ def concat_overload(arr_list):
             return out_arr
 
         return string_concat_impl
-    if not isinstance(arr_list.dtype, types.Array):
-        raise ValueError("concat supports only numerical and string arrays")
+    for typ in arr_list:
+        if not isinstance(typ, types.Array):
+            raise ValueError("concat supports only numerical and string arrays")
     # numerical input
     return lambda a: np.concatenate(a)
 
