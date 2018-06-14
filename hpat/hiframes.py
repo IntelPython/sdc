@@ -49,7 +49,10 @@ def remove_hiframes(rhs, lives, call_list):
     if call_list == ['ceil', math]:
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
-            call_list[0] in ['fix_df_array', 'fix_rolling_array']):
+            call_list[0] in ['fix_df_array', 'fix_rolling_array',
+            'concat', 'count', 'mean', 'quantile', 'var', 'ts_series_getitem',
+            'str_contains_regex', 'str_contains_noregex', 'column_sum',
+            'nunique']):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
             call_list[0]
@@ -522,12 +525,13 @@ class HiFrames(object):
                         conc_arg_names.append(out_name)
                         i += 1
                         # TODO: fix type
+                        # TODO: allocate string array of NAs
                         allocs += "    {} = np.full(len({}), np.nan)\n".format(
                             out_name, len_name)
 
                 func_text = "def f({}):\n".format(",".join(arg_names))
                 func_text += allocs
-                func_text += "    s = np.concatenate(({}))\n".format(
+                func_text += "    s = hpat.hiframes_api.concat(({}))\n".format(
                     ",".join(conc_arg_names))
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
