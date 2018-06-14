@@ -371,7 +371,7 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
             func_text += "    n_uniq_keys = send_counts.sum()\n"
             func_text += "    n_uniq_keys_char = send_counts_char.sum()\n"
             func_text += "    recv_size = recv_counts.sum()\n"
-            func_text += "    recv_size_chars = recv_counts.sum()\n"
+            func_text += "    recv_size_chars = recv_counts_char.sum()\n"
         else:
             func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
             func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
