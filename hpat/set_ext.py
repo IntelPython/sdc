@@ -4,6 +4,7 @@ from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
 from numba import cgutils
+from numba.typing.templates import signature, AbstractTemplate, infer
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -11,6 +12,7 @@ import hset_ext
 ll.add_symbol('init_set_string', hset_ext.init_set_string)
 ll.add_symbol('insert_set_string', hset_ext.insert_set_string)
 ll.add_symbol('len_set_string', hset_ext.len_set_string)
+ll.add_symbol('set_in_string', hset_ext.set_in_string)
 ll.add_symbol('num_total_chars_set_string', hset_ext.num_total_chars_set_string)
 ll.add_symbol('populate_str_arr_from_set', hset_ext.populate_str_arr_from_set)
 
@@ -89,6 +91,22 @@ def len_set_str_overload(in_typ):
         def len_impl(str_set):
             return len_set_string(str_set)
         return len_impl
+
+@infer
+class InSet(AbstractTemplate):
+    key = "in"
+
+    def generic(self, args, kws):
+        _, cont_typ = args
+        if cont_typ == set_string_type:
+            return signature(types.boolean, cont_typ.dtype, cont_typ)
+
+@lower_builtin("in", string_type, set_string_type)
+def lower_dict_in(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
+                                                lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
+    return builder.call(fn, args)
 
 @overload(to_array)
 def to_array_overload(in_typ):

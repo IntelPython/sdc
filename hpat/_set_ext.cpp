@@ -8,6 +8,7 @@
 std::unordered_set<std::string>* init_set_string();
 void insert_set_string(std::unordered_set<std::string>* str_set, std::string* val);
 int64_t len_set_string(std::unordered_set<std::string>* str_set);
+bool set_in_string(std::string* val, std::unordered_set<std::string>* str_set);
 int64_t num_total_chars_set_string(std::unordered_set<std::string>* str_set);
 void populate_str_arr_from_set(std::unordered_set<std::string>* str_set,
                                 uint32_t *offsets, char *data);
@@ -26,6 +27,8 @@ PyMODINIT_FUNC PyInit_hset_ext(void) {
                             PyLong_FromVoidPtr((void*)(&insert_set_string)));
     PyObject_SetAttrString(m, "len_set_string",
                             PyLong_FromVoidPtr((void*)(&len_set_string)));
+    PyObject_SetAttrString(m, "set_in_string",
+                            PyLong_FromVoidPtr((void*)(&set_in_string)));
     PyObject_SetAttrString(m, "num_total_chars_set_string",
                             PyLong_FromVoidPtr((void*)(&num_total_chars_set_string)));
     PyObject_SetAttrString(m, "populate_str_arr_from_set",
@@ -47,6 +50,11 @@ void insert_set_string(std::unordered_set<std::string>* str_set, std::string* va
 int64_t len_set_string(std::unordered_set<std::string>* str_set)
 {
     return str_set->size();
+}
+
+bool set_in_string(std::string* val, std::unordered_set<std::string>* str_set)
+{
+    return (str_set->find(*val) != str_set->end());
 }
 
 int64_t num_total_chars_set_string(std::unordered_set<std::string>* str_set)
