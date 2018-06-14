@@ -394,11 +394,13 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
 
         # call local aggregate
         send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
+        extra_args = ""
         if key_typ == string_array_type:
-            send_col_args += ", send_key_arr_chars"
+            send_col_args = "send_key_arr_chars, " + send_col_args
+            extra_args = ", send_disp_char"
         func_text += ("    send_key_arr, {} = __agg_func_p(n_uniq_keys, "
-                                    "n_uniq_keys_char, key_arr, {}, send_disp)\n").format(
-            send_col_args, ", ".join(in_names))
+                                    "n_uniq_keys_char, key_arr, {}, send_disp{})\n").format(
+            send_col_args, ", ".join(in_names), extra_args)
         # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
 
         # shuffle key arr
@@ -453,6 +455,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     #              2- aggregate input column to reduce arrays for communication (parallel_local)
     #              3- aggregate received reduce arrays to output (parallel_combine)
 
+    extra_arg_typs = []
     # in combine phase after shuffle, inputs are reduce vars
     if parallel_combine:
         in_typs = [types.Array(t, 1, 'C') for t in agg_func_struct.var_typs]
@@ -461,13 +464,13 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     if parallel_local:
         assert not parallel_combine
         out_typs = []
-
-    arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs + in_typs)
-
-    if parallel_local:
         # add send_disp arg
-        arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs
-                                + in_typs + [types.Array(types.int32, 1, 'C')])
+        extra_arg_typs = [types.Array(types.int32, 1, 'C')]
+        if key_typ == string_array_type:
+            # add send_disp_char arg
+            extra_arg_typs.append(types.Array(types.int32, 1, 'C'))
+
+    arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs + in_typs + extra_arg_typs)
 
     num_red_vars = len(agg_func_struct.vars)
 
@@ -479,7 +482,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                                   {'hpat': hpat, 'np': np,
                                   '__update_redvars': agg_func_struct.update,
                                   '__combine_redvars': __combine_redvars,
-                                  '__eval_res': __eval_res},
+                                  '__eval_res': __eval_res,
+                                  'str_copy': hpat.hiframes_api.str_copy},
                                   typingctx, arg_typs,
                                   typemap, calltypes)
 
@@ -570,6 +574,8 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     if parallel_local:
         # needed due to alltoallv
         extra_args = ", send_disp"
+        if key_typ == string_array_type:
+            extra_args += ", send_disp_char"
 
     func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr, {}{}):\n".format(
         ", ".join(out_names + in_names), extra_args)
@@ -583,17 +589,21 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     # key is returned in parallel local agg phase (TODO: avoid if key is output already)
     if parallel_local:
         if key_typ == string_array_type:
-            func_text += "    recv_key_arr = hpat.str_arr_ext.pre_alloc_string_array(recv_size, recv_size_chars)\n"
+            func_text += "    out_key_lens = np.empty(n_uniq_keys, np.uint32)\n"
+            func_text += "    out_key_chars = np.empty(n_uniq_keys_char, np.uint8)\n"
         else:
             func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
                                                                 key_typ.dtype)
         func_text += "    n_pes = hpat.distributed_api.get_size()\n"
         func_text += "    tmp_offset = np.zeros(n_pes, dtype=np.int64)\n"
+        if key_typ == string_array_type:
+            func_text += "    tmp_offset_char = np.zeros(n_pes, dtype=np.int64)\n"
 
     # find write location
     # TODO: non-int dict
     func_text += "    key_write_map = hpat.dict_ext.init_dict_{}_int64()\n".format(
                                                                  key_typ.dtype)
+
     func_text += "    curr_write_ind = 0\n"
     func_text += "    for i in range(len(key_arr)):\n"
     func_text += "      k = key_arr[i]\n"
@@ -610,7 +620,14 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     func_text += "        key_write_map[k] = w_ind\n"
 
     if parallel_local:
-        func_text += "        out_key[w_ind] = k\n"
+        if key_typ == string_array_type:
+            func_text += "        k_len = len(k)\n"
+            func_text += "        out_key_lens[w_ind] = k_len\n"
+            func_text += "        w_ind_c = send_disp_char[node_id] + tmp_offset_char[node_id]\n"
+            func_text += "        tmp_offset_char[node_id] += k_len\n"
+            func_text += "        str_copy(out_key_chars, w_ind_c, k.c_str(), k_len)\n"
+        else:
+            func_text += "        out_key[w_ind] = k\n"
 
     func_text += "      else:\n"
     func_text += "        w_ind = key_write_map[k]\n"
@@ -636,7 +653,10 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
 
     if parallel_local:
         # return out key array and reduce arrays for communication
-        func_text += "    return out_key, {}\n".format(redvar_arrnames)
+        if key_typ == string_array_type:
+            func_text += "    return out_key_lens, out_key_chars, {}\n".format(redvar_arrnames)
+        else:
+            func_text += "    return out_key, {}\n".format(redvar_arrnames)
     else:
         # get final output from reduce varis
         redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
