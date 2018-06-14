@@ -33,3 +33,6 @@ D = 10
 gen_lr("lr.hdf5", N, D)
 gen_kde_pq('kde.parquet', N)
 gen_pq_test('example.parquet')
+
+df = pd.DataFrame({'A': ['bc']+["a"]*3+ ["bc"]*3+['a'], 'B': [-8,1,2,3,1,5,6,7]})
+df.to_parquet("groupby3.pq")

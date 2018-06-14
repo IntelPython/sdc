@@ -566,8 +566,9 @@ class TestHiFrames(unittest.TestCase):
             return A.values
 
         hpat_func = hpat.jit(test_impl)
-        df = pd.DataFrame({'A': [1,1,1,1,2,2,2], 'B': [1,2,3,1,5,6,7]})
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
     def test_agg_parallel(self):
         def test_impl(n):
@@ -578,6 +579,17 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_str(self):
+        def test_impl():
+            df = pq.read_table("groupby3.pq").to_pandas()
+            A = df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
