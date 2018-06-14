@@ -299,23 +299,49 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
-        # daal4py
-        # We do not "meet" distributions, the d4p algos accept a certain decomposition only.
-        # The required distribution/decomposition is defined in the algorithms specs.
-        if func_name == 'compute' and isinstance(func_mod, ir.Var):
-            # every d4p algo gets executed by invoking "compute".
-            # we need to find the algorithm that's currently called
-            for algo in d4p_algos:
-                if algo.all_nbtypes[algo.name] == self.typemap[func_mod.name]:
-                    # handle all input arguments and set their distribution as given by the spec
-                    for i in range(len(args)):
-                        array_dists[args[i].name] = algo.spec.input_types[i][1]
-                    # handle distribution of the result
-                    array_dists[lhs] = algo.spec.result_dist
-                    return
+        if isinstance(func_mod, ir.Var) and self._analyze_call_d4p(lhs, func_name, self.typemap[func_mod.name], args, array_dists):
+            return
 
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists)
+
+
+    def _analyze_call_d4p(self, lhs, func_name, mod_name, args, array_dists):
+        '''
+        Analyze distribution for calls to daal4py.
+        Return True of a call for daal4py was detected and handled.
+        We cannot simply "meet" distributions, the d4p algos accept a certain decomposition only.
+        The required distribution/decomposition is defined in the algorithms specs.
+        We raise an exception if the required distribution cannot be met.
+        '''
+        if func_name == 'compute':
+            # every d4p algo gets executed by invoking "compute".
+            # we need to find the algorithm that's currently called
+            for algo in d4p_algos:
+                if algo.all_nbtypes[algo.name] == mod_name:
+                    # handle all input arguments and set their distribution as given by the spec
+                    for i in range(len(args)):
+                        aname = args[i].name
+                        adist = algo.spec.input_types[i][1]
+                        if aname not in array_dists:
+                            array_dists[aname] = adist
+                        else:
+                            # bail out if there is a distribution conflict with some other use of the argument
+                            # FIXME: handle Distribution.Thread and Disribution.REP as equivalent
+                            assert array_dists[aname] == adist,\
+                                   'Distribution of argument {} to "daal4py.{}.compute" must be "{}". '\
+                                   'Some other use of it demands "{}", though.'\
+                                   .format(i+1, algo.name, adist, array_dists[aname])
+                    # handle distribution of the result
+                    assert algo.spec.result_dist in [Distribution.Thread, Distribution.REP],\
+                           'Cannot handle "{}" distribution of result of "daal4py.{}.compute"'\
+                           .format(algo.spec.result_dist, algo.name)
+                    if lhs not in array_dists:
+                        array_dists[lhs] = algo.spec.result_dist
+                    else:
+                        array_dists[lhs] = Distribution(min(array_dists[lhs].value, algo.spec.result_dist.value))
+                    return True
+            return False
 
 
     def _analyze_call_np(self, lhs, func_name, args, array_dists):
