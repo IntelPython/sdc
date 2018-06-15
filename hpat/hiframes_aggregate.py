@@ -718,7 +718,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     assert f_ir.arg_count == 1, "agg function should have one input"
     input_name = f_ir.arg_names[0]
     df_pass = hpat.hiframes.HiFrames(f_ir, typingctx,
-                           arg_typs, {})#{input_name+":input": "series"})
+                           arg_typs, {input_name+":input": "series"})
     df_pass.run()
     remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
     typemap, return_type, calltypes = compiler.type_inference_stage(
@@ -791,6 +791,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
 
     return AggFuncStruct(redvars, var_types, init_nodes, update_func, eval_nodes, pm)
 
+
 def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
                                         in_col_typ, pm, typingctx, targetctx):
     num_red_vars = len(redvars)
@@ -836,24 +837,40 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
 
     f_ir._definitions = build_definitions(f_ir.blocks)
 
-    label = list(f_ir.blocks)[0]
-    body = f_ir.blocks[label].body
+    body = f_ir.blocks.popitem()[1].body
     return_typ = pm.typemap[body[-1].value.name]
-    new_body = []
-    initial_assigns = []
 
+    blocks = wrap_parfor_blocks(parfor)
+    topo_order = find_topo_order(blocks)
+    topo_order = topo_order[1:]  # ignore init block
+    unwrap_parfor_blocks(parfor)
+
+    f_ir.blocks = parfor.loop_body
+    first_block = f_ir.blocks[topo_order[0]]
+    last_block = f_ir.blocks[topo_order[-1]]
+
+    # arg assigns
+    initial_assigns = body[:2*num_red_vars]
+    # return nodes: build_tuple, cast, return
+    return_nodes = body[-3:]
+
+    # assign input reduce vars
     # redvar_i = v_i
     for i in range(num_red_vars):
         arg_var = body[i].target
         node = ir.Assign(arg_var, red_ir_vars[i], arg_var.loc)
         initial_assigns.append(node)
 
+    # assign input value vars
     # redvar_in_i = in_i
     for i in range(num_red_vars, 2*num_red_vars):
         arg_var = body[i].target
         node = ir.Assign(arg_var, in_vars[i-num_red_vars], arg_var.loc)
         initial_assigns.append(node)
 
+    first_block.body = initial_assigns + first_block.body
+
+    # assign ouput reduce vars
     # v_i = red_var_i
     after_assigns = []
     for i in range(num_red_vars):
@@ -861,17 +878,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
         node = ir.Assign(red_ir_vars[i], arg_var, arg_var.loc)
         after_assigns.append(node)
 
-    # find sentinel and insert update body
-    for stmt in f_ir.blocks[label].body:
-        if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__update_redvars', 'hpat.hiframes_aggregate')):
-            new_body.extend(initial_assigns)
-            new_body.extend(bl.body)
-            new_body.extend(after_assigns)
-            continue
-        new_body.append(stmt)
-
-    f_ir.blocks[label].body = new_body
+    last_block.body += after_assigns + return_nodes
 
     # compile implementation to binary (Dispatcher)
     agg_impl_func = compiler.compile_ir(
