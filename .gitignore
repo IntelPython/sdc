@@ -14,3 +14,9 @@
 build/
 docs/gh-pages/
 *.DS_Store
+
+# data files for testing
+*.pq
+*.csv
+*.parquet
+*.hdf5
