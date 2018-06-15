@@ -333,8 +333,7 @@ class HiFrames(object):
 
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-        if (func_name in ['agg', 'aggregate'] and isinstance(func_mod, ir.Var)
-                and self._is_groupby(func_mod)):
+        if isinstance(func_mod, ir.Var) and self._is_groupby(func_mod):
             return self._handle_aggregate(lhs, rhs, func_mod, func_name, label)
 
         if fdef == ('fromfile', 'numpy'):
@@ -873,6 +872,7 @@ class HiFrames(object):
         dummy_ir.blocks[0].body = all_body
 
         _globals = self.func_ir.func_id.func.__globals__
+        _globals.update({'hpat': hpat, 'numba': numba, 'np': np})
         f_ir = compile_to_numba_ir(wrapper_func, {'hpat': hpat})
         # fix definitions to enable finding sentinel
         f_ir._definitions = build_definitions(f_ir.blocks)
@@ -1187,18 +1187,13 @@ class HiFrames(object):
 
     def _handle_aggregate(self, lhs, rhs, agg_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-
+        _supported_agg_funcs = ['agg', 'aggregate', 'sum']
         # TODO: support aggregation functions sum, count, etc.
-        assert func_name in ['agg', 'aggregate'], "only groubpy agg for now"
+        if func_name not in _supported_agg_funcs:
+            raise ValueError("only {} supported in groupby".format(
+                                             ", ".join(_supported_agg_funcs)))
 
-        # error checking: make sure there is function input only
-        if len(rhs.args) != 1:
-            raise ValueError("agg expects 1 argument")
-        agg_func = guard(get_definition, self.func_ir, rhs.args[0])
-        if agg_func is None or not (isinstance(agg_func, ir.Expr)
-                                and agg_func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
-
+        agg_func = self._get_agg_func(func_name, rhs)
 
         # find selected output columns
         # TODO: support other selection formats
@@ -1234,6 +1229,21 @@ class HiFrames(object):
             out_colname, df_var.name, key_colname, {out_colname: lhs},
             {out_colname: in_var}, self.df_vars[df_var.name][key_colname],
             agg_func, {out_colname: out_typ}, lhs.loc)]
+
+    def _get_agg_func(self, func_name, rhs):
+        if func_name == 'sum':
+            return hpat.hiframes_typed._column_sum_impl
+
+        # agg case
+        # error checking: make sure there is function input only
+        if len(rhs.args) != 1:
+            raise ValueError("agg expects 1 argument")
+        agg_func = guard(get_definition, self.func_ir, rhs.args[0])
+        if agg_func is None or not (isinstance(agg_func, ir.Expr)
+                                and agg_func.op == 'make_function'):
+            raise ValueError("lambda for map not found")
+
+        return agg_func
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc

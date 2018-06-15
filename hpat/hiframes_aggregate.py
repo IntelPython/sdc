@@ -714,7 +714,8 @@ def agg_send_recv_counts_str(key_arr):
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
     # XXX are outside function's globals needed?
-    f_ir = get_ir_of_code({}, func.code)
+    code = func.code if hasattr(func, 'code') else func.__code__
+    f_ir = get_ir_of_code({'numba': numba, 'np': np, 'hpat': hpat}, code)
     assert f_ir.arg_count == 1, "agg function should have one input"
     input_name = f_ir.arg_names[0]
     df_pass = hpat.hiframes.HiFrames(f_ir, typingctx,
