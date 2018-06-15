@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+import warnings
 import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
@@ -236,7 +237,25 @@ class HiFramesTyped(object):
             return f_blocks
 
     def _handle_df_col_calls(self, lhs_name, rhs, assign):
-        if guard(find_callname, self.func_ir, rhs) == ('ts_series_getitem', 'hpat.hiframes_api'):
+
+        func_name = ""
+        func_mod = ""
+        fdef = guard(find_callname, self.func_ir, rhs)
+        if fdef is None:
+            # could be make_function from list comprehension which is ok
+            func_def = guard(get_definition, self.func_ir, rhs.func)
+            if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
+                return [assign]
+            # warnings.warn(
+            #     "function call couldn't be found for initial analysis")
+            return [assign]
+        else:
+            func_name, func_mod = fdef
+
+        if func_mod != 'hpat.hiframes_api':
+            return [assign]
+
+        if func_name == 'ts_series_getitem':
             in_arr = rhs.args[0]
             ind = rhs.args[1]
             def f(_in_arr, _ind):
@@ -253,7 +272,7 @@ class HiFramesTyped(object):
             nodes[-1].target = assign.target
             return nodes
 
-        if guard(find_callname, self.func_ir, rhs) == ('count', 'hpat.hiframes_api'):
+        if func_name == 'count':
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_count_impl,
                                            {'numba': numba, 'np': np,
@@ -265,10 +284,10 @@ class HiFramesTyped(object):
             last_block = topo_order[-1]
             replace_arg_nodes(f_blocks[first_block], [in_arr])
             # assign results to lhs output
-            f_blocks[last_block].body[-4].target = assign.target
+            f_blocks[last_block].body[-3].target = assign.target
             return f_blocks
 
-        if guard(find_callname, self.func_ir, rhs) == ('fillna', 'hpat.hiframes_api'):
+        if func_name == 'fillna':
             out_arr = rhs.args[0]
             in_arr = rhs.args[1]
             val = rhs.args[2]
@@ -281,7 +300,7 @@ class HiFramesTyped(object):
             replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
             return f_blocks
 
-        if guard(find_callname, self.func_ir, rhs) == ('column_sum', 'hpat.hiframes_api'):
+        if func_name == 'column_sum':
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_sum_impl,
                                            {'numba': numba, 'np': np,
@@ -293,10 +312,10 @@ class HiFramesTyped(object):
             last_block = topo_order[-1]
             replace_arg_nodes(f_blocks[first_block], [in_arr])
             # assign results to lhs output
-            f_blocks[last_block].body[-4].target = assign.target
+            f_blocks[last_block].body[-3].target = assign.target
             return f_blocks
 
-        if guard(find_callname, self.func_ir, rhs) == ('mean', 'hpat.hiframes_api'):
+        if func_name == 'mean':
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_mean_impl,
                                            {'numba': numba, 'np': np,
@@ -308,10 +327,10 @@ class HiFramesTyped(object):
             last_block = topo_order[-1]
             replace_arg_nodes(f_blocks[first_block], [in_arr])
             # assign results to lhs output
-            f_blocks[last_block].body[-4].target = assign.target
+            f_blocks[last_block].body[-3].target = assign.target
             return f_blocks
 
-        if guard(find_callname, self.func_ir, rhs) == ('var', 'hpat.hiframes_api'):
+        if func_name == 'var':
             in_arr = rhs.args[0]
             f_blocks = compile_to_numba_ir(_column_var_impl,
                                            {'numba': numba, 'np': np,
@@ -323,7 +342,7 @@ class HiFramesTyped(object):
             last_block = topo_order[-1]
             replace_arg_nodes(f_blocks[first_block], [in_arr])
             # assign results to lhs output
-            f_blocks[last_block].body[-4].target = assign.target
+            f_blocks[last_block].body[-3].target = assign.target
             return f_blocks
 
         return
@@ -354,6 +373,7 @@ def _column_count_impl(A):  # pragma: no cover
             count += 1
 
     res = count
+    return res
 
 
 def _column_fillna_impl(A, B, fill):  # pragma: no cover
@@ -382,6 +402,7 @@ def _column_sum_impl(A):  # pragma: no cover
             count += 1
 
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
+    return res
 
 
 @numba.njit
@@ -404,6 +425,7 @@ def _column_mean_impl(A):  # pragma: no cover
             count += 1
 
     res = hpat.hiframes_typed._mean_handle_nan(s, count)
+    return res
 
 
 @numba.njit
@@ -434,3 +456,4 @@ def _column_var_impl(A):  # pragma: no cover
             count += 1
 
     res = hpat.hiframes_typed._var_handle_nan(s, count)
+    return res

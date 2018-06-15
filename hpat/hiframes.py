@@ -1681,7 +1681,7 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
     return stencil_nodes
 
 
-def remove_none_return_from_block(last_block):
+def remove_return_from_block(last_block):
     # remove const none, cast, return nodes
     assert isinstance(last_block.body[-1], ir.Return)
     last_block.body.pop()
@@ -1689,10 +1689,10 @@ def remove_none_return_from_block(last_block):
             and isinstance(last_block.body[-1].value, ir.Expr)
             and last_block.body[-1].value.op == 'cast')
     last_block.body.pop()
-    assert (isinstance(last_block.body[-1], ir.Assign)
+    if (isinstance(last_block.body[-1], ir.Assign)
             and isinstance(last_block.body[-1].value, ir.Const)
-            and last_block.body[-1].value.value is None)
-    last_block.body.pop()
+            and last_block.body[-1].value.value is None):
+        last_block.body.pop()
 
 
 def include_new_blocks(blocks, new_blocks, label, new_body):
@@ -1704,7 +1704,7 @@ def include_new_blocks(blocks, new_blocks, label, new_body):
     inner_topo_order = find_topo_order(inner_blocks)
     inner_first_label = inner_topo_order[0]
     inner_last_label = inner_topo_order[-1]
-    remove_none_return_from_block(inner_blocks[inner_last_label])
+    remove_return_from_block(inner_blocks[inner_last_label])
     new_body.append(ir.Jump(inner_first_label, loc))
     blocks[label].body = new_body
     label = ir_utils.next_label()
