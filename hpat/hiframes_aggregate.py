@@ -6,10 +6,11 @@ import copy
 import numpy as np
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, compiler
-from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
-                            mk_unique_var, find_topo_order)
+                            mk_unique_var, find_topo_order, is_getitem,
+                            build_definitions, remove_dels, get_ir_of_code)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -487,8 +488,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                                   typingctx, arg_typs,
                                   typemap, calltypes)
 
-    f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
-    topo_order = numba.ir_utils.find_topo_order(f_ir.blocks)
+    f_ir._definitions = build_definitions(f_ir.blocks)
+    topo_order = find_topo_order(f_ir.blocks)
     first_block = f_ir.blocks[topo_order[0]]
 
     # deep copy the nodes since they can be reused
@@ -713,7 +714,13 @@ def agg_send_recv_counts_str(key_arr):
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
     # XXX are outside function's globals needed?
-    f_ir = numba.ir_utils.get_ir_of_code({}, func.code)
+    f_ir = get_ir_of_code({}, func.code)
+    assert f_ir.arg_count == 1, "agg function should have one input"
+    input_name = f_ir.arg_names[0]
+    df_pass = hpat.hiframes.HiFrames(f_ir, typingctx,
+                           arg_typs, {})#{input_name+":input": "series"})
+    df_pass.run()
+    remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
     typemap, return_type, calltypes = compiler.type_inference_stage(
                 typingctx, f_ir, arg_typs, None)
 
@@ -733,12 +740,17 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
             options
             )
     preparfor_pass.run()
+    df_t_pass = hpat.hiframes_typed.HiFramesTyped(f_ir, typingctx, typemap, calltypes)
+    df_t_pass.run()
     numba.rewrites.rewrite_registry.apply('after-inference', pm, f_ir)
     parfor_pass = numba.parfor.ParforPass(f_ir, typemap,
     calltypes, return_type, typingctx,
     options, flags)
     parfor_pass.run()
-    numba.ir_utils.remove_dels(f_ir.blocks)
+    remove_dels(f_ir.blocks)
+    # make sure eval nodes are after the parfor for easier extraction
+    # TODO: extract an eval func more robustly
+    numba.parfor.maximize_fusion(f_ir, f_ir.blocks, False)
     return f_ir, pm
 
 def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
@@ -748,6 +760,8 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     """
     f_ir, pm = compile_to_optimized_ir(
         agg_func, tuple([in_col_typ]), typingctx)
+
+    # TODO: support multiple top-level blocks
     assert len(f_ir.blocks) == 1 and 0 in f_ir.blocks, ("only simple functions"
                                   " with one block supported for aggregation")
     block = f_ir.blocks[0]
@@ -758,7 +772,8 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
             parfor_ind = i
 
     parfor = block.body[parfor_ind]
-    numba.ir_utils.remove_dels({0: parfor.init_block})
+    remove_dels(parfor.loop_body)
+    remove_dels({0: parfor.init_block})
 
     # ignore arg and size/shape nodes for input arr
     assert (isinstance(block.body[0], ir.Assign)
@@ -782,7 +797,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     red_ir_vars = [0]*num_red_vars
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
-            if numba.ir_utils.is_getitem(stmt) and stmt.value.value.name == arr_var.name:
+            if is_getitem(stmt) and stmt.value.value.name == arr_var.name:
                 redvar = var_to_redvar[stmt.target.name]
                 ind = redvars.index(redvar)
                 stmt.value = in_vars[ind]
@@ -810,8 +825,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
-    f_ir._definitions = numba.ir_utils.build_definitions(f_ir.blocks)
-
+    f_ir._definitions = build_definitions(f_ir.blocks)
 
     label = list(f_ir.blocks)[0]
     body = f_ir.blocks[label].body

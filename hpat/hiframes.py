@@ -1339,6 +1339,10 @@ class HiFrames(object):
         if arg_name in flagged_inputs.keys():
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
+            if flag== 'series':
+                # XXX hack for agg functions, replace with proper Series type
+                self.df_cols.add(arg_var.name)
+                return nodes
             # replace assign target with tmp
             in_arr_tmp = ir.Var(scope, mk_unique_var(flag + "_input"), loc)
             arg_assign.target = in_arr_tmp
