@@ -784,6 +784,15 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
 
     redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
                                                                 pm.calltypes)
+
+    var_types = [pm.typemap[v] for v in redvars]
+    update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
+        arr_var, in_col_typ, pm, typingctx, targetctx)
+
+    return AggFuncStruct(redvars, var_types, init_nodes, update_func, eval_nodes, pm)
+
+def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
+                                        in_col_typ, pm, typingctx, targetctx):
     num_red_vars = len(redvars)
     var_types = [pm.typemap[v] for v in redvars]
 
@@ -877,9 +886,7 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
 
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
     imp_dis.add_overload(agg_impl_func)
-
-    return AggFuncStruct(redvars, var_types, init_nodes, imp_dis, eval_nodes, pm)
-
+    return imp_dis
 
 # adapted from numba/parfor.py
 def get_parfor_reductions(parfor, parfor_params, calltypes,
