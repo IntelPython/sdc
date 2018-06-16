@@ -570,10 +570,115 @@ class TestHiFrames(unittest.TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    def test_agg_seq_sum(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].sum()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_count(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].count()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_mean(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].mean()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_min(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].min()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_max(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].max()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
             A = df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_sum(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].sum()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_count(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].count()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_mean(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].mean()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_min(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].min()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_max(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].max()
             return A.sum()
 
         hpat_func = hpat.jit(test_impl)
