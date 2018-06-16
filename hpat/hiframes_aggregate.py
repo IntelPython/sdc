@@ -10,7 +10,8 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
                             mk_unique_var, find_topo_order, is_getitem,
-                            build_definitions, remove_dels, get_ir_of_code)
+                            build_definitions, remove_dels, get_ir_of_code,
+                            get_definition, find_callname)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -23,7 +24,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
-                                                    'update', 'eval', 'pm'])
+                                            'update', 'combine', 'eval', 'pm'])
 
 
 class Aggregate(ir.Stmt):
@@ -482,7 +483,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     f_ir = compile_to_numba_ir(iter_func,
                                   {'hpat': hpat, 'np': np,
                                   '__update_redvars': agg_func_struct.update,
-                                  '__combine_redvars': __combine_redvars,
+                                  '__combine_redvars': agg_func_struct.combine,
                                   '__eval_res': __eval_res,
                                   'str_copy': hpat.hiframes_api.str_copy},
                                   typingctx, arg_typs,
@@ -642,15 +643,15 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     #         ", ".join(in_names), redvar_arrnames)
     # else:
     # update reduce vars with input
+    # TODO: extend to multiple input
+    inarr_access = ", ".join(["{}[i]".format(a) for a in in_names])
     if parallel_combine:
-        inarr_access = ", ".join(["{}[i]".format(a)
-                                    for a in in_names])
+        f_name = '__combine_redvars'
     else:
-        # TODO: extend to multiple input
-        inarr_access = ", ".join(["{}[i]".format(a)
-                                    for a in in_names*num_red_vars])
-    func_text += "      {} = __update_redvars({}, {})\n".format(
-        redvar_access, redvar_access, inarr_access)
+        f_name = '__update_redvars'
+
+    func_text += "      {} = {}({}, {})\n".format(
+            redvar_access, f_name, redvar_access, inarr_access)
 
     if parallel_local:
         # return out key array and reduce arrays for communication
@@ -762,63 +763,151 @@ def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
     f_ir, pm = compile_to_optimized_ir(
         agg_func, tuple([in_col_typ]), typingctx)
 
+    f_ir._definitions = build_definitions(f_ir.blocks)
     # TODO: support multiple top-level blocks
     assert len(f_ir.blocks) == 1 and 0 in f_ir.blocks, ("only simple functions"
                                   " with one block supported for aggregation")
     block = f_ir.blocks[0]
-    parfor_ind = -1
+
+    # find and ignore arg and size/shape nodes for input arr
+    block_body = []
+    arr_var = None
     for i, stmt in enumerate(block.body):
+        if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
+            arr_var = stmt.target
+            # XXX assuming shape/size nodes are right after arg
+            shape_nd = block.body[i+1]
+            assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)
+                and shape_nd.value.op == 'getattr' and shape_nd.value.attr == 'shape'
+                and shape_nd.value.value.name == arr_var.name)
+            shape_vr = shape_nd.target
+            size_nd = block.body[i+2]
+            assert (is_assign(size_nd) and isinstance(size_nd.value, ir.Expr)
+                and size_nd.value.op == 'static_getitem'
+                and size_nd.value.value.name == shape_vr.name)
+            # ignore size/shape vars
+            block_body += block.body[i+3:]
+            break
+        block_body.append(stmt)
+
+    parfor_ind = -1
+    for i, stmt in enumerate(block_body):
         if isinstance(stmt, numba.parfor.Parfor):
             assert parfor_ind == -1, "only one parfor for aggregation function"
             parfor_ind = i
 
-    parfor = block.body[parfor_ind]
+    parfor = block_body[parfor_ind]
     remove_dels(parfor.loop_body)
     remove_dels({0: parfor.init_block})
 
-    # ignore arg and size/shape nodes for input arr
-    assert (isinstance(block.body[0], ir.Assign)
-            and isinstance(block.body[0].value, ir.Arg)), "invalid agg func"
-    init_nodes = block.body[3:parfor_ind] + parfor.init_block.body
-    eval_nodes = block.body[parfor_ind+1:-2]  # ignore cast and return
-    arr_var = block.body[0].target
+    init_nodes = block_body[:parfor_ind] + parfor.init_block.body
+    eval_nodes = block_body[parfor_ind+1:-1]  # ignore return
+    eval_nodes[-1].value = eval_nodes[-1].value.value  # convert cast to assign
 
     redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
                                                                 pm.calltypes)
 
     var_types = [pm.typemap[v] for v in redvars]
+
+    combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
+        var_types, arr_var, in_col_typ, pm, typingctx, targetctx)
+
+    # XXX: update mutates parfor body
     update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
         arr_var, in_col_typ, pm, typingctx, targetctx)
 
-    return AggFuncStruct(redvars, var_types, init_nodes, update_func, eval_nodes, pm)
+    return AggFuncStruct(redvars, var_types, init_nodes, update_func,
+                         combine_func, eval_nodes, pm)
 
+def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
+                       in_col_typ, pm, typingctx, targetctx):
+    num_red_vars = len(redvars)
+    redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
+    in_names = ["in{}".format(i) for i in range(num_red_vars)]
+
+    func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
+
+    for bl in parfor.loop_body.values():
+        for stmt in bl.body:
+            # reduction variables
+            if is_assign(stmt) and stmt.target.name in redvars:
+                red_var = stmt.target.name
+                ind = redvars.index(red_var)
+                if len(f_ir._definitions[red_var]) == 2:
+                    # 0 is the actual func since init_block is traversed later
+                    # in parfor.py:3039, TODO: make this detection more robust
+                    var_def = f_ir._definitions[red_var][0]
+                    while isinstance(var_def, ir.Var):
+                        var_def = guard(get_definition, f_ir, var_def)
+                    if (isinstance(var_def, ir.Expr)
+                            and var_def.op == 'inplace_binop'
+                            and var_def.fn == '+='):
+                        func_text += "    v{} += in{}\n".format(ind, ind)
+                    if (isinstance(var_def, ir.Expr) and var_def.op == 'call'):
+                        fdef = guard(find_callname, f_ir, var_def)
+                        if fdef == ('min', 'builtins'):
+                            func_text += "    v{} = min(v{}, in{})\n".format(ind, ind, ind)
+                        if fdef == ('max', 'builtins'):
+                            func_text += "    v{} = max(v{}, in{})\n".format(ind, ind, ind)
+
+    func_text += "    return {}".format(", ".join(["v{}".format(i)
+                                                for i in range(num_red_vars)]))
+    # print(func_text)
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    # reduction variable types for new input and existing values
+    arg_typs = tuple(2 * var_types)
+
+    f_ir = compile_to_numba_ir(f, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+                                  typingctx, arg_typs,
+                                  pm.typemap, pm.calltypes)
+
+    block = list(f_ir.blocks.values())[0]
+
+    return_typ = pm.typemap[block.body[-1].value.name]
+    # compile implementation to binary (Dispatcher)
+    combine_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            return_typ,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis.add_overload(combine_func)
+    return imp_dis
 
 def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
-                                        in_col_typ, pm, typingctx, targetctx):
+                       in_col_typ, pm, typingctx, targetctx):
     num_red_vars = len(redvars)
     var_types = [pm.typemap[v] for v in redvars]
 
+    num_in_vars = 1
+
     # create input value variable for each reduction variable
     in_vars = []
-    for redvar in redvars:
-        in_var = ir.Var(arr_var.scope, "${}#input".format(redvar), arr_var.loc)
+    for i in range(num_in_vars):
+        in_var = ir.Var(arr_var.scope, "$input{}".format(i), arr_var.loc)
         in_vars.append(in_var)
 
-    # replace X[i] with reduction input value
+    # replace X[i] with input value
     red_ir_vars = [0]*num_red_vars
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
             if is_getitem(stmt) and stmt.value.value.name == arr_var.name:
-                redvar = var_to_redvar[stmt.target.name]
-                ind = redvars.index(redvar)
-                stmt.value = in_vars[ind]
+                stmt.value = in_vars[0]
             # store reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 ind = redvars.index(stmt.target.name)
                 red_ir_vars[ind] = stmt.target
 
     redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
-    in_names = ["in{}".format(i) for i in range(num_red_vars)]
+    in_names = ["in{}".format(i) for i in range(num_in_vars)]
 
     func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
     func_text += "    __update_redvars()\n"
@@ -830,7 +919,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     f = loc_vars['f']
 
     # XXX input column type can be different than reduction variable type
-    arg_typs = tuple(var_types + [in_col_typ.dtype]*num_red_vars)
+    arg_typs = tuple(var_types + [in_col_typ.dtype]*num_in_vars)
 
     f_ir = compile_to_numba_ir(f, {'__update_redvars': __update_redvars},  # TODO: add outside globals
                                   typingctx, arg_typs,
@@ -851,9 +940,16 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     last_block = f_ir.blocks[topo_order[-1]]
 
     # arg assigns
-    initial_assigns = body[:2*num_red_vars]
-    # return nodes: build_tuple, cast, return
-    return_nodes = body[-3:]
+    initial_assigns = body[:(num_red_vars + num_in_vars)]
+    if num_red_vars > 1:
+        # return nodes: build_tuple, cast, return
+        return_nodes = body[-3:]
+        assert (is_assign(return_nodes[0])
+            and isinstance(return_nodes[0].value, ir.Expr)
+            and return_nodes[0].value.op == 'build_tuple')
+    else:
+        # return nodes: cast, return
+        return_nodes = body[-2:]
 
     # assign input reduce vars
     # redvar_i = v_i
@@ -864,7 +960,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
 
     # assign input value vars
     # redvar_in_i = in_i
-    for i in range(num_red_vars, 2*num_red_vars):
+    for i in range(num_red_vars, num_red_vars + num_in_vars):
         arg_var = body[i].target
         node = ir.Assign(arg_var, in_vars[i-num_red_vars], arg_var.loc)
         initial_assigns.append(node)
@@ -881,6 +977,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
 
     last_block.body += after_assigns + return_nodes
 
+    # TODO: simplify f_ir
     # compile implementation to binary (Dispatcher)
     agg_impl_func = compiler.compile_ir(
             typingctx,
