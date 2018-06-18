@@ -10,7 +10,7 @@ from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
-                            add_offset_to_labels, get_ir_of_code,
+                            add_offset_to_labels, get_ir_of_code, find_const,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition,
                             build_definitions, replace_vars_stmt, replace_vars_inner)
@@ -1197,19 +1197,21 @@ class HiFrames(object):
         agg_func = self._get_agg_func(func_name, rhs)
 
         # find selected output columns
-        # TODO: support other selection formats
+        # TODO: support other selection formats (e.g. whole dataframe)
         select_def = guard(get_definition, self.func_ir, agg_var)
         assert (isinstance(select_def, ir.Expr) and select_def.op == 'getitem')
         agg_var = select_def.value
-        out_colname = ir_utils.find_const(self.func_ir, select_def.index)
-        assert isinstance(out_colname, str)
+        out_colnames = guard(find_const, self.func_ir, select_def.index)
+        if not isinstance(out_colnames, (str, tuple)):
+            raise ValueError("Groupby output column names should be constant")
+        if isinstance(out_colnames, str):
+            out_colnames = [out_colnames]
 
         # find groupby key
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
         assert len(groubpy_call.args) == 1
-        key_colname = guard(ir_utils.find_const, self.func_ir,
-                                                        groubpy_call.args[0])
+        key_colname = guard(find_const, self.func_ir, groubpy_call.args[0])
 
         # find dataframe
         call_def = guard(find_callname, self.func_ir, groubpy_call)
@@ -1218,18 +1220,30 @@ class HiFrames(object):
                 and self._is_df_var(call_def[1]))
         df_var = call_def[1]
 
-        # TODO: handle more than one output column
-        # find output type
-        in_var = self.df_vars[df_var.name][out_colname]
-        def f(A):
-            return map_func(A)
-        out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
-        self.df_cols.add(lhs.name)
+        # find input vars and output types
+        out_types = {}
+        in_vars = {}
+        for out_cname in out_colnames:
+            in_var = self.df_vars[df_var.name][out_cname]
+            in_vars[out_cname] = in_var
+            def f(A):
+                return map_func(A)
+            out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
+            out_types[out_cname] = out_typ
+
+        # output column map, create dataframe if multiple outputs
+        if len(out_colnames) == 1:
+            df_col_map = {out_colnames[0]: lhs}
+            self.df_cols.add(lhs.name)  # output is series
+        else:
+            df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in out_colnames})
+            self._create_df(lhs.name, df_col_map, label)
 
         return [hiframes_aggregate.Aggregate(
-            out_colname, df_var.name, key_colname, {out_colname: lhs},
-            {out_colname: in_var}, self.df_vars[df_var.name][key_colname],
-            agg_func, {out_colname: out_typ}, lhs.loc)]
+            lhs.name, df_var.name, key_colname, df_col_map,
+            in_vars, self.df_vars[df_var.name][key_colname],
+            agg_func, out_types, lhs.loc)]
 
     def _get_agg_func(self, func_name, rhs):
         agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
