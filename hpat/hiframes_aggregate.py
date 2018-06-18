@@ -24,7 +24,8 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
-                                            'update', 'combine', 'eval', 'pm'])
+                                            'update', 'combine', 'eval',
+                                            'typemap', 'calltypes'])
 
 
 class Aggregate(ir.Stmt):
@@ -309,7 +310,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     out_col_typs = [typemap[v.name] for v in out_col_vars]
     arg_typs = tuple([key_typ] + in_col_typs)
 
-    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs[0],
+    agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs,
                                                           typingctx, targetctx)
 
     if parallel:
@@ -482,8 +483,8 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     f_ir = compile_to_numba_ir(iter_func,
                                   {'hpat': hpat, 'np': np,
-                                  '__update_redvars': agg_func_struct.update,
-                                  '__combine_redvars': agg_func_struct.combine,
+                                  '__update_redvars': agg_func_struct.update[0],
+                                  '__combine_redvars': agg_func_struct.combine[0],
                                   '__eval_res': __eval_res,
                                   'str_copy': hpat.hiframes_api.str_copy},
                                   typingctx, arg_typs,
@@ -755,69 +756,91 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     numba.parfor.maximize_fusion(f_ir, f_ir.blocks, False)
     return f_ir, pm
 
-def get_agg_func_struct(agg_func, in_col_typ, typingctx, targetctx):
+
+def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
     """find initialization, update, combine and final evaluation code of the
     aggregation function. Currently assuming that the function is single block
     and has one parfor.
     """
-    f_ir, pm = compile_to_optimized_ir(
-        agg_func, tuple([in_col_typ]), typingctx)
+    all_redvars = []
+    all_vartypes = []
+    all_init_nodes = []
+    all_eval_nodes = []
+    all_update_funcs = []
+    all_combine_funcs = []
+    typemap = {}
+    calltypes = {}
 
-    f_ir._definitions = build_definitions(f_ir.blocks)
-    # TODO: support multiple top-level blocks
-    assert len(f_ir.blocks) == 1 and 0 in f_ir.blocks, ("only simple functions"
-                                  " with one block supported for aggregation")
-    block = f_ir.blocks[0]
+    for in_col_typ in in_col_types:
+        f_ir, pm = compile_to_optimized_ir(
+            agg_func, tuple([in_col_typ]), typingctx)
 
-    # find and ignore arg and size/shape nodes for input arr
-    block_body = []
-    arr_var = None
-    for i, stmt in enumerate(block.body):
-        if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
-            arr_var = stmt.target
-            # XXX assuming shape/size nodes are right after arg
-            shape_nd = block.body[i+1]
-            assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)
-                and shape_nd.value.op == 'getattr' and shape_nd.value.attr == 'shape'
-                and shape_nd.value.value.name == arr_var.name)
-            shape_vr = shape_nd.target
-            size_nd = block.body[i+2]
-            assert (is_assign(size_nd) and isinstance(size_nd.value, ir.Expr)
-                and size_nd.value.op == 'static_getitem'
-                and size_nd.value.value.name == shape_vr.name)
-            # ignore size/shape vars
-            block_body += block.body[i+3:]
-            break
-        block_body.append(stmt)
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        # TODO: support multiple top-level blocks
+        assert len(f_ir.blocks) == 1 and 0 in f_ir.blocks, ("only simple functions"
+                                    " with one block supported for aggregation")
+        block = f_ir.blocks[0]
 
-    parfor_ind = -1
-    for i, stmt in enumerate(block_body):
-        if isinstance(stmt, numba.parfor.Parfor):
-            assert parfor_ind == -1, "only one parfor for aggregation function"
-            parfor_ind = i
+        # find and ignore arg and size/shape nodes for input arr
+        block_body = []
+        arr_var = None
+        for i, stmt in enumerate(block.body):
+            if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
+                arr_var = stmt.target
+                # XXX assuming shape/size nodes are right after arg
+                shape_nd = block.body[i+1]
+                assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)
+                    and shape_nd.value.op == 'getattr' and shape_nd.value.attr == 'shape'
+                    and shape_nd.value.value.name == arr_var.name)
+                shape_vr = shape_nd.target
+                size_nd = block.body[i+2]
+                assert (is_assign(size_nd) and isinstance(size_nd.value, ir.Expr)
+                    and size_nd.value.op == 'static_getitem'
+                    and size_nd.value.value.name == shape_vr.name)
+                # ignore size/shape vars
+                block_body += block.body[i+3:]
+                break
+            block_body.append(stmt)
 
-    parfor = block_body[parfor_ind]
-    remove_dels(parfor.loop_body)
-    remove_dels({0: parfor.init_block})
+        parfor_ind = -1
+        for i, stmt in enumerate(block_body):
+            if isinstance(stmt, numba.parfor.Parfor):
+                assert parfor_ind == -1, "only one parfor for aggregation function"
+                parfor_ind = i
 
-    init_nodes = block_body[:parfor_ind] + parfor.init_block.body
-    eval_nodes = block_body[parfor_ind+1:-1]  # ignore return
-    eval_nodes[-1].value = eval_nodes[-1].value.value  # convert cast to assign
+        parfor = block_body[parfor_ind]
+        remove_dels(parfor.loop_body)
+        remove_dels({0: parfor.init_block})
 
-    redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
-                                                                pm.calltypes)
+        init_nodes = block_body[:parfor_ind] + parfor.init_block.body
+        eval_nodes = block_body[parfor_ind+1:-1]  # ignore return
+        eval_nodes[-1].value = eval_nodes[-1].value.value  # convert cast to assign
 
-    var_types = [pm.typemap[v] for v in redvars]
+        redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
+                                                                    pm.calltypes)
 
-    combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
-        var_types, arr_var, in_col_typ, pm, typingctx, targetctx)
+        var_types = [pm.typemap[v] for v in redvars]
 
-    # XXX: update mutates parfor body
-    update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
-        arr_var, in_col_typ, pm, typingctx, targetctx)
+        combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
+            var_types, arr_var, in_col_typ, pm, typingctx, targetctx)
 
-    return AggFuncStruct(redvars, var_types, init_nodes, update_func,
-                         combine_func, eval_nodes, pm)
+        # XXX: update mutates parfor body
+        update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
+            arr_var, in_col_typ, pm, typingctx, targetctx)
+
+        all_redvars += redvars
+        all_vartypes += var_types
+        all_init_nodes += init_nodes
+        all_eval_nodes += eval_nodes
+        typemap.update(pm.typemap)
+        calltypes.update(pm.calltypes)
+        all_update_funcs.append(update_func)
+        all_combine_funcs.append(combine_func)
+
+    return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
+                         all_update_funcs, all_combine_funcs, all_eval_nodes,
+                         typemap, calltypes)
+
 
 def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
                        in_col_typ, pm, typingctx, targetctx):
