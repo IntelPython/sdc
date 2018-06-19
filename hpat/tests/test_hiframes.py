@@ -615,6 +615,24 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    def test_agg_seq_all_col(self):
+        def test_impl(df):
+            df2 = df.groupby('A').mean()
+            return df2.B.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_as_index(self):
+        def test_impl(df):
+            df2 = df.groupby('A', as_index=False).mean()
+            return df2.A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -695,6 +713,30 @@ class TestHiFrames(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_all_col(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            df2 = df.groupby('A').max()
+            return df2.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_as_index(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            df2 = df.groupby('A', as_index=False).max()
+            return df2.A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
