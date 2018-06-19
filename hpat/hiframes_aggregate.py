@@ -496,7 +496,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     for i in range(len(agg_func_struct.update)):
         _globals['__update_redvars_{}'.format(i)] = agg_func_struct.update[i]
         _globals['__combine_redvars_{}'.format(i)] = agg_func_struct.combine[i]
-        _globals['__eval_res_{}'.format(i)] = __eval_res
+        _globals['__eval_res_{}'.format(i)] = agg_func_struct.eval[i]
 
     f_ir = compile_to_numba_ir(iter_func,
                                   _globals,
@@ -509,7 +509,6 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     # deep copy the nodes since they can be reused
     init_nodes = copy.deepcopy(agg_func_struct.init)
-    eval_nodes = copy.deepcopy(agg_func_struct.eval)
 
     # find reduce variables from names and store in the same order
     reduce_vars = [0] * num_red_vars
@@ -528,7 +527,6 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     # replace init and eval sentinels
     # TODO: replace with functions
-    func_ind = 0
     for l in topo_order:
         block = f_ir.blocks[l]
         for i, stmt in enumerate(block.body):
@@ -536,33 +534,6 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                 first_dot = stmt.target.name.index(".")
                 var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
                 stmt.value = reduce_vars[var_ind]
-
-            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__eval_res', 'hpat.hiframes_aggregate')):
-                # get reduce var inds using offsets
-                r_start = agg_func_struct.redvar_offsets[func_ind]
-                r_end = agg_func_struct.redvar_offsets[func_ind + 1]
-                func_ind += 1
-                r_vars = agg_func_struct.vars[r_start:r_end]
-                red_vals = stmt.value.args[1:]
-                replace_dict = {}
-                for k, v in enumerate(r_vars):
-                    replace_dict[v] = red_vals[k]
-                for inst in eval_nodes:
-                    replace_vars_stmt(inst, replace_dict)
-                # add new eval nodes
-                # assuming eval sentinel is before setitem and jump
-                # XXX can modify since iterator is terminated
-                assert i == len(block.body) - 3
-                jump_node = block.body.pop()
-                setitem_node = block.body.pop()
-                eval_nodes[-1].target = setitem_node.value
-                block.body.pop()  # remove update call
-                block.body += eval_nodes
-                block.body.append(setitem_node)
-                block.body.append(jump_node)
-                break
-
 
     return_typ = types.none
     if parallel_local:
@@ -688,8 +659,8 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         for i in range(num_col_ins):
             redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
                                     for i in range(redvar_offsets[i], redvar_offsets[i+1])])
-            func_text += "      out_c{}[j] = __eval_res_{}(out_c{}, {})\n".format(
-                                                       i, i, i , redvar_access)
+            func_text += "      out_c{}[j] = __eval_res_{}({})\n".format(
+                                                       i, i, redvar_access)
 
     # print(func_text)
 
@@ -797,7 +768,7 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
     all_redvars = []
     all_vartypes = []
     all_init_nodes = []
-    all_eval_nodes = []
+    all_eval_funcs = []
     all_update_funcs = []
     all_combine_funcs = []
     typemap = {}
@@ -848,12 +819,17 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         remove_dels({0: parfor.init_block})
 
         init_nodes = block_body[:parfor_ind] + parfor.init_block.body
-        eval_nodes = block_body[parfor_ind+1:-1]  # ignore return
-        eval_nodes[-1].value = eval_nodes[-1].value.value  # convert cast to assign
+        eval_nodes = block_body[parfor_ind+1:]
 
         redvars, var_to_redvar = get_parfor_reductions(parfor, parfor.params,
                                                                     pm.calltypes)
 
+        # find reduce variables given their names
+        reduce_vars = [0] * len(redvars)
+        for stmt in init_nodes:
+            if is_assign(stmt) and stmt.target.name in redvars:
+                ind = redvars.index(stmt.target.name)
+                reduce_vars[ind] = stmt.target
         var_types = [pm.typemap[v] for v in redvars]
 
         combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
@@ -863,10 +839,12 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
             arr_var, in_col_typ, pm, typingctx, targetctx)
 
+        eval_func = gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targetctx)
+
         all_redvars += redvars
         all_vartypes += var_types
         all_init_nodes += init_nodes
-        all_eval_nodes += eval_nodes
+        all_eval_funcs.append(eval_func)
         typemap.update(pm.typemap)
         calltypes.update(pm.calltypes)
         all_update_funcs.append(update_func)
@@ -875,8 +853,53 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         redvar_offsets.append(curr_offset)
 
     return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
-                         all_update_funcs, all_combine_funcs, all_eval_nodes,
+                         all_update_funcs, all_combine_funcs, all_eval_funcs,
                          typemap, calltypes, redvar_offsets)
+
+
+def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
+
+    # eval func takes reduce vars and produces final result
+    num_red_vars = len(var_types)
+    in_names = ["in{}".format(i) for i in range(num_red_vars)]
+    return_typ = pm.typemap[eval_nodes[-1].value.name]
+
+    # TODO: non-numeric return
+    func_text = "def f({}):\n return np.{}(0)\n".format(", ".join(in_names), return_typ)
+
+    # print(func_text)
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    f = loc_vars['f']
+
+    arg_typs = tuple(var_types)
+    f_ir = compile_to_numba_ir(f, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+                                  typingctx, arg_typs,
+                                  pm.typemap, pm.calltypes)
+
+    # TODO: support multi block eval funcs
+    block = list(f_ir.blocks.values())[0]
+
+    # assign inputs to reduce vars used in computation
+    assign_nodes = []
+    for i, v in enumerate(reduce_vars):
+        assign_nodes.append(ir.Assign(block.body[i].target, v, v.loc))
+    block.body = block.body[:num_red_vars] + assign_nodes + eval_nodes
+
+    # compile implementation to binary (Dispatcher)
+    combine_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            return_typ,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis.add_overload(combine_func)
+    return imp_dis
 
 
 def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
