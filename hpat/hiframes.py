@@ -1242,9 +1242,15 @@ class HiFrames(object):
 
         # find groupby key
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
+        kws = dict(groubpy_call.kws)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
-        assert len(groubpy_call.args) == 1
-        key_colname = guard(find_const, self.func_ir, groubpy_call.args[0])
+        if len(groubpy_call.args) == 1:
+            by_arg = groubpy_call.args[0]
+        elif 'by' in kws:
+            by_arg = kws['by']
+        else:  # pragma: no cover
+            raise ValueError("by argument for groupby() required")
+        key_colname = guard(find_const, self.func_ir, by_arg)
 
         # find dataframe
         call_def = guard(find_callname, self.func_ir, groubpy_call)
