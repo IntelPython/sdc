@@ -1196,22 +1196,8 @@ class HiFrames(object):
 
         agg_func = self._get_agg_func(func_name, rhs)
 
-        # find selected output columns and groupby var
-        agg_var, out_colnames = self._analyze_agg_select(obj_var)
-
-
-        # find groupby key
-        groubpy_call = guard(get_definition, self.func_ir, agg_var)
-        assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
-        assert len(groubpy_call.args) == 1
-        key_colname = guard(find_const, self.func_ir, groubpy_call.args[0])
-
-        # find dataframe
-        call_def = guard(find_callname, self.func_ir, groubpy_call)
-        assert (call_def is not None and call_def[0] == 'groupby'
-                and isinstance(call_def[1], ir.Var)
-                and self._is_df_var(call_def[1]))
-        df_var = call_def[1]
+        # find selected output columns
+        df_var, key_colname, out_colnames = self._analyze_agg_select(obj_var)
 
         # find input vars and output types
         out_types = {}
@@ -1239,16 +1225,38 @@ class HiFrames(object):
             agg_func, out_types, lhs.loc)]
 
     def _analyze_agg_select(self, obj_var):
-        # TODO: support other selection formats
+        """analyze selection of columns in after groupby()
+        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
+        """
         select_def = guard(get_definition, self.func_ir, obj_var)
-        assert (isinstance(select_def, ir.Expr) and select_def.op == 'getitem')
-        agg_var = select_def.value
-        out_colnames = guard(find_const, self.func_ir, select_def.index)
-        if not isinstance(out_colnames, (str, tuple)):
-            raise ValueError("Groupby output column names should be constant")
-        if isinstance(out_colnames, str):
-            out_colnames = [out_colnames]
-        return agg_var, out_colnames
+        out_colnames = None
+        if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
+            agg_var = select_def.value
+            out_colnames = guard(find_const, self.func_ir, select_def.index)
+            if not isinstance(out_colnames, (str, tuple)):
+                raise ValueError("Groupby output column names should be constant")
+            if isinstance(out_colnames, str):
+                out_colnames = [out_colnames]
+        else:
+            agg_var = obj_var
+
+        # find groupby key
+        groubpy_call = guard(get_definition, self.func_ir, agg_var)
+        assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
+        assert len(groubpy_call.args) == 1
+        key_colname = guard(find_const, self.func_ir, groubpy_call.args[0])
+
+        # find dataframe
+        call_def = guard(find_callname, self.func_ir, groubpy_call)
+        assert (call_def is not None and call_def[0] == 'groupby'
+                and isinstance(call_def[1], ir.Var)
+                and self._is_df_var(call_def[1]))
+        df_var = call_def[1]
+
+        if out_colnames is None:
+            out_colnames = self.df_vars[df_var.name].keys()
+
+        return df_var, key_colname, out_colnames
 
     def _get_agg_func(self, func_name, rhs):
         agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
