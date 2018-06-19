@@ -1197,7 +1197,7 @@ class HiFrames(object):
         agg_func = self._get_agg_func(func_name, rhs)
 
         # find selected output columns
-        df_var, key_colname, as_index, out_colnames = self._analyze_agg_select(
+        df_var, key_colname, as_index, out_colnames, explicit_select = self._analyze_agg_select(
                                                                        obj_var)
 
         # find input vars and output types
@@ -1213,7 +1213,7 @@ class HiFrames(object):
 
         # output column map, create dataframe if multiple outputs
         out_key_var = None
-        if len(out_colnames) == 1:
+        if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
             self.df_cols.add(lhs.name)  # output is series
         else:
@@ -1237,6 +1237,7 @@ class HiFrames(object):
         """
         select_def = guard(get_definition, self.func_ir, obj_var)
         out_colnames = None
+        explicit_select = False
         if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
             agg_var = select_def.value
             out_colnames = guard(find_const, self.func_ir, select_def.index)
@@ -1244,6 +1245,7 @@ class HiFrames(object):
                 raise ValueError("Groupby output column names should be constant")
             if isinstance(out_colnames, str):
                 out_colnames = [out_colnames]
+            explicit_select = True
         else:
             agg_var = obj_var
 
@@ -1278,7 +1280,7 @@ class HiFrames(object):
             # as_index should be handled separately since it just returns keys
             out_colnames.remove(key_colname)
 
-        return df_var, key_colname, as_index, out_colnames
+        return df_var, key_colname, as_index, out_colnames, explicit_select
 
     def _get_agg_func(self, func_name, rhs):
         agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
