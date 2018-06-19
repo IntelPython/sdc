@@ -11,7 +11,8 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             replace_vars_stmt, find_callname, guard,
                             mk_unique_var, find_topo_order, is_getitem,
                             build_definitions, remove_dels, get_ir_of_code,
-                            get_definition, find_callname)
+                            get_definition, find_callname, get_name_var_table,
+                            replace_var_names)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -683,10 +684,10 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
             func_text += "    return out_key, {}\n".format(redvar_arrnames)
     else:
         # get final output from reduce varis
-        redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
-                                    for i in range(num_red_vars)])
         func_text += "    for j in range(n_uniq_keys):\n"
-        for i in range(num_outs):
+        for i in range(num_col_ins):
+            redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
+                                    for i in range(redvar_offsets[i], redvar_offsets[i+1])])
             func_text += "      out_c{}[j] = __eval_res_{}(out_c{}, {})\n".format(
                                                        i, i, i , redvar_access)
 
@@ -740,6 +741,15 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     # XXX are outside function's globals needed?
     code = func.code if hasattr(func, 'code') else func.__code__
     f_ir = get_ir_of_code({'numba': numba, 'np': np, 'hpat': hpat}, code)
+
+    # rename all variables to avoid conflict (init and eval nodes)
+    var_table = get_name_var_table(f_ir.blocks)
+    new_var_dict = {}
+    for name, var in var_table.items():
+        new_var_dict[name] = mk_unique_var(name)
+    replace_var_names(f_ir.blocks, new_var_dict)
+    f_ir._definitions = build_definitions(f_ir.blocks)
+
     assert f_ir.arg_count == 1, "agg function should have one input"
     input_name = f_ir.arg_names[0]
     df_pass = hpat.hiframes.HiFrames(f_ir, typingctx,
