@@ -31,14 +31,15 @@ AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
 
 
 class Aggregate(ir.Stmt):
-    def __init__(self, df_out, df_in, key_name, df_out_vars, df_in_vars,
-                                             key_arr, agg_func, out_typs, loc):
+    def __init__(self, df_out, df_in, key_name, out_key_var, df_out_vars,
+                                 df_in_vars, key_arr, agg_func, out_typs, loc):
         # name of output dataframe (just for printing purposes)
         self.df_out = df_out
         # name of input dataframe (just for printing purposes)
         self.df_in = df_in
         # key name (for printing)
         self.key_name = key_name
+        self.out_key_var = out_key_var
 
         self.df_out_vars = df_out_vars
         self.df_in_vars = df_in_vars
@@ -73,6 +74,13 @@ def aggregate_typeinfer(aggregate_node, typeinferer):
 
         typeinferer.lock_type(out_var.name, arr_type, loc=aggregate_node.loc)
 
+    # return key case
+    if aggregate_node.out_key_var is not None:
+        in_var = aggregate_node.key_arr
+        typeinferer.constraints.append(typeinfer.Propagate(
+            dst=aggregate_node.out_key_var.name, src=in_var.name,
+            loc=aggregate_node.loc))
+
     return
 
 typeinfer.typeinfer_extensions[Aggregate] = aggregate_typeinfer
@@ -90,6 +98,10 @@ def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
 
     # output columns are defined
     def_set.update({v.name for v in aggregate_node.df_out_vars.values()})
+
+    # return key is defined
+    if aggregate_node.out_key_var is not None:
+         def_set.add(aggregate_node.out_key_var.name)
 
     return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
@@ -109,9 +121,14 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
         aggregate_node.df_in_vars.pop(cname)
         aggregate_node.df_out_vars.pop(cname)
 
+    out_key_var = aggregate_node.out_key_var
+    if out_key_var is not None and out_key_var.name not in lives:
+        aggregate_node.out_key_var = None
+
     # TODO: test agg remove
     # remove empty aggregate node
-    if len(aggregate_node.df_in_vars) == 0:
+    if (len(aggregate_node.df_out_vars) == 0
+            and aggregate_node.out_key_var is None):
         return None
 
     return aggregate_node
@@ -122,6 +139,8 @@ ir_utils.remove_dead_extensions[Aggregate] = remove_dead_aggregate
 def get_copies_aggregate(aggregate_node, typemap):
     # aggregate doesn't generate copies, it just kills the output columns
     kill_set = set(v.name for v in aggregate_node.df_out_vars.values())
+    if aggregate_node.out_key_var is not None:
+        kill_set.add(aggregate_node.out_key_var.name)
     return set(), kill_set
 
 
@@ -140,6 +159,10 @@ def apply_copies_aggregate(aggregate_node, var_dict, name_var_table,
     for col_name in list(aggregate_node.df_out_vars.keys()):
         aggregate_node.df_out_vars[col_name] = replace_vars_inner(
             aggregate_node.df_out_vars[col_name], var_dict)
+
+    if aggregate_node.out_key_var is not None:
+        aggregate_node.out_key_var = replace_vars_inner(
+            aggregate_node.out_key_var, var_dict)
 
     return
 
@@ -162,6 +185,10 @@ def visit_vars_aggregate(aggregate_node, callback, cbdata):
         aggregate_node.df_out_vars[col_name] = visit_vars_inner(
             aggregate_node.df_out_vars[col_name], callback, cbdata)
 
+    if aggregate_node.out_key_var is not None:
+        aggregate_node.out_key_var = visit_vars_inner(
+            aggregate_node.out_key_var, callback, cbdata)
+
 
 # add call to visit aggregate variable
 ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
@@ -170,7 +197,7 @@ ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
 def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
                                                             array_analysis):
     # empty aggregate nodes should be deleted in remove dead
-    assert len(aggregate_node.df_in_vars) > 0, ("empty aggregate in array"
+    assert len(aggregate_node.df_in_vars) > 0 or aggregate_node.out_key_var is not None, ("empty aggregate in array"
                                                                    "analysis")
 
     # arrays of input df have same size in first dimension as key array
@@ -197,7 +224,11 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
     # gen size variable for an output column
     post = []
     all_shapes = []
-    for _, col_var in aggregate_node.df_out_vars.items():
+    out_vars = list(aggregate_node.df_out_vars.values())
+    if aggregate_node.out_key_var is not None:
+        out_vars.append(aggregate_node.out_key_var)
+
+    for col_var in out_vars:
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
@@ -239,10 +270,19 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
             out_dist = Distribution(
                 min(out_dist.value, array_dists[col_var.name].value))
 
+    if aggregate_node.out_key_var is not None:
+        col_var = aggregate_node.out_key_var
+        if col_var.name in array_dists:
+            out_dist = Distribution(
+                min(out_dist.value, array_dists[col_var.name].value))
+
     # out dist should meet input dist (e.g. REP in causes REP out)
     out_dist = Distribution(min(out_dist.value, in_dist.value))
     for _, col_var in aggregate_node.df_out_vars.items():
         array_dists[col_var.name] = out_dist
+
+    if aggregate_node.out_key_var is not None:
+        array_dists[aggregate_node.out_key_var.name] = out_dist
 
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
@@ -325,8 +365,10 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                         out_col_typs, typingctx, typemap, calltypes, targetctx)
         agg_impl_p = None
 
+    return_key = agg_node.out_key_var is not None
+
     top_level_func = gen_top_level_agg_func(
-        key_typ, agg_func_struct.var_typs, agg_node.out_typs,
+        key_typ, return_key, agg_func_struct.var_typs, agg_node.out_typs,
         agg_node.df_in_vars.keys(), agg_node.df_out_vars.keys(), parallel)
 
     f_block = compile_to_numba_ir(top_level_func,
@@ -354,14 +396,17 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         out_var = tuple_assign.value.items[i]
         nodes.append(ir.Assign(out_var, var, var.loc))
 
+    if return_key:
+        nodes.append(ir.Assign(tuple_assign.value.items[len(out_col_vars)], agg_node.out_key_var, agg_node.out_key_var.loc))
+
     return nodes
 
 
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 
-def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
-                                                      out_col_names, parallel):
+def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
+                                        in_col_names, out_col_names, parallel):
     """create the top level aggregation function by generating text
     """
     num_red_vars = len(red_var_typs)
@@ -451,7 +496,10 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
 
     func_text += "    __agg_func(n_uniq_keys, 0, key_arr, {}, {})\n".format(
         ", ".join(out_names), ", ".join(in_names))
-    func_text += "    return ({},)\n".format(", ".join(out_names))
+    out_tup = ", ".join(out_names)
+    if return_key:
+        out_tup += ", key_arr"
+    func_text += "    return ({},)\n".format(out_tup)
 
     # print(func_text)
 

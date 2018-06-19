@@ -1197,7 +1197,8 @@ class HiFrames(object):
         agg_func = self._get_agg_func(func_name, rhs)
 
         # find selected output columns
-        df_var, key_colname, out_colnames = self._analyze_agg_select(obj_var)
+        df_var, key_colname, as_index, out_colnames = self._analyze_agg_select(
+                                                                       obj_var)
 
         # find input vars and output types
         out_types = {}
@@ -1211,16 +1212,22 @@ class HiFrames(object):
             out_types[out_cname] = out_typ
 
         # output column map, create dataframe if multiple outputs
+        out_key_var = None
         if len(out_colnames) == 1:
             df_col_map = {out_colnames[0]: lhs}
             self.df_cols.add(lhs.name)  # output is series
         else:
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                                 for col in out_colnames})
-            self._create_df(lhs.name, df_col_map, label)
+            out_df = df_col_map.copy()
+            if as_index is False:
+                out_key_var = ir.Var(lhs.scope, mk_unique_var(key_colname), lhs.loc)
+                out_df[key_colname] = out_key_var
+
+            self._create_df(lhs.name, out_df, label)
 
         return [hiframes_aggregate.Aggregate(
-            lhs.name, df_var.name, key_colname, df_col_map,
+            lhs.name, df_var.name, key_colname, out_key_var, df_col_map,
             in_vars, self.df_vars[df_var.name][key_colname],
             agg_func, out_types, lhs.loc)]
 
@@ -1267,10 +1274,11 @@ class HiFrames(object):
 
         if out_colnames is None:
             out_colnames = list(self.df_vars[df_var.name].keys())
-            if as_index:
-                out_colnames.remove(key_colname)
+            # key arr is not output by default
+            # as_index should be handled separately since it just returns keys
+            out_colnames.remove(key_colname)
 
-        return df_var, key_colname, out_colnames
+        return df_var, key_colname, as_index, out_colnames
 
     def _get_agg_func(self, func_name, rhs):
         agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
