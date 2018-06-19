@@ -355,17 +355,19 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs,
                                                           typingctx, targetctx)
 
+    return_key = agg_node.out_key_var is not None
+
     if parallel:
         agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-           out_col_typs, typingctx, typemap, calltypes, targetctx, False, True)
+           out_col_typs, typingctx, typemap, calltypes, targetctx, return_key,
+           False, True)
         agg_impl_p = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-                  out_col_typs, typingctx, typemap, calltypes, targetctx, True)
+                  out_col_typs, typingctx, typemap, calltypes, targetctx,
+                  return_key, True)
     else:
         agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-                        out_col_typs, typingctx, typemap, calltypes, targetctx)
+            out_col_typs, typingctx, typemap, calltypes, targetctx, return_key)
         agg_impl_p = None
-
-    return_key = agg_node.out_key_var is not None
 
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, agg_node.out_typs,
@@ -415,7 +417,11 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     in_names = ["in_c{}".format(i) for i in range(len(in_col_names))]
     out_names = ["out_c{}".format(i) for i in range(len(out_col_names))]
 
-    func_text = "def f(key_arr, {}):\n".format(", ".join(in_names))
+    in_args = ", ".join(in_names)
+    if in_args != '':
+        in_args = ", " + in_args
+
+    func_text = "def f(key_arr{}):\n".format(in_args)
 
     if parallel:
         # get send/recv counts
@@ -457,8 +463,8 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
             send_col_args = "send_key_arr_chars, " + send_col_args
             extra_args = ", send_disp_char"
         func_text += ("    send_key_arr, {} = __agg_func_p(n_uniq_keys, "
-                                    "n_uniq_keys_char, key_arr, {}, send_disp{})\n").format(
-            send_col_args, ", ".join(in_names), extra_args)
+                                    "n_uniq_keys_char, key_arr{}, send_disp{})\n").format(
+            send_col_args, in_args, extra_args)
         # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
 
         # shuffle key arr
@@ -494,11 +500,18 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
                                                 i, out_typs[col])
 
-    func_text += "    __agg_func(n_uniq_keys, 0, key_arr, {}, {})\n".format(
-        ", ".join(out_names), ", ".join(in_names))
-    out_tup = ", ".join(out_names)
+    out_key = ""
     if return_key:
-        out_tup += ", key_arr"
+        out_key = "out_key = "
+
+    in_args = ", ".join(out_names + in_names)
+    if len(out_names) != 0:
+        in_args = ", " + in_args
+
+    func_text += "    {}__agg_func(n_uniq_keys, 0, key_arr{})\n".format(
+        out_key, in_args)
+
+    out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
     func_text += "    return ({},)\n".format(out_tup)
 
     # print(func_text)
@@ -510,8 +523,8 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
 
 
 def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
-                 typemap, calltypes, targetctx, parallel_local=False,
-                 parallel_combine=False):
+                 typemap, calltypes, targetctx, return_key,
+                 parallel_local=False, parallel_combine=False):
     # has 3 modes: 1- aggregate input column to output (sequential case)
     #              2- aggregate input column to reduce arrays for communication (parallel_local)
     #              3- aggregate received reduce arrays to output (parallel_combine)
@@ -537,10 +550,13 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     iter_func = gen_agg_iter_func(
         key_typ, agg_func_struct.var_typs, len(in_typs), len(out_typs),
-        num_red_vars, agg_func_struct.redvar_offsets, parallel_local,
-        parallel_combine)
+        num_red_vars, agg_func_struct.redvar_offsets, return_key,
+        parallel_local, parallel_combine)
 
-    _globals = {'hpat': hpat, 'np': np, 'str_copy': hpat.hiframes_api.str_copy}
+    _globals = {'hpat': hpat, 'np': np, 'str_copy': hpat.hiframes_api.str_copy,
+            'setitem_string_array': hpat.str_arr_ext.setitem_string_array,
+            'get_offset_ptr': hpat.str_arr_ext.get_offset_ptr,
+            'get_data_ptr': hpat.str_arr_ext.get_data_ptr}
     for i in range(len(agg_func_struct.update)):
         _globals['__update_redvars_{}'.format(i)] = agg_func_struct.update[i]
         _globals['__combine_redvars_{}'.format(i)] = agg_func_struct.combine[i]
@@ -583,9 +599,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
                 var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
                 stmt.value = reduce_vars[var_ind]
 
-    return_typ = types.none
-    if parallel_local:
-        return_typ = typemap[f_ir.blocks[topo_order[-1]].body[-1].value.name]
+    return_typ = typemap[f_ir.blocks[topo_order[-1]].body[-1].value.name]
 
     # compile implementation to binary (Dispatcher)
     agg_impl_func = compiler.compile_ir(
@@ -603,7 +617,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     return imp_dis
 
 def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
-                             redvar_offsets, parallel_local, parallel_combine):
+                 redvar_offsets, return_key, parallel_local, parallel_combine):
     # arg names
     in_names = ["in_c{}".format(i) for i in range(num_ins)]
     out_names = ["out_c{}".format(i) for i in range(num_outs)]
@@ -621,8 +635,12 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         if key_typ == string_array_type:
             extra_args += ", send_disp_char"
 
-    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr, {}{}):\n".format(
-        ", ".join(out_names + in_names), extra_args)
+    in_args = ", ".join(out_names + in_names)
+    if num_ins != 0:
+        in_args = ", " + in_args
+
+    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr{}{}):\n".format(
+        in_args, extra_args)
 
     # allocate reduction var arrays
     for i, typ in enumerate(red_var_typs):
@@ -642,6 +660,12 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         func_text += "    tmp_offset = np.zeros(n_pes, dtype=np.int64)\n"
         if key_typ == string_array_type:
             func_text += "    tmp_offset_char = np.zeros(n_pes, dtype=np.int64)\n"
+    elif return_key:
+        if key_typ == string_array_type:
+            func_text += "    out_key =  hpat.str_arr_ext.pre_alloc_string_array(n_uniq_keys, n_uniq_keys_char)\n"
+        else:
+            func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
+                                                                key_typ.dtype)
 
     # find write location
     # TODO: non-int dict
@@ -670,6 +694,11 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
             func_text += "        w_ind_c = send_disp_char[node_id] + tmp_offset_char[node_id]\n"
             func_text += "        tmp_offset_char[node_id] += k_len\n"
             func_text += "        str_copy(out_key_chars, w_ind_c, k.c_str(), k_len)\n"
+        else:
+            func_text += "        out_key[w_ind] = k\n"
+    elif return_key:
+        if key_typ == string_array_type:
+            func_text += "        setitem_string_array(get_offset_ptr(out_key), get_data_ptr(out_key), k, w_ind)\n"
         else:
             func_text += "        out_key[w_ind] = k\n"
 
@@ -703,12 +732,15 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
             func_text += "    return out_key, {}\n".format(redvar_arrnames)
     else:
         # get final output from reduce varis
-        func_text += "    for j in range(n_uniq_keys):\n"
+        if num_col_ins != 0:
+            func_text += "    for j in range(n_uniq_keys):\n"
         for i in range(num_col_ins):
             redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
                                     for i in range(redvar_offsets[i], redvar_offsets[i+1])])
             func_text += "      out_c{}[j] = __eval_res_{}({})\n".format(
                                                        i, i, redvar_access)
+        if return_key:
+            func_text += "    return out_key\n"
 
     # print(func_text)
 
