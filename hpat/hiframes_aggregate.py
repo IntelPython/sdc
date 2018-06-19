@@ -25,7 +25,8 @@ from hpat.str_arr_ext import string_array_type
 
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
                                             'update', 'combine', 'eval',
-                                            'typemap', 'calltypes'])
+                                            'typemap', 'calltypes',
+                                            'redvar_offsets'])
 
 
 class Aggregate(ir.Stmt):
@@ -278,7 +279,7 @@ def __eval_res():
 class EvalDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        # takse the output array as first argument to know the output dtype
+        # takes the output array as first argument to know the output dtype
         return signature(args[0].dtype, *args)
 
 def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx):
@@ -342,8 +343,16 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                                   typemap, calltypes).blocks.popitem()[1]
 
     replace_arg_nodes(f_block, [agg_node.key_arr] + in_col_vars)
+
+    tuple_assign = f_block.body[-3]
+    assert (is_assign(tuple_assign) and isinstance(tuple_assign.value, ir.Expr)
+        and tuple_assign.value.op == 'build_tuple')
     nodes = f_block.body[:-3]
-    nodes[-1].target = list(agg_node.df_out_vars.values())[0]
+
+    for i, var in enumerate(agg_node.df_out_vars.values()):
+        out_var = tuple_assign.value.items[i]
+        nodes.append(ir.Assign(out_var, var, var.loc))
+
     return nodes
 
 
@@ -441,7 +450,7 @@ def gen_top_level_agg_func(key_typ, red_var_typs, out_typs, in_col_names,
 
     func_text += "    __agg_func(n_uniq_keys, 0, key_arr, {}, {})\n".format(
         ", ".join(out_names), ", ".join(in_names))
-    func_text += "    c = out_c0\n"
+    func_text += "    return ({},)\n".format(", ".join(out_names))
 
     # print(func_text)
 
@@ -479,14 +488,17 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     iter_func = gen_agg_iter_func(
         key_typ, agg_func_struct.var_typs, len(in_typs), len(out_typs),
-        num_red_vars, parallel_local, parallel_combine)
+        num_red_vars, agg_func_struct.redvar_offsets, parallel_local,
+        parallel_combine)
+
+    _globals = {'hpat': hpat, 'np': np, 'str_copy': hpat.hiframes_api.str_copy}
+    for i in range(len(agg_func_struct.update)):
+        _globals['__update_redvars_{}'.format(i)] = agg_func_struct.update[i]
+        _globals['__combine_redvars_{}'.format(i)] = agg_func_struct.combine[i]
+        _globals['__eval_res_{}'.format(i)] = __eval_res
 
     f_ir = compile_to_numba_ir(iter_func,
-                                  {'hpat': hpat, 'np': np,
-                                  '__update_redvars': agg_func_struct.update[0],
-                                  '__combine_redvars': agg_func_struct.combine[0],
-                                  '__eval_res': __eval_res,
-                                  'str_copy': hpat.hiframes_api.str_copy},
+                                  _globals,
                                   typingctx, arg_typs,
                                   typemap, calltypes)
 
@@ -515,6 +527,7 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
     # replace init and eval sentinels
     # TODO: replace with functions
+    func_ind = 0
     for l in topo_order:
         block = f_ir.blocks[l]
         for i, stmt in enumerate(block.body):
@@ -525,9 +538,14 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
 
             if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__eval_res', 'hpat.hiframes_aggregate')):
+                # get reduce var inds using offsets
+                r_start = agg_func_struct.redvar_offsets[func_ind]
+                r_end = agg_func_struct.redvar_offsets[func_ind + 1]
+                func_ind += 1
+                r_vars = agg_func_struct.vars[r_start:r_end]
                 red_vals = stmt.value.args[1:]
                 replace_dict = {}
-                for k, v in enumerate(agg_func_struct.vars):
+                for k, v in enumerate(r_vars):
                     replace_dict[v] = red_vals[k]
                 for inst in eval_nodes:
                     replace_vars_stmt(inst, replace_dict)
@@ -565,10 +583,13 @@ def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
     return imp_dis
 
 def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
-                                             parallel_local, parallel_combine):
+                             redvar_offsets, parallel_local, parallel_combine):
     # arg names
     in_names = ["in_c{}".format(i) for i in range(num_ins)]
     out_names = ["out_c{}".format(i) for i in range(num_outs)]
+
+    # number of actual column intpus (parallel_combine case)
+    num_col_ins = len(redvar_offsets) - 1
 
     redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
                                     for i in range(num_red_vars)])
@@ -635,24 +656,24 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
     func_text += "      else:\n"
     func_text += "        w_ind = key_write_map[k]\n"
 
-    redvar_access = ", ".join(["redvar_{}_arr[w_ind]".format(i)
-                            for i in range(num_red_vars)])
-    # TODO: separate combine function which can have different input types
-    # if parallel_combine:
-    #     # combine reduce vars
-    #     func_text += "      __combine_redvars(w_ind, i, {}, {})\n".format(
-    #         ", ".join(in_names), redvar_arrnames)
-    # else:
-    # update reduce vars with input
-    # TODO: extend to multiple input
-    inarr_access = ", ".join(["{}[i]".format(a) for a in in_names])
+    redvar_access = []
+    for i in range(num_col_ins):
+        redvar_access.append(", ".join(["redvar_{}_arr[w_ind]".format(i)
+                            for i in range(redvar_offsets[i], redvar_offsets[i+1])]))
+
+    inarr_access = []
     if parallel_combine:
+        for i in range(num_col_ins):
+            inarr_access.append(", ".join(["{}[i]".format(a) for a in in_names[redvar_offsets[i]:redvar_offsets[i+1]]]))
         f_name = '__combine_redvars'
     else:
+        for i in range(num_col_ins):
+            inarr_access.append("{}[i]".format(in_names[i]))
         f_name = '__update_redvars'
 
-    func_text += "      {} = {}({}, {})\n".format(
-            redvar_access, f_name, redvar_access, inarr_access)
+    for i in range(num_col_ins):
+        func_text += "      {} = {}_{}({}, {})\n".format(
+            redvar_access[i], f_name, i, redvar_access[i], inarr_access[i])
 
     if parallel_local:
         # return out key array and reduce arrays for communication
@@ -665,8 +686,9 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
                                     for i in range(num_red_vars)])
         func_text += "    for j in range(n_uniq_keys):\n"
-        func_text += "      out_c0[j] = __eval_res(out_c0, {})\n".format(
-                                                                redvar_access)
+        for i in range(num_outs):
+            func_text += "      out_c{}[j] = __eval_res_{}(out_c{}, {})\n".format(
+                                                       i, i, i , redvar_access)
 
     # print(func_text)
 
@@ -770,6 +792,9 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
     all_combine_funcs = []
     typemap = {}
     calltypes = {}
+    # offsets of reduce vars
+    curr_offset = 0
+    redvar_offsets = [0]
 
     for in_col_typ in in_col_types:
         f_ir, pm = compile_to_optimized_ir(
@@ -836,10 +861,12 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         calltypes.update(pm.calltypes)
         all_update_funcs.append(update_func)
         all_combine_funcs.append(combine_func)
+        curr_offset += len(redvars)
+        redvar_offsets.append(curr_offset)
 
     return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
                          all_update_funcs, all_combine_funcs, all_eval_nodes,
-                         typemap, calltypes)
+                         typemap, calltypes, redvar_offsets)
 
 
 def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
