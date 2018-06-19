@@ -1240,10 +1240,16 @@ class HiFrames(object):
         else:
             agg_var = obj_var
 
-        # find groupby key
+        # find groupby key and as_index
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
-        kws = dict(groubpy_call.kws)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
+        kws = dict(groubpy_call.kws)
+        as_index = True
+        if 'as_index' in kws:
+            as_index = guard(find_const, self.func_ir, kws['as_index'])
+            if as_index is None:
+                raise ValueError(
+                    "groupby as_index argument should be constant")
         if len(groubpy_call.args) == 1:
             by_arg = groubpy_call.args[0]
         elif 'by' in kws:
@@ -1260,7 +1266,9 @@ class HiFrames(object):
         df_var = call_def[1]
 
         if out_colnames is None:
-            out_colnames = self.df_vars[df_var.name].keys()
+            out_colnames = list(self.df_vars[df_var.name].keys())
+            if as_index:
+                out_colnames.remove(key_colname)
 
         return df_var, key_colname, out_colnames
 
