@@ -1185,7 +1185,7 @@ class HiFrames(object):
             return True
         return False
 
-    def _handle_aggregate(self, lhs, rhs, agg_var, func_name, label):
+    def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
         _supported_agg_funcs = ['agg', 'aggregate', 'sum', 'count', 'mean',
                                 'min', 'max']
@@ -1196,16 +1196,9 @@ class HiFrames(object):
 
         agg_func = self._get_agg_func(func_name, rhs)
 
-        # find selected output columns
-        # TODO: support other selection formats (e.g. whole dataframe)
-        select_def = guard(get_definition, self.func_ir, agg_var)
-        assert (isinstance(select_def, ir.Expr) and select_def.op == 'getitem')
-        agg_var = select_def.value
-        out_colnames = guard(find_const, self.func_ir, select_def.index)
-        if not isinstance(out_colnames, (str, tuple)):
-            raise ValueError("Groupby output column names should be constant")
-        if isinstance(out_colnames, str):
-            out_colnames = [out_colnames]
+        # find selected output columns and groupby var
+        agg_var, out_colnames = self._analyze_agg_select(obj_var)
+
 
         # find groupby key
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
@@ -1244,6 +1237,18 @@ class HiFrames(object):
             lhs.name, df_var.name, key_colname, df_col_map,
             in_vars, self.df_vars[df_var.name][key_colname],
             agg_func, out_types, lhs.loc)]
+
+    def _analyze_agg_select(self, obj_var):
+        # TODO: support other selection formats
+        select_def = guard(get_definition, self.func_ir, obj_var)
+        assert (isinstance(select_def, ir.Expr) and select_def.op == 'getitem')
+        agg_var = select_def.value
+        out_colnames = guard(find_const, self.func_ir, select_def.index)
+        if not isinstance(out_colnames, (str, tuple)):
+            raise ValueError("Groupby output column names should be constant")
+        if isinstance(out_colnames, str):
+            out_colnames = [out_colnames]
+        return agg_var, out_colnames
 
     def _get_agg_func(self, func_name, rhs):
         agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
