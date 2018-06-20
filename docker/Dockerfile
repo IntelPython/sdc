@@ -14,7 +14,7 @@ ENV PATH="/root/anaconda3/bin/:${PATH}"
 
 RUN conda create -y -y -n HPAT python=3.6 pandas
 RUN source activate HPAT && \
-    conda install -y numba -c numba &&\
+    conda install -y numba &&\
     conda install -y pyarrow mpich -c conda-forge &&\
     conda install -y hpat -c ehsantn
 
