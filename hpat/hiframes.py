@@ -327,6 +327,11 @@ class HiFrames(object):
                 and func_name == 'describe'):
             return self._handle_df_describe(assign, lhs, rhs, func_mod)
 
+        # df.itertuples()
+        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
+                and func_name == 'itertuples'):
+            return self._handle_df_itertuples(assign, lhs, rhs, func_mod)
+
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
             return res
@@ -760,6 +765,33 @@ class HiFrames(object):
         f_block = compile_to_numba_ir(
             f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         col_vars = self._get_df_col_vars(func_mod)
+        replace_arg_nodes(f_block, col_vars)
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        return nodes
+
+    def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
+        """pass df column names and variables to get_itertuples() to be able
+        to create the iterator.
+        e.g. get_itertuples("A", "B", A_arr, B_arr)
+        """
+        col_names = self._get_df_col_names(df_var)
+
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(col_names))])
+        name_consts = ', '.join(["'{}'".format(c) for c in col_names])
+
+        func_text = "def f({}):\n".format(col_name_args)
+        func_text += "  it = hpat.hiframes_api.get_itertuples({}, {})\n"\
+                                            .format(name_consts, col_name_args)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+
+        col_vars = self._get_df_col_vars(df_var)
         replace_arg_nodes(f_block, col_vars)
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs

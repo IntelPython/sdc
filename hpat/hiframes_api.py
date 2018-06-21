@@ -1,11 +1,18 @@
 from __future__ import print_function, division, absolute_import
 
+from collections import namedtuple
+
 import numba
 from numba import ir, ir_utils
+from numba.ir_utils import require
 from numba import types
+import numba.array_analysis
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, intrinsic
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.arrayobj import _getitem_array1d
+import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
@@ -649,3 +656,127 @@ def np_array_array_overload(in_tp):
                 i += 1
             return arr
         return f
+
+class DataFrameTupleIterator(types.SimpleIteratorType):
+    """
+    Type class for itertuples of dataframes.
+    """
+
+    def __init__(self, col_names, arr_typs):
+        self.array_types = arr_typs
+        self.col_names = col_names
+        name_args = ["{}={}".format(col_names[i], arr_typs[i])
+                                                for i in range(len(col_names))]
+        name = "itertuples({})".format(",".join(name_args))
+        py_ntup = namedtuple('Pandas', col_names)
+        yield_type = types.NamedTuple([a.dtype for a in arr_typs], py_ntup)
+        super(DataFrameTupleIterator, self).__init__(name, yield_type)
+
+def get_itertuples():  # pragma: no cover
+    pass
+
+@infer_global(get_itertuples)
+class TypeIterTuples(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) % 2 == 0, "name and column pairs expected"
+        col_names = [a.value for a in args[:len(args)//2]]
+        arr_types = args[len(args)//2:]
+        # XXX index handling, assuming implicit index
+        assert "Index" not in col_names[0]
+        col_names = ['Index'] + col_names
+        arr_types = [types.Array(types.int64, 1, 'C')] + list(arr_types)
+        iter_typ = DataFrameTupleIterator(col_names, arr_types)
+        return signature(iter_typ, *args)
+
+TypeIterTuples.support_literals = True
+
+@register_model(DataFrameTupleIterator)
+class DataFrameTupleIteratorModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        # We use an unsigned index to avoid the cost of negative index tests.
+        # XXX array_types[0] is implicit index
+        members = ([('index', types.EphemeralPointer(types.uintp))]
+            + [('array{}'.format(i), arr) for i, arr in enumerate(fe_type.array_types[1:])])
+        super(DataFrameTupleIteratorModel, self).__init__(dmm, fe_type, members)
+
+@lower_builtin(get_itertuples, types.VarArg(types.Any))
+def get_itertuples_impl(context, builder, sig, args):
+    arrays = args[len(args)//2:]
+    array_types = sig.args[len(sig.args)//2:]
+
+    iterobj = context.make_helper(builder, sig.return_type)
+
+    zero = context.get_constant(types.intp, 0)
+    indexptr = cgutils.alloca_once_value(builder, zero)
+
+    iterobj.index = indexptr
+
+    for i, arr in enumerate(arrays):
+        setattr(iterobj, "array{}".format(i), arr)
+
+    # Incref arrays
+    if context.enable_nrt:
+        for arr, arr_typ in zip(arrays, array_types):
+            context.nrt.incref(builder, arr_typ, arr)
+
+    res = iterobj._getvalue()
+
+    # Note: a decref on the iterator will dereference all internal MemInfo*
+    return impl_ret_new_ref(context, builder, sig.return_type, res)
+
+@lower_builtin('getiter', DataFrameTupleIterator)
+def getiter_itertuples(context, builder, sig, args):
+    # simply return the iterator
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+# similar to iternext of ArrayIterator
+@lower_builtin('iternext', DataFrameTupleIterator)
+@iternext_impl
+def iternext_itertuples(context, builder, sig, args, result):
+    iterty, = sig.args
+    it, = args
+
+    # TODO: support string arrays
+    iterobj = context.make_helper(builder, iterty, value=it)
+    # first array type is implicit int index
+    ary = make_array(iterty.array_types[1])(context, builder, value=iterobj.array0)
+    nitems, = cgutils.unpack_tuple(builder, ary.shape, count=1)
+
+    index = builder.load(iterobj.index)
+    is_valid = builder.icmp(lc.ICMP_SLT, index, nitems)
+    result.set_valid(is_valid)
+
+    with builder.if_then(is_valid):
+        values = [index]  # XXX implicit int index
+        for i, arr_typ in enumerate(iterty.array_types[1:]):
+            arr_ptr = getattr(iterobj, "array{}".format(i))
+            arr = make_array(arr_typ)(context, builder, value=arr_ptr)
+            val = _getitem_array1d(context, builder, arr_typ, arr, index,
+                                 wraparound=False)
+            values.append(val)
+
+        value = context.make_tuple(builder, iterty.yield_type, values)
+        result.yield_(value)
+        nindex = cgutils.increment_index(builder, index)
+        builder.store(nindex, iterobj.index)
+
+
+# TODO: move this to array analysis
+# the namedtuples created by get_itertuples-iternext-pair_first don't have
+# shapes created in array analysis
+def _analyze_op_static_getitem(self, scope, equiv_set, expr):
+    var = expr.value
+    typ = self.typemap[var.name]
+    if not isinstance(typ, types.BaseTuple):
+        return self._index_to_shape(scope, equiv_set, expr.value, expr.index_var)
+    try:
+        shape = equiv_set._get_shape(var)
+        require(isinstance(expr.index, int) and expr.index < len(shape))
+        return shape[expr.index], []
+    except:
+        pass
+
+    return None
+
+numba.array_analysis.ArrayAnalysis._analyze_op_static_getitem = _analyze_op_static_getitem
