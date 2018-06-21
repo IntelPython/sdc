@@ -356,14 +356,23 @@ class HiFrames(object):
     def _handle_pd_DataFrame(self, assign, lhs, rhs, label):
         """transform pd.DataFrame({'A': A}) call
         """
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError(
-                "Invalid DataFrame() arguments (one expected)")
-        arg_def = guard(get_definition, self.func_ir, rhs.args[0])
+        kws = dict(rhs.kws)
+        if 'data' in kws:
+            data = kws['data']
+            if len(rhs.args) != 0:  # pragma: no cover
+                raise ValueError(
+                    "only data argument suppoted in pd.DataFrame()")
+        else:
+            if len(rhs.args) != 1:  # pragma: no cover
+                raise ValueError(
+                    "data argument in pd.DataFrame() expected")
+            data = rhs.args[0]
+
+        arg_def = guard(get_definition, self.func_ir, data)
         if (not isinstance(arg_def, ir.Expr)
                 or arg_def.op != 'build_map'):  # pragma: no cover
             raise ValueError(
-                "Invalid DataFrame() arguments (map expected)")
+                "Invalid DataFrame() arguments (constant dict of columns expected)")
         out, items = self._fix_df_arrays(arg_def.items)
         col_map = self._process_df_build_map(items)
         self._create_df(lhs.name, col_map, label)
