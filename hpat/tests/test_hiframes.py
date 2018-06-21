@@ -740,6 +740,18 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_itertuples(self):
+        def test_impl(df):
+            res = 0.0
+            for r in df.itertuples():
+                res += r[1]
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.ones(n, np.int64)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
