@@ -162,18 +162,22 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
+def _get_numba_typ_from_pq_typ(pq_typ):
+    if pq_typ not in _pq_type_to_numba:
+        raise ValueError("parquet data type {} not supported yet".format(
+                                                                       pq_typ))
+    return _pq_type_to_numba[pq_typ]
 
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
-    import pyarrow as pa
-    from pyarrow.parquet import ParquetDataset
     col_names = []
     col_types = []
 
     pq_dataset = pq.ParquetDataset(file_name)
     col_names = pq_dataset.schema.names
     num_cols = len(col_names)
-    col_types = [_pq_type_to_numba[pq_dataset.schema.column(i).physical_type]
+    col_types = [_get_numba_typ_from_pq_typ(
+                 pq_dataset.schema.column(i).physical_type)
                  for i in range(num_cols)]
     # TODO: close file?
     return col_names, col_types
