@@ -18,7 +18,7 @@ requirements:
     - setuptools
     - numba 0.38.*
     - numpy 1.14.*
-    - pandas
+    - pandas 0.23
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost-cpp
@@ -30,7 +30,7 @@ requirements:
   run:
     - python 3.6.*
     - numpy 1.14.*
-    - pandas
+    - pandas 0.23
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost-cpp

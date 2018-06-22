@@ -1688,7 +1688,9 @@ class HiFrames(object):
         return []
 
     def _create_df(self, df_varname, df_col_map, label):
-        #
+        # order is important for proper handling of itertuples, apply, etc.
+        # starting pandas 0.23 and Python 3.6, regular dict order is OK
+        # for <0.23 ordered_df_map = OrderedDict(sorted(df_col_map.items()))
         self.df_vars[df_varname] = df_col_map
         self._update_df_cols()
         self.df_labels[df_varname] = label
