@@ -299,6 +299,8 @@ def const_string(context, builder, ty, pyval):
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):
     in_typ = sig.args[0]
+    if in_typ == string_type:
+        return args[0]
     ll_in_typ = context.get_value_type(sig.args[0])
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
     fn = builder.module.get_or_insert_function(
