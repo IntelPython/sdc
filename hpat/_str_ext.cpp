@@ -35,6 +35,7 @@ void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 const char* get_c_str(std::string* s);
 const char* get_char_ptr(char c);
 void* str_concat(std::string* s1, std::string* s2);
+int str_compare(std::string* s1, std::string* s2);
 bool str_equal(std::string* s1, std::string* s2);
 bool str_equal_cstr(std::string* s1, char* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
@@ -99,6 +100,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&get_char_ptr)));
     PyObject_SetAttrString(m, "str_concat",
                             PyLong_FromVoidPtr((void*)(&str_concat)));
+    PyObject_SetAttrString(m, "str_compare",
+                            PyLong_FromVoidPtr((void*)(&str_compare)));
     PyObject_SetAttrString(m, "str_equal",
                             PyLong_FromVoidPtr((void*)(&str_equal)));
     PyObject_SetAttrString(m, "str_equal_cstr",
@@ -220,6 +223,12 @@ void* str_concat(std::string* s1, std::string* s2)
     // printf("in concat %s %s\n", s1->c_str(), s2->c_str());
     std::string* res = new std::string((*s1)+(*s2));
     return res;
+}
+
+int str_compare(std::string* s1, std::string* s2)
+{
+    // printf("in str_comp %s %s\n", s1->c_str(), s2->c_str());
+    return s1->compare(*s2);
 }
 
 bool str_equal(std::string* s1, std::string* s2)

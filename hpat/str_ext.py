@@ -7,6 +7,7 @@ from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from numba import cgutils
+import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hpat
@@ -110,6 +111,22 @@ class StringOpEq(AbstractTemplate):
 class StringOpNotEq(StringOpEq):
     key = '!='
 
+@infer
+class StringOpGE(StringOpEq):
+    key = '>='
+
+@infer
+class StringOpGT(StringOpEq):
+    key = '>'
+
+@infer
+class StringOpLE(StringOpEq):
+    key = '<='
+
+@infer
+class StringOpLT(StringOpEq):
+    key = '<'
+
 
 @infer_getattr
 class StringAttribute(AttributeTemplate):
@@ -208,6 +225,7 @@ ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
 ll.add_symbol('get_c_str', hstr_ext.get_c_str)
 ll.add_symbol('str_concat', hstr_ext.str_concat)
+ll.add_symbol('str_compare', hstr_ext.str_compare)
 ll.add_symbol('str_equal', hstr_ext.str_equal)
 ll.add_symbol('str_equal_cstr', hstr_ext.str_equal_cstr)
 ll.add_symbol('str_split', hstr_ext.str_split)
@@ -338,6 +356,46 @@ def string_neq_impl(context, builder, sig, args):
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
+
+@lower_builtin('>=', string_type, string_type)
+def string_ge_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    comp_val = builder.call(fn, args)
+    zero = context.get_constant(types.int32, 0)
+    res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
+    return res
+
+@lower_builtin('>', string_type, string_type)
+def string_gt_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    comp_val = builder.call(fn, args)
+    zero = context.get_constant(types.int32, 0)
+    res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
+    return res
+
+@lower_builtin('<=', string_type, string_type)
+def string_le_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    comp_val = builder.call(fn, args)
+    zero = context.get_constant(types.int32, 0)
+    res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
+    return res
+
+@lower_builtin('<', string_type, string_type)
+def string_lt_impl(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    comp_val = builder.call(fn, args)
+    zero = context.get_constant(types.int32, 0)
+    res = builder.icmp(lc.ICMP_SLT, comp_val, zero)
+    return res
 
 
 @lower_builtin("str.split", string_type, string_type)
