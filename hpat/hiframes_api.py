@@ -740,8 +740,11 @@ def iternext_itertuples(context, builder, sig, args, result):
     # TODO: support string arrays
     iterobj = context.make_helper(builder, iterty, value=it)
     # first array type is implicit int index
-    ary = make_array(iterty.array_types[1])(context, builder, value=iterobj.array0)
-    nitems, = cgutils.unpack_tuple(builder, ary.shape, count=1)
+    # use len() to support string arrays
+    len_sig = signature(types.intp, iterty.array_types[1])
+    nitems = context.compile_internal(builder, lambda a: len(a), len_sig, [iterobj.array0])
+    # ary = make_array(iterty.array_types[1])(context, builder, value=iterobj.array0)
+    # nitems, = cgutils.unpack_tuple(builder, ary.shape, count=1)
 
     index = builder.load(iterobj.index)
     is_valid = builder.icmp(lc.ICMP_SLT, index, nitems)
@@ -751,9 +754,11 @@ def iternext_itertuples(context, builder, sig, args, result):
         values = [index]  # XXX implicit int index
         for i, arr_typ in enumerate(iterty.array_types[1:]):
             arr_ptr = getattr(iterobj, "array{}".format(i))
-            arr = make_array(arr_typ)(context, builder, value=arr_ptr)
-            val = _getitem_array1d(context, builder, arr_typ, arr, index,
-                                 wraparound=False)
+            getitem_sig = signature(arr_typ.dtype, arr_typ, types.intp)
+            val = context.compile_internal(builder, lambda a,i: a[i], getitem_sig, [arr_ptr, index])
+            # arr = make_array(arr_typ)(context, builder, value=arr_ptr)
+            # val = _getitem_array1d(context, builder, arr_typ, arr, index,
+            #                      wraparound=False)
             values.append(val)
 
         value = context.make_tuple(builder, iterty.yield_type, values)
