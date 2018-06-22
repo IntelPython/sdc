@@ -752,6 +752,18 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.ones(n, np.int64)})
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    def test_itertuples_str(self):
+        def test_impl(df):
+            res = ""
+            for r in df.itertuples():
+                res += r[1]
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 3
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc'], 'B': np.ones(n, np.int64)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
     def test_itertuples_order(self):
         def test_impl(n):
             res = 0.0
