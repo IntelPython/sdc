@@ -176,6 +176,22 @@ class CmpOpEqStringArray(AbstractTemplate):
 class CmpOpNEqStringArray(CmpOpEqStringArray):
     key = '!='
 
+@infer
+class CmpOpGEStringArray(CmpOpEqStringArray):
+    key = '>='
+
+@infer
+class CmpOpGTStringArray(CmpOpEqStringArray):
+    key = '>'
+
+@infer
+class CmpOpLEStringArray(CmpOpEqStringArray):
+    key = '<='
+
+@infer
+class CmpOpLTStringArray(CmpOpEqStringArray):
+    key = '<'
+
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):
 #     def generic(self, args, kws):

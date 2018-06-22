@@ -86,7 +86,7 @@ class HiFramesTyped(object):
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
-                and rhs.fn in ['==', '!=']
+                and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
                 and (self.typemap[rhs.lhs.name] == string_array_type
                      or self.typemap[rhs.rhs.name] == string_array_type)):
             arg1 = rhs.lhs
