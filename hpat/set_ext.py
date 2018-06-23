@@ -49,8 +49,16 @@ class SetIterType(types.BaseContainerIterator):
 
 register_model(SetType)(models.OpaqueModel)
 
-init_set_string = types.ExternalFunction("init_set_string",
+
+_init_set_string = types.ExternalFunction("init_set_string",
                                          set_string_type())
+
+def init_set_string():
+    return set()
+
+@overload(init_set_string)
+def init_set_overload():
+    return lambda: _init_set_string()
 
 add_set_string = types.ExternalFunction("insert_set_string",
                                     types.void(set_string_type, string_type))
