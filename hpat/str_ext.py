@@ -82,6 +82,19 @@ get_c_str = types.ExternalFunction("get_c_str", types.voidptr(string_type))
 def str_c_str(str_typ):
     return lambda s: get_c_str(s)
 
+@overload_method(StringType, 'join')
+def str_join(str_typ, iterable_typ):
+    # TODO: more efficient implementation (e.g. C++ string buffer)
+    def str_join_impl(sep_str, str_container):
+        res = ""
+        counter = 0
+        for s in str_container:
+            if counter != 0:
+                res += sep_str
+            counter += 1
+            res += s
+        return res
+    return str_join_impl
 
 @overload(hash)
 def hash_overload(str_typ):
