@@ -3,6 +3,7 @@ from numba import types, typing
 from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 from numba import cgutils
 from numba.typing.templates import signature, AbstractTemplate, infer
 
@@ -13,6 +14,9 @@ ll.add_symbol('init_set_string', hset_ext.init_set_string)
 ll.add_symbol('insert_set_string', hset_ext.insert_set_string)
 ll.add_symbol('len_set_string', hset_ext.len_set_string)
 ll.add_symbol('set_in_string', hset_ext.set_in_string)
+ll.add_symbol('set_iterator_string', hset_ext.set_iterator_string)
+ll.add_symbol('set_itervalid_string', hset_ext.set_itervalid_string)
+ll.add_symbol('set_nextval_string', hset_ext.set_nextval_string)
 ll.add_symbol('num_total_chars_set_string', hset_ext.num_total_chars_set_string)
 ll.add_symbol('populate_str_arr_from_set', hset_ext.populate_str_arr_from_set)
 
@@ -156,70 +160,48 @@ def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ):
 
     return types.void(set_string_type, string_array_type), codegen
 
-#
-# TODO: implement iterator
-# @register_model(SetIterType)
-# class SetIterTypeModel(models.StructModel):
-#     def __init__(self, dmm, fe_type):
-#         members = [
-#             ('set', SetType),
-#             ('index', types.int64),
-#         ]
-#         models.StructModel.__init__(self, dmm, fe_type, members)
+# TODO: delete iterator
 
-#
-# class SetTypeIterInstance(_SetPayloadMixin):
-#
-#     def __init__(self, context, builder, iter_type, iter_val):
-#         self._context = context
-#         self._builder = builder
-#         self._ty = iter_type
-#         self._iter = context.make_helper(builder, iter_type, iter_val)
-#         self._datamodel = context.data_model_manager[iter_type.yield_type]
-#
-#     @classmethod
-#     def from_set(cls, context, builder, iter_type, set_val):
-#         set_inst = SetInstance(context, builder, iter_type.container, set_val)
-#         self = cls(context, builder, iter_type, None)
-#         index = context.get_constant(types.intp, 0)
-#         self._iter.index = cgutils.alloca_once_value(builder, index)
-#         self._iter.meminfo = set_inst.meminfo
-#         return self
-#
-#     @property
-#     def _payload(self):
-#         # This cannot be cached as it can be reallocated
-#         return get_set_payload(self._context, self._builder,
-#                                 self._ty.container, self._iter)
-#
-#     @property
-#     def value(self):
-#         return self._iter._getvalue()
-#
-#     @property
-#     def index(self):
-#         return self._builder.load(self._iter.index)
-#
-#     @index.setter
-#     def index(self, value):
-#         self._builder.store(value, self._iter.index)
-#
-#
-# @lower_builtin('getiter', SetType)
-# def getiter_set(context, builder, sig, args):
-#     inst = SetTypeIterInstance.from_set(context, builder, sig.return_type, args[0])
-#     return impl_ret_borrowed(context, builder, sig.return_type, inst.value)
-#
-# @lower_builtin('iternext', types.SetIter)
-# @iternext_impl
-# def iternext_setiter(context, builder, sig, args, result):
-#     inst = SetTypeIterInstance(context, builder, sig.args[0], args[0])
-#
-#     index = inst.index
-#     nitems = inst.size
-#     is_valid = builder.icmp_signed('<', index, nitems)
-#     result.set_valid(is_valid)
-#
-#     with builder.if_then(is_valid):
-#         result.yield_(inst.getitem(index))
-#         inst.index = builder.add(index, context.get_constant(types.intp, 1))
+@register_model(SetIterType)
+class StrSetIteratorModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [('itp', types.Opaque('SetIterPtr')),
+                   ('set', set_string_type)]
+        super(StrSetIteratorModel, self).__init__(dmm, fe_type, members)
+
+
+@lower_builtin('getiter', SetType)
+def getiter_set(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                                                [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="set_iterator_string")
+    itp = builder.call(fn, args)
+
+    iterobj = context.make_helper(builder, sig.return_type)
+
+    iterobj.itp = itp
+    iterobj.set = args[0]
+
+    return iterobj._getvalue()
+
+
+@lower_builtin('iternext', SetIterType)
+@iternext_impl
+def iternext_setiter(context, builder, sig, args, result):
+    iterty, = sig.args
+    it, = args
+    iterobj = context.make_helper(builder, iterty, value=it)
+
+    fnty = lir.FunctionType(lir.IntType(1),
+                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="set_itervalid_string")
+    is_valid = builder.call(fn, [iterobj.itp, iterobj.set])
+    result.set_valid(is_valid)
+
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                    [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="set_nextval_string")
+
+    with builder.if_then(is_valid):
+        val = builder.call(fn, [iterobj.itp])
+        result.yield_(val)

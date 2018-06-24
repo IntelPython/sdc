@@ -12,6 +12,9 @@ bool set_in_string(std::string* val, std::unordered_set<std::string>* str_set);
 int64_t num_total_chars_set_string(std::unordered_set<std::string>* str_set);
 void populate_str_arr_from_set(std::unordered_set<std::string>* str_set,
                                 uint32_t *offsets, char *data);
+void* set_iterator_string(std::unordered_set<std::string>* str_set);
+bool set_itervalid_string(std::unordered_set<std::string>::iterator * itp, std::unordered_set<std::string>* str_set);
+std::string* set_nextval_string(std::unordered_set<std::string>::iterator * itp);
 
 PyMODINIT_FUNC PyInit_hset_ext(void) {
     PyObject *m;
@@ -29,6 +32,12 @@ PyMODINIT_FUNC PyInit_hset_ext(void) {
                             PyLong_FromVoidPtr((void*)(&len_set_string)));
     PyObject_SetAttrString(m, "set_in_string",
                             PyLong_FromVoidPtr((void*)(&set_in_string)));
+    PyObject_SetAttrString(m, "set_iterator_string",
+                            PyLong_FromVoidPtr((void*)(&set_iterator_string)));
+    PyObject_SetAttrString(m, "set_itervalid_string",
+                            PyLong_FromVoidPtr((void*)(&set_itervalid_string)));
+    PyObject_SetAttrString(m, "set_nextval_string",
+                            PyLong_FromVoidPtr((void*)(&set_nextval_string)));
     PyObject_SetAttrString(m, "num_total_chars_set_string",
                             PyLong_FromVoidPtr((void*)(&num_total_chars_set_string)));
     PyObject_SetAttrString(m, "populate_str_arr_from_set",
@@ -80,4 +89,22 @@ void populate_str_arr_from_set(std::unordered_set<std::string>* str_set,
         index++;
     }
     offsets[index] = curr_data_ind;
+}
+
+void* set_iterator_string(std::unordered_set<std::string>* str_set)
+{
+    std::unordered_set<std::string>::iterator * itp = new std::unordered_set<std::string>::iterator(str_set->begin());
+    return itp;
+}
+
+bool set_itervalid_string(std::unordered_set<std::string>::iterator * itp, std::unordered_set<std::string>* str_set)
+{
+    return (*itp) != str_set->end();
+}
+
+std::string* set_nextval_string(std::unordered_set<std::string>::iterator * itp)
+{
+    std::string* res = new std::string(*(*itp));
+    (*itp)++;
+    return res;
 }
