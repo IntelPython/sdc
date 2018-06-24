@@ -9,7 +9,8 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              lower_getattr, intrinsic, overload_method, overload)
 from numba import cgutils
 from hpat.str_ext import string_type, del_str
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+import llvmlite.llvmpy.core as lc
 from glob import glob
 
 class StringArray(object):
@@ -22,7 +23,7 @@ class StringArray(object):
         return 'StringArray({}, {}, {})'.format(self.offsets, self.data, self.size)
 
 
-class StringArrayType(types.Type):
+class StringArrayType(types.IterableType):
     def __init__(self):
         super(StringArrayType, self).__init__(
             name='StringArrayType()')
@@ -30,6 +31,10 @@ class StringArrayType(types.Type):
     @property
     def dtype(self):
         return string_type
+
+    @property
+    def iterator_type(self):
+        return StringArrayIterator()
 
 
 string_array_type = StringArrayType()
@@ -90,6 +95,47 @@ class StringArrayModel(models.StructModel):
 #                 raise IndexError("boolean index did not match indexed array along dimension 0")
 #             return str_arr
 #         return str_arr_bool_impl
+
+class StringArrayIterator(types.SimpleIteratorType):
+    """
+    Type class for iterators of string arrays.
+    """
+
+    def __init__(self):
+        name = "iter(String)"
+        yield_type = string_type
+        super(StringArrayIterator, self).__init__(name, yield_type)
+
+@register_model(StringArrayIterator)
+class StrArrayIteratorModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        # We use an unsigned index to avoid the cost of negative index tests.
+        members = [('index', types.EphemeralPointer(types.uintp)),
+                   ('array', string_array_type)]
+        super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
+
+lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
+
+@lower_builtin('iternext', StringArrayIterator)
+@iternext_impl
+def iternext_str_array(context, builder, sig, args, result):
+    [iterty] = sig.args
+    [iter_arg] = args
+
+    iterobj = context.make_helper(builder, iterty, value=iter_arg)
+    len_sig = signature(types.intp, string_array_type)
+    nitems = context.compile_internal(builder, lambda a: len(a), len_sig, [iterobj.array])
+
+    index = builder.load(iterobj.index)
+    is_valid = builder.icmp(lc.ICMP_SLT, index, nitems)
+    result.set_valid(is_valid)
+
+    with builder.if_then(is_valid):
+        getitem_sig = signature(string_type, string_array_type, types.intp)
+        value = context.compile_internal(builder, lambda a,i: a[i], getitem_sig, [iterobj.array, index])
+        result.yield_(value)
+        nindex = cgutils.increment_index(builder, index)
+        builder.store(nindex, iterobj.index)
 
 @intrinsic
 def num_total_chars(typingctx, str_arr_typ):
