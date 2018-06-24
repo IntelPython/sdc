@@ -11,6 +11,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
+import hpat
 from hpat.str_ext import StringType
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
@@ -21,11 +22,15 @@ _pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
                      'FLOAT': types.Array(types.float32, 1, 'C'),
                      'DOUBLE': types.Array(types.float64, 1, 'C'),
                      'BYTE_ARRAY': string_array_type,
+                     'INT96': types.Array(types.NPDatetime('ns'), 1, 'C'),
                      }
 
 # boolean, int32, int64, int96, float, double
+# XXX arrow converts int96 timestamp to int64
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
-                            'int96': 3, 'float32': 4, 'float64': 5}
+                            'int96': 3, 'float32': 4, 'float64': 5,
+                            'datetime64(ns)': 3}
+
 
 
 def read_parquet():
@@ -132,8 +137,12 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
             i)
     else:
         el_type = get_element_type(c_type.dtype)
-        func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
-            el_type)
+        if el_type == 'datetime64(ns)':
+            func_text += '  column_tmp = np.empty(col_size, dtype=np.int64)\n'
+            func_text += '  column = hpat.hiframes_api.ts_series_to_arr_typ(column_tmp)\n'
+        else:
+            func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
+                el_type)
         func_text += '  status = read_parquet(fname, {}, column, np.int32({}))\n'.format(
             i, _type_to_pq_dtype_number[el_type])
     loc_vars = {}
@@ -142,7 +151,9 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_parquet': get_column_size_parquet,
                                       'read_parquet': read_parquet,
-                                      'read_parquet_str': read_parquet_str, 'np': np,
+                                      'read_parquet_str': read_parquet_str,
+                                      'np': np,
+                                      'hpat': hpat,
                                       'StringArray': StringArray}).blocks.popitem()
 
     replace_arg_nodes(f_block, [file_name])

@@ -42,7 +42,8 @@ void pq_init_reader(const char* file_name,
 
 // parquet type sizes (NOT arrow)
 // boolean, int32, int64, int96, float, double
-static int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
+// XXX assuming int96 is always converted to int64 since it's timestamp
+static int pq_type_sizes[] = {1, 4, 8, 8, 4, 8};
 
 
 int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx)
@@ -72,7 +73,7 @@ int64_t pq_read_single_file(const char* file_name, int64_t column_idx,
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
     int dtype_size = pq_type_sizes[out_dtype];
-    // printf("dtype %d\n", dtype);
+    // printf("dtype %d out_dtype %d dtype_size %d\n", dtype, out_dtype, dtype_size);
 
     auto buffers = arr->data()->buffers;
     // std::cout<<"num buffs: "<< buffers.size()<<std::endl;

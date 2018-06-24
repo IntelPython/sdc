@@ -607,10 +607,11 @@ class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == timestamp_series_type
+        assert args[0] == timestamp_series_type or args[0] == types.Array(types.int64, 1, 'C')
         return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
 
 @lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
+@lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
