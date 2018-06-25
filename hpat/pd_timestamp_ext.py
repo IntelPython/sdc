@@ -460,7 +460,7 @@ def convert_datetime64_to_timestamp(dt64):
         year = 400 * (days // days400years)
         days = days % days400years
     else:
-        years = 400 * ((days - (days400years - 1)) // days400years)
+        year = 400 * ((days - (days400years - 1)) // days400years)
         days = days % days400years
         if days < 0:
             days += days400years
