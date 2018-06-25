@@ -445,15 +445,17 @@ def dt64_to_integer(context, builder, fromty, toty, val):
 
 @numba.njit
 def convert_datetime64_to_timestamp(dt64):
+    # pandas 0.23 np_datetime.c:762
     perday = 24 * 60 * 60 * 1000 * 1000 * 1000
 
-    if dt64 > 0:
+    if dt64 >= 0:
         in_day = dt64 % perday
         dt64 = dt64 // perday
     else:
         in_day = (perday - 1) + (dt64 + 1) % perday
         dt64 = dt64 // perday - (0 if (dt64 % perday == 0) else 1)
 
+    # pandas 0.23np_datetime.c:173
     days400years = 146097
     days = dt64 - 10957
     if days >= 0:
@@ -476,6 +478,7 @@ def convert_datetime64_to_timestamp(dt64):
                 days = (days - 1) % 365
 
     year = year + 2000
+    # pandas 0.23 np_datetime.c:237
     leapyear = (year % 400 == 0) or (year %4 == 0 and year %100 != 0)
     month_len = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     if leapyear:
