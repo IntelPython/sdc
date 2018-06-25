@@ -6,7 +6,7 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
-                            find_callname, mk_alloc)
+                            find_callname, mk_alloc, find_const)
 
 import hpat
 from hpat.utils import get_definitions
@@ -77,11 +77,53 @@ class HiFramesTyped(object):
                 if res is not None:
                     return res
 
+                fdef = guard(find_callname, self.func_ir, rhs)
+                if fdef is None:
+                    # could be make_function from list comprehension which is ok
+                    func_def = guard(get_definition, self.func_ir, rhs.func)
+                    if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
+                        return [assign]
+                    warnings.warn(
+                        "function call couldn't be found for initial analysis")
+                    return [assign]
+                else:
+                    func_name, func_mod = fdef
+
+                if fdef == ('ts_binop_wrapper', 'hpat.hiframes_api'):
+                    return self._handle_ts_binop(lhs, rhs, assign)
+
             res = self._handle_str_contains(lhs, rhs, assign, call_table)
             if res is not None:
                 return res
 
         return [assign]
+
+    def _handle_ts_binop(self, lhs, rhs, assign):
+        op = guard(find_const, self.func_ir, rhs.args[0])
+        assert op is not None
+        ts_arr = rhs.args[1]
+        ts_str = rhs.args[2]
+
+        func_text = 'def f(ts_arr, ts_str):\n'
+        func_text += '  l = len(ts_arr)\n'
+        func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(ts_str)\n'
+        func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
+        func_text += '  for i in numba.parfor.internal_prange(l):\n'
+        func_text += '    S[i] = ts_arr[i] {} other\n'.format(op)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+        f_blocks = compile_to_numba_ir(f,
+                                        {'numba': numba, 'np': np, 'hpat': hpat},
+                                        self.typingctx,
+                                        (self.typemap[ts_arr.name],
+                                        self.typemap[ts_str.name]),
+                                        self.typemap, self.calltypes).blocks
+        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [ts_arr, ts_str])
+        # replace == expression with result of parfor (S)
+        # S is target of last statement in 1st block of f
+        assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
+        return (f_blocks, [assign])
 
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor
