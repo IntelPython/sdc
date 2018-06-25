@@ -4,6 +4,7 @@ import numba
 from numba import *
 import hpat.dict_ext
 import hpat.set_ext
+from hpat.set_ext import init_set_string
 import hpat.distributed_api
 from hpat.distributed_api import dist_time
 from hpat.dict_ext import DictIntInt, DictInt32Int32, dict_int_int_type, dict_int32_int32_type
