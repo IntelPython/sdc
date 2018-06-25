@@ -193,6 +193,7 @@ class StrConstInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
+        assert args[0] in [types.int32, types.int64, types.float32, types.float64, string_type]
         return signature(string_type, *args)
 
 
