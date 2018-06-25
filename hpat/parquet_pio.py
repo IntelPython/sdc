@@ -121,7 +121,7 @@ class ParquetHandler(object):
 
             out_nodes += get_column_read_nodes(c_type, cvar, file_name, i)
 
-        return col_items, out_nodes
+        return col_items, col_types, out_nodes
 
 
 def get_column_read_nodes(c_type, cvar, file_name, i):

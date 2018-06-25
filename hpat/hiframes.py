@@ -163,6 +163,10 @@ class HiFrames(object):
                     and isinstance(rhs.index, str)):
                 assign.value = self._get_df_cols(rhs.value)[rhs.index]
                 self.df_cols.add(lhs)  # save lhs as column
+                if assign.value.name in self.ts_series_vars:
+                    self.ts_series_vars.add(lhs)
+                if assign.value.name in self.dt_date_series_vars:
+                    self.dt_date_series_vars.add(lhs)
 
             # df1 = df[df.A > .5]
             if rhs.op == 'getitem' and self._is_df_var(rhs.value):
@@ -469,8 +473,11 @@ class HiFrames(object):
         return []
 
     def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var, label):
-        col_items, nodes = self.pq_handler.gen_parquet_read(
+        col_items, col_types, nodes = self.pq_handler.gen_parquet_read(
             self.arrow_tables[t_var.name], lhs)
+        for v, t in zip(col_items, col_types):
+            if t == types.Array(types.NPDatetime('ns'), 1, 'C'):
+                self.ts_series_vars.add(v[1].name)
         col_map = self._process_df_build_map(col_items)
         self._create_df(lhs.name, col_map, label)
         return nodes
