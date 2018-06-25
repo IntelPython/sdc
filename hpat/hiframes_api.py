@@ -690,8 +690,14 @@ class DataFrameTupleIterator(types.SimpleIteratorType):
                                                 for i in range(len(col_names))]
         name = "itertuples({})".format(",".join(name_args))
         py_ntup = namedtuple('Pandas', col_names)
-        yield_type = types.NamedTuple([a.dtype for a in arr_typs], py_ntup)
+        yield_type = types.NamedTuple([_get_series_dtype(a) for a in arr_typs], py_ntup)
         super(DataFrameTupleIterator, self).__init__(name, yield_type)
+
+def _get_series_dtype(arr_typ):
+    # values of datetimeindex are extracted as Timestamp
+    if arr_typ == types.Array(types.NPDatetime('ns'), 1, 'C'):
+        return pandas_timestamp_type
+    return arr_typ.dtype
 
 def get_itertuples():  # pragma: no cover
     pass
@@ -775,8 +781,15 @@ def iternext_itertuples(context, builder, sig, args, result):
         values = [index]  # XXX implicit int index
         for i, arr_typ in enumerate(iterty.array_types[1:]):
             arr_ptr = getattr(iterobj, "array{}".format(i))
-            getitem_sig = signature(arr_typ.dtype, arr_typ, types.intp)
-            val = context.compile_internal(builder, lambda a,i: a[i], getitem_sig, [arr_ptr, index])
+
+            if arr_typ == types.Array(types.NPDatetime('ns'), 1, 'C'):
+                getitem_sig = signature(pandas_timestamp_type, arr_typ, types.intp)
+                val = context.compile_internal(builder,
+                    lambda a,i: hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(np.int64(a[i])),
+                        getitem_sig, [arr_ptr, index])
+            else:
+                getitem_sig = signature(arr_typ.dtype, arr_typ, types.intp)
+                val = context.compile_internal(builder, lambda a,i: a[i], getitem_sig, [arr_ptr, index])
             # arr = make_array(arr_typ)(context, builder, value=arr_ptr)
             # val = _getitem_array1d(context, builder, arr_typ, arr, index,
             #                      wraparound=False)
