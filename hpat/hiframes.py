@@ -372,6 +372,8 @@ class HiFrames(object):
 
         # both timeseries, not needed
         if rhs.rhs.name in self.ts_series_vars and rhs.lhs.name in self.ts_series_vars:
+            self.ts_series_vars.add(lhs.name)
+            self.df_cols.add(lhs.name)
             return [assign]
 
         if rhs.rhs.name in self.ts_series_vars:
@@ -391,6 +393,7 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [ts_arr, other])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
+        self.df_cols.add(lhs.name)
         return nodes
 
     def _get_reverse_copies(self, body):
