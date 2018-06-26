@@ -365,13 +365,13 @@ def overload_pd_timestamp_isoformat(ts_typ, sep=None):
             _time = str_2d(ts.hour) + ':' + str_2d(ts.minute) + ':' + str_2d(ts.second)
             res = str(ts.year) + '-' + str_2d(ts.month) + '-' + str_2d(ts.day) + 'T' + _time
             return res
-        return timestamp_isoformat_impl
+    else:
+        def timestamp_isoformat_impl(ts, sep):
+            assert ts.nanosecond == 0 # TODO: handle nanosecond (timestamps.pyx)
+            _time = str_2d(ts.hour) + ':' + str_2d(ts.minute) + ':' + str_2d(ts.second)
+            res = str(ts.year) + '-' + str_2d(ts.month) + '-' + str_2d(ts.day) + sep + _time
+            return res
 
-    def timestamp_isoformat_impl(ts, sep):
-        assert ts.nanosecond == 0 # TODO: handle nanosecond (timestamps.pyx)
-        _time = str_2d(ts.hour) + ':' + str_2d(ts.minute) + ':' + str_2d(ts.second)
-        res = str(ts.year) + '-' + str_2d(ts.month) + '-' + str_2d(ts.day) + sep + _time
-        return res
     return timestamp_isoformat_impl
 
 # TODO: support general string formatting
