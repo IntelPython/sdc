@@ -429,7 +429,8 @@ def string_split_impl(context, builder, sig, args):
     _list.size = size
     with cgutils.for_range(builder, size) as loop:
         value = builder.load(cgutils.gep_inbounds(builder, ptr, loop.index))
-        _list.setitem(loop.index, value)
+        # TODO: refcounted str
+        _list.setitem(loop.index, value, incref=False)
     return impl_ret_new_ref(context, builder, sig.return_type, _list.value)
 
 
