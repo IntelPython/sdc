@@ -776,6 +776,23 @@ class TestHiFrames(unittest.TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_itertuples_analysis(self):
+        """tests array analysis handling of generated tuples, shapes going
+        through blocks and getting used in an array dimension
+        """
+        def test_impl(n):
+            res = 0
+            df = pd.DataFrame({'B': np.arange(n), 'A': np.ones(n, np.int64)})
+            for r in df.itertuples():
+                if r[1] == 2:
+                    A = np.ones(r[1])
+                    res += len(A)
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
