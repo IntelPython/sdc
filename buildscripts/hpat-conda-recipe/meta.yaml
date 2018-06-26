@@ -16,7 +16,7 @@ requirements:
   host:
     - python 3.6.*
     - setuptools
-    - numba 0.38.*
+    - numba 0.39.*
     - numpy 1.14.*
     - pandas 0.23
     - mpich # [not win]
@@ -25,7 +25,7 @@ requirements:
     - hdf5
     - h5py
     - opencv 3.3.1
-    - hpat-parquet-reader # [not win]
+    - hpat-parquet-reader 0.1.1 # [not win]
 
   run:
     - python 3.6.*
@@ -34,10 +34,10 @@ requirements:
     - mpich # [not win]
     - pyarrow 0.9.*
     - boost-cpp
-    - numba 0.38.*
+    - numba 0.39.*
     - hdf5
     - h5py
-    - hpat-parquet-reader # [not win]
+    - hpat-parquet-reader 0.1.1 # [not win]
 
 test:
   imports:

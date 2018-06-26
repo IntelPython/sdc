@@ -1,6 +1,6 @@
 package:
   name: hpat-parquet-reader
-  version: "0.1"
+  version: "0.1.1"
 
 source:
    path: ../../parquet_reader
