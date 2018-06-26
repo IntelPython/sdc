@@ -357,6 +357,32 @@ def overload_pd_timestamp_date(ptt):
         return datetime.date(ptt.year, ptt.month, ptt.day)
     return pd_timestamp_date_impl
 
+@overload_method(PandasTimestampType, 'isoformat')
+def overload_pd_timestamp_isoformat(ts_typ, sep=None):
+    if sep is None:
+        def timestamp_isoformat_impl(ts):
+            assert ts.nanosecond == 0 # TODO: handle nanosecond (timestamps.pyx)
+            _time = str_2d(ts.hour) + ':' + str_2d(ts.minute) + ':' + str_2d(ts.second)
+            res = str(ts.year) + '-' + str_2d(ts.month) + '-' + str_2d(ts.day) + 'T' + _time
+            return res
+        return timestamp_isoformat_impl
+
+    def timestamp_isoformat_impl(ts, sep):
+        assert ts.nanosecond == 0 # TODO: handle nanosecond (timestamps.pyx)
+        _time = str_2d(ts.hour) + ':' + str_2d(ts.minute) + ':' + str_2d(ts.second)
+        res = str(ts.year) + '-' + str_2d(ts.month) + '-' + str_2d(ts.day) + sep + _time
+        return res
+    return timestamp_isoformat_impl
+
+# TODO: support general string formatting
+@numba.njit
+def str_2d(a):
+    res = str(a)
+    if len(res) == 1:
+        return '0' + res
+    return res
+
+
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
     year_obj = c.pyapi.object_getattr_string(val, "year")
