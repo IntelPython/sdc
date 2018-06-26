@@ -36,20 +36,12 @@ such as Numba and LLVM on Ubuntu Linux::
     conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
     source activate HPAT
     conda install -c numba numba
-    conda install pyarrow=0.9.* mpich -c conda-forge
+    conda install mpich -c conda-forge
+    conda install pyarrow
     conda install h5py -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
     git clone https://github.com/IntelLabs/hpat
     cd hpat
-    pushd parquet_reader
-    mkdir build
-    pushd build
-    cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
-        -DCMAKE_INSTALL_LIBDIR=$CONDA_PREFIX/lib -DPQ_PREFIX=$CONDA_PREFIX ..
-    make
-    make install
-    popd
-    popd
     # build HPAT
     HDF5_DIR=$CONDA_PREFIX python setup.py develop
 

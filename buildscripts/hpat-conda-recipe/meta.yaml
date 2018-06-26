@@ -21,11 +21,9 @@ requirements:
     - pandas 0.23
     - mpich # [not win]
     - pyarrow 0.9.*
-    - boost-cpp
+    - boost
     - hdf5
     - h5py
-    - opencv 3.3.1
-    - hpat-parquet-reader 0.1.1 # [not win]
 
   run:
     - python 3.6.*
@@ -33,11 +31,10 @@ requirements:
     - pandas 0.23
     - mpich # [not win]
     - pyarrow 0.9.*
-    - boost-cpp
+    - boost
     - numba 0.39.*
     - hdf5
     - h5py
-    - hpat-parquet-reader 0.1.1 # [not win]
 
 test:
   imports:

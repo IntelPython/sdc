@@ -147,7 +147,7 @@ ext_set = Extension(name="hset_ext",
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=['boost_regex'] + np_compile_args['libraries'],
-                    define_macros = np_compile_args['define_macros'], #+ [('USE_BOOST_REGEX', None)],
+                    define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
                     extra_compile_args = eca,
                     extra_link_args = ela,
                     include_dirs = np_compile_args['include_dirs'] + ind,
@@ -183,17 +183,19 @@ ext_quantile = Extension(name="quantile_alg",
 # pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
 pq_libs = MPI_LIBS + ['boost_filesystem']
 
-if is_win:
-    pq_libs += ['arrow', 'parquet']
-else:
-    # seperate parquet reader used due to ABI incompatibility of arrow
-    pq_libs += ['hpat_parquet_reader']
+# if is_win:
+#     pq_libs += ['arrow', 'parquet']
+# else:
+#     # seperate parquet reader used due to ABI incompatibility of arrow
+#     pq_libs += ['hpat_parquet_reader']
+
+pq_libs += ['arrow', 'parquet']
 
 ext_parquet = Extension(name="parquet_cpp",
                         sources=["hpat/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
-                        # define_macros = [('BUILTIN_PARQUET_READER', None)],
+                        define_macros = [('BUILTIN_PARQUET_READER', None)],
                         extra_compile_args = eca,
                         extra_link_args = ela,
                         library_dirs = lid,
@@ -254,7 +256,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.2.1',
+      version='0.22',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[
