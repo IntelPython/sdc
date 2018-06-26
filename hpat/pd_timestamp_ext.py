@@ -2,7 +2,7 @@ import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
-                             lower_getattr, infer_getattr, overload_method, intrinsic)
+                             lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
 from numba.targets.arrayobj import make_array
 from numba.targets.boxing import unbox_array
@@ -382,6 +382,10 @@ def str_2d(a):
         return '0' + res
     return res
 
+@overload(str)
+def ts_str_overload(in_typ):
+    if in_typ == pandas_timestamp_type:
+        return lambda a: a.isoformat(' ')
 
 @unbox(PandasTimestampType)
 def unbox_pandas_timestamp(typ, val, c):
