@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import numba
 from numba import ir, ir_utils
-from numba.ir_utils import require
+from numba.ir_utils import require, mk_unique_var
 from numba import types
 import numba.array_analysis
 from numba.typing import signature
@@ -804,18 +804,47 @@ def iternext_itertuples(context, builder, sig, args, result):
 # TODO: move this to array analysis
 # the namedtuples created by get_itertuples-iternext-pair_first don't have
 # shapes created in array analysis
-def _analyze_op_static_getitem(self, scope, equiv_set, expr):
-    var = expr.value
-    typ = self.typemap[var.name]
-    if not isinstance(typ, types.BaseTuple):
-        return self._index_to_shape(scope, equiv_set, expr.value, expr.index_var)
-    try:
-        shape = equiv_set._get_shape(var)
-        require(isinstance(expr.index, int) and expr.index < len(shape))
-        return shape[expr.index], []
-    except:
-        pass
+# def _analyze_op_static_getitem(self, scope, equiv_set, expr):
+#     var = expr.value
+#     typ = self.typemap[var.name]
+#     if not isinstance(typ, types.BaseTuple):
+#         return self._index_to_shape(scope, equiv_set, expr.value, expr.index_var)
+#     try:
+#         shape = equiv_set._get_shape(var)
+#         require(isinstance(expr.index, int) and expr.index < len(shape))
+#         return shape[expr.index], []
+#     except:
+#         pass
 
-    return None
+#     return None
 
-numba.array_analysis.ArrayAnalysis._analyze_op_static_getitem = _analyze_op_static_getitem
+# numba.array_analysis.ArrayAnalysis._analyze_op_static_getitem = _analyze_op_static_getitem
+
+# FIXME: fix array analysis for tuples in general
+def _analyze_op_pair_first(self, scope, equiv_set, expr):
+    # make dummy lhs since we don't have access to lhs
+    typ = self.typemap[expr.value.name].first_type
+    if not isinstance(typ, types.NamedTuple):
+        return None
+    lhs = ir.Var(scope, mk_unique_var("tuple_var"), expr.loc)
+    self.typemap[lhs.name] = typ
+    rhs = ir.Expr.pair_first(expr.value, expr.loc)
+    lhs_assign = ir.Assign(rhs, lhs, expr.loc)
+    #(shape, post) = self._gen_shape_call(equiv_set, lhs, typ.count, )
+    var = lhs
+    out = []
+    size_vars = []
+    ndims = typ.count
+    for i in range(ndims):
+        # get size: Asize0 = A_sh_attr[0]
+        size_var = ir.Var(var.scope, mk_unique_var(
+                            "{}_size{}".format(var.name, i)), var.loc)
+        getitem = ir.Expr.static_getitem(lhs, i, None, var.loc)
+        self.calltypes[getitem] = None
+        out.append(ir.Assign(getitem, size_var, var.loc))
+        self._define(equiv_set, size_var, types.intp, getitem)
+        size_vars.append(size_var)
+    shape = tuple(size_vars)
+    return shape, [lhs_assign] + out
+
+numba.array_analysis.ArrayAnalysis._analyze_op_pair_first = _analyze_op_pair_first
