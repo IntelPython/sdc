@@ -1,6 +1,7 @@
-import numba
 import numpy as np
-
+import pandas as pd
+import numba
+from numba.extending import overload
 
 # ported from Spark to Numba-compilable Python
 # A port of the Android TimSort class, which utilizes a "stable, adaptive, iterative mergesort."
@@ -55,8 +56,8 @@ MIN_MERGE = 32
 # sort, assuming the input array is large enough to warrant the full-blown
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
-@numba.njit
-def sort(sortState, key_arr, lo, hi):
+#@numba.njit
+def sort(sortState, key_arr, lo, hi, data):
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -64,8 +65,8 @@ def sort(sortState, key_arr, lo, hi):
 
     # If array is small, do a "mini-TimSort" with no merges
     if nRemaining < MIN_MERGE:
-        initRunLen = countRunAndMakeAscending(key_arr, lo, hi)
-        binarySort(key_arr, lo, hi, lo + initRunLen)
+        initRunLen = countRunAndMakeAscending(key_arr, lo, hi, data)
+        binarySort(key_arr, lo, hi, lo + initRunLen, data)
         return
 
     # March over the array once, left to right, finding natural runs,
@@ -75,12 +76,12 @@ def sort(sortState, key_arr, lo, hi):
     minRun = minRunLength(nRemaining)
     while True:  # emulating do-while
         # Identify next run
-        runLen = countRunAndMakeAscending(key_arr, lo, hi)
+        runLen = countRunAndMakeAscending(key_arr, lo, hi, data)
 
         # If run is short, extend to min(minRun, nRemaining)
         if runLen < minRun:
             force = nRemaining if nRemaining <= minRun else minRun
-            binarySort(key_arr, lo, lo + force, lo + runLen)
+            binarySort(key_arr, lo, lo + force, lo + runLen, data)
             runLen = force
 
         # Push run onto pending-run stack, and maybe merge
@@ -118,7 +119,7 @@ def sort(sortState, key_arr, lo, hi):
 # @param c comparator to used for the sort
 
 @numba.njit
-def binarySort(key_arr, lo, hi, start):
+def binarySort(key_arr, lo, hi, start, data):
     assert lo <= start and start <= hi
     if start == lo:
         start += 1
@@ -128,6 +129,7 @@ def binarySort(key_arr, lo, hi, start):
     while start < hi:
         #pivotStore = key_arr[start]  # TODO: copy data to pivot
         pivot = key_arr[start]
+        pivot_data = getitem_arr_tup(data, start)
 
         # Set left (and right) to the index where key_arr[start] (pivot) belongs
         left = lo
@@ -160,9 +162,11 @@ def binarySort(key_arr, lo, hi, start):
         # FIXME: is slicing ok?
         #key_arr[left+1:left+1+n] = key_arr[left:left+n]
         copyRange(key_arr, left, key_arr, left + 1, n)
+        copyRange_tup(data, left, data, left + 1, n)
 
         #copyElement(pivotStore, 0, key_arr, left)
         key_arr[left] = pivot
+        setitem_arr_tup(data, left, pivot_data)
         start += 1
 
 
@@ -192,7 +196,7 @@ def binarySort(key_arr, lo, hi, start):
 #         the specified array
 
 @numba.njit
-def countRunAndMakeAscending(key_arr, lo, hi):
+def countRunAndMakeAscending(key_arr, lo, hi, data):
     assert lo < hi
     runHi = lo + 1
     if runHi == hi:
@@ -203,7 +207,7 @@ def countRunAndMakeAscending(key_arr, lo, hi):
         runHi += 1
         while runHi < hi and key_arr[runHi] < key_arr[runHi-1]:
             runHi += 1
-        reverseRange(key_arr, lo, runHi)
+        reverseRange(key_arr, lo, runHi, data)
     else:                     # Ascending
         runHi += 1
         while runHi < hi and key_arr[runHi] >= key_arr[runHi-1]:
@@ -219,7 +223,7 @@ def countRunAndMakeAscending(key_arr, lo, hi):
 # @param hi the index after the last element in the range to be reversed
 
 @numba.njit
-def reverseRange(key_arr, lo, hi):
+def reverseRange(key_arr, lo, hi, data):
     hi -= 1
     while lo < hi:
         # swap, TODO: copy data
@@ -227,9 +231,15 @@ def reverseRange(key_arr, lo, hi):
         key_arr[lo] = key_arr[hi]
         key_arr[hi] = tmp
 
+        # TODO: add support for map and use it
+        swap_arrs(data, lo, hi)
+        # for arr in data:
+        #     tmp_v = arr[lo]
+        #     arr[lo] = arr[hi]
+        #     arr[hi] = tmp_v
+
         lo += 1
         hi -= 1
-
 
 
 # Returns the minimum acceptable run length for an array of the specified
@@ -272,13 +282,6 @@ MIN_GALLOP = 7
 
 INITIAL_TMP_STORAGE_LENGTH = 256
 
-@numba.njit
-def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
-    dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
-
-@numba.njit
-def copyElement(src_arr, src_pos, dst_arr, dst_pos):
-    dst_arr[dst_pos] = src_arr[src_pos]
 
 # spec = [
 #     ('key_arr', numba.float64[:]),
@@ -294,8 +297,9 @@ def copyElement(src_arr, src_pos, dst_arr, dst_pos):
 # Creates a TimSort instance to maintain the state of an ongoing sort.
 #@numba.jitclass(spec)
 class SortState:
-    def __init__(self, key_arr, aLength):
+    def __init__(self, key_arr, aLength, data):
         self.key_arr = key_arr
+        self.data = data
         self.aLength = aLength
 
         # This controls when we get *into* galloping mode.  It is initialized
@@ -907,6 +911,94 @@ class SortState:
         return self.tmp
 
 
+################### Utils #############
+
+def swap_arrs(data, lo, hi):
+    for arr in data:
+        tmp_v = arr[lo]
+        arr[lo] = arr[hi]
+        arr[hi] = tmp_v
+
+@overload(swap_arrs)
+def swap_arrs_overload(d_typ, l_typ, h_typ):
+    if d_typ.count == 0:
+        return lambda a,b,c: None
+    elif d_typ.count == 1:
+        def swap_impl(arr_t, lo, hi):
+            arr = arr_t[0]
+            tmp = arr[lo]
+            arr[lo] = arr[hi]
+            arr[hi] = tmp
+        return swap_impl
+    else:
+        def rec_swap(data, lo, hi):
+            swap_arrs((data[0],), lo, hi)
+            swap_arrs(data[1:], lo, hi)
+        return rec_swap
+
+
+@numba.njit
+def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
+    dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
+
+def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
+    for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
+        dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
+
+@overload(copyRange_tup)
+def copyRange_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t, n_t):
+    count = src_arr_tup_t.count
+    assert count == dst_arr_tup_t.count
+
+    func_text = "def f(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):\n"
+    for i in range(count):
+        func_text += "  copyRange(src_arr_tup[{}], src_pos, dst_arr_tup[{}], dst_pos, n)\n".format(i, i)
+
+    loc_vars = {}
+    exec(func_text, {'copyRange': copyRange}, loc_vars)
+    copy_impl = loc_vars['f']
+    return copy_impl
+
+@numba.njit
+def copyElement(src_arr, src_pos, dst_arr, dst_pos):
+    dst_arr[dst_pos] = src_arr[src_pos]
+
+
+def getitem_arr_tup(arr_tup, ind):
+    l = [arr[ind] for arr in arr_tup]
+    return tuple(l)
+
+@overload(getitem_arr_tup)
+def getitem_arr_tup_overload(arr_tup_t, ind_t):
+    count = arr_tup_t.count
+
+    func_text = "def f(arr_tup, ind):\n"
+    func_text += "  return ({},)\n".format(
+        ','.join(["arr_tup[{}][ind]".format(i) for i in range(count)]))
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+def setitem_arr_tup(arr_tup, ind, val_tup):
+    for arr, val in zip(arr_tup, val_tup):
+        arr[ind] = val
+
+@overload(setitem_arr_tup)
+def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
+    count = arr_tup_t.count
+
+    func_text = "def f(arr_tup, ind, val_tup):\n"
+    for i in range(count):
+        func_text += "  arr_tup[{}][ind] = val_tup[{}]\n".format(i, i)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+
 def test():
     import time
     spec = [
@@ -919,22 +1011,29 @@ def test():
     ('runBase', numba.int64[:]),
     ('runLen', numba.int64[:]),
     ]
-    SortStateCL = numba.jitclass(spec)(SortState)
+    SortStateCL = SortState #numba.jitclass(spec)(SortState)
     # warm up
     t1 = time.time()
     T = np.ones(3)
-    sortState = SortStateCL(T, 3)
-    sort(sortState, T, 0, 3)
+    data = (np.ones(3),)
+    sortState = SortStateCL(T, 3, data)
+    sort(sortState, T, 0, 3, data)
     print("compile time", time.time()-t1)
-    n = 224000
+    n = 11
+    np.random.seed(2)
+    data = (np.arange(n), np.random.ranf(n))
     A = np.random.ranf(n)
+    df = pd.DataFrame({'A': A, 'B': data[0]})
     t1 = time.time()
-    B = np.sort(A)
+    #B = np.sort(A)
+    df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
-    sortState = SortStateCL(A, n)
-    sort(sortState, A, 0, n)
+    sortState = SortStateCL(A, n, data)
+    sort(sortState, A, 0, n, data)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
-    np.testing.assert_almost_equal(A, B)
+    print(df2.B)
+    print(data)
+    #np.testing.assert_almost_equal(A, B)
 
 if __name__ == '__main__':
     test()

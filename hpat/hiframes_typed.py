@@ -143,10 +143,10 @@ class HiFramesTyped(object):
             ('runLen', numba.int64[:]),
         ]
 
-        def sort_impl(key_arr):
+        def sort_impl(key_arr, data):
             _sort_len = len(key_arr)
             sort_state = SortState(key_arr, _sort_len)
-            hpat.timsort.sort(sort_state, key_arr, 0, _sort_len)
+            hpat.timsort.sort(sort_state, key_arr, 0, _sort_len, data)
 
         SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
 
@@ -154,7 +154,7 @@ class HiFramesTyped(object):
                                         {'hpat': hpat, 'SortState': SortStateCL}, self.typingctx,
                                         (self.typemap[key_arr.name],),
                                         self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [key_arr])
+        replace_arg_nodes(f_block, rhs.args)
         nodes = f_block.body[:-3]
         return nodes
 

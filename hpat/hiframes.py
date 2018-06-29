@@ -847,7 +847,7 @@ class HiFrames(object):
         col_name_args = ', '.join(["c"+str(i) for i in range(len(df_cols))])
 
         func_text = "def f(key_arr, {}):\n".format(col_name_args)
-        func_text += "  hpat.hiframes_api.sort_values(key_arr)\n"#, ({},))\n .format(col_name_args)
+        func_text += "  hpat.hiframes_api.sort_values(key_arr, ({},))\n".format(col_name_args)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
