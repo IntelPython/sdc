@@ -920,21 +920,19 @@ def swap_arrs(data, lo, hi):
         arr[hi] = tmp_v
 
 @overload(swap_arrs)
-def swap_arrs_overload(d_typ, l_typ, h_typ):
-    if d_typ.count == 0:
-        return lambda a,b,c: None
-    elif d_typ.count == 1:
-        def swap_impl(arr_t, lo, hi):
-            arr = arr_t[0]
-            tmp = arr[lo]
-            arr[lo] = arr[hi]
-            arr[hi] = tmp
-        return swap_impl
-    else:
-        def rec_swap(data, lo, hi):
-            swap_arrs((data[0],), lo, hi)
-            swap_arrs(data[1:], lo, hi)
-        return rec_swap
+def swap_arrs_overload(arr_tup_t, l_typ, h_typ):
+    count = arr_tup_t.count
+
+    func_text = "def f(arr_tup, lo, hi):\n"
+    for i in range(count):
+        func_text += "  tmp_v_{} = arr_tup[{}][lo]\n".format(i, i)
+        func_text += "  arr_tup[{}][lo] = arr_tup[{}][hi]\n".format(i, i)
+        func_text += "  arr_tup[{}][hi] = tmp_v_{}\n".format(i, i)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    swap_impl = loc_vars['f']
+    return swap_impl
 
 
 @numba.njit
