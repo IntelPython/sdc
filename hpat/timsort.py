@@ -56,7 +56,7 @@ MIN_MERGE = 32
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
 @numba.njit
-def sort(key_arr, lo, hi):
+def sort(sortState, key_arr, lo, hi):
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -71,8 +71,6 @@ def sort(key_arr, lo, hi):
     # March over the array once, left to right, finding natural runs,
     # extending short natural runs to minRun elements, and merging runs
     # to maintain stack invariant.
-
-    sortState = SortState(key_arr, hi - lo)
 
     minRun = minRunLength(nRemaining)
     while True:  # emulating do-while
@@ -911,13 +909,18 @@ class SortState:
 def test():
     import time
     # warm up
-    sort(np.ones(3), 0, 3)
+    t1 = time.time()
+    T = np.ones(3)
+    sortState = SortState(T, 3)
+    sort(sortState, T, 0, 3)
+    print("compile time", time.time()-t1)
     n = 224000
     A = np.random.ranf(n)
     t1 = time.time()
     B = np.sort(A)
     t2 = time.time()
-    sort(A, 0, n)
+    sortState = SortState(A, n)
+    sort(sortState, A, 0, n)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
     np.testing.assert_almost_equal(A, B)
 
