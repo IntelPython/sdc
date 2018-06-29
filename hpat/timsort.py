@@ -55,6 +55,7 @@ MIN_MERGE = 32
 # sort, assuming the input array is large enough to warrant the full-blown
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
+@numba.njit
 def sort(key_arr, lo, hi):
 
     nRemaining  = hi - lo
@@ -281,7 +282,19 @@ def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):
     dst_arr[dst_pos] = src_arr[src_pos]
 
+spec = [
+    ('key_arr', numba.float64[:]),
+    ('aLength', numba.intp),
+    ('minGallop', numba.intp),
+    ('tmpLength', numba.intp),
+    ('tmp', numba.float64[:]),
+    ('stackSize', numba.intp),
+    ('runBase', numba.int64[:]),
+    ('runLen', numba.int64[:]),
+]
+
 # Creates a TimSort instance to maintain the state of an ongoing sort.
+@numba.jitclass(spec)
 class SortState:
     def __init__(self, key_arr, aLength):
         self.key_arr = key_arr
@@ -896,10 +909,16 @@ class SortState:
         return self.tmp
 
 def test():
-    n = 124000
+    import time
+    # warm up
+    sort(np.ones(3), 0, 3)
+    n = 224000
     A = np.random.ranf(n)
+    t1 = time.time()
     B = np.sort(A)
+    t2 = time.time()
     sort(A, 0, n)
+    print("HPAT", time.time()-t2, "Numpy", t2-t1)
     np.testing.assert_almost_equal(A, B)
 
 if __name__ == '__main__':
