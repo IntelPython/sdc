@@ -280,19 +280,19 @@ def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):
     dst_arr[dst_pos] = src_arr[src_pos]
 
-spec = [
-    ('key_arr', numba.float64[:]),
-    ('aLength', numba.intp),
-    ('minGallop', numba.intp),
-    ('tmpLength', numba.intp),
-    ('tmp', numba.float64[:]),
-    ('stackSize', numba.intp),
-    ('runBase', numba.int64[:]),
-    ('runLen', numba.int64[:]),
-]
+# spec = [
+#     ('key_arr', numba.float64[:]),
+#     ('aLength', numba.intp),
+#     ('minGallop', numba.intp),
+#     ('tmpLength', numba.intp),
+#     ('tmp', numba.float64[:]),
+#     ('stackSize', numba.intp),
+#     ('runBase', numba.int64[:]),
+#     ('runLen', numba.int64[:]),
+# ]
 
 # Creates a TimSort instance to maintain the state of an ongoing sort.
-@numba.jitclass(spec)
+#@numba.jitclass(spec)
 class SortState:
     def __init__(self, key_arr, aLength):
         self.key_arr = key_arr
@@ -906,12 +906,24 @@ class SortState:
 
         return self.tmp
 
+
 def test():
     import time
+    spec = [
+    ('key_arr', numba.float64[:]),
+    ('aLength', numba.intp),
+    ('minGallop', numba.intp),
+    ('tmpLength', numba.intp),
+    ('tmp', numba.float64[:]),
+    ('stackSize', numba.intp),
+    ('runBase', numba.int64[:]),
+    ('runLen', numba.int64[:]),
+    ]
+    SortStateCL = numba.jitclass(spec)(SortState)
     # warm up
     t1 = time.time()
     T = np.ones(3)
-    sortState = SortState(T, 3)
+    sortState = SortStateCL(T, 3)
     sort(sortState, T, 0, 3)
     print("compile time", time.time()-t1)
     n = 224000
@@ -919,7 +931,7 @@ def test():
     t1 = time.time()
     B = np.sort(A)
     t2 = time.time()
-    sortState = SortState(A, n)
+    sortState = SortStateCL(A, n)
     sort(sortState, A, 0, n)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
     np.testing.assert_almost_equal(A, B)

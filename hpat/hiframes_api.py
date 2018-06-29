@@ -413,6 +413,16 @@ def fix_df_array(c):  # pragma: no cover
 def fix_rolling_array(c):  # pragma: no cover
     return c
 
+def sort_values(key_arr):  # pragma: no cover
+    return
+
+@infer_global(sort_values)
+class SortTyping(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.none, *args)
+
+
 import pandas as pd
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue
 from numba import numpy_support

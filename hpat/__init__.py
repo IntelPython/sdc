@@ -16,6 +16,7 @@ import hpat.compiler
 import hpat.io
 import hpat.pd_timestamp_ext
 import hpat.config
+import hpat.timsort
 
 if hpat.config._has_xenon:
     from hpat.xenon_ext import read_xenon, xe_connect, xe_open, xe_close

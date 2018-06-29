@@ -92,6 +92,9 @@ class HiFramesTyped(object):
                 if fdef == ('ts_binop_wrapper', 'hpat.hiframes_api'):
                     return self._handle_ts_binop(lhs, rhs, assign)
 
+                if fdef == ('sort_values', 'hpat.hiframes_api'):
+                    return self._handle_sort_values(lhs, rhs, assign)
+
             res = self._handle_str_contains(lhs, rhs, assign, call_table)
             if res is not None:
                 return res
@@ -124,6 +127,36 @@ class HiFramesTyped(object):
         # S is target of last statement in 1st block of f
         assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
         return (f_blocks, [assign])
+
+    def _handle_sort_values(self, lhs, rhs, assign):
+
+        key_arr = rhs.args[0]
+        key_typ = self.typemap[key_arr.name]
+        sort_state_spec = [
+            ('key_arr', key_typ),
+            ('aLength', numba.intp),
+            ('minGallop', numba.intp),
+            ('tmpLength', numba.intp),
+            ('tmp', key_typ),
+            ('stackSize', numba.intp),
+            ('runBase', numba.int64[:]),
+            ('runLen', numba.int64[:]),
+        ]
+
+        def sort_impl(key_arr):
+            _sort_len = len(key_arr)
+            sort_state = SortState(key_arr, _sort_len)
+            hpat.timsort.sort(sort_state, key_arr, 0, _sort_len)
+
+        SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
+
+        f_block = compile_to_numba_ir(sort_impl,
+                                        {'hpat': hpat, 'SortState': SortStateCL}, self.typingctx,
+                                        (self.typemap[key_arr.name],),
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [key_arr])
+        nodes = f_block.body[:-3]
+        return nodes
 
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor

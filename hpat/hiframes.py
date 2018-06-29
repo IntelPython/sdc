@@ -103,6 +103,8 @@ class HiFrames(object):
             func_ir, typingctx, args, _locals, self.reverse_copies)
 
     def run(self):
+        # FIXME: see why this breaks test_kmeans
+        # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
         cfg = compute_cfg_from_blocks(self.func_ir.blocks)
         topo_order = find_topo_order(self.func_ir.blocks)
@@ -333,6 +335,11 @@ class HiFrames(object):
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'describe'):
             return self._handle_df_describe(assign, lhs, rhs, func_mod)
+
+        # df.sort_values()
+        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
+                and func_name == 'sort_values'):
+            return self._handle_df_sort_values(assign, lhs, rhs, func_mod)
 
         # df.itertuples()
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
@@ -816,6 +823,45 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
         return nodes
+
+    def _handle_df_sort_values(self, assign, lhs, rhs, df):
+        kws = dict(rhs.kws)
+        # find key array for sort ('by' arg)
+        key_name = None
+        if len(rhs.args) > 0:
+            key_name = guard(find_const, self.func_ir, rhs.args[0])
+        else:
+            key_name = kws['by'] if 'by' in kws else None
+        if key_name is None:
+            raise ValueError("'by' argument is required for sort_values() "
+                             "which should be a constant string")
+        # TODO: support inplace=False
+        assert 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True
+        # TODO: support multiple columns as key
+        # TODO: support ascending=False
+
+        df_cols = self._get_df_cols(df).copy()  # copy since it'll be modified
+        assert key_name in df_cols
+        key_var = df_cols.pop(key_name)
+
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(df_cols))])
+
+        func_text = "def f(key_arr, {}):\n".format(col_name_args)
+        func_text += "  hpat.hiframes_api.sort_values(key_arr)\n"#, ({},))\n .format(col_name_args)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        sort_impl = loc_vars['f']
+
+        f_block = compile_to_numba_ir(
+            sort_impl, {'hpat': hpat}).blocks.popitem()[1]
+
+        replace_arg_nodes(f_block, [key_var] + list(df_cols.values()))
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        return nodes
+
+
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
         """pass df column names and variables to get_itertuples() to be able
