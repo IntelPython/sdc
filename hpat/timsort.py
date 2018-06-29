@@ -311,6 +311,7 @@ class SortState:
         # Allocate temp storage (which may be increased later if necessary)
         self.tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
         self.tmp = np.empty(self.tmpLength, key_arr.dtype)
+        self.tmp_data = alloc_arr_tup(self.tmpLength, data)
 
 
         # A stack of pending runs yet to be merged.  Run i starts at
@@ -603,9 +604,12 @@ class SortState:
 
         # Copy first run into temp array
         arr = self.key_arr
+        arr_data = self.data
         tmp = self.ensureCapacity(len1)
-        # copyRange(arr, base1, tmp, 0, len1)
-        tmp[:len1] = arr[base1:base1+len1]
+        tmp_data = self.tmp_data
+        copyRange(arr, base1, tmp, 0, len1)
+        #tmp[:len1] = arr[base1:base1+len1]
+        copyRange_tup(arr_data, base1, tmp_data, 0, len1)
 
         cursor1 = 0       # Indexes into tmp array
         cursor2 = base2   # Indexes a
@@ -614,17 +618,22 @@ class SortState:
         # Move first element of second run and deal with degenerate cases
         # copyElement(arr, cursor2, arr, dest)
         arr[dest] = arr[cursor2]
+        copyElement_tup(arr_data, cursor2, arr_data, dest)
+
         cursor2 += 1
         dest += 1
         len2 -= 1
         if len2 == 0:
-            # copyRange(tmp, cursor1, a, dest, len1)
-            arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
+            copyRange(tmp, cursor1, arr, dest, len1)
+            copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
+            #arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
             return
 
         if len1 == 1:
             copyRange(arr, cursor2, arr, dest, len2)
+            copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
             copyElement(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
+            copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
             return
 
 
@@ -641,17 +650,22 @@ class SortState:
         if len1 == 1:
             assert len2 > 0
             copyRange(arr, cursor2, arr, dest, len2)
+            copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
             copyElement(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
+            copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
         elif len1 == 0:
             raise ValueError("Comparison method violates its general contract!")
         else:
             assert len2 == 0
             assert len1 > 1
             copyRange(tmp, cursor1, arr, dest, len1)
+            copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
 
 
     def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
         arr = self.key_arr
+        arr_data = self.data
+        tmp_data = self.tmp_data
 
         while True:
             count1 = 0 # Number of times in a row that first run won
@@ -665,6 +679,7 @@ class SortState:
                 assert len1 > 1 and len2 > 0
                 if arr[cursor2] < tmp[cursor1]:
                     copyElement(arr, cursor2, arr, dest)
+                    copyElement_tup(arr_data, cursor2, arr_data, dest)
                     cursor2 += 1
                     dest += 1
                     count2 += 1
@@ -674,6 +689,7 @@ class SortState:
                         return len1, len2, cursor1, cursor2, dest, minGallop
                 else:
                     copyElement(tmp, cursor1, arr, dest)
+                    copyElement_tup(tmp_data, cursor1, arr_data, dest)
                     cursor1 += 1
                     dest += 1
                     count1 += 1
@@ -695,6 +711,7 @@ class SortState:
                 count1 = self.gallopRight(arr[cursor2], tmp, cursor1, len1, 0)
                 if count1 != 0:
                     copyRange(tmp, cursor1, arr, dest, count1)
+                    copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
                     dest += count1
                     cursor1 += count1
                     len1 -= count1
@@ -702,6 +719,7 @@ class SortState:
                         return len1, len2, cursor1, cursor2, dest, minGallop
 
                 copyElement(arr, cursor2, arr, dest)
+                copyElement_tup(arr_data, cursor2, arr_data, dest)
                 cursor2 += 1
                 dest += 1
                 len2 -= 1
@@ -711,6 +729,7 @@ class SortState:
                 count2 = self.gallopLeft(tmp[cursor1], arr, cursor2, len2, 0)
                 if count2 != 0:
                     copyRange(arr, cursor2, arr, dest, count2)
+                    copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
                     dest += count2
                     cursor2 += count2
                     len2 -= count2
@@ -718,6 +737,7 @@ class SortState:
                         return len1, len2, cursor1, cursor2, dest, minGallop
 
                 copyElement(tmp, cursor1, arr, dest)
+                copyElement_tup(tmp_data, cursor1, arr_data, dest)
                 cursor1 += 1
                 dest += 1
                 len1 -= 1
@@ -752,8 +772,11 @@ class SortState:
 
         # Copy second run into temp array
         arr = self.key_arr
+        arr_data = self.data
         tmp = self.ensureCapacity(len2)
+        tmp_data = self.tmp_data
         copyRange(arr, base2, tmp, 0, len2)
+        copyRange_tup(arr_data, base2, tmp_data, 0, len2)
 
         cursor1 = base1 + len1 - 1  # Indexes into arr
         cursor2 = len2 - 1          # Indexes into tmp array
@@ -761,18 +784,22 @@ class SortState:
 
         # Move last element of first run and deal with degenerate cases
         copyElement(arr, cursor1, arr, dest)
+        copyElement_tup(arr_data, cursor1, arr_data, dest)
         cursor1 -= 1
         dest -= 1
         len1 -= 1
         if len1 == 0:
             copyRange(tmp, 0, arr, dest - (len2 - 1), len2)
+            copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
             return
 
         if len2 == 1:
             dest -= len1
             cursor1 -= len1
             copyRange(arr, cursor1 + 1, arr, dest + 1, len1)
+            copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
             copyElement(tmp, cursor2, arr, dest)
+            copyElement_tup(tmp_data, cursor2, arr_data, dest)
             return
 
         minGallop = self.minGallop
@@ -789,18 +816,23 @@ class SortState:
             dest -= len1
             cursor1 -= len1
             copyRange(arr, cursor1 + 1, arr, dest + 1, len1)
+            copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
             copyElement(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
+            copyElement_tup(tmp_data, cursor2, arr_data, dest)
         elif len2 == 0:
             raise ValueError("Comparison method violates its general contract!")
         else:
             assert len1 == 0
             assert len2 > 0
             copyRange(tmp, 0, arr, dest - (len2 - 1), len2)
+            copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
 
 
     # XXX refactored nested loop break
     def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
         arr = self.key_arr
+        arr_data = self.data
+        tmp_data = self.tmp_data
 
         while True:
             count1 = 0 # Number of times in a row that first run won
@@ -813,6 +845,7 @@ class SortState:
                 assert len1 > 0 and len2 > 1
                 if tmp[cursor2] < arr[cursor1]:
                     copyElement(arr, cursor1, arr, dest)
+                    copyElement_tup(arr_data, cursor1, arr_data, dest)
                     cursor1 -= 1
                     dest -= 1
                     count1 += 1
@@ -822,6 +855,7 @@ class SortState:
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
                 else:
                     copyElement(tmp, cursor2, arr, dest)
+                    copyElement_tup(tmp_data, cursor2, arr_data, dest)
                     cursor2 -=1
                     dest -= 1
                     count2 += 1
@@ -846,10 +880,12 @@ class SortState:
                     cursor1 -= count1
                     len1 -= count1
                     copyRange(arr, cursor1 + 1, arr, dest + 1, count1)
+                    copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, count1)
                     if len1 == 0:
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
                 copyElement(tmp, cursor2, arr, dest)
+                copyElement_tup(tmp_data, cursor2, arr_data, dest)
                 cursor2 -= 1
                 dest -= 1
                 len2 -= 1
@@ -862,10 +898,12 @@ class SortState:
                     cursor2 -= count2
                     len2 -= count2
                     copyRange(tmp, cursor2 + 1, arr, dest + 1, count2)
+                    copyRange_tup(tmp_data, cursor2 + 1, arr_data, dest + 1, count2)
                     if len2 <= 1:  # len2 == 1 or len2 == 0
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
                 copyElement(arr, cursor1, arr, dest)
+                copyElement_tup(arr_data, cursor1, arr_data, dest)
                 cursor1 -= 1
                 dest -= 1
                 len1 -= 1
@@ -906,6 +944,7 @@ class SortState:
                 newSize = min(newSize, self.aLength >> 1)
 
             self.tmp = np.empty(newSize, self.key_arr.dtype)
+            self.tmp_data = alloc_arr_tup(newSize, self.data)
             self.tmpLength = newSize
 
         return self.tmp
@@ -961,6 +1000,9 @@ def copyRange_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t, n
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):
     dst_arr[dst_pos] = src_arr[src_pos]
 
+def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
+    for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
+        dst_arr[dst_pos] = src_arr[src_pos]
 
 def getitem_arr_tup(arr_tup, ind):
     l = [arr[ind] for arr in arr_tup]
@@ -996,6 +1038,11 @@ def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
     impl = loc_vars['f']
     return impl
 
+def alloc_arr_tup(n, arr_tup):
+    arrs = []
+    for in_arr in arr_tup:
+        arrs.append(np.empty(n, in_arr.dtype))
+    return tuple(arrs)
 
 def test():
     import time
@@ -1017,11 +1064,11 @@ def test():
     sortState = SortStateCL(T, 3, data)
     sort(sortState, T, 0, 3, data)
     print("compile time", time.time()-t1)
-    n = 11
+    n = 210000
     np.random.seed(2)
     data = (np.arange(n), np.random.ranf(n))
     A = np.random.ranf(n)
-    df = pd.DataFrame({'A': A, 'B': data[0]})
+    df = pd.DataFrame({'A': A, 'B': data[0], 'C': data[1]})
     t1 = time.time()
     #B = np.sort(A)
     df2 = df.sort_values('A', inplace=False)
@@ -1029,9 +1076,10 @@ def test():
     sortState = SortStateCL(A, n, data)
     sort(sortState, A, 0, n, data)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
-    print(df2.B)
-    print(data)
-    #np.testing.assert_almost_equal(A, B)
+    # print(df2.B)
+    # print(data)
+    np.testing.assert_almost_equal(data[0], df2.B.values)
+    np.testing.assert_almost_equal(data[1], df2.C.values)
 
 if __name__ == '__main__':
     test()
