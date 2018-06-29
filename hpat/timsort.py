@@ -895,3 +895,12 @@ class SortState:
 
         return self.tmp
 
+def test():
+    n = 124000
+    A = np.random.ranf(n)
+    B = np.sort(A)
+    sort(A, 0, n)
+    np.testing.assert_almost_equal(A, B)
+
+if __name__ == '__main__':
+    test()
