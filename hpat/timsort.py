@@ -56,7 +56,7 @@ MIN_MERGE = 32
 # sort, assuming the input array is large enough to warrant the full-blown
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
-#@numba.njit
+@numba.njit
 def sort(sortState, key_arr, lo, hi, data):
 
     nRemaining  = hi - lo
@@ -1004,6 +1004,20 @@ def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos] = src_arr[src_pos]
 
+@overload(copyElement_tup)
+def copyElement_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t):
+    count = src_arr_tup_t.count
+    assert count == dst_arr_tup_t.count
+
+    func_text = "def f(src_arr_tup, src_pos, dst_arr_tup, dst_pos):\n"
+    for i in range(count):
+        func_text += "  copyElement(src_arr_tup[{}], src_pos, dst_arr_tup[{}], dst_pos)\n".format(i, i)
+
+    loc_vars = {}
+    exec(func_text, {'copyElement': copyElement}, loc_vars)
+    copy_impl = loc_vars['f']
+    return copy_impl
+
 def getitem_arr_tup(arr_tup, ind):
     l = [arr[ind] for arr in arr_tup]
     return tuple(l)
@@ -1044,8 +1058,24 @@ def alloc_arr_tup(n, arr_tup):
         arrs.append(np.empty(n, in_arr.dtype))
     return tuple(arrs)
 
+@overload(alloc_arr_tup)
+def alloc_arr_tup_overload(n_t, data_t):
+    count = data_t.count
+    func_text = "def f(n, d):\n"
+    func_text += "  return ({},)\n".format(','.join(["np.empty(n, np.{})".format(data_t.types[i].dtype) for i in range(count)]))
+
+    loc_vars = {}
+    exec(func_text, {'np': np}, loc_vars)
+    alloc_impl = loc_vars['f']
+    return alloc_impl
+
 def test():
     import time
+    #SortStateCL = SortState #numba.jitclass(spec)(SortState)
+    # warm up
+    t1 = time.time()
+    T = np.ones(3)
+    data = (np.arange(3), np.ones(3),)
     spec = [
     ('key_arr', numba.float64[:]),
     ('aLength', numba.intp),
@@ -1055,12 +1085,10 @@ def test():
     ('stackSize', numba.intp),
     ('runBase', numba.int64[:]),
     ('runLen', numba.int64[:]),
+    ('data', numba.typeof(data)),
+    ('tmp_data', numba.typeof(data)),
     ]
-    SortStateCL = SortState #numba.jitclass(spec)(SortState)
-    # warm up
-    t1 = time.time()
-    T = np.ones(3)
-    data = (np.ones(3),)
+    SortStateCL = numba.jitclass(spec)(SortState)
     sortState = SortStateCL(T, 3, data)
     sort(sortState, T, 0, 3, data)
     print("compile time", time.time()-t1)
