@@ -129,9 +129,11 @@ class HiFramesTyped(object):
         return (f_blocks, [assign])
 
     def _handle_sort_values(self, lhs, rhs, assign):
-
         key_arr = rhs.args[0]
         key_typ = self.typemap[key_arr.name]
+        data_tup = rhs.args[1]
+        data_tup_typ = self.typemap[data_tup.name]
+
         sort_state_spec = [
             ('key_arr', key_typ),
             ('aLength', numba.intp),
@@ -141,18 +143,20 @@ class HiFramesTyped(object):
             ('stackSize', numba.intp),
             ('runBase', numba.int64[:]),
             ('runLen', numba.int64[:]),
+            ('data', data_tup_typ),
+            ('tmp_data', data_tup_typ),
         ]
 
         def sort_impl(key_arr, data):
             _sort_len = len(key_arr)
-            sort_state = SortState(key_arr, _sort_len)
+            sort_state = SortState(key_arr, _sort_len, data)
             hpat.timsort.sort(sort_state, key_arr, 0, _sort_len, data)
 
         SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
 
         f_block = compile_to_numba_ir(sort_impl,
                                         {'hpat': hpat, 'SortState': SortStateCL}, self.typingctx,
-                                        (self.typemap[key_arr.name],),
+                                        (key_typ, data_tup_typ),
                                         self.typemap, self.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, rhs.args)
         nodes = f_block.body[:-3]
