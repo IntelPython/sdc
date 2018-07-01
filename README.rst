@@ -28,25 +28,13 @@ Installation
 ############
 
 HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_
-environment easily (Linux/Mac)::
+environment easily (Linux/Mac/Windows)::
 
-    conda create -n HPAT python=3.6
-    source activate HPAT
-    conda install pandas
-    conda install numba -c numba
-    conda install pyarrow mpich -c conda-forge
-    conda install hpat -c ehsantn
+    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge hpat
 
 Windows installaton requires
 `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
-installed separately instead of `mpich`. The rest is the same::
-
-    conda create -n HPAT python=3.6
-    activate HPAT
-    conda install pandas
-    conda install numba -c numba
-    conda install pyarrow -c conda-forge
-    conda install hpat -c ehsantn
+installed.
 
 Docker Container
 ----------------

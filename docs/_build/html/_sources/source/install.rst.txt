@@ -4,30 +4,20 @@ Installing HPAT
 ===============
 
 HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ environment
-easily. On Linux/Mac::
+easily. On Linux/Mac/Windows::
 
-    conda create -n HPAT python=3.6
-    source activate HPAT
-    conda install pandas
-    conda install numba -c numba
-    conda install pyarrow mpich -c conda-forge
-    conda install hpat -c ehsantn
+    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge hpat
 
-On Windows::
-
-    conda create -n HPAT python=3.6
-    activate HPAT
-    conda install pandas
-    conda install numba -c numba
-    conda install pyarrow -c conda-forge
-    conda install hpat -c ehsantn
+Windows installaton requires
+`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
+installed.
 
 Building HPAT from Source
 -------------------------
 
-We use `Anaconda 5.1.0 <https://repo.continuum.io/archive/Anaconda3-5.1.0-Linux-x86_64.sh>`_ distribution of
+We use `Anaconda <https://www.anaconda.com/download/>`_ distribution of
 Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
-such as Numba and LLVM on Ubuntu Linux::
+such as Numba on Ubuntu Linux::
 
     wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
     chmod +x miniconda.sh
