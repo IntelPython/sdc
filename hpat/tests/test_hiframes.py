@@ -793,6 +793,17 @@ class TestHiFrames(unittest.TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_sort_values(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.B.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
