@@ -38,6 +38,7 @@ void hpat_dist_waitall(int size, MPI_Request *req);
 
 void c_gather_scalar(void* send_data, void* recv_data, int typ_enum);
 void c_gatherv(void* send_data, int sendcount, void* recv_data, int* recv_counts, int* displs, int typ_enum);
+void c_bcast(void* send_data, int sendcount, int typ_enum);
 
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
@@ -122,6 +123,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&c_gather_scalar)));
     PyObject_SetAttrString(m, "c_gatherv",
                             PyLong_FromVoidPtr((void*)(&c_gatherv)));
+    PyObject_SetAttrString(m, "c_bcast",
+                            PyLong_FromVoidPtr((void*)(&c_bcast)));
     PyObject_SetAttrString(m, "c_alltoallv",
                             PyLong_FromVoidPtr((void*)(&c_alltoallv)));
     PyObject_SetAttrString(m, "c_alltoall",
@@ -467,6 +470,13 @@ void c_gatherv(void* send_data, int sendcount, void* recv_data, int* recv_counts
     MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
     MPI_Gatherv(send_data, sendcount, mpi_typ, recv_data, recv_counts, displs, mpi_typ, ROOT_PE,
            MPI_COMM_WORLD);
+    return;
+}
+
+void c_bcast(void* send_data, int sendcount, int typ_enum)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
+    MPI_Bcast(send_data, sendcount, mpi_typ, ROOT_PE, MPI_COMM_WORLD);
     return;
 }
 

@@ -12,6 +12,7 @@ import llvmlite.binding as ll
 ll.add_symbol('c_alltoall', hdist.c_alltoall)
 ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
 ll.add_symbol('c_gatherv', hdist.c_gatherv)
+ll.add_symbol('c_bcast', hdist.c_bcast)
 
 from enum import Enum
 
@@ -120,6 +121,20 @@ def gatherv_overload(data_t):
     gatherv_impl = loc_vars['gatherv_impl']
     return gatherv_impl
 
+
+# TODO: test
+# TODO: large BCast
+@numba.njit
+def bcast(data):  # pragma: no cover
+    typ_enum = get_type_enum(data)
+    count = len(data)
+    assert count < INT_MAX
+    c_bcast(data.ctypes, np.int32(count), typ_enum)
+    return
+
+# sendbuf, sendcount, dtype
+c_bcast = types.ExternalFunction("c_bcast",
+    types.void(types.voidptr, types.int32, types.int32))
 
 
 def get_rank():  # pragma: no cover
