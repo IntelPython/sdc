@@ -847,7 +847,9 @@ class HiFrames(object):
         col_name_args = ', '.join(["c"+str(i) for i in range(len(df_cols))])
 
         func_text = "def f(key_arr, {}):\n".format(col_name_args)
-        func_text += "  hpat.hiframes_api.sort_values(key_arr, ({},))\n".format(col_name_args)
+        func_text += "  hpat.hiframes_api.sort_values(key_arr, ({}{}))\n".format(
+            col_name_args,
+            "," if len(df_cols) == 1 else "")  # single value needs comma to become tuple
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)

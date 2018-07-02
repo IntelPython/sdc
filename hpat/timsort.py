@@ -967,6 +967,7 @@ def swap_arrs_overload(arr_tup_t, l_typ, h_typ):
         func_text += "  tmp_v_{} = arr_tup[{}][lo]\n".format(i, i)
         func_text += "  arr_tup[{}][lo] = arr_tup[{}][hi]\n".format(i, i)
         func_text += "  arr_tup[{}][hi] = tmp_v_{}\n".format(i, i)
+    func_text += "  return\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -990,6 +991,7 @@ def copyRange_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t, n
     func_text = "def f(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):\n"
     for i in range(count):
         func_text += "  copyRange(src_arr_tup[{}], src_pos, dst_arr_tup[{}], dst_pos, n)\n".format(i, i)
+    func_text += "  return\n"
 
     loc_vars = {}
     exec(func_text, {'copyRange': copyRange}, loc_vars)
@@ -1012,6 +1014,7 @@ def copyElement_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t)
     func_text = "def f(src_arr_tup, src_pos, dst_arr_tup, dst_pos):\n"
     for i in range(count):
         func_text += "  copyElement(src_arr_tup[{}], src_pos, dst_arr_tup[{}], dst_pos)\n".format(i, i)
+    func_text += "  return\n"
 
     loc_vars = {}
     exec(func_text, {'copyElement': copyElement}, loc_vars)
@@ -1027,8 +1030,9 @@ def getitem_arr_tup_overload(arr_tup_t, ind_t):
     count = arr_tup_t.count
 
     func_text = "def f(arr_tup, ind):\n"
-    func_text += "  return ({},)\n".format(
-        ','.join(["arr_tup[{}][ind]".format(i) for i in range(count)]))
+    func_text += "  return ({}{})\n".format(
+        ','.join(["arr_tup[{}][ind]".format(i) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -1046,6 +1050,7 @@ def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
     func_text = "def f(arr_tup, ind, val_tup):\n"
     for i in range(count):
         func_text += "  arr_tup[{}][ind] = val_tup[{}]\n".format(i, i)
+    func_text += "  return\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -1061,8 +1066,11 @@ def alloc_arr_tup(n, arr_tup):
 @overload(alloc_arr_tup)
 def alloc_arr_tup_overload(n_t, data_t):
     count = data_t.count
+
     func_text = "def f(n, d):\n"
-    func_text += "  return ({},)\n".format(','.join(["np.empty(n, np.{})".format(data_t.types[i].dtype) for i in range(count)]))
+    func_text += "  return ({}{})\n".format(','.join(["np.empty(n, np.{})".format(
+        data_t.types[i].dtype) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
     exec(func_text, {'np': np}, loc_vars)
