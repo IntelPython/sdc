@@ -310,7 +310,7 @@ class DistWait(AbstractTemplate):
         return signature(types.int32, *args)
 
 @infer_global(waitall)
-class DistWait(AbstractTemplate):
+class DistWaitAll(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2 and args == (types.int32, req_array_type)
