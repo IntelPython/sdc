@@ -11,12 +11,15 @@ import hdist
 import llvmlite.binding as ll
 ll.add_symbol('c_alltoall', hdist.c_alltoall)
 ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
+ll.add_symbol('c_gatherv', hdist.c_gatherv)
 
 from enum import Enum
 
 # get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
 import hdist
 mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.mpi_req_num_bytes))
+
+MPI_ROOT = 0
 
 class Reduce_Type(Enum):
     Sum = 0
@@ -59,6 +62,7 @@ def gather_scalar(data):  # pragma: no cover
 
 c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voidptr, types.voidptr, types.int32))
 
+# TODO: test
 @overload(gather_scalar)
 def gather_scalar_overload(data_t):
     assert isinstance(data_t, (types.Integer, types.Float))
@@ -67,15 +71,56 @@ def gather_scalar_overload(data_t):
     func_text = (
     "def gather_scalar_impl(val):\n"
     "  n_pes = hpat.distributed_api.get_size()\n"
+    "  rank = hpat.distributed_api.get_rank()\n"
     "  send = np.full(1, val, np.{})\n"
-    "  res = np.empty(n_pes, np.{})\n"
+    "  res_size = n_pes if rank == {} else 0\n"
+    "  res = np.empty(res_size, np.{})\n"
     "  c_gather_scalar(send.ctypes, res.ctypes, np.int32({}))\n"
-    "  return res\n").format(data_t, data_t, typ_val)
+    "  return res\n").format(data_t, MPI_ROOT, data_t, typ_val)
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np, 'c_gather_scalar': c_gather_scalar}, loc_vars)
     gather_impl = loc_vars['gather_scalar_impl']
     return gather_impl
+
+# TODO: test
+def gatherv(data):  # pragma: no cover
+    return data
+
+# sendbuf, sendcount, recvbuf, recv_counts, displs, dtype
+c_gatherv = types.ExternalFunction("c_gatherv",
+    types.void(types.voidptr, types.int32, types.voidptr, types.voidptr, types.voidptr, types.int32))
+
+@overload(gatherv)
+def gatherv_overload(data_t):
+    assert isinstance(data_t, types.Array)
+    # TODO: other types like boolean
+    typ_val = _h5_typ_table[data_t.dtype]
+    func_text = (
+    "def gatherv_impl(data):\n"
+    "  n_pes = hpat.distributed_api.get_size()\n"
+    "  rank = hpat.distributed_api.get_rank()\n"
+    "  n_loc = len(data)\n"
+    "  recv_counts = gather_scalar(np.int32(n_loc))\n"
+    "  n_total = recv_counts.sum()\n"
+    "  all_data = np.empty(n_total, np.{})\n"
+    # displacements
+    "  displs = np.empty(n_pes, np.int32)\n"
+    "  cur_ind = np.int32(0)\n"
+    "  if rank == {}:\n"
+    "    for i in range(n_pes):\n"
+    "      displs[i] = cur_ind\n"
+    "      cur_ind += recv_counts[i]\n"
+    #"  print(rank, n_loc, n_total, recv_counts, displs)\n"
+    "  c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32({}))\n"
+    "  return all_data\n").format(data_t.dtype, MPI_ROOT, typ_val)
+
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'np': np, 'c_gatherv': c_gatherv, 'gather_scalar': gather_scalar}, loc_vars)
+    gatherv_impl = loc_vars['gatherv_impl']
+    return gatherv_impl
+
+
 
 def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""
