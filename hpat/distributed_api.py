@@ -4,11 +4,13 @@ from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
+import hpat
 import time
 from llvmlite import ir as lir
 import hdist
 import llvmlite.binding as ll
 ll.add_symbol('c_alltoall', hdist.c_alltoall)
+ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
 
 from enum import Enum
 
@@ -51,6 +53,29 @@ def alltoall(send_arr, recv_arr, count):
     assert count < INT_MAX
     type_enum = get_type_enum(send_arr)
     _alltoall(send_arr.ctypes, recv_arr.ctypes, np.int32(count), type_enum)
+
+def gather_scalar(data):  # pragma: no cover
+    return np.ones(1)
+
+c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voidptr, types.voidptr, types.int32))
+
+@overload(gather_scalar)
+def gather_scalar_overload(data_t):
+    assert isinstance(data_t, (types.Integer, types.Float))
+    # TODO: other types like boolean
+    typ_val = _h5_typ_table[data_t]
+    func_text = (
+    "def gather_scalar_impl(val):\n"
+    "  n_pes = hpat.distributed_api.get_size()\n"
+    "  send = np.full(1, val, np.{})\n"
+    "  res = np.empty(n_pes, np.{})\n"
+    "  c_gather_scalar(send.ctypes, res.ctypes, np.int32({}))\n"
+    "  return res\n").format(data_t, data_t, typ_val)
+
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'np': np, 'c_gather_scalar': c_gather_scalar}, loc_vars)
+    gather_impl = loc_vars['gather_scalar_impl']
+    return gather_impl
 
 def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""

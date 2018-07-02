@@ -9,6 +9,8 @@
 #include <tuple>
 #include <random>
 
+#define MPI_ROOT 0
+
 int hpat_dist_get_rank();
 int hpat_dist_get_size();
 int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id);
@@ -33,6 +35,8 @@ MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag,
 MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
 int hpat_dist_wait(MPI_Request req, bool cond);
 void hpat_dist_waitall(int size, MPI_Request *req);
+
+void c_gather_scalar(void* send_data, void* recv_data, int typ_enum);
 
 void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
                 int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
@@ -113,6 +117,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_get_item_pointer)));
     PyObject_SetAttrString(m, "hpat_get_dummy_ptr",
                             PyLong_FromVoidPtr((void*)(&hpat_get_dummy_ptr)));
+    PyObject_SetAttrString(m, "c_gather_scalar",
+                            PyLong_FromVoidPtr((void*)(&c_gather_scalar)));
     PyObject_SetAttrString(m, "c_alltoallv",
                             PyLong_FromVoidPtr((void*)(&c_alltoallv)));
     PyObject_SetAttrString(m, "c_alltoall",
@@ -443,6 +449,14 @@ int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count)
     if (ind >= start && ind < start+count)
         return ind-start;
     return -1;
+}
+
+void c_gather_scalar(void* send_data, void* recv_data, int typ_enum)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(typ_enum);
+    MPI_Gather(send_data, 1, mpi_typ, recv_data, 1, mpi_typ, MPI_ROOT,
+           MPI_COMM_WORLD);
+    return;
 }
 
 
