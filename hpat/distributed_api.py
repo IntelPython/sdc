@@ -136,6 +136,21 @@ def bcast(data):  # pragma: no cover
 c_bcast = types.ExternalFunction("c_bcast",
     types.void(types.voidptr, types.int32, types.int32))
 
+# send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
+c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,
+    types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))
+
+# TODO: test
+# TODO: big alltoallv
+@numba.njit
+def alltoallv(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):  # pragma: no cover
+    typ_enum = get_type_enum(send_data)
+    typ_enum_o = get_type_enum(out_data)
+    assert typ_enum == typ_enum_o
+
+    c_alltoallv(send_data.ctypes, out_data.ctypes, send_counts.ctypes,
+              recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, typ_enum)
+    return
 
 def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""
