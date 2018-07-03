@@ -20,7 +20,7 @@ from numba.analysis import compute_cfg_from_blocks
 
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
-                  hiframes_join, hiframes_aggregate)
+                  hiframes_join, hiframes_aggregate, hiframes_sort)
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import StringType, string_type
@@ -843,27 +843,7 @@ class HiFrames(object):
         df_cols = self._get_df_cols(df).copy()  # copy since it'll be modified
         assert key_name in df_cols
         key_var = df_cols.pop(key_name)
-
-        col_name_args = ', '.join(["c"+str(i) for i in range(len(df_cols))])
-
-        func_text = "def f(key_arr, {}):\n".format(col_name_args)
-        func_text += "  hpat.hiframes_api.sort_values(key_arr, ({}{}))\n".format(
-            col_name_args,
-            "," if len(df_cols) == 1 else "")  # single value needs comma to become tuple
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        sort_impl = loc_vars['f']
-
-        f_block = compile_to_numba_ir(
-            sort_impl, {'hpat': hpat}).blocks.popitem()[1]
-
-        replace_arg_nodes(f_block, [key_var] + list(df_cols.values()))
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
-
-
+        return [hiframes_sort.Sort(df.name, key_var, df_cols, lhs.loc)]
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
         """pass df column names and variables to get_itertuples() to be able

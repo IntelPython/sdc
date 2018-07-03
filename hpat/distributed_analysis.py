@@ -252,24 +252,6 @@ class DistributedAnalysis(object):
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
-        # TODO: make Sort node to enable remove_dead etc.
-        if fdef == ('SortState', 'numba.jitclass.base'):
-            return
-
-        if fdef == ('sort', 'hpat.timsort'):
-            # meet all arrs
-            key_arr = rhs.args[1]
-            data_arrs = guard(find_build_tuple, self.func_ir, rhs.args[4])
-            assert data_arrs is not None
-            dist = array_dists[key_arr.name]
-            for arr in data_arrs:
-                dist = Distribution(min(dist.value, array_dists[arr.name].value))
-
-            array_dists[key_arr.name] = dist
-            for arr in data_arrs:
-                array_dists[arr.name] = dist
-            return
-
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return
