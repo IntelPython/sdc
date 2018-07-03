@@ -13,8 +13,8 @@ from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
 from hpat.str_arr_ext import string_array_type
 
-#MIN_SAMPLES = 1000000
-MIN_SAMPLES = 100
+MIN_SAMPLES = 1000000
+#MIN_SAMPLES = 100
 samplePointsPerPartitionHint = 20
 MPI_ROOT = 0
 

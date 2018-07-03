@@ -2,7 +2,9 @@ import unittest
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
+import numba
 import hpat
+from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
@@ -384,7 +386,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
         # size 7 with unroll
-        def test_impl(n):
+        def test_impl_2(n):
             df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.random.ranf(n)})
             Ac = df.A.rolling(7).sum()
             return Ac.sum()
@@ -802,7 +804,12 @@ class TestHiFrames(unittest.TestCase):
         np.random.seed(2)
         df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+        save_min_samples = hiframes_sort.MIN_SAMPLES
+        try:
+            np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+        finally:
+            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+
 
     def test_sort_values_single_col(self):
         def test_impl(df):
@@ -813,7 +820,12 @@ class TestHiFrames(unittest.TestCase):
         np.random.seed(2)
         df = pd.DataFrame({'A': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+        save_min_samples = hiframes_sort.MIN_SAMPLES
+        try:
+            np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+        finally:
+            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+
 
     def test_intraday(self):
         def test_impl(nsyms):
@@ -840,6 +852,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_OneDs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
