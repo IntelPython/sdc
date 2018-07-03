@@ -804,11 +804,7 @@ class TestHiFrames(unittest.TestCase):
         np.random.seed(2)
         df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
-        save_min_samples = hiframes_sort.MIN_SAMPLES
-        try:
-            np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
-        finally:
-            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
 
     def test_sort_values_single_col(self):
@@ -820,9 +816,23 @@ class TestHiFrames(unittest.TestCase):
         np.random.seed(2)
         df = pd.DataFrame({'A': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_parallel_single_col(self):
+        # TODO: better parallel sort test
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            df.sort_values('points', inplace=True)
+            res = df.points.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
+
         save_min_samples = hiframes_sort.MIN_SAMPLES
         try:
-            np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+            hiframes_sort.MIN_SAMPLES = 10
+            res = hpat_func()
+            self.assertTrue((np.diff(res)>=0).all())
         finally:
             hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
 
