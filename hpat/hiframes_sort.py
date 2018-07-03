@@ -8,6 +8,7 @@ from numba.typing import signature
 import hpat
 import hpat.timsort
 from hpat import distributed, distributed_analysis
+from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
 from hpat.str_arr_ext import string_array_type
@@ -180,7 +181,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     ]
 
     col_name_args = ', '.join(["c"+str(i) for i in range(len(data_vars))])
-
+    # TODO: use *args
     func_text = "def f(key_arr, {}):\n".format(col_name_args)
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(data_vars) == 1 else "")  # single value needs comma to become tuple
@@ -201,35 +202,41 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
                                     typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [sort_node.key_arr] + data_vars)
     nodes = f_block.body[:-3]
+
+    if not parallel:
+        return nodes
+
+    # parallel case
+    # TODO: handle data
+    assert len(data_vars) == 0
+
+    def par_sort_impl(key_arr):
+        out = parallel_sort(key_arr)
+        key_arr = out
+        # TODO: use k-way merge instead of sort
+        # sort output
+        n_out = len(key_arr)
+        sort_state_o = SortState(key_arr, n_out, ())
+        hpat.timsort.sort(sort_state_o, key_arr, 0, n_out, ())
+
+    f_block = compile_to_numba_ir(par_sort_impl,
+                                    {'hpat': hpat, 'SortState': SortStateCL,
+                                    'parallel_sort': parallel_sort},
+                                    typingctx,
+                                    (key_typ,),
+                                    typemap, calltypes).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [sort_node.key_arr])
+    nodes += f_block.body[:-3]
     return nodes
+
 
 distributed.distributed_run_extensions[Sort] = sort_distributed_run
 
 
-key_typ = numba.int64[:]
-data_tup_typ = types.Tuple([])
-
-sort_state_spec = [
-    ('key_arr', key_typ),
-    ('aLength', numba.intp),
-    ('minGallop', numba.intp),
-    ('tmpLength', numba.intp),
-    ('tmp', key_typ),
-    ('stackSize', numba.intp),
-    ('runBase', numba.int64[:]),
-    ('runLen', numba.int64[:]),
-    ('data', data_tup_typ),
-    ('tmp_data', data_tup_typ),
-]
-
-SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
-
-@hpat.jit
-def parallel_sort(key_arr, n_total):
-    # local sort
+@numba.njit
+def parallel_sort(key_arr):
     n_local = len(key_arr)
-    sort_state = SortStateCL(key_arr, n_local, ())
-    hpat.timsort.sort(sort_state, key_arr, 0, n_local, ())
+    n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))
 
     n_pes = hpat.distributed_api.get_size()
     my_rank = hpat.distributed_api.get_rank()
@@ -268,21 +275,9 @@ def parallel_sort(key_arr, n_total):
 
     # shuffle
     n_out = recv_counts.sum()
-    out_data = np.empty(n_out, key_arr.dtype)
+    out_key_arr = np.empty(n_out, key_arr.dtype)
     send_disp = hpat.hiframes_join.calc_disp(send_counts)
     recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-    hpat.distributed_api.alltoallv(key_arr, out_data, send_counts, recv_counts, send_disp, recv_disp)
+    hpat.distributed_api.alltoallv(key_arr, out_key_arr, send_counts, recv_counts, send_disp, recv_disp)
 
-    # TODO: use k-way merge instead of sort
-    # sort output
-    sort_state_o = SortStateCL(out_data, n_out, ())
-    hpat.timsort.sort(sort_state_o, out_data, 0, n_out, ())
-
-    return my_rank, out_data
-
-
-if __name__ == '__main__':
-    n = 100
-    A = np.arange(n)
-    b = parallel_sort(A, n * 5)
-    print(b)
+    return out_key_arr

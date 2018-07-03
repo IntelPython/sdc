@@ -181,7 +181,7 @@ def get_node_portion(total_size, pes, rank):  # pragma: no cover
     return 0
 
 
-def dist_reduce(value):  # pragma: no cover
+def dist_reduce(value, op):  # pragma: no cover
     """dummy to implement simple reductions"""
     return value
 
