@@ -207,25 +207,41 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         return nodes
 
     # parallel case
-    # TODO: handle data
-    assert len(data_vars) == 0
+    # TODO: refactor with previous call, use *args?
+    # get data variable tuple
+    func_text = "def f({}):\n".format(col_name_args)
+    func_text += "  data = ({}{})\n".format(col_name_args,
+        "," if len(data_vars) == 1 else "")  # single value needs comma to become tuple
 
-    def par_sort_impl(key_arr):
-        out = parallel_sort(key_arr)
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    tup_impl = loc_vars['f']
+    f_block = compile_to_numba_ir(tup_impl,
+                                    {},
+                                    typingctx,
+                                    list(data_tup_typ.types),
+                                    typemap, calltypes).blocks.popitem()[1]
+
+    replace_arg_nodes(f_block, data_vars)
+    nodes += f_block.body[:-3]
+    data_tup_var = nodes[-1].target
+
+    def par_sort_impl(key_arr, data):
+        out = parallel_sort(key_arr, data)
         key_arr = out
         # TODO: use k-way merge instead of sort
         # sort output
         n_out = len(key_arr)
-        sort_state_o = SortState(key_arr, n_out, ())
-        hpat.timsort.sort(sort_state_o, key_arr, 0, n_out, ())
+        sort_state_o = SortState(key_arr, n_out, data)
+        hpat.timsort.sort(sort_state_o, key_arr, 0, n_out, data)
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,
                                     'parallel_sort': parallel_sort},
                                     typingctx,
-                                    (key_typ,),
+                                    (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [sort_node.key_arr])
+    replace_arg_nodes(f_block, [sort_node.key_arr, data_tup_var])
     nodes += f_block.body[:-3]
     return nodes
 
@@ -234,7 +250,7 @@ distributed.distributed_run_extensions[Sort] = sort_distributed_run
 
 
 @numba.njit
-def parallel_sort(key_arr):
+def parallel_sort(key_arr, data):
     n_local = len(key_arr)
     n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))
 
