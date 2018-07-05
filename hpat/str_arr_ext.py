@@ -187,6 +187,25 @@ def get_data_ptr(typingctx, str_arr_typ):
 
     return types.voidptr(string_array_type), codegen
 
+# convert array to list of strings if it is StringArray
+# just return it otherwise
+def to_string_list(arr):
+    return arr
+
+@overload(to_string_list)
+def to_string_list_overload(arr_typ):
+    if arr_typ == string_array_type:
+        def to_string_impl(str_arr):
+            n = len(str_arr)
+            l_str = []
+            for i in range(n):
+                l_str.append(str_arr[i])
+            return l_str
+        return to_string_impl
+    return lambda a: a
+
+
+
 @infer
 class GetItemStringArray(AbstractTemplate):
     key = "getitem"
