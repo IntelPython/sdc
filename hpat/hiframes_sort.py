@@ -227,8 +227,9 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     data_tup_var = nodes[-1].target
 
     def par_sort_impl(key_arr, data):
-        out = parallel_sort(key_arr, data)
+        out, out_data = parallel_sort(key_arr, data)
         key_arr = out
+        data = out_data
         # TODO: use k-way merge instead of sort
         # sort output
         n_out = len(key_arr)
@@ -298,4 +299,4 @@ def parallel_sort(key_arr, data):
     hpat.distributed_api.alltoallv(key_arr, out_key_arr, send_counts, recv_counts, send_disp, recv_disp)
     hpat.distributed_api.alltoallv_tup(data, out_data, send_counts, recv_counts, send_disp, recv_disp)
 
-    return out_key_arr
+    return out_key_arr, out_data
