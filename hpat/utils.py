@@ -8,6 +8,7 @@ from numba.targets.imputils import lower_builtin
 from numba.extending import overload
 import collections
 import numpy as np
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 # sentinel value representing non-constant values
@@ -204,6 +205,18 @@ def to_array_overload(in_typ):
         return to_array_impl
     except:
         pass  # should be handled elsewhere (e.g. Set)
+
+def empty_like_type(n, arr):
+    return np.empty(n, arr.dtype)
+
+@overload(empty_like_type)
+def empty_like_type_overload(size_t, arr_typ):
+    if isinstance(arr_typ, types.Array):
+        return lambda a,b: np.empty(a, b.dtype)
+    if isinstance(arr_typ, types.List) and arr_typ.dtype == string_type:
+        def empty_like_type_str_list(n, arr):
+            return [''] * n
+        return empty_like_type_str_list
 
 def is_call(stmt):
     """true if stmt is a getitem or static_getitem assignment"""
