@@ -152,6 +152,25 @@ def alltoallv(send_data, out_data, send_counts, recv_counts, send_disp, recv_dis
               recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, typ_enum)
     return
 
+def alltoallv_tup(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):  # pragma: no cover
+    return
+
+@overload(alltoallv_tup)
+def alltoallv_tup_overload(send_data_typ, out_data_typ, send_counts_typ, recv_counts_typ, send_disp_typ, recv_disp_typ):
+
+    count = send_data_typ.count
+    assert out_data_typ.count == count
+
+    func_text = "def f(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):\n"
+    for i in range(count):
+        func_text += "  alltoallv(send_data[{}], out_data[{}], send_counts, recv_counts, send_disp, recv_disp)\n".format(i, i)
+    func_text += "  return\n"
+
+    loc_vars = {}
+    exec(func_text, {'alltoallv': alltoallv}, loc_vars)
+    a2a_impl = loc_vars['f']
+    return a2a_impl
+
 def get_rank():  # pragma: no cover
     """dummy function for C mpi get_rank"""
     return 0

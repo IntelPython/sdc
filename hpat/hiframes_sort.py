@@ -292,8 +292,10 @@ def parallel_sort(key_arr, data):
     # shuffle
     n_out = recv_counts.sum()
     out_key_arr = np.empty(n_out, key_arr.dtype)
+    out_data = hpat.timsort.alloc_arr_tup(n_out, data)
     send_disp = hpat.hiframes_join.calc_disp(send_counts)
     recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
     hpat.distributed_api.alltoallv(key_arr, out_key_arr, send_counts, recv_counts, send_disp, recv_disp)
+    hpat.distributed_api.alltoallv_tup(data, out_data, send_counts, recv_counts, send_disp, recv_disp)
 
     return out_key_arr
