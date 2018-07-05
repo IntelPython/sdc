@@ -33,7 +33,13 @@ if 'HDF5_DIR' in os.environ:
 if 'CONDA_BUILD' in os.environ:
     PREFIX_DIR = os.environ['PREFIX']
 else:
-    PREFIX_DIR = os.environ['CONDA_PREFIX']
+    # see if we can get prefix from environment
+    cmd="conda info --base"
+    CONDA_DIR=os.popen(cmd).read().strip()
+    if CONDA_DIR is not None:
+        PREFIX_DIR=CONDA_DIR
+    else:
+        PREFIX_DIR = os.environ['CONDA_PREFIX']
     # C libraries are in \Library on Windows
     if is_win:
         PREFIX_DIR += '\Library'
