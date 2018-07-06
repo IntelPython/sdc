@@ -371,6 +371,8 @@ ll.add_symbol('print_int', hstr_ext.print_int)
 ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
 ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
 
+convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
+
 import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)

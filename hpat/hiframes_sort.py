@@ -291,7 +291,8 @@ def parallel_sort(key_arr, data):
     # print(sampleSize, fraction, n_local, n_loc_samples, len(samples))
 
     all_samples = hpat.distributed_api.gatherv(samples)
-    bounds = empty_like_type(n_pes-1, key_arr)
+    all_samples = to_string_list(all_samples)
+    bounds = empty_like_type(n_pes-1, all_samples)
 
     if my_rank == MPI_ROOT:
         all_samples.sort()

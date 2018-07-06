@@ -5,6 +5,9 @@ from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
 import hpat
+from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
+                              pre_alloc_string_array, del_str, get_offset_ptr,
+                              get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import debug_prints, empty_like_type
 import time
 from llvmlite import ir as lir
@@ -95,29 +98,70 @@ c_gatherv = types.ExternalFunction("c_gatherv",
 
 @overload(gatherv)
 def gatherv_overload(data_t):
-    assert isinstance(data_t, types.Array)
-    # TODO: other types like boolean
-    typ_val = _h5_typ_table[data_t.dtype]
+    if isinstance(data_t, types.Array):
+        # TODO: other types like boolean
+        typ_val = _h5_typ_table[data_t.dtype]
 
-    def gatherv_impl(data):
-        n_pes = hpat.distributed_api.get_size()
-        rank = hpat.distributed_api.get_rank()
-        n_loc = len(data)
-        recv_counts = gather_scalar(np.int32(n_loc))
-        n_total = recv_counts.sum()
-        all_data = empty_like_type(n_total, data)
-        # displacements
-        displs = np.empty(n_pes, np.int32)
-        cur_ind = np.int32(0)
-        if rank == MPI_ROOT:
-            for i in range(n_pes):
-                displs[i] = cur_ind
-                cur_ind += recv_counts[i]
-        #  print(rank, n_loc, n_total, recv_counts, displs)
-        c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32(typ_val))
-        return all_data
+        def gatherv_impl(data):
+            rank = hpat.distributed_api.get_rank()
+            n_loc = len(data)
+            recv_counts = gather_scalar(np.int32(n_loc))
+            n_total = recv_counts.sum()
+            all_data = empty_like_type(n_total, data)
+            # displacements
+            displs = np.empty(1, np.int32)
+            if rank == MPI_ROOT:
+                displs = hpat.hiframes_join.calc_disp(recv_counts)
+            #  print(rank, n_loc, n_total, recv_counts, displs)
+            c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32(typ_val))
+            return all_data
 
-    return gatherv_impl
+        return gatherv_impl
+
+    if data_t == string_array_type:
+        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
+        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+
+        def gatherv_str_arr_impl(data):
+            rank = hpat.distributed_api.get_rank()
+            n_loc = len(data)
+            n_all_chars = num_total_chars(data)
+
+            # allocate send lens arrays
+            send_arr_lens = np.empty(n_loc, np.uint32)  # XXX offset type is uint32
+            send_data_ptr = get_data_ptr(data)
+
+            for i in range(n_loc):
+                _str = data[i]
+                send_arr_lens[i] = len(_str)
+                del_str(_str)
+
+            recv_counts = gather_scalar(np.int32(n_loc))
+            recv_counts_char = gather_scalar(np.int32(n_all_chars))
+            n_total = recv_counts.sum()
+            n_total_char = recv_counts_char.sum()
+
+
+            # displacements
+            all_data = StringArray([''])  # dummy arrays on non-root PEs
+            displs = np.empty(1, np.int32)
+            displs_char = np.empty(1, np.int32)
+
+            if rank == MPI_ROOT:
+                all_data = pre_alloc_string_array(n_total, n_total_char)
+                displs = hpat.hiframes_join.calc_disp(recv_counts)
+                displs_char = hpat.hiframes_join.calc_disp(recv_counts_char)
+
+            #  print(rank, n_loc, n_total, recv_counts, displs)
+            offset_ptr = get_offset_ptr(all_data)
+            data_ptr = get_data_ptr(all_data)
+            c_gatherv(send_arr_lens.ctypes, np.int32(n_loc), offset_ptr, recv_counts.ctypes, displs.ctypes, int32_typ_enum)
+            c_gatherv(send_data_ptr, np.int32(n_all_chars), data_ptr, recv_counts_char.ctypes, displs_char.ctypes, char_typ_enum)
+            convert_len_arr_to_offset(offset_ptr, n_total)
+            return all_data
+
+        return gatherv_str_arr_impl
+
 
 
 # TODO: test
