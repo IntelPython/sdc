@@ -263,6 +263,8 @@ class GetItemStringArray(AbstractTemplate):
                 return signature(string_type, *args)
             elif idx == types.Array(types.bool_, 1, 'C'):
                 return signature(string_array_type, *args)
+            elif idx == types.Array(types.intp, 1, 'C'):
+                return signature(string_array_type, *args)
 
 
 @infer
@@ -629,6 +631,32 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
                 del_str(str)
         return out_arr
     res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
+    return res
+
+
+@lower_builtin('getitem', StringArrayType, types.Array(types.intp, 1, 'C'))
+def lower_string_arr_getitem_arr(context, builder, sig, args):
+    def str_arr_arr_impl(str_arr, ind_arr):
+        n = len(ind_arr)
+        # get lengths
+        n_strs = 0
+        n_chars = 0
+        for i in range(n):
+            # TODO: use get_cstr_and_len instead of getitem
+            _str = str_arr[ind_arr[i]]
+            n_strs += 1
+            n_chars += len(_str)
+            del_str(_str)
+
+        out_arr = pre_alloc_string_array(n_strs, n_chars)
+        str_ind = 0
+        for i in range(n):
+            _str = str_arr[ind_arr[i]]
+            setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), _str, str_ind)
+            str_ind += 1
+            del_str(_str)
+        return out_arr
+    res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
     return res
 
 
