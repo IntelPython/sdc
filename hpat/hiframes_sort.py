@@ -11,7 +11,7 @@ from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
-from hpat.str_arr_ext import string_array_type
+from hpat.str_arr_ext import string_array_type, to_string_list, cp_str_list_to_array
 
 MIN_SAMPLES = 1000000
 #MIN_SAMPLES = 100
@@ -191,8 +191,11 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(data_vars) == 1 else "")  # single value needs comma to become tuple
     func_text += "  _sort_len = len(key_arr)\n"
-    func_text += "  sort_state = SortState(key_arr, _sort_len, data)\n"
-    func_text += "  hpat.timsort.sort(sort_state, key_arr, 0, _sort_len, data)\n"
+    # convert StringArray to list(string) to enable swapping in sort
+    func_text += "  l_key_arr = to_string_list(key_arr)\n"
+    func_text += "  sort_state = SortState(l_key_arr, _sort_len, data)\n"
+    func_text += "  hpat.timsort.sort(sort_state, l_key_arr, 0, _sort_len, data)\n"
+    func_text += "  cp_str_list_to_array(key_arr, l_key_arr)\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -201,7 +204,9 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
 
     f_block = compile_to_numba_ir(sort_impl,
-                                    {'hpat': hpat, 'SortState': SortStateCL},
+                                    {'hpat': hpat, 'SortState': SortStateCL,
+                                    'to_string_list': to_string_list,
+                                    'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
                                     tuple([key_typ] + list(data_tup_typ.types)),
                                     typemap, calltypes).blocks.popitem()[1]
@@ -235,11 +240,13 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         out, out_data = parallel_sort(key_arr, data)
         key_arr = out
         data = out_data
+        l_key_arr = to_string_list(key_arr)
         # TODO: use k-way merge instead of sort
         # sort output
         n_out = len(key_arr)
-        sort_state_o = SortState(key_arr, n_out, data)
-        hpat.timsort.sort(sort_state_o, key_arr, 0, n_out, data)
+        sort_state_o = SortState(l_key_arr, n_out, data)
+        hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, data)
+        cp_str_list_to_array(key_arr, l_key_arr)
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,

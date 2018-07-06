@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import numba
 from numba.extending import overload
-from hpat.str_arr_ext import to_string_list
 from hpat.utils import empty_like_type
 
 # ported from Spark to Numba-compilable Python
@@ -60,7 +59,6 @@ MIN_MERGE = 32
 
 @numba.njit
 def sort(sortState, key_arr, lo, hi, data):
-    key_arr = to_string_list(key_arr)
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -301,7 +299,7 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 #@numba.jitclass(spec)
 class SortState:
     def __init__(self, key_arr, aLength, data):
-        self.key_arr = to_string_list(key_arr)
+        self.key_arr = key_arr
         self.data = data
         self.aLength = aLength
 

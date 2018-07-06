@@ -202,8 +202,25 @@ def to_string_list_overload(arr_typ):
                 l_str.append(str_arr[i])
             return l_str
         return to_string_impl
+
     return lambda a: a
 
+def cp_str_list_to_array(str_arr, str_list):
+    return
+
+@overload(cp_str_list_to_array)
+def cp_str_list_to_array_overload(arr_typ, list_typ):
+    if arr_typ == string_array_type:
+        def cp_str_list_impl(str_arr, str_list):
+            n = len(str_list)
+            for i in range(n):
+                _str = str_list[i]
+                setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
+                del_str(_str)
+
+        return cp_str_list_impl
+
+    return lambda a,b: None
 
 
 @infer
