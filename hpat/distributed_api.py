@@ -5,6 +5,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
 import hpat
+from hpat.utils import debug_prints, empty_like_type
 import time
 from llvmlite import ir as lir
 import hdist
@@ -97,28 +98,25 @@ def gatherv_overload(data_t):
     assert isinstance(data_t, types.Array)
     # TODO: other types like boolean
     typ_val = _h5_typ_table[data_t.dtype]
-    func_text = (
-    "def gatherv_impl(data):\n"
-    "  n_pes = hpat.distributed_api.get_size()\n"
-    "  rank = hpat.distributed_api.get_rank()\n"
-    "  n_loc = len(data)\n"
-    "  recv_counts = gather_scalar(np.int32(n_loc))\n"
-    "  n_total = recv_counts.sum()\n"
-    "  all_data = np.empty(n_total, np.{})\n"
-    # displacements
-    "  displs = np.empty(n_pes, np.int32)\n"
-    "  cur_ind = np.int32(0)\n"
-    "  if rank == {}:\n"
-    "    for i in range(n_pes):\n"
-    "      displs[i] = cur_ind\n"
-    "      cur_ind += recv_counts[i]\n"
-    #"  print(rank, n_loc, n_total, recv_counts, displs)\n"
-    "  c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32({}))\n"
-    "  return all_data\n").format(data_t.dtype, MPI_ROOT, typ_val)
 
-    loc_vars = {}
-    exec(func_text, {'hpat': hpat, 'np': np, 'c_gatherv': c_gatherv, 'gather_scalar': gather_scalar}, loc_vars)
-    gatherv_impl = loc_vars['gatherv_impl']
+    def gatherv_impl(data):
+        n_pes = hpat.distributed_api.get_size()
+        rank = hpat.distributed_api.get_rank()
+        n_loc = len(data)
+        recv_counts = gather_scalar(np.int32(n_loc))
+        n_total = recv_counts.sum()
+        all_data = empty_like_type(n_total, data)
+        # displacements
+        displs = np.empty(n_pes, np.int32)
+        cur_ind = np.int32(0)
+        if rank == MPI_ROOT:
+            for i in range(n_pes):
+                displs[i] = cur_ind
+                cur_ind += recv_counts[i]
+        #  print(rank, n_loc, n_total, recv_counts, displs)
+        c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32(typ_val))
+        return all_data
+
     return gatherv_impl
 
 
