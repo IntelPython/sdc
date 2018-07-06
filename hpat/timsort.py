@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import numba
 from numba.extending import overload
+from hpat.str_arr_ext import to_string_list
+from hpat.utils import empty_like_type
 
 # ported from Spark to Numba-compilable Python
 # A port of the Android TimSort class, which utilizes a "stable, adaptive, iterative mergesort."
@@ -58,6 +60,7 @@ MIN_MERGE = 32
 
 @numba.njit
 def sort(sortState, key_arr, lo, hi, data):
+    key_arr = to_string_list(key_arr)
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -298,7 +301,7 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 #@numba.jitclass(spec)
 class SortState:
     def __init__(self, key_arr, aLength, data):
-        self.key_arr = key_arr
+        self.key_arr = to_string_list(key_arr)
         self.data = data
         self.aLength = aLength
 
@@ -310,7 +313,7 @@ class SortState:
         arr_len = aLength
         # Allocate temp storage (which may be increased later if necessary)
         self.tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
-        self.tmp = np.empty(self.tmpLength, key_arr.dtype)
+        self.tmp = empty_like_type(self.tmpLength, self.key_arr)
         self.tmp_data = alloc_arr_tup(self.tmpLength, data)
 
 
@@ -943,7 +946,7 @@ class SortState:
             else:
                 newSize = min(newSize, self.aLength >> 1)
 
-            self.tmp = np.empty(newSize, self.key_arr.dtype)
+            self.tmp = empty_like_type(newSize, self.key_arr)
             self.tmp_data = alloc_arr_tup(newSize, self.data)
             self.tmpLength = newSize
 

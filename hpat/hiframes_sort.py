@@ -38,8 +38,10 @@ def sort_array_analysis(sort_node, equiv_set, typemap, array_analysis):
 
     # arrays of input df have same size in first dimension as key array
     col_shape = equiv_set.get_shape(sort_node.key_arr)
-    # TODO: string key
-    all_shapes = [col_shape[0]]
+    if typemap[sort_node.key_arr.name] == string_array_type:
+        all_shapes = []
+    else:
+        all_shapes = [col_shape[0]]
     for col_var in sort_node.df_vars.values():
         typ = typemap[col_var.name]
         if typ == string_array_type:
@@ -153,7 +155,10 @@ def apply_copies_sort(sort_node, var_dict, name_var_table,
 
 ir_utils.apply_copy_propagate_extensions[Sort] = apply_copies_sort
 
-
+def to_string_list_typ(typ):
+    if typ == string_array_type:
+        return types.List(hpat.str_ext.string_type)
+    return typ
 
 def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
     parallel = True
@@ -168,11 +173,11 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     data_tup_typ = types.Tuple([typemap[v.name] for v in sort_node.df_vars.values()])
 
     sort_state_spec = [
-        ('key_arr', key_typ),
+        ('key_arr', to_string_list_typ(key_typ)),
         ('aLength', numba.intp),
         ('minGallop', numba.intp),
         ('tmpLength', numba.intp),
-        ('tmp', key_typ),
+        ('tmp', to_string_list_typ(key_typ)),
         ('stackSize', numba.intp),
         ('runBase', numba.int64[:]),
         ('runLen', numba.int64[:]),
