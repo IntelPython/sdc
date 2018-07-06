@@ -303,6 +303,7 @@ def parallel_sort(key_arr, data):
         # print(bounds)
 
     bounds = str_list_to_array(bounds)
+    bounds = hpat.distributed_api.prealloc_str_for_bcast(bounds)
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts

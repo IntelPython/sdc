@@ -267,6 +267,7 @@ def str_list_to_array_overload(list_typ):
                 _str = str_list[i]
                 setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
                 del_str(_str)
+            return str_arr
 
         return str_list_impl
 

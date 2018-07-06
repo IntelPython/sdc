@@ -389,21 +389,23 @@ void hpat_dist_waitall(int size, MPI_Request *req_arr)
 //     int8:0,
 //     uint8:1,
 //     int32:2,
-//     int64:3,
-//     float32:4,
-//     float64:5
+//     uint32:3,
+//     int64:4,
+//     float32:5,
+//     float64:6
+//     uint64: 7
 //     }
 
 MPI_Datatype get_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
-    if (typ_enum < 0 || typ_enum > 6)
+    if (typ_enum < 0 || typ_enum > 7)
     {
         std::cerr << "Invalid MPI_Type" << "\n";
         return MPI_LONG_LONG_INT;
     }
     MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE,
+            MPI_INT, MPI_UNSIGNED, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE,
             MPI_UNSIGNED_LONG_LONG};
     return types_list[typ_enum];
 }
@@ -413,13 +415,13 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
     // printf("h5 type enum:%d\n", typ_enum);
     // XXX: LONG is used for int64, which doesn't work on Windows
     // XXX: LONG is used for uint64
-    if (typ_enum < 0 || typ_enum > 6)
+    if (typ_enum < 0 || typ_enum > 7)
     {
         std::cerr << "Invalid MPI_Type" << "\n";
         return MPI_DATATYPE_NULL;
     }
     MPI_Datatype types_list[] = {MPI_DATATYPE_NULL, MPI_DATATYPE_NULL,
-            MPI_2INT, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT, MPI_LONG_INT};
+            MPI_2INT, MPI_DATATYPE_NULL, MPI_LONG_INT, MPI_FLOAT_INT, MPI_DOUBLE_INT, MPI_LONG_INT};
     return types_list[typ_enum];
 }
 
@@ -440,12 +442,12 @@ MPI_Op get_MPI_op(int op_enum)
 
 int get_elem_size(int type_enum)
 {
-    if (type_enum < 0 || type_enum > 6)
+    if (type_enum < 0 || type_enum > 7)
     {
         std::cerr << "Invalid MPI_Type" << "\n";
         return 8;
     }
-    int types_sizes[] = {1,1,4,8,4,8,8};
+    int types_sizes[] = {1,1,4,4,8,4,8,8};
     return types_sizes[type_enum];
 }
 

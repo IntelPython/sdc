@@ -63,11 +63,15 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
     if (type_enum == 2)
         return quantile_parallel_int((int *)data, local_size, at, type_enum, myrank, n_pes);
     if (type_enum == 3)
-        return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
+        return quantile_parallel_int((uint32_t *)data, local_size, at, type_enum, myrank, n_pes);
     if (type_enum == 4)
-        return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
+        return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
     if (type_enum == 5)
+        return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
+    if (type_enum == 6)
         return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
+    if (type_enum == 7)
+        return quantile_parallel_int((uint64_t*)data, local_size, quantile, type_enum, myrank, n_pes);
 
     printf("unknown quantile data type");
     return -1.0;
@@ -112,9 +116,10 @@ double quantile_parallel_float(T* data, int64_t local_size, double quantile, int
 //     int8:0,
 //     uint8:1,
 //     int32:2,
-//     int64:3,
-//     float32:4,
-//     float64:5
+//     uint32:3,
+//     int64:4,
+//     float32:5,
+//     float64:6
 //     }
 
 // TODO: refactor to header
@@ -122,7 +127,7 @@ MPI_Datatype get_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
     MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
+            MPI_INT, MPI_UNSIGNED, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
     return types_list[typ_enum];
 }
 

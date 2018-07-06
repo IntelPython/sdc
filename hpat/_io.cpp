@@ -173,16 +173,17 @@ int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
 //     int8:0,
 //     uint8:1,
 //     int32:2,
-//     int64:3,
-//     float32:4,
-//     float64:5
+//     uint32:3,
+//     int64:4,
+//     float32:5,
+//     float64:6
 //     }
 
 hid_t get_h5_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
     hid_t types_list[] = {H5T_NATIVE_CHAR, H5T_NATIVE_UCHAR,
-            H5T_NATIVE_INT, H5T_NATIVE_LLONG, H5T_NATIVE_FLOAT, H5T_NATIVE_DOUBLE};
+            H5T_NATIVE_INT, H5T_NATIVE_UINT, H5T_NATIVE_LLONG, H5T_NATIVE_FLOAT, H5T_NATIVE_DOUBLE};
     return types_list[typ_enum];
 }
 
@@ -204,12 +205,14 @@ int hpat_h5_get_type_enum(std::string *s)
         typ = 1;
     if ((*s)=="i4")
         typ = 2;
-    if ((*s)=="i8")
+    if ((*s)=="u4")
         typ = 3;
-    if ((*s)=="f4")
+    if ((*s)=="i8")
         typ = 4;
-    if ((*s)=="f8")
+    if ((*s)=="f4")
         typ = 5;
+    if ((*s)=="f8")
+        typ = 6;
 
     return typ;
 }

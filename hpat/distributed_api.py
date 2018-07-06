@@ -38,10 +38,11 @@ _h5_typ_table = {
     types.int8: 0,
     types.uint8: 1,
     types.int32: 2,
-    types.int64: 3,
-    types.float32: 4,
-    types.float64: 5,
-    types.uint64: 6
+    types.uint32: 3,
+    types.int64: 4,
+    types.float32: 5,
+    types.float64: 6,
+    types.uint64: 7
 }
 
 def get_type_enum(arr):
@@ -166,17 +167,95 @@ def gatherv_overload(data_t):
 
 # TODO: test
 # TODO: large BCast
-@numba.njit
+
 def bcast(data):  # pragma: no cover
-    typ_enum = get_type_enum(data)
-    count = len(data)
-    assert count < INT_MAX
-    c_bcast(data.ctypes, np.int32(count), typ_enum)
     return
+
+@overload(bcast)
+def bcast_overload(data_t):
+    if isinstance(data_t, types.Array):
+        def bcast_impl(data):
+            typ_enum = get_type_enum(data)
+            count = len(data)
+            assert count < INT_MAX
+            c_bcast(data.ctypes, np.int32(count), typ_enum)
+            return
+        return bcast_impl
+
+    if data_t == string_array_type:
+        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
+        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+
+        def bcast_str_impl(data):
+            rank = hpat.distributed_api.get_rank()
+            n_loc = len(data)
+            n_all_chars = num_total_chars(data)
+            assert n_loc < INT_MAX
+            assert n_all_chars < INT_MAX
+
+            offset_ptr = get_offset_ptr(data)
+            data_ptr = get_data_ptr(data)
+
+            if rank == MPI_ROOT:
+                send_arr_lens = np.empty(n_loc, np.uint32)  # XXX offset type is uint32
+                for i in range(n_loc):
+                    _str = data[i]
+                    send_arr_lens[i] = len(_str)
+                    del_str(_str)
+
+                c_bcast(send_arr_lens.ctypes, np.int32(n_loc), int32_typ_enum)
+            else:
+                c_bcast(offset_ptr, np.int32(n_loc), int32_typ_enum)
+
+            c_bcast(data_ptr, np.int32(n_all_chars), char_typ_enum)
+            if rank != MPI_ROOT:
+                convert_len_arr_to_offset(offset_ptr, n_loc)
+
+        return bcast_str_impl
 
 # sendbuf, sendcount, dtype
 c_bcast = types.ExternalFunction("c_bcast",
     types.void(types.voidptr, types.int32, types.int32))
+
+def bcast_scalar(val):  # pragma: no cover
+    return val
+
+# TODO: test
+@overload(bcast_scalar)
+def bcast_scalar_overload(data_t):
+    assert isinstance(data_t, (types.Integer, types.Float))
+    # TODO: other types like boolean
+    typ_val = _h5_typ_table[data_t]
+    # TODO: fix np.full and refactor
+    func_text = (
+    "def bcast_scalar_impl(val):\n"
+    "  send = np.full(1, val, np.{})\n"
+    "  c_bcast(send.ctypes, np.int32(1), np.int32({}))\n"
+    "  return send[0]\n").format(data_t, typ_val)
+
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'np': np, 'c_bcast': c_bcast}, loc_vars)
+    bcast_scalar_impl = loc_vars['bcast_scalar_impl']
+    return bcast_scalar_impl
+
+# if arr is string array, pre-allocate on non-root the same size as root
+def prealloc_str_for_bcast(arr):
+    return arr
+
+@overload(prealloc_str_for_bcast)
+def prealloc_str_for_bcast_overload(arr_t):
+    if arr_t == string_array_type:
+        def prealloc_impl(arr):
+            rank = hpat.distributed_api.get_rank()
+            n_loc = bcast_scalar(len(arr))
+            n_all_char = bcast_scalar(np.int64(num_total_chars(arr)))
+            if rank != MPI_ROOT:
+                arr = pre_alloc_string_array(n_loc, n_all_char)
+            return arr
+
+        return prealloc_impl
+
+    return lambda a: a
 
 # send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,
