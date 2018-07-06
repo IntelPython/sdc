@@ -10,7 +10,7 @@ import hpat.timsort
 from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
-from hpat.utils import debug_prints
+from hpat.utils import debug_prints, empty_like_type
 from hpat.str_arr_ext import string_array_type, to_string_list, cp_str_list_to_array
 
 MIN_SAMPLES = 1000000
@@ -259,7 +259,9 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,
-                                    'parallel_sort': parallel_sort},
+                                    'parallel_sort': parallel_sort,
+                                    'to_string_list': to_string_list,
+                                    'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
                                     (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
@@ -289,7 +291,7 @@ def parallel_sort(key_arr, data):
     # print(sampleSize, fraction, n_local, n_loc_samples, len(samples))
 
     all_samples = hpat.distributed_api.gatherv(samples)
-    bounds = np.empty(n_pes-1, key_arr.dtype)
+    bounds = empty_like_type(n_pes-1, key_arr)
 
     if my_rank == MPI_ROOT:
         all_samples.sort()
@@ -313,7 +315,7 @@ def parallel_sort(key_arr, data):
 
     # shuffle
     n_out = recv_counts.sum()
-    out_key_arr = np.empty(n_out, key_arr.dtype)
+    out_key_arr = empty_like_type(n_out, key_arr)
     out_data = hpat.timsort.alloc_arr_tup(n_out, data)
     send_disp = hpat.hiframes_join.calc_disp(send_counts)
     recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
