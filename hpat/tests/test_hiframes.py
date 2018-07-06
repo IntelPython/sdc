@@ -1,6 +1,8 @@
 import unittest
 import pandas as pd
 import numpy as np
+import random
+import string
 import pyarrow.parquet as pq
 import numba
 import hpat
@@ -817,6 +819,23 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_values_single_col_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.A.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+        df = pd.DataFrame({'A': str_vals})
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df.copy()) == test_impl(df)).all())
 
     def test_sort_parallel_single_col(self):
         # TODO: better parallel sort test
