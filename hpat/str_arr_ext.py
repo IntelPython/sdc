@@ -203,6 +203,19 @@ def to_string_list_overload(arr_typ):
             return l_str
         return to_string_impl
 
+    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
+        count = arr_typ.count
+
+        func_text = "def f(data):\n"
+        func_text += "  return ({}{})\n".format(','.join(["to_string_list(data[{}])".format(
+            i) for i in range(count)]),
+            "," if count == 1 else "")  # single value needs comma to become tuple
+
+        loc_vars = {}
+        exec(func_text, {'to_string_list': to_string_list}, loc_vars)
+        to_str_impl = loc_vars['f']
+        return to_str_impl
+
     return lambda a: a
 
 def cp_str_list_to_array(str_arr, str_list):
@@ -219,6 +232,19 @@ def cp_str_list_to_array_overload(arr_typ, list_typ):
                 del_str(_str)
 
         return cp_str_list_impl
+
+    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
+        count = arr_typ.count
+
+        func_text = "def f(data, l_data):\n"
+        for i in range(count):
+            func_text += "  cp_str_list_to_array(data[{}], l_data[{}])\n".format(i, i)
+        func_text += "  return\n"
+
+        loc_vars = {}
+        exec(func_text, {'cp_str_list_to_array': cp_str_list_to_array}, loc_vars)
+        cp_str_impl = loc_vars['f']
+        return cp_str_impl
 
     return lambda a,b: None
 

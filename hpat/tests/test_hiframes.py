@@ -837,6 +837,29 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue((hpat_func(df.copy()) == test_impl(df)).all())
 
+    def test_sort_values_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.B.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+        str_vals2 = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals2.append(val)
+
+        df = pd.DataFrame({'A': str_vals, 'B': str_vals2})
+        # use mergesort for stability, in str generation equal keys are more probable
+        sorted_df = df.sort_values('A', inplace=False, kind='mergesort')
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
+
     def test_sort_parallel_single_col(self):
         # TODO: better parallel sort test
         def test_impl():

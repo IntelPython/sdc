@@ -1069,12 +1069,12 @@ def alloc_arr_tup_overload(n_t, data_t):
     count = data_t.count
 
     func_text = "def f(n, d):\n"
-    func_text += "  return ({}{})\n".format(','.join(["np.empty(n, np.{})".format(
-        data_t.types[i].dtype) for i in range(count)]),
+    func_text += "  return ({}{})\n".format(','.join(["empty_like_type(n, d[{}])".format(
+        i) for i in range(count)]),
         "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
-    exec(func_text, {'np': np}, loc_vars)
+    exec(func_text, {'empty_like_type': empty_like_type}, loc_vars)
     alloc_impl = loc_vars['f']
     return alloc_impl
 

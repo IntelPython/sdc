@@ -158,6 +158,13 @@ ir_utils.apply_copy_propagate_extensions[Sort] = apply_copies_sort
 def to_string_list_typ(typ):
     if typ == string_array_type:
         return types.List(hpat.str_ext.string_type)
+
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        new_typs = []
+        for i in range(typ.count):
+            new_typs.append(to_string_list_typ(typ.types[i]))
+        return types.Tuple(new_typs)
+
     return typ
 
 def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
@@ -181,8 +188,8 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         ('stackSize', numba.intp),
         ('runBase', numba.int64[:]),
         ('runLen', numba.int64[:]),
-        ('data', data_tup_typ),
-        ('tmp_data', data_tup_typ),
+        ('data', to_string_list_typ(data_tup_typ)),
+        ('tmp_data', to_string_list_typ(data_tup_typ)),
     ]
 
     col_name_args = ', '.join(["c"+str(i) for i in range(len(data_vars))])
@@ -193,9 +200,11 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     func_text += "  _sort_len = len(key_arr)\n"
     # convert StringArray to list(string) to enable swapping in sort
     func_text += "  l_key_arr = to_string_list(key_arr)\n"
-    func_text += "  sort_state = SortState(l_key_arr, _sort_len, data)\n"
-    func_text += "  hpat.timsort.sort(sort_state, l_key_arr, 0, _sort_len, data)\n"
+    func_text += "  l_data = to_string_list(data)\n"
+    func_text += "  sort_state = SortState(l_key_arr, _sort_len, l_data)\n"
+    func_text += "  hpat.timsort.sort(sort_state, l_key_arr, 0, _sort_len, l_data)\n"
     func_text += "  cp_str_list_to_array(key_arr, l_key_arr)\n"
+    func_text += "  cp_str_list_to_array(data, l_data)\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
