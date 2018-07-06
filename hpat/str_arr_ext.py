@@ -249,6 +249,29 @@ def cp_str_list_to_array_overload(arr_typ, list_typ):
     return lambda a,b: None
 
 
+def str_list_to_array(str_list):
+    return str_list
+
+@overload(str_list_to_array)
+def str_list_to_array_overload(list_typ):
+    if list_typ == types.List(string_type):
+        def str_list_impl(str_list):
+            n = len(str_list)
+            n_char = 0
+            for i in range(n):
+                _str = str_list[i]
+                n_char += len(_str)
+                del_str(_str)
+            str_arr = pre_alloc_string_array(n, n_char)
+            for i in range(n):
+                _str = str_list[i]
+                setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
+                del_str(_str)
+
+        return str_list_impl
+
+    return lambda a: a
+
 @infer
 class GetItemStringArray(AbstractTemplate):
     key = "getitem"

@@ -11,7 +11,7 @@ from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints, empty_like_type
-from hpat.str_arr_ext import string_array_type, to_string_list, cp_str_list_to_array
+from hpat.str_arr_ext import string_array_type, to_string_list, cp_str_list_to_array, str_list_to_array
 
 MIN_SAMPLES = 1000000
 #MIN_SAMPLES = 100
@@ -302,6 +302,7 @@ def parallel_sort(key_arr, data):
             bounds[i] = all_samples[min((i + 1) * step, n_samples - 1)]
         # print(bounds)
 
+    bounds = str_list_to_array(bounds)
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts
