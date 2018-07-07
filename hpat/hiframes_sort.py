@@ -1,10 +1,12 @@
 import numpy as np
 import math
+from collections import namedtuple
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 from numba.typing import signature
+from numba.extending import overload
 import hpat
 import hpat.timsort
 from hpat import distributed, distributed_analysis
@@ -307,22 +309,95 @@ def parallel_sort(key_arr, data):
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts
-    send_counts = np.zeros(n_pes, np.int32)
-    recv_counts = np.empty(n_pes, np.int32)
+    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes)
     node_id = 0
     for i in range(n_local):
         if node_id < (n_pes - 1) and key_arr[i] >= bounds[node_id]:
             node_id += 1
-        send_counts[node_id] += 1
-    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
+        update_shuffle_meta(shuffle_meta, node_id)
+
+    finalize_shuffle_meta(key_arr, shuffle_meta)
 
     # shuffle
-    n_out = recv_counts.sum()
-    out_key_arr = empty_like_type(n_out, key_arr)
-    out_data = hpat.timsort.alloc_arr_tup(n_out, data)
-    send_disp = hpat.hiframes_join.calc_disp(send_counts)
-    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-    hpat.distributed_api.alltoallv(key_arr, out_key_arr, send_counts, recv_counts, send_disp, recv_disp)
-    hpat.distributed_api.alltoallv_tup(data, out_data, send_counts, recv_counts, send_disp, recv_disp)
+    alltoallv(key_arr, shuffle_meta)
+    out_data = hpat.timsort.alloc_arr_tup(shuffle_meta.n_out, data)
+    hpat.distributed_api.alltoallv_tup(data, out_data,
+        shuffle_meta.send_counts, shuffle_meta.recv_counts, shuffle_meta.send_disp, shuffle_meta.recv_disp)
 
-    return out_key_arr, out_data
+    return shuffle_meta.out_arr, out_data
+
+# ShuffleMeta = namedtuple('ShuffleMeta',
+#     ['send_counts', 'recv_counts', 'out_arr', 'n_out', 'send_disp', 'recv_disp', 'send_counts_char',
+#     'recv_counts_char', 'send_arr_lens', 'send_arr_chars'])
+
+class ShuffleMeta:
+    def __init__(self, send_counts, recv_counts, out_arr, n_out, send_disp, recv_disp, send_counts_char,
+            recv_counts_char, send_arr_lens, send_arr_chars):
+        self.send_counts = send_counts
+        self.recv_counts = recv_counts
+        self.out_arr = out_arr
+        self.n_out = n_out
+        self.send_disp = send_disp
+        self.recv_disp = recv_disp
+        self.send_counts_char = send_counts_char
+        self.recv_counts_char = recv_counts_char
+        self.send_arr_lens = send_arr_lens
+        self.send_arr_chars = send_arr_chars
+
+@numba.njit
+def update_shuffle_meta(shuffle_meta, node_id):
+    shuffle_meta.send_counts[node_id] += 1
+
+def alloc_shuffle_metadata(arr, n_pes):
+    return ShuffleMeta(arr, n_pes)
+
+@overload(alloc_shuffle_metadata)
+def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
+    count_arr_typ = types.Array(types.int32, 1, 'C')
+    if isinstance(arr_t, types.Array):
+        spec = [
+            ('send_counts', count_arr_typ),
+            ('recv_counts', count_arr_typ),
+            ('out_arr', arr_t),
+            ('n_out', types.intp),
+            ('send_disp', count_arr_typ),
+            ('recv_disp', count_arr_typ),
+            ('send_counts_char', types.none),
+            ('recv_counts_char', types.none),
+            ('send_arr_lens', types.none),
+            ('send_arr_chars', types.none)
+        ]
+        ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
+        def shuff_meta_impl(arr, n_pes):
+            send_counts = np.zeros(n_pes, np.int32)
+            recv_counts = np.empty(n_pes, np.int32)
+            # arr as out_arr placeholder, send/recv counts as placeholder for type inference
+            return ShuffleMetaCL(send_counts, recv_counts, arr, 0, send_counts, recv_counts, None, None, None, None)
+        return shuff_meta_impl
+
+def finalize_shuffle_meta(arr, shuffle_meta):
+    return
+
+@overload(finalize_shuffle_meta)
+def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t):
+    if isinstance(arr_t, types.Array):
+        def finalize_impl(arr, shuffle_meta):
+            hpat.distributed_api.alltoall(shuffle_meta.send_counts, shuffle_meta.recv_counts, 1)
+            shuffle_meta.n_out = shuffle_meta.recv_counts.sum()
+            shuffle_meta.out_arr = np.empty(shuffle_meta.n_out, arr.dtype)
+            shuffle_meta.send_disp = hpat.hiframes_join.calc_disp(shuffle_meta.send_counts)
+            shuffle_meta.recv_disp = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts)
+        return finalize_impl
+
+
+def alltoallv(arr, m):
+    return
+
+@overload(alltoallv)
+def alltoallv_impl(arr_t, metadata_t):
+    if isinstance(arr_t, types.Array):
+        def a2av_impl(arr, metadata):
+            hpat.distributed_api.alltoallv(
+                arr, metadata.out_arr, metadata.send_counts,
+                metadata.recv_counts, metadata.send_disp, metadata.recv_disp)
+    return a2av_impl
