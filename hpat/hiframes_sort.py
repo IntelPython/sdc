@@ -10,10 +10,13 @@ from numba.extending import overload
 import hpat
 import hpat.timsort
 from hpat import distributed, distributed_analysis
-from hpat.distributed_api import Reduce_Type
+from hpat.distributed_api import Reduce_Type, _h5_typ_table
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints, empty_like_type
-from hpat.str_arr_ext import string_array_type, to_string_list, cp_str_list_to_array, str_list_to_array
+from hpat.str_arr_ext import (string_array_type, to_string_list,
+                              cp_str_list_to_array, str_list_to_array,
+                              get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
+                              pre_alloc_string_array, del_str)
 
 MIN_SAMPLES = 1000000
 #MIN_SAMPLES = 100
@@ -258,6 +261,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         sort_state_o = SortState(l_key_arr, n_out, data)
         hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, data)
         cp_str_list_to_array(key_arr, l_key_arr)
+        res = key_arr
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,
@@ -269,6 +273,8 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
                                     typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [sort_node.key_arr, data_tup_var])
     nodes += f_block.body[:-3]
+    # set key arr since new array is created after communication
+    nodes.append(ir.Assign(nodes[-1].target, sort_node.key_arr, sort_node.key_arr.loc))
     return nodes
 
 
@@ -312,9 +318,10 @@ def parallel_sort(key_arr, data):
     shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes)
     node_id = 0
     for i in range(n_local):
-        if node_id < (n_pes - 1) and key_arr[i] >= bounds[node_id]:
+        val = key_arr[i]
+        if node_id < (n_pes - 1) and val >= bounds[node_id]:
             node_id += 1
-        update_shuffle_meta(shuffle_meta, node_id)
+        update_shuffle_meta(shuffle_meta, node_id, i, val)
 
     finalize_shuffle_meta(key_arr, shuffle_meta)
 
@@ -332,21 +339,41 @@ def parallel_sort(key_arr, data):
 
 class ShuffleMeta:
     def __init__(self, send_counts, recv_counts, out_arr, n_out, send_disp, recv_disp, send_counts_char,
-            recv_counts_char, send_arr_lens, send_arr_chars):
+            recv_counts_char, send_arr_lens, send_arr_chars, send_disp_char, recv_disp_char):
         self.send_counts = send_counts
         self.recv_counts = recv_counts
         self.out_arr = out_arr
         self.n_out = n_out
         self.send_disp = send_disp
         self.recv_disp = recv_disp
+        # string arrays
         self.send_counts_char = send_counts_char
         self.recv_counts_char = recv_counts_char
         self.send_arr_lens = send_arr_lens
         self.send_arr_chars = send_arr_chars
+        self.send_disp_char = send_disp_char
+        self.recv_disp_char = recv_disp_char
 
-@numba.njit
-def update_shuffle_meta(shuffle_meta, node_id):
+
+def update_shuffle_meta(shuffle_meta, node_id, ind, val):
     shuffle_meta.send_counts[node_id] += 1
+
+@overload(update_shuffle_meta)
+def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t):
+    arr_t = meta_t.struct['out_arr']
+    if isinstance(arr_t, types.Array):
+        def update_impl(shuffle_meta, node_id, ind, val):
+            shuffle_meta.send_counts[node_id] += 1
+        return update_impl
+    assert arr_t == string_array_type
+    def update_str_impl(shuffle_meta, node_id, ind, val):
+        n_chars = len(val)
+        shuffle_meta.send_counts[node_id] += 1
+        shuffle_meta.send_counts_char[node_id] += n_chars
+        shuffle_meta.send_arr_lens[ind] = n_chars
+        del_str(val)
+
+    return update_str_impl
 
 def alloc_shuffle_metadata(arr, n_pes):
     return ShuffleMeta(arr, n_pes)
@@ -365,15 +392,49 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
             ('send_counts_char', types.none),
             ('recv_counts_char', types.none),
             ('send_arr_lens', types.none),
-            ('send_arr_chars', types.none)
+            ('send_arr_chars', types.none),
+            ('send_disp_char', types.none),
+            ('recv_disp_char', types.none),
         ]
         ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
         def shuff_meta_impl(arr, n_pes):
             send_counts = np.zeros(n_pes, np.int32)
             recv_counts = np.empty(n_pes, np.int32)
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
-            return ShuffleMetaCL(send_counts, recv_counts, arr, 0, send_counts, recv_counts, None, None, None, None)
+            return ShuffleMetaCL(
+                send_counts, recv_counts, arr, 0, send_counts, recv_counts,
+                None, None, None, None, None, None)
         return shuff_meta_impl
+
+    assert arr_t == string_array_type
+    spec = [
+        ('send_counts', count_arr_typ),
+        ('recv_counts', count_arr_typ),
+        ('out_arr', arr_t),
+        ('n_out', types.intp),
+        ('send_disp', count_arr_typ),
+        ('recv_disp', count_arr_typ),
+        ('send_counts_char', count_arr_typ),
+        ('recv_counts_char', count_arr_typ),
+        ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
+        ('send_arr_chars', types.voidptr),
+        ('send_disp_char', count_arr_typ),
+        ('recv_disp_char', count_arr_typ),
+    ]
+    ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
+    def shuff_meta_str_impl(arr, n_pes):
+        send_counts = np.zeros(n_pes, np.int32)
+        recv_counts = np.empty(n_pes, np.int32)
+        send_counts_char = np.zeros(n_pes, np.int32)
+        recv_counts_char = np.empty(n_pes, np.int32)
+        send_arr_lens = np.empty(len(arr), np.uint32)
+        send_arr_chars = get_data_ptr(arr)
+        # arr as out_arr placeholder, send/recv counts as placeholder for type inference
+        return ShuffleMetaCL(
+            send_counts, recv_counts, arr, 0, send_counts, recv_counts,
+            send_counts_char, recv_counts_char, send_arr_lens,
+            send_arr_chars, send_counts_char, recv_counts_char)
+    return shuff_meta_str_impl
 
 def finalize_shuffle_meta(arr, shuffle_meta):
     return
@@ -389,6 +450,20 @@ def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t):
             shuffle_meta.recv_disp = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts)
         return finalize_impl
 
+    assert arr_t == string_array_type
+    def finalize_str_impl(arr, shuffle_meta):
+        hpat.distributed_api.alltoall(shuffle_meta.send_counts, shuffle_meta.recv_counts, 1)
+        hpat.distributed_api.alltoall(shuffle_meta.send_counts_char, shuffle_meta.recv_counts_char, 1)
+        shuffle_meta.n_out = shuffle_meta.recv_counts.sum()
+        n_all_chars = shuffle_meta.recv_counts_char.sum()
+        shuffle_meta.out_arr = pre_alloc_string_array(shuffle_meta.n_out, n_all_chars)
+        shuffle_meta.send_disp = hpat.hiframes_join.calc_disp(shuffle_meta.send_counts)
+        shuffle_meta.recv_disp = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts)
+        shuffle_meta.send_disp_char = hpat.hiframes_join.calc_disp(shuffle_meta.send_counts_char)
+        shuffle_meta.recv_disp_char = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts_char)
+
+    return finalize_str_impl
+
 
 def alltoallv(arr, m):
     return
@@ -400,4 +475,19 @@ def alltoallv_impl(arr_t, metadata_t):
             hpat.distributed_api.alltoallv(
                 arr, metadata.out_arr, metadata.send_counts,
                 metadata.recv_counts, metadata.send_disp, metadata.recv_disp)
-    return a2av_impl
+        return a2av_impl
+
+    assert arr_t == string_array_type
+    int32_typ_enum = np.int32(_h5_typ_table[types.int32])
+    char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+    def a2av_str_impl(arr, metadata):
+        # TODO: increate refcount?
+        offset_ptr = get_offset_ptr(metadata.out_arr)
+        hpat.distributed_api.c_alltoallv(
+            metadata.send_arr_lens.ctypes, offset_ptr, metadata.send_counts.ctypes,
+            metadata.recv_counts.ctypes, metadata.send_disp.ctypes, metadata.recv_disp.ctypes, int32_typ_enum)
+        hpat.distributed_api.c_alltoallv(
+            metadata.send_arr_chars, get_data_ptr(metadata.out_arr), metadata.send_counts_char.ctypes,
+            metadata.recv_counts_char.ctypes, metadata.send_disp_char.ctypes, metadata.recv_disp_char.ctypes, char_typ_enum)
+        convert_len_arr_to_offset(offset_ptr, metadata.n_out)
+    return a2av_str_impl
