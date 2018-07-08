@@ -261,12 +261,11 @@ def str_list_to_array_overload(list_typ):
             for i in range(n):
                 _str = str_list[i]
                 n_char += len(_str)
-                del_str(_str)
             str_arr = pre_alloc_string_array(n, n_char)
             for i in range(n):
                 _str = str_list[i]
                 setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
-                del_str(_str)
+                del_str(_str)  # XXX assuming str list is not used anymore
             return str_arr
 
         return str_list_impl
