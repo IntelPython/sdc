@@ -255,12 +255,15 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         key_arr = out
         data = out_data
         l_key_arr = to_string_list(key_arr)
+        l_data = to_string_list(data)
         # TODO: use k-way merge instead of sort
         # sort output
         n_out = len(key_arr)
-        sort_state_o = SortState(l_key_arr, n_out, data)
-        hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, data)
+        sort_state_o = SortState(l_key_arr, n_out, l_data)
+        hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, l_data)
         cp_str_list_to_array(key_arr, l_key_arr)
+        cp_str_list_to_array(data, l_data)
+        res_data = data
         res = key_arr
 
     f_block = compile_to_numba_ir(par_sort_impl,
@@ -273,8 +276,16 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
                                     typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [sort_node.key_arr, data_tup_var])
     nodes += f_block.body[:-3]
-    # set key arr since new array is created after communication
+    # set vars since new arrays are created after communication
+    data_tup = nodes[-2].target
+    # key
     nodes.append(ir.Assign(nodes[-1].target, sort_node.key_arr, sort_node.key_arr.loc))
+
+    for i, var in enumerate(data_vars):
+        getitem = ir.Expr.static_getitem(data_tup, i, None, var.loc)
+        calltypes[getitem] = None
+        nodes.append(ir.Assign(getitem, var, var.loc))
+
     return nodes
 
 
@@ -316,20 +327,21 @@ def parallel_sort(key_arr, data):
 
     # calc send/recv counts
     shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes)
+    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes)
     node_id = 0
     for i in range(n_local):
         val = key_arr[i]
         if node_id < (n_pes - 1) and val >= bounds[node_id]:
             node_id += 1
         update_shuffle_meta(shuffle_meta, node_id, i, val)
+        update_data_shuffle_meta(data_shuffle_meta, node_id, i, data)
 
     finalize_shuffle_meta(key_arr, shuffle_meta)
+    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta)
 
     # shuffle
     alltoallv(key_arr, shuffle_meta)
-    out_data = hpat.timsort.alloc_arr_tup(shuffle_meta.n_out, data)
-    hpat.distributed_api.alltoallv_tup(data, out_data,
-        shuffle_meta.send_counts, shuffle_meta.recv_counts, shuffle_meta.send_disp, shuffle_meta.recv_disp)
+    out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
 
     return shuffle_meta.out_arr, out_data
 
@@ -464,7 +476,6 @@ def alltoallv_impl(arr_t, metadata_t):
     return a2av_str_impl
 
 def get_shuffle_meta_class(arr_t):
-
     count_arr_typ = types.Array(types.int32, 1, 'C')
     if isinstance(arr_t, types.Array):
         spec = [
@@ -499,3 +510,160 @@ def get_shuffle_meta_class(arr_t):
 
     ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
     return ShuffleMetaCL
+
+
+########  meta data for string data column handling  #########
+
+
+def data_alloc_shuffle_metadata(arr, n_pes):
+    return ShuffleMeta(arr, n_pes)
+
+@overload(data_alloc_shuffle_metadata)
+def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
+    count = data_t.count
+    spec_null = [
+        ('send_counts', types.none),
+        ('recv_counts', types.none),
+        ('out_arr', types.none),
+        ('n_out', types.none),
+        ('send_disp', types.none),
+        ('recv_disp', types.none),
+        ('send_counts_char', types.none),
+        ('recv_counts_char', types.none),
+        ('send_arr_lens', types.none),
+        ('send_arr_chars', types.none),
+        ('send_disp_char', types.none),
+        ('recv_disp_char', types.none),
+    ]
+    ShuffleMetaNull = numba.jitclass(spec_null)(ShuffleMeta)
+    count_arr_typ = types.Array(types.int32, 1, 'C')
+    spec_str = [
+        ('send_counts', types.none),
+        ('recv_counts', types.none),
+        ('out_arr', string_array_type),
+        ('n_out', types.none),
+        ('send_disp', types.none),
+        ('recv_disp', types.none),
+        ('send_counts_char', count_arr_typ),
+        ('recv_counts_char', count_arr_typ),
+        ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
+        ('send_arr_chars', types.voidptr),
+        ('send_disp_char', count_arr_typ),
+        ('recv_disp_char', count_arr_typ),
+    ]
+    ShuffleMetaStr = numba.jitclass(spec_str)(ShuffleMeta)
+
+    func_text = "def f(data, n_pes):\n"
+    for i in range(count):
+        typ = data_t.types[i]
+        if isinstance(typ, types.Array):
+            func_text += ("  meta_{} = ShuffleMetaNull(None, None, None, None,"
+                " None, None, None, None, None, None, None, None)\n").format(i)
+        else:
+            assert typ == string_array_type
+            func_text += "  arr = data[{}]\n".format(i)
+            func_text += "  send_counts_char = np.zeros(n_pes, np.int32)\n"
+            func_text += "  recv_counts_char = np.empty(n_pes, np.int32)\n"
+            func_text += "  send_arr_lens = np.empty(len(arr), np.uint32)\n"
+            func_text += "  send_arr_chars = get_data_ptr(arr)\n"
+            func_text += ("  meta_{} = ShuffleMetaStr(None, None, arr, None, "
+                "None, None, send_counts_char, recv_counts_char, send_arr_lens,"
+                " send_arr_chars, send_counts_char, recv_counts_char)\n").format(i)
+    func_text += "  return ({}{})\n".format(
+        ','.join(['meta_{}'.format(i) for i in range(count)]),
+        "," if count == 1 else "")
+
+    loc_vars = {}
+    exec(func_text, {'ShuffleMetaNull': ShuffleMetaNull,
+        'ShuffleMetaStr': ShuffleMetaStr, 'np': np,
+        'get_data_ptr': get_data_ptr}, loc_vars)
+    alloc_impl = loc_vars['f']
+    return alloc_impl
+
+def update_data_shuffle_meta(shuffle_meta, node_id, ind, data):
+    return
+
+@overload(update_data_shuffle_meta)
+def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t):
+    func_text = "def f(meta_tup, node_id, ind, data):\n"
+    for i, typ in enumerate(data_t.types):
+        if typ == string_array_type:
+            func_text += "  val_{} = data[{}][ind]\n".format(i, i)
+            func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
+            func_text += "  del_str(val_{})\n".format(i)
+            func_text += "  meta_tup[{}].send_counts_char[node_id] += n_chars_{}\n".format(i, i)
+            func_text += "  meta_tup[{}].send_arr_lens[ind] = n_chars_{}\n".format(i, i)
+    
+    func_text += "  return\n"
+    loc_vars = {}
+    exec(func_text, {'del_str': del_str}, loc_vars)
+    update_impl = loc_vars['f']
+    return update_impl
+
+def finalize_data_shuffle_meta(data, shuffle_meta, key_meta):
+    return
+
+@overload(finalize_data_shuffle_meta)
+def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t):
+    func_text = "def f(data, meta_tup, key_meta):\n"
+    for i, typ in enumerate(data_t.types):
+        if isinstance(typ, types.Array):
+            func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ)
+        else:
+            assert typ == string_array_type
+            func_text += ("  hpat.distributed_api.alltoall("
+                "meta_tup[{}].send_counts_char, meta_tup[{}].recv_counts_char, 1)\n").format(i, i)
+            func_text += "  n_all_chars_{} = meta_tup[{}].recv_counts_char.sum()\n".format(i, i)
+            func_text += "  meta_tup[{}].out_arr = pre_alloc_string_array(key_meta.n_out, n_all_chars_{})\n".format(i, i)
+            func_text += ("  meta_tup[{}].send_disp_char = hpat.hiframes_join."
+                "calc_disp(meta_tup[{}].send_counts_char)\n").format(i, i)
+            func_text += ("  meta_tup[{}].recv_disp_char = hpat.hiframes_join."
+                "calc_disp(meta_tup[{}].recv_counts_char)\n").format(i, i)
+
+    func_text += "  return\n"
+    loc_vars = {}
+    exec(func_text, {'np': np, 'hpat': hpat,
+         'pre_alloc_string_array': pre_alloc_string_array}, loc_vars)
+    finalize_impl = loc_vars['f']
+    return finalize_impl
+
+def alltoallv_tup(data, data_shuffle_meta, shuffle_meta):
+    return data
+
+@overload(alltoallv_tup)
+def alltoallv_tup_overload(data_t, data_shuffle_meta_t, shuffle_meta_t):
+    func_text = "def f(data, meta_tup, key_meta):\n"
+    for i, typ in enumerate(data_t.types):
+        if isinstance(typ, types.Array):
+            func_text += ("  hpat.distributed_api.alltoallv("
+                "data[{}], meta_tup[{}].out_arr, key_meta.send_counts,"
+                "key_meta.recv_counts, key_meta.send_disp, key_meta.recv_disp)\n").format(i, i)
+        else:
+            assert typ == string_array_type
+            func_text += "  offset_ptr_{} = get_offset_ptr(meta_tup[{}].out_arr)\n".format(i, i)
+
+            func_text += ("  hpat.distributed_api.c_alltoallv("
+                "meta_tup[{}].send_arr_lens.ctypes, offset_ptr_{}, key_meta.send_counts.ctypes, "
+                "key_meta.recv_counts.ctypes, key_meta.send_disp.ctypes, "
+                "key_meta.recv_disp.ctypes, int32_typ_enum)\n").format(i, i)
+
+            func_text += ("  hpat.distributed_api.c_alltoallv("
+                "meta_tup[{}].send_arr_chars, get_data_ptr(meta_tup[{}].out_arr), meta_tup[{}].send_counts_char.ctypes,"
+                "meta_tup[{}].recv_counts_char.ctypes, meta_tup[{}].send_disp_char.ctypes,"
+                "meta_tup[{}].recv_disp_char.ctypes, char_typ_enum)\n").format(i, i, i, i, i, i)
+
+            func_text += "  convert_len_arr_to_offset(offset_ptr_{}, key_meta.n_out)\n".format(i)
+
+    func_text += "  return ({}{})\n".format(
+        ','.join(['meta_tup[{}].out_arr'.format(i) for i in range(data_t.count)]),
+        "," if data_t.count == 1 else "")
+
+    int32_typ_enum = np.int32(_h5_typ_table[types.int32])
+    char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat, 'get_offset_ptr': get_offset_ptr,
+         'get_data_ptr': get_data_ptr, 'int32_typ_enum': int32_typ_enum,
+         'char_typ_enum': char_typ_enum,
+         'convert_len_arr_to_offset': convert_len_arr_to_offset}, loc_vars)
+    a2a_impl = loc_vars['f']
+    return a2a_impl
