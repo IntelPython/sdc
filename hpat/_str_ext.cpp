@@ -300,6 +300,8 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
     //                                                 total_size << std::endl;
     *offsets = new uint32_t[num_strings+1];
     *data = new char[total_size];
+    (*offsets)[0] = 0;
+    (*offsets)[num_strings] = (uint32_t)total_size;  // in case total chars is read from here
     // *data = (char*) new std::string("gggg");
     return;
 }
