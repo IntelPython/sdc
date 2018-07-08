@@ -380,23 +380,8 @@ def alloc_shuffle_metadata(arr, n_pes):
 
 @overload(alloc_shuffle_metadata)
 def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
-    count_arr_typ = types.Array(types.int32, 1, 'C')
     if isinstance(arr_t, types.Array):
-        spec = [
-            ('send_counts', count_arr_typ),
-            ('recv_counts', count_arr_typ),
-            ('out_arr', arr_t),
-            ('n_out', types.intp),
-            ('send_disp', count_arr_typ),
-            ('recv_disp', count_arr_typ),
-            ('send_counts_char', types.none),
-            ('recv_counts_char', types.none),
-            ('send_arr_lens', types.none),
-            ('send_arr_chars', types.none),
-            ('send_disp_char', types.none),
-            ('recv_disp_char', types.none),
-        ]
-        ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
+        ShuffleMetaCL = get_shuffle_meta_class(arr_t)
         def shuff_meta_impl(arr, n_pes):
             send_counts = np.zeros(n_pes, np.int32)
             recv_counts = np.empty(n_pes, np.int32)
@@ -407,21 +392,7 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
         return shuff_meta_impl
 
     assert arr_t == string_array_type
-    spec = [
-        ('send_counts', count_arr_typ),
-        ('recv_counts', count_arr_typ),
-        ('out_arr', arr_t),
-        ('n_out', types.intp),
-        ('send_disp', count_arr_typ),
-        ('recv_disp', count_arr_typ),
-        ('send_counts_char', count_arr_typ),
-        ('recv_counts_char', count_arr_typ),
-        ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
-        ('send_arr_chars', types.voidptr),
-        ('send_disp_char', count_arr_typ),
-        ('recv_disp_char', count_arr_typ),
-    ]
-    ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
+    ShuffleMetaCL = get_shuffle_meta_class(arr_t)
     def shuff_meta_str_impl(arr, n_pes):
         send_counts = np.zeros(n_pes, np.int32)
         recv_counts = np.empty(n_pes, np.int32)
@@ -491,3 +462,40 @@ def alltoallv_impl(arr_t, metadata_t):
             metadata.recv_counts_char.ctypes, metadata.send_disp_char.ctypes, metadata.recv_disp_char.ctypes, char_typ_enum)
         convert_len_arr_to_offset(offset_ptr, metadata.n_out)
     return a2av_str_impl
+
+def get_shuffle_meta_class(arr_t):
+
+    count_arr_typ = types.Array(types.int32, 1, 'C')
+    if isinstance(arr_t, types.Array):
+        spec = [
+                ('send_counts', count_arr_typ),
+                ('recv_counts', count_arr_typ),
+                ('out_arr', arr_t),
+                ('n_out', types.intp),
+                ('send_disp', count_arr_typ),
+                ('recv_disp', count_arr_typ),
+                ('send_counts_char', types.none),
+                ('recv_counts_char', types.none),
+                ('send_arr_lens', types.none),
+                ('send_arr_chars', types.none),
+                ('send_disp_char', types.none),
+                ('recv_disp_char', types.none),
+            ]
+    else:
+        spec = [
+            ('send_counts', count_arr_typ),
+            ('recv_counts', count_arr_typ),
+            ('out_arr', arr_t),
+            ('n_out', types.intp),
+            ('send_disp', count_arr_typ),
+            ('recv_disp', count_arr_typ),
+            ('send_counts_char', count_arr_typ),
+            ('recv_counts_char', count_arr_typ),
+            ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
+            ('send_arr_chars', types.voidptr),
+            ('send_disp_char', count_arr_typ),
+            ('recv_disp_char', count_arr_typ),
+        ]
+
+    ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
+    return ShuffleMetaCL
