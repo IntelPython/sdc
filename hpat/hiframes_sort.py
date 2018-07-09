@@ -172,18 +172,7 @@ def to_string_list_typ(typ):
 
     return typ
 
-def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
-    parallel = True
-    data_vars = list(sort_node.df_vars.values())
-    for v in [sort_node.key_arr] + data_vars:
-        if (array_dists[v.name] != distributed.Distribution.OneD
-                and array_dists[v.name] != distributed.Distribution.OneD_Var):
-            parallel = False
-
-    key_arr = sort_node.key_arr
-    key_typ = typemap[key_arr.name]
-    data_tup_typ = types.Tuple([typemap[v.name] for v in sort_node.df_vars.values()])
-
+def get_sort_state_class(key_typ, data_tup_typ):
     sort_state_spec = [
         ('key_arr', to_string_list_typ(key_typ)),
         ('aLength', numba.intp),
@@ -196,6 +185,17 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         ('data', to_string_list_typ(data_tup_typ)),
         ('tmp_data', to_string_list_typ(data_tup_typ)),
     ]
+    return numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
+
+def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
+    parallel = True
+    data_vars = list(sort_node.df_vars.values())
+    for v in [sort_node.key_arr] + data_vars:
+        if (array_dists[v.name] != distributed.Distribution.OneD
+                and array_dists[v.name] != distributed.Distribution.OneD_Var):
+            parallel = False
+
+    key_arr = sort_node.key_arr
 
     col_name_args = ', '.join(["c"+str(i) for i in range(len(data_vars))])
     # TODO: use *args
@@ -215,7 +215,9 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     exec(func_text, {}, loc_vars)
     sort_impl = loc_vars['f']
 
-    SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
+    key_typ = typemap[key_arr.name]
+    data_tup_typ = types.Tuple([typemap[v.name] for v in sort_node.df_vars.values()])
+    SortStateCL = get_sort_state_class(key_typ, data_tup_typ)
 
     f_block = compile_to_numba_ir(sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,
@@ -593,7 +595,7 @@ def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t):
             func_text += "  del_str(val_{})\n".format(i)
             func_text += "  meta_tup[{}].send_counts_char[node_id] += n_chars_{}\n".format(i, i)
             func_text += "  meta_tup[{}].send_arr_lens[ind] = n_chars_{}\n".format(i, i)
-    
+
     func_text += "  return\n"
     loc_vars = {}
     exec(func_text, {'del_str': del_str}, loc_vars)
