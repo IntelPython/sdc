@@ -93,14 +93,14 @@ if use_impi:
 
 if is_win:
     # use Intel MPI on Windows
-    MPI_LIBS = ['impi', 'impicxx']
+    MPI_LIBS = ['libimalloc', 'impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
 
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp"],
-                   libraries = ['hdf5'] + MPI_LIBS + ['boost_filesystem'],
+                   libraries = MPI_LIBS + ['hdf5'] + ['boost_filesystem'],
                    include_dirs = [HDF5_DIR+'/include',] + ind,
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
                    define_macros = H5_CPP_FLAGS,
