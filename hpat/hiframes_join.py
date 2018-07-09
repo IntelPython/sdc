@@ -8,7 +8,10 @@ import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints
 from hpat.distributed_analysis import Distribution
-from hpat.str_arr_ext import string_array_type
+from hpat.str_arr_ext import (string_array_type, to_string_list,
+                              cp_str_list_to_array, str_list_to_array,
+                              get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
+                              pre_alloc_string_array, del_str)
 import numpy as np
 
 
@@ -320,12 +323,37 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                           ",".join(right_arg_names), right_send_names, right_recv_names))
         local_left_data = left_recv_names
         local_right_data = right_recv_names
+        func_text += "    t1_key = recv_t1_key\n"
+        func_text += "    t2_key = recv_t2_key\n"
     else:
         local_left_data = ",".join(left_arg_names)
         local_right_data = ",".join(right_arg_names)
 
-    func_text += "    hpat.hiframes_join.sort({})\n".format(local_left_data)
-    func_text += "    hpat.hiframes_join.sort({})\n".format(local_right_data)
+
+    func_text += "    data_left = ({}{})[1:]\n".format(local_left_data, ",")
+    func_text += "    data_right = ({}{})[1:]\n".format(local_right_data, ",")
+
+    # local sort
+    func_text += "    _sort_len = len(t1_key)\n"
+    # convert StringArray to list(string) to enable swapping in sort
+    func_text += "    l_t1_key = to_string_list(t1_key)\n"
+    func_text += "    l_data_left = to_string_list(data_left)\n"
+    func_text += "    sort_state = SortStateLeft(l_t1_key, _sort_len, l_data_left)\n"
+    func_text += "    hpat.timsort.sort(sort_state, l_t1_key, 0, _sort_len, l_data_left)\n"
+    func_text += "    cp_str_list_to_array(t1_key, l_t1_key)\n"
+    func_text += "    cp_str_list_to_array(data_left, l_data_left)\n"
+
+    func_text += "    _sort_len = len(t2_key)\n"
+    # convert StringArray to list(string) to enable swapping in sort
+    func_text += "    l_t2_key = to_string_list(t2_key)\n"
+    func_text += "    l_data_right = to_string_list(data_right)\n"
+    func_text += "    sort_state = SortStateRight(l_t2_key, _sort_len, l_data_right)\n"
+    func_text += "    hpat.timsort.sort(sort_state, l_t2_key, 0, _sort_len, l_data_right)\n"
+    func_text += "    cp_str_list_to_array(t2_key, l_t2_key)\n"
+    func_text += "    cp_str_list_to_array(data_right, l_data_right)\n"
+
+    # func_text += "    hpat.hiframes_join.sort({})\n".format(local_left_data)
+    # func_text += "    hpat.hiframes_join.sort({})\n".format(local_right_data)
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
@@ -347,10 +375,20 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
+    join_impl = loc_vars['f']
 
-    f_block = compile_to_numba_ir(f,
-                                  {'hpat': hpat, 'np': np}, typingctx, arg_typs,
+    left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
+    SortStateLeftCL = hpat.hiframes_sort.get_sort_state_class(typemap[left_key_var.name], left_data_tup_typ)
+    right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
+    SortStateRightCL = hpat.hiframes_sort.get_sort_state_class(typemap[right_key_var.name], right_data_tup_typ)
+
+    f_block = compile_to_numba_ir(join_impl,
+                                  {'hpat': hpat, 'np': np,
+                                  'to_string_list': to_string_list,
+                                  'cp_str_list_to_array': cp_str_list_to_array,
+                                  'SortStateLeft': SortStateLeftCL,
+                                  'SortStateRight': SortStateRightCL,},
+                                  typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
                       + left_other_col_vars + right_other_col_vars)
@@ -363,6 +401,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
 
 distributed.distributed_run_extensions[Join] = join_distributed_run
+
 
 
 from numba.typing.templates import (
