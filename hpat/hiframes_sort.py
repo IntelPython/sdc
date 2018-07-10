@@ -543,7 +543,6 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
         ('send_disp_char', types.none),
         ('recv_disp_char', types.none),
     ]
-    ShuffleMetaNull = numba.jitclass(spec_null)(ShuffleMeta)
     count_arr_typ = types.Array(types.int32, 1, 'C')
     spec_str = [
         ('send_counts', types.none),
@@ -561,15 +560,22 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
     ]
     ShuffleMetaStr = numba.jitclass(spec_str)(ShuffleMeta)
 
+    glbls = {'ShuffleMetaStr': ShuffleMetaStr, 'np': np, 'get_data_ptr': get_data_ptr}
+    for i, typ in enumerate(data_t.types):
+        if isinstance(typ, types.Array):
+            spec_null[2] = ('out_arr', typ)
+            ShuffleMetaCL = numba.jitclass(spec_null.copy())(ShuffleMeta)
+            glbls['ShuffleMeta_{}'.format(i)] = ShuffleMetaCL
+
     func_text = "def f(data, n_pes):\n"
     for i in range(count):
         typ = data_t.types[i]
+        func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
-            func_text += ("  meta_{} = ShuffleMetaNull(None, None, None, None,"
-                " None, None, None, None, None, None, None, None)\n").format(i)
+            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, arr, None,"
+                " None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
             assert typ == string_array_type
-            func_text += "  arr = data[{}]\n".format(i)
             func_text += "  send_counts_char = np.zeros(n_pes, np.int32)\n"
             func_text += "  recv_counts_char = np.empty(n_pes, np.int32)\n"
             func_text += "  send_arr_lens = np.empty(len(arr), np.uint32)\n"
@@ -582,9 +588,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
         "," if count == 1 else "")
 
     loc_vars = {}
-    exec(func_text, {'ShuffleMetaNull': ShuffleMetaNull,
-        'ShuffleMetaStr': ShuffleMetaStr, 'np': np,
-        'get_data_ptr': get_data_ptr}, loc_vars)
+    exec(func_text, glbls, loc_vars)
     alloc_impl = loc_vars['f']
     return alloc_impl
 
@@ -616,7 +620,7 @@ def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t):
     func_text = "def f(data, meta_tup, key_meta):\n"
     for i, typ in enumerate(data_t.types):
         if isinstance(typ, types.Array):
-            func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ)
+            func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ.dtype)
         else:
             assert typ == string_array_type
             func_text += ("  hpat.distributed_api.alltoall("
