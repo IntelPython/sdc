@@ -16,7 +16,7 @@ from hpat.utils import debug_prints, empty_like_type
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
-                              pre_alloc_string_array, del_str)
+                              pre_alloc_string_array, del_str, num_total_chars)
 
 MIN_SAMPLES = 1000000
 #MIN_SAMPLES = 100
@@ -334,7 +334,7 @@ def parallel_sort(key_arr, data):
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts
-    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes)
+    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, True)
     data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes)
     node_id = 0
     for i in range(n_local):
@@ -396,31 +396,38 @@ def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t):
 
     return update_str_impl
 
-def alloc_shuffle_metadata(arr, n_pes):
-    return ShuffleMeta(arr, n_pes)
+def alloc_shuffle_metadata(arr, n_pes, contig):
+    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
+        np.zeros(1), None, None, None, None, None, None)
 
 @overload(alloc_shuffle_metadata)
-def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
+def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
     if isinstance(arr_t, types.Array):
         ShuffleMetaCL = get_shuffle_meta_class(arr_t)
-        def shuff_meta_impl(arr, n_pes):
+        def shuff_meta_impl(arr, n_pes, is_contig):
             send_counts = np.zeros(n_pes, np.int32)
             recv_counts = np.empty(n_pes, np.int32)
+            send_buff = arr
+            if not is_contig:
+                send_buff = np.empty_like(arr)
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
             return ShuffleMetaCL(
-                send_counts, recv_counts, arr, arr, 0, send_counts, recv_counts,
+                send_counts, recv_counts, send_buff, arr, 0, send_counts, recv_counts,
                 None, None, None, None, None, None)
         return shuff_meta_impl
 
     assert arr_t == string_array_type
     ShuffleMetaCL = get_shuffle_meta_class(arr_t)
-    def shuff_meta_str_impl(arr, n_pes):
+    def shuff_meta_str_impl(arr, n_pes, is_contig):
         send_counts = np.zeros(n_pes, np.int32)
         recv_counts = np.empty(n_pes, np.int32)
         send_counts_char = np.zeros(n_pes, np.int32)
         recv_counts_char = np.empty(n_pes, np.int32)
         send_arr_lens = np.empty(len(arr), np.uint32)
         send_arr_chars = get_data_ptr(arr)
+        if not is_contig:
+            n_all_chars = num_total_chars(arr)
+            send_arr_chars = np.empty(n_all_chars, np.uint8).ctypes
         # arr as out_arr placeholder, send/recv counts as placeholder for type inference
         return ShuffleMetaCL(
             send_counts, recv_counts, None, arr, 0, send_counts, recv_counts,
