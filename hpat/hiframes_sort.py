@@ -254,25 +254,21 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
 
     def par_sort_impl(key_arr, data):
         out, out_data = parallel_sort(key_arr, data)
-        key_arr = out
-        data = out_data
-        l_key_arr = to_string_list(key_arr)
-        l_data = to_string_list(data)
         # TODO: use k-way merge instead of sort
         # sort output
-        n_out = len(key_arr)
-        sort_state_o = SortState(l_key_arr, n_out, l_data)
-        hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, l_data)
-        cp_str_list_to_array(key_arr, l_key_arr)
-        cp_str_list_to_array(data, l_data)
-        res_data = data
-        res = key_arr
+        local_sort_f(out, out_data)
+        res_data = out_data
+        res = out
+
+    local_sort.__globals__['SortState'] = SortStateCL
+    _local_sort_f = numba.njit(local_sort)
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat, 'SortState': SortStateCL,
                                     'parallel_sort': parallel_sort,
                                     'to_string_list': to_string_list,
-                                    'cp_str_list_to_array': cp_str_list_to_array},
+                                    'cp_str_list_to_array': cp_str_list_to_array,
+                                    'local_sort_f': _local_sort_f},
                                     typingctx,
                                     (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
@@ -292,6 +288,16 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
 
 
 distributed.distributed_run_extensions[Sort] = sort_distributed_run
+
+
+def local_sort(key_arr, data):
+    l_key_arr = to_string_list(key_arr)
+    l_data = to_string_list(data)
+    n_out = len(key_arr)
+    sort_state_o = SortState(l_key_arr, n_out, l_data)
+    hpat.timsort.sort(sort_state_o, l_key_arr, 0, n_out, l_data)
+    cp_str_list_to_array(key_arr, l_key_arr)
+    cp_str_list_to_array(data, l_data)
 
 
 @numba.njit
