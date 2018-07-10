@@ -335,7 +335,7 @@ def parallel_sort(key_arr, data):
 
     # calc send/recv counts
     shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, True)
-    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes)
+    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes, True)
     node_id = 0
     for i in range(n_local):
         val = key_arr[i]
@@ -533,11 +533,12 @@ def get_shuffle_meta_class(arr_t):
 ########  meta data for string data column handling  #########
 
 
-def data_alloc_shuffle_metadata(arr, n_pes):
-    return ShuffleMeta(arr, n_pes)
+def data_alloc_shuffle_metadata(arr, n_pes, is_contig):
+    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
+        np.zeros(1), None, None, None, None, None, None)
 
 @overload(data_alloc_shuffle_metadata)
-def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
+def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
     count = data_t.count
     spec_null = [
         ('send_counts', types.none),
@@ -580,12 +581,15 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
             ShuffleMetaCL = numba.jitclass(spec_null.copy())(ShuffleMeta)
             glbls['ShuffleMeta_{}'.format(i)] = ShuffleMetaCL
 
-    func_text = "def f(data, n_pes):\n"
+    func_text = "def f(data, n_pes, is_contig):\n"
     for i in range(count):
         typ = data_t.types[i]
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
-            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, arr, arr, None,"
+            func_text += "  send_buff = arr\n"
+            func_text += "  if not is_contig:\n"
+            func_text += "    send_buff = np.empty_like(arr)\n"
+            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None,"
                 " None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
             assert typ == string_array_type
@@ -593,6 +597,9 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
             func_text += "  recv_counts_char = np.empty(n_pes, np.int32)\n"
             func_text += "  send_arr_lens = np.empty(len(arr), np.uint32)\n"
             func_text += "  send_arr_chars = get_data_ptr(arr)\n"
+            func_text += "  if not is_contig:\n"
+            func_text += "    n_all_chars = num_total_chars(arr)\n"
+            func_text += "    send_arr_chars = np.empty(n_all_chars, np.uint8).ctypes\n"
             func_text += ("  meta_{} = ShuffleMetaStr(None, None, None, arr, None, "
                 "None, None, send_counts_char, recv_counts_char, send_arr_lens,"
                 " send_arr_chars, send_counts_char, recv_counts_char)\n").format(i)
