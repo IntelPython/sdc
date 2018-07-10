@@ -202,14 +202,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     func_text = "def f(key_arr, {}):\n".format(col_name_args)
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(data_vars) == 1 else "")  # single value needs comma to become tuple
-    func_text += "  _sort_len = len(key_arr)\n"
-    # convert StringArray to list(string) to enable swapping in sort
-    func_text += "  l_key_arr = to_string_list(key_arr)\n"
-    func_text += "  l_data = to_string_list(data)\n"
-    func_text += "  sort_state = SortState(l_key_arr, _sort_len, l_data)\n"
-    func_text += "  hpat.timsort.sort(sort_state, l_key_arr, 0, _sort_len, l_data)\n"
-    func_text += "  cp_str_list_to_array(key_arr, l_key_arr)\n"
-    func_text += "  cp_str_list_to_array(data, l_data)\n"
+    func_text += "  local_sort_f(key_arr, data)\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -218,9 +211,12 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
     key_typ = typemap[key_arr.name]
     data_tup_typ = types.Tuple([typemap[v.name] for v in sort_node.df_vars.values()])
     SortStateCL = get_sort_state_class(key_typ, data_tup_typ)
+    local_sort.__globals__['SortState'] = SortStateCL
+    _local_sort_f = numba.njit(local_sort)
 
     f_block = compile_to_numba_ir(sort_impl,
-                                    {'hpat': hpat, 'SortState': SortStateCL,
+                                    {'hpat': hpat,
+                                    'local_sort_f': _local_sort_f,
                                     'to_string_list': to_string_list,
                                     'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
@@ -260,11 +256,8 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
         res_data = out_data
         res = out
 
-    local_sort.__globals__['SortState'] = SortStateCL
-    _local_sort_f = numba.njit(local_sort)
-
     f_block = compile_to_numba_ir(par_sort_impl,
-                                    {'hpat': hpat, 'SortState': SortStateCL,
+                                    {'hpat': hpat,
                                     'parallel_sort': parallel_sort,
                                     'to_string_list': to_string_list,
                                     'cp_str_list_to_array': cp_str_list_to_array,
@@ -291,6 +284,7 @@ distributed.distributed_run_extensions[Sort] = sort_distributed_run
 
 
 def local_sort(key_arr, data):
+    # convert StringArray to list(string) to enable swapping in sort
     l_key_arr = to_string_list(key_arr)
     l_data = to_string_list(data)
     n_out = len(key_arr)
