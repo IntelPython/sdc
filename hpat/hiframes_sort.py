@@ -160,32 +160,6 @@ def apply_copies_sort(sort_node, var_dict, name_var_table,
 
 ir_utils.apply_copy_propagate_extensions[Sort] = apply_copies_sort
 
-def to_string_list_typ(typ):
-    if typ == string_array_type:
-        return types.List(hpat.str_ext.string_type)
-
-    if isinstance(typ, (types.Tuple, types.UniTuple)):
-        new_typs = []
-        for i in range(typ.count):
-            new_typs.append(to_string_list_typ(typ.types[i]))
-        return types.Tuple(new_typs)
-
-    return typ
-
-def get_sort_state_class(key_typ, data_tup_typ):
-    sort_state_spec = [
-        ('key_arr', to_string_list_typ(key_typ)),
-        ('aLength', numba.intp),
-        ('minGallop', numba.intp),
-        ('tmpLength', numba.intp),
-        ('tmp', to_string_list_typ(key_typ)),
-        ('stackSize', numba.intp),
-        ('runBase', numba.int64[:]),
-        ('runLen', numba.int64[:]),
-        ('data', to_string_list_typ(data_tup_typ)),
-        ('tmp_data', to_string_list_typ(data_tup_typ)),
-    ]
-    return numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
 
 def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
     parallel = True
@@ -210,9 +184,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
 
     key_typ = typemap[key_arr.name]
     data_tup_typ = types.Tuple([typemap[v.name] for v in sort_node.df_vars.values()])
-    SortStateCL = get_sort_state_class(key_typ, data_tup_typ)
-    local_sort.__globals__['SortState'] = SortStateCL
-    _local_sort_f = numba.njit(local_sort)
+    _local_sort_f = get_local_sort_func(key_typ, data_tup_typ)
 
     f_block = compile_to_numba_ir(sort_impl,
                                     {'hpat': hpat,
@@ -281,6 +253,40 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, 
 
 
 distributed.distributed_run_extensions[Sort] = sort_distributed_run
+
+
+def to_string_list_typ(typ):
+    if typ == string_array_type:
+        return types.List(hpat.str_ext.string_type)
+
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        new_typs = []
+        for i in range(typ.count):
+            new_typs.append(to_string_list_typ(typ.types[i]))
+        return types.Tuple(new_typs)
+
+    return typ
+
+def get_local_sort_func(key_typ, data_tup_typ):
+    sort_state_spec = [
+        ('key_arr', to_string_list_typ(key_typ)),
+        ('aLength', numba.intp),
+        ('minGallop', numba.intp),
+        ('tmpLength', numba.intp),
+        ('tmp', to_string_list_typ(key_typ)),
+        ('stackSize', numba.intp),
+        ('runBase', numba.int64[:]),
+        ('runLen', numba.int64[:]),
+        ('data', to_string_list_typ(data_tup_typ)),
+        ('tmp_data', to_string_list_typ(data_tup_typ)),
+    ]
+    SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
+
+    # XXX: make sure function is not using old SortState
+    local_sort.__globals__['SortState'] = SortStateCL
+    _local_sort_f = numba.njit(local_sort)
+    _local_sort_f.compile(signature(types.none, key_typ, data_tup_typ))
+    return _local_sort_f
 
 
 def local_sort(key_arr, data):
