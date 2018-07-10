@@ -376,22 +376,23 @@ class ShuffleMeta:
         self.recv_disp_char = recv_disp_char
 
 
-def update_shuffle_meta(shuffle_meta, node_id, ind, val):
+def update_shuffle_meta(shuffle_meta, node_id, ind, val, is_contig=False):
     shuffle_meta.send_counts[node_id] += 1
 
 @overload(update_shuffle_meta)
-def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t):
+def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t, is_contig_t=None):
     arr_t = meta_t.struct['out_arr']
     if isinstance(arr_t, types.Array):
-        def update_impl(shuffle_meta, node_id, ind, val):
+        def update_impl(shuffle_meta, node_id, ind, val, is_contig=True):
             shuffle_meta.send_counts[node_id] += 1
         return update_impl
     assert arr_t == string_array_type
-    def update_str_impl(shuffle_meta, node_id, ind, val):
+    def update_str_impl(shuffle_meta, node_id, ind, val, is_contig=True):
         n_chars = len(val)
         shuffle_meta.send_counts[node_id] += 1
         shuffle_meta.send_counts_char[node_id] += n_chars
-        shuffle_meta.send_arr_lens[ind] = n_chars
+        if is_contig:
+            shuffle_meta.send_arr_lens[ind] = n_chars
         del_str(val)
 
     return update_str_impl
