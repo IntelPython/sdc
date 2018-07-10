@@ -2,16 +2,23 @@ from __future__ import print_function, division, absolute_import
 
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
+from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints
 from hpat.distributed_analysis import Distribution
+from hpat.hiframes_sort import (
+    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta,
+    )
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str)
+from hpat.hiframes_api import str_copy
 import numpy as np
 
 
@@ -292,46 +299,22 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                 ("," if len(left_other_names) != 0 else ""),
                 ",".join(right_other_names))
 
+    func_text += "    data_left = ({}{})\n".format(",".join(left_other_names),
+                                                "," if len(left_other_names) != 0 else "")
+    func_text += "    data_right = ({}{})\n".format(",".join(right_other_names),
+                                                "," if len(right_other_names) != 0 else "")
+
     if parallel:
-        # get send/recv counts
-        func_text += "    (t1_send_counts, t1_recv_counts, t1_send_disp,\n"
-        func_text += "     t1_recv_disp, t1_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t1_key)\n"
-        func_text += "    (t2_send_counts, t2_recv_counts, t2_send_disp,\n"
-        func_text += "     t2_recv_disp, t2_recv_size) = hpat.hiframes_join.get_sendrecv_counts(t2_key)\n"
-        #func_text += "    hpat.cprint(t1_recv_size, t2_recv_size)\n"
-
-        # prepare for shuffle
-        # allocate send/recv buffers
-        for a in left_arg_names:
-            func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-            func_text += "    recv_{} = np.empty(t1_recv_size, {}.dtype)\n".format(
-                a, a)
-
-        for a in right_arg_names:
-            func_text += "    send_{} = np.empty_like({})\n".format(a, a)
-            func_text += "    recv_{} = np.empty(t2_recv_size, {}.dtype)\n".format(
-                a, a)
-        left_send_names = ",".join(["send_" + v for v in left_arg_names])
-        left_recv_names = ",".join(["recv_" + v for v in left_arg_names])
-        func_text += ("    hpat.hiframes_join.shuffle_data(t1_send_counts,"
-                      + " t1_recv_counts, t1_send_disp, t1_recv_disp, {},{},{})\n".format(
-                          ",".join(left_arg_names), left_send_names, left_recv_names))
-        right_send_names = ",".join(["send_" + v for v in right_arg_names])
-        right_recv_names = ",".join(["recv_" + v for v in right_arg_names])
-        func_text += ("    hpat.hiframes_join.shuffle_data(t2_send_counts,"
-                      + " t2_recv_counts, t2_send_disp, t2_recv_disp, {},{},{})\n".format(
-                          ",".join(right_arg_names), right_send_names, right_recv_names))
-        local_left_data = left_recv_names
-        local_right_data = right_recv_names
-        func_text += "    t1_key = recv_t1_key\n"
-        func_text += "    t2_key = recv_t2_key\n"
+        func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
+        #func_text += "    print(t2_key, data_right)\n"
+        func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
+        #func_text += "    print(t2_key, data_right)\n"
+        local_left_data = "t1_key" + (", " if len(left_other_names) != 0 else "") + ",".join(["data_left[{}]".format(i) for i in range(len(left_other_names))])
+        local_right_data = "t2_key" + (", " if len(right_other_names) != 0 else "") + ",".join(["data_right[{}]".format(i) for i in range(len(right_other_names))])
     else:
         local_left_data = ",".join(left_arg_names)
         local_right_data = ",".join(right_arg_names)
 
-
-    func_text += "    data_left = ({}{})[1:]\n".format(local_left_data, ",")
-    func_text += "    data_right = ({}{})[1:]\n".format(local_right_data, ",")
 
     # local sort
     func_text += "    local_sort_f1(t1_key, data_left)\n"
@@ -351,10 +334,6 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         ",".join(out_names), len(left_arg_names),
         local_left_data, local_right_data)
 
-    # TODO: delete buffers
-    #delete_buffers((t1_send_counts, t1_recv_counts, t1_send_disp, t1_recv_disp))
-    #delete_buffers((t2_send_counts, t2_recv_counts, t2_send_disp, t2_recv_disp))
-
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     join_impl = loc_vars['f']
@@ -369,7 +348,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                   'to_string_list': to_string_list,
                                   'cp_str_list_to_array': cp_str_list_to_array,
                                   'local_sort_f1': _local_sort_f1,
-                                  'local_sort_f2': _local_sort_f2,},
+                                  'local_sort_f2': _local_sort_f2,
+                                  'parallel_join': parallel_join},
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
@@ -385,6 +365,92 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 distributed.distributed_run_extensions[Join] = join_distributed_run
 
 
+@numba.njit
+def parallel_join(key_arr, data):
+    # alloc shuffle meta
+    n_pes = hpat.distributed_api.get_size()
+    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
+    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes, False)
+
+    # calc send/recv counts
+    for i in range(len(key_arr)):
+        val = key_arr[i]
+        node_id = hash(val) % n_pes
+        update_shuffle_meta(shuffle_meta, node_id, i, val, False)
+        update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
+
+    finalize_shuffle_meta(key_arr, shuffle_meta)
+    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta)
+
+    # write send buffers
+    for i in range(len(key_arr)):
+        val = key_arr[i]
+        node_id = hash(val) % n_pes
+        write_send_buff(shuffle_meta, node_id, val)
+        write_data_send_buff(data_shuffle_meta, node_id, i, data, shuffle_meta)
+        # update last since it is reused in data
+        shuffle_meta.tmp_offset[node_id] += 1
+
+    # shuffle
+    alltoallv(key_arr, shuffle_meta)
+    out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
+
+    return shuffle_meta.out_arr, out_data
+
+def write_send_buff(shuffle_meta, node_id, val):
+    return
+
+@overload(write_send_buff)
+def write_send_buff_overload(meta_t, node_id_t, val_t):
+    arr_t = meta_t.struct['out_arr']
+    if isinstance(arr_t, types.Array):
+        def write_impl(shuffle_meta, node_id, val):
+            # TODO: refactor to use only tmp_offset
+            ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+            shuffle_meta.send_buff[ind] = val
+
+        return write_impl
+    assert arr_t == string_array_type
+    def write_str_impl(shuffle_meta, node_id, val):
+        n_chars = len(val)
+        # offset buff
+        ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+        shuffle_meta.send_arr_lens[ind] = n_chars
+        # data buff
+        indc = shuffle_meta.send_disp_chars[node_id] + shuffle_meta.tmp_offset_chars[node_id]
+        str_copy(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
+        shuffle_meta.tmp_offset_chars[node_id] += n_chars
+        del_str(val)
+
+    return write_str_impl
+
+
+def write_data_send_buff(data_shuffle_meta, node_id, i, data, key_meta):
+    return
+
+@overload(write_data_send_buff)
+def write_data_send_buff_overload(meta_t, node_id_t, ind_t, data_t, key_meta_t):
+    func_text = "def f(meta_tup, node_id, ind, data, key_meta):\n"
+    for i, typ in enumerate(data_t.types):
+        func_text += "  val_{} = data[{}][ind]\n".format(i, i)
+        func_text += "  ind_{} = key_meta.send_disp[node_id] + key_meta.tmp_offset[node_id]\n".format(i)
+        if isinstance(typ, types.Array):
+            func_text += "  meta_tup[{}].send_buff[ind_{}] = val_{}\n".format(i, i, i)
+        else:
+            # TODO: fix
+            assert typ == string_array_type
+            func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
+            func_text += "  meta_tup[{}].send_arr_lens[ind] = n_chars_{}\n".format(i, i)
+            func_text += "  indc_{} = meta_tup[{}].send_disp_chars[node_id] + meta_tup[{}].tmp_offset_chars[node_id]\n".format(i, i, i)
+            func_text += "  str_copy(meta_tup[{}].send_arr_chars, indc_{}, val_{}.c_str(), n_chars_{})\n".format(i, i, i, i)
+            func_text += "  meta_tup[{}].tmp_offset_chars[node_id] += n_chars_{}\n".format(i, i)
+            func_text += "  del_str(val_{})\n".format(i)
+
+    func_text += "  return\n"
+    loc_vars = {}
+    exec(func_text, {'del_str': del_str, 'str_copy': str_copy}, loc_vars)
+    write_impl = loc_vars['f']
+    return write_impl
 
 from numba.typing.templates import (
     signature, AbstractTemplate, infer_global, infer)
@@ -439,7 +505,7 @@ class ShuffleTyper(AbstractTemplate):
 
 
 @infer_global(sort)
-class ShuffleTyper(AbstractTemplate):
+class SortTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.int32, *args)
