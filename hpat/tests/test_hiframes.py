@@ -878,6 +878,24 @@ class TestHiFrames(unittest.TestCase):
         finally:
             hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
 
+    def test_sort_parallel(self):
+        # TODO: better parallel sort test
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            df['A'] = df.points.astype(np.float64)
+            df.sort_values('points', inplace=True)
+            res = df.A.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
+
+        save_min_samples = hiframes_sort.MIN_SAMPLES
+        try:
+            hiframes_sort.MIN_SAMPLES = 10
+            res = hpat_func()
+            self.assertTrue((np.diff(res)>=0).all())
+        finally:
+            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
 
     def test_intraday(self):
         def test_impl(nsyms):
