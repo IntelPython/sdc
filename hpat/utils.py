@@ -11,6 +11,10 @@ import numpy as np
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
+# silence Numba error messages for now
+# TODO: customize through @hpat.jit
+numba.errors.error_extras = {'unsupported_error': '', 'typing': '', 'reportable': '', 'interpreter': '', 'constant_inference': ''}
+
 # sentinel value representing non-constant values
 class NotConstant:
     pass
