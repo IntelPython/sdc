@@ -376,7 +376,7 @@ class ShuffleMeta:
         self.recv_disp_char = recv_disp_char
 
 
-def update_shuffle_meta(shuffle_meta, node_id, ind, val, is_contig=False):
+def update_shuffle_meta(shuffle_meta, node_id, ind, val, is_contig=True):
     shuffle_meta.send_counts[node_id] += 1
 
 @overload(update_shuffle_meta)
@@ -613,19 +613,20 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
     alloc_impl = loc_vars['f']
     return alloc_impl
 
-def update_data_shuffle_meta(shuffle_meta, node_id, ind, data):
+def update_data_shuffle_meta(shuffle_meta, node_id, ind, data, is_contig=True):
     return
 
 @overload(update_data_shuffle_meta)
-def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t):
-    func_text = "def f(meta_tup, node_id, ind, data):\n"
+def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t, is_contig=None):
+    func_text = "def f(meta_tup, node_id, ind, data, is_contig=True):\n"
     for i, typ in enumerate(data_t.types):
         if typ == string_array_type:
             func_text += "  val_{} = data[{}][ind]\n".format(i, i)
             func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
             func_text += "  del_str(val_{})\n".format(i)
             func_text += "  meta_tup[{}].send_counts_char[node_id] += n_chars_{}\n".format(i, i)
-            func_text += "  meta_tup[{}].send_arr_lens[ind] = n_chars_{}\n".format(i, i)
+            func_text += "  if is_contig:\n"
+            func_text += "    meta_tup[{}].send_arr_lens[ind] = n_chars_{}\n".format(i, i)
 
     func_text += "  return\n"
     loc_vars = {}
