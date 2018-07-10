@@ -358,10 +358,11 @@ def parallel_sort(key_arr, data):
 #     'recv_counts_char', 'send_arr_lens', 'send_arr_chars'])
 
 class ShuffleMeta:
-    def __init__(self, send_counts, recv_counts, out_arr, n_out, send_disp, recv_disp, send_counts_char,
+    def __init__(self, send_counts, recv_counts, send_buff, out_arr, n_out, send_disp, recv_disp, send_counts_char,
             recv_counts_char, send_arr_lens, send_arr_chars, send_disp_char, recv_disp_char):
         self.send_counts = send_counts
         self.recv_counts = recv_counts
+        self.send_buff = send_buff
         self.out_arr = out_arr
         self.n_out = n_out
         self.send_disp = send_disp
@@ -407,7 +408,7 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
             recv_counts = np.empty(n_pes, np.int32)
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
             return ShuffleMetaCL(
-                send_counts, recv_counts, arr, 0, send_counts, recv_counts,
+                send_counts, recv_counts, arr, arr, 0, send_counts, recv_counts,
                 None, None, None, None, None, None)
         return shuff_meta_impl
 
@@ -422,7 +423,7 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t):
         send_arr_chars = get_data_ptr(arr)
         # arr as out_arr placeholder, send/recv counts as placeholder for type inference
         return ShuffleMetaCL(
-            send_counts, recv_counts, arr, 0, send_counts, recv_counts,
+            send_counts, recv_counts, None, arr, 0, send_counts, recv_counts,
             send_counts_char, recv_counts_char, send_arr_lens,
             send_arr_chars, send_counts_char, recv_counts_char)
     return shuff_meta_str_impl
@@ -464,7 +465,7 @@ def alltoallv_impl(arr_t, metadata_t):
     if isinstance(arr_t, types.Array):
         def a2av_impl(arr, metadata):
             hpat.distributed_api.alltoallv(
-                arr, metadata.out_arr, metadata.send_counts,
+                metadata.send_buff, metadata.out_arr, metadata.send_counts,
                 metadata.recv_counts, metadata.send_disp, metadata.recv_disp)
         return a2av_impl
 
@@ -489,6 +490,7 @@ def get_shuffle_meta_class(arr_t):
         spec = [
                 ('send_counts', count_arr_typ),
                 ('recv_counts', count_arr_typ),
+                ('send_buff', arr_t),
                 ('out_arr', arr_t),
                 ('n_out', types.intp),
                 ('send_disp', count_arr_typ),
@@ -504,6 +506,7 @@ def get_shuffle_meta_class(arr_t):
         spec = [
             ('send_counts', count_arr_typ),
             ('recv_counts', count_arr_typ),
+            ('send_buff', types.none),
             ('out_arr', arr_t),
             ('n_out', types.intp),
             ('send_disp', count_arr_typ),
@@ -532,6 +535,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
     spec_null = [
         ('send_counts', types.none),
         ('recv_counts', types.none),
+        ('send_buff', types.none),
         ('out_arr', types.none),
         ('n_out', types.none),
         ('send_disp', types.none),
@@ -547,6 +551,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
     spec_str = [
         ('send_counts', types.none),
         ('recv_counts', types.none),
+        ('send_buff', types.none),
         ('out_arr', string_array_type),
         ('n_out', types.none),
         ('send_disp', types.none),
@@ -563,7 +568,8 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
     glbls = {'ShuffleMetaStr': ShuffleMetaStr, 'np': np, 'get_data_ptr': get_data_ptr}
     for i, typ in enumerate(data_t.types):
         if isinstance(typ, types.Array):
-            spec_null[2] = ('out_arr', typ)
+            spec_null[2] = ('send_buff', typ)
+            spec_null[3] = ('out_arr', typ)
             ShuffleMetaCL = numba.jitclass(spec_null.copy())(ShuffleMeta)
             glbls['ShuffleMeta_{}'.format(i)] = ShuffleMetaCL
 
@@ -572,7 +578,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
         typ = data_t.types[i]
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
-            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, arr, None,"
+            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, arr, arr, None,"
                 " None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
             assert typ == string_array_type
@@ -580,7 +586,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t):
             func_text += "  recv_counts_char = np.empty(n_pes, np.int32)\n"
             func_text += "  send_arr_lens = np.empty(len(arr), np.uint32)\n"
             func_text += "  send_arr_chars = get_data_ptr(arr)\n"
-            func_text += ("  meta_{} = ShuffleMetaStr(None, None, arr, None, "
+            func_text += ("  meta_{} = ShuffleMetaStr(None, None, None, arr, None, "
                 "None, None, send_counts_char, recv_counts_char, send_arr_lens,"
                 " send_arr_chars, send_counts_char, recv_counts_char)\n").format(i)
     func_text += "  return ({}{})\n".format(
@@ -648,7 +654,7 @@ def alltoallv_tup_overload(data_t, data_shuffle_meta_t, shuffle_meta_t):
     for i, typ in enumerate(data_t.types):
         if isinstance(typ, types.Array):
             func_text += ("  hpat.distributed_api.alltoallv("
-                "data[{}], meta_tup[{}].out_arr, key_meta.send_counts,"
+                "meta_tup[{}].send_buff, meta_tup[{}].out_arr, key_meta.send_counts,"
                 "key_meta.recv_counts, key_meta.send_disp, key_meta.recv_disp)\n").format(i, i)
         else:
             assert typ == string_array_type
