@@ -358,8 +358,8 @@ def parallel_sort(key_arr, data):
 #     'recv_counts_char', 'send_arr_lens', 'send_arr_chars'])
 
 class ShuffleMeta:
-    def __init__(self, send_counts, recv_counts, send_buff, out_arr, n_out, send_disp, recv_disp, send_counts_char,
-            recv_counts_char, send_arr_lens, send_arr_chars, send_disp_char, recv_disp_char):
+    def __init__(self, send_counts, recv_counts, send_buff, out_arr, n_out, send_disp, recv_disp, tmp_offset, send_counts_char,
+            recv_counts_char, send_arr_lens, send_arr_chars, send_disp_char, recv_disp_char, tmp_offset_chars):
         self.send_counts = send_counts
         self.recv_counts = recv_counts
         self.send_buff = send_buff
@@ -367,6 +367,7 @@ class ShuffleMeta:
         self.n_out = n_out
         self.send_disp = send_disp
         self.recv_disp = recv_disp
+        self.tmp_offset = tmp_offset
         # string arrays
         self.send_counts_char = send_counts_char
         self.recv_counts_char = recv_counts_char
@@ -374,6 +375,7 @@ class ShuffleMeta:
         self.send_arr_chars = send_arr_chars
         self.send_disp_char = send_disp_char
         self.recv_disp_char = recv_disp_char
+        self.tmp_offset_chars = tmp_offset_chars
 
 
 def update_shuffle_meta(shuffle_meta, node_id, ind, val, is_contig=True):
@@ -399,7 +401,7 @@ def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t, is_contig_t=No
 
 def alloc_shuffle_metadata(arr, n_pes, contig):
     return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
-        np.zeros(1), None, None, None, None, None, None)
+        np.zeros(1), np.zeros(1), None, None, None, None, None, None, None)
 
 @overload(alloc_shuffle_metadata)
 def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
@@ -409,12 +411,14 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
             send_counts = np.zeros(n_pes, np.int32)
             recv_counts = np.empty(n_pes, np.int32)
             send_buff = arr
+            tmp_offset = send_counts  # dummy
             if not is_contig:
                 send_buff = np.empty_like(arr)
+                tmp_offset = np.zeros(n_pes, np.int32)
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
             return ShuffleMetaCL(
-                send_counts, recv_counts, send_buff, arr, 0, send_counts, recv_counts,
-                None, None, None, None, None, None)
+                send_counts, recv_counts, send_buff, arr, 0, send_counts, recv_counts, tmp_offset,
+                None, None, None, None, None, None, None)
         return shuff_meta_impl
 
     assert arr_t == string_array_type
@@ -426,14 +430,19 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
         recv_counts_char = np.empty(n_pes, np.int32)
         send_arr_lens = np.empty(len(arr), np.uint32)
         send_arr_chars = get_data_ptr(arr)
+        tmp_offset = send_counts  # dummy
+        tmp_offset_chars = send_counts  # dummy
+
         if not is_contig:
             n_all_chars = num_total_chars(arr)
             send_arr_chars = np.empty(n_all_chars, np.uint8).ctypes
+            tmp_offset = np.zeros(n_pes, np.int32)
+            tmp_offset_chars = np.zeros(n_pes, np.int32)
         # arr as out_arr placeholder, send/recv counts as placeholder for type inference
         return ShuffleMetaCL(
-            send_counts, recv_counts, None, arr, 0, send_counts, recv_counts,
+            send_counts, recv_counts, None, arr, 0, send_counts, recv_counts, tmp_offset,
             send_counts_char, recv_counts_char, send_arr_lens,
-            send_arr_chars, send_counts_char, recv_counts_char)
+            send_arr_chars, send_counts_char, recv_counts_char, tmp_offset_chars)
     return shuff_meta_str_impl
 
 def finalize_shuffle_meta(arr, shuffle_meta):
@@ -503,12 +512,14 @@ def get_shuffle_meta_class(arr_t):
                 ('n_out', types.intp),
                 ('send_disp', count_arr_typ),
                 ('recv_disp', count_arr_typ),
+                ('tmp_offset', count_arr_typ),
                 ('send_counts_char', types.none),
                 ('recv_counts_char', types.none),
                 ('send_arr_lens', types.none),
                 ('send_arr_chars', types.none),
                 ('send_disp_char', types.none),
                 ('recv_disp_char', types.none),
+                ('tmp_offset_chars', types.none),
             ]
     else:
         spec = [
@@ -519,12 +530,14 @@ def get_shuffle_meta_class(arr_t):
             ('n_out', types.intp),
             ('send_disp', count_arr_typ),
             ('recv_disp', count_arr_typ),
+            ('tmp_offset', count_arr_typ),
             ('send_counts_char', count_arr_typ),
             ('recv_counts_char', count_arr_typ),
             ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
             ('send_arr_chars', types.voidptr),
             ('send_disp_char', count_arr_typ),
             ('recv_disp_char', count_arr_typ),
+            ('tmp_offset_chars', count_arr_typ),
         ]
 
     ShuffleMetaCL = numba.jitclass(spec)(ShuffleMeta)
@@ -536,7 +549,7 @@ def get_shuffle_meta_class(arr_t):
 
 def data_alloc_shuffle_metadata(arr, n_pes, is_contig):
     return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
-        np.zeros(1), None, None, None, None, None, None)
+        np.zeros(1), np.zeros(1), None, None, None, None, None, None, None)
 
 @overload(data_alloc_shuffle_metadata)
 def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
@@ -549,12 +562,14 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         ('n_out', types.none),
         ('send_disp', types.none),
         ('recv_disp', types.none),
+        ('tmp_offset', types.none),
         ('send_counts_char', types.none),
         ('recv_counts_char', types.none),
         ('send_arr_lens', types.none),
         ('send_arr_chars', types.none),
         ('send_disp_char', types.none),
         ('recv_disp_char', types.none),
+        ('tmp_offset_chars', types.none),
     ]
     count_arr_typ = types.Array(types.int32, 1, 'C')
     spec_str = [
@@ -565,12 +580,14 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         ('n_out', types.none),
         ('send_disp', types.none),
         ('recv_disp', types.none),
+        ('tmp_offset', types.none),
         ('send_counts_char', count_arr_typ),
         ('recv_counts_char', count_arr_typ),
         ('send_arr_lens', types.Array(types.uint32, 1, 'C')),
         ('send_arr_chars', types.voidptr),
         ('send_disp_char', count_arr_typ),
         ('recv_disp_char', count_arr_typ),
+        ('tmp_offset_chars', count_arr_typ),
     ]
     ShuffleMetaStr = numba.jitclass(spec_str)(ShuffleMeta)
 
@@ -590,20 +607,22 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
             func_text += "  send_buff = arr\n"
             func_text += "  if not is_contig:\n"
             func_text += "    send_buff = np.empty_like(arr)\n"
-            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None,"
-                " None, None, None, None, None, None, None, None)\n").format(i, i)
+            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None, None,"
+                " None, None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
             assert typ == string_array_type
             func_text += "  send_counts_char = np.zeros(n_pes, np.int32)\n"
             func_text += "  recv_counts_char = np.empty(n_pes, np.int32)\n"
             func_text += "  send_arr_lens = np.empty(len(arr), np.uint32)\n"
             func_text += "  send_arr_chars = get_data_ptr(arr)\n"
+            func_text += "  tmp_offset_chars = send_counts_char\n"
             func_text += "  if not is_contig:\n"
             func_text += "    n_all_chars = num_total_chars(arr)\n"
             func_text += "    send_arr_chars = np.empty(n_all_chars, np.uint8).ctypes\n"
+            func_text += "    tmp_offset_chars = np.zeros(n_pes, np.int32)\n"
             func_text += ("  meta_{} = ShuffleMetaStr(None, None, None, arr, None, "
-                "None, None, send_counts_char, recv_counts_char, send_arr_lens,"
-                " send_arr_chars, send_counts_char, recv_counts_char)\n").format(i)
+                "None, None, None, send_counts_char, recv_counts_char, send_arr_lens,"
+                " send_arr_chars, send_counts_char, recv_counts_char, send_arr_chars)\n").format(i)
     func_text += "  return ({}{})\n".format(
         ','.join(['meta_{}'.format(i) for i in range(count)]),
         "," if count == 1 else "")
