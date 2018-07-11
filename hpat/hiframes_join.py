@@ -263,19 +263,12 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
-        if (typemap[v.name] != types.Array(types.intp, 1, 'C')
-                and typemap[v.name] != types.Array(types.float64, 1, 'C')):
-            raise ValueError(
-                "Only int64 and float64 columns are currently supported in join")
 
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     # get column variables
     left_key_var = join_node.left_vars[join_node.left_key]
     right_key_var = join_node.right_vars[join_node.right_key]
-    if (typemap[left_key_var.name] != types.Array(types.intp, 1, 'C')
-            or typemap[right_key_var.name] != types.Array(types.intp, 1, 'C')):
-        raise ValueError("Only int64 keys are currently supported in join")
 
     left_other_col_vars = [v for (n, v) in sorted(join_node.left_vars.items())
                            if n != join_node.left_key]
@@ -753,6 +746,18 @@ def trim_arr_tup_overload(data_t, new_size_t):
     alloc_impl = loc_vars['f']
     return alloc_impl
 
+
+# @numba.njit
+# def copy_merge_data(left_key, data_left, data_right, left_ind, right_ind,
+#                         out_left_key, out_data_left, out_data_right, out_ind):
+#     out_left_key = ensure_capacity(out_left_key, out_ind+1)
+#     out_data_left = ensure_capacity(out_data_left, out_ind+1)
+#     out_data_right = ensure_capacity(out_data_right, out_ind+1)
+
+#     out_left_key[out_ind] = left_key[left_ind]
+#     copyElement_tup(data_left, left_ind, out_data_left, out_ind)
+#     copyElement_tup(data_right, right_ind, out_data_right, out_ind)
+#     return out_left_key, out_data_left, out_data_right
 
 @numba.njit
 def local_merge_new(left_key, right_key, data_left, data_right):
