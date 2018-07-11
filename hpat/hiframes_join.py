@@ -7,7 +7,7 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
 from hpat import distributed, distributed_analysis
-from hpat.utils import debug_prints, alloc_arr_tup
+from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
 from hpat.distributed_analysis import Distribution
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
@@ -17,7 +17,8 @@ from hpat.hiframes_sort import (
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
-                              pre_alloc_string_array, del_str)
+                              pre_alloc_string_array, del_str, num_total_chars,
+                              getitem_str_offset, copy_str_arr_slice, setitem_string_array)
 from hpat.hiframes_api import str_copy
 from hpat.timsort import copyElement_tup
 import numpy as np
@@ -728,6 +729,25 @@ def ensure_capacity_overload(arr_t, new_size_t):
     alloc_impl = loc_vars['f']
     return alloc_impl
 
+
+@numba.njit
+def ensure_capacity_str(arr, new_size, n_chars):
+    # new_size is right after write index
+    new_arr = arr
+    curr_len = len(arr)
+    curr_num_chars = num_total_chars(arr)
+
+    # TODO: corner case test
+    #print("new alloc", new_size, curr_len, getitem_str_offset(arr, new_size-1), n_chars, curr_num_chars)
+    if curr_len < new_size or getitem_str_offset(arr, new_size-1) + n_chars > curr_num_chars:
+        new_len = 2 * curr_len
+        new_num_chars = 2 * curr_num_chars
+        new_arr = pre_alloc_string_array(new_len, new_num_chars)
+        copy_str_arr_slice(new_arr, arr, new_size-1)
+
+    return new_arr
+
+
 def trim_arr_tup(data, new_size):
     return data
 
@@ -759,10 +779,46 @@ def trim_arr_tup_overload(data_t, new_size_t):
 #     copyElement_tup(data_right, right_ind, out_data_right, out_ind)
 #     return out_left_key, out_data_left, out_data_right
 
+def copy_elem_buff(arr, ind, val):
+    new_arr = ensure_capacity(arr, ind+1)
+    new_arr[ind] = val
+    return new_arr
+
+@overload(copy_elem_buff)
+def copy_elem_buff_overload(arr_t, ind_t, val_t):
+    if isinstance(arr_t, types.Array):
+        return copy_elem_buff
+
+    assert arr_t == string_array_type
+    def copy_elem_buff_str(arr, ind, val):
+        new_arr = ensure_capacity_str(arr, ind+1, len(val))
+        #new_arr[ind] = val
+        setitem_string_array(get_offset_ptr(new_arr), get_data_ptr(new_arr), val, ind)
+        return new_arr
+
+    return copy_elem_buff_str
+
+def trim_arr(arr, size):
+    return arr[:size]
+
+@overload(trim_arr)
+def trim_arr_overload(arr_t, size_t):
+    if isinstance(arr_t, types.Array):
+        return trim_arr
+
+    assert arr_t == string_array_type
+    def trim_arr_str(arr, size):
+        # print("trim size", size, arr[size-1], getitem_str_offset(arr, size))
+        new_arr = pre_alloc_string_array(size, np.int64(getitem_str_offset(arr, size)))
+        copy_str_arr_slice(new_arr, arr, size)
+        return new_arr
+
+    return trim_arr_str
+
 @numba.njit
 def local_merge_new(left_key, right_key, data_left, data_right):
     curr_size = 101 + min(len(left_key), len(right_key)) // 10
-    out_left_key = np.empty(curr_size, left_key.dtype)
+    out_left_key = empty_like_type(curr_size, left_key)
     out_data_left = alloc_arr_tup(curr_size, data_left)
     out_data_right = alloc_arr_tup(curr_size, data_right)
 
@@ -772,34 +828,38 @@ def local_merge_new(left_key, right_key, data_left, data_right):
 
     while left_ind < len(left_key) and right_ind < len(right_key):
         if left_key[left_ind] == right_key[right_ind]:
-            out_left_key = ensure_capacity(out_left_key, out_ind+1)
+            out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+
+            #out_left_key = ensure_capacity(out_left_key, out_ind+1)
             out_data_left = ensure_capacity(out_data_left, out_ind+1)
             out_data_right = ensure_capacity(out_data_right, out_ind+1)
 
-            out_left_key[out_ind] = left_key[left_ind]
+            #out_left_key[out_ind] = left_key[left_ind]
             copyElement_tup(data_left, left_ind, out_data_left, out_ind)
             copyElement_tup(data_right, right_ind, out_data_right, out_ind)
             out_ind += 1
             left_run = left_ind + 1
             while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:
-                out_left_key = ensure_capacity(out_left_key, out_ind+1)
+                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_run])
+                #out_left_key = ensure_capacity(out_left_key, out_ind+1)
                 out_data_left = ensure_capacity(out_data_left, out_ind+1)
                 out_data_right = ensure_capacity(out_data_right, out_ind+1)
 
-                out_left_key[out_ind] = left_key[left_run]
-                copyElement_tup(data_left, left_ind, out_data_left, out_ind)
+                #out_left_key[out_ind] = left_key[left_run]
+                copyElement_tup(data_left, left_run, out_data_left, out_ind)
                 copyElement_tup(data_right, right_ind, out_data_right, out_ind)
                 out_ind += 1
                 left_run += 1
             right_run = right_ind + 1
             while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:
-                out_left_key = ensure_capacity(out_left_key, out_ind+1)
+                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+                #out_left_key = ensure_capacity(out_left_key, out_ind+1)
                 out_data_left = ensure_capacity(out_data_left, out_ind+1)
                 out_data_right = ensure_capacity(out_data_right, out_ind+1)
 
-                out_left_key[out_ind] = left_key[left_ind]
+                #out_left_key[out_ind] = left_key[left_ind]
                 copyElement_tup(data_left, left_ind, out_data_left, out_ind)
-                copyElement_tup(data_right, right_ind, out_data_right, out_ind)
+                copyElement_tup(data_right, right_run, out_data_right, out_ind)
                 out_ind += 1
                 right_run += 1
             left_ind += 1
@@ -809,8 +869,11 @@ def local_merge_new(left_key, right_key, data_left, data_right):
         else:
             right_ind += 1
 
-    out_left_key = out_left_key[:out_ind]
-    out_right_key = out_left_key.copy()
+    #out_left_key = out_left_key[:out_ind]
+    out_left_key = trim_arr(out_left_key, out_ind)
+
+    # TODO: string copy
+    out_right_key = out_left_key#.copy()
     out_data_left = trim_arr_tup(out_data_left, out_ind)
     out_data_right = trim_arr_tup(out_data_right, out_ind)
 

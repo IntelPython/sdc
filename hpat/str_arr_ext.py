@@ -187,6 +187,54 @@ def get_data_ptr(typingctx, str_arr_typ):
 
     return types.voidptr(string_array_type), codegen
 
+@intrinsic
+def getitem_str_offset(typingctx, str_arr_typ, ind_t):
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+        dtype = StringArrayPayloadType()
+
+        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+        offsets = builder.bitcast(string_array.offsets, lir.IntType(32).as_pointer())
+        return builder.load(builder.gep(offsets, [ind]))
+
+    return types.uint32(string_array_type, ind_t), codegen
+
+@intrinsic
+def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t):
+    def codegen(context, builder, sig, args):
+        out_str_arr, in_str_arr, ind = args
+        dtype = StringArrayPayloadType()
+
+        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        in_string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+
+        inst_struct = context.make_helper(builder, string_array_type, out_str_arr)
+        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
+        data_pointer = builder.bitcast(data_pointer,
+                                       context.get_data_type(dtype).as_pointer())
+
+        out_string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
+
+        in_offsets = builder.bitcast(in_string_array.offsets, lir.IntType(32).as_pointer())
+        out_offsets = builder.bitcast(out_string_array.offsets, lir.IntType(32).as_pointer())
+
+        ind_p1 = builder.add(ind, context.get_constant(types.intp, 1))
+        cgutils.memcpy(builder, out_offsets, in_offsets, ind_p1)
+        cgutils.memcpy(builder, out_string_array.data, in_string_array.data, builder.load(builder.gep(in_offsets, [ind])))
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type, ind_t), codegen
+
+
 # convert array to list of strings if it is StringArray
 # just return it otherwise
 def to_string_list(arr):

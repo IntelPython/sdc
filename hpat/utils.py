@@ -9,7 +9,7 @@ from numba.extending import overload
 import collections
 import numpy as np
 from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type
+from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 
 # silence Numba error messages for now
 # TODO: customize through @hpat.jit
@@ -221,6 +221,15 @@ def empty_like_type_overload(size_t, arr_typ):
         def empty_like_type_str_list(n, arr):
             return [''] * n
         return empty_like_type_str_list
+
+    # string array buffer for join
+    assert arr_typ == string_array_type
+    def empty_like_type_str_arr(n, arr):
+        # average character heuristic
+        avg_chars = num_total_chars(arr) // len(arr)
+        return pre_alloc_string_array(n, n * avg_chars)
+
+    return empty_like_type_str_arr
 
 
 def alloc_arr_tup(n, arr_tup):
