@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import numba
 from numba.extending import overload
-from hpat.utils import empty_like_type
+from hpat.utils import empty_like_type, alloc_arr_tup
 
 # ported from Spark to Numba-compilable Python
 # A port of the Android TimSort class, which utilizes a "stable, adaptive, iterative mergesort."
@@ -1058,25 +1058,6 @@ def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
     impl = loc_vars['f']
     return impl
 
-def alloc_arr_tup(n, arr_tup):
-    arrs = []
-    for in_arr in arr_tup:
-        arrs.append(np.empty(n, in_arr.dtype))
-    return tuple(arrs)
-
-@overload(alloc_arr_tup)
-def alloc_arr_tup_overload(n_t, data_t):
-    count = data_t.count
-
-    func_text = "def f(n, d):\n"
-    func_text += "  return ({}{})\n".format(','.join(["empty_like_type(n, d[{}])".format(
-        i) for i in range(count)]),
-        "," if count == 1 else "")  # single value needs comma to become tuple
-
-    loc_vars = {}
-    exec(func_text, {'empty_like_type': empty_like_type}, loc_vars)
-    alloc_impl = loc_vars['f']
-    return alloc_impl
 
 def test():
     import time

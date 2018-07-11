@@ -222,6 +222,28 @@ def empty_like_type_overload(size_t, arr_typ):
             return [''] * n
         return empty_like_type_str_list
 
+
+def alloc_arr_tup(n, arr_tup):
+    arrs = []
+    for in_arr in arr_tup:
+        arrs.append(np.empty(n, in_arr.dtype))
+    return tuple(arrs)
+
+@overload(alloc_arr_tup)
+def alloc_arr_tup_overload(n_t, data_t):
+    count = data_t.count
+
+    func_text = "def f(n, d):\n"
+    func_text += "  return ({}{})\n".format(','.join(["empty_like_type(n, d[{}])".format(
+        i) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
+
+    loc_vars = {}
+    exec(func_text, {'empty_like_type': empty_like_type}, loc_vars)
+    alloc_impl = loc_vars['f']
+    return alloc_impl
+
+
 def is_call(stmt):
     """true if stmt is a getitem or static_getitem assignment"""
     return (isinstance(stmt, ir.Assign)
