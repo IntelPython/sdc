@@ -735,7 +735,8 @@ def lower_local_merge(context, builder, sig, args):
     func_text += "            right_ind += 1\n"
     # shrink to size
     func_text += "    out_left_key = out_left_key[:out_ind]\n"
-    func_text += "    out_right_key = out_right_key[:out_ind]\n"
+    #func_text += "    out_right_key = out_right_key[:out_ind]\n"
+    func_text += "    out_right_key = out_left_key.copy()\n"
     for v in (left_other_names + right_other_names):
         func_text += "    out_{} = out_{}[:out_ind]\n".format(v, v)
     # return output
@@ -772,9 +773,9 @@ def _set_merge_output(indent, left_other_names, right_other_names, left_ind, rig
     func_text += indent + \
         "{}[out_ind] = {}\n".format(
             "out_left_key", "left_key[{}]".format(left_ind))
-    func_text += indent + \
-        "{}[out_ind] = {}\n".format(
-            "out_right_key", "right_key[{}]".format(left_ind))
+    # func_text += indent + \
+    #     "{}[out_ind] = {}\n".format(
+    #         "out_right_key", "right_key[{}]".format(left_ind))
 
     for v in left_other_names:
         func_text += indent + \
