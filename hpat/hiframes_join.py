@@ -7,7 +7,7 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
 from hpat import distributed, distributed_analysis
-from hpat.utils import debug_prints
+from hpat.utils import debug_prints, alloc_arr_tup
 from hpat.distributed_analysis import Distribution
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
@@ -19,6 +19,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str)
 from hpat.hiframes_api import str_copy
+from hpat.timsort import copyElement_tup
 import numpy as np
 
 
@@ -330,9 +331,26 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                   if n != join_node.right_key]
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
-    func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
-        ",".join(out_names), len(left_arg_names),
-        local_left_data, local_right_data)
+    func_text += "    out_t1_key, out_t2_key, out_data_left, out_data_right = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n"
+
+    for i in range(len(left_other_names)):
+        func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
+
+    for i in range(len(right_other_names)):
+        func_text += "    right_{} = out_data_right[{}]\n".format(i, i)
+
+    func_text += "    {} = out_t1_key\n".format(out_names[0])
+    func_text += "    {} = out_t2_key\n".format(out_names[1])
+
+    for i in range(len(left_other_names)):
+        func_text += "    {} = left_{}\n".format(out_names[i+2], i)
+
+    for i in range(len(right_other_names)):
+        func_text += "    {} = right_{}\n".format(out_names[i+2+len(left_other_names)], i)
+
+    # func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
+    #     ",".join(out_names), len(left_arg_names),
+    #     local_left_data, local_right_data)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -690,6 +708,108 @@ def lower_sort(context, builder, sig, args):
     builder.call(fn, call_args)
     return lir.Constant(lir.IntType(32), 0)
 
+
+def ensure_capacity(arr, new_size):
+    new_arr = arr
+    curr_len = len(arr)
+    if curr_len < new_size:
+        new_len = 2 * curr_len
+        new_arr = np.empty(new_len, arr.dtype)
+        new_arr[:curr_len] = arr
+    return new_arr
+
+@overload(ensure_capacity)
+def ensure_capacity_overload(arr_t, new_size_t):
+    if isinstance(arr_t, types.Array):
+        return ensure_capacity
+    assert isinstance(arr_t, (types.Tuple, types.UniTuple))
+    count = arr_t.count
+
+    func_text = "def f(data, new_size):\n"
+    func_text += "  return ({}{})\n".format(','.join(["ensure_capacity(data[{}], new_size)".format(
+        i) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
+
+    loc_vars = {}
+    exec(func_text, {'ensure_capacity': ensure_capacity}, loc_vars)
+    alloc_impl = loc_vars['f']
+    return alloc_impl
+
+def trim_arr_tup(data, new_size):
+    return data
+
+@overload(trim_arr_tup)
+def trim_arr_tup_overload(data_t, new_size_t):
+    assert isinstance(data_t, (types.Tuple, types.UniTuple))
+    count = data_t.count
+
+    func_text = "def f(data, new_size):\n"
+    func_text += "  return ({}{})\n".format(','.join(["data[{}][:new_size]".format(
+        i) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    alloc_impl = loc_vars['f']
+    return alloc_impl
+
+
+@numba.njit
+def local_merge_new(left_key, right_key, data_left, data_right):
+    curr_size = 101 + min(len(left_key), len(right_key)) // 10
+    out_left_key = np.empty(curr_size, left_key.dtype)
+    out_data_left = alloc_arr_tup(curr_size, data_left)
+    out_data_right = alloc_arr_tup(curr_size, data_right)
+
+    out_ind = 0
+    left_ind = 0
+    right_ind = 0
+
+    while left_ind < len(left_key) and right_ind < len(right_key):
+        if left_key[left_ind] == right_key[right_ind]:
+            out_left_key = ensure_capacity(out_left_key, out_ind+1)
+            out_data_left = ensure_capacity(out_data_left, out_ind+1)
+            out_data_right = ensure_capacity(out_data_right, out_ind+1)
+
+            out_left_key[out_ind] = left_key[left_ind]
+            copyElement_tup(data_left, left_ind, out_data_left, out_ind)
+            copyElement_tup(data_right, right_ind, out_data_right, out_ind)
+            out_ind += 1
+            left_run = left_ind + 1
+            while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:
+                out_left_key = ensure_capacity(out_left_key, out_ind+1)
+                out_data_left = ensure_capacity(out_data_left, out_ind+1)
+                out_data_right = ensure_capacity(out_data_right, out_ind+1)
+
+                out_left_key[out_ind] = left_key[left_run]
+                copyElement_tup(data_left, left_ind, out_data_left, out_ind)
+                copyElement_tup(data_right, right_ind, out_data_right, out_ind)
+                out_ind += 1
+                left_run += 1
+            right_run = right_ind + 1
+            while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:
+                out_left_key = ensure_capacity(out_left_key, out_ind+1)
+                out_data_left = ensure_capacity(out_data_left, out_ind+1)
+                out_data_right = ensure_capacity(out_data_right, out_ind+1)
+
+                out_left_key[out_ind] = left_key[left_ind]
+                copyElement_tup(data_left, left_ind, out_data_left, out_ind)
+                copyElement_tup(data_right, right_ind, out_data_right, out_ind)
+                out_ind += 1
+                right_run += 1
+            left_ind += 1
+            right_ind += 1
+        elif left_key[left_ind] < right_key[right_ind]:
+            left_ind += 1
+        else:
+            right_ind += 1
+
+    out_left_key = out_left_key[:out_ind]
+    out_right_key = out_left_key.copy()
+    out_data_left = trim_arr_tup(out_data_left, out_ind)
+    out_data_right = trim_arr_tup(out_data_right, out_ind)
+
+    return out_left_key, out_right_key, out_data_left, out_data_right
 
 @lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
 def lower_local_merge(context, builder, sig, args):
