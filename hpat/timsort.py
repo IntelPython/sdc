@@ -58,7 +58,7 @@ MIN_MERGE = 32
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
 @numba.njit
-def sort(sortState, key_arr, lo, hi, data):
+def sort(sortState, key_arr, lo, hi, data):  # pragma: no cover
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -120,7 +120,7 @@ def sort(sortState, key_arr, lo, hi, data):
 # @param c comparator to used for the sort
 
 @numba.njit
-def binarySort(key_arr, lo, hi, start, data):
+def binarySort(key_arr, lo, hi, start, data):  # pragma: no cover
     assert lo <= start and start <= hi
     if start == lo:
         start += 1
@@ -197,7 +197,7 @@ def binarySort(key_arr, lo, hi, start, data):
 #         the specified array
 
 @numba.njit
-def countRunAndMakeAscending(key_arr, lo, hi, data):
+def countRunAndMakeAscending(key_arr, lo, hi, data):  # pragma: no cover
     assert lo < hi
     runHi = lo + 1
     if runHi == hi:
@@ -224,7 +224,7 @@ def countRunAndMakeAscending(key_arr, lo, hi, data):
 # @param hi the index after the last element in the range to be reversed
 
 @numba.njit
-def reverseRange(key_arr, lo, hi, data):
+def reverseRange(key_arr, lo, hi, data):  # pragma: no cover
     hi -= 1
     while lo < hi:
         # swap, TODO: copy data
@@ -261,7 +261,7 @@ def reverseRange(key_arr, lo, hi, data):
 
 
 @numba.njit
-def minRunLength(n):
+def minRunLength(n):  # pragma: no cover
     assert n >= 0
     r = 0      # Becomes 1 if any 1 bits are shifted off
     while n >= MIN_MERGE:
@@ -977,10 +977,10 @@ def swap_arrs_overload(arr_tup_t, l_typ, h_typ):
 
 
 @numba.njit
-def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
+def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):  # pragma: no cover
     dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
-def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
+def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
@@ -1000,10 +1000,10 @@ def copyRange_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t, n
     return copy_impl
 
 @numba.njit
-def copyElement(src_arr, src_pos, dst_arr, dst_pos):
+def copyElement(src_arr, src_pos, dst_arr, dst_pos):  # pragma: no cover
     dst_arr[dst_pos] = src_arr[src_pos]
 
-def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
+def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos] = src_arr[src_pos]
 
@@ -1022,7 +1022,7 @@ def copyElement_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t)
     copy_impl = loc_vars['f']
     return copy_impl
 
-def getitem_arr_tup(arr_tup, ind):
+def getitem_arr_tup(arr_tup, ind):  # pragma: no cover
     l = [arr[ind] for arr in arr_tup]
     return tuple(l)
 
@@ -1040,7 +1040,7 @@ def getitem_arr_tup_overload(arr_tup_t, ind_t):
     impl = loc_vars['f']
     return impl
 
-def setitem_arr_tup(arr_tup, ind, val_tup):
+def setitem_arr_tup(arr_tup, ind, val_tup):  # pragma: no cover
     for arr, val in zip(arr_tup, val_tup):
         arr[ind] = val
 
@@ -1059,7 +1059,7 @@ def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
     return impl
 
 
-def test():
+def test():  # pragma: no cover
     import time
     #SortStateCL = SortState #numba.jitclass(spec)(SortState)
     # warm up
