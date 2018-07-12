@@ -510,6 +510,16 @@ class TestHiFrames(unittest.TestCase):
         n = 11111
         self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
 
+    def test_join1_seq_str(self):
+        def test_impl():
+            df1 = pd.DataFrame({'key1': ['foo', 'bar', 'baz']})
+            df2 = pd.DataFrame({'key2': ['baz', 'bar', 'baz'], 'B': ['b', 'zzz', 'ss']})
+            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
+            return df3.B
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(list(hpat_func()), list(test_impl()))
+
     def test_concat(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})
