@@ -156,8 +156,11 @@ def num_total_chars(typingctx, str_arr_typ):
     return types.uint32(string_array_type), codegen
 
 
+data_ctypes_type = types.ArrayCTypes(types.Array(types.uint8, 1, 'C'))
+offset_ctypes_type = types.ArrayCTypes(types.Array(types.uint32, 1, 'C'))
+
 @intrinsic
-def get_offset_ptr(typingctx, str_arr_typ):
+def get_offset_ptr(typingctx, str_arr_typ=None):
     def codegen(context, builder, sig, args):
         in_str_arr, = args
         dtype = StringArrayPayloadType()
@@ -168,12 +171,19 @@ def get_offset_ptr(typingctx, str_arr_typ):
                                        context.get_data_type(dtype).as_pointer())
 
         string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
-        return string_array.offsets
+        #return string_array.offsets
+        # # Create new ArrayCType structure
+        ctinfo = context.make_helper(builder, offset_ctypes_type)
+        ctinfo.data = builder.bitcast(string_array.offsets, lir.IntType(32).as_pointer())
+        ctinfo.meminfo = inst_struct.meminfo
+        res = ctinfo._getvalue()
+        return impl_ret_borrowed(context, builder, offset_ctypes_type, res)
 
-    return types.voidptr(string_array_type), codegen
+    return offset_ctypes_type(string_array_type), codegen
 
 @intrinsic
 def get_data_ptr(typingctx, str_arr_typ):
+    assert str_arr_typ == string_array_type
     def codegen(context, builder, sig, args):
         in_str_arr, = args
         dtype = StringArrayPayloadType()
@@ -184,9 +194,16 @@ def get_data_ptr(typingctx, str_arr_typ):
                                        context.get_data_type(dtype).as_pointer())
 
         string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
-        return string_array.data
+        #return string_array.data
+        # Create new ArrayCType structure
+        # TODO: put offset/data in main structure since immutable
+        ctinfo = context.make_helper(builder, data_ctypes_type)
+        ctinfo.data = string_array.data
+        ctinfo.meminfo = inst_struct.meminfo
+        res = ctinfo._getvalue()
+        return impl_ret_borrowed(context, builder, data_ctypes_type, res)
 
-    return types.voidptr(string_array_type), codegen
+    return data_ctypes_type(string_array_type), codegen
 
 @intrinsic
 def getitem_str_offset(typingctx, str_arr_typ, ind_t):
