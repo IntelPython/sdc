@@ -318,9 +318,9 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
     merge_out = [join_node.df_out_vars[join_node.left_key]]
+    merge_out.append(join_node.df_out_vars[join_node.right_key])
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
                   if n != join_node.left_key]
-    merge_out.append(join_node.df_out_vars[join_node.right_key])
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
                   if n != join_node.right_key]
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
