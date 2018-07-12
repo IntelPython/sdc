@@ -297,7 +297,7 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 
 # Creates a TimSort instance to maintain the state of an ongoing sort.
 #@numba.jitclass(spec)
-class SortState:
+class SortState:  # pragma: no cover
     def __init__(self, key_arr, aLength, data):
         self.key_arr = key_arr
         self.data = data
@@ -953,7 +953,7 @@ class SortState:
 
 ################### Utils #############
 
-def swap_arrs(data, lo, hi):
+def swap_arrs(data, lo, hi):  # pragma: no cover
     for arr in data:
         tmp_v = arr[lo]
         arr[lo] = arr[hi]
@@ -1099,5 +1099,5 @@ def test():  # pragma: no cover
     np.testing.assert_almost_equal(data[0], df2.B.values)
     np.testing.assert_almost_equal(data[1], df2.C.values)
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     test()
