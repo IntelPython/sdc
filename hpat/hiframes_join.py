@@ -20,7 +20,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               pre_alloc_string_array, del_str, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice, setitem_string_array)
 from hpat.hiframes_api import str_copy
-from hpat.timsort import copyElement_tup
+from hpat.timsort import copyElement_tup, getitem_arr_tup
 import numpy as np
 
 
@@ -748,7 +748,7 @@ def ensure_capacity_str(arr, new_size, n_chars):
     return new_arr
 
 
-def trim_arr_tup(data, new_size):
+def trim_arr_tup(data, new_size):  # pragma: no cover
     return data
 
 @overload(trim_arr_tup)
@@ -757,12 +757,12 @@ def trim_arr_tup_overload(data_t, new_size_t):
     count = data_t.count
 
     func_text = "def f(data, new_size):\n"
-    func_text += "  return ({}{})\n".format(','.join(["data[{}][:new_size]".format(
+    func_text += "  return ({}{})\n".format(','.join(["trim_arr(data[{}], new_size)".format(
         i) for i in range(count)]),
         "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'trim_arr': trim_arr}, loc_vars)
     alloc_impl = loc_vars['f']
     return alloc_impl
 
@@ -779,7 +779,7 @@ def trim_arr_tup_overload(data_t, new_size_t):
 #     copyElement_tup(data_right, right_ind, out_data_right, out_ind)
 #     return out_left_key, out_data_left, out_data_right
 
-def copy_elem_buff(arr, ind, val):
+def copy_elem_buff(arr, ind, val):  # pragma: no cover
     new_arr = ensure_capacity(arr, ind+1)
     new_arr[ind] = val
     return new_arr
@@ -798,7 +798,27 @@ def copy_elem_buff_overload(arr_t, ind_t, val_t):
 
     return copy_elem_buff_str
 
-def trim_arr(arr, size):
+def copy_elem_buff_tup(arr, ind, val):  # pragma: no cover
+    return arr
+
+@overload(copy_elem_buff_tup)
+def copy_elem_buff_tup_overload(data_t, ind_t, val_t):
+    assert isinstance(data_t, (types.Tuple, types.UniTuple))
+    count = data_t.count
+
+    func_text = "def f(data, ind, val):\n"
+    for i in range(count):
+        func_text += "  arr_{} = copy_elem_buff(data[{}], ind, val[{}])\n".format(i, i, i)
+    func_text += "  return ({}{})\n".format(
+        ','.join(["arr_{}".format(i) for i in range(count)]),
+        "," if count == 1 else "")
+
+    loc_vars = {}
+    exec(func_text, {'copy_elem_buff': copy_elem_buff}, loc_vars)
+    cp_impl = loc_vars['f']
+    return cp_impl
+
+def trim_arr(arr, size):  # pragma: no cover
     return arr[:size]
 
 @overload(trim_arr)
@@ -829,37 +849,30 @@ def local_merge_new(left_key, right_key, data_left, data_right):
     while left_ind < len(left_key) and right_ind < len(right_key):
         if left_key[left_ind] == right_key[right_ind]:
             out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+            l_data_val = getitem_arr_tup(data_left, left_ind)
+            out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+            r_data_val = getitem_arr_tup(data_right, right_ind)
+            out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
 
-            #out_left_key = ensure_capacity(out_left_key, out_ind+1)
-            out_data_left = ensure_capacity(out_data_left, out_ind+1)
-            out_data_right = ensure_capacity(out_data_right, out_ind+1)
-
-            #out_left_key[out_ind] = left_key[left_ind]
-            copyElement_tup(data_left, left_ind, out_data_left, out_ind)
-            copyElement_tup(data_right, right_ind, out_data_right, out_ind)
             out_ind += 1
             left_run = left_ind + 1
             while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:
                 out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_run])
-                #out_left_key = ensure_capacity(out_left_key, out_ind+1)
-                out_data_left = ensure_capacity(out_data_left, out_ind+1)
-                out_data_right = ensure_capacity(out_data_right, out_ind+1)
+                l_data_val = getitem_arr_tup(data_left, left_run)
+                out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+                r_data_val = getitem_arr_tup(data_right, right_ind)
+                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
 
-                #out_left_key[out_ind] = left_key[left_run]
-                copyElement_tup(data_left, left_run, out_data_left, out_ind)
-                copyElement_tup(data_right, right_ind, out_data_right, out_ind)
                 out_ind += 1
                 left_run += 1
             right_run = right_ind + 1
             while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:
                 out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
-                #out_left_key = ensure_capacity(out_left_key, out_ind+1)
-                out_data_left = ensure_capacity(out_data_left, out_ind+1)
-                out_data_right = ensure_capacity(out_data_right, out_ind+1)
+                l_data_val = getitem_arr_tup(data_left, left_ind)
+                out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+                r_data_val = getitem_arr_tup(data_right, right_run)
+                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
 
-                #out_left_key[out_ind] = left_key[left_ind]
-                copyElement_tup(data_left, left_ind, out_data_left, out_ind)
-                copyElement_tup(data_right, right_run, out_data_right, out_ind)
                 out_ind += 1
                 right_run += 1
             left_ind += 1
