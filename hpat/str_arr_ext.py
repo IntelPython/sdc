@@ -2,11 +2,12 @@ import numpy as np
 import numba
 import hpat
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate, infer, signature, AttributeTemplate, infer_getattr
+from numba.typing.templates import (infer_global, AbstractTemplate, infer,
+    signature, AttributeTemplate, infer_getattr, bound_function)
 import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox,
-                             lower_getattr, intrinsic, overload_method, overload)
+                             lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
 from hpat.str_ext import string_type, del_str
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
@@ -384,7 +385,7 @@ make_attribute_wrapper(StringArrayPayloadType, 'size', 'size')
 make_attribute_wrapper(StringArrayPayloadType, 'offsets', 'offsets')
 make_attribute_wrapper(StringArrayPayloadType, 'data', 'data')
 
-
+# XXX can't use this with overload_method
 @infer_getattr
 class StrArrayAttribute(AttributeTemplate):
     key = string_array_type
@@ -392,11 +393,48 @@ class StrArrayAttribute(AttributeTemplate):
     def resolve_size(self, ctflags):
         return types.intp
 
+    @bound_function("str_arr.copy")
+    def resolve_copy(self, ary, args, kws):
+        return signature(string_array_type, *args)
+
+@lower_builtin("str_arr.copy", string_array_type)
+def str_arr_copy_impl(context, builder, sig, args):
+    return context.compile_internal(builder, copy_impl, sig, args)
+
+
+def copy_impl(arr):
+    n = len(arr)
+    n_chars = num_total_chars(arr)
+    new_arr = pre_alloc_string_array(n, np.int64(n_chars))
+    copy_str_arr_slice(new_arr, arr, n)
+    return new_arr
+
+# @overload_method(StringArrayType, 'copy')
+# def string_array_copy(arr_t):
+#     return copy_impl
+
+
+# @overload_attribute(string_array_type, 'size')
+# def string_array_attr_size(arr_t):
+#     return get_str_arr_size
+
+# def get_str_arr_size(arr):  # pragma: no cover
+#     return len(arr)
+
+# @infer_global(get_str_arr_size)
+# class StrArrSizeInfer(AbstractTemplate):
+#     def generic(self, args, kws):
+#         assert not kws
+#         assert len(args) == 1 and args[0] == string_array_type
+#         return signature(types.intp, *args)
+
+# @lower_builtin(get_str_arr_size, string_array_type)
+# def str_arr_size_impl(context, builder, sig, args):
 
 @lower_getattr(string_array_type, 'size')
 def str_arr_size_impl(context, builder, typ, val):
     dtype = StringArrayPayloadType()
-    inst_struct = context.make_helper(builder, typ, val)
+    inst_struct = context.make_helper(builder, string_array_type, val)
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     # cgutils.printf(builder, "data [%p]\n", data_pointer)
     data_pointer = builder.bitcast(data_pointer,
