@@ -600,7 +600,8 @@ class DistributedPass(object):
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
-            return self._run_call_rebalance_array(lhs, assign, rhs.args)
+            # TODO: rebalance strings?
+            return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
             # assign.value = rhs.args[0]
             # return [assign]
 
