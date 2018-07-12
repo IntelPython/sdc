@@ -228,10 +228,11 @@ def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ):
 def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ):
     def codegen(context, builder, sig, args):
         ptr, ind, _str, len_str = args
+        ptr = builder.gep(ptr, [ind])
         cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
         return context.get_dummy_value()
 
-    return types.void(ptr_typ, types.intp, types.voidptr, types.intp), codegen
+    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
 
 from numba.typing.arraydecl import _expand_integer
 
