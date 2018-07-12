@@ -872,8 +872,7 @@ def local_merge_new(left_key, right_key, data_left, data_right):
     #out_left_key = out_left_key[:out_ind]
     out_left_key = trim_arr(out_left_key, out_ind)
 
-    # TODO: string copy
-    out_right_key = out_left_key#.copy()
+    out_right_key = out_left_key.copy()
     out_data_left = trim_arr_tup(out_data_left, out_ind)
     out_data_right = trim_arr_tup(out_data_right, out_ind)
 
