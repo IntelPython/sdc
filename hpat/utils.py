@@ -5,7 +5,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
-from numba.extending import overload
+from numba.extending import overload, intrinsic
 import collections
 import numpy as np
 from hpat.str_ext import string_type
@@ -254,6 +254,16 @@ def alloc_arr_tup_overload(n_t, data_t):
     alloc_impl = loc_vars['f']
     return alloc_impl
 
+
+@intrinsic
+def get_ctypes_ptr(typingctx, ctypes_typ):
+    assert isinstance(ctypes_typ, types.ArrayCTypes)
+    def codegen(context, builder, sig, args):
+        in_carr, = args
+        ctinfo = context.make_helper(builder, sig.args[0], in_carr)
+        return ctinfo.data
+
+    return types.voidptr(ctypes_typ), codegen
 
 def is_call(stmt):
     """true if stmt is a getitem or static_getitem assignment"""
