@@ -226,7 +226,9 @@ def empty_like_type_overload(size_t, arr_typ):
     assert arr_typ == string_array_type
     def empty_like_type_str_arr(n, arr):
         # average character heuristic
-        avg_chars = num_total_chars(arr) // len(arr)
+        avg_chars = 20  # heuristic
+        if len(arr) != 0:
+            avg_chars = num_total_chars(arr) // len(arr)
         return pre_alloc_string_array(n, n * avg_chars)
 
     return empty_like_type_str_arr
