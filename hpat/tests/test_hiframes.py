@@ -818,6 +818,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
+    def test_sort_values_copy(self):
+        def test_impl(df):
+            df2 = df.sort_values('A')
+            return df2.B.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
     def test_sort_values_single_col(self):
         def test_impl(df):
