@@ -339,7 +339,7 @@ class HiFrames(object):
         # df.sort_values()
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'sort_values'):
-            return self._handle_df_sort_values(assign, lhs, rhs, func_mod)
+            return self._handle_df_sort_values(assign, lhs, rhs, func_mod, label)
 
         # df.itertuples()
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
@@ -824,7 +824,7 @@ class HiFrames(object):
         nodes[-1].target = lhs
         return nodes
 
-    def _handle_df_sort_values(self, assign, lhs, rhs, df):
+    def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)
         # find key array for sort ('by' arg)
         key_name = None
@@ -835,15 +835,34 @@ class HiFrames(object):
         if key_name is None:
             raise ValueError("'by' argument is required for sort_values() "
                              "which should be a constant string")
-        # TODO: support inplace=False
-        assert 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True
+
+        inplace = False
+        if 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True:
+            inplace = True
+
         # TODO: support multiple columns as key
         # TODO: support ascending=False
 
+        out = []
         df_cols = self._get_df_cols(df).copy()  # copy since it'll be modified
-        assert key_name in df_cols
+        if not inplace:
+            new_df_cols = {}
+            def cp_func(arr):
+                arr_cp = arr.copy()
+            for cname, cvar in df_cols.items():
+                f_block = compile_to_numba_ir(cp_func, {}).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [cvar])
+                out += f_block.body[:-3]
+                new_df_cols[cname] = out[-1].target
+            df_cols = new_df_cols
+            self._create_df(lhs.name, df_cols.copy(), label)
+
+        if key_name not in df_cols:
+            raise ValueError("invalid sort key {}".format(key_name))
         key_var = df_cols.pop(key_name)
-        return [hiframes_sort.Sort(df.name, key_var, df_cols, lhs.loc)]
+
+        out.append(hiframes_sort.Sort(df.name, key_var, df_cols, lhs.loc))
+        return out
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
         """pass df column names and variables to get_itertuples() to be able
