@@ -757,7 +757,7 @@ class DistributedPass(object):
     def _run_call_array(self, lhs, arr, func_name, assign, args):
         #
         out = [assign]
-        if func_name == 'astype' and not self._is_REP(arr.name):
+        if func_name in ('astype', 'copy') and not self._is_REP(arr.name):
             self._array_starts[lhs] = self._array_starts[arr.name]
             self._array_counts[lhs] = self._array_counts[arr.name]
             self._array_sizes[lhs] = self._array_sizes[arr.name]
