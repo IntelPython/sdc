@@ -67,6 +67,17 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_pd_read_parquet(self):
+        def test_impl():
+            df = pd.read_parquet('kde.parquet')
+            X = df['points']
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_pq_str(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
