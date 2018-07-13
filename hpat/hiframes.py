@@ -312,6 +312,9 @@ class HiFrames(object):
                 and func_mod.name in self.arrow_tables):
             return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod, label)
 
+        if fdef == ('read_parquet', 'pandas'):
+            return self._handle_pd_read_parquet(assign, lhs, rhs, label)
+
         if fdef == ('merge', 'pandas'):
             return self._handle_merge(assign, lhs, rhs, label)
 
@@ -483,14 +486,21 @@ class HiFrames(object):
         return []
 
     def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var, label):
+        return self._gen_parquet_read(self.arrow_tables[t_var.name], lhs, label)
+
+    def _gen_parquet_read(self, fname, lhs, label):
         col_items, col_types, nodes = self.pq_handler.gen_parquet_read(
-            self.arrow_tables[t_var.name], lhs)
+            fname, lhs)
         for v, t in zip(col_items, col_types):
             if t == types.Array(types.NPDatetime('ns'), 1, 'C'):
                 self.ts_series_vars.add(v[1].name)
         col_map = self._process_df_build_map(col_items)
         self._create_df(lhs.name, col_map, label)
         return nodes
+
+    def _handle_pd_read_parquet(self, assign, lhs, rhs, label):
+        fname = rhs.args[0]
+        return self._gen_parquet_read(fname, lhs, label)
 
     def _handle_merge(self, assign, lhs, rhs, label):
         """transform pd.merge() into a Join node

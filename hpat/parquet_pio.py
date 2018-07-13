@@ -78,7 +78,6 @@ class ParquetHandler(object):
         self.reverse_copies = _reverse_copies
 
     def gen_parquet_read(self, file_name, lhs):
-        import pyarrow.parquet as pq
         scope = file_name.scope
         loc = file_name.loc
 
