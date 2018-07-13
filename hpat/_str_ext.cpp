@@ -23,7 +23,6 @@ using std::regex_search;
 extern "C" {
 
 struct str_arr_payload {
-    int64_t size;
     uint32_t *offsets;
     char* data;
 };
@@ -53,7 +52,7 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
                             uint32_t *in_offsets, char *in_data,
                             int64_t start_str_ind, int64_t start_chars_ind,
-                            int64_t num_strs, uint32_t num_chars);
+                            int64_t num_strs, int64_t num_chars);
 void convert_len_arr_to_offset(uint32_t *offsets, int64_t num_strs);
 char* getitem_string_array(uint32_t *offsets, char *data, int64_t index);
 void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
@@ -323,7 +322,7 @@ void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
                             uint32_t *in_offsets, char *in_data,
                             int64_t start_str_ind, int64_t start_chars_ind,
-                            int64_t num_strs, uint32_t num_chars)
+                            int64_t num_strs, int64_t num_chars)
 {
     // printf("%d %d\n", start_str_ind, start_chars_ind); fflush(stdout);
     uint32_t curr_offset = 0;

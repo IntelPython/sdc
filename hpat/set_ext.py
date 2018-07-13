@@ -134,22 +134,17 @@ def to_array_overload(in_typ):
         return set_string_to_array
 
 @intrinsic
-def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ):
+def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ=None):
     assert in_set_typ == set_string_type
     assert in_str_arr_typ == string_array_type
     def codegen(context, builder, sig, args):
         in_set, in_str_arr = args
-        dtype = StringArrayPayloadType()
 
-        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
-        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
-        data_pointer = builder.bitcast(data_pointer,
-                                       context.get_data_type(dtype).as_pointer())
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
 
-        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
         fnty = lir.FunctionType( lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
-                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(32).as_pointer(),
                                  lir.IntType(8).as_pointer(),
                                 ])
         fn_getitem = builder.module.get_or_insert_function(fnty,
