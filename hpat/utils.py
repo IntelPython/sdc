@@ -256,7 +256,7 @@ def alloc_arr_tup_overload(n_t, data_t):
 
 
 @intrinsic
-def get_ctypes_ptr(typingctx, ctypes_typ):
+def get_ctypes_ptr(typingctx, ctypes_typ=None):
     assert isinstance(ctypes_typ, types.ArrayCTypes)
     def codegen(context, builder, sig, args):
         in_carr, = args
