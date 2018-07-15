@@ -358,12 +358,13 @@ def parallel_sort(key_arr, data):
 #     'recv_counts_char', 'send_arr_lens', 'send_arr_chars'])
 
 class ShuffleMeta:
-    def __init__(self, send_counts, recv_counts, send_buff, out_arr, n_out, send_disp, recv_disp, tmp_offset, send_counts_char,
+    def __init__(self, send_counts, recv_counts, send_buff, out_arr, n_send, n_out, send_disp, recv_disp, tmp_offset, send_counts_char,
             recv_counts_char, send_arr_lens, send_arr_chars, send_disp_char, recv_disp_char, tmp_offset_char, send_arr_chars_arr):
         self.send_counts = send_counts
         self.recv_counts = recv_counts
         self.send_buff = send_buff
         self.out_arr = out_arr
+        self.n_send = n_send
         self.n_out = n_out
         self.send_disp = send_disp
         self.recv_disp = recv_disp
@@ -403,7 +404,7 @@ def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t, is_contig_t=No
     return update_str_impl
 
 def alloc_shuffle_metadata(arr, n_pes, contig):
-    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
+    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, n_pes, np.zeros(1),
         np.zeros(1), np.zeros(1), None, None, None, None, None, None, None, None)
 
 @overload(alloc_shuffle_metadata)
@@ -420,7 +421,7 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
 
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
             return ShuffleMetaCL(
-                send_counts, recv_counts, send_buff, arr, 0, send_counts, recv_counts, tmp_offset,
+                send_counts, recv_counts, send_buff, arr, 0, 0, send_counts, recv_counts, tmp_offset,
                 None, None, None, None, None, None, None, None)
         return shuff_meta_impl
 
@@ -446,7 +447,7 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
 
         # arr as out_arr placeholder, send/recv counts as placeholder for type inference
         return ShuffleMetaCL(
-            send_counts, recv_counts, None, arr, 0, send_counts, recv_counts, tmp_offset,
+            send_counts, recv_counts, None, arr, 0, 0, send_counts, recv_counts, tmp_offset,
             send_counts_char, recv_counts_char, send_arr_lens,
             send_arr_chars, send_counts_char, recv_counts_char, tmp_offset_char, send_arr_chars_arr)
     return shuff_meta_str_impl
@@ -525,6 +526,7 @@ def get_shuffle_meta_class(arr_t):
                 ('recv_counts', count_arr_typ),
                 ('send_buff', arr_t),
                 ('out_arr', arr_t),
+                ('n_send', types.intp),
                 ('n_out', types.intp),
                 ('send_disp', count_arr_typ),
                 ('recv_disp', count_arr_typ),
@@ -544,6 +546,7 @@ def get_shuffle_meta_class(arr_t):
             ('recv_counts', count_arr_typ),
             ('send_buff', types.none),
             ('out_arr', arr_t),
+            ('n_send', types.intp),
             ('n_out', types.intp),
             ('send_disp', count_arr_typ),
             ('recv_disp', count_arr_typ),
@@ -566,7 +569,7 @@ def get_shuffle_meta_class(arr_t):
 
 
 def data_alloc_shuffle_metadata(arr, n_pes, is_contig):
-    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
+    return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, n_pes, np.zeros(1),
         np.zeros(1), np.zeros(1), None, None, None, None, None, None, None, None)
 
 @overload(data_alloc_shuffle_metadata)
@@ -577,6 +580,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         ('recv_counts', types.none),
         ('send_buff', types.none),
         ('out_arr', types.none),
+        ('n_send', types.none),
         ('n_out', types.none),
         ('send_disp', types.none),
         ('recv_disp', types.none),
@@ -596,6 +600,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         ('recv_counts', types.none),
         ('send_buff', types.none),
         ('out_arr', string_array_type),
+        ('n_send', types.none),
         ('n_out', types.none),
         ('send_disp', types.none),
         ('recv_disp', types.none),
@@ -627,7 +632,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
             func_text += "  send_buff = arr\n"
-            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None, None,"
+            func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None, None, None,"
                 " None, None, None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
             assert typ == string_array_type
@@ -641,7 +646,7 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
             func_text += "  send_arr_chars_arr = np.empty(1, np.uint8)\n"
             func_text += "  if not is_contig:\n"
             func_text += "    tmp_offset_char = np.zeros(n_pes, np.int32)\n"
-            func_text += ("  meta_{} = ShuffleMetaStr(None, None, None, arr, None, "
+            func_text += ("  meta_{} = ShuffleMetaStr(None, None, None, arr, None, None,"
                 "None, None, None, send_counts_char, recv_counts_char, send_arr_lens,"
                 " send_arr_chars, send_counts_char, recv_counts_char, tmp_offset_char, send_arr_chars_arr)\n").format(i)
     func_text += "  return ({}{})\n".format(
