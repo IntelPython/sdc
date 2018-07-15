@@ -460,14 +460,14 @@ def finalize_shuffle_meta(arr, shuffle_meta, is_contig):
 def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t, is_contig_t):
     if isinstance(arr_t, types.Array):
         def finalize_impl(arr, shuffle_meta, is_contig):
-            if not is_contig:
-                shuffle_meta.send_buff = np.empty_like(arr)
-
             hpat.distributed_api.alltoall(shuffle_meta.send_counts, shuffle_meta.recv_counts, 1)
             shuffle_meta.n_out = shuffle_meta.recv_counts.sum()
             shuffle_meta.out_arr = np.empty(shuffle_meta.n_out, arr.dtype)
             shuffle_meta.send_disp = hpat.hiframes_join.calc_disp(shuffle_meta.send_counts)
             shuffle_meta.recv_disp = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts)
+            if not is_contig:
+                shuffle_meta.n_send = shuffle_meta.send_counts.sum()
+                shuffle_meta.send_buff = np.empty(shuffle_meta.n_send, arr.dtype)
         return finalize_impl
 
     assert arr_t == string_array_type
@@ -483,8 +483,11 @@ def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t, is_contig_t):
         shuffle_meta.recv_disp_char = hpat.hiframes_join.calc_disp(shuffle_meta.recv_counts_char)
 
         if not is_contig:
-            shuffle_meta.send_arr_lens = np.empty(len(arr), np.uint32)
-            s_n_all_chars = num_total_chars(arr)
+            shuffle_meta.n_send = shuffle_meta.send_counts.sum()
+            shuffle_meta.send_arr_lens = np.empty(shuffle_meta.n_send, np.uint32)
+            # shuffle_meta.send_arr_lens = np.empty(len(arr), np.uint32)
+            # s_n_all_chars = num_total_chars(arr)
+            s_n_all_chars = shuffle_meta.send_counts_char.sum()
             shuffle_meta.send_arr_chars_arr = np.empty(s_n_all_chars, np.uint8)
             shuffle_meta.send_arr_chars = get_ctypes_ptr(shuffle_meta.send_arr_chars_arr.ctypes)
 
@@ -690,7 +693,7 @@ def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_c
         if isinstance(typ, types.Array):
             func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ.dtype)
             func_text += "  if not is_contig:\n"
-            func_text += "    meta_tup[{}].send_buff = np.empty_like(arr)\n".format(i)
+            func_text += "    meta_tup[{}].send_buff = np.empty(key_meta.n_send, arr.dtype)\n".format(i)
         else:
             assert typ == string_array_type
             func_text += ("  hpat.distributed_api.alltoall("
@@ -702,8 +705,10 @@ def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_c
             func_text += ("  meta_tup[{}].recv_disp_char = hpat.hiframes_join."
                 "calc_disp(meta_tup[{}].recv_counts_char)\n").format(i, i)
             func_text += "  if not is_contig:\n"
-            func_text += "    meta_tup[{}].send_arr_lens = np.empty(len(arr), np.uint32)\n".format(i)
-            func_text += "    s_n_all_chars = num_total_chars(arr)\n"
+            func_text += "    meta_tup[{}].send_arr_lens = np.empty(key_meta.n_send, np.uint32)\n".format(i)
+            # func_text += "    meta_tup[{}].send_arr_lens = np.empty(len(arr), np.uint32)\n".format(i)
+            # func_text += "    s_n_all_chars = num_total_chars(arr)\n"
+            func_text += "    s_n_all_chars = key_meta.send_counts_char.sum()\n"
             func_text += "    meta_tup[{}].send_arr_chars_arr = np.empty(s_n_all_chars, np.uint8)\n".format(i)
             func_text += "    meta_tup[{}].send_arr_chars = get_ctypes_ptr(meta_tup[{}].send_arr_chars_arr.ctypes)\n".format(i, i)
 
