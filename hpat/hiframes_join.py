@@ -391,8 +391,8 @@ def parallel_join(key_arr, data):
         update_shuffle_meta(shuffle_meta, node_id, i, val, False)
         update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
 
-    finalize_shuffle_meta(key_arr, shuffle_meta)
-    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta)
+    finalize_shuffle_meta(key_arr, shuffle_meta, False)
+    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta, False)
 
     # write send buffers
     for i in range(len(key_arr)):

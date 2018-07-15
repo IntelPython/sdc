@@ -796,7 +796,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     # rename all variables to avoid conflict (init and eval nodes)
     var_table = get_name_var_table(f_ir.blocks)
     new_var_dict = {}
-    for name, var in var_table.items():
+    for name, _ in var_table.items():
         new_var_dict[name] = mk_unique_var(name)
     replace_var_names(f_ir.blocks, new_var_dict)
     f_ir._definitions = build_definitions(f_ir.blocks)

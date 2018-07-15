@@ -344,8 +344,8 @@ def parallel_sort(key_arr, data):
         update_shuffle_meta(shuffle_meta, node_id, i, val)
         update_data_shuffle_meta(data_shuffle_meta, node_id, i, data)
 
-    finalize_shuffle_meta(key_arr, shuffle_meta)
-    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta)
+    finalize_shuffle_meta(key_arr, shuffle_meta, True)
+    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta, True)
 
     # shuffle
     alltoallv(key_arr, shuffle_meta)
@@ -416,8 +416,8 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
             send_buff = arr
             tmp_offset = send_counts  # dummy
             if not is_contig:
-                send_buff = np.empty_like(arr)
                 tmp_offset = np.zeros(n_pes, np.int32)
+
             # arr as out_arr placeholder, send/recv counts as placeholder for type inference
             return ShuffleMetaCL(
                 send_counts, recv_counts, send_buff, arr, 0, send_counts, recv_counts, tmp_offset,
@@ -451,13 +451,16 @@ def alloc_shuffle_metadata_overload(arr_t, n_pes_t, is_contig_t):
     return shuff_meta_str_impl
 
 
-def finalize_shuffle_meta(arr, shuffle_meta):
+def finalize_shuffle_meta(arr, shuffle_meta, is_contig):
     return
 
 @overload(finalize_shuffle_meta)
-def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t):
+def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t, is_contig_t):
     if isinstance(arr_t, types.Array):
-        def finalize_impl(arr, shuffle_meta):
+        def finalize_impl(arr, shuffle_meta, is_contig):
+            if not is_contig:
+                shuffle_meta.send_buff = np.empty_like(arr)
+
             hpat.distributed_api.alltoall(shuffle_meta.send_counts, shuffle_meta.recv_counts, 1)
             shuffle_meta.n_out = shuffle_meta.recv_counts.sum()
             shuffle_meta.out_arr = np.empty(shuffle_meta.n_out, arr.dtype)
@@ -466,7 +469,7 @@ def finalize_shuffle_meta_overload(arr_t, shuffle_meta_t):
         return finalize_impl
 
     assert arr_t == string_array_type
-    def finalize_str_impl(arr, shuffle_meta):
+    def finalize_str_impl(arr, shuffle_meta, is_contig):
         hpat.distributed_api.alltoall(shuffle_meta.send_counts, shuffle_meta.recv_counts, 1)
         hpat.distributed_api.alltoall(shuffle_meta.send_counts_char, shuffle_meta.recv_counts_char, 1)
         shuffle_meta.n_out = shuffle_meta.recv_counts.sum()
@@ -557,7 +560,7 @@ def get_shuffle_meta_class(arr_t):
 
 def data_alloc_shuffle_metadata(arr, n_pes, is_contig):
     return ShuffleMeta(np.zeros(1), np.zeros(1), arr, arr, n_pes, np.zeros(1),
-        np.zeros(1), np.zeros(1), None, None, None, None, None, None, None)
+        np.zeros(1), np.zeros(1), None, None, None, None, None, None, None, None)
 
 @overload(data_alloc_shuffle_metadata)
 def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
@@ -617,8 +620,6 @@ def data_alloc_shuffle_metadata_overload(data_t, n_pes_t, is_contig_t):
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
             func_text += "  send_buff = arr\n"
-            func_text += "  if not is_contig:\n"
-            func_text += "    send_buff = np.empty_like(arr)\n"
             func_text += ("  meta_{} = ShuffleMeta_{}(None, None, send_buff, arr, None, None,"
                 " None, None, None, None, None, None, None, None, None, None)\n").format(i, i)
         else:
@@ -667,15 +668,17 @@ def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t, is_conti
     update_impl = loc_vars['f']
     return update_impl
 
-def finalize_data_shuffle_meta(data, shuffle_meta, key_meta):
+def finalize_data_shuffle_meta(data, shuffle_meta, key_meta, is_contig):
     return
 
 @overload(finalize_data_shuffle_meta)
-def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t):
-    func_text = "def f(data, meta_tup, key_meta):\n"
+def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_contig_t):
+    func_text = "def f(data, meta_tup, key_meta, is_contig):\n"
     for i, typ in enumerate(data_t.types):
         if isinstance(typ, types.Array):
             func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ.dtype)
+            func_text += "  if not is_contig:\n"
+            func_text += "    meta_tup[{}].send_buff = np.empty_like(meta_tup[{}].arr)\n"
         else:
             assert typ == string_array_type
             func_text += ("  hpat.distributed_api.alltoall("
