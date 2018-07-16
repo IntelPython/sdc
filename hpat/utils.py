@@ -234,19 +234,26 @@ def empty_like_type_overload(size_t, arr_typ):
     return empty_like_type_str_arr
 
 
-def alloc_arr_tup(n, arr_tup):
+def alloc_arr_tup(n, arr_tup, init_vals=()):
     arrs = []
     for in_arr in arr_tup:
         arrs.append(np.empty(n, in_arr.dtype))
     return tuple(arrs)
 
 @overload(alloc_arr_tup)
-def alloc_arr_tup_overload(n_t, data_t):
+def alloc_arr_tup_overload(n_t, data_t, init_vals_t=None):
     count = data_t.count
 
-    func_text = "def f(n, d):\n"
-    func_text += "  return ({}{})\n".format(','.join(["empty_like_type(n, d[{}])".format(
-        i) for i in range(count)]),
+    allocs = ','.join(["empty_like_type(n, d[{}])".format(i)
+                        for i in range(count)])
+
+    if init_vals_t is not None:
+        # TODO check for numeric value
+        allocs = ','.join(["np.full(n, d[{}].dtype, init_vals[{}])".format(i, i)
+                        for i in range(count)])
+
+    func_text = "def f(n, d, init_vals=()):\n"
+    func_text += "  return ({}{})\n".format(allocs,
         "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
