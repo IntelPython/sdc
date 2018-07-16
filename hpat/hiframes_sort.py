@@ -682,18 +682,21 @@ def update_data_shuffle_meta_overload(meta_t, node_id_t, ind_t, data_t, is_conti
     update_impl = loc_vars['f']
     return update_impl
 
-def finalize_data_shuffle_meta(data, shuffle_meta, key_meta, is_contig):
+def finalize_data_shuffle_meta(data, shuffle_meta, key_meta, is_contig, init_vals=()):
     return
 
 @overload(finalize_data_shuffle_meta)
-def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_contig_t):
-    func_text = "def f(data, meta_tup, key_meta, is_contig):\n"
+def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_contig_t, init_vals_t=None):
+    func_text = "def f(data, meta_tup, key_meta, is_contig, init_vals=()):\n"
     for i, typ in enumerate(data_t.types):
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
             func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ.dtype)
             func_text += "  if not is_contig:\n"
-            func_text += "    meta_tup[{}].send_buff = np.empty(key_meta.n_send, arr.dtype)\n".format(i)
+            if init_vals_t is not None:
+                func_text += "    meta_tup[{}].send_buff = np.full(key_meta.n_send, init_vals[{}], arr.dtype)\n".format(i, i)
+            else:
+                func_text += "    meta_tup[{}].send_buff = np.empty(key_meta.n_send, arr.dtype)\n".format(i)
         else:
             assert typ == string_array_type
             func_text += ("  hpat.distributed_api.alltoall("
