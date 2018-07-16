@@ -1086,19 +1086,19 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         curr_offset += len(redvars)
         redvar_offsets.append(curr_offset)
 
-    init_func = gen_init_func(all_init_nodes, all_reduce_vars, all_vartypes, pm, typingctx, targetctx)
-    update_all_func = gen_all_update_func(all_update_funcs, all_reduce_vars, all_vartypes, in_col_types, redvar_offsets, pm, typingctx, targetctx)
+    init_func = gen_init_func(all_init_nodes, all_reduce_vars, all_vartypes, typingctx, targetctx)
+    update_all_func = gen_all_update_func(all_update_funcs, all_reduce_vars, all_vartypes, in_col_types, redvar_offsets, typingctx, targetctx)
 
     return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
                          all_update_funcs, all_combine_funcs, all_eval_funcs,
                          typemap, calltypes, redvar_offsets, init_func, update_all_func)
 
-def gen_init_func(init_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
+def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
 
     return_typ = types.Tuple(var_types)
 
     dummy_f = lambda: None
-    f_ir = compile_to_numba_ir(dummy_f, {}, typingctx, (), pm.typemap, pm.calltypes)
+    f_ir = compile_to_numba_ir(dummy_f, {})
     block = list(f_ir.blocks.values())[0]
     loc = block.loc
 
@@ -1108,9 +1108,6 @@ def gen_init_func(init_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
     block.body = block.body[-2:]
     block.body = init_nodes + [tup_assign] + block.body
     block.body[-2].value.value = tup_var
-    pm.typemap[tup_var.name] = return_typ
-    pm.typemap.pop(block.body[-2].target.name)
-    pm.typemap[block.body[-2].target.name] = return_typ
 
     # compile implementation to binary (Dispatcher)
     init_all_func = compiler.compile_ir(
@@ -1127,15 +1124,13 @@ def gen_init_func(init_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
     imp_dis.add_overload(init_all_func)
     return imp_dis
 
-def gen_all_update_func(update_funcs, reduce_vars, reduce_var_types, in_col_types, redvar_offsets, pm, typingctx, targetctx):
+def gen_all_update_func(update_funcs, reduce_vars, reduce_var_types, in_col_types, redvar_offsets, typingctx, targetctx):
 
     reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C') for t in reduce_var_types])
     col_tup_typ = types.Tuple(in_col_types)
     arg_typs = (reduce_arrs_tup_typ, col_tup_typ, types.intp, types.intp)
 
     num_cols = len(in_col_types)
-    num_redvars = len(reduce_vars)
-    assert num_redvars % num_cols == 0
 
     # redvar_arrs[0][w_ind], redvar_arrs[1][w_ind] = __update_redvars(redvar_arrs[0][w_ind], redvar_arrs[1][w_ind], data_in[0][i])
 
@@ -1153,7 +1148,7 @@ def gen_all_update_func(update_funcs, reduce_vars, reduce_var_types, in_col_type
     exec(func_text, glbs, loc_vars)
     update_all_f = loc_vars['update_all_f']
 
-    f_ir = compile_to_numba_ir(update_all_f, glbs, typingctx, arg_typs, pm.typemap, pm.calltypes)
+    f_ir = compile_to_numba_ir(update_all_f, glbs)
 
     # compile implementation to binary (Dispatcher)
     update_all_func = compiler.compile_ir(
