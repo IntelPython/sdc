@@ -978,6 +978,7 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
     aggregation function. Currently assuming that the function is single block
     and has one parfor.
     """
+    all_reduce_vars = []
     all_redvars = []
     all_vartypes = []
     all_init_nodes = []
@@ -1054,8 +1055,7 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
 
         eval_func = gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targetctx)
 
-        init_func = gen_init_func(f_ir, init_nodes, reduce_vars, var_types, pm, typingctx, targetctx)
-
+        all_reduce_vars += reduce_vars
         all_redvars += redvars
         all_vartypes += var_types
         all_init_nodes += init_nodes
@@ -1067,11 +1067,13 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         curr_offset += len(redvars)
         redvar_offsets.append(curr_offset)
 
+    init_func = gen_init_func(all_init_nodes, all_reduce_vars, all_vartypes, pm, typingctx, targetctx)
+
     return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
                          all_update_funcs, all_combine_funcs, all_eval_funcs,
                          typemap, calltypes, redvar_offsets, init_func)
 
-def gen_init_func(f_ir, init_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
+def gen_init_func(init_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
 
     return_typ = types.Tuple(var_types)
 
