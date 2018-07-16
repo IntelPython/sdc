@@ -513,10 +513,13 @@ def get_key_set_overload(arr_t):
     if arr_t == string_array_type:
         return lambda a: hpat.set_ext.init_set_string()
 
+    # hack to return set with specified type
     def get_set(arr):
         s = set()
         s.add(arr[0])
         s.remove(arr[0])
+        return s
+
     return get_set
 
 def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
