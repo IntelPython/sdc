@@ -539,14 +539,15 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     func_text = "def f(key_arr{}):\n".format(in_args)
 
     if parallel:
-        func_text += "    data_redvar_dummy = ({})\n".format(
-            ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]))
+        func_text += "    data_redvar_dummy = ({}{})\n".format(
+            ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
+            "," if len(red_var_typs) == 1 else "")
         func_text += "    data_in = ({}{})\n".format(",".join(in_names),
             "," if len(in_names) == 1 else "")
         recv_names = ["recv_{}".format(i) for i in range(num_red_vars)]
         func_text += "    init_vals = __init_func()\n"
-        func_text += "    key_arr, ({}) = parallel_agg(key_arr, data_redvar_dummy, data_in, init_vals, __update_redvars)\n".format(
-            ",".join(recv_names)
+        func_text += "    key_arr, ({}{}) = parallel_agg(key_arr, data_redvar_dummy, data_in, init_vals, __update_redvars)\n".format(
+            ",".join(recv_names), "," if len(recv_names) == 1 else ""
         )
         func_text += "    n_uniq_keys = len(set(key_arr))\n"
         # allocate output
