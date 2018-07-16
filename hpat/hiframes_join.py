@@ -410,7 +410,7 @@ def parallel_join(key_arr, data):
     return shuffle_meta.out_arr, out_data
 
 def write_send_buff(shuffle_meta, node_id, val):
-    return
+    return 0
 
 @overload(write_send_buff)
 def write_send_buff_overload(meta_t, node_id_t, val_t):
@@ -420,6 +420,7 @@ def write_send_buff_overload(meta_t, node_id_t, val_t):
             # TODO: refactor to use only tmp_offset
             ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
             shuffle_meta.send_buff[ind] = val
+            return ind
 
         return write_impl
     assert arr_t == string_array_type
@@ -432,7 +433,8 @@ def write_send_buff_overload(meta_t, node_id_t, val_t):
         indc = shuffle_meta.send_disp_char[node_id] + shuffle_meta.tmp_offset_char[node_id]
         str_copy_ptr(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
         shuffle_meta.tmp_offset_char[node_id] += n_chars
-        del_str(val)
+        #del_str(val)
+        return ind
 
     return write_str_impl
 

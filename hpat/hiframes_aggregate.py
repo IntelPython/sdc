@@ -30,7 +30,7 @@ from hpat.hiframes_sort import (
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
     )
-
+from hpat.hiframes_join import write_send_buff
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
                                             'update', 'combine', 'eval',
                                             'typemap', 'calltypes',
@@ -424,7 +424,7 @@ def parallel_agg(key_arr, data_redvar_dummy, data_in, init_vals, __update_redvar
     data_shuffle_meta = data_alloc_shuffle_metadata(data_redvar_dummy, n_pes, False)
 
     # calc send/recv counts
-    key_set = set()
+    key_set = get_key_set(key_arr)
     for i in range(len(key_arr)):
         val = key_arr[i]
         if val not in key_set:
@@ -439,7 +439,7 @@ def parallel_agg(key_arr, data_redvar_dummy, data_in, init_vals, __update_redvar
     agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, __update_redvars)
     alltoallv(key_arr, shuffle_meta)
     out_data = alltoallv_tup(data_redvar_dummy, data_shuffle_meta, shuffle_meta)
-    print(data_shuffle_meta[0].out_arr)
+    #print(data_shuffle_meta[0].out_arr)
     return shuffle_meta.out_arr, out_data
 
     # key_arr = shuffle_meta.out_arr
@@ -463,10 +463,11 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, _
         k = key_arr[i]
         if k not in key_write_map:
             node_id = hash(k) % n_pes
-            w_ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+            # w_ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+            # shuffle_meta.send_buff[w_ind] = k
+            w_ind = write_send_buff(shuffle_meta, node_id, k)
             shuffle_meta.tmp_offset[node_id] += 1
             key_write_map[k] = w_ind
-            shuffle_meta.send_buff[w_ind] = k
         else:
             w_ind = key_write_map[k]
         __update_redvars(redvar_arrs, data_in, w_ind, i)
@@ -502,6 +503,21 @@ def get_key_dict_overload(arr_t):
     exec(func_text, {'hpat': hpat}, loc_vars)
     k_dict_impl = loc_vars['f']
     return k_dict_impl
+
+
+def get_key_set(arr):
+    return set()
+
+@overload(get_key_set)
+def get_key_set_overload(arr_t):
+    if arr_t == string_array_type:
+        return lambda a: hpat.set_ext.init_set_string()
+
+    def get_set(arr):
+        s = set()
+        s.add(arr[0])
+        s.remove(arr[0])
+    return get_set
 
 def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
@@ -1125,7 +1141,7 @@ def gen_all_update_func(update_funcs, reduce_vars, reduce_var_types, in_col_type
                     for i in range(redvar_offsets[j], redvar_offsets[j+1])])
         func_text += "  {} = update_vars_{}({},  data_in[{}][i])\n".format(redvar_access, j, redvar_access, j)
     func_text += "  return\n"
-    print(func_text)
+    # print(func_text)
     glbs = {}
     for i, f in enumerate(update_funcs):
         glbs['update_vars_{}'.format(i)] = f
