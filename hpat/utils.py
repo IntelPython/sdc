@@ -249,7 +249,7 @@ def alloc_arr_tup_overload(n_t, data_t, init_vals_t=None):
 
     if init_vals_t is not None:
         # TODO check for numeric value
-        allocs = ','.join(["np.full(n, d[{}].dtype, init_vals[{}])".format(i, i)
+        allocs = ','.join(["np.full(n, init_vals[{}], d[{}].dtype)".format(i, i)
                         for i in range(count)])
 
     func_text = "def f(n, d, init_vals=()):\n"
@@ -257,7 +257,7 @@ def alloc_arr_tup_overload(n_t, data_t, init_vals_t=None):
         "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
-    exec(func_text, {'empty_like_type': empty_like_type}, loc_vars)
+    exec(func_text, {'empty_like_type': empty_like_type, 'np': np}, loc_vars)
     alloc_impl = loc_vars['f']
     return alloc_impl
 
