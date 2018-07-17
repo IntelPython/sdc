@@ -392,6 +392,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                                   {'hpat': hpat, 'np': np,
                                   'agg_send_recv_counts': agg_send_recv_counts,
                                   'agg_send_recv_counts_str': agg_send_recv_counts_str,
+                                  'agg_seq_iter': agg_seq_iter,
                                   '__agg_func': agg_impl,
                                   '__agg_func_p': agg_impl_p,
                                   'parallel_agg' : parallel_agg,
@@ -512,6 +513,33 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
         else:
             w_ind = key_write_map[k]
         __combine_redvars(local_redvars, reduce_recvs, w_ind, i)
+    for j in range(n_uniq_keys):
+        __eval_res(local_redvars, out_arrs, j)
+    return out_arrs
+
+@numba.njit
+def agg_seq_iter(key_arr, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
+                           __update_redvars, __eval_res, return_key):
+    key_set = set(key_arr)
+    n_uniq_keys = len(key_set)
+    out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
+    # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+    local_redvars = alloc_arr_tup(n_uniq_keys, redvar_dummy_tup, init_vals)
+
+    key_write_map = get_key_dict(key_arr)
+    curr_write_ind = 0
+    for i in range(len(key_arr)):
+        k = key_arr[i]
+        if k not in key_write_map:
+            w_ind = curr_write_ind
+            curr_write_ind += 1
+            key_write_map[k] = w_ind
+            if return_key:
+                setitem_array_with_str(out_arrs[-1], w_ind, k)
+                # out_arrs[-1][w_ind] = k
+        else:
+            w_ind = key_write_map[k]
+        __update_redvars(local_redvars, data_in, w_ind, i)
     for j in range(n_uniq_keys):
         __eval_res(local_redvars, out_arrs, j)
     return out_arrs
@@ -637,46 +665,28 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         in_args = ", " + in_args
 
     func_text = "def f(key_arr{}):\n".format(in_args)
+    func_text += "    data_redvar_dummy = ({}{})\n".format(
+        ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
+        "," if len(red_var_typs) == 1 else "")
+    func_text += "    out_dummy_tup = ({}{}{})\n".format(
+        ",".join(["np.empty(1, np.{})".format(t) for t in out_typs.values()]),
+        "," if len(out_typs) != 0 else "",
+        "key_arr," if return_key else "")
+    func_text += "    data_in = ({}{})\n".format(",".join(in_names),
+        "," if len(in_names) == 1 else "")
+    func_text += "    init_vals = __init_func()\n"
+    out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
 
     if parallel:
-        func_text += "    data_redvar_dummy = ({}{})\n".format(
-            ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
-            "," if len(red_var_typs) == 1 else "")
-        func_text += "    out_dummy_tup = ({}{}{})\n".format(
-            ",".join(["np.empty(1, np.{})".format(t) for t in out_typs.values()]),
-            "," if len(out_typs) != 0 else "",
-            "key_arr," if return_key else "")
-        func_text += "    data_in = ({}{})\n".format(",".join(in_names),
-            "," if len(in_names) == 1 else "")
-        recv_names = ["recv_{}".format(i) for i in range(num_red_vars)]
-        func_text += "    init_vals = __init_func()\n"
-        out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
         func_text += ("    ({},) = parallel_agg(key_arr, data_redvar_dummy, "
             "out_dummy_tup, data_in, init_vals, __update_redvars, "
             "__combine_redvars, __eval_res, {})\n").format(out_tup, return_key)
-        func_text += "    return ({},)\n".format(out_tup)
-        in_names = recv_names
-
     else:
-        func_text += "    n_uniq_keys = len(set(key_arr))\n"
-        # allocate output
-        for i, col in enumerate(in_col_names):
-            func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
-                                                    i, out_typs[col])
+        func_text += ("    ({},) = agg_seq_iter(key_arr, data_redvar_dummy, "
+            "out_dummy_tup, data_in, init_vals, __update_redvars, "
+            "__eval_res, {})\n").format(out_tup, return_key)
 
-        out_key = ""
-        if return_key:
-            out_key = "out_key = "
-
-        in_args = ", ".join(out_names + in_names)
-        if len(out_names) != 0:
-            in_args = ", " + in_args
-
-        func_text += "    {}__agg_func(n_uniq_keys, 0, key_arr{})\n".format(
-            out_key, in_args)
-
-        out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
-        func_text += "    return ({},)\n".format(out_tup)
+    func_text += "    return ({},)\n".format(out_tup)
 
     # print(func_text)
 
