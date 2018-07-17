@@ -408,7 +408,7 @@ distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 @numba.njit
 def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
-        __update_redvars, __combine_redvars, __eval_res, return_key):
+        __update_redvars, __combine_redvars, __eval_res, return_key):  # pragma: no cover
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
     shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
@@ -443,7 +443,8 @@ def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
 
 
 @numba.njit
-def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, __update_redvars):
+def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
+                                        __update_redvars):  # pragma: no cover
     # _init_val_0 = np.int64(0)
     # redvar_0_arr = np.full(n_uniq_keys, _init_val_0, np.int64)
     # _init_val_1 = np.int64(0)
@@ -471,7 +472,7 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, _
 
 @numba.njit
 def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
-                           __combine_redvars, __eval_res, return_key, data_in):
+                           __combine_redvars, __eval_res, return_key, data_in):  # pragma: no cover
     key_set = set(key_arr)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
@@ -498,7 +499,7 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
 
 @numba.njit
 def agg_seq_iter(key_arr, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
-                           __update_redvars, __eval_res, return_key):
+                 __update_redvars, __eval_res, return_key):  # pragma: no cover
     key_set = set(key_arr)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
@@ -523,7 +524,7 @@ def agg_seq_iter(key_arr, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
         __eval_res(local_redvars, out_arrs, j)
     return out_arrs
 
-def get_shuffle_send_buffs(sh):
+def get_shuffle_send_buffs(sh):  # pragma: no cover
     return ()
 
 @overload(get_shuffle_send_buffs)
@@ -541,7 +542,7 @@ def get_shuffle_send_buffs_overload(data_shuff_t):
     send_buff_impl = loc_vars['f']
     return send_buff_impl
 
-def get_key_dict(arr):
+def get_key_dict(arr):  # pragma: no cover
     return dict()
 
 @overload(get_key_dict)
@@ -554,7 +555,7 @@ def get_key_dict_overload(arr_t):
     return k_dict_impl
 
 
-def get_key_set(arr):
+def get_key_set(arr):  # pragma: no cover
     return set()
 
 @overload(get_key_set)
@@ -571,7 +572,7 @@ def get_key_set_overload(arr_t):
 
     return get_set
 
-def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in):
+def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in):  # pragma: no cover
     return out_dummy_tup
 
 @overload(alloc_agg_output)
@@ -608,7 +609,7 @@ def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t, data_in
 
     return no_key_out_alloc
 
-def setitem_array_with_str(arr, i, v):
+def setitem_array_with_str(arr, i, v):  # pragma: no cover
     return
 
 @overload(setitem_array_with_str)
