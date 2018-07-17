@@ -84,7 +84,10 @@ class Aggregate(ir.Stmt):
 
 def aggregate_typeinfer(aggregate_node, typeinferer):
     for out_name, out_var in aggregate_node.df_out_vars.items():
-        typ = aggregate_node.out_typs[out_name]
+        if aggregate_node.pivot_arr is not None:
+            typ = list(aggregate_node.out_typs.values())[0]
+        else:
+            typ = aggregate_node.out_typs[out_name]
         # TODO: are there other non-numpy array types?
         if typ == string_type:
             arr_type = string_array_type
@@ -115,6 +118,9 @@ def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
     use_set.add(aggregate_node.key_arr.name)
     use_set.update({v.name for v in aggregate_node.df_in_vars.values()})
 
+    if aggregate_node.pivot_arr is not None:
+        use_set.add(aggregate_node.pivot_arr.name)
+
     # output columns are defined
     def_set.update({v.name for v in aggregate_node.df_out_vars.values()})
 
@@ -137,9 +143,10 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
             dead_cols.append(col_name)
 
     for cname in dead_cols:
-        aggregate_node.df_in_vars.pop(cname)
         aggregate_node.df_out_vars.pop(cname)
-        aggregate_node.out_typs.pop(cname)
+        if aggregate_node.pivot_arr is None:
+            aggregate_node.df_in_vars.pop(cname)
+            aggregate_node.out_typs.pop(cname)
 
     out_key_var = aggregate_node.out_key_var
     if out_key_var is not None and out_key_var.name not in lives:
@@ -184,6 +191,10 @@ def apply_copies_aggregate(aggregate_node, var_dict, name_var_table,
         aggregate_node.out_key_var = replace_vars_inner(
             aggregate_node.out_key_var, var_dict)
 
+    if aggregate_node.pivot_arr is not None:
+        aggregate_node.pivot_arr = replace_vars_inner(
+            aggregate_node.pivot_arr, var_dict)
+
     return
 
 
@@ -209,6 +220,10 @@ def visit_vars_aggregate(aggregate_node, callback, cbdata):
         aggregate_node.out_key_var = visit_vars_inner(
             aggregate_node.out_key_var, callback, cbdata)
 
+    if aggregate_node.pivot_arr is not None:
+        aggregate_node.pivot_arr = visit_vars_inner(
+            aggregate_node.pivot_arr, callback, cbdata)
+
 
 # add call to visit aggregate variable
 ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
@@ -228,6 +243,12 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
     else:
         col_shape = equiv_set.get_shape(aggregate_node.key_arr)
         all_shapes = [col_shape[0]]
+
+    if aggregate_node.pivot_arr is not None:
+        pivot_typ = typemap[aggregate_node.pivot_arr.name]
+        if pivot_typ != string_array_type:
+            col_shape = equiv_set.get_shape(aggregate_node.pivot_arr)
+            all_shapes.append(col_shape[0])
 
     for _, col_var in aggregate_node.df_in_vars.items():
         typ = typemap[col_var.name]
@@ -278,6 +299,13 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
     # key arr
     in_dist = Distribution(
         min(in_dist.value, array_dists[aggregate_node.key_arr.name].value))
+
+    # pivot case
+    if aggregate_node.pivot_arr is not None:
+        in_dist = Distribution(
+          min(in_dist.value, array_dists[aggregate_node.pivot_arr.name].value))
+        array_dists[aggregate_node.pivot_arr.name] = in_dist
+
     for _, col_var in aggregate_node.df_in_vars.items():
         array_dists[col_var.name] = in_dist
     array_dists[aggregate_node.key_arr.name] = in_dist
