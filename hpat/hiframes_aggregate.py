@@ -45,7 +45,8 @@ AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
 
 class Aggregate(ir.Stmt):
     def __init__(self, df_out, df_in, key_name, out_key_var, df_out_vars,
-                                 df_in_vars, key_arr, agg_func, out_typs, loc):
+                                 df_in_vars, key_arr, agg_func, out_typs, loc,
+                                 pivot_arr=None, pivot_values=None):
         # name of output dataframe (just for printing purposes)
         self.df_out = df_out
         # name of input dataframe (just for printing purposes)
@@ -62,6 +63,9 @@ class Aggregate(ir.Stmt):
         self.out_typs = out_typs
 
         self.loc = loc
+        # pivot_table handling
+        self.pivot_arr = pivot_arr
+        self.pivot_values = pivot_values
 
     def __repr__(self):  # pragma: no cover
         out_cols = ""
@@ -72,8 +76,10 @@ class Aggregate(ir.Stmt):
         for (c, v) in self.df_in_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_in_str = "{}{{{}}}".format(self.df_in, in_cols)
-        return "aggregate: {} = {} [key: {}:{}] ".format(df_out_str, df_in_str,
-                                            self.key_name, self.key_arr.name)
+        pivot = ("pivot {}:{}".format(self.pivot_arr.name, self.pivot_values)
+                                        if self.pivot_arr is not None else "")
+        return "aggregate: {} = {} [key: {}:{}] {}".format(
+            df_out_str, df_in_str, self.key_name, self.key_arr.name, pivot)
 
 
 def aggregate_typeinfer(aggregate_node, typeinferer):

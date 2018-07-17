@@ -349,6 +349,11 @@ class HiFrames(object):
                 and func_name == 'itertuples'):
             return self._handle_df_itertuples(assign, lhs, rhs, func_mod)
 
+        # df.pivot_table()
+        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
+                and func_name == 'pivot_table'):
+            return self._handle_df_pivot_table(lhs, rhs, func_mod, label)
+
         res = self._handle_rolling_call(assign.target, rhs)
         if res is not None:
             return res
@@ -1329,6 +1334,58 @@ class HiFrames(object):
                 or self._is_df_var(call_def[1]))):
             return True
         return False
+
+    def _handle_df_pivot_table(self, lhs, rhs, df_var, label):
+        kws = dict(rhs.kws)
+        values_arg = self._get_str_arg('pivot_table', rhs.args, kws, 0, 'values')
+        index_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'index')
+        columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'columns')
+        agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'aggfunc', 'mean')
+
+        agg_func = self._get_agg_func(agg_func_arg, rhs)
+
+        in_vars = {values_arg: self.df_vars[df_var.name][values_arg]}
+        def _map_dummy_f(A):
+            return map_func(A)
+        out_typ = self._get_func_output_typ(in_vars[values_arg], agg_func, _map_dummy_f, label)
+        out_types = {values_arg: out_typ}
+
+        pivot_values = self._get_pivot_values(lhs.name)
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        # df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+        #                         for col in [values_arg]})
+        out_df = df_col_map.copy()
+        self._create_df(lhs.name, out_df, label)
+        pivot_arr = self.df_vars[df_var.name][columns_arg]
+
+        return [hiframes_aggregate.Aggregate(
+            lhs.name, df_var.name, index_arg, None, df_col_map,
+            in_vars, self.df_vars[df_var.name][index_arg],
+            agg_func, out_types, lhs.loc, pivot_arr, pivot_values)]
+
+
+    def _get_pivot_values(self, varname):
+        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':pivot') not in self.locals:
+            raise ValueError("pivot_table() requires annotation of pivot values")
+        new_name = self.reverse_copies[varname]
+        values = self.locals.pop(new_name + ":pivot")
+        return values
+
+    def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
+        arg = None
+        if len(args) >= 1:
+            arg = guard(find_const, self.func_ir, args[0])
+        elif 'values' in kws:
+            arg = guard(find_const, self.func_ir, kws[arg_name])
+        if default is not None:
+            return default
+        if arg is None:
+            raise ValueError(("{} requires '{}' argument as a"
+                             "constant string").format(f_name, arg_name))
+        return arg
+
+
 
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
