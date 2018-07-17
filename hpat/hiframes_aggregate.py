@@ -371,39 +371,18 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     return_key = agg_node.out_key_var is not None
 
-    if parallel:
-        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-           out_col_typs, typingctx, typemap, calltypes, targetctx, return_key,
-           False, True)
-        agg_impl_p = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-                  out_col_typs, typingctx, typemap, calltypes, targetctx,
-                  return_key, True)
-    else:
-        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-            out_col_typs, typingctx, typemap, calltypes, targetctx, return_key)
-        agg_impl_p = None
-
-
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, agg_node.out_typs,
         agg_node.df_in_vars.keys(), agg_node.df_out_vars.keys(), parallel)
 
     f_block = compile_to_numba_ir(top_level_func,
                                   {'hpat': hpat, 'np': np,
-                                  'agg_send_recv_counts': agg_send_recv_counts,
-                                  'agg_send_recv_counts_str': agg_send_recv_counts_str,
                                   'agg_seq_iter': agg_seq_iter,
-                                  '__agg_func': agg_impl,
-                                  '__agg_func_p': agg_impl_p,
                                   'parallel_agg' : parallel_agg,
                                   '__update_redvars': agg_func_struct.update_all_func,
                                   '__init_func': agg_func_struct.init_func,
                                   '__combine_redvars': agg_func_struct.combine_all_func,
                                   '__eval_res': agg_func_struct.eval_all_func,
-                                  'c_alltoallv': hpat.hiframes_api.c_alltoallv,
-                                  'convert_len_arr_to_offset': hpat.hiframes_api.convert_len_arr_to_offset,
-                                  'int32_typ_enum': np.int32(_h5_typ_table[types.int32]),
-                                  'char_typ_enum': np.int32(_h5_typ_table[types.uint8]),
                                   },
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
@@ -654,7 +633,6 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
     """create the top level aggregation function by generating text
     """
-    num_red_vars = len(red_var_typs)
 
     # arg names
     in_names = ["in_c{}".format(i) for i in range(len(in_col_names))]
@@ -694,272 +672,6 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     exec(func_text, {}, loc_vars)
     f = loc_vars['f']
     return f
-
-
-def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
-                 typemap, calltypes, targetctx, return_key,
-                 parallel_local=False, parallel_combine=False):
-    # has 3 modes: 1- aggregate input column to output (sequential case)
-    #              2- aggregate input column to reduce arrays for communication (parallel_local)
-    #              3- aggregate received reduce arrays to output (parallel_combine)
-
-    extra_arg_typs = []
-    # in combine phase after shuffle, inputs are reduce vars
-    if parallel_combine:
-        in_typs = [types.Array(t, 1, 'C') for t in agg_func_struct.var_typs]
-
-    # no output columns in parallel-local computation (reduce arrs returned)
-    if parallel_local:
-        assert not parallel_combine
-        out_typs = []
-        # add send_disp arg
-        extra_arg_typs = [types.Array(types.int32, 1, 'C')]
-        if key_typ == string_array_type:
-            # add send_disp_char arg
-            extra_arg_typs.append(types.Array(types.int32, 1, 'C'))
-
-    arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs + in_typs + extra_arg_typs)
-
-    num_red_vars = len(agg_func_struct.vars)
-
-    iter_func = gen_agg_iter_func(
-        key_typ, agg_func_struct.var_typs, len(in_typs), len(out_typs),
-        num_red_vars, agg_func_struct.redvar_offsets, return_key,
-        parallel_local, parallel_combine)
-
-    _globals = {'hpat': hpat, 'np': np, 'str_copy': hpat.hiframes_api.str_copy,
-            'setitem_string_array': hpat.str_arr_ext.setitem_string_array,
-            'get_offset_ptr': hpat.str_arr_ext.get_offset_ptr,
-            'get_data_ptr': hpat.str_arr_ext.get_data_ptr}
-    for i in range(len(agg_func_struct.update)):
-        _globals['__update_redvars_{}'.format(i)] = agg_func_struct.update[i]
-        _globals['__combine_redvars_{}'.format(i)] = agg_func_struct.combine[i]
-        _globals['__eval_res_{}'.format(i)] = agg_func_struct.eval[i]
-
-    f_ir = compile_to_numba_ir(iter_func,
-                                  _globals,
-                                  typingctx, arg_typs,
-                                  typemap, calltypes)
-
-    f_ir._definitions = build_definitions(f_ir.blocks)
-    topo_order = find_topo_order(f_ir.blocks)
-    first_block = f_ir.blocks[topo_order[0]]
-
-    # deep copy the nodes since they can be reused
-    init_nodes = copy.deepcopy(agg_func_struct.init)
-
-    # find reduce variables from names and store in the same order
-    reduce_vars = [0] * num_red_vars
-    for node in init_nodes:
-        if isinstance(node, ir.Assign) and node.target.name in agg_func_struct.vars:
-            var_ind = agg_func_struct.vars.index(node.target.name)
-            reduce_vars[var_ind] = node.target
-    assert 0 not in reduce_vars
-
-    # add initialization code to first block
-    # make sure arg nodes are in the beginning
-    arg_nodes = []
-    for i in range(len(arg_typs)):
-        arg_nodes.append(first_block.body[i])
-    first_block.body = arg_nodes + init_nodes + first_block.body[len(arg_nodes):]
-
-    # replace init and eval sentinels
-    # TODO: replace with functions
-    for l in topo_order:
-        block = f_ir.blocks[l]
-        for i, stmt in enumerate(block.body):
-            if isinstance(stmt, ir.Assign) and stmt.target.name.startswith("_init_val_"):
-                first_dot = stmt.target.name.index(".")
-                var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
-                stmt.value = reduce_vars[var_ind]
-
-    return_typ = typemap[f_ir.blocks[topo_order[-1]].body[-1].value.name]
-
-    # compile implementation to binary (Dispatcher)
-    agg_impl_func = compiler.compile_ir(
-            typingctx,
-            targetctx,
-            f_ir,
-            arg_typs,
-            return_typ,
-            compiler.DEFAULT_FLAGS,
-            {}
-    )
-
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](iter_func)
-    imp_dis.add_overload(agg_impl_func)
-    return imp_dis
-
-def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
-                 redvar_offsets, return_key, parallel_local, parallel_combine):
-    # arg names
-    in_names = ["in_c{}".format(i) for i in range(num_ins)]
-    out_names = ["out_c{}".format(i) for i in range(num_outs)]
-
-    # number of actual column intpus (parallel_combine case)
-    num_col_ins = len(redvar_offsets) - 1
-
-    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
-                                    for i in range(num_red_vars)])
-
-    extra_args = ""
-    if parallel_local:
-        # needed due to alltoallv
-        extra_args = ", send_disp"
-        if key_typ == string_array_type:
-            extra_args += ", send_disp_char"
-
-    in_args = ", ".join(out_names + in_names)
-    if num_ins != 0:
-        in_args = ", " + in_args
-
-    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr{}{}):\n".format(
-        in_args, extra_args)
-
-    # allocate reduction var arrays
-    for i, typ in enumerate(red_var_typs):
-        func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
-        func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
-            i, i, typ)
-
-    # key is returned in parallel local agg phase (TODO: avoid if key is output already)
-    if parallel_local:
-        if key_typ == string_array_type:
-            func_text += "    out_key_lens = np.empty(n_uniq_keys, np.uint32)\n"
-            func_text += "    out_key_chars = np.empty(n_uniq_keys_char, np.uint8)\n"
-        else:
-            func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
-                                                                key_typ.dtype)
-        func_text += "    n_pes = hpat.distributed_api.get_size()\n"
-        func_text += "    tmp_offset = np.zeros(n_pes, dtype=np.int64)\n"
-        if key_typ == string_array_type:
-            func_text += "    tmp_offset_char = np.zeros(n_pes, dtype=np.int64)\n"
-    elif return_key:
-        if key_typ == string_array_type:
-            func_text += "    out_key =  hpat.str_arr_ext.pre_alloc_string_array(n_uniq_keys, n_uniq_keys_char)\n"
-        else:
-            func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
-                                                                key_typ.dtype)
-
-    # find write location
-    # TODO: non-int dict
-    func_text += "    key_write_map = hpat.dict_ext.init_dict_{}_int64()\n".format(
-                                                                 key_typ.dtype)
-
-    func_text += "    curr_write_ind = 0\n"
-    func_text += "    for i in range(len(key_arr)):\n"
-    func_text += "      k = key_arr[i]\n"
-    func_text += "      if k not in key_write_map:\n"
-
-    if parallel_local:
-        # write to proper buffer location for alltoallv
-        func_text += "        node_id = hash(k) % n_pes\n"
-        func_text += "        w_ind = send_disp[node_id] + tmp_offset[node_id]\n"
-        func_text += "        tmp_offset[node_id] += 1\n"
-    else:
-        func_text += "        w_ind = curr_write_ind\n"
-        func_text += "        curr_write_ind += 1\n"
-    func_text += "        key_write_map[k] = w_ind\n"
-
-    if parallel_local:
-        if key_typ == string_array_type:
-            func_text += "        k_len = len(k)\n"
-            func_text += "        out_key_lens[w_ind] = k_len\n"
-            func_text += "        w_ind_c = send_disp_char[node_id] + tmp_offset_char[node_id]\n"
-            func_text += "        tmp_offset_char[node_id] += k_len\n"
-            func_text += "        str_copy(out_key_chars, w_ind_c, k.c_str(), k_len)\n"
-        else:
-            func_text += "        out_key[w_ind] = k\n"
-    elif return_key:
-        if key_typ == string_array_type:
-            func_text += "        setitem_string_array(get_offset_ptr(out_key), get_data_ptr(out_key), k, w_ind)\n"
-        else:
-            func_text += "        out_key[w_ind] = k\n"
-
-    func_text += "      else:\n"
-    func_text += "        w_ind = key_write_map[k]\n"
-
-    redvar_access = []
-    for i in range(num_col_ins):
-        redvar_access.append(", ".join(["redvar_{}_arr[w_ind]".format(i)
-                            for i in range(redvar_offsets[i], redvar_offsets[i+1])]))
-
-    inarr_access = []
-    if parallel_combine:
-        for i in range(num_col_ins):
-            inarr_access.append(", ".join(["{}[i]".format(a) for a in in_names[redvar_offsets[i]:redvar_offsets[i+1]]]))
-        f_name = '__combine_redvars'
-    else:
-        for i in range(num_col_ins):
-            inarr_access.append("{}[i]".format(in_names[i]))
-        f_name = '__update_redvars'
-
-    for i in range(num_col_ins):
-        func_text += "      {} = {}_{}({}, {})\n".format(
-            redvar_access[i], f_name, i, redvar_access[i], inarr_access[i])
-
-    if parallel_local:
-        # return out key array and reduce arrays for communication
-        if key_typ == string_array_type:
-            func_text += "    return out_key_lens, out_key_chars, {}\n".format(redvar_arrnames)
-        else:
-            func_text += "    return out_key, {}\n".format(redvar_arrnames)
-    else:
-        # get final output from reduce varis
-        if num_col_ins != 0:
-            func_text += "    for j in range(n_uniq_keys):\n"
-        for i in range(num_col_ins):
-            redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
-                                    for i in range(redvar_offsets[i], redvar_offsets[i+1])])
-            func_text += "      out_c{}[j] = __eval_res_{}({})\n".format(
-                                                       i, i, redvar_access)
-        if return_key:
-            func_text += "    return out_key\n"
-
-    # print(func_text)
-
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
-
-    return f
-
-@numba.njit
-def agg_send_recv_counts(key_arr):
-    n_pes = hpat.distributed_api.get_size()
-    send_counts = np.zeros(n_pes, np.int32)
-    recv_counts = np.empty(n_pes, np.int32)
-    key_set = set()
-    for i in range(len(key_arr)):
-        k = key_arr[i]
-        if k not in key_set:
-            key_set.add(k)
-            node_id = hash(k) % n_pes
-            send_counts[node_id] += 1
-
-    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
-    return send_counts, recv_counts
-
-@numba.njit
-def agg_send_recv_counts_str(key_arr):
-    n_pes = hpat.distributed_api.get_size()
-    send_counts = np.zeros(n_pes, np.int32)
-    recv_counts = np.empty(n_pes, np.int32)
-    send_counts_char = np.zeros(n_pes, np.int32)
-    recv_counts_char = np.empty(n_pes, np.int32)
-    key_set = hpat.set_ext.init_set_string()
-    for i in range(len(key_arr)):
-        k = key_arr[i]
-        if k not in key_set:
-            key_set.add(k)
-            node_id = hash(k) % n_pes
-            send_counts[node_id] += 1
-            send_counts_char[node_id] += len(k)
-            hpat.str_ext.del_str(k)
-
-    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
-    hpat.distributed_api.alltoall(send_counts_char, recv_counts_char, 1)
-    return send_counts, recv_counts, send_counts_char, recv_counts_char
 
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
