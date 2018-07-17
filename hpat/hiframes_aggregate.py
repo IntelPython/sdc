@@ -423,7 +423,8 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 @numba.njit
-def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals, __update_redvars, __combine_redvars, __eval_res):
+def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
+        __update_redvars, __combine_redvars, __eval_res, return_key):
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
     shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
@@ -448,7 +449,7 @@ def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals, 
     #print(data_shuffle_meta[0].out_arr)
     key_arr = shuffle_meta.out_arr
     out_arrs = agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup,
-                                      init_vals, __combine_redvars, __eval_res)
+        init_vals, __combine_redvars, __eval_res, return_key)
     return out_arrs
 
     # key_arr = shuffle_meta.out_arr
@@ -485,7 +486,7 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, _
 
 
 @numba.njit
-def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals, __combine_redvars, __eval_res):
+def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals, __combine_redvars, __eval_res, return_key):
     key_set = set(key_arr)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
@@ -499,6 +500,8 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals, _
             w_ind = curr_write_ind
             curr_write_ind += 1
             key_write_map[k] = w_ind
+            if return_key:
+                out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
         __combine_redvars(local_redvars, reduce_recvs, w_ind, i)
@@ -585,7 +588,7 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
         func_text += ("    ({},) = parallel_agg(key_arr, data_redvar_dummy, "
             "out_dummy_tup, data_in, init_vals, __update_redvars, "
-            "__combine_redvars, __eval_res)\n").format(out_tup)
+            "__combine_redvars, __eval_res, {})\n").format(out_tup, return_key)
         func_text += "    return ({},)\n".format(out_tup)
         in_names = recv_names
 
