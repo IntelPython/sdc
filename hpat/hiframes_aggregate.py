@@ -130,6 +130,7 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
     for cname in dead_cols:
         aggregate_node.df_in_vars.pop(cname)
         aggregate_node.df_out_vars.pop(cname)
+        aggregate_node.out_typs.pop(cname)
 
     out_key_var = aggregate_node.out_key_var
     if out_key_var is not None and out_key_var.name not in lives:
@@ -573,18 +574,19 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         func_text += "    data_redvar_dummy = ({}{})\n".format(
             ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
             "," if len(red_var_typs) == 1 else "")
-        func_text += "    out_dummy_tup = ({}{})\n".format(
+        func_text += "    out_dummy_tup = ({}{}{})\n".format(
             ",".join(["np.empty(1, np.{})".format(t) for t in out_typs.values()]),
-            "," if len(out_typs) == 1 else "")
+            "," if len(out_typs) != 0 else "",
+            "key_arr," if return_key else "")
         func_text += "    data_in = ({}{})\n".format(",".join(in_names),
             "," if len(in_names) == 1 else "")
         recv_names = ["recv_{}".format(i) for i in range(num_red_vars)]
         func_text += "    init_vals = __init_func()\n"
-        out_tup = "({},)".format(", ".join(out_names))
-        func_text += ("    {} = parallel_agg(key_arr, data_redvar_dummy, "
+        out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
+        func_text += ("    ({},) = parallel_agg(key_arr, data_redvar_dummy, "
             "out_dummy_tup, data_in, init_vals, __update_redvars, "
             "__combine_redvars, __eval_res)\n").format(out_tup)
-        func_text += "    return {}\n".format(out_tup)
+        func_text += "    return ({},)\n".format(out_tup)
         in_names = recv_names
 
     else:
@@ -836,7 +838,7 @@ def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
         if return_key:
             func_text += "    return out_key\n"
 
-    print(func_text)
+    # print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
