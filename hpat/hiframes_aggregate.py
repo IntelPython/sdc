@@ -18,12 +18,15 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload
 import hpat
-from hpat.utils import is_call, is_var_assign, is_assign, debug_prints, alloc_arr_tup
+from hpat.utils import (is_call, is_var_assign, is_assign, debug_prints,
+        alloc_arr_tup, empty_like_type)
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.distributed_lower import _h5_typ_table
 from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type
+from hpat.set_ext import num_total_chars_set_string
+from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
+                            setitem_string_array, get_offset_ptr, get_data_ptr)
 
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
@@ -380,6 +383,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
             out_col_typs, typingctx, typemap, calltypes, targetctx, return_key)
         agg_impl_p = None
 
+
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, agg_node.out_typs,
         agg_node.df_in_vars.keys(), agg_node.df_out_vars.keys(), parallel)
@@ -449,7 +453,7 @@ def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
     #print(data_shuffle_meta[0].out_arr)
     key_arr = shuffle_meta.out_arr
     out_arrs = agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup,
-        init_vals, __combine_redvars, __eval_res, return_key)
+        init_vals, __combine_redvars, __eval_res, return_key, data_in)
     return out_arrs
 
     # key_arr = shuffle_meta.out_arr
@@ -486,10 +490,12 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, _
 
 
 @numba.njit
-def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals, __combine_redvars, __eval_res, return_key):
+def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
+                           __combine_redvars, __eval_res, return_key, data_in):
     key_set = set(key_arr)
     n_uniq_keys = len(key_set)
-    out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+    out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
+    # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
     local_redvars = alloc_arr_tup(n_uniq_keys, reduce_recvs, init_vals)
 
     key_write_map = get_key_dict(key_arr)
@@ -501,7 +507,8 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals, _
             curr_write_ind += 1
             key_write_map[k] = w_ind
             if return_key:
-                out_arrs[-1][w_ind] = k
+                setitem_array_with_str(out_arrs[-1], w_ind, k)
+                # out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
         __combine_redvars(local_redvars, reduce_recvs, w_ind, i)
@@ -556,6 +563,64 @@ def get_key_set_overload(arr_t):
         return s
 
     return get_set
+
+def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in):
+    return out_dummy_tup
+
+@overload(alloc_agg_output)
+def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t, data_in_t):
+
+    if out_dummy_tup_t.count > data_in_t.count:
+        assert out_dummy_tup_t.count == data_in_t.count + 1
+        key_typ = key_set_t.dtype
+
+        func_text = "def out_alloc_f(n_uniq_keys, out_dummy_tup, key_set, data_in):\n"
+        for i in range(data_in_t.count):
+            func_text += "  c_{} = empty_like_type(n_uniq_keys, out_dummy_tup[{}])\n".format(i, i)
+
+        if key_typ == string_type:
+            func_text += "  num_total_chars = num_total_chars_set_string(key_set)\n"
+            func_text += "  out_key = pre_alloc_string_array(n_uniq_keys, num_total_chars)\n"
+        else:
+            func_text += "  out_key = np.empty(n_uniq_keys, np.{})\n".format(key_typ)
+
+        func_text += "  return ({}{}out_key,)\n".format(
+            ", ".join(["c_{}".format(i) for i in range(data_in_t.count)]),
+            "," if data_in_t.count != 0 else "")
+
+        loc_vars = {}
+        # print(func_text)
+        exec(func_text, {'empty_like_type': empty_like_type, 'np': np,
+            'pre_alloc_string_array': pre_alloc_string_array,
+            'num_total_chars_set_string': num_total_chars_set_string}, loc_vars)
+        alloc_impl = loc_vars['out_alloc_f']
+        return alloc_impl
+
+    def no_key_out_alloc(n_uniq_keys, out_dummy_tup, key_set, data_in):
+        return alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+
+    return no_key_out_alloc
+
+def setitem_array_with_str(arr, i, v):
+    return
+
+@overload(setitem_array_with_str)
+def setitem_array_with_str_overload(arr_t, ind_t, val_t):
+    if arr_t == string_array_type:
+        def setitem_str_arr(arr, i, v):
+            setitem_string_array(get_offset_ptr(arr), get_data_ptr(arr), v, i)
+        return setitem_str_arr
+
+    # return_key == False case where val could be string resulting in typing
+    # issue, no need to set
+    if val_t == string_type:
+        return lambda a,i,v: None
+
+    def setitem_impl(arr, i, v):
+        arr[i] = v
+
+    return setitem_impl
+
 
 def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
@@ -613,7 +678,7 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
         func_text += "    return ({},)\n".format(out_tup)
 
-    print(func_text)
+    # print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)

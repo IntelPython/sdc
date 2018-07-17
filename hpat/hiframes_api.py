@@ -213,7 +213,7 @@ def set_recv_counts_chars(key_arr):
     return send_counts, recv_counts
 
 @intrinsic
-def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ):
+def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
     def codegen(context, builder, sig, args):
         buff_arr, ind, str, len_str = args
         buff_arr = make_array(sig.args[0])(context, builder, buff_arr)
@@ -225,7 +225,7 @@ def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ):
 
 
 @intrinsic
-def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ):
+def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
     def codegen(context, builder, sig, args):
         ptr, ind, _str, len_str = args
         ptr = builder.gep(ptr, [ind])
