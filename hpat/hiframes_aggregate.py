@@ -34,13 +34,9 @@ from hpat.hiframes_sort import (
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
     )
 from hpat.hiframes_join import write_send_buff
-AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
-                                            'update', 'combine', 'eval',
-                                            'typemap', 'calltypes',
-                                            'redvar_offsets', 'init_func',
-                                            'update_all_func',
-                                            'combine_all_func',
-                                            'eval_all_func'])
+AggFuncStruct = namedtuple('AggFuncStruct',
+    ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
+     'eval_all_func'])
 
 
 class Aggregate(ir.Stmt):
@@ -433,7 +429,9 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         nodes.append(ir.Assign(out_var, var, var.loc))
 
     if return_key:
-        nodes.append(ir.Assign(tuple_assign.value.items[len(out_col_vars)], agg_node.out_key_var, agg_node.out_key_var.loc))
+        nodes.append(ir.Assign(
+            tuple_assign.value.items[len(out_col_vars)], agg_node.out_key_var,
+            agg_node.out_key_var.loc))
 
     return nodes
 
@@ -860,9 +858,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx, targetc
     combine_all_func = gen_all_combine_func(all_combine_funcs, all_vartypes, redvar_offsets, typingctx, targetctx)
     eval_all_func = gen_all_eval_func(all_eval_funcs, all_vartypes, redvar_offsets, out_col_typs, typingctx, targetctx)
 
-    return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
-                         all_update_funcs, all_combine_funcs, all_eval_funcs,
-                         typemap, calltypes, redvar_offsets, init_func,
+    return AggFuncStruct(all_vartypes, init_func,
                          update_all_func, combine_all_func, eval_all_func)
 
 def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
