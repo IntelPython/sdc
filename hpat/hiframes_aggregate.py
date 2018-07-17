@@ -16,18 +16,31 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
+from numba.extending import overload
 import hpat
-from hpat.utils import is_call, is_var_assign, is_assign, debug_prints
+from hpat.utils import (is_call, is_var_assign, is_assign, debug_prints,
+        alloc_arr_tup, empty_like_type)
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.distributed_lower import _h5_typ_table
 from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type
+from hpat.set_ext import num_total_chars_set_string
+from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
+                            setitem_string_array, get_offset_ptr, get_data_ptr)
 
+from hpat.hiframes_sort import (
+    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+    )
+from hpat.hiframes_join import write_send_buff
 AggFuncStruct = namedtuple('AggFuncStruct', ['vars', 'var_typs', 'init',
                                             'update', 'combine', 'eval',
                                             'typemap', 'calltypes',
-                                            'redvar_offsets'])
+                                            'redvar_offsets', 'init_func',
+                                            'update_all_func',
+                                            'combine_all_func',
+                                            'eval_all_func'])
 
 
 class Aggregate(ir.Stmt):
@@ -120,6 +133,7 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
     for cname in dead_cols:
         aggregate_node.df_in_vars.pop(cname)
         aggregate_node.df_out_vars.pop(cname)
+        aggregate_node.out_typs.pop(cname)
 
     out_key_var = aggregate_node.out_key_var
     if out_key_var is not None and out_key_var.name not in lives:
@@ -353,21 +367,9 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     arg_typs = tuple([key_typ] + in_col_typs)
 
     agg_func_struct = get_agg_func_struct(agg_node.agg_func, in_col_typs,
-                                                          typingctx, targetctx)
+                                            out_col_typs, typingctx, targetctx)
 
     return_key = agg_node.out_key_var is not None
-
-    if parallel:
-        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-           out_col_typs, typingctx, typemap, calltypes, targetctx, return_key,
-           False, True)
-        agg_impl_p = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-                  out_col_typs, typingctx, typemap, calltypes, targetctx,
-                  return_key, True)
-    else:
-        agg_impl = gen_agg_func(agg_func_struct, key_typ, in_col_typs,
-            out_col_typs, typingctx, typemap, calltypes, targetctx, return_key)
-        agg_impl_p = None
 
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, agg_node.out_typs,
@@ -375,14 +377,12 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     f_block = compile_to_numba_ir(top_level_func,
                                   {'hpat': hpat, 'np': np,
-                                  'agg_send_recv_counts': agg_send_recv_counts,
-                                  'agg_send_recv_counts_str': agg_send_recv_counts_str,
-                                  '__agg_func': agg_impl,
-                                  '__agg_func_p': agg_impl_p,
-                                  'c_alltoallv': hpat.hiframes_api.c_alltoallv,
-                                  'convert_len_arr_to_offset': hpat.hiframes_api.convert_len_arr_to_offset,
-                                  'int32_typ_enum': np.int32(_h5_typ_table[types.int32]),
-                                  'char_typ_enum': np.int32(_h5_typ_table[types.uint8]),
+                                  'agg_seq_iter': agg_seq_iter,
+                                  'parallel_agg' : parallel_agg,
+                                  '__update_redvars': agg_func_struct.update_all_func,
+                                  '__init_func': agg_func_struct.init_func,
+                                  '__combine_redvars': agg_func_struct.combine_all_func,
+                                  '__eval_res': agg_func_struct.eval_all_func,
                                   },
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
@@ -406,12 +406,234 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
+@numba.njit
+def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
+        __update_redvars, __combine_redvars, __eval_res, return_key):  # pragma: no cover
+    # alloc shuffle meta
+    n_pes = hpat.distributed_api.get_size()
+    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
+    data_shuffle_meta = data_alloc_shuffle_metadata(data_redvar_dummy, n_pes, False)
+
+    # calc send/recv counts
+    key_set = get_key_set(key_arr)
+    for i in range(len(key_arr)):
+        val = key_arr[i]
+        if val not in key_set:
+            key_set.add(val)
+            node_id = hash(val) % n_pes
+            update_shuffle_meta(shuffle_meta, node_id, i, val, False)
+        #update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
+
+    finalize_shuffle_meta(key_arr, shuffle_meta, False)
+    finalize_data_shuffle_meta(data_redvar_dummy, data_shuffle_meta, shuffle_meta, False, init_vals)
+
+    agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, __update_redvars)
+    alltoallv(key_arr, shuffle_meta)
+    reduce_recvs = alltoallv_tup(data_redvar_dummy, data_shuffle_meta, shuffle_meta)
+    #print(data_shuffle_meta[0].out_arr)
+    key_arr = shuffle_meta.out_arr
+    out_arrs = agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup,
+        init_vals, __combine_redvars, __eval_res, return_key, data_in)
+    return out_arrs
+
+    # key_arr = shuffle_meta.out_arr
+    # n_uniq_keys = len(set(key_arr))
+    # out_key = __agg_func(n_uniq_keys, 0, key_arr)
+    # return (out_key,)
+
+
+@numba.njit
+def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
+                                        __update_redvars):  # pragma: no cover
+    # _init_val_0 = np.int64(0)
+    # redvar_0_arr = np.full(n_uniq_keys, _init_val_0, np.int64)
+    # _init_val_1 = np.int64(0)
+    # redvar_1_arr = np.full(n_uniq_keys, _init_val_1, np.int64)
+    # out_key = np.empty(n_uniq_keys, np.float64)
+    n_pes = hpat.distributed_api.get_size()
+    key_write_map = get_key_dict(key_arr)#hpat.dict_ext.init_dict_float64_int64()
+    redvar_arrs = get_shuffle_send_buffs(data_shuffle_meta)
+
+    for i in range(len(key_arr)):
+        k = key_arr[i]
+        if k not in key_write_map:
+            node_id = hash(k) % n_pes
+            # w_ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+            # shuffle_meta.send_buff[w_ind] = k
+            w_ind = write_send_buff(shuffle_meta, node_id, k)
+            shuffle_meta.tmp_offset[node_id] += 1
+            key_write_map[k] = w_ind
+        else:
+            w_ind = key_write_map[k]
+        __update_redvars(redvar_arrs, data_in, w_ind, i)
+        #redvar_arrs[0][w_ind], redvar_arrs[1][w_ind] = __update_redvars(redvar_arrs[0][w_ind], redvar_arrs[1][w_ind], data_in[0][i])
+    return
+
+
+@numba.njit
+def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
+                           __combine_redvars, __eval_res, return_key, data_in):  # pragma: no cover
+    key_set = set(key_arr)
+    n_uniq_keys = len(key_set)
+    out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
+    # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+    local_redvars = alloc_arr_tup(n_uniq_keys, reduce_recvs, init_vals)
+
+    key_write_map = get_key_dict(key_arr)
+    curr_write_ind = 0
+    for i in range(len(key_arr)):
+        k = key_arr[i]
+        if k not in key_write_map:
+            w_ind = curr_write_ind
+            curr_write_ind += 1
+            key_write_map[k] = w_ind
+            if return_key:
+                setitem_array_with_str(out_arrs[-1], w_ind, k)
+                # out_arrs[-1][w_ind] = k
+        else:
+            w_ind = key_write_map[k]
+        __combine_redvars(local_redvars, reduce_recvs, w_ind, i)
+    for j in range(n_uniq_keys):
+        __eval_res(local_redvars, out_arrs, j)
+    return out_arrs
+
+@numba.njit
+def agg_seq_iter(key_arr, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
+                 __update_redvars, __eval_res, return_key):  # pragma: no cover
+    key_set = set(key_arr)
+    n_uniq_keys = len(key_set)
+    out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in)
+    # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+    local_redvars = alloc_arr_tup(n_uniq_keys, redvar_dummy_tup, init_vals)
+
+    key_write_map = get_key_dict(key_arr)
+    curr_write_ind = 0
+    for i in range(len(key_arr)):
+        k = key_arr[i]
+        if k not in key_write_map:
+            w_ind = curr_write_ind
+            curr_write_ind += 1
+            key_write_map[k] = w_ind
+            if return_key:
+                setitem_array_with_str(out_arrs[-1], w_ind, k)
+                # out_arrs[-1][w_ind] = k
+        else:
+            w_ind = key_write_map[k]
+        __update_redvars(local_redvars, data_in, w_ind, i)
+    for j in range(n_uniq_keys):
+        __eval_res(local_redvars, out_arrs, j)
+    return out_arrs
+
+def get_shuffle_send_buffs(sh):  # pragma: no cover
+    return ()
+
+@overload(get_shuffle_send_buffs)
+def get_shuffle_send_buffs_overload(data_shuff_t):
+    assert isinstance(data_shuff_t, (types.Tuple, types.UniTuple))
+    count = data_shuff_t.count
+
+    func_text = "def f(data):\n"
+    func_text += "  return ({}{})\n".format(','.join(["data[{}].send_buff".format(
+        i) for i in range(count)]),
+        "," if count == 1 else "")  # single value needs comma to become tuple
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    send_buff_impl = loc_vars['f']
+    return send_buff_impl
+
+def get_key_dict(arr):  # pragma: no cover
+    return dict()
+
+@overload(get_key_dict)
+def get_key_dict_overload(arr_t):
+    func_text = "def f(arr):\n"
+    func_text += "  return hpat.dict_ext.init_dict_{}_int64()\n".format(arr_t.dtype)
+    loc_vars = {}
+    exec(func_text, {'hpat': hpat}, loc_vars)
+    k_dict_impl = loc_vars['f']
+    return k_dict_impl
+
+
+def get_key_set(arr):  # pragma: no cover
+    return set()
+
+@overload(get_key_set)
+def get_key_set_overload(arr_t):
+    if arr_t == string_array_type:
+        return lambda a: hpat.set_ext.init_set_string()
+
+    # hack to return set with specified type
+    def get_set(arr):
+        s = set()
+        s.add(arr[0])
+        s.remove(arr[0])
+        return s
+
+    return get_set
+
+def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in):  # pragma: no cover
+    return out_dummy_tup
+
+@overload(alloc_agg_output)
+def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t, data_in_t):
+
+    if out_dummy_tup_t.count > data_in_t.count:
+        assert out_dummy_tup_t.count == data_in_t.count + 1
+        key_typ = key_set_t.dtype
+
+        func_text = "def out_alloc_f(n_uniq_keys, out_dummy_tup, key_set, data_in):\n"
+        for i in range(data_in_t.count):
+            func_text += "  c_{} = empty_like_type(n_uniq_keys, out_dummy_tup[{}])\n".format(i, i)
+
+        if key_typ == string_type:
+            func_text += "  num_total_chars = num_total_chars_set_string(key_set)\n"
+            func_text += "  out_key = pre_alloc_string_array(n_uniq_keys, num_total_chars)\n"
+        else:
+            func_text += "  out_key = np.empty(n_uniq_keys, np.{})\n".format(key_typ)
+
+        func_text += "  return ({}{}out_key,)\n".format(
+            ", ".join(["c_{}".format(i) for i in range(data_in_t.count)]),
+            "," if data_in_t.count != 0 else "")
+
+        loc_vars = {}
+        # print(func_text)
+        exec(func_text, {'empty_like_type': empty_like_type, 'np': np,
+            'pre_alloc_string_array': pre_alloc_string_array,
+            'num_total_chars_set_string': num_total_chars_set_string}, loc_vars)
+        alloc_impl = loc_vars['out_alloc_f']
+        return alloc_impl
+
+    def no_key_out_alloc(n_uniq_keys, out_dummy_tup, key_set, data_in):
+        return alloc_arr_tup(n_uniq_keys, out_dummy_tup)
+
+    return no_key_out_alloc
+
+def setitem_array_with_str(arr, i, v):  # pragma: no cover
+    return
+
+@overload(setitem_array_with_str)
+def setitem_array_with_str_overload(arr_t, ind_t, val_t):
+    if arr_t == string_array_type:
+        def setitem_str_arr(arr, i, v):
+            setitem_string_array(get_offset_ptr(arr), get_data_ptr(arr), v, i)
+        return setitem_str_arr
+
+    # return_key == False case where val could be string resulting in typing
+    # issue, no need to set
+    if val_t == string_type:
+        return lambda a,i,v: None
+
+    def setitem_impl(arr, i, v):
+        arr[i] = v
+
+    return setitem_impl
+
 
 def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
     """create the top level aggregation function by generating text
     """
-    num_red_vars = len(red_var_typs)
 
     # arg names
     in_names = ["in_c{}".format(i) for i in range(len(in_col_names))]
@@ -422,96 +644,27 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
         in_args = ", " + in_args
 
     func_text = "def f(key_arr{}):\n".format(in_args)
+    func_text += "    data_redvar_dummy = ({}{})\n".format(
+        ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
+        "," if len(red_var_typs) == 1 else "")
+    func_text += "    out_dummy_tup = ({}{}{})\n".format(
+        ",".join(["np.empty(1, np.{})".format(t) for t in out_typs.values()]),
+        "," if len(out_typs) != 0 else "",
+        "key_arr," if return_key else "")
+    func_text += "    data_in = ({}{})\n".format(",".join(in_names),
+        "," if len(in_names) == 1 else "")
+    func_text += "    init_vals = __init_func()\n"
+    out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
 
     if parallel:
-        # get send/recv counts
-        if key_typ == string_array_type:
-            func_text += ("    send_counts, recv_counts, send_counts_char, "
-                      "recv_counts_char = agg_send_recv_counts_str(key_arr)\n")
-            func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
-            func_text += "    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
-            func_text += "    send_disp_char = hpat.hiframes_join.calc_disp(send_counts_char)\n"
-            func_text += "    recv_disp_char = hpat.hiframes_join.calc_disp(recv_counts_char)\n"
-            func_text += "    n_uniq_keys = send_counts.sum()\n"
-            func_text += "    n_uniq_keys_char = send_counts_char.sum()\n"
-            func_text += "    recv_size = recv_counts.sum()\n"
-            func_text += "    recv_size_chars = recv_counts_char.sum()\n"
-        else:
-            func_text += "    send_counts, recv_counts = agg_send_recv_counts(key_arr)\n"
-            func_text += "    send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
-            func_text += "    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
-            func_text += "    n_uniq_keys = send_counts.sum()\n"
-            func_text += "    n_uniq_keys_char = 0\n"
-            func_text += "    recv_size = recv_counts.sum()\n"
-        # func_text += "    hpat.cprint(n_uniq_keys, recv_size)\n"
+        func_text += ("    ({},) = parallel_agg(key_arr, data_redvar_dummy, "
+            "out_dummy_tup, data_in, init_vals, __update_redvars, "
+            "__combine_redvars, __eval_res, {})\n").format(out_tup, return_key)
+    else:
+        func_text += ("    ({},) = agg_seq_iter(key_arr, data_redvar_dummy, "
+            "out_dummy_tup, data_in, init_vals, __update_redvars, "
+            "__eval_res, {})\n").format(out_tup, return_key)
 
-        # prepare for shuffle
-        # allocate send/recv buffers
-        if key_typ == string_array_type:
-            func_text += "    recv_key_arr = hpat.str_arr_ext.pre_alloc_string_array(recv_size, recv_size_chars)\n"
-        else:
-            func_text += "    recv_key_arr = np.empty(recv_size, np.{})\n".format(
-                key_typ.dtype)
-        for i in range(num_red_vars):
-            func_text += "    recv_{} = np.empty(recv_size, np.{})\n".format(
-                i, red_var_typs[i])
-
-        # call local aggregate
-        send_col_args = ", ".join(["send_{}".format(a) for a in range(num_red_vars)])
-        extra_args = ""
-        if key_typ == string_array_type:
-            send_col_args = "send_key_arr_chars, " + send_col_args
-            extra_args = ", send_disp_char"
-        func_text += ("    send_key_arr, {} = __agg_func_p(n_uniq_keys, "
-                                    "n_uniq_keys_char, key_arr{}, send_disp{})\n").format(
-            send_col_args, in_args, extra_args)
-        # func_text += "    hpat.cprint(send_key_arr[0], send_in_c0[0])\n"
-
-        # shuffle key arr
-        if key_typ == string_array_type:
-            func_text += "    offset_ptr = hpat.str_arr_ext.get_offset_ptr(recv_key_arr)\n"
-            func_text += "    data_ptr = hpat.str_arr_ext.get_data_ptr(recv_key_arr)\n"
-            func_text += ("    c_alltoallv(send_key_arr.ctypes, "
-                "offset_ptr, send_counts.ctypes, recv_counts.ctypes, "
-                "send_disp.ctypes, recv_disp.ctypes, int32_typ_enum)\n")
-            func_text += ("    c_alltoallv(send_key_arr_chars.ctypes, "
-                "data_ptr, send_counts_char.ctypes, recv_counts_char.ctypes, "
-                "send_disp_char.ctypes, recv_disp_char.ctypes, char_typ_enum)\n")
-            func_text += "    convert_len_arr_to_offset(offset_ptr, recv_size)\n"
-        else:
-            func_text += ("    c_alltoallv(send_key_arr.ctypes, "
-                "recv_key_arr.ctypes, send_counts.ctypes, recv_counts.ctypes, "
-                "send_disp.ctypes, recv_disp.ctypes, np.int32({}))\n").format(
-                _h5_typ_table[key_typ.dtype])
-
-        # shuffle other columns
-        for i, a in enumerate(red_var_typs):
-            func_text += ("    c_alltoallv(send_{}.ctypes, recv_{}.ctypes, "
-            "send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, "
-            "recv_disp.ctypes, np.int32({}))\n").format(i, i, _h5_typ_table[a])
-
-        func_text += "    key_arr = recv_key_arr\n"
-        in_names = ["recv_{}".format(i) for i in range(num_red_vars)]
-        # func_text += "    print(hpat.distributed_api.get_rank(), key_arr)\n"
-
-    func_text += "    n_uniq_keys = len(set(key_arr))\n"
-    # allocate output
-    for i, col in enumerate(in_col_names):
-        func_text += "    out_c{} = np.empty(n_uniq_keys, np.{})\n".format(
-                                                i, out_typs[col])
-
-    out_key = ""
-    if return_key:
-        out_key = "out_key = "
-
-    in_args = ", ".join(out_names + in_names)
-    if len(out_names) != 0:
-        in_args = ", " + in_args
-
-    func_text += "    {}__agg_func(n_uniq_keys, 0, key_arr{})\n".format(
-        out_key, in_args)
-
-    out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
     func_text += "    return ({},)\n".format(out_tup)
 
     # print(func_text)
@@ -520,272 +673,6 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     exec(func_text, {}, loc_vars)
     f = loc_vars['f']
     return f
-
-
-def gen_agg_func(agg_func_struct, key_typ, in_typs, out_typs, typingctx,
-                 typemap, calltypes, targetctx, return_key,
-                 parallel_local=False, parallel_combine=False):
-    # has 3 modes: 1- aggregate input column to output (sequential case)
-    #              2- aggregate input column to reduce arrays for communication (parallel_local)
-    #              3- aggregate received reduce arrays to output (parallel_combine)
-
-    extra_arg_typs = []
-    # in combine phase after shuffle, inputs are reduce vars
-    if parallel_combine:
-        in_typs = [types.Array(t, 1, 'C') for t in agg_func_struct.var_typs]
-
-    # no output columns in parallel-local computation (reduce arrs returned)
-    if parallel_local:
-        assert not parallel_combine
-        out_typs = []
-        # add send_disp arg
-        extra_arg_typs = [types.Array(types.int32, 1, 'C')]
-        if key_typ == string_array_type:
-            # add send_disp_char arg
-            extra_arg_typs.append(types.Array(types.int32, 1, 'C'))
-
-    arg_typs = tuple([types.intp, types.intp, key_typ] + out_typs + in_typs + extra_arg_typs)
-
-    num_red_vars = len(agg_func_struct.vars)
-
-    iter_func = gen_agg_iter_func(
-        key_typ, agg_func_struct.var_typs, len(in_typs), len(out_typs),
-        num_red_vars, agg_func_struct.redvar_offsets, return_key,
-        parallel_local, parallel_combine)
-
-    _globals = {'hpat': hpat, 'np': np, 'str_copy': hpat.hiframes_api.str_copy,
-            'setitem_string_array': hpat.str_arr_ext.setitem_string_array,
-            'get_offset_ptr': hpat.str_arr_ext.get_offset_ptr,
-            'get_data_ptr': hpat.str_arr_ext.get_data_ptr}
-    for i in range(len(agg_func_struct.update)):
-        _globals['__update_redvars_{}'.format(i)] = agg_func_struct.update[i]
-        _globals['__combine_redvars_{}'.format(i)] = agg_func_struct.combine[i]
-        _globals['__eval_res_{}'.format(i)] = agg_func_struct.eval[i]
-
-    f_ir = compile_to_numba_ir(iter_func,
-                                  _globals,
-                                  typingctx, arg_typs,
-                                  typemap, calltypes)
-
-    f_ir._definitions = build_definitions(f_ir.blocks)
-    topo_order = find_topo_order(f_ir.blocks)
-    first_block = f_ir.blocks[topo_order[0]]
-
-    # deep copy the nodes since they can be reused
-    init_nodes = copy.deepcopy(agg_func_struct.init)
-
-    # find reduce variables from names and store in the same order
-    reduce_vars = [0] * num_red_vars
-    for node in init_nodes:
-        if isinstance(node, ir.Assign) and node.target.name in agg_func_struct.vars:
-            var_ind = agg_func_struct.vars.index(node.target.name)
-            reduce_vars[var_ind] = node.target
-    assert 0 not in reduce_vars
-
-    # add initialization code to first block
-    # make sure arg nodes are in the beginning
-    arg_nodes = []
-    for i in range(len(arg_typs)):
-        arg_nodes.append(first_block.body[i])
-    first_block.body = arg_nodes + init_nodes + first_block.body[len(arg_nodes):]
-
-    # replace init and eval sentinels
-    # TODO: replace with functions
-    for l in topo_order:
-        block = f_ir.blocks[l]
-        for i, stmt in enumerate(block.body):
-            if isinstance(stmt, ir.Assign) and stmt.target.name.startswith("_init_val_"):
-                first_dot = stmt.target.name.index(".")
-                var_ind = int(stmt.target.name[len("_init_val_"):first_dot])
-                stmt.value = reduce_vars[var_ind]
-
-    return_typ = typemap[f_ir.blocks[topo_order[-1]].body[-1].value.name]
-
-    # compile implementation to binary (Dispatcher)
-    agg_impl_func = compiler.compile_ir(
-            typingctx,
-            targetctx,
-            f_ir,
-            arg_typs,
-            return_typ,
-            compiler.DEFAULT_FLAGS,
-            {}
-    )
-
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](iter_func)
-    imp_dis.add_overload(agg_impl_func)
-    return imp_dis
-
-def gen_agg_iter_func(key_typ, red_var_typs, num_ins, num_outs, num_red_vars,
-                 redvar_offsets, return_key, parallel_local, parallel_combine):
-    # arg names
-    in_names = ["in_c{}".format(i) for i in range(num_ins)]
-    out_names = ["out_c{}".format(i) for i in range(num_outs)]
-
-    # number of actual column intpus (parallel_combine case)
-    num_col_ins = len(redvar_offsets) - 1
-
-    redvar_arrnames = ", ".join(["redvar_{}_arr".format(i)
-                                    for i in range(num_red_vars)])
-
-    extra_args = ""
-    if parallel_local:
-        # needed due to alltoallv
-        extra_args = ", send_disp"
-        if key_typ == string_array_type:
-            extra_args += ", send_disp_char"
-
-    in_args = ", ".join(out_names + in_names)
-    if num_ins != 0:
-        in_args = ", " + in_args
-
-    func_text = "def f(n_uniq_keys, n_uniq_keys_char, key_arr{}{}):\n".format(
-        in_args, extra_args)
-
-    # allocate reduction var arrays
-    for i, typ in enumerate(red_var_typs):
-        func_text += "    _init_val_{} = np.{}(0)\n".format(i, typ)
-        func_text += "    redvar_{}_arr = np.full(n_uniq_keys, _init_val_{}, np.{})\n".format(
-            i, i, typ)
-
-    # key is returned in parallel local agg phase (TODO: avoid if key is output already)
-    if parallel_local:
-        if key_typ == string_array_type:
-            func_text += "    out_key_lens = np.empty(n_uniq_keys, np.uint32)\n"
-            func_text += "    out_key_chars = np.empty(n_uniq_keys_char, np.uint8)\n"
-        else:
-            func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
-                                                                key_typ.dtype)
-        func_text += "    n_pes = hpat.distributed_api.get_size()\n"
-        func_text += "    tmp_offset = np.zeros(n_pes, dtype=np.int64)\n"
-        if key_typ == string_array_type:
-            func_text += "    tmp_offset_char = np.zeros(n_pes, dtype=np.int64)\n"
-    elif return_key:
-        if key_typ == string_array_type:
-            func_text += "    out_key =  hpat.str_arr_ext.pre_alloc_string_array(n_uniq_keys, n_uniq_keys_char)\n"
-        else:
-            func_text += "    out_key = np.empty(n_uniq_keys, np.{})\n".format(
-                                                                key_typ.dtype)
-
-    # find write location
-    # TODO: non-int dict
-    func_text += "    key_write_map = hpat.dict_ext.init_dict_{}_int64()\n".format(
-                                                                 key_typ.dtype)
-
-    func_text += "    curr_write_ind = 0\n"
-    func_text += "    for i in range(len(key_arr)):\n"
-    func_text += "      k = key_arr[i]\n"
-    func_text += "      if k not in key_write_map:\n"
-
-    if parallel_local:
-        # write to proper buffer location for alltoallv
-        func_text += "        node_id = hash(k) % n_pes\n"
-        func_text += "        w_ind = send_disp[node_id] + tmp_offset[node_id]\n"
-        func_text += "        tmp_offset[node_id] += 1\n"
-    else:
-        func_text += "        w_ind = curr_write_ind\n"
-        func_text += "        curr_write_ind += 1\n"
-    func_text += "        key_write_map[k] = w_ind\n"
-
-    if parallel_local:
-        if key_typ == string_array_type:
-            func_text += "        k_len = len(k)\n"
-            func_text += "        out_key_lens[w_ind] = k_len\n"
-            func_text += "        w_ind_c = send_disp_char[node_id] + tmp_offset_char[node_id]\n"
-            func_text += "        tmp_offset_char[node_id] += k_len\n"
-            func_text += "        str_copy(out_key_chars, w_ind_c, k.c_str(), k_len)\n"
-        else:
-            func_text += "        out_key[w_ind] = k\n"
-    elif return_key:
-        if key_typ == string_array_type:
-            func_text += "        setitem_string_array(get_offset_ptr(out_key), get_data_ptr(out_key), k, w_ind)\n"
-        else:
-            func_text += "        out_key[w_ind] = k\n"
-
-    func_text += "      else:\n"
-    func_text += "        w_ind = key_write_map[k]\n"
-
-    redvar_access = []
-    for i in range(num_col_ins):
-        redvar_access.append(", ".join(["redvar_{}_arr[w_ind]".format(i)
-                            for i in range(redvar_offsets[i], redvar_offsets[i+1])]))
-
-    inarr_access = []
-    if parallel_combine:
-        for i in range(num_col_ins):
-            inarr_access.append(", ".join(["{}[i]".format(a) for a in in_names[redvar_offsets[i]:redvar_offsets[i+1]]]))
-        f_name = '__combine_redvars'
-    else:
-        for i in range(num_col_ins):
-            inarr_access.append("{}[i]".format(in_names[i]))
-        f_name = '__update_redvars'
-
-    for i in range(num_col_ins):
-        func_text += "      {} = {}_{}({}, {})\n".format(
-            redvar_access[i], f_name, i, redvar_access[i], inarr_access[i])
-
-    if parallel_local:
-        # return out key array and reduce arrays for communication
-        if key_typ == string_array_type:
-            func_text += "    return out_key_lens, out_key_chars, {}\n".format(redvar_arrnames)
-        else:
-            func_text += "    return out_key, {}\n".format(redvar_arrnames)
-    else:
-        # get final output from reduce varis
-        if num_col_ins != 0:
-            func_text += "    for j in range(n_uniq_keys):\n"
-        for i in range(num_col_ins):
-            redvar_access = ", ".join(["redvar_{}_arr[j]".format(i)
-                                    for i in range(redvar_offsets[i], redvar_offsets[i+1])])
-            func_text += "      out_c{}[j] = __eval_res_{}({})\n".format(
-                                                       i, i, redvar_access)
-        if return_key:
-            func_text += "    return out_key\n"
-
-    # print(func_text)
-
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
-
-    return f
-
-@numba.njit
-def agg_send_recv_counts(key_arr):
-    n_pes = hpat.distributed_api.get_size()
-    send_counts = np.zeros(n_pes, np.int32)
-    recv_counts = np.empty(n_pes, np.int32)
-    key_set = set()
-    for i in range(len(key_arr)):
-        k = key_arr[i]
-        if k not in key_set:
-            key_set.add(k)
-            node_id = hash(k) % n_pes
-            send_counts[node_id] += 1
-
-    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
-    return send_counts, recv_counts
-
-@numba.njit
-def agg_send_recv_counts_str(key_arr):
-    n_pes = hpat.distributed_api.get_size()
-    send_counts = np.zeros(n_pes, np.int32)
-    recv_counts = np.empty(n_pes, np.int32)
-    send_counts_char = np.zeros(n_pes, np.int32)
-    recv_counts_char = np.empty(n_pes, np.int32)
-    key_set = hpat.set_ext.init_set_string()
-    for i in range(len(key_arr)):
-        k = key_arr[i]
-        if k not in key_set:
-            key_set.add(k)
-            node_id = hash(k) % n_pes
-            send_counts[node_id] += 1
-            send_counts_char[node_id] += len(k)
-            hpat.str_ext.del_str(k)
-
-    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
-    hpat.distributed_api.alltoall(send_counts_char, recv_counts_char, 1)
-    return send_counts, recv_counts, send_counts_char, recv_counts_char
 
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
@@ -840,11 +727,12 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     return f_ir, pm
 
 
-def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
+def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx, targetctx):
     """find initialization, update, combine and final evaluation code of the
     aggregation function. Currently assuming that the function is single block
     and has one parfor.
     """
+    all_reduce_vars = []
     all_redvars = []
     all_vartypes = []
     all_init_nodes = []
@@ -921,6 +809,7 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
 
         eval_func = gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targetctx)
 
+        all_reduce_vars += reduce_vars
         all_redvars += redvars
         all_vartypes += var_types
         all_init_nodes += init_nodes
@@ -932,10 +821,172 @@ def get_agg_func_struct(agg_func, in_col_types, typingctx, targetctx):
         curr_offset += len(redvars)
         redvar_offsets.append(curr_offset)
 
+    init_func = gen_init_func(all_init_nodes, all_reduce_vars, all_vartypes, typingctx, targetctx)
+    update_all_func = gen_all_update_func(all_update_funcs, all_reduce_vars, all_vartypes, in_col_types, redvar_offsets, typingctx, targetctx)
+    combine_all_func = gen_all_combine_func(all_combine_funcs, all_vartypes, redvar_offsets, typingctx, targetctx)
+    eval_all_func = gen_all_eval_func(all_eval_funcs, all_vartypes, redvar_offsets, out_col_typs, typingctx, targetctx)
+
     return AggFuncStruct(all_redvars, all_vartypes, all_init_nodes,
                          all_update_funcs, all_combine_funcs, all_eval_funcs,
-                         typemap, calltypes, redvar_offsets)
+                         typemap, calltypes, redvar_offsets, init_func,
+                         update_all_func, combine_all_func, eval_all_func)
 
+def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
+
+    return_typ = types.Tuple(var_types)
+
+    dummy_f = lambda: None
+    f_ir = compile_to_numba_ir(dummy_f, {})
+    block = list(f_ir.blocks.values())[0]
+    loc = block.loc
+
+    # return initialized reduce vars as tuple
+    tup_var = ir.Var(block.scope, mk_unique_var("init_tup"), loc)
+    tup_assign = ir.Assign(ir.Expr.build_tuple(reduce_vars, loc), tup_var, loc)
+    block.body = block.body[-2:]
+    block.body = init_nodes + [tup_assign] + block.body
+    block.body[-2].value.value = tup_var
+
+    # compile implementation to binary (Dispatcher)
+    init_all_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            (),
+            return_typ,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](dummy_f)
+    imp_dis.add_overload(init_all_func)
+    return imp_dis
+
+def gen_all_update_func(update_funcs, reduce_vars, reduce_var_types, in_col_types, redvar_offsets, typingctx, targetctx):
+
+    reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C') for t in reduce_var_types])
+    col_tup_typ = types.Tuple(in_col_types)
+    arg_typs = (reduce_arrs_tup_typ, col_tup_typ, types.intp, types.intp)
+
+    num_cols = len(in_col_types)
+
+    # redvar_arrs[0][w_ind], redvar_arrs[1][w_ind] = __update_redvars(redvar_arrs[0][w_ind], redvar_arrs[1][w_ind], data_in[0][i])
+
+    func_text = "def update_all_f(redvar_arrs, data_in, w_ind, i):\n"
+    for j in range(num_cols):
+        redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
+                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+        func_text += "  {} = update_vars_{}({},  data_in[{}][i])\n".format(redvar_access, j, redvar_access, j)
+    func_text += "  return\n"
+    # print(func_text)
+    glbs = {}
+    for i, f in enumerate(update_funcs):
+        glbs['update_vars_{}'.format(i)] = f
+    loc_vars = {}
+    exec(func_text, glbs, loc_vars)
+    update_all_f = loc_vars['update_all_f']
+
+    f_ir = compile_to_numba_ir(update_all_f, glbs)
+
+    # compile implementation to binary (Dispatcher)
+    update_all_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            types.none,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](update_all_f)
+    imp_dis.add_overload(update_all_func)
+    return imp_dis
+
+def gen_all_combine_func(combine_funcs, reduce_var_types, redvar_offsets, typingctx, targetctx):
+
+    reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C') for t in reduce_var_types])
+    arg_typs = (reduce_arrs_tup_typ, reduce_arrs_tup_typ, types.intp, types.intp)
+
+    num_cols = len(redvar_offsets) - 1
+
+    #       redvar_0_arr[w_ind], redvar_1_arr[w_ind] = __combine_redvars_0(redvar_0_arr[w_ind], redvar_1_arr[w_ind], in_c0[i], in_c1[i])
+    #       redvar_2_arr[w_ind], redvar_3_arr[w_ind] = __combine_redvars_1(redvar_2_arr[w_ind], redvar_3_arr[w_ind], in_c2[i], in_c3[i])
+
+    func_text = "def combine_all_f(redvar_arrs, recv_arrs, w_ind, i):\n"
+    for j in range(num_cols):
+        redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
+                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+        recv_access = ", ".join(["recv_arrs[{}][i]".format(i)
+                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+        func_text += "  {} = combine_vars_{}({}, {})\n".format(redvar_access, j, redvar_access, recv_access)
+    func_text += "  return\n"
+    # print(func_text)
+    glbs = {}
+    for i, f in enumerate(combine_funcs):
+        glbs['combine_vars_{}'.format(i)] = f
+    loc_vars = {}
+    exec(func_text, glbs, loc_vars)
+    combine_all_f = loc_vars['combine_all_f']
+
+    f_ir = compile_to_numba_ir(combine_all_f, glbs)
+
+    # compile implementation to binary (Dispatcher)
+    combine_all_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            types.none,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](combine_all_f)
+    imp_dis.add_overload(combine_all_func)
+    return imp_dis
+
+def gen_all_eval_func(eval_funcs, reduce_var_types, redvar_offsets, out_col_typs, typingctx, targetctx):
+
+    reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C') for t in reduce_var_types])
+    out_col_typs = types.Tuple(out_col_typs)
+    arg_typs = (reduce_arrs_tup_typ, out_col_typs, types.intp)
+
+    num_cols = len(redvar_offsets) - 1
+
+    #       out_c0[j] = __eval_res_0(redvar_0_arr[j], redvar_1_arr[j])
+    #       out_c1[j] = __eval_res_1(redvar_2_arr[j], redvar_3_arr[j])
+
+    func_text = "def eval_all_f(redvar_arrs, out_arrs, j):\n"
+    for j in range(num_cols):
+        redvar_access = ", ".join(["redvar_arrs[{}][j]".format(i)
+                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+        func_text += "  out_arrs[{}][j] = eval_vars_{}({})\n".format(j, j, redvar_access)
+    func_text += "  return\n"
+    # print(func_text)
+    glbs = {}
+    for i, f in enumerate(eval_funcs):
+        glbs['eval_vars_{}'.format(i)] = f
+    loc_vars = {}
+    exec(func_text, glbs, loc_vars)
+    eval_all_f = loc_vars['eval_all_f']
+
+    f_ir = compile_to_numba_ir(eval_all_f, glbs)
+
+    # compile implementation to binary (Dispatcher)
+    eval_all_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            f_ir,
+            arg_typs,
+            types.none,
+            compiler.DEFAULT_FLAGS,
+            {}
+    )
+
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](eval_all_f)
+    imp_dis.add_overload(eval_all_func)
+    return imp_dis
 
 def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targetctx):
 
@@ -967,7 +1018,7 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
     block.body = block.body[:num_red_vars] + assign_nodes + eval_nodes
 
     # compile implementation to binary (Dispatcher)
-    combine_func = compiler.compile_ir(
+    eval_func = compiler.compile_ir(
             typingctx,
             targetctx,
             f_ir,
@@ -978,7 +1029,7 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
     )
 
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
-    imp_dis.add_overload(combine_func)
+    imp_dis.add_overload(eval_func)
     return imp_dis
 
 
