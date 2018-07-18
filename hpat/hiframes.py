@@ -1339,8 +1339,8 @@ class HiFrames(object):
         kws = dict(rhs.kws)
         values_arg = self._get_str_arg('pivot_table', rhs.args, kws, 0, 'values')
         index_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'index')
-        columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'columns')
-        agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'aggfunc', 'mean')
+        columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 2, 'columns')
+        agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 3, 'aggfunc', 'mean')
 
         agg_func = self._get_agg_func(agg_func_arg, rhs)
 
@@ -1374,13 +1374,14 @@ class HiFrames(object):
 
     def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
         arg = None
-        if len(args) >= 1:
-            arg = guard(find_const, self.func_ir, args[0])
-        elif 'values' in kws:
+        if len(args) > arg_no:
+            arg = guard(find_const, self.func_ir, args[arg_no])
+        elif arg_name in kws:
             arg = guard(find_const, self.func_ir, kws[arg_name])
-        if default is not None:
-            return default
+
         if arg is None:
+            if default is not None:
+                return default
             raise ValueError(("{} requires '{}' argument as a"
                              "constant string").format(f_name, arg_name))
         return arg
