@@ -143,6 +143,8 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
         if aggregate_node.pivot_arr is None:
             aggregate_node.df_in_vars.pop(cname)
             aggregate_node.out_typs.pop(cname)
+        else:
+            aggregate_node.pivot_values.remove(cname)
 
     out_key_var = aggregate_node.out_key_var
     if out_key_var is not None and out_key_var.name not in lives:
