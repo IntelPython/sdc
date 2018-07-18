@@ -917,6 +917,24 @@ class TestHiFrames(unittest.TestCase):
         finally:
             hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
 
+    def test_pivot(self):
+        def test_impl(df):
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            return (pt.small.values, pt.large.values)
+
+        df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                          "bar", "bar", "bar", "bar"],
+                    "B": ["one", "one", "one", "two", "two",
+                          "one", "one", "two", "two"],
+                    "C": ["small", "large", "large", "small",
+                          "small", "large", "small", "small",
+                          "large"],
+                    "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(set(hpat_func(df)[0]), set(test_impl(df)[0]))
+        self.assertEqual(set(hpat_func(df)[1]), set(test_impl(df)[1]))
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
