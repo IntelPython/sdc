@@ -935,6 +935,18 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(set(hpat_func(df)[0]), set(test_impl(df)[0]))
         self.assertEqual(set(hpat_func(df)[1]), set(test_impl(df)[1]))
 
+    def test_pivot_parallel(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            res = pt.small.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'},
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(set(hpat_func()), set(test_impl()))
+
+
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100

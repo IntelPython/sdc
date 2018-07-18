@@ -36,3 +36,13 @@ gen_pq_test('example.parquet')
 
 df = pd.DataFrame({'A': ['bc']+["a"]*3+ ["bc"]*3+['a'], 'B': [-8,1,2,3,1,5,6,7]})
 df.to_parquet("groupby3.pq")
+
+df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                          "bar", "bar", "bar", "bar"],
+                    "B": ["one", "one", "one", "two", "two",
+                          "one", "one", "two", "two"],
+                    "C": ["small", "large", "large", "small",
+                          "small", "large", "small", "small",
+                          "large"],
+                    "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+df.to_parquet("pivot2.pq")
