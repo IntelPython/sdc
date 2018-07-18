@@ -28,6 +28,16 @@ def jit(signature_or_function=None, **options):
     # set nopython by default
     if 'nopython' not in options:
         options['nopython'] = True
+
+    _locals = options.pop('locals', {})
+
+    # put pivots in locals TODO: generalize numba.jit options
+    pivots = options.pop('pivots', {})
+    for var, vals in pivots.items():
+        _locals[var+":pivot"] = vals
+
+    options['locals'] = _locals
+
     #options['parallel'] = True
     options['parallel'] = {'comprehension': True,
                            'setitem':       False,  # FIXME: support parallel setitem
