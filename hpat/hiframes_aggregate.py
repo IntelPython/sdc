@@ -481,7 +481,7 @@ def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
     #print(data_shuffle_meta[0].out_arr)
     key_arr = shuffle_meta.out_arr
     out_arrs = agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup,
-        init_vals, __combine_redvars, __eval_res, return_key, data_in)
+        init_vals, __combine_redvars, __eval_res, return_key, data_in, pivot_arr)
     return out_arrs
 
     # key_arr = shuffle_meta.out_arr
@@ -520,7 +520,7 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
 
 @numba.njit
 def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
-                           __combine_redvars, __eval_res, return_key, data_in):  # pragma: no cover
+                __combine_redvars, __eval_res, return_key, data_in, pivot_arr):  # pragma: no cover
     key_set = set(key_arr)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
@@ -541,7 +541,7 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
                 # out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
-        __combine_redvars(local_redvars, reduce_recvs, w_ind, i)
+        __combine_redvars(local_redvars, reduce_recvs, w_ind, i, pivot_arr)
     for j in range(n_uniq_keys):
         __eval_res(local_redvars, out_arrs, j)
     return out_arrs
@@ -909,7 +909,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
     update_all_func = gen_all_update_func(all_update_funcs, all_vartypes,
         in_col_types, redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values)
     combine_all_func = gen_all_combine_func(all_combine_funcs, all_vartypes,
-        redvar_offsets, typingctx, targetctx)
+        redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values)
     eval_all_func = gen_all_eval_func(all_eval_funcs, all_vartypes,
         redvar_offsets, out_col_typs, typingctx, targetctx, pivot_values)
 
@@ -1005,23 +1005,42 @@ def gen_all_update_func(update_funcs, reduce_var_types, in_col_types,
     imp_dis.add_overload(update_all_func)
     return imp_dis
 
-def gen_all_combine_func(combine_funcs, reduce_var_types, redvar_offsets, typingctx, targetctx):
+def gen_all_combine_func(combine_funcs, reduce_var_types, redvar_offsets,
+                                typingctx, targetctx, pivot_typ, pivot_values):
 
-    reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C') for t in reduce_var_types])
-    arg_typs = (reduce_arrs_tup_typ, reduce_arrs_tup_typ, types.intp, types.intp)
+    reduce_arrs_tup_typ = types.Tuple([types.Array(t, 1, 'C')
+                                                    for t in reduce_var_types])
+    arg_typs = (reduce_arrs_tup_typ, reduce_arrs_tup_typ, types.intp,
+                                                         types.intp, pivot_typ)
 
     num_cols = len(redvar_offsets) - 1
+    num_redvars = redvar_offsets[num_cols]
 
-    #       redvar_0_arr[w_ind], redvar_1_arr[w_ind] = __combine_redvars_0(redvar_0_arr[w_ind], redvar_1_arr[w_ind], in_c0[i], in_c1[i])
-    #       redvar_2_arr[w_ind], redvar_3_arr[w_ind] = __combine_redvars_1(redvar_2_arr[w_ind], redvar_3_arr[w_ind], in_c2[i], in_c3[i])
+    #       redvar_0_arr[w_ind], redvar_1_arr[w_ind] = __combine_redvars_0(
+    #             redvar_0_arr[w_ind], redvar_1_arr[w_ind], in_c0[i], in_c1[i])
+    #       redvar_2_arr[w_ind], redvar_3_arr[w_ind] = __combine_redvars_1(
+    #             redvar_2_arr[w_ind], redvar_3_arr[w_ind], in_c2[i], in_c3[i])
 
-    func_text = "def combine_all_f(redvar_arrs, recv_arrs, w_ind, i):\n"
-    for j in range(num_cols):
-        redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
-                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
-        recv_access = ", ".join(["recv_arrs[{}][i]".format(i)
-                    for i in range(redvar_offsets[j], redvar_offsets[j+1])])
-        func_text += "  {} = combine_vars_{}({}, {})\n".format(redvar_access, j, redvar_access, recv_access)
+    func_text = "def combine_all_f(redvar_arrs, recv_arrs, w_ind, i, pivot_arr):\n"
+
+    if pivot_values is not None:
+        assert num_cols == 1
+        for k in range(len(pivot_values)):
+            init_offset = num_redvars * k
+            redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
+                    for i in range(init_offset + redvar_offsets[0], init_offset + redvar_offsets[1])])
+            recv_access = ", ".join(["recv_arrs[{}][i]".format(i)
+                    for i in range(init_offset + redvar_offsets[0], init_offset + redvar_offsets[1])])
+            func_text += "  {} = combine_vars_0({}, {})\n".format(
+                                redvar_access, redvar_access, recv_access)
+    else:
+        for j in range(num_cols):
+            redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
+                        for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+            recv_access = ", ".join(["recv_arrs[{}][i]".format(i)
+                        for i in range(redvar_offsets[j], redvar_offsets[j+1])])
+            func_text += "  {} = combine_vars_{}({}, {})\n".format(
+                                    redvar_access, j, redvar_access, recv_access)
     func_text += "  return\n"
     # print(func_text)
     glbs = {}
