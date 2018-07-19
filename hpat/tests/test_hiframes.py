@@ -939,12 +939,12 @@ class TestHiFrames(unittest.TestCase):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
             pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
-            res = pt.small.values
+            res = pt.small.values.sum()
             return res
 
-        hpat_func = hpat.jit(locals={'res:return': 'distributed'},
+        hpat_func = hpat.jit(
             pivots={'pt': ['small', 'large']})(test_impl)
-        self.assertEqual(set(hpat_func()), set(test_impl()))
+        self.assertEqual(hpat_func(), test_impl())
 
 
     def test_intraday(self):
