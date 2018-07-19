@@ -23,8 +23,7 @@ from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort)
 from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
 from hpat.hiframes_api import PandasDataFrameType
-from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
+from hpat.str_ext import string_type
 
 import numpy as np
 import math
