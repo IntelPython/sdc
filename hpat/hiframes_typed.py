@@ -12,7 +12,7 @@ import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type, StringArrayType
+from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type
 
 class HiFramesTyped(object):
@@ -140,20 +140,20 @@ class HiFramesTyped(object):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
                 and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
-                and (self.typemap[rhs.lhs.name] == string_series_type
-                     or self.typemap[rhs.rhs.name] == string_series_type)):
+                and (is_str_arr_typ(self.typemap[rhs.lhs.name])
+                     or is_str_arr_typ(self.typemap[rhs.rhs.name]))):
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             arg1_access = 'A'
             arg2_access = 'B'
             len_call = 'len(A)'
-            if self.typemap[arg1.name] == string_series_type:
+            if is_str_arr_typ(self.typemap[arg1.name]):
                 arg1_access = 'A[i]'
                 # replace type now for correct typing of len, etc.
                 self.typemap.pop(arg1.name)
                 self.typemap[arg1.name] = string_array_type
 
-            if self.typemap[arg2.name] == string_series_type:
+            if is_str_arr_typ(self.typemap[arg2.name]):
                 arg1_access = 'B[i]'
                 len_call = 'len(B)'
                 self.typemap.pop(arg2.name)
