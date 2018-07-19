@@ -11,8 +11,9 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
 import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType
-from hpat.pd_series_ext import SeriesType
+from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -48,13 +49,11 @@ class HiFramesTyped(object):
                     new_body.append(inst)
             blocks[label].body = new_body
 
-        # replace SeriesType with types.Array
         replace_series = {}
         for vname, typ in self.typemap.items():
             if isinstance(typ, SeriesType):
-                replace_series[vname] = types.Array(
-                    typ.dtype, typ.ndim, typ.layout, not typ.mutable,
-                    aligned=typ.aligned)
+                new_typ = series_to_array_type(typ)
+                replace_series[vname] = new_typ
 
         for vname, typ in replace_series.items():
             self.typemap.pop(vname)
@@ -141,24 +140,32 @@ class HiFramesTyped(object):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
                 and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
-                and (self.typemap[rhs.lhs.name] == string_array_type
-                     or self.typemap[rhs.rhs.name] == string_array_type)):
+                and (self.typemap[rhs.lhs.name] == string_series_type
+                     or self.typemap[rhs.rhs.name] == string_series_type)):
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             arg1_access = 'A'
             arg2_access = 'B'
             len_call = 'len(A)'
-            if self.typemap[arg1.name] == string_array_type:
+            if self.typemap[arg1.name] == string_series_type:
                 arg1_access = 'A[i]'
-            if self.typemap[arg2.name] == string_array_type:
+                # replace type now for correct typing of len, etc.
+                self.typemap.pop(arg1.name)
+                self.typemap[arg1.name] = string_array_type
+
+            if self.typemap[arg2.name] == string_series_type:
                 arg1_access = 'B[i]'
                 len_call = 'len(B)'
+                self.typemap.pop(arg2.name)
+                self.typemap[arg2.name] = string_array_type
+
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
                                                         arg2_access)
+
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']

@@ -1,5 +1,8 @@
 from numba import types
-from numba.extending import models, register_model
+from numba.extending import models, register_model, lower_cast
+import hpat
+from hpat.str_ext import string_type
+from hpat.str_arr_ext import string_array_type, offset_typ, char_typ, str_arr_payload_type, StringArrayType
 
 class SeriesType(types.Array):
     """Temporary type class for Series objects.
@@ -54,4 +57,48 @@ class SeriesType(types.Array):
         # XXX: unify Series/Array as Array
         return super(SeriesType, self).unify(typingctx, other)
 
-register_model(SeriesType)(models.ArrayModel)
+string_series_type = SeriesType(string_type, 1, 'C', True)
+
+# register_model(SeriesType)(models.ArrayModel)
+# need to define model since fix_df_array overload goes to native code
+@register_model(SeriesType)
+class SeriesModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        # TODO: types other than Array and StringArray?
+        if fe_type == string_series_type:
+            members = [
+                ('num_items', types.uint64),
+                ('num_total_chars', types.uint64),
+                ('offsets', types.CPointer(offset_typ)),
+                ('data', types.CPointer(char_typ)),
+                ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
+            ]
+        else:
+            ndim = fe_type.ndim
+            members = [
+                ('meminfo', types.MemInfoPointer(fe_type.dtype)),
+                ('parent', types.pyobject),
+                ('nitems', types.intp),
+                ('itemsize', types.intp),
+                ('data', types.CPointer(fe_type.dtype)),
+                ('shape', types.UniTuple(types.intp, ndim)),
+                ('strides', types.UniTuple(types.intp, ndim)),
+
+            ]
+
+        super(SeriesModel, self).__init__(dmm, fe_type, members)
+
+def series_to_array_type(typ):
+    if typ.dtype == string_type:
+        new_typ = string_array_type
+    else:
+        # TODO: other types?
+        new_typ = types.Array(
+        typ.dtype, typ.ndim, typ.layout, not typ.mutable,
+        aligned=typ.aligned)
+    return new_typ
+
+@lower_cast(string_series_type, string_array_type)
+@lower_cast(string_array_type, string_series_type)
+def cast_string_series(context, builder, fromty, toty, val):
+    return val

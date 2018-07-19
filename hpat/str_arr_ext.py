@@ -337,10 +337,10 @@ class CmpOpEqStringArray(AbstractTemplate):
         assert not kws
         [va, vb] = args
         # if one of the inputs is string array
-        if va == string_array_type or vb == string_array_type:
+        if is_str_arr_typ(va) or is_str_arr_typ(vb):
             # inputs should be either string array or string
-            assert va == string_array_type or va == string_type
-            assert vb == string_array_type or vb == string_type
+            assert is_str_arr_typ(va) or va == string_type
+            assert is_str_arr_typ(vb) or vb == string_type
             return signature(types.Array(types.boolean, 1, 'C'), va, vb)
 
 
@@ -363,6 +363,11 @@ class CmpOpLEStringArray(CmpOpEqStringArray):
 @infer
 class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
+
+from hpat.pd_series_ext import string_series_type
+
+def is_str_arr_typ(typ):
+    return typ == string_array_type or typ == string_series_type
 
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):

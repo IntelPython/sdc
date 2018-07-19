@@ -22,7 +22,7 @@ from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_b
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
-from hpat.pd_series_ext import SeriesType
+from hpat.pd_series_ext import SeriesType, string_series_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -591,14 +591,20 @@ class ToSeriesType(AbstractTemplate):
         assert not kws
         assert len(args) == 1
         arr = args[0]
-        assert isinstance(arr, types.Array)
-        series_type = SeriesType(arr.dtype, arr.ndim, arr.layout,
+        series_type = None
+        if isinstance(arr, types.Array):
+            series_type = SeriesType(arr.dtype, arr.ndim, arr.layout,
                 not arr.mutable, aligned=arr.aligned)
+        elif arr == string_array_type:
+            # StringArray is readonly
+            series_type = string_series_type
+
+        assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
         return signature(series_type, arr)
 
 @lower_builtin(to_series_type, types.Any)
 def to_series_dummy_impl(context, builder, sig, args):
-    return args[0]
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 @overload(fix_df_array)
 def fix_df_array_overload(column):
@@ -609,11 +615,14 @@ def fix_df_array_overload(column):
         def fix_df_array_list_impl(column):  # pragma: no cover
             return to_series_type(np.array(column))
         return fix_df_array_list_impl
+
     # convert list of strings to string array
     if isinstance(column, types.List) and isinstance(column.dtype, StringType):
         def fix_df_array_str_impl(column):  # pragma: no cover
-            return to_series_type(StringArray(column))
+            arr = StringArray(column)
+            return to_series_type(arr)
         return fix_df_array_str_impl
+
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
     def fix_df_array_impl(column):  # pragma: no cover
