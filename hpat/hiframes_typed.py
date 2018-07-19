@@ -12,7 +12,7 @@ import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.str_arr_ext import string_array_type, StringArrayType
-
+from hpat.pd_series_ext import SeriesType
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -47,6 +47,18 @@ class HiFramesTyped(object):
                 else:
                     new_body.append(inst)
             blocks[label].body = new_body
+
+        # replace SeriesType with types.Array
+        replace_series = {}
+        for vname, typ in self.typemap.items():
+            if isinstance(typ, SeriesType):
+                replace_series[vname] = types.Array(
+                    typ.dtype, typ.ndim, typ.layout, not typ.mutable,
+                    aligned=typ.aligned)
+
+        for vname, typ in replace_series.items():
+            self.typemap.pop(vname)
+            self.typemap[vname] = typ
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return
