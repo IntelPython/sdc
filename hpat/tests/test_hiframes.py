@@ -448,19 +448,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    def test_list_convert(self):
-        def test_impl():
-            df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
-                        'two': ['foo', 'bar', 'baz'],
-                        'three': [True, False, True]})
-            return df.one.values, df.two.values, df.three.values
-
-        hpat_func = hpat.jit(test_impl)
-        one, two, three = hpat_func()
-        self.assertTrue(isinstance(one, np.ndarray))
-        self.assertTrue(isinstance(two,  np.ndarray))
-        self.assertTrue(isinstance(three, np.ndarray))
-
     def test_df_input(self):
         def test_impl(df):
             return df.B.sum()

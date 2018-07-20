@@ -110,5 +110,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_list_convert(self):
+        def test_impl():
+            df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
+                        'two': ['foo', 'bar', 'baz'],
+                        'three': [True, False, True]})
+            return df.one.values, df.two.values, df.three.values
+
+        hpat_func = hpat.jit(test_impl)
+        one, two, three = hpat_func()
+        self.assertTrue(isinstance(one, np.ndarray))
+        self.assertTrue(isinstance(two,  np.ndarray))
+        self.assertTrue(isinstance(three, np.ndarray))
+
 if __name__ == "__main__":
     unittest.main()
