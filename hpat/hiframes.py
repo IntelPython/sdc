@@ -30,6 +30,7 @@ import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
 df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
                 'quantile', 'count', 'describe', 'nunique']
@@ -1612,6 +1613,7 @@ class HiFrames(object):
         arg_name = arg_assign.value.name
         arg_ind = arg_assign.value.index
         arg_var = arg_assign.target
+        arg_typ = self.args[arg_ind]
         scope = arg_var.scope
         loc = arg_var.loc
 
@@ -1697,6 +1699,23 @@ class HiFrames(object):
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)
+
+        if isinstance(arg_typ, BoxedSeriesType):
+            # self.args[arg_ind] = SeriesType(arg_typ.dtype, 1, 'C')
+            # replace arg var with tmp
+            in_arr_tmp = ir.Var(scope, mk_unique_var("series_input"), loc)
+            nodes[-1].target = in_arr_tmp
+            def f(_boxed_series):  # pragma: no cover
+                _dt_arr = hpat.hiframes_api.unbox_series(_boxed_series)
+
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr_tmp])
+            nodes += f_block.body[:-3]  # remove none return
+            nodes[-1].target = arg_var
+            self.df_cols.add(arg_var.name)
+            if arg_typ.dtype == types.NPDatetime('ns'):
+                self.ts_series_vars.add(arg_var.name)
 
         return nodes
 

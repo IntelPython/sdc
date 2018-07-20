@@ -88,15 +88,48 @@ class SeriesModel(models.StructModel):
 
         super(SeriesModel, self).__init__(dmm, fe_type, members)
 
+class BoxedSeriesType(types.Type):
+    """Series type before unboxing. Using a different type to avoid data model
+    issues and confusion.
+    """
+    def __init__(self, dtype):
+        self.dtype = dtype
+        name = "BoxedSeriesType({})".format(dtype)
+        super(BoxedSeriesType, self).__init__(name)
+
+register_model(BoxedSeriesType)(models.OpaqueModel)
+
 def series_to_array_type(typ):
     if typ.dtype == string_type:
         new_typ = string_array_type
+    elif isinstance(typ, BoxedSeriesType):
+        new_typ = types.Array(typ.dtype, 1, 'C')
     else:
         # TODO: other types?
         new_typ = types.Array(
         typ.dtype, typ.ndim, typ.layout, not typ.mutable,
         aligned=typ.aligned)
     return new_typ
+
+
+def arr_to_series_type(arr):
+    series_type = None
+    if isinstance(arr, types.Array):
+        series_type = SeriesType(arr.dtype, arr.ndim, arr.layout,
+            not arr.mutable, aligned=arr.aligned)
+    elif arr == string_array_type:
+        # StringArray is readonly
+        series_type = string_series_type
+    return series_type
+
+def arr_to_boxed_series_type(arr):
+    series_type = None
+    if isinstance(arr, types.Array):
+        series_type = BoxedSeriesType(arr.dtype)
+    elif arr == string_array_type:
+        series_type = BoxedSeriesType(string_type)
+    return series_type
+
 
 @lower_cast(string_series_type, string_array_type)
 @lower_cast(string_array_type, string_series_type)

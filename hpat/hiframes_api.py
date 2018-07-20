@@ -22,7 +22,7 @@ from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_b
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
-from hpat.pd_series_ext import SeriesType, string_series_type
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -509,6 +509,25 @@ class UnBoxDfCol(AbstractTemplate):
 
 UnBoxDfCol.support_literals = True
 
+
+def unbox_series(S, dtype):
+    return S
+
+@infer_global(unbox_series)
+class UnBoxSeries(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        series_typ, = args[0],
+        if series_typ.dtype == string_type:
+            out_typ = string_array_type
+        else:
+            out_typ = types.Array(series_typ.dtype, 1, 'C')
+        return signature(out_typ, *args)
+
+UnBoxSeries.support_literals = True
+
+
 def set_df_col(df, cname, arr):
     df[cname] = arr
 
@@ -582,6 +601,47 @@ def lower_unbox_df_column(context, builder, sig, args):
     c.pyapi.decref(arr_obj)
     return native_val.value
 
+
+@lower_builtin(unbox_series, BoxedSeriesType)
+def lower_unbox_series(context, builder, sig, args):
+    # FIXME: last arg should be types.DType?
+    pyapi = context.get_python_api(builder)
+    c = numba.pythonapi._UnboxContext(context, builder, pyapi)
+    dtype = sig.args[0].dtype
+
+    series_obj = args[0]
+    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+
+    if dtype == string_type:
+        native_val = unbox_str_series(string_array_type, arr_obj, c)
+    else:
+        # TODO: error handling like Numba callwrappers.py
+        native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+
+    c.pyapi.decref(arr_obj)
+    return native_val.value
+
+# @unbox(BoxedSeriesType)
+# def unbox_series(typ, val, c):
+#     arr_obj = c.pyapi.object_getattr_string(val, "values")
+
+#     if typ.dtype == string_type:
+#         native_val = unbox_str_series(string_array_type, arr_obj, c)
+#     else:
+#         # TODO: error handling like Numba callwrappers.py
+#         native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
+
+#     c.pyapi.decref(arr_obj)
+#     return native_val.value
+
+@unbox(BoxedSeriesType)
+def unbox_series_in(typ, val, c):
+    """unbox Series to an Opaque pointer
+    array will be extracted later.
+    """
+    # XXX: refcount?
+    return NativeValue(val)
+
 def to_series_type(arr):
     return arr
 
@@ -591,14 +651,10 @@ class ToSeriesType(AbstractTemplate):
         assert not kws
         assert len(args) == 1
         arr = args[0]
-        series_type = None
-        if isinstance(arr, types.Array):
-            series_type = SeriesType(arr.dtype, arr.ndim, arr.layout,
-                not arr.mutable, aligned=arr.aligned)
-        elif arr == string_array_type:
-            # StringArray is readonly
-            series_type = string_series_type
-
+        if isinstance(arr, BoxedSeriesType):
+            series_type = SeriesType(arr.dtype, 1, 'C')
+        else:
+            series_type = arr_to_series_type(arr)
         assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
         return signature(series_type, arr)
 
@@ -698,10 +754,16 @@ TsBinopWrapperType.support_literals = True
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
-        return string_array_type
+    # TODO: replace timestamp type
     if len(val) > 0 and isinstance(val[0], pd.Timestamp):
         return timestamp_series_type
+
+    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
+        arr_typ = string_array_type
+    else:
+        arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
+
+    return arr_to_boxed_series_type(arr_typ)
 
 
 @overload(np.array)
