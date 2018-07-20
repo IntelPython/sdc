@@ -15,7 +15,7 @@ from numba.targets.arrayobj import _getitem_array1d
 import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
+from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series, is_str_arr_typ
 
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
@@ -85,7 +85,7 @@ def concat_overload(arr_list):
     # all string input case
     # TODO: handle numerics to string casting case
     if (isinstance(arr_list, types.UniTuple)
-            and arr_list.dtype == string_array_type):
+            and is_str_arr_typ(arr_list.dtype)):
         def string_concat_impl(in_arrs):
             # preallocate the output
             num_strs = 0
@@ -128,7 +128,7 @@ def nunique_overload(arr_typ):
 def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
-    if arr_typ == string_array_type:
+    if is_str_arr_typ(arr_typ):
         int32_typ_enum = np.int32(_h5_typ_table[types.int32])
         char_typ_enum = np.int32(_h5_typ_table[types.uint8])
         def nunique_par_str(A):
