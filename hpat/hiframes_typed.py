@@ -6,7 +6,7 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
-                            find_callname, mk_alloc, find_const)
+                            find_callname, mk_alloc, find_const, is_setitem)
 
 import hpat
 from hpat.utils import get_definitions
@@ -46,6 +46,12 @@ class HiFramesTyped(object):
                                                    new_body)
                         new_body = post_nodes
                 else:
+                    # replace SetItem series type with array
+                    if is_setitem(inst):
+                        sig = self.calltypes[inst]
+                        arr_typ = series_to_array_type(sig.args[0])
+                        sig.args = (arr_typ, *sig.args[1:])
+
                     new_body.append(inst)
             blocks[label].body = new_body
 

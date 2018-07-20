@@ -72,6 +72,16 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_static_setitem_series1(self):
+        def test_impl(A):
+            A[0] = 2
+            return (A == 2).sum()
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
 
 if __name__ == "__main__":
     unittest.main()
