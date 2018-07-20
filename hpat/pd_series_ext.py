@@ -1,9 +1,12 @@
 from numba import types
-from numba.extending import models, register_model, lower_cast
+from numba.extending import models, register_model, lower_cast, infer_getattr
+from numba.typing.templates import AttributeTemplate
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, offset_typ, char_typ, str_arr_payload_type, StringArrayType
 
+# TODO: implement type inference instead of subtyping array since Pandas as of
+# 0.23 is deprecating things like itemsize etc.
 class SeriesType(types.Array):
     """Temporary type class for Series objects.
     """
@@ -136,3 +139,10 @@ def arr_to_boxed_series_type(arr):
 @lower_cast(string_array_type, string_series_type)
 def cast_string_series(context, builder, fromty, toty, val):
     return val
+
+@infer_getattr
+class ArrayAttribute(AttributeTemplate):
+    key = SeriesType
+
+    def resolve_values(self, ary):
+        return series_to_array_type(ary)

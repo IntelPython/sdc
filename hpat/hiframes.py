@@ -210,14 +210,6 @@ class HiFrames(object):
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
 
-            # c = df.column.values
-            if (rhs.op == 'getattr' and rhs.value.name in self.df_cols and
-                    rhs.attr == 'values'):
-                # simply return the column
-                # output is array so it's not added to df_cols
-                assign.value = rhs.value
-                return [assign]
-
             # replace getitems on timestamp series with function
             # for proper type inference
             if (rhs.op in ['getitem', 'static_getitem']

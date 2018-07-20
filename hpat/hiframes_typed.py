@@ -80,6 +80,13 @@ class HiFramesTyped(object):
         rhs = assign.value
 
         if isinstance(rhs, ir.Expr):
+            # arr = S.values
+            if (rhs.op == 'getattr' and isinstance(self.typemap[rhs.value.name], SeriesType)
+                    and rhs.attr == 'values'):
+                # simply return the column
+                assign.value = rhs.value
+                return [assign]
+
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
                 return res
