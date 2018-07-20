@@ -1651,9 +1651,9 @@ class HiFrames(object):
             # replace arg var with tmp
             in_arr_tmp = ir.Var(scope, mk_unique_var("ts_series_input"), loc)
             nodes[-1].target = in_arr_tmp
-
+            # TODO: remove timestamp_series_type
             def f(_ts_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.ts_series_to_arr_typ(_ts_series)
+                _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.ts_series_to_arr_typ(_ts_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
@@ -1683,7 +1683,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, {}, {})\n".format(col, i, alloc_dt)
+                func_text += "  _col_input_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.unbox_df_column(_df, {}, {}))\n".format(col, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
