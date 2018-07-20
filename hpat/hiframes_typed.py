@@ -8,13 +8,18 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem)
-
+from numba.typing.templates import Signature
 import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type, BoxedSeriesType
+
+def if_series_to_array_type(typ):
+    if isinstance(typ, SeriesType):
+        return series_to_array_type(typ)
+    return typ
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -33,10 +38,6 @@ class HiFramesTyped(object):
         for label in topo_order:
             new_body = []
             for inst in blocks[label].body:
-                if is_getitem(inst):
-                    sig = self.calltypes[inst.value]
-                    arr_typ = series_to_array_type(sig.args[0])
-                    sig.args = (arr_typ, *sig.args[1:])
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, call_table)
                     if isinstance(out_nodes, list):
@@ -51,12 +52,6 @@ class HiFramesTyped(object):
                                                    new_body)
                         new_body = post_nodes
                 else:
-                    # replace SetItem series type with array
-                    if is_setitem(inst):
-                        sig = self.calltypes[inst]
-                        arr_typ = series_to_array_type(sig.args[0])
-                        sig.args = (arr_typ, *sig.args[1:])
-
                     new_body.append(inst)
             blocks[label].body = new_body
 
@@ -70,6 +65,12 @@ class HiFramesTyped(object):
         for vname, typ in replace_series.items():
             self.typemap.pop(vname)
             self.typemap[vname] = typ
+
+        # replace sig of getitem/setitem/... series type with array
+        for sig in self.calltypes.values():
+            assert isinstance(sig, Signature)
+            sig.return_type = if_series_to_array_type(sig.return_type)
+            sig.args = tuple(map(if_series_to_array_type, sig.args))
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return
