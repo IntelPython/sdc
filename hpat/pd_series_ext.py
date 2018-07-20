@@ -65,7 +65,7 @@ string_series_type = SeriesType(string_type, 1, 'C', True)
 class SeriesModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         # TODO: types other than Array and StringArray?
-        if fe_type == string_series_type:
+        if fe_type.dtype == string_type:
             members = [
                 ('num_items', types.uint64),
                 ('num_total_chars', types.uint64),
@@ -74,7 +74,7 @@ class SeriesModel(models.StructModel):
                 ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
             ]
         else:
-            ndim = fe_type.ndim
+            ndim = 1
             members = [
                 ('meminfo', types.MemInfoPointer(fe_type.dtype)),
                 ('parent', types.pyobject),
@@ -97,7 +97,8 @@ class BoxedSeriesType(types.Type):
         name = "BoxedSeriesType({})".format(dtype)
         super(BoxedSeriesType, self).__init__(name)
 
-register_model(BoxedSeriesType)(models.OpaqueModel)
+# register_model(BoxedSeriesType)(models.OpaqueModel)
+register_model(BoxedSeriesType)(SeriesModel)
 
 def series_to_array_type(typ):
     if typ.dtype == string_type:

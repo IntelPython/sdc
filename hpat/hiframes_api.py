@@ -22,7 +22,7 @@ from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_b
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
-from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type, series_to_array_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -510,24 +510,6 @@ class UnBoxDfCol(AbstractTemplate):
 UnBoxDfCol.support_literals = True
 
 
-def unbox_series(S, dtype):
-    return S
-
-@infer_global(unbox_series)
-class UnBoxSeries(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        series_typ, = args[0],
-        if series_typ.dtype == string_type:
-            out_typ = string_array_type
-        else:
-            out_typ = types.Array(series_typ.dtype, 1, 'C')
-        return signature(out_typ, *args)
-
-UnBoxSeries.support_literals = True
-
-
 def set_df_col(df, cname, arr):
     df[cname] = arr
 
@@ -602,45 +584,19 @@ def lower_unbox_df_column(context, builder, sig, args):
     return native_val.value
 
 
-@lower_builtin(unbox_series, BoxedSeriesType)
-def lower_unbox_series(context, builder, sig, args):
-    # FIXME: last arg should be types.DType?
-    pyapi = context.get_python_api(builder)
-    c = numba.pythonapi._UnboxContext(context, builder, pyapi)
-    dtype = sig.args[0].dtype
+@unbox(BoxedSeriesType)
+def unbox_series(typ, val, c):
+    arr_obj = c.pyapi.object_getattr_string(val, "values")
 
-    series_obj = args[0]
-    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-
-    if dtype == string_type:
+    if typ.dtype == string_type:
         native_val = unbox_str_series(string_array_type, arr_obj, c)
     else:
         # TODO: error handling like Numba callwrappers.py
-        native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
+        native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
 
     c.pyapi.decref(arr_obj)
-    return native_val.value
+    return native_val
 
-# @unbox(BoxedSeriesType)
-# def unbox_series(typ, val, c):
-#     arr_obj = c.pyapi.object_getattr_string(val, "values")
-
-#     if typ.dtype == string_type:
-#         native_val = unbox_str_series(string_array_type, arr_obj, c)
-#     else:
-#         # TODO: error handling like Numba callwrappers.py
-#         native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
-
-#     c.pyapi.decref(arr_obj)
-#     return native_val.value
-
-@unbox(BoxedSeriesType)
-def unbox_series_in(typ, val, c):
-    """unbox Series to an Opaque pointer
-    array will be extracted later.
-    """
-    # XXX: refcount?
-    return NativeValue(val)
 
 def to_series_type(arr):
     return arr
@@ -661,6 +617,23 @@ class ToSeriesType(AbstractTemplate):
 @lower_builtin(to_series_type, types.Any)
 def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+# dummy func to convert input series to array type
+def dummy_unbox_series(arr):
+    return arr
+
+@infer_global(dummy_unbox_series)
+class DummyToSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = series_to_array_type(args[0])
+        return signature(arr, *args)
+
+@lower_builtin(dummy_unbox_series, BoxedSeriesType)
+def dummy_unbox_series_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
 
 @overload(fix_df_array)
 def fix_df_array_overload(column):

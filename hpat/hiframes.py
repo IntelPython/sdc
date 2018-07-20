@@ -1706,7 +1706,7 @@ class HiFrames(object):
             in_arr_tmp = ir.Var(scope, mk_unique_var("series_input"), loc)
             nodes[-1].target = in_arr_tmp
             def f(_boxed_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.unbox_series(_boxed_series)
+                _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(_boxed_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
