@@ -140,6 +140,11 @@ def arr_to_boxed_series_type(arr):
 def cast_string_series(context, builder, fromty, toty, val):
     return val
 
+@lower_cast(SeriesType, types.Array)
+@lower_cast(types.Array, SeriesType)
+def cast_series(context, builder, fromty, toty, val):
+    return val
+
 @infer_getattr
 class ArrayAttribute(AttributeTemplate):
     key = SeriesType
