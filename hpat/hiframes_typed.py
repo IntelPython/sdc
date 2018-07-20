@@ -183,6 +183,12 @@ class HiFramesTyped(object):
         return None
 
     def _handle_fix_df_array(self, lhs, rhs, assign, call_table):
+        if (rhs.op == 'call'
+                and rhs.func.name in call_table
+                and call_table[rhs.func.name] ==
+                ['to_series_type', 'hiframes_api', hpat]):
+            assign.value = rhs.args[0]
+            return [assign]
         # arr = fix_df_array(col) -> arr=col if col is array
         if (rhs.op == 'call'
                 and rhs.func.name in call_table

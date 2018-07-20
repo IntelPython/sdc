@@ -613,20 +613,19 @@ def fix_df_array_overload(column):
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
         def fix_df_array_list_impl(column):  # pragma: no cover
-            return to_series_type(np.array(column))
+            return np.array(column)
         return fix_df_array_list_impl
 
     # convert list of strings to string array
     if isinstance(column, types.List) and isinstance(column.dtype, StringType):
         def fix_df_array_str_impl(column):  # pragma: no cover
-            arr = StringArray(column)
-            return to_series_type(arr)
+            return StringArray(column)
         return fix_df_array_str_impl
 
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
     def fix_df_array_impl(column):  # pragma: no cover
-        return to_series_type(column)
+        return column
     # FIXME: np.array() for everything else?
     return fix_df_array_impl
 

@@ -367,8 +367,9 @@ class HiFrames(object):
 
         if fdef == ('read_xenon', 'hpat.xenon_ext'):
             col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.func_ir)
-            col_map = self._process_df_build_map(col_items)
+            df_nodes, col_map = self._process_df_build_map(col_items)
             self._create_df(lhs.name, col_map, label)
+            nodes += df_nodes
             return nodes
 
         return [assign]
@@ -436,11 +437,12 @@ class HiFrames(object):
                 or arg_def.op != 'build_map'):  # pragma: no cover
             raise ValueError(
                 "Invalid DataFrame() arguments (constant dict of columns expected)")
-        out, items = self._fix_df_arrays(arg_def.items)
-        col_map = self._process_df_build_map(items)
+        nodes, items = self._fix_df_arrays(arg_def.items)
+        df_nodes, col_map = self._process_df_build_map(items)
+        nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
-        return out
+        return nodes
 
     def _handle_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
@@ -498,7 +500,8 @@ class HiFrames(object):
         for v, t in zip(col_items, col_types):
             if t == types.Array(types.NPDatetime('ns'), 1, 'C'):
                 self.ts_series_vars.add(v[1].name)
-        col_map = self._process_df_build_map(col_items)
+        df_nodes, col_map = self._process_df_build_map(col_items)
+        nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
         return nodes
 
@@ -672,6 +675,7 @@ class HiFrames(object):
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
+        nodes = []
         for item in items_list:
             col_var = item[0]
             if isinstance(col_var, str):
@@ -681,8 +685,16 @@ class HiFrames(object):
                 if col_name is NOT_CONSTANT:  # pragma: no cover
                     raise ValueError(
                         "data frame column names should be constant")
-            df_cols[col_name] = item[1]
-        return df_cols
+            # cast to series type
+            def f(arr):  # pragma: no cover
+                df_arr = hpat.hiframes_api.to_series_type(arr)
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [item[1]])
+            nodes += f_block.body[:-3]  # remove none return
+            new_col_arr = nodes[-1].target
+            df_cols[col_name] = new_col_arr
+        return nodes, df_cols
 
     def _update_df_cols(self):
         for df_name, cols_map in self.df_vars.items():
