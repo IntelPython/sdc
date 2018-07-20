@@ -6,7 +6,8 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
-                            find_callname, mk_alloc, find_const, is_setitem)
+                            find_callname, mk_alloc, find_const, is_setitem,
+                            is_getitem)
 
 import hpat
 from hpat.utils import get_definitions
@@ -32,6 +33,10 @@ class HiFramesTyped(object):
         for label in topo_order:
             new_body = []
             for inst in blocks[label].body:
+                if is_getitem(inst):
+                    sig = self.calltypes[inst.value]
+                    arr_typ = series_to_array_type(sig.args[0])
+                    sig.args = (arr_typ, *sig.args[1:])
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, call_table)
                     if isinstance(out_nodes, list):
