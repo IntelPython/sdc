@@ -622,11 +622,16 @@ class ToSeriesType(AbstractTemplate):
 def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
-def if_series_to_array_type(typ):
+def if_series_to_array_type(typ, replace_boxed=False):
     if isinstance(typ, SeriesType):
-        return series_to_array_type(typ)
+        return series_to_array_type(typ, replace_boxed)
+    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
+    # it results in cast error for call dummy_unbox_series
+    if replace_boxed and isinstance(typ, BoxedSeriesType):
+        return series_to_array_type(typ, replace_boxed)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
-        return types.Tuple(list(map(if_series_to_array_type, typ.types)))
+        return types.Tuple(
+            [if_series_to_array_type(t, replace_boxed) for t in typ.types])
     # TODO: other types than can have Series inside: list, set, etc.
     return typ
 
@@ -640,7 +645,7 @@ class DummyToSeriesType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        arr = if_series_to_array_type(args[0])
+        arr = if_series_to_array_type(args[0], True)
         return signature(arr, *args)
 
 @lower_builtin(dummy_unbox_series, types.Any)

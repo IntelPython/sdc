@@ -103,11 +103,13 @@ class BoxedSeriesType(types.Type):
 # register_model(BoxedSeriesType)(models.OpaqueModel)
 register_model(BoxedSeriesType)(SeriesModel)
 
-def series_to_array_type(typ):
+def series_to_array_type(typ, replace_boxed=False):
     if typ.dtype == string_type:
         new_typ = string_array_type
     elif isinstance(typ, BoxedSeriesType):
-        new_typ = types.Array(typ.dtype, 1, 'C')
+        new_typ = typ
+        if replace_boxed:
+            new_typ = types.Array(typ.dtype, 1, 'C')
     else:
         # TODO: other types?
         new_typ = types.Array(
@@ -150,4 +152,4 @@ class ArrayAttribute(AttributeTemplate):
     key = SeriesType
 
     def resolve_values(self, ary):
-        return series_to_array_type(ary)
+        return series_to_array_type(ary, True)
