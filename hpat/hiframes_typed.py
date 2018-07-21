@@ -78,7 +78,11 @@ class HiFramesTyped(object):
             sig.args = tuple(map(if_series_to_array_type, sig.args))
             # XXX: side effect: force update of call signatures
             if isinstance(call, ir.Expr) and call.op == 'call':
-                self.typemap[call.func.name].get_call_type(self.typingctx , sig.args, {})
+                # StencilFunc requires kws for typing so sig.args can't be used
+                # reusing sig.args since some types become Const in sig
+                argtyps = sig.args[:len(call.args)]
+                kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+                self.typemap[call.func.name].get_call_type(self.typingctx , argtyps, kwtyps)
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return
