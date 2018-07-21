@@ -21,12 +21,13 @@ from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_t
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes):
+    def __init__(self, func_ir, typingctx, typemap, calltypes, return_type):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.typemap = typemap
         self.calltypes = calltypes
         self.df_cols = func_ir.df_cols
+        self.return_type = return_type
 
     def run(self):
         blocks = self.func_ir.blocks
@@ -79,7 +80,7 @@ class HiFramesTyped(object):
                 self.typemap[call.func.name].get_call_type(self.typingctx , argtyps, kwtyps)
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
-        return
+        return if_series_to_array_type(self.return_type)
 
     def _run_assign(self, assign, call_table):
         lhs = assign.target.name
