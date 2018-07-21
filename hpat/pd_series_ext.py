@@ -1,5 +1,6 @@
 from numba import types
-from numba.extending import models, register_model, lower_cast, infer_getattr
+from numba.extending import models, register_model, lower_cast, infer_getattr, type_callable
+from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing.templates import AttributeTemplate
 import hpat
 from hpat.str_ext import string_type
@@ -10,6 +11,7 @@ from hpat.str_arr_ext import string_array_type, offset_typ, char_typ, str_arr_pa
 class SeriesType(types.Array):
     """Temporary type class for Series objects.
     """
+    array_priority = 1000
     def __init__(self, dtype, ndim, layout, readonly=False, name=None,
                  aligned=True):
         # same as types.Array, except name is Series
@@ -153,3 +155,16 @@ class ArrayAttribute(AttributeTemplate):
 
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
+
+# TODO: use ops logic from pandas/core/ops.py
+# called from numba/numpy_support.py:resolve_output_type
+# similar to SmartArray (targets/smartarray.py)
+@type_callable('__array_wrap__')
+def type_series_array_wrap(context):
+    def typer(input_type, result):
+        if isinstance(input_type, SeriesType):
+            return input_type.copy(dtype=result.dtype,
+                                   ndim=result.ndim,
+                                   layout=result.layout)
+
+    return typer
