@@ -80,9 +80,28 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 def concat(arr_list):
     return pd.concat(arr_list)
 
+@infer_global(concat)
+class ConcatType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr_list = args[0]
+        if (isinstance(arr_list, types.UniTuple)
+                and is_str_arr_typ(arr_list.dtype)):
+            ret_typ = string_array_type
+        else:
+            # use typer of np.concatenate
+            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list)
 
-# TODO: use infer_global to avoid lowering multiple versions?
-@overload(concat)
+        return signature(ret_typ, arr_list)
+
+@lower_builtin(concat, types.Any)  # TODO: replace Any with types
+def lower_concat(context, builder, sig, args):
+    func = concat_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(concat)
 def concat_overload(arr_list):
     # all string input case
     # TODO: handle numerics to string casting case
@@ -699,8 +718,26 @@ def fix_df_array_overload(column):
     # FIXME: np.array() for everything else?
     return fix_df_array_impl
 
+@infer_global(fix_rolling_array)
+class FixDfRollingArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        dtype = column.dtype
+        ret_typ = column
+        if dtype == types.boolean or isinstance(dtype, types.Integer):
+            ret_typ = types.Array(types.float64, 1, 'C')
+        # TODO: add other types
+        return signature(ret_typ, column)
 
-@overload(fix_rolling_array)
+@lower_builtin(fix_rolling_array, types.Any)  # TODO: replace Any with types
+def lower_fix_rolling_array(context, builder, sig, args):
+    func = fix_rolling_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(fix_rolling_array)
 def fix_rolling_array_overload(column):
     assert isinstance(column, types.Array)
     dtype = column.dtype
