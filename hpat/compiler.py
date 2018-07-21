@@ -222,4 +222,5 @@ class HPATPipeline(numba.compiler.BasePipeline):
         ret_typ = df_pass.run()
         # XXX update return type since it can be Series and trigger box_array
         # for string array etc.
-        self.return_type = ret_typ
+        if ret_typ is not None:
+            self.return_type = ret_typ

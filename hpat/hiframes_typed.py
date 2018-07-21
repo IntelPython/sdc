@@ -21,7 +21,7 @@ from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_t
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes, return_type):
+    def __init__(self, func_ir, typingctx, typemap, calltypes, return_type=None):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.typemap = typemap
