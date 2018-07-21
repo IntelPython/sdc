@@ -652,8 +652,31 @@ class DummyToSeriesType(AbstractTemplate):
 def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+# XXX: use infer_global instead of overload, since overload fails if the same
+# user function is compiled twice
+@infer_global(fix_df_array)
+class FixDfArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        ret_typ = column
+        if (isinstance(column, types.List)
+            and (isinstance(column.dtype, types.Number)
+                 or column.dtype == types.boolean)):
+            ret_typ = types.Array(column.dtype, 1, 'C')
+        if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+            ret_typ = string_array_type
+        # TODO: add other types
+        return signature(ret_typ, column)
 
-@overload(fix_df_array)
+@lower_builtin(fix_df_array, types.Any)  # TODO: replace Any with types
+def lower_fix_df_array(context, builder, sig, args):
+    func = fix_df_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+#@overload(fix_df_array)
 def fix_df_array_overload(column):
     # convert list of numbers/bools to numpy array
     if (isinstance(column, types.List)
