@@ -801,11 +801,11 @@ class TypeIterTuples(AbstractTemplate):
         assert not kws
         assert len(args) % 2 == 0, "name and column pairs expected"
         col_names = [a.value for a in args[:len(args)//2]]
-        arr_types = args[len(args)//2:]
+        arr_types =  [if_series_to_array_type(a) for a in args[len(args)//2:]]
         # XXX index handling, assuming implicit index
         assert "Index" not in col_names[0]
         col_names = ['Index'] + col_names
-        arr_types = [types.Array(types.int64, 1, 'C')] + list(arr_types)
+        arr_types = [types.Array(types.int64, 1, 'C')] + arr_types
         iter_typ = DataFrameTupleIterator(col_names, arr_types)
         return signature(iter_typ, *args)
 
