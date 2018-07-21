@@ -64,6 +64,17 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_pass_series2(self):
+        # test creating dataframe from passed series
+        def test_impl(A):
+            df = pd.DataFrame({'A': A})
+            return (df.A == 2).sum()
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
     def test_pass_series_str(self):
         def test_impl(A):
             return (A == 'a').sum()
