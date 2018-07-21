@@ -19,6 +19,9 @@ from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_t
 def if_series_to_array_type(typ):
     if isinstance(typ, SeriesType):
         return series_to_array_type(typ)
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple(list(map(if_series_to_array_type, typ.types)))
+    # TODO: other types than can have Series inside: list, set, etc.
     return typ
 
 class HiFramesTyped(object):
@@ -67,10 +70,15 @@ class HiFramesTyped(object):
             self.typemap[vname] = typ
 
         # replace sig of getitem/setitem/... series type with array
-        for sig in self.calltypes.values():
+        for call, sig in self.calltypes.items():
+            if sig is None:
+                continue
             assert isinstance(sig, Signature)
             sig.return_type = if_series_to_array_type(sig.return_type)
             sig.args = tuple(map(if_series_to_array_type, sig.args))
+            # XXX: side effect: force update of call signatures
+            if isinstance(call, ir.Expr) and call.op == 'call':
+                self.typemap[call.func.name].get_call_type(self.typingctx , sig.args, {})
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return
