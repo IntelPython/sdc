@@ -818,9 +818,9 @@ class TsBinopWrapperType(AbstractTemplate):
         # TODO: extend to other types like string array
         assert other == string_type
         # TODO: examine all possible ops
-        out = types.Array(types.NPDatetime('ns'), 1, 'C')
+        out = SeriesType(types.NPDatetime('ns'), 1, 'C')
         if op.value in ['==', '!=', '>=', '>', '<=', '<']:
-            out = types.Array(types.boolean, 1, 'C')
+            out = SeriesType(types.boolean, 1, 'C')
         return signature(out, *args)
 
 TsBinopWrapperType.support_literals = True
