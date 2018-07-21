@@ -273,6 +273,9 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     def test_nunique_str(self):
         def test_impl(n):
@@ -282,6 +285,9 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     def test_nunique_str_parallel(self):
         # TODO: test without file
@@ -289,6 +295,10 @@ class TestHiFrames(unittest.TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.two.nunique()
 
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        # test compile again for overload related issues
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
