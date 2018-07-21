@@ -3,7 +3,8 @@ from numba import types, typing
 from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+                                    iternext_impl, impl_ret_untracked)
 from numba import cgutils
 from numba.typing.templates import signature, AbstractTemplate, infer
 
@@ -24,7 +25,9 @@ import hpat
 from hpat.utils import to_array
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
-                              pre_alloc_string_array, StringArrayPayloadType)
+                              pre_alloc_string_array, StringArrayPayloadType,
+                              is_str_arr_typ)
+from hpat.hiframes_api import dummy_unbox_series
 
 # similar to types.Container.Set
 class SetType(types.Container):
@@ -77,8 +80,9 @@ num_total_chars_set_string = types.ExternalFunction("num_total_chars_set_string"
 
 @overload(set)
 def init_set_string_array(in_typ):
-    if in_typ == string_array_type:
-        def f(str_arr):
+    if is_str_arr_typ(in_typ):
+        def f(A):
+            str_arr = dummy_unbox_series(A)
             str_set = init_set_string()
             n = len(str_arr)
             for i in range(n):
@@ -103,6 +107,17 @@ def len_set_str_overload(in_typ):
         def len_impl(str_set):
             return len_set_string(str_set)
         return len_impl
+
+# FIXME: overload fails in lowering sometimes!
+@lower_builtin(len, set_string_type)
+def lower_len_set_impl(context, builder, sig, args):
+
+    def len_impl(str_set):
+        return len_set_string(str_set)
+
+    res = context.compile_internal(builder, len_impl, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
 
 @infer
 class InSet(AbstractTemplate):
@@ -136,7 +151,7 @@ def to_array_overload(in_typ):
 @intrinsic
 def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ=None):
     assert in_set_typ == set_string_type
-    assert in_str_arr_typ == string_array_type
+    assert is_str_arr_typ(in_str_arr_typ)
     def codegen(context, builder, sig, args):
         in_set, in_str_arr = args
 
