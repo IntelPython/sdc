@@ -113,7 +113,7 @@ def concat_overload(arr_list):
         if not isinstance(typ, types.Array):
             raise ValueError("concat supports only numerical and string arrays")
     # numerical input
-    return lambda a: np.concatenate(a)
+    return lambda a: np.concatenate(dummy_unbox_series(a))
 
 def nunique(A):  # pragma: no cover
     return len(set(A))
@@ -622,6 +622,15 @@ class ToSeriesType(AbstractTemplate):
 def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+def if_series_to_array_type(typ):
+    if isinstance(typ, SeriesType):
+        return series_to_array_type(typ)
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple(list(map(if_series_to_array_type, typ.types)))
+    # TODO: other types than can have Series inside: list, set, etc.
+    return typ
+
+
 # dummy func to convert input series to array type
 def dummy_unbox_series(arr):
     return arr
@@ -631,7 +640,7 @@ class DummyToSeriesType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        arr = series_to_array_type(args[0])
+        arr = if_series_to_array_type(args[0])
         return signature(arr, *args)
 
 @lower_builtin(dummy_unbox_series, types.Any)

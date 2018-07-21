@@ -12,17 +12,11 @@ from numba.typing.templates import Signature
 import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
+from hpat.hiframes_api import if_series_to_array_type
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type, BoxedSeriesType
 
-def if_series_to_array_type(typ):
-    if isinstance(typ, SeriesType):
-        return series_to_array_type(typ)
-    if isinstance(typ, (types.Tuple, types.UniTuple)):
-        return types.Tuple(list(map(if_series_to_array_type, typ.types)))
-    # TODO: other types than can have Series inside: list, set, etc.
-    return typ
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
