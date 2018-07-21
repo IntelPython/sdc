@@ -80,6 +80,8 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 def concat(arr_list):
     return pd.concat(arr_list)
 
+
+# TODO: use infer_global to avoid lowering multiple versions?
 @overload(concat)
 def concat_overload(arr_list):
     # all string input case
@@ -91,17 +93,19 @@ def concat_overload(arr_list):
             num_strs = 0
             num_chars = 0
             for A in in_arrs:
-                num_strs += len(A)
-                num_chars += hpat.str_arr_ext.num_total_chars(A)
+                arr = dummy_unbox_series(A)
+                num_strs += len(arr)
+                num_chars += hpat.str_arr_ext.num_total_chars(arr)
             out_arr = hpat.str_arr_ext.pre_alloc_string_array(num_strs, num_chars)
             # copy data to output
             curr_str_ind = 0
             curr_chars_ind = 0
             for A in in_arrs:
+                arr = dummy_unbox_series(A)
                 hpat.str_arr_ext.set_string_array_range(
-                    out_arr, A, curr_str_ind, curr_chars_ind)
-                curr_str_ind += len(A)
-                curr_chars_ind += hpat.str_arr_ext.num_total_chars(A)
+                    out_arr, arr, curr_str_ind, curr_chars_ind)
+                curr_str_ind += len(arr)
+                curr_chars_ind += hpat.str_arr_ext.num_total_chars(arr)
             return out_arr
 
         return string_concat_impl
@@ -630,7 +634,7 @@ class DummyToSeriesType(AbstractTemplate):
         arr = series_to_array_type(args[0])
         return signature(arr, *args)
 
-@lower_builtin(dummy_unbox_series, BoxedSeriesType)
+@lower_builtin(dummy_unbox_series, types.Any)
 def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
