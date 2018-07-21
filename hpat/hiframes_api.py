@@ -813,7 +813,8 @@ class TsBinopWrapperType(AbstractTemplate):
         assert not kws
         [op, ts_arr, other] = args
         assert isinstance(op, types.Const) and isinstance(op.value, str)
-        assert ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
+        assert (ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
+                or ts_arr == SeriesType(types.NPDatetime('ns'), 1, 'C'))
         # TODO: extend to other types like string array
         assert other == string_type
         # TODO: examine all possible ops
