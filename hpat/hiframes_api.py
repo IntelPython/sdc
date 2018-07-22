@@ -15,13 +15,14 @@ from numba.targets.arrayobj import _getitem_array1d
 import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
+from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series, is_str_arr_typ
 
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type, series_to_array_type
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -79,28 +80,51 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 def concat(arr_list):
     return pd.concat(arr_list)
 
-@overload(concat)
+@infer_global(concat)
+class ConcatType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr_list = args[0]
+        if (isinstance(arr_list, types.UniTuple)
+                and is_str_arr_typ(arr_list.dtype)):
+            ret_typ = string_array_type
+        else:
+            # use typer of np.concatenate
+            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list)
+
+        return signature(ret_typ, arr_list)
+
+@lower_builtin(concat, types.Any)  # TODO: replace Any with types
+def lower_concat(context, builder, sig, args):
+    func = concat_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(concat)
 def concat_overload(arr_list):
     # all string input case
     # TODO: handle numerics to string casting case
     if (isinstance(arr_list, types.UniTuple)
-            and arr_list.dtype == string_array_type):
+            and is_str_arr_typ(arr_list.dtype)):
         def string_concat_impl(in_arrs):
             # preallocate the output
             num_strs = 0
             num_chars = 0
             for A in in_arrs:
-                num_strs += len(A)
-                num_chars += hpat.str_arr_ext.num_total_chars(A)
+                arr = dummy_unbox_series(A)
+                num_strs += len(arr)
+                num_chars += hpat.str_arr_ext.num_total_chars(arr)
             out_arr = hpat.str_arr_ext.pre_alloc_string_array(num_strs, num_chars)
             # copy data to output
             curr_str_ind = 0
             curr_chars_ind = 0
             for A in in_arrs:
+                arr = dummy_unbox_series(A)
                 hpat.str_arr_ext.set_string_array_range(
-                    out_arr, A, curr_str_ind, curr_chars_ind)
-                curr_str_ind += len(A)
-                curr_chars_ind += hpat.str_arr_ext.num_total_chars(A)
+                    out_arr, arr, curr_str_ind, curr_chars_ind)
+                curr_str_ind += len(arr)
+                curr_chars_ind += hpat.str_arr_ext.num_total_chars(arr)
             return out_arr
 
         return string_concat_impl
@@ -108,7 +132,7 @@ def concat_overload(arr_list):
         if not isinstance(typ, types.Array):
             raise ValueError("concat supports only numerical and string arrays")
     # numerical input
-    return lambda a: np.concatenate(a)
+    return lambda a: np.concatenate(dummy_unbox_series(a))
 
 def nunique(A):  # pragma: no cover
     return len(set(A))
@@ -116,18 +140,41 @@ def nunique(A):  # pragma: no cover
 def nunique_parallel(A):  # pragma: no cover
     return len(set(A))
 
-@overload(nunique)
+@infer_global(nunique)
+@infer_global(nunique_parallel)
+class NuniqueType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        # if arr == string_series_type:
+        #     arr = string_array_type
+        return signature(types.intp, arr)
+
+@lower_builtin(nunique, types.Any)  # TODO: replace Any with types
+def lower_nunique(context, builder, sig, args):
+    func = nunique_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(nunique)
 def nunique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def nunique_seq(A):
         return len(set(A))
     return nunique_seq
 
-@overload(nunique_parallel)
+@lower_builtin(nunique_parallel, types.Any)  # TODO: replace Any with types
+def lower_nunique_parallel(context, builder, sig, args):
+    func = nunique_overload_parallel(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(nunique_parallel)
 def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
-    if arr_typ == string_array_type:
+    if is_str_arr_typ(arr_typ):
         int32_typ_enum = np.int32(_h5_typ_table[types.int32])
         char_typ_enum = np.int32(_h5_typ_table[types.uint8])
         def nunique_par_str(A):
@@ -508,6 +555,7 @@ class UnBoxDfCol(AbstractTemplate):
 
 UnBoxDfCol.support_literals = True
 
+
 def set_df_col(df, cname, arr):
     df[cname] = arr
 
@@ -582,21 +630,110 @@ def lower_unbox_df_column(context, builder, sig, args):
     return native_val.value
 
 
+@unbox(BoxedSeriesType)
+def unbox_series(typ, val, c):
+    arr_obj = c.pyapi.object_getattr_string(val, "values")
 
-@overload(fix_df_array)
+    if typ.dtype == string_type:
+        native_val = unbox_str_series(string_array_type, arr_obj, c)
+    else:
+        # TODO: error handling like Numba callwrappers.py
+        native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
+
+    c.pyapi.decref(arr_obj)
+    return native_val
+
+
+def to_series_type(arr):
+    return arr
+
+@infer_global(to_series_type)
+class ToSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        if isinstance(arr, BoxedSeriesType):
+            series_type = SeriesType(arr.dtype, 1, 'C')
+        else:
+            series_type = arr_to_series_type(arr)
+        assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
+        return signature(series_type, arr)
+
+@lower_builtin(to_series_type, types.Any)
+def to_series_dummy_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+def if_series_to_array_type(typ, replace_boxed=False):
+    if isinstance(typ, SeriesType):
+        return series_to_array_type(typ, replace_boxed)
+    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
+    # it results in cast error for call dummy_unbox_series
+    if replace_boxed and isinstance(typ, BoxedSeriesType):
+        return series_to_array_type(typ, replace_boxed)
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple(
+            [if_series_to_array_type(t, replace_boxed) for t in typ.types])
+    # TODO: other types than can have Series inside: list, set, etc.
+    return typ
+
+
+# dummy func to convert input series to array type
+def dummy_unbox_series(arr):
+    return arr
+
+@infer_global(dummy_unbox_series)
+class DummyToSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = if_series_to_array_type(args[0], True)
+        return signature(arr, *args)
+
+@lower_builtin(dummy_unbox_series, types.Any)
+def dummy_unbox_series_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+# XXX: use infer_global instead of overload, since overload fails if the same
+# user function is compiled twice
+@infer_global(fix_df_array)
+class FixDfArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        ret_typ = column
+        if (isinstance(column, types.List)
+            and (isinstance(column.dtype, types.Number)
+                 or column.dtype == types.boolean)):
+            ret_typ = types.Array(column.dtype, 1, 'C')
+        if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+            ret_typ = string_array_type
+        # TODO: add other types
+        return signature(ret_typ, column)
+
+@lower_builtin(fix_df_array, types.Any)  # TODO: replace Any with types
+def lower_fix_df_array(context, builder, sig, args):
+    func = fix_df_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+#@overload(fix_df_array)
 def fix_df_array_overload(column):
     # convert list of numbers/bools to numpy array
     if (isinstance(column, types.List)
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
-        def fix_df_array_impl(column):  # pragma: no cover
+        def fix_df_array_list_impl(column):  # pragma: no cover
             return np.array(column)
-        return fix_df_array_impl
+        return fix_df_array_list_impl
+
     # convert list of strings to string array
     if isinstance(column, types.List) and isinstance(column.dtype, StringType):
-        def fix_df_array_impl(column):  # pragma: no cover
+        def fix_df_array_str_impl(column):  # pragma: no cover
             return StringArray(column)
-        return fix_df_array_impl
+        return fix_df_array_str_impl
+
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
     def fix_df_array_impl(column):  # pragma: no cover
@@ -604,8 +741,26 @@ def fix_df_array_overload(column):
     # FIXME: np.array() for everything else?
     return fix_df_array_impl
 
+@infer_global(fix_rolling_array)
+class FixDfRollingArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        dtype = column.dtype
+        ret_typ = column
+        if dtype == types.boolean or isinstance(dtype, types.Integer):
+            ret_typ = types.Array(types.float64, 1, 'C')
+        # TODO: add other types
+        return signature(ret_typ, column)
 
-@overload(fix_rolling_array)
+@lower_builtin(fix_rolling_array, types.Any)  # TODO: replace Any with types
+def lower_fix_rolling_array(context, builder, sig, args):
+    func = fix_rolling_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(fix_rolling_array)
 def fix_rolling_array_overload(column):
     assert isinstance(column, types.Array)
     dtype = column.dtype
@@ -658,13 +813,14 @@ class TsBinopWrapperType(AbstractTemplate):
         assert not kws
         [op, ts_arr, other] = args
         assert isinstance(op, types.Const) and isinstance(op.value, str)
-        assert ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
+        assert (ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
+                or ts_arr == SeriesType(types.NPDatetime('ns'), 1, 'C'))
         # TODO: extend to other types like string array
         assert other == string_type
         # TODO: examine all possible ops
-        out = types.Array(types.NPDatetime('ns'), 1, 'C')
+        out = SeriesType(types.NPDatetime('ns'), 1, 'C')
         if op.value in ['==', '!=', '>=', '>', '<=', '<']:
-            out = types.Array(types.boolean, 1, 'C')
+            out = SeriesType(types.boolean, 1, 'C')
         return signature(out, *args)
 
 TsBinopWrapperType.support_literals = True
@@ -673,10 +829,16 @@ TsBinopWrapperType.support_literals = True
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
-        return string_array_type
+    # TODO: replace timestamp type
     if len(val) > 0 and isinstance(val[0], pd.Timestamp):
         return timestamp_series_type
+
+    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
+        arr_typ = string_array_type
+    else:
+        arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
+
+    return arr_to_boxed_series_type(arr_typ)
 
 
 @overload(np.array)
@@ -728,11 +890,11 @@ class TypeIterTuples(AbstractTemplate):
         assert not kws
         assert len(args) % 2 == 0, "name and column pairs expected"
         col_names = [a.value for a in args[:len(args)//2]]
-        arr_types = args[len(args)//2:]
+        arr_types =  [if_series_to_array_type(a) for a in args[len(args)//2:]]
         # XXX index handling, assuming implicit index
         assert "Index" not in col_names[0]
         col_names = ['Index'] + col_names
-        arr_types = [types.Array(types.int64, 1, 'C')] + list(arr_types)
+        arr_types = [types.Array(types.int64, 1, 'C')] + arr_types
         iter_typ = DataFrameTupleIterator(col_names, arr_types)
         return signature(iter_typ, *args)
 

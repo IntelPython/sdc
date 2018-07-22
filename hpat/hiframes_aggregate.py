@@ -27,7 +27,7 @@ from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
                             setitem_string_array, get_offset_ptr, get_data_ptr)
-
+from hpat.pd_series_ext import SeriesType
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
@@ -84,11 +84,15 @@ def aggregate_typeinfer(aggregate_node, typeinferer):
             typ = list(aggregate_node.out_typs.values())[0]
         else:
             typ = aggregate_node.out_typs[out_name]
+
         # TODO: are there other non-numpy array types?
-        if typ == string_type:
-            arr_type = string_array_type
-        else:
-            arr_type = types.Array(typ, 1, 'C')
+        # if typ == string_type:
+        #     arr_type = string_array_type
+        # else:
+        #     arr_type = types.Array(typ, 1, 'C')
+
+        # output is Series in type inference
+        arr_type = SeriesType(typ, 1, 'C')
 
         typeinferer.lock_type(out_var.name, arr_type, loc=aggregate_node.loc)
 

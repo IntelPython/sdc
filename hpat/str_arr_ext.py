@@ -151,7 +151,7 @@ def iternext_str_array(context, builder, sig, args, result):
 @intrinsic
 def num_total_chars(typingctx, str_arr_typ=None):
     # None default to make IntelliSense happy
-    assert str_arr_typ == string_array_type
+    assert is_str_arr_typ(str_arr_typ)
     def codegen(context, builder, sig, args):
         in_str_arr, = args
         string_array = context.make_helper(builder, string_array_type, in_str_arr)
@@ -162,7 +162,7 @@ def num_total_chars(typingctx, str_arr_typ=None):
 
 @intrinsic
 def get_offset_ptr(typingctx, str_arr_typ=None):
-    assert str_arr_typ == string_array_type
+    assert is_str_arr_typ(str_arr_typ)
     def codegen(context, builder, sig, args):
         in_str_arr, = args
 
@@ -179,7 +179,7 @@ def get_offset_ptr(typingctx, str_arr_typ=None):
 
 @intrinsic
 def get_data_ptr(typingctx, str_arr_typ=None):
-    assert str_arr_typ == string_array_type
+    assert is_str_arr_typ(str_arr_typ)
     def codegen(context, builder, sig, args):
         in_str_arr, = args
 
@@ -233,7 +233,7 @@ def to_string_list(arr):
 
 @overload(to_string_list)
 def to_string_list_overload(arr_typ):
-    if arr_typ == string_array_type:
+    if is_str_arr_typ(arr_typ):
         def to_string_impl(str_arr):
             n = len(str_arr)
             l_str = []
@@ -262,7 +262,7 @@ def cp_str_list_to_array(str_arr, str_list):
 
 @overload(cp_str_list_to_array)
 def cp_str_list_to_array_overload(arr_typ, list_typ):
-    if arr_typ == string_array_type:
+    if is_str_arr_typ(arr_typ):
         def cp_str_list_impl(str_arr, str_list):
             n = len(str_list)
             for i in range(n):
@@ -337,10 +337,10 @@ class CmpOpEqStringArray(AbstractTemplate):
         assert not kws
         [va, vb] = args
         # if one of the inputs is string array
-        if va == string_array_type or vb == string_array_type:
+        if is_str_arr_typ(va) or is_str_arr_typ(vb):
             # inputs should be either string array or string
-            assert va == string_array_type or va == string_type
-            assert vb == string_array_type or vb == string_type
+            assert is_str_arr_typ(va) or va == string_type
+            assert is_str_arr_typ(vb) or vb == string_type
             return signature(types.Array(types.boolean, 1, 'C'), va, vb)
 
 
@@ -363,6 +363,11 @@ class CmpOpLEStringArray(CmpOpEqStringArray):
 @infer
 class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
+
+from hpat.pd_series_ext import string_series_type
+
+def is_str_arr_typ(typ):
+    return typ == string_array_type or typ == string_series_type
 
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):
@@ -446,7 +451,7 @@ def str_arr_size_impl(context, builder, typ, val):
 
 @overload(len)
 def str_arr_len_overload(str_arr):
-    if str_arr == string_array_type:
+    if is_str_arr_typ(str_arr):
         def str_arr_len(s):
             return s.size
         return str_arr_len
@@ -617,7 +622,7 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
 
 @intrinsic
 def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_typ=None):
-    assert out_typ == string_array_type and in_typ == string_array_type
+    assert is_str_arr_typ(out_typ) and is_str_arr_typ(in_typ)
     assert curr_str_typ == types.intp and curr_chars_typ == types.intp
     def codegen(context, builder, sig, args):
         out_arr, in_arr, curr_str_ind, curr_chars_ind = args

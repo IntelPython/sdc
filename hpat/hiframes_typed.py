@@ -6,23 +6,28 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
-                            find_callname, mk_alloc, find_const)
-
+                            find_callname, mk_alloc, find_const, is_setitem,
+                            is_getitem)
+from numba.typing.templates import Signature
 import hpat
 from hpat.utils import get_definitions
 from hpat.hiframes import include_new_blocks, gen_empty_like
-from hpat.str_arr_ext import string_array_type, StringArrayType
+from hpat.hiframes_api import if_series_to_array_type
+from hpat.str_ext import string_type
+from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
+from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type, BoxedSeriesType
 
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes):
+    def __init__(self, func_ir, typingctx, typemap, calltypes, return_type=None):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.typemap = typemap
         self.calltypes = calltypes
         self.df_cols = func_ir.df_cols
+        self.return_type = return_type
 
     def run(self):
         blocks = self.func_ir.blocks
@@ -48,14 +53,47 @@ class HiFramesTyped(object):
                     new_body.append(inst)
             blocks[label].body = new_body
 
+        replace_series = {}
+        for vname, typ in self.typemap.items():
+            if isinstance(typ, SeriesType):
+                # print("replacing series type", vname)
+                new_typ = series_to_array_type(typ)
+                replace_series[vname] = new_typ
+
+        for vname, typ in replace_series.items():
+            self.typemap.pop(vname)
+            self.typemap[vname] = typ
+
+        # replace sig of getitem/setitem/... series type with array
+        for call, sig in self.calltypes.items():
+            if sig is None:
+                continue
+            assert isinstance(sig, Signature)
+            sig.return_type = if_series_to_array_type(sig.return_type)
+            sig.args = tuple(map(if_series_to_array_type, sig.args))
+            # XXX: side effect: force update of call signatures
+            if isinstance(call, ir.Expr) and call.op == 'call':
+                # StencilFunc requires kws for typing so sig.args can't be used
+                # reusing sig.args since some types become Const in sig
+                argtyps = sig.args[:len(call.args)]
+                kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+                self.typemap[call.func.name].get_call_type(self.typingctx , argtyps, kwtyps)
+
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
-        return
+        return if_series_to_array_type(self.return_type)
 
     def _run_assign(self, assign, call_table):
         lhs = assign.target.name
         rhs = assign.value
 
         if isinstance(rhs, ir.Expr):
+            # arr = S.values
+            if (rhs.op == 'getattr' and isinstance(self.typemap[rhs.value.name], SeriesType)
+                    and rhs.attr == 'values'):
+                # simply return the column
+                assign.value = rhs.value
+                return [assign]
+
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
                 return res
@@ -129,24 +167,32 @@ class HiFramesTyped(object):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
                 and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
-                and (self.typemap[rhs.lhs.name] == string_array_type
-                     or self.typemap[rhs.rhs.name] == string_array_type)):
+                and (is_str_arr_typ(self.typemap[rhs.lhs.name])
+                     or is_str_arr_typ(self.typemap[rhs.rhs.name]))):
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             arg1_access = 'A'
             arg2_access = 'B'
             len_call = 'len(A)'
-            if self.typemap[arg1.name] == string_array_type:
+            if is_str_arr_typ(self.typemap[arg1.name]):
                 arg1_access = 'A[i]'
-            if self.typemap[arg2.name] == string_array_type:
+                # replace type now for correct typing of len, etc.
+                self.typemap.pop(arg1.name)
+                self.typemap[arg1.name] = string_array_type
+
+            if is_str_arr_typ(self.typemap[arg2.name]):
                 arg1_access = 'B[i]'
                 len_call = 'len(B)'
+                self.typemap.pop(arg2.name)
+                self.typemap[arg2.name] = string_array_type
+
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
                                                         arg2_access)
+
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
@@ -164,6 +210,12 @@ class HiFramesTyped(object):
         return None
 
     def _handle_fix_df_array(self, lhs, rhs, assign, call_table):
+        if (rhs.op == 'call'
+                and rhs.func.name in call_table
+                and call_table[rhs.func.name] ==
+                ['to_series_type', 'hiframes_api', hpat]):
+            assign.value = rhs.args[0]
+            return [assign]
         # arr = fix_df_array(col) -> arr=col if col is array
         if (rhs.op == 'call'
                 and rhs.func.name in call_table

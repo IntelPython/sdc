@@ -216,5 +216,11 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # Ensure we have an IR and type information.
         assert self.func_ir
         df_pass = HiFramesTyped(self.func_ir, self.typingctx,
-                                self.type_annotation.typemap, self.type_annotation.calltypes)
-        df_pass.run()
+                                self.type_annotation.typemap,
+                                self.type_annotation.calltypes,
+                                self.return_type)
+        ret_typ = df_pass.run()
+        # XXX update return type since it can be Series and trigger box_array
+        # for string array etc.
+        if ret_typ is not None:
+            self.return_type = ret_typ
