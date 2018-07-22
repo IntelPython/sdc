@@ -687,6 +687,8 @@ class HiFrames(object):
             nodes += f_block.body[:-3]  # remove none return
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
+            if item[1].name in self.ts_series_vars:
+                self.ts_series_vars.add(new_col_arr.name)
         return nodes, df_cols
 
     def _update_df_cols(self):
