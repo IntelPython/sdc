@@ -8,7 +8,8 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem)
-from numba.typing.templates import Signature
+from numba.typing.templates import Signature, bound_function
+from numba.typing.arraydecl import ArrayAttribute
 import hpat
 from hpat.utils import get_definitions, debug_prints
 from hpat.hiframes import include_new_blocks, gen_empty_like
@@ -61,6 +62,16 @@ class HiFramesTyped(object):
                 # print("replacing series type", vname)
                 new_typ = series_to_array_type(typ)
                 replace_series[vname] = new_typ
+            # replace array.call() variable types
+            if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
+                this = series_to_array_type(typ.this)
+                # TODO: handle string arrays, etc.
+                assert typ.typing_key.startswith('array.')
+                attr = typ.typing_key[len('array.'):]
+                resolver = getattr(ArrayAttribute, 'resolve_'+attr).__wrapped__
+                new_typ = bound_function(typ.typing_key)(resolver)(
+                    ArrayAttribute(self.typingctx), this)
+                replace_series[vname] = new_typ
 
         for vname, typ in replace_series.items():
             self.typemap.pop(vname)
@@ -79,7 +90,14 @@ class HiFramesTyped(object):
                 # reusing sig.args since some types become Const in sig
                 argtyps = sig.args[:len(call.args)]
                 kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
-                self.typemap[call.func.name].get_call_type(self.typingctx , argtyps, kwtyps)
+
+                new_call_typ = self.typemap[call.func.name].get_call_type(
+                    self.typingctx , argtyps, kwtyps)
+                # calltypes of things like BoundFunction (array.call) need to
+                # be update for lowering to work
+                if call in self.calltypes:
+                    self.calltypes.pop(call)
+                    self.calltypes[call] = new_call_typ
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return if_series_to_array_type(self.return_type)
