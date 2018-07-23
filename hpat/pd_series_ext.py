@@ -1,3 +1,4 @@
+import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
     type_callable, infer)
@@ -292,3 +293,9 @@ class CmpOpLTSeries(SeriesCompEqual):
 #         # replace result with Timestamp
 #         if out is not None and out.result == types.NPDatetime('ns'):
 #             return signature(pandas_timestamp_type, ary, out.index)
+
+
+# use ArrayAttribute for attributes not defined in SeriesAttribute
+for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
+    if attr.startswith('resolve_') and attr not in SeriesAttribute.__dict__:
+        setattr(SeriesAttribute, attr, func)
