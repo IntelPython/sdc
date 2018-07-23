@@ -101,10 +101,6 @@ class HiFramesTyped(object):
             if res is not None:
                 return res
 
-            res = self._handle_fix_df_array(lhs, rhs, assign, call_table)
-            if res is not None:
-                return res
-
             res = self._handle_empty_like(lhs, rhs, assign, call_table)
             if res is not None:
                 return res
@@ -136,16 +132,40 @@ class HiFramesTyped(object):
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
-            res = self._handle_str_contains(lhs, rhs, assign, call_table)
-            if res is not None:
-                return res
-
         return [assign]
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
         if func_name == 'to_series_type':
             assign.value = rhs.args[0]
             return [assign]
+
+        if func_name in ('str_contains_regex', 'str_contains_noregex'):
+            return self._handle_str_contains(assign, lhs, rhs, func_name)
+
+        # arr = fix_df_array(col) -> arr=col if col is array
+        if (func_name == 'fix_df_array'
+                and isinstance(self.typemap[rhs.args[0].name],
+                               (types.Array, StringArrayType))):
+            assign.value = rhs.args[0]
+            return [assign]
+
+        # arr = fix_rolling_array(col) -> arr=col if col is float array
+        if func_name == 'fix_rolling_array':
+            in_arr = rhs.args[0]
+            if isinstance(self.typemap[in_arr.name].dtype, types.Float):
+                assign.value = rhs.args[0]
+                return [assign]
+            else:
+                def f(column):  # pragma: no cover
+                    a = column.astype(np.float64)
+                f_block = compile_to_numba_ir(f,
+                                              {'hpat': hpat, 'np': np}, self.typingctx,
+                                              (self.typemap[in_arr.name],),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [in_arr])
+                nodes = f_block.body[:-3]
+                nodes[-1].target = assign.target
+                return nodes
 
         return [assign]
 
@@ -244,38 +264,6 @@ class HiFramesTyped(object):
 
         return None
 
-    def _handle_fix_df_array(self, lhs, rhs, assign, call_table):
-        # arr = fix_df_array(col) -> arr=col if col is array
-        if (rhs.op == 'call'
-                and rhs.func.name in call_table
-                and call_table[rhs.func.name] ==
-            ['fix_df_array', 'hiframes_api', hpat]
-                and isinstance(self.typemap[rhs.args[0].name],
-                               (types.Array, StringArrayType))):
-            assign.value = rhs.args[0]
-            return [assign]
-        # arr = fix_rolling_array(col) -> arr=col if col is float array
-        if (rhs.op == 'call'
-                and rhs.func.name in call_table
-                and call_table[rhs.func.name] ==
-                ['fix_rolling_array', 'hiframes_api', hpat]):
-            in_arr = rhs.args[0]
-            if isinstance(self.typemap[in_arr.name].dtype, types.Float):
-                assign.value = rhs.args[0]
-                return [assign]
-            else:
-                def f(column):  # pragma: no cover
-                    a = column.astype(np.float64)
-                f_block = compile_to_numba_ir(f,
-                                              {'hpat': hpat, 'np': np}, self.typingctx,
-                                              (self.typemap[in_arr.name],),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [in_arr])
-                nodes = f_block.body[:-3]
-                nodes[-1].target = assign.target
-                return nodes
-        return None
-
     def _handle_empty_like(self, lhs, rhs, assign, call_table):
         # B = empty_like(A) -> B = empty(len(A), dtype)
         if (rhs.op == 'call'
@@ -301,17 +289,14 @@ class HiFramesTyped(object):
             return nodes
         return None
 
-    def _handle_str_contains(self, lhs, rhs, assign, call_table):
-        fname = guard(find_callname, self.func_ir, rhs)
-        if fname is None:
-            return None
+    def _handle_str_contains(self, assign, lhs, rhs, fname):
 
-        if fname == ('str_contains_regex', 'hpat.hiframes_api'):
+        if fname == 'str_contains_regex':
             comp_func = 'hpat.str_ext.contains_regex'
-        elif fname == ('str_contains_noregex', 'hpat.hiframes_api'):
+        elif fname == 'str_contains_noregex':
             comp_func = 'hpat.str_ext.contains_noregex'
         else:
-            return None
+            assert False
 
         str_arr = rhs.args[0]
         pat = rhs.args[1]
