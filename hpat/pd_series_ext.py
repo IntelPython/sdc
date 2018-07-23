@@ -294,8 +294,12 @@ class CmpOpLTSeries(SeriesCompEqual):
 #         if out is not None and out.result == types.NPDatetime('ns'):
 #             return signature(pandas_timestamp_type, ary, out.index)
 
+# TODO: add itemsize, strides, etc. when removed from Pandas
+_not_series_array_attrs = ['flat', 'ctypes']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
-    if attr.startswith('resolve_') and attr not in SeriesAttribute.__dict__:
+    if (attr.startswith('resolve_')
+            and attr not in SeriesAttribute.__dict__
+            and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
