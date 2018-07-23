@@ -804,27 +804,6 @@ class TsSeriesGetItemType(AbstractTemplate):
         if out is not None and out.result == types.NPDatetime('ns'):
             return signature(pandas_timestamp_type, ary, out.index)
 
-def ts_binop_wrapper(op, arr, other):  # pragma: no cover
-    return
-
-@infer_global(ts_binop_wrapper)
-class TsBinopWrapperType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [op, ts_arr, other] = args
-        assert isinstance(op, types.Const) and isinstance(op.value, str)
-        assert (ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
-                or ts_arr == SeriesType(types.NPDatetime('ns'), 1, 'C'))
-        # TODO: extend to other types like string array
-        assert other == string_type
-        # TODO: examine all possible ops
-        out = SeriesType(types.NPDatetime('ns'), 1, 'C')
-        if op.value in ['==', '!=', '>=', '>', '<=', '<']:
-            out = SeriesType(types.boolean, 1, 'C')
-        return signature(out, *args)
-
-TsBinopWrapperType.support_literals = True
-
 
 # register series types for import
 @typeof_impl.register(pd.Series)

@@ -45,5 +45,13 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    def test_datetimeindex_str_comp2(self):
+        def test_impl(df):
+            return ('2011-10-23' <= df.A).values
+
+        df = pd.DataFrame({'A': pd.DatetimeIndex(['2015-01-03', '2010-10-11'])})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
 if __name__ == "__main__":
     unittest.main()

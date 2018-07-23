@@ -157,9 +157,6 @@ class HiFrames(object):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
 
-            if rhs.op == 'binop':
-                return self._run_binop(assign)
-
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
                     and isinstance(rhs.index, str)):
@@ -366,43 +363,6 @@ class HiFrames(object):
             return nodes
 
         return [assign]
-
-    def _run_binop(self, assign):
-        """wrap binops with timeseries data in case type conversion is required
-        """
-        # TODO: proper Series/Timeseries type to avoid this
-        lhs = assign.target
-        rhs = assign.value
-
-        # no timeseries, not needed
-        if rhs.rhs.name not in self.ts_series_vars and rhs.lhs.name not in self.ts_series_vars:
-            return [assign]
-
-        # both timeseries, not needed
-        if rhs.rhs.name in self.ts_series_vars and rhs.lhs.name in self.ts_series_vars:
-            self.ts_series_vars.add(lhs.name)
-            self.df_cols.add(lhs.name)
-            return [assign]
-
-        if rhs.rhs.name in self.ts_series_vars:
-            ts_arr = rhs.rhs
-            other = rhs.lhs
-        else:
-            ts_arr = rhs.lhs
-            other = rhs.rhs
-
-        func_text = "def f(ts_arr, other):\n"
-        func_text += "    s = hpat.hiframes_api.ts_binop_wrapper('{}', ts_arr, other)\n".format(rhs.fn)
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        ts_binop_f = loc_vars['f']
-
-        f_block = compile_to_numba_ir(ts_binop_f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [ts_arr, other])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        self.df_cols.add(lhs.name)
-        return nodes
 
     def _get_reverse_copies(self, body):
         for inst in body:

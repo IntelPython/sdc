@@ -15,7 +15,8 @@ from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.hiframes_api import if_series_to_array_type
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
-from hpat.pd_series_ext import SeriesType, string_series_type, series_to_array_type, BoxedSeriesType
+from hpat.pd_series_ext import (SeriesType, string_series_type,
+    series_to_array_type, BoxedSeriesType, dt_index_series_type)
 
 
 class HiFramesTyped(object):
@@ -129,8 +130,8 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
-                if fdef == ('ts_binop_wrapper', 'hpat.hiframes_api'):
-                    return self._handle_ts_binop(lhs, rhs, assign)
+            if self._is_dt_index_binop(rhs):
+                return self._handle_dt_index_binop(lhs, rhs, assign)
 
             res = self._handle_str_contains(lhs, rhs, assign, call_table)
             if res is not None:
@@ -138,28 +139,49 @@ class HiFramesTyped(object):
 
         return [assign]
 
-    def _handle_ts_binop(self, lhs, rhs, assign):
-        op = guard(find_const, self.func_ir, rhs.args[0])
-        assert op is not None
-        ts_arr = rhs.args[1]
-        ts_str = rhs.args[2]
+    def _is_dt_index_binop(self, rhs):
+        if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
+            return False
 
-        func_text = 'def f(ts_arr, ts_str):\n'
-        func_text += '  l = len(ts_arr)\n'
-        func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(ts_str)\n'
+        arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
+        # one of them is dt_index but not both
+        if ((arg1 == dt_index_series_type or arg2 == dt_index_series_type)
+                and not (arg1 == dt_index_series_type and arg2 == dt_index_series_type)):
+            return True
+
+        return False
+
+    def _handle_dt_index_binop(self, lhs, rhs, assign):
+        arg1, arg2 = rhs.lhs, rhs.rhs
+        allowed_types = (dt_index_series_type, string_type)
+
+        if (self.typemap[arg1.name] not in allowed_types
+                or self.typemap[arg2.name] not in allowed_types):
+            raise ValueError("DatetimeIndex operation not supported")
+
+        func_text = 'def f(arg1, arg2):\n'
+        if self.typemap[arg1.name] == dt_index_series_type:
+            func_text += '  dt_index, _str = arg1, arg2\n'
+            comp = 'dt_index[i] {} other'.format(rhs.fn)
+        else:
+            func_text += '  dt_index, _str = arg2, arg1\n'
+            comp = 'other {} dt_index[i]'.format(rhs.fn)
+        func_text += '  l = len(dt_index)\n'
+        func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(_str)\n'
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
-        func_text += '    S[i] = ts_arr[i] {} other\n'.format(op)
+        func_text += '    S[i] = {}\n'.format(comp)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
+        # print(func_text)
         f_blocks = compile_to_numba_ir(f,
                                         {'numba': numba, 'np': np, 'hpat': hpat},
                                         self.typingctx,
-                                        (self.typemap[ts_arr.name],
-                                        self.typemap[ts_str.name]),
+                                        (self.typemap[arg1.name],
+                                        self.typemap[arg2.name]),
                                         self.typemap, self.calltypes).blocks
-        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [ts_arr, ts_str])
+        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
         # replace == expression with result of parfor (S)
         # S is target of last statement in 1st block of f
         assign.value = f_blocks[min(f_blocks.keys())].body[-2].target

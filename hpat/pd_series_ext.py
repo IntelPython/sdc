@@ -65,6 +65,8 @@ class SeriesType(types.Array):
         return super(SeriesType, self).unify(typingctx, other)
 
 string_series_type = SeriesType(string_type, 1, 'C', True)
+# TODO: create a separate DatetimeIndex type from Series
+dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
@@ -183,6 +185,10 @@ class SeriesCompEqual(AbstractTemplate):
             # inputs should be either string array or string
             assert is_str_arr_typ(va) or va == string_type
             assert is_str_arr_typ(vb) or vb == string_type
+            return signature(SeriesType(types.boolean, 1, 'C'), va, vb)
+
+        if ((va == dt_index_series_type and vb == string_type)
+                or (vb == dt_index_series_type and va == string_type)):
             return signature(SeriesType(types.boolean, 1, 'C'), va, vb)
 
 @infer
