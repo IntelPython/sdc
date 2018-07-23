@@ -3,22 +3,32 @@ from numba.extending import (models, register_model, lower_cast, infer_getattr,
     type_callable, infer)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate)
+from numba.typing.arraydecl import get_array_index_type
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType)
+from hpat.pd_timestamp_ext import pandas_timestamp_type
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
-class SeriesType(types.Array):
+# class SeriesType(types.ArrayCompatible):
+class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
-    array_priority = 1000
+    # array_priority = 1000
     def __init__(self, dtype, ndim, layout, readonly=False, name=None,
                  aligned=True):
-        # same as types.Array, except name is Series
+        # same as types.Array, except name is Series, and buffer attributes
+        # initialized here
         assert ndim == 1, "Series() should be one dimensional"
         assert name is None
+        self.mutable = True
+        self.aligned = True
+        self.dtype = dtype
+        self.ndim = ndim
+        self.layout = layout
+
         if readonly:
             self.mutable = False
         if (not aligned or
@@ -31,7 +41,15 @@ class SeriesType(types.Array):
             if not self.aligned:
                 type_name = "unaligned " + type_name
             name = "%s(%s, %sd, %s)" % (type_name, dtype, ndim, layout)
-        super(SeriesType, self).__init__(dtype, ndim, layout, name=name)
+        super(SeriesType, self).__init__(name=name)
+
+    @property
+    def mangling_args(self):
+        # same as types.Array
+        args = [self.dtype, self.ndim, self.layout,
+                'mutable' if self.mutable else 'readonly',
+                'aligned' if self.aligned else 'unaligned']
+        return self.__class__.__name__, args
 
     def copy(self, dtype=None, ndim=None, layout=None, readonly=None):
         # same as types.Array, except Series return type
@@ -45,6 +63,11 @@ class SeriesType(types.Array):
             readonly = not self.mutable
         return SeriesType(dtype=dtype, ndim=ndim, layout=layout, readonly=readonly,
                      aligned=self.aligned)
+
+    @property
+    def key(self):
+        # same as types.Array
+        return self.dtype, self.ndim, self.layout, self.mutable, self.aligned
 
     def unify(self, typingctx, other):
         # same as types.Array, except returns Series for Series/Series
@@ -63,6 +86,45 @@ class SeriesType(types.Array):
 
         # XXX: unify Series/Array as Array
         return super(SeriesType, self).unify(typingctx, other)
+
+    # @property
+    # def as_array(self):
+    #     return types.Array(self.dtype, self.ndim, self.layout)
+
+    def can_convert_to(self, typingctx, other):
+        # same as types.Array, TODO: add Series?
+        if (isinstance(other, types.Array) and other.ndim == self.ndim
+            and other.dtype == self.dtype):
+            if (other.layout in ('A', self.layout)
+                and (self.mutable or not other.mutable)
+                and (self.aligned or not other.aligned)):
+                return types.Conversion.safe
+
+    def is_precise(self):
+        # same as types.Array
+        return self.dtype.is_precise()
+
+    @property
+    def iterator_type(self):
+        # same as Buffer
+        # TODO: fix timestamp
+        return types.iterators.ArrayIterator(self)
+
+    @property
+    def is_c_contig(self):
+        # same as Buffer
+        return self.layout == 'C' or (self.ndim <= 1 and self.layout in 'CF')
+
+    @property
+    def is_f_contig(self):
+        # same as Buffer
+        return self.layout == 'F' or (self.ndim <= 1 and self.layout in 'CF')
+
+    @property
+    def is_contig(self):
+        # same as Buffer
+        return self.layout in 'CF'
+
 
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
@@ -153,25 +215,29 @@ def cast_string_series(context, builder, fromty, toty, val):
 def cast_series(context, builder, fromty, toty, val):
     return val
 
+# --------------------------------------------------------------------------- #
+# --- typing similar to arrays adopted from arraydecl.py, npydecl.py -------- #
+
+
 @infer_getattr
-class ArrayAttribute(AttributeTemplate):
+class SeriesAttribute(AttributeTemplate):
     key = SeriesType
 
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
 # TODO: use ops logic from pandas/core/ops.py
-# called from numba/numpy_support.py:resolve_output_type
-# similar to SmartArray (targets/smartarray.py)
-@type_callable('__array_wrap__')
-def type_series_array_wrap(context):
-    def typer(input_type, result):
-        if isinstance(input_type, SeriesType):
-            return input_type.copy(dtype=result.dtype,
-                                   ndim=result.ndim,
-                                   layout=result.layout)
+# # called from numba/numpy_support.py:resolve_output_type
+# # similar to SmartArray (targets/smartarray.py)
+# @type_callable('__array_wrap__')
+# def type_series_array_wrap(context):
+#     def typer(input_type, result):
+#         if isinstance(input_type, SeriesType):
+#             return input_type.copy(dtype=result.dtype,
+#                                    ndim=result.ndim,
+#                                    layout=result.layout)
 
-    return typer
+#     return typer
 
 @infer
 class SeriesCompEqual(AbstractTemplate):
@@ -210,3 +276,19 @@ class CmpOpLESeries(SeriesCompEqual):
 @infer
 class CmpOpLTSeries(SeriesCompEqual):
     key = '<'
+
+# @infer
+# class GetItemBuffer(AbstractTemplate):
+#     key = "getitem"
+
+#     def generic(self, args, kws):
+#         assert not kws
+#         [ary, idx] = args
+#         import pdb; pdb.set_trace()
+#         if not isinstance(ary, SeriesType):
+#             return
+#         out = get_array_index_type(ary, idx)
+#         # check result to be dt64 since it might be sliced array
+#         # replace result with Timestamp
+#         if out is not None and out.result == types.NPDatetime('ns'):
+#             return signature(pandas_timestamp_type, ary, out.index)
