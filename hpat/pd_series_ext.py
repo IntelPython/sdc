@@ -295,7 +295,7 @@ class CmpOpLTSeries(SeriesCompEqual):
 #             return signature(pandas_timestamp_type, ary, out.index)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
