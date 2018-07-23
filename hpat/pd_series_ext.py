@@ -172,7 +172,7 @@ def type_series_array_wrap(context):
     return typer
 
 @infer
-class SeriesEqual(AbstractTemplate):
+class SeriesCompEqual(AbstractTemplate):
     key = '=='
     def generic(self, args, kws):
         from hpat.str_arr_ext import is_str_arr_typ
@@ -184,3 +184,23 @@ class SeriesEqual(AbstractTemplate):
             assert is_str_arr_typ(va) or va == string_type
             assert is_str_arr_typ(vb) or vb == string_type
             return signature(SeriesType(types.boolean, 1, 'C'), va, vb)
+
+@infer
+class CmpOpNEqSeries(SeriesCompEqual):
+    key = '!='
+
+@infer
+class CmpOpGESeries(SeriesCompEqual):
+    key = '>='
+
+@infer
+class CmpOpGTSeries(SeriesCompEqual):
+    key = '>'
+
+@infer
+class CmpOpLESeries(SeriesCompEqual):
+    key = '<='
+
+@infer
+class CmpOpLTSeries(SeriesCompEqual):
+    key = '<'
