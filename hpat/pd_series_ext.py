@@ -1,10 +1,12 @@
 from numba import types
-from numba.extending import models, register_model, lower_cast, infer_getattr, type_callable
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing.templates import AttributeTemplate
+from numba.extending import (models, register_model, lower_cast, infer_getattr,
+    type_callable, infer)
+from numba.typing.templates import (infer_global, AbstractTemplate, signature,
+    AttributeTemplate)
 import hpat
 from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type, offset_typ, char_typ, str_arr_payload_type, StringArrayType
+from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
+    str_arr_payload_type, StringArrayType)
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -168,3 +170,17 @@ def type_series_array_wrap(context):
                                    layout=result.layout)
 
     return typer
+
+@infer
+class SeriesEqual(AbstractTemplate):
+    key = '=='
+    def generic(self, args, kws):
+        from hpat.str_arr_ext import is_str_arr_typ
+        assert not kws
+        [va, vb] = args
+        # if one of the inputs is string array
+        if va == string_series_type or vb == string_series_type:
+            # inputs should be either string array or string
+            assert is_str_arr_typ(va) or va == string_type
+            assert is_str_arr_typ(vb) or vb == string_type
+            return signature(SeriesType(types.boolean, 1, 'C'), va, vb)

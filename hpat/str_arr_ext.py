@@ -337,7 +337,7 @@ class CmpOpEqStringArray(AbstractTemplate):
         assert not kws
         [va, vb] = args
         # if one of the inputs is string array
-        if is_str_arr_typ(va) or is_str_arr_typ(vb):
+        if va == string_array_type or vb == string_array_type:
             # inputs should be either string array or string
             assert is_str_arr_typ(va) or va == string_type
             assert is_str_arr_typ(vb) or vb == string_type

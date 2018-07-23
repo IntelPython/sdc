@@ -10,7 +10,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             is_getitem)
 from numba.typing.templates import Signature
 import hpat
-from hpat.utils import get_definitions
+from hpat.utils import get_definitions, debug_prints
 from hpat.hiframes import include_new_blocks, gen_empty_like
 from hpat.hiframes_api import if_series_to_array_type
 from hpat.str_ext import string_type
@@ -53,6 +53,8 @@ class HiFramesTyped(object):
                     new_body.append(inst)
             blocks[label].body = new_body
 
+        if debug_prints():  # pragma: no cover
+            print("types before Series replacement:", self.typemap)
         replace_series = {}
         for vname, typ in self.typemap.items():
             if isinstance(typ, SeriesType):
