@@ -130,6 +130,9 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
+                if func_mod == 'hpat.hiframes_api':
+                    return self._run_call_hiframes(assign, assign.target, rhs, func_name)
+
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
@@ -138,6 +141,14 @@ class HiFramesTyped(object):
                 return res
 
         return [assign]
+
+    def _run_call_hiframes(self, assign, lhs, rhs, func_name):
+        if func_name == 'to_series_type':
+            assign.value = rhs.args[0]
+            return [assign]
+
+        return [assign]
+
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
@@ -234,12 +245,6 @@ class HiFramesTyped(object):
         return None
 
     def _handle_fix_df_array(self, lhs, rhs, assign, call_table):
-        if (rhs.op == 'call'
-                and rhs.func.name in call_table
-                and call_table[rhs.func.name] ==
-                ['to_series_type', 'hiframes_api', hpat]):
-            assign.value = rhs.args[0]
-            return [assign]
         # arr = fix_df_array(col) -> arr=col if col is array
         if (rhs.op == 'call'
                 and rhs.func.name in call_table
