@@ -94,12 +94,12 @@ class TestSeries(unittest.TestCase):
 
     def test_series_attr2(self):
         def test_impl(A):
-            return A.copy()
+            return A.copy().values
 
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
     def test_series_values1(self):
         def test_impl(A):
