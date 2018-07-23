@@ -92,6 +92,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_attr2(self):
+        def test_impl(A):
+            return A.copy()
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
     def test_series_values1(self):
         def test_impl(A):
             return (A == 2).values
