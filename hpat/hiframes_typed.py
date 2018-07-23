@@ -32,13 +32,12 @@ class HiFramesTyped(object):
 
     def run(self):
         blocks = self.func_ir.blocks
-        call_table, _ = ir_utils.get_call_table(blocks)
         topo_order = find_topo_order(blocks)
         for label in topo_order:
             new_body = []
             for inst in blocks[label].body:
                 if isinstance(inst, ir.Assign):
-                    out_nodes = self._run_assign(inst, call_table)
+                    out_nodes = self._run_assign(inst)
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
@@ -85,7 +84,7 @@ class HiFramesTyped(object):
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return if_series_to_array_type(self.return_type)
 
-    def _run_assign(self, assign, call_table):
+    def _run_assign(self, assign):
         lhs = assign.target.name
         rhs = assign.value
 
@@ -101,18 +100,11 @@ class HiFramesTyped(object):
             if res is not None:
                 return res
 
-            res = self._handle_empty_like(lhs, rhs, assign, call_table)
-            if res is not None:
-                return res
-
             res = self._handle_df_col_filter(lhs, rhs, assign)
             if res is not None:
                 return res
 
             if rhs.op == 'call':
-                res = self._handle_df_col_calls(lhs, rhs, assign)
-                if res is not None:
-                    return res
 
                 fdef = guard(find_callname, self.func_ir, rhs)
                 if fdef is None:
@@ -128,6 +120,9 @@ class HiFramesTyped(object):
 
                 if func_mod == 'hpat.hiframes_api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
+
+                if fdef == ('empty_like', 'numpy'):
+                    return self._handle_empty_like(assign, lhs, rhs)
 
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
@@ -167,7 +162,7 @@ class HiFramesTyped(object):
                 nodes[-1].target = assign.target
                 return nodes
 
-        return [assign]
+        return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
 
     def _is_dt_index_binop(self, rhs):
@@ -264,30 +259,26 @@ class HiFramesTyped(object):
 
         return None
 
-    def _handle_empty_like(self, lhs, rhs, assign, call_table):
+    def _handle_empty_like(self, assign, lhs, rhs):
         # B = empty_like(A) -> B = empty(len(A), dtype)
-        if (rhs.op == 'call'
-                and rhs.func.name in call_table
-                and call_table[rhs.func.name] == ['empty_like', np]):
-            in_arr = rhs.args[0]
+        in_arr = rhs.args[0]
 
-            if self.typemap[in_arr.name].ndim == 1:
-                # generate simpler len() for 1D case
-                def f(_in_arr):  # pragma: no cover
-                    _alloc_size = len(_in_arr)
-                    _out_arr = np.empty(_alloc_size, _in_arr.dtype)
-            else:
-                def f(_in_arr):  # pragma: no cover
-                    _alloc_size = _in_arr.shape
-                    _out_arr = np.empty(_alloc_size, _in_arr.dtype)
+        if self.typemap[in_arr.name].ndim == 1:
+            # generate simpler len() for 1D case
+            def f(_in_arr):  # pragma: no cover
+                _alloc_size = len(_in_arr)
+                _out_arr = np.empty(_alloc_size, _in_arr.dtype)
+        else:
+            def f(_in_arr):  # pragma: no cover
+                _alloc_size = _in_arr.shape
+                _out_arr = np.empty(_alloc_size, _in_arr.dtype)
 
-            f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (self.typemap[in_arr.name],),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr])
-            nodes = f_block.body[:-3]  # remove none return
-            nodes[-1].target = assign.target
-            return nodes
-        return None
+        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (self.typemap[in_arr.name],),
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [in_arr])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = assign.target
+        return nodes
 
     def _handle_str_contains(self, assign, lhs, rhs, fname):
 
@@ -344,24 +335,7 @@ class HiFramesTyped(object):
                 f_blocks[first_block].body
             return f_blocks
 
-    def _handle_df_col_calls(self, lhs_name, rhs, assign):
-
-        func_name = ""
-        func_mod = ""
-        fdef = guard(find_callname, self.func_ir, rhs)
-        if fdef is None:
-            # could be make_function from list comprehension which is ok
-            func_def = guard(get_definition, self.func_ir, rhs.func)
-            if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
-                return [assign]
-            # warnings.warn(
-            #     "function call couldn't be found for initial analysis")
-            return [assign]
-        else:
-            func_name, func_mod = fdef
-
-        if func_mod != 'hpat.hiframes_api':
-            return [assign]
+    def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
 
         if func_name == 'ts_series_getitem':
             in_arr = rhs.args[0]
@@ -453,7 +427,7 @@ class HiFramesTyped(object):
             f_blocks[last_block].body[-3].target = assign.target
             return f_blocks
 
-        return
+        return [assign]
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
