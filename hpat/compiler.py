@@ -148,8 +148,11 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # e.g. need to handle string array exprs before nopython rewrites
         # converts them to arrayexpr.
         # self.add_optimization_stage(pm)
-        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
+        # hiframes typed pass should be before pre_parfor since variable types
+        # need updating, and A.call to np.call transformation is invalid for
+        # Series (e.g. S.var is not the same as np.var(S))
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
+        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:
             pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
         if self.flags.auto_parallel.enabled:
