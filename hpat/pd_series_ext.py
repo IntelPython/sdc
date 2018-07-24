@@ -6,7 +6,7 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
     ArrayAttribute, SetItemBuffer)
-from numba.typing.npydecl import (NumpyRulesArrayOperator,
+from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
     NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator)
 import hpat
 from hpat.str_ext import string_type
@@ -401,13 +401,13 @@ class SetItemSeries(SetItemBuffer):
             res.args = (new_series, res.args[1], res.args[2])
             return res
 
-def series_op_generic(self, args, kws):
+def series_op_generic(cls, self, args, kws):
     # return if no Series
     if not any(isinstance(arg, SeriesType) for arg in args):
         return None
     # convert args to array
     new_args = tuple(if_series_to_array_type(arg) for arg in args)
-    sig = super(SeriesOpUfuncs, self).generic(new_args, kws)
+    sig = super(cls, self).generic(new_args, kws)
     # convert back to Series
     if sig is not None:
         sig.return_type = if_arr_to_series_type(sig.return_type)
@@ -415,13 +415,16 @@ def series_op_generic(self, args, kws):
     return sig
 
 class SeriesOpUfuncs(NumpyRulesArrayOperator):
-    generic = series_op_generic
+    def generic(self, args, kws):
+        return series_op_generic(SeriesOpUfuncs, self, args, kws)
 
 class SeriesInplaceOpUfuncs(NumpyRulesInplaceArrayOperator):
-    generic = series_op_generic
+    def generic(self, args, kws):
+        return series_op_generic(SeriesInplaceOpUfuncs, self, args, kws)
 
 class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
-    generic = series_op_generic
+    def generic(self, args, kws):
+        return series_op_generic(SeriesUnaryOpUfuncs, self, args, kws)
 
 # TODO: change class name to Series in install_operations
 SeriesOpUfuncs.install_operations()
