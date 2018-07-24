@@ -285,5 +285,15 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(isinstance(two,  np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    @unittest.skip("needs empty_like typing fix in npydecl.py")
+    def test_series_empty_like(self):
+        def test_impl(A):
+            return np.empty_like(A)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
+
 if __name__ == "__main__":
     unittest.main()

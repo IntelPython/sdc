@@ -8,7 +8,8 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
     ArrayAttribute, SetItemBuffer)
 from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
-    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator)
+    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
+    NdConstructorLike)
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
@@ -462,3 +463,17 @@ class LenSeriesType(AbstractTemplate):
     def generic(self, args, kws):
         if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
             return signature(types.intp, *args)
+
+# @infer_global(np.empty_like)
+# @infer_global(np.zeros_like)
+# @infer_global(np.ones_like)
+# class SeriesLikeTyper(NdConstructorLike):
+#     def generic(self):
+#         typer = super(SeriesLikeTyper, self).generic()
+#         def wrapper(*args, **kws):
+#             new_args = tuple(if_series_to_array_type(arg) for arg in args)
+#             new_kws = {n:if_series_to_array_type(t) for n,t in kws.items()}
+#             return typer(*new_args, **new_kws)
+#         return wrapper
+
+#@infer_global(np.full_like)
