@@ -176,6 +176,21 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_setitem_series2(self):
+        def test_impl(A, i):
+            A[i] = 100
+            # TODO: remove return after aliasing fix
+            return A
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, 0)
+        test_impl(A2, 0)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[0]

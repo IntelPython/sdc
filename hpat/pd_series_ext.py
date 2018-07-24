@@ -5,7 +5,7 @@ from numba.extending import (models, register_model, lower_cast, infer_getattr,
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
-    ArrayAttribute)
+    ArrayAttribute, SetItemBuffer)
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
@@ -344,7 +344,7 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
         setattr(SeriesAttribute, attr, func)
 
 @infer
-class GetItemBuffer(AbstractTemplate):
+class GetItemSeries(AbstractTemplate):
     key = "getitem"
 
     def generic(self, args, kws):
@@ -360,3 +360,20 @@ class GetItemBuffer(AbstractTemplate):
             if ret_typ is None:  # not array output
                 ret_typ = out.result
             return signature(ret_typ, ary, out.index)
+
+@infer
+class SetItemSeries(SetItemBuffer):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        series, idx, val = args
+        if not isinstance(series, SeriesType):
+            return None
+        ary = series_to_array_type(series)
+        # TODO: strings, dt_index
+        res = super(SetItemSeries, self).generic((ary, idx, val), kws)
+        if res is not None:
+            new_series = arr_to_series_type(res.args[0])
+            res.args = (new_series, res.args[1], res.args[2])
+            return res
