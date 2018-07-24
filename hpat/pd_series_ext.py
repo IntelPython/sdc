@@ -3,8 +3,9 @@ from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
     type_callable, infer)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-    AttributeTemplate)
-from numba.typing.arraydecl import get_array_index_type, _expand_integer
+    AttributeTemplate, bound_function)
+from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
+    ArrayAttribute)
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
@@ -226,6 +227,13 @@ class SeriesAttribute(AttributeTemplate):
 
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
+
+    @bound_function("array.argsort")
+    def resolve_argsort(self, ary, args, kws):
+        resolver = ArrayAttribute.resolve_argsort.__wrapped__
+        sig = resolver(self, ary, args, kws)
+        sig.return_type = arr_to_series_type(sig.return_type)
+        return sig
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
