@@ -1,3 +1,4 @@
+import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
@@ -430,3 +431,23 @@ class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
 SeriesOpUfuncs.install_operations()
 SeriesInplaceOpUfuncs.install_operations()
 SeriesUnaryOpUfuncs.install_operations()
+
+class Series_Numpy_rules_ufunc(Numpy_rules_ufunc):
+    def generic(self, args, kws):
+        return series_op_generic(Series_Numpy_rules_ufunc, self, args, kws)
+
+# copied from npydecl.py since deleted
+_aliases = set(["bitwise_not", "mod", "abs"])
+if np.divide == np.true_divide:
+    _aliases.add("divide")
+
+for func in numba.typing.npydecl.supported_ufuncs:
+    name = func.__name__
+    #_numpy_ufunc(func)
+    class typing_class(Series_Numpy_rules_ufunc):
+        key = func
+
+    typing_class.__name__ = "resolve_series_{0}".format(name)
+
+    if not name in _aliases:
+        infer_global(func, types.Function(typing_class))
