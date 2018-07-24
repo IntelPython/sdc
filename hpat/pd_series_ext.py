@@ -342,3 +342,21 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in SeriesAttribute.__dict__
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
+
+@infer
+class GetItemBuffer(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        [series, idx] = args
+        if not isinstance(series, SeriesType):
+            return None
+        ary = series_to_array_type(series)
+        # TODO: string array, dt_index
+        out = get_array_index_type(ary, idx)
+        if out is not None:
+            ret_typ = arr_to_series_type(out.result)
+            if ret_typ is None:  # not array output
+                ret_typ = out.result
+            return signature(ret_typ, ary, out.index)
