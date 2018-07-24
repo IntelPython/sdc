@@ -110,6 +110,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_attr4(self):
+        def test_impl(A):
+            return A.cumsum().values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
     def test_np_call_on_series1(self):
         def test_impl(A):
             return np.min(A)
