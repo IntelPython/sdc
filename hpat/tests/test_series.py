@@ -209,6 +209,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_getitem_series_str1(self):
+        def test_impl(A, i):
+            return A[i]
+
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+
     def test_series_op1(self):
         def test_impl(A, i):
             return A+A

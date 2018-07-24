@@ -12,7 +12,7 @@ from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
-    str_arr_payload_type, StringArrayType)
+    str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
@@ -377,11 +377,18 @@ class GetItemSeries(AbstractTemplate):
         if not isinstance(series, SeriesType):
             return None
         ary = series_to_array_type(series)
-        # TODO: string array, dt_index
-        out = get_array_index_type(ary, idx)
-        if out is not None:
-            ret_typ = if_arr_to_series_type(out.result)
-            return signature(ret_typ, ary, out.index)
+
+        # TODO: dt_index
+        if ary == string_array_type:
+            sig = GetItemStringArray.generic(self, (ary, idx), kws)
+        else:
+            out = get_array_index_type(ary, idx)
+            sig = signature(out.result, ary, out.index)
+
+        if sig is not None:
+            sig.return_type = if_arr_to_series_type(sig.return_type)
+            sig.args = tuple(if_arr_to_series_type(a) for a in sig.args)
+        return sig
 
 @infer
 class SetItemSeries(SetItemBuffer):
