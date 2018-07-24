@@ -224,7 +224,7 @@ def if_series_to_array_type(typ, replace_boxed=False):
     return typ
 
 def if_arr_to_series_type(typ):
-    if isinstance(typ, types.Array):
+    if isinstance(typ, types.Array) or typ == string_array_type:
         return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
