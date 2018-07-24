@@ -237,6 +237,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A.copy(), 1), test_impl(df.A, 1))
 
+    def test_series_ufunc1(self):
+        def test_impl(A, i):
+            return np.isinf(A).values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
+
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
