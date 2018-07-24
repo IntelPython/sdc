@@ -13,11 +13,11 @@ from numba.typing.arraydecl import ArrayAttribute
 import hpat
 from hpat.utils import get_definitions, debug_prints
 from hpat.hiframes import include_new_blocks, gen_empty_like
-from hpat.hiframes_api import if_series_to_array_type
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
-    series_to_array_type, BoxedSeriesType, dt_index_series_type)
+    series_to_array_type, BoxedSeriesType, dt_index_series_type,
+    if_series_to_array_type)
 
 
 class HiFramesTyped(object):

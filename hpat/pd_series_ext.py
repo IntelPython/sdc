@@ -6,6 +6,8 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
     ArrayAttribute, SetItemBuffer)
+from numba.typing.npydecl import (NumpyRulesArrayOperator,
+    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator)
 import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
@@ -207,6 +209,27 @@ def arr_to_boxed_series_type(arr):
     return series_type
 
 
+def if_series_to_array_type(typ, replace_boxed=False):
+    if isinstance(typ, SeriesType):
+        return series_to_array_type(typ, replace_boxed)
+    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
+    # it results in cast error for call dummy_unbox_series
+    if replace_boxed and isinstance(typ, BoxedSeriesType):
+        return series_to_array_type(typ, replace_boxed)
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple(
+            [if_series_to_array_type(t, replace_boxed) for t in typ.types])
+    # TODO: other types than can have Series inside: list, set, etc.
+    return typ
+
+def if_arr_to_series_type(typ):
+    if isinstance(typ, types.Array):
+        return arr_to_series_type(typ)
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
+    # TODO: other types than can have Arrays inside: list, set, etc.
+    return typ
+
 @lower_cast(string_series_type, string_array_type)
 @lower_cast(string_array_type, string_series_type)
 def cast_string_series(context, builder, fromty, toty, val):
@@ -377,3 +400,30 @@ class SetItemSeries(SetItemBuffer):
             new_series = arr_to_series_type(res.args[0])
             res.args = (new_series, res.args[1], res.args[2])
             return res
+
+def series_op_generic(self, args, kws):
+    # return if no Series
+    if not any(isinstance(arg, SeriesType) for arg in args):
+        return None
+    # convert args to array
+    new_args = tuple(if_series_to_array_type(arg) for arg in args)
+    sig = super(SeriesOpUfuncs, self).generic(new_args, kws)
+    # convert back to Series
+    if sig is not None:
+        sig.return_type = if_arr_to_series_type(sig.return_type)
+        sig.args = tuple(if_arr_to_series_type(a) for a in sig.args)
+    return sig
+
+class SeriesOpUfuncs(NumpyRulesArrayOperator):
+    generic = series_op_generic
+
+class SeriesInplaceOpUfuncs(NumpyRulesInplaceArrayOperator):
+    generic = series_op_generic
+
+class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
+    generic = series_op_generic
+
+# TODO: change class name to Series in install_operations
+SeriesOpUfuncs.install_operations()
+SeriesInplaceOpUfuncs.install_operations()
+SeriesUnaryOpUfuncs.install_operations()

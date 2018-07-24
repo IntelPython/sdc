@@ -22,7 +22,9 @@ from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_b
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
-from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type, series_to_array_type
+from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
+    string_series_type, arr_to_series_type, arr_to_boxed_series_type,
+    series_to_array_type, if_series_to_array_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -663,19 +665,6 @@ class ToSeriesType(AbstractTemplate):
 @lower_builtin(to_series_type, types.Any)
 def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-def if_series_to_array_type(typ, replace_boxed=False):
-    if isinstance(typ, SeriesType):
-        return series_to_array_type(typ, replace_boxed)
-    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
-    # it results in cast error for call dummy_unbox_series
-    if replace_boxed and isinstance(typ, BoxedSeriesType):
-        return series_to_array_type(typ, replace_boxed)
-    if isinstance(typ, (types.Tuple, types.UniTuple)):
-        return types.Tuple(
-            [if_series_to_array_type(t, replace_boxed) for t in typ.types])
-    # TODO: other types than can have Series inside: list, set, etc.
-    return typ
 
 
 # dummy func to convert input series to array type
