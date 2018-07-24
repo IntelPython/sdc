@@ -235,6 +235,13 @@ class SeriesAttribute(AttributeTemplate):
         sig.return_type = arr_to_series_type(sig.return_type)
         return sig
 
+    @bound_function("array.take")
+    def resolve_take(self, ary, args, kws):
+        resolver = ArrayAttribute.resolve_take.__wrapped__
+        sig = resolver(self, ary, args, kws)
+        sig.return_type = arr_to_series_type(sig.return_type)
+        return sig
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)
