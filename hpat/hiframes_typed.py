@@ -68,9 +68,12 @@ class HiFramesTyped(object):
                 # TODO: handle string arrays, etc.
                 assert typ.typing_key.startswith('array.')
                 attr = typ.typing_key[len('array.'):]
-                resolver = getattr(ArrayAttribute, 'resolve_'+attr).__wrapped__
-                new_typ = bound_function(typ.typing_key)(resolver)(
-                    ArrayAttribute(self.typingctx), this)
+                resolver = getattr(ArrayAttribute, 'resolve_'+attr)
+                # methods are either installed with install_array_method or
+                # using @bound_function in arraydecl.py
+                if hasattr(resolver, '__wrapped__'):
+                    resolver = bound_function(typ.typing_key)(resolver.__wrapped__)
+                new_typ = resolver(ArrayAttribute(self.typingctx), this)
                 replace_series[vname] = new_typ
 
         for vname, typ in replace_series.items():
