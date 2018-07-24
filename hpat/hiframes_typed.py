@@ -106,7 +106,7 @@ class HiFramesTyped(object):
                     # fix types with undefined dtypes in empty_inferred, etc.
                     return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
                     args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
-                    self.calltypes[call] = signature(return_type, *args)
+                    self.calltypes[call] = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
 
         if debug_prints():  # pragma: no cover
             print("--- types after Series replacement:", self.typemap)
