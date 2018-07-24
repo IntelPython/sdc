@@ -186,7 +186,7 @@ class HiFramesTyped(object):
                     a = column.astype(np.float64)
                 f_block = compile_to_numba_ir(f,
                                               {'hpat': hpat, 'np': np}, self.typingctx,
-                                              (self.typemap[in_arr.name],),
+                                              (if_series_to_array_type(self.typemap[in_arr.name]),),
                                               self.typemap, self.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [in_arr])
                 nodes = f_block.body[:-3]
@@ -235,8 +235,8 @@ class HiFramesTyped(object):
         f_blocks = compile_to_numba_ir(f,
                                         {'numba': numba, 'np': np, 'hpat': hpat},
                                         self.typingctx,
-                                        (self.typemap[arg1.name],
-                                        self.typemap[arg2.name]),
+                                        (if_series_to_array_type(self.typemap[arg1.name]),
+                                        if_series_to_array_type(self.typemap[arg2.name])),
                                         self.typemap, self.calltypes).blocks
         replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
         # replace == expression with result of parfor (S)
@@ -279,8 +279,8 @@ class HiFramesTyped(object):
             f = loc_vars['f']
             f_blocks = compile_to_numba_ir(f,
                                            {'numba': numba, 'np': np}, self.typingctx,
-                                           (self.typemap[arg1.name],
-                                            self.typemap[arg2.name]),
+                                           (if_series_to_array_type(self.typemap[arg1.name]),
+                                            if_series_to_array_type(self.typemap[arg2.name])),
                                            self.typemap, self.calltypes).blocks
             replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
             # replace == expression with result of parfor (S)
@@ -304,7 +304,7 @@ class HiFramesTyped(object):
                 _alloc_size = _in_arr.shape
                 _out_arr = np.empty(_alloc_size, _in_arr.dtype)
 
-        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (self.typemap[in_arr.name],),
+        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (if_series_to_array_type(self.typemap[in_arr.name]),),
                                         self.typemap, self.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [in_arr])
         nodes = f_block.body[:-3]  # remove none return
@@ -333,8 +333,8 @@ class HiFramesTyped(object):
         f_blocks = compile_to_numba_ir(f,
                                        {'numba': numba, 'np': np,
                                            'hpat': hpat}, self.typingctx,
-                                       (self.typemap[str_arr.name],
-                                        self.typemap[pat.name]),
+                                       (if_series_to_array_type(self.typemap[str_arr.name]),
+                                        if_series_to_array_type(self.typemap[pat.name])),
                                        self.typemap, self.calltypes).blocks
         replace_arg_nodes(f_blocks[min(f_blocks.keys())], [str_arr, pat])
         # replace call with result of parfor (S)
@@ -355,7 +355,7 @@ class HiFramesTyped(object):
             index_var = rhs.index
             f_blocks = compile_to_numba_ir(_column_filter_impl_float,
                                            {'numba': numba, 'np': np}, self.typingctx,
-                                           (self.typemap[lhs.name], self.typemap[in_arr.name],
+                                           (if_series_to_array_type(self.typemap[lhs.name]), if_series_to_array_type(self.typemap[in_arr.name]),
                                                self.typemap[index_var.name]),
                                            self.typemap, self.calltypes).blocks
             first_block = min(f_blocks.keys())
@@ -378,7 +378,7 @@ class HiFramesTyped(object):
 
             f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
-                                           (self.typemap[in_arr.name], types.intp),
+                                           (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
                                            self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_arr, ind])
             nodes = f_block.body[:-3]  # remove none return
@@ -390,7 +390,7 @@ class HiFramesTyped(object):
             f_blocks = compile_to_numba_ir(_column_count_impl,
                                            {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
-                                           (self.typemap[in_arr.name],),
+                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
                                            self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
@@ -406,8 +406,8 @@ class HiFramesTyped(object):
             val = rhs.args[2]
             f_blocks = compile_to_numba_ir(_column_fillna_impl,
                                            {'numba': numba, 'np': np}, self.typingctx,
-                                           (self.typemap[out_arr.name], self.typemap[in_arr.name],
-                                               self.typemap[val.name]),
+                                           (if_series_to_array_type(self.typemap[out_arr.name]), if_series_to_array_type(self.typemap[in_arr.name]),
+                                               if_series_to_array_type(self.typemap[val.name])),
                                            self.typemap, self.calltypes).blocks
             first_block = min(f_blocks.keys())
             replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
@@ -418,7 +418,7 @@ class HiFramesTyped(object):
             f_blocks = compile_to_numba_ir(_column_sum_impl,
                                            {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
-                                           (self.typemap[in_arr.name],),
+                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
                                            self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
@@ -433,7 +433,7 @@ class HiFramesTyped(object):
             f_blocks = compile_to_numba_ir(_column_mean_impl,
                                            {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
-                                           (self.typemap[in_arr.name],),
+                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
                                            self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
@@ -448,7 +448,7 @@ class HiFramesTyped(object):
             f_blocks = compile_to_numba_ir(_column_var_impl,
                                            {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
-                                           (self.typemap[in_arr.name],),
+                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
                                            self.typemap, self.calltypes).blocks
             topo_order = find_topo_order(f_blocks)
             first_block = topo_order[0]
