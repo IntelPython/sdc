@@ -23,7 +23,7 @@ import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
-    string_series_type, arr_to_series_type, arr_to_boxed_series_type,
+    string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
@@ -658,7 +658,7 @@ class ToSeriesType(AbstractTemplate):
         if isinstance(arr, BoxedSeriesType):
             series_type = SeriesType(arr.dtype, 1, 'C')
         else:
-            series_type = arr_to_series_type(arr)
+            series_type = if_arr_to_series_type(arr)
         assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
         return signature(series_type, arr)
 

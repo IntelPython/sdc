@@ -256,14 +256,14 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_argsort(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_argsort.__wrapped__
         sig = resolver(self, ary, args, kws)
-        sig.return_type = arr_to_series_type(sig.return_type)
+        sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
     @bound_function("array.take")
     def resolve_take(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_take.__wrapped__
         sig = resolver(self, ary, args, kws)
-        sig.return_type = arr_to_series_type(sig.return_type)
+        sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
 # TODO: use ops logic from pandas/core/ops.py
@@ -380,9 +380,7 @@ class GetItemSeries(AbstractTemplate):
         # TODO: string array, dt_index
         out = get_array_index_type(ary, idx)
         if out is not None:
-            ret_typ = arr_to_series_type(out.result)
-            if ret_typ is None:  # not array output
-                ret_typ = out.result
+            ret_typ = if_arr_to_series_type(out.result)
             return signature(ret_typ, ary, out.index)
 
 @infer
@@ -398,7 +396,7 @@ class SetItemSeries(SetItemBuffer):
         # TODO: strings, dt_index
         res = super(SetItemSeries, self).generic((ary, idx, val), kws)
         if res is not None:
-            new_series = arr_to_series_type(res.args[0])
+            new_series = if_arr_to_series_type(res.args[0])
             res.args = (new_series, res.args[1], res.args[2])
             return res
 
