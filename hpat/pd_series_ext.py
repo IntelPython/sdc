@@ -449,3 +449,9 @@ for func in numba.typing.npydecl.supported_ufuncs:
 
     if not name in _aliases:
         infer_global(func, types.Function(typing_class))
+
+@infer_global(len)
+class LenSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
+            return signature(types.intp, *args)
