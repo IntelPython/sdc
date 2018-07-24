@@ -93,7 +93,8 @@ class ConcatType(AbstractTemplate):
             ret_typ = string_array_type
         else:
             # use typer of np.concatenate
-            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list)
+            arr_list_to_arr = if_series_to_array_type(arr_list)
+            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list_to_arr)
 
         return signature(ret_typ, arr_list)
 
