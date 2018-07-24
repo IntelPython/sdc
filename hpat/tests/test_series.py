@@ -295,5 +295,13 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
+    def test_series_fillna(self):
+        def test_impl(A):
+            return A.fillna(5.0)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
 if __name__ == "__main__":
     unittest.main()
