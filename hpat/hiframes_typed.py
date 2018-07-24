@@ -8,7 +8,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem)
-from numba.typing.templates import Signature, bound_function
+from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
 from hpat.utils import get_definitions, debug_prints
@@ -55,7 +55,7 @@ class HiFramesTyped(object):
             blocks[label].body = new_body
 
         if debug_prints():  # pragma: no cover
-            print("types before Series replacement:", self.typemap)
+            print("--- types before Series replacement:", self.typemap)
             print("calltypes: ", self.calltypes)
 
         replace_series = {}
@@ -96,14 +96,21 @@ class HiFramesTyped(object):
                 argtyps = sig.args[:len(call.args)]
                 kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
 
-                new_call_typ = self.typemap[call.func.name].get_call_type(
+                new_sig = self.typemap[call.func.name].get_call_type(
                     self.typingctx , argtyps, kwtyps)
                 # calltypes of things like BoundFunction (array.call) need to
                 # be update for lowering to work
-                # XXX: new_call_typ could be None for things like np.int32()
-                if call in self.calltypes and new_call_typ is not None:
-                    self.calltypes.pop(call)
-                    self.calltypes[call] = new_call_typ
+                # XXX: new_sig could be None for things like np.int32()
+                if call in self.calltypes and new_sig is not None:
+                    old_sig = self.calltypes.pop(call)
+                    # fix types with undefined dtypes in empty_inferred, etc.
+                    return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
+                    args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
+                    self.calltypes[call] = signature(return_type, *args)
+
+        if debug_prints():  # pragma: no cover
+            print("--- types after Series replacement:", self.typemap)
+            print("calltypes: ", self.calltypes)
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
         return if_series_to_array_type(self.return_type)
@@ -456,6 +463,18 @@ class HiFramesTyped(object):
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
         return isinstance(typ, types.npytypes.Array) and typ.dtype == types.bool_
+
+def _fix_typ_undefs(new_typ, old_typ):
+    if isinstance(old_typ, (types.Array, SeriesType)):
+        assert isinstance(new_typ, (types.Array, SeriesType))
+        if new_typ.dtype == types.undefined:
+            return new_typ.copy(old_typ.dtype)
+    if isinstance(old_typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple([_fix_typ_undefs(t, u)
+                                for t, u in zip(new_typ.types, old_typ.types)])
+    # TODO: fix List, Set
+    return new_typ
+
 
 # float columns can have regular np.nan
 
