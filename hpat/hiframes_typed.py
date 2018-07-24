@@ -56,6 +56,8 @@ class HiFramesTyped(object):
 
         if debug_prints():  # pragma: no cover
             print("types before Series replacement:", self.typemap)
+            print("calltypes: ", self.calltypes)
+
         replace_series = {}
         for vname, typ in self.typemap.items():
             if isinstance(typ, SeriesType):
@@ -98,7 +100,8 @@ class HiFramesTyped(object):
                     self.typingctx , argtyps, kwtyps)
                 # calltypes of things like BoundFunction (array.call) need to
                 # be update for lowering to work
-                if call in self.calltypes:
+                # XXX: new_call_typ could be None for things like np.int32()
+                if call in self.calltypes and new_call_typ is not None:
                     self.calltypes.pop(call)
                     self.calltypes[call] = new_call_typ
 

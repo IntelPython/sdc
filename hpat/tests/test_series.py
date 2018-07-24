@@ -254,6 +254,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_np_typ_call_replace(self):
+        # calltype replacement is tricky for np.typ() calls since variable
+        # type can't provide calltype
+        def test_impl(i):
+            return np.int32(i)
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(1), test_impl(1))
+
     def test_series_ufunc1(self):
         def test_impl(A, i):
             return np.isinf(A).values
