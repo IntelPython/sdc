@@ -29,6 +29,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_create_series1(self):
+        def test_impl():
+            A = pd.Series([1,2,3])
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})

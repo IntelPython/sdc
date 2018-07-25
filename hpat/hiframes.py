@@ -288,6 +288,9 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        if fdef == ('Series', 'pandas'):
+            return self._handle_pd_Series(assign, lhs, rhs)
+
         if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
             return self._df_len(lhs, rhs.args[0])
 
@@ -395,6 +398,31 @@ class HiFrames(object):
         nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
+        return nodes
+
+    def _handle_pd_Series(self, assign, lhs, rhs):
+        """transform pd.Series(A) call
+        """
+        kws = dict(rhs.kws)
+        if 'data' in kws:
+            data = kws['data']
+            if len(rhs.args) != 0:  # pragma: no cover
+                raise ValueError(
+                    "only data argument suppoted in pd.Series()")
+        else:
+            if len(rhs.args) != 1:  # pragma: no cover
+                raise ValueError(
+                    "data argument in pd.Series() expected")
+            data = rhs.args[0]
+
+        def f(arr):  # pragma: no cover
+            df_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.fix_df_array(arr))
+        f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [data])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        self.df_cols.add(lhs.name)
         return nodes
 
     def _handle_pd_DatetimeIndex(self, assign, lhs, rhs):
