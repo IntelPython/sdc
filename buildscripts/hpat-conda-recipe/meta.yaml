@@ -19,22 +19,26 @@ requirements:
     - numba 0.39.*
     - numpy 1.14.*
     - pandas 0.23
-    - mpich # [not win]
     - pyarrow 0.9.*
+    - arrow-cpp
+    - parquet-cpp
     - boost
     - hdf5
     - h5py
+    - mpich # [not win]
 
   run:
     - python 3.6.*
     - numpy 1.14.*
     - pandas 0.23
-    - mpich # [not win]
     - pyarrow 0.9.*
+    - arrow-cpp
+    - parquet-cpp
     - boost
     - numba 0.39.*
     - hdf5
     - h5py
+    - mpich # [not win]
 
 test:
   imports:
