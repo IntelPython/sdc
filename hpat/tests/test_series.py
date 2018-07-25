@@ -83,6 +83,70 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_attr1(self):
+        def test_impl(A):
+            return A.size
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_attr2(self):
+        def test_impl(A):
+            return A.copy().values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_attr3(self):
+        def test_impl(A):
+            return A.min()
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_attr4(self):
+        def test_impl(A):
+            return A.cumsum().values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    @unittest.skip("needs argsort fix in canonicalize_array_math")
+    def test_series_attr5(self):
+        def test_impl(A):
+            return A.argsort().values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_attr6(self):
+        def test_impl(A):
+            return A.take([2,3]).values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_np_call_on_series1(self):
+        def test_impl(A):
+            return np.min(A)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
     def test_series_values1(self):
         def test_impl(A):
             return (A == 2).values
@@ -112,6 +176,21 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_setitem_series2(self):
+        def test_impl(A, i):
+            A[i] = 100
+            # TODO: remove return after aliasing fix
+            return A
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, 0)
+        test_impl(A2, 0)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[0]
@@ -130,6 +209,69 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_getitem_series_str1(self):
+        def test_impl(A, i):
+            return A[i]
+
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+
+    def test_series_op1(self):
+        def test_impl(A, i):
+            return A+A
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A, 0), test_impl(df.A, 0))
+
+    def test_series_op2(self):
+        def test_impl(A, i):
+            return A+i
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
+
+    def test_series_op3(self):
+        def test_impl(A, i):
+            A += i
+            return A
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A.copy(), 1), test_impl(df.A, 1))
+
+    def test_series_len(self):
+        def test_impl(A, i):
+            return len(A)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+
+    def test_np_typ_call_replace(self):
+        # calltype replacement is tricky for np.typ() calls since variable
+        # type can't provide calltype
+        def test_impl(i):
+            return np.int32(i)
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(1), test_impl(1))
+
+    def test_series_ufunc1(self):
+        def test_impl(A, i):
+            return np.isinf(A).values
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
+
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
@@ -142,6 +284,24 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(isinstance(one, np.ndarray))
         self.assertTrue(isinstance(two,  np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
+
+    @unittest.skip("needs empty_like typing fix in npydecl.py")
+    def test_series_empty_like(self):
+        def test_impl(A):
+            return np.empty_like(A)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
+
+    def test_series_fillna(self):
+        def test_impl(A):
+            return A.fillna(5.0)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
 if __name__ == "__main__":
     unittest.main()

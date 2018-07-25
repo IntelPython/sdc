@@ -37,7 +37,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_set_column2(self):
         # create new column
@@ -51,7 +51,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_len_df(self):
         def test_impl(n):

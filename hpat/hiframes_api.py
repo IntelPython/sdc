@@ -22,7 +22,9 @@ from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_b
 import numpy as np
 from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
-from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type, arr_to_series_type, arr_to_boxed_series_type, series_to_array_type
+from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
+    string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
+    series_to_array_type, if_series_to_array_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -91,7 +93,8 @@ class ConcatType(AbstractTemplate):
             ret_typ = string_array_type
         else:
             # use typer of np.concatenate
-            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list)
+            arr_list_to_arr = if_series_to_array_type(arr_list)
+            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list_to_arr)
 
         return signature(ret_typ, arr_list)
 
@@ -656,7 +659,7 @@ class ToSeriesType(AbstractTemplate):
         if isinstance(arr, BoxedSeriesType):
             series_type = SeriesType(arr.dtype, 1, 'C')
         else:
-            series_type = arr_to_series_type(arr)
+            series_type = if_arr_to_series_type(arr)
         assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
         return signature(series_type, arr)
 
@@ -664,19 +667,21 @@ class ToSeriesType(AbstractTemplate):
 def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
-def if_series_to_array_type(typ, replace_boxed=False):
-    if isinstance(typ, SeriesType):
-        return series_to_array_type(typ, replace_boxed)
-    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
-    # it results in cast error for call dummy_unbox_series
-    if replace_boxed and isinstance(typ, BoxedSeriesType):
-        return series_to_array_type(typ, replace_boxed)
-    if isinstance(typ, (types.Tuple, types.UniTuple)):
-        return types.Tuple(
-            [if_series_to_array_type(t, replace_boxed) for t in typ.types])
-    # TODO: other types than can have Series inside: list, set, etc.
-    return typ
 
+def to_arr_from_series(arr):
+    return arr
+
+@infer_global(to_arr_from_series)
+class ToArrFromSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        return signature(if_series_to_array_type(arr), arr)
+
+@lower_builtin(to_arr_from_series, types.Any)
+def to_arr_from_series_dummy_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 # dummy func to convert input series to array type
 def dummy_unbox_series(arr):

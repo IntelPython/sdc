@@ -1881,20 +1881,13 @@ class HiFrames(object):
 
 
 def gen_empty_like(in_arr, out_arr):
-    scope = in_arr.scope
-    loc = in_arr.loc
-    # g_np_var = Global(numpy)
-    g_np_var = ir.Var(scope, mk_unique_var("$np_g_var"), loc)
-    g_np = ir.Global('np', np, loc)
-    g_np_assign = ir.Assign(g_np, g_np_var, loc)
-    # attr call: empty_attr = getattr(g_np_var, empty_like)
-    empty_attr_call = ir.Expr.getattr(g_np_var, "empty_like", loc)
-    attr_var = ir.Var(scope, mk_unique_var("$empty_attr_attr"), loc)
-    attr_assign = ir.Assign(empty_attr_call, attr_var, loc)
-    # alloc call: out_arr = empty_attr(in_arr)
-    alloc_call = ir.Expr.call(attr_var, [in_arr], (), loc)
-    alloc_assign = ir.Assign(alloc_call, out_arr, loc)
-    return [g_np_assign, attr_assign, alloc_assign]
+    def f(A):  # pragma: no cover
+        B = np.empty(A.shape, A.dtype)
+    f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [in_arr])
+    nodes = f_block.body[:-3]  # remove none return
+    nodes[-1].target = out_arr
+    return nodes
 
 
 def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
@@ -1918,8 +1911,10 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
     stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
 
     def f(A, B, f):  # pragma: no cover
-        numba.stencil(f)(A, out=B)
-    f_block = compile_to_numba_ir(f, {'numba': numba}).blocks.popitem()[1]
+        in_arr = hpat.hiframes_api.to_arr_from_series(A)
+        numba.stencil(f)(in_arr, out=B)
+    f_block = compile_to_numba_ir(f, {'numba': numba,
+        'hpat': hpat}).blocks.popitem()[1]
     replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
     stencil_nodes += f_block.body[:-3]  # remove none return
     setup_call = stencil_nodes[-2].value
