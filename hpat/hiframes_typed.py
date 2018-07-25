@@ -161,7 +161,7 @@ class HiFramesTyped(object):
         return [assign]
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
-        if func_name == 'to_series_type':
+        if func_name in ('to_series_type', 'to_arr_from_series'):
             assign.value = rhs.args[0]
             return [assign]
 

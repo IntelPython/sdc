@@ -1911,8 +1911,10 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
     stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
 
     def f(A, B, f):  # pragma: no cover
-        numba.stencil(f)(A, out=B)
-    f_block = compile_to_numba_ir(f, {'numba': numba}).blocks.popitem()[1]
+        in_arr = hpat.hiframes_api.to_arr_from_series(A)
+        numba.stencil(f)(in_arr, out=B)
+    f_block = compile_to_numba_ir(f, {'numba': numba,
+        'hpat': hpat}).blocks.popitem()[1]
     replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
     stencil_nodes += f_block.body[:-3]  # remove none return
     setup_call = stencil_nodes[-2].value

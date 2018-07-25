@@ -668,6 +668,21 @@ def to_series_dummy_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
+def to_arr_from_series(arr):
+    return arr
+
+@infer_global(to_arr_from_series)
+class ToArrFromSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        return signature(if_series_to_array_type(arr), arr)
+
+@lower_builtin(to_arr_from_series, types.Any)
+def to_arr_from_series_dummy_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
 # dummy func to convert input series to array type
 def dummy_unbox_series(arr):
     return arr
