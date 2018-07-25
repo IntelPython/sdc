@@ -374,21 +374,37 @@ class GetItemSeries(AbstractTemplate):
 
     def generic(self, args, kws):
         assert not kws
-        [series, idx] = args
-        if not isinstance(series, SeriesType):
+        [in_arr, in_idx] = args
+        is_arr_series = False
+        is_idx_series = False
+
+        if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
             return None
-        ary = series_to_array_type(series)
+
+        if isinstance(in_arr, SeriesType):
+            in_arr = series_to_array_type(in_arr)
+            is_arr_series = True
+
+        if isinstance(in_idx, SeriesType):
+            in_idx = series_to_array_type(in_idx)
+            is_idx_series = True
 
         # TODO: dt_index
-        if ary == string_array_type:
-            sig = GetItemStringArray.generic(self, (ary, idx), kws)
+        if in_arr == string_array_type:
+            sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
         else:
-            out = get_array_index_type(ary, idx)
-            sig = signature(out.result, ary, out.index)
+            out = get_array_index_type(in_arr, in_idx)
+            sig = signature(out.result, in_arr, out.index)
 
         if sig is not None:
-            sig.return_type = if_arr_to_series_type(sig.return_type)
-            sig.args = tuple(if_arr_to_series_type(a) for a in sig.args)
+            arg1 = sig.args[0]
+            arg2 = sig.args[1]
+            if is_arr_series:
+                sig.return_type = if_arr_to_series_type(sig.return_type)
+                arg1 = if_arr_to_series_type(arg1)
+            if is_idx_series:
+                arg2 = if_arr_to_series_type(arg2)
+            sig.args = (arg1, arg2)
         return sig
 
 @infer
