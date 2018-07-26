@@ -78,6 +78,55 @@ bool pq_exclude_file(const std::string &file_name)
 }
 
 
+std::vector<std::string> get_pq_pieces(std::string* file_name)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return std::vector<std::string>();}
+
+    std::vector<std::string> paths;
+
+    auto gilstate = PyGILState_Ensure();
+
+    // import pyarrow.parquet, FIXME: is this import reliable?
+    PyObject* pq_mod = PyImport_ImportModule("pyarrow.parquet");
+
+    // ds = pq.ParquetDataset(file_name)
+    PyObject* ds = PyObject_CallMethod(pq_mod, "ParquetDataset", "s", file_name->c_str());
+    CHECK(!PyErr_Occurred(), "Python error during Parquet dataset metadata")
+    Py_DECREF(pq_mod);
+
+    // all_peices = ds.pieces
+    PyObject* all_peices = PyObject_GetAttrString(ds, "pieces");
+    Py_DECREF(ds);
+
+    // paths.append(piece.path) for piece in all peices
+    PyObject *iterator = PyObject_GetIter(all_peices);
+    Py_DECREF(all_peices);
+    PyObject *piece;
+
+    if (iterator == NULL) {
+        // printf("empty\n");
+        PyGILState_Release(gilstate);
+        Py_DECREF(iterator);
+        return paths;
+    }
+
+    while (piece = PyIter_Next(iterator)) {
+        PyObject* p = PyObject_GetAttrString(piece, "path");
+        const char *c_path = PyUnicode_AsUTF8(p);
+        // printf("piece %s\n", c_path);
+        paths.push_back(std::string(c_path));
+        Py_DECREF(piece);
+        Py_DECREF(p);
+    }
+
+    Py_DECREF(iterator);
+
+    CHECK(!PyErr_Occurred(), "Python error during Parquet dataset metadata")
+    PyGILState_Release(gilstate);
+    return paths;
+#undef CHECK
+}
+
 std::vector<std::string> get_dir_pq_files(boost::filesystem::path &f_path)
 {
     std::vector<std::string> all_files;
