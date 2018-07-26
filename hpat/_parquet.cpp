@@ -119,6 +119,10 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 {
     std::vector<std::string> all_files = get_pq_pieces(file_name);
+    if (all_files.size() == 0) {
+        printf("empty parquet dataset\n");
+        return 0;
+    }
 
     if (all_files.size() > 1)
     {
@@ -135,7 +139,7 @@ int64_t pq_get_size(std::string* file_name, int64_t column_idx)
     }
     else
     {
-        return pq_get_size_single_file(file_name->c_str(), column_idx);
+        return pq_get_size_single_file(all_files[0].c_str(), column_idx);
     }
     return 0;
 }
@@ -144,6 +148,10 @@ int64_t pq_read(std::string* file_name, int64_t column_idx,
                 uint8_t *out_data, int out_dtype)
 {
     std::vector<std::string> all_files = get_pq_pieces(file_name);
+    if (all_files.size() == 0) {
+        printf("empty parquet dataset\n");
+        return 0;
+    }
 
     if (all_files.size() > 1)
     {
@@ -161,7 +169,7 @@ int64_t pq_read(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_single_file(file_name->c_str(), column_idx, out_data, out_dtype);
+        return pq_read_single_file(all_files[0].c_str(), column_idx, out_data, out_dtype);
     }
     return 0;
 }
@@ -177,6 +185,10 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
     }
 
     std::vector<std::string> all_files = get_pq_pieces(file_name);
+    if (all_files.size() == 0) {
+        printf("empty parquet dataset\n");
+        return 0;
+    }
 
     if (all_files.size() > 1)
     {
@@ -216,7 +228,7 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_parallel_single_file(file_name->c_str(), column_idx,
+        return pq_read_parallel_single_file(all_files[0].c_str(), column_idx,
                                         out_data, out_dtype, start, count);
     }
     return 0;
@@ -227,6 +239,10 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
 {
 
     std::vector<std::string> all_files = get_pq_pieces(file_name);
+    if (all_files.size() == 0) {
+        printf("empty parquet dataset\n");
+        return 0;
+    }
 
     if (all_files.size() > 1)
     {
@@ -265,7 +281,7 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_string_single_file(file_name->c_str(), column_idx, out_offsets, out_data);
+        return pq_read_string_single_file(all_files[0].c_str(), column_idx, out_offsets, out_data);
     }
     return 0;
 }
@@ -277,6 +293,10 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     //                                 file_name->c_str(), column_idx, start, count);
 
     std::vector<std::string> all_files = get_pq_pieces(file_name);
+    if (all_files.size() == 0) {
+        printf("empty parquet dataset\n");
+        return 0;
+    }
 
     if (all_files.size() > 1)
     {
@@ -333,7 +353,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_string_parallel_single_file(file_name->c_str(), column_idx,
+        return pq_read_string_parallel_single_file(all_files[0].c_str(), column_idx,
                 out_offsets, out_data, start, count);
     }
     return 0;
