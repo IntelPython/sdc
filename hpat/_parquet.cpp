@@ -4,8 +4,6 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem.hpp>
 
 // just include parquet reader on Windows since the GCC ABI change issue
 // doesn't exist, and VC linker removes unused lib symbols
@@ -68,15 +66,6 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     return m;
 }
 
-bool pq_exclude_file(const std::string &file_name)
-{
-    return ( file_name.compare("_SUCCESS")==0
-            || boost::algorithm::ends_with(file_name, "/_SUCCESS")
-            || boost::algorithm::ends_with(file_name, "_common_metadata")
-            || boost::algorithm::ends_with(file_name, "_metadata")
-            || boost::algorithm::ends_with(file_name, ".crc"));
-}
-
 
 std::vector<std::string> get_pq_pieces(std::string* file_name)
 {
@@ -127,41 +116,15 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
 #undef CHECK
 }
 
-std::vector<std::string> get_dir_pq_files(boost::filesystem::path &f_path)
-{
-    std::vector<std::string> all_files;
-
-    for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(f_path))
-    {
-        std::string inner_file = x.path().string();
-        // std::cout << inner_file << '\n';
-        if (!pq_exclude_file(inner_file))
-            all_files.push_back(inner_file);
-    }
-    // sort file names to match pyarrow order
-    std::sort(all_files.begin(), all_files.end());
-    return all_files;
-}
-
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 {
-    bool is_hdfs = file_name->find("hdfs://")==0;
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
 
-    // TODO: run on rank 0 and broadcast
-    boost::filesystem::path f_path(*file_name);
-
-    // TODO: check HDFS file existence
-    if (!is_hdfs && !boost::filesystem::exists(f_path))
-    {
-        std::cerr << "pq get size - parquet file path does not exist: " << *file_name << '\n';
-        return 0;
-    }
-
-    if (!is_hdfs && boost::filesystem::is_directory(f_path))
+    if (all_files.size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
         int64_t ret = 0;
-        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        std::vector<std::string> all_files = get_pq_pieces(file_name);
         for (const auto& inner_file : all_files)
         {
             ret += pq_get_size_single_file(inner_file.c_str(), column_idx);
@@ -180,21 +143,12 @@ int64_t pq_get_size(std::string* file_name, int64_t column_idx)
 int64_t pq_read(std::string* file_name, int64_t column_idx,
                 uint8_t *out_data, int out_dtype)
 {
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
 
-    bool is_hdfs = file_name->find("hdfs://")==0;
-
-    // TODO: run on rank 0 and broadcast
-    boost::filesystem::path f_path(*file_name);
-
-    // TODO: check HDFS file existence
-    if (!is_hdfs && !boost::filesystem::exists(f_path))
-        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
-
-    // TODO: support HDFS directory
-    if (!is_hdfs && boost::filesystem::is_directory(f_path))
+    if (all_files.size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         int64_t byte_offset = 0;
         for (const auto& inner_file : all_files)
@@ -222,20 +176,13 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         return 0;
     }
 
-    bool is_hdfs = file_name->find("hdfs://")==0;
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
 
-    // TODO: run on rank 0 and broadcast
-    boost::filesystem::path f_path(*file_name);
-
-    // TODO: check HDFS file existence
-    if (!is_hdfs && !boost::filesystem::exists(f_path))
-        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
-
-    if (!is_hdfs && boost::filesystem::is_directory(f_path))
+    if (all_files.size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
         // TODO: get file sizes on root rank only
-        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         // skip whole files if no need to read any rows
         int file_ind = 0;
@@ -278,23 +225,13 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
 int pq_read_string(std::string* file_name, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data)
 {
-    // std::cout << "string read file" << *file_name << '\n';
-    bool is_hdfs = file_name->find("hdfs://")==0;
 
-    // TODO: run on rank 0 and broadcast
-    boost::filesystem::path f_path(*file_name);
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
 
-    // TODO: check HDFS file existence
-    if (!is_hdfs && !boost::filesystem::exists(f_path))
-    {
-        std::cerr << "parquet file path does not exist: " << *file_name << '\n';
-        return 0;
-    }
-
-    if (!is_hdfs && boost::filesystem::is_directory(f_path))
+    if (all_files.size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
@@ -339,22 +276,12 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     // printf("read parquet parallel str file: %s column: %lld start: %lld count: %lld\n",
     //                                 file_name->c_str(), column_idx, start, count);
 
-    bool is_hdfs = file_name->find("hdfs://")==0;
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
 
-    // TODO: run on rank 0 and broadcast
-    boost::filesystem::path f_path(*file_name);
-
-    // TODO: check HDFS file existence
-    if (!is_hdfs && !boost::filesystem::exists(f_path))
-    {
-        std::cerr << "read parquet parallel str column - parquet file path does not exist: " << *file_name << '\n';
-        return 0;
-    }
-
-    if (!is_hdfs && boost::filesystem::is_directory(f_path))
+    if (all_files.size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_dir_pq_files(f_path);
+        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         // skip whole files if no need to read any rows
         int file_ind = 0;
