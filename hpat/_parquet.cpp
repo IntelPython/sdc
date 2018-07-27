@@ -23,15 +23,15 @@ int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
 extern "C" {
 
 void pq_init_reader(const char* file_name, std::shared_ptr<FileReader> *a_reader);
-int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx);
-int64_t pq_read_single_file(const char* file_name, int64_t column_idx, uint8_t *out,
+int64_t pq_get_size_single_file(std::shared_ptr<FileReader>, int64_t column_idx);
+int64_t pq_read_single_file(std::shared_ptr<FileReader>, int64_t column_idx, uint8_t *out,
                 int out_dtype);
-int pq_read_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
-int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
+int64_t pq_read_string_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
                                 uint32_t **out_offsets, uint8_t **out_data,
     std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
-int pq_read_string_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_string_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
         std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
 
@@ -43,14 +43,14 @@ FileReaderVec* get_arrow_readers(std::string* file_name);
 void del_arrow_readers(FileReaderVec *readers);
 
 PyObject* str_list_to_vec(PyObject* self, PyObject* str_list);
-int64_t pq_get_size(std::string* file_name, int64_t column_idx);
-int64_t pq_read(std::string* file_name, int64_t column_idx,
+int64_t pq_get_size(FileReaderVec *readers, int64_t column_idx);
+int64_t pq_read(FileReaderVec *readers, int64_t column_idx,
                 uint8_t *out_data, int out_dtype);
-int pq_read_parallel(std::string* file_name, int64_t column_idx,
+int pq_read_parallel(FileReaderVec *readers, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
-int pq_read_string(std::string* file_name, int64_t column_idx,
+int pq_read_string(FileReaderVec *readers, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data);
-int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
+int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
 
 static PyMethodDef parquet_cpp_methods[] = {
@@ -187,22 +187,20 @@ void del_arrow_readers(FileReaderVec *readers)
     return;
 }
 
-int64_t pq_get_size(std::string* file_name, int64_t column_idx)
+int64_t pq_get_size(FileReaderVec *readers, int64_t column_idx)
 {
-    std::vector<std::string> all_files = get_pq_pieces(file_name);
-    if (all_files.size() == 0) {
+    if (readers->size() == 0) {
         printf("empty parquet dataset\n");
         return 0;
     }
 
-    if (all_files.size() > 1)
+    if (readers->size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
         int64_t ret = 0;
-        std::vector<std::string> all_files = get_pq_pieces(file_name);
-        for (const auto& inner_file : all_files)
+        for (size_t i=0; i<readers->size(); i++)
         {
-            ret += pq_get_size_single_file(inner_file.c_str(), column_idx);
+            ret += pq_get_size_single_file(readers->at(i), column_idx);
         }
 
         // std::cout << "total pq dir size: " << ret << '\n';
@@ -210,29 +208,27 @@ int64_t pq_get_size(std::string* file_name, int64_t column_idx)
     }
     else
     {
-        return pq_get_size_single_file(all_files[0].c_str(), column_idx);
+        return pq_get_size_single_file(readers->at(0), column_idx);
     }
     return 0;
 }
 
-int64_t pq_read(std::string* file_name, int64_t column_idx,
+int64_t pq_read(FileReaderVec *readers, int64_t column_idx,
                 uint8_t *out_data, int out_dtype)
 {
-    std::vector<std::string> all_files = get_pq_pieces(file_name);
-    if (all_files.size() == 0) {
+    if (readers->size() == 0) {
         printf("empty parquet dataset\n");
         return 0;
     }
 
-    if (all_files.size() > 1)
+    if (readers->size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         int64_t byte_offset = 0;
-        for (const auto& inner_file : all_files)
+        for (size_t i=0; i<readers->size(); i++)
         {
-            byte_offset += pq_read_single_file(inner_file.c_str(), column_idx, out_data+byte_offset, out_dtype);
+            byte_offset += pq_read_single_file(readers->at(i), column_idx, out_data+byte_offset, out_dtype);
         }
 
         // std::cout << "total pq dir size: " << byte_offset << '\n';
@@ -240,12 +236,12 @@ int64_t pq_read(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_single_file(all_files[0].c_str(), column_idx, out_data, out_dtype);
+        return pq_read_single_file(readers->at(0), column_idx, out_data, out_dtype);
     }
     return 0;
 }
 
-int pq_read_parallel(std::string* file_name, int64_t column_idx,
+int pq_read_parallel(FileReaderVec *readers, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count)
 {
     // printf("read parquet parallel column: %lld start: %lld count: %lld\n",
@@ -255,26 +251,24 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         return 0;
     }
 
-    std::vector<std::string> all_files = get_pq_pieces(file_name);
-    if (all_files.size() == 0) {
+    if (readers->size() == 0) {
         printf("empty parquet dataset\n");
         return 0;
     }
 
-    if (all_files.size() > 1)
+    if (readers->size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
         // TODO: get file sizes on root rank only
-        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         // skip whole files if no need to read any rows
         int file_ind = 0;
-        int64_t file_size = pq_get_size_single_file(all_files[0].c_str(), column_idx);
+        int64_t file_size = pq_get_size_single_file(readers->at(0), column_idx);
         while (start >= file_size)
         {
             start -= file_size;
             file_ind++;
-            file_size = pq_get_size_single_file(all_files[file_ind].c_str(), column_idx);
+            file_size = pq_get_size_single_file(readers->at(file_ind), column_idx);
         }
 
         int dtype_size = pq_type_sizes[out_dtype];
@@ -285,48 +279,46 @@ int pq_read_parallel(std::string* file_name, int64_t column_idx,
         while (read_rows<count)
         {
             int64_t rows_to_read = std::min(count-read_rows, file_size-start);
-            pq_read_parallel_single_file(all_files[file_ind].c_str(), column_idx,
+            pq_read_parallel_single_file(readers->at(file_ind), column_idx,
                 out_data+read_rows*dtype_size, out_dtype, start, rows_to_read);
             read_rows += rows_to_read;
             start = 0;  // start becomes 0 after reading non-empty first chunk
             file_ind++;
             // std::cout << "next file: " << all_files[file_ind] << '\n';
             if (read_rows<count)
-                file_size = pq_get_size_single_file(all_files[file_ind].c_str(), column_idx);
+                file_size = pq_get_size_single_file(readers->at(file_ind), column_idx);
         }
         return 0;
         // std::cout << "total pq dir size: " << byte_offset << '\n';
     }
     else
     {
-        return pq_read_parallel_single_file(all_files[0].c_str(), column_idx,
+        return pq_read_parallel_single_file(readers->at(0), column_idx,
                                         out_data, out_dtype, start, count);
     }
     return 0;
 }
 
-int pq_read_string(std::string* file_name, int64_t column_idx,
+int pq_read_string(FileReaderVec *readers, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data)
 {
 
-    std::vector<std::string> all_files = get_pq_pieces(file_name);
-    if (all_files.size() == 0) {
+    if (readers->size() == 0) {
         printf("empty parquet dataset\n");
         return 0;
     }
 
-    if (all_files.size() > 1)
+    if (readers->size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
         int32_t last_offset = 0;
         int64_t res = 0;
-        for (const auto& inner_file : all_files)
+        for (size_t i=0; i<readers->size(); i++)
         {
-            int64_t n_vals = pq_read_string_single_file(inner_file.c_str(), column_idx, NULL, NULL, &offset_vec, &data_vec);
+            int64_t n_vals = pq_read_string_single_file(readers->at(i), column_idx, NULL, NULL, &offset_vec, &data_vec);
             if (n_vals==-1)
                 continue;
 
@@ -352,36 +344,34 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_string_single_file(all_files[0].c_str(), column_idx, out_offsets, out_data);
+        return pq_read_string_single_file(readers->at(0), column_idx, out_offsets, out_data);
     }
     return 0;
 }
 
-int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
+int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count)
 {
     // printf("read parquet parallel str file: %s column: %lld start: %lld count: %lld\n",
     //                                 file_name->c_str(), column_idx, start, count);
 
-    std::vector<std::string> all_files = get_pq_pieces(file_name);
-    if (all_files.size() == 0) {
+    if (readers->size() == 0) {
         printf("empty parquet dataset\n");
         return 0;
     }
 
-    if (all_files.size() > 1)
+    if (readers->size() > 1)
     {
         // std::cout << "pq path is dir" << '\n';
-        std::vector<std::string> all_files = get_pq_pieces(file_name);
 
         // skip whole files if no need to read any rows
         int file_ind = 0;
-        int64_t file_size = pq_get_size_single_file(all_files[0].c_str(), column_idx);
+        int64_t file_size = pq_get_size_single_file(readers->at(0), column_idx);
         while (start >= file_size)
         {
             start -= file_size;
             file_ind++;
-            file_size = pq_get_size_single_file(all_files[file_ind].c_str(), column_idx);
+            file_size = pq_get_size_single_file(readers->at(file_ind), column_idx);
         }
 
         int64_t res = 0;
@@ -396,7 +386,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
             int64_t rows_to_read = std::min(count-read_rows, file_size-start);
             if (rows_to_read>0)
             {
-                pq_read_string_parallel_single_file(all_files[file_ind].c_str(), column_idx,
+                pq_read_string_parallel_single_file(readers->at(file_ind), column_idx,
                     NULL, NULL, start, rows_to_read, &offset_vec, &data_vec);
 
                 int size = offset_vec.size();
@@ -411,7 +401,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
             start = 0;  // start becomes 0 after reading non-empty first chunk
             file_ind++;
             if (read_rows<count)
-                file_size = pq_get_size_single_file(all_files[file_ind].c_str(), column_idx);
+                file_size = pq_get_size_single_file(readers->at(file_ind), column_idx);
         }
         offset_vec.push_back(last_offset);
 
@@ -424,7 +414,7 @@ int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
     }
     else
     {
-        return pq_read_string_parallel_single_file(all_files[0].c_str(), column_idx,
+        return pq_read_string_parallel_single_file(readers->at(0), column_idx,
                 out_offsets, out_data, start, count);
     }
     return 0;

@@ -129,11 +129,11 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
 
     func_text = 'def f(fname):\n'
     func_text += '  arrow_readers = get_arrow_readers(fname)\n'
-    func_text += '  col_size = get_column_size_parquet(fname, {})\n'.format(i)
+    func_text += '  col_size = get_column_size_parquet(arrow_readers, {})\n'.format(i)
     # generate strings differently
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_parquet_str(fname, {}, col_size)\n'.format(
+        func_text += '  column = read_parquet_str(arrow_readers, {}, col_size)\n'.format(
             i)
     else:
         el_type = get_element_type(c_type.dtype)
@@ -143,7 +143,7 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
         else:
             func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
                 el_type)
-        func_text += '  status = read_parquet(fname, {}, column, np.int32({}))\n'.format(
+        func_text += '  status = read_parquet(arrow_readers, {}, column, np.int32({}))\n'.format(
             i, _type_to_pq_dtype_number[el_type])
     func_text += '  del_arrow_readers(arrow_readers)\n'
 
@@ -263,7 +263,7 @@ if _has_pyarrow:
     ll.add_symbol('pq_read_string_parallel', parquet_cpp.read_string_parallel)
 
 
-@lower_builtin(get_column_size_parquet, StringType, types.intp)
+@lower_builtin(get_column_size_parquet, types.Opaque('arrow_reader'), types.intp)
 def pq_size_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -271,7 +271,7 @@ def pq_size_lower(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(read_parquet, StringType, types.intp, types.Array, types.int32)
+@lower_builtin(read_parquet, types.Opaque('arrow_reader'), types.intp, types.Array, types.int32)
 def pq_read_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -285,7 +285,7 @@ def pq_read_lower(context, builder, sig, args):
                              args[3]])
 
 
-@lower_builtin(read_parquet_parallel, StringType, types.intp, types.Array, types.int32, types.intp, types.intp)
+@lower_builtin(read_parquet_parallel, types.Opaque('arrow_reader'), types.intp, types.Array, types.int32, types.intp, types.intp)
 def pq_read_parallel_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -302,7 +302,7 @@ def pq_read_parallel_lower(context, builder, sig, args):
 # read strings
 
 
-@lower_builtin(read_parquet_str, StringType, types.intp, types.intp)
+@lower_builtin(read_parquet_str, types.Opaque('arrow_reader'), types.intp, types.intp)
 def pq_read_string_lower(context, builder, sig, args):
     typ = sig.return_type
     dtype = StringArrayPayloadType()
@@ -332,7 +332,7 @@ def pq_read_string_lower(context, builder, sig, args):
     return impl_ret_new_ref(context, builder, typ, ret)
 
 
-@lower_builtin(read_parquet_str_parallel, StringType, types.intp, types.intp, types.intp)
+@lower_builtin(read_parquet_str_parallel, types.Opaque('arrow_reader'), types.intp, types.intp, types.intp)
 def pq_read_string_parallel_lower(context, builder, sig, args):
     typ = sig.return_type
     dtype = StringArrayPayloadType()

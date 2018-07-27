@@ -463,7 +463,7 @@ class DistributedPass(object):
                                                               arr, out_dtype, start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (string_type, types.intp,
+                                          (self.typemap[rhs.args[0].name], types.intp,
                                            self.typemap[arr], types.int32, types.intp, types.intp),
                                           self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
@@ -488,7 +488,7 @@ class DistributedPass(object):
                                                                   start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (string_type, types.intp,
+                                          (self.typemap[rhs.args[0].name], types.intp,
                                            types.intp, types.intp),
                                           self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
