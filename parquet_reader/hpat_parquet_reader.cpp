@@ -18,16 +18,16 @@ using parquet::ParquetFileReader;
 
 extern "C" {
 
-int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx);
-int64_t pq_read_single_file(const char* file_name, int64_t column_idx, uint8_t *out,
+int64_t pq_get_size_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx);
+int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx, uint8_t *out,
                 int out_dtype);
-int pq_read_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 
-int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
+int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
                                 uint32_t **out_offsets, uint8_t **out_data,
     std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
-int pq_read_string_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
         std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
 
@@ -46,22 +46,18 @@ void pq_init_reader(const char* file_name,
 static int pq_type_sizes[] = {1, 4, 8, 8, 4, 8};
 
 
-int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx)
+int64_t pq_get_size_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
 {
 
-    std::shared_ptr<FileReader> arrow_reader;
-    pq_init_reader(file_name, &arrow_reader);
     int64_t nrows = arrow_reader->parquet_reader()->metadata()->num_rows();
     // std::cout << nrows << std::endl;
     return nrows;
 }
 
-int64_t pq_read_single_file(const char* file_name, int64_t column_idx,
+int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
                 uint8_t *out_data, int out_dtype)
 {
 
-    std::shared_ptr<FileReader> arrow_reader;
-    pq_init_reader(file_name, &arrow_reader);
 
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
@@ -89,15 +85,13 @@ int64_t pq_read_single_file(const char* file_name, int64_t column_idx,
     return num_values*dtype_size;
 }
 
-int pq_read_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count)
 {
 
     if (count==0) {
         return 0;
     }
-    std::shared_ptr<FileReader> arrow_reader;
-    pq_init_reader(file_name, &arrow_reader);
 
     int64_t n_row_groups = arrow_reader->parquet_reader()->metadata()->num_row_groups();
     std::vector<int> column_indices;
@@ -288,13 +282,11 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
     return;
 }
 
-int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
+int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data,
     std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
 {
     // std::cout << "string read file" << *file_name << '\n';
-    std::shared_ptr<FileReader> arrow_reader;
-    pq_init_reader(file_name, &arrow_reader);
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
@@ -341,7 +333,7 @@ int64_t pq_read_string_single_file(const char* file_name, int64_t column_idx,
     return num_values;
 }
 
-int pq_read_string_parallel_single_file(const char* file_name, int64_t column_idx,
+int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
     std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
 {
@@ -354,8 +346,6 @@ int pq_read_string_parallel_single_file(const char* file_name, int64_t column_id
         return 0;
     }
 
-    std::shared_ptr<FileReader> arrow_reader;
-    pq_init_reader(file_name, &arrow_reader);
     int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
                                             ColumnChunk(column_idx)->type();
     if (dtype!=6) // TODO: get constant from parquet-cpp
