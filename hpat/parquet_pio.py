@@ -12,7 +12,7 @@ from numba.typing import signature
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
 import hpat
-from hpat.str_ext import StringType
+from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
@@ -127,8 +127,9 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
 
     loc = cvar.loc
 
-    func_text = ('def f(fname):\n  col_size = get_column_size_parquet(fname, {})\n'.
-                 format(i))
+    func_text = 'def f(fname):\n'
+    func_text += '  arrow_readers = get_arrow_readers(fname)\n'
+    func_text += '  col_size = get_column_size_parquet(fname, {})\n'.format(i)
     # generate strings differently
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
@@ -144,11 +145,15 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
                 el_type)
         func_text += '  status = read_parquet(fname, {}, column, np.int32({}))\n'.format(
             i, _type_to_pq_dtype_number[el_type])
+    func_text += '  del_arrow_readers(arrow_readers)\n'
+
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_parquet': get_column_size_parquet,
+                                      'get_arrow_readers': _get_arrow_readers,
+                                      'del_arrow_readers': _del_arrow_readers,
                                       'read_parquet': read_parquet,
                                       'read_parquet_str': read_parquet_str,
                                       'np': np,
@@ -191,6 +196,9 @@ def parquet_file_schema(file_name):
                  for i in range(num_cols)]
     # TODO: close file?
     return col_names, col_types
+
+_get_arrow_readers = types.ExternalFunction("get_arrow_readers", types.Opaque('arrow_reader')(string_type))
+_del_arrow_readers = types.ExternalFunction("del_arrow_readers", types.void(types.Opaque('arrow_reader')))
 
 
 @infer_global(get_column_size_parquet)
@@ -246,6 +254,8 @@ import llvmlite.binding as ll
 from hpat.config import _has_pyarrow
 if _has_pyarrow:
     import parquet_cpp
+    ll.add_symbol('get_arrow_readers', parquet_cpp.get_arrow_readers)
+    ll.add_symbol('del_arrow_readers', parquet_cpp.del_arrow_readers)
     ll.add_symbol('pq_read', parquet_cpp.read)
     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
     ll.add_symbol('pq_get_size', parquet_cpp.get_size)

@@ -5,6 +5,9 @@
 #include <cstring>
 #include <cmath>
 
+#include "parquet/arrow/reader.h"
+using parquet::arrow::FileReader;
+
 // just include parquet reader on Windows since the GCC ABI change issue
 // doesn't exist, and VC linker removes unused lib symbols
 #if defined(_MSC_VER) || defined(BUILTIN_PARQUET_READER)
@@ -17,6 +20,7 @@ int pq_type_sizes[] = {1, 4, 8, 12, 4, 8};
 
 extern "C" {
 
+void pq_init_reader(const char* file_name, std::shared_ptr<FileReader> *a_reader);
 int64_t pq_get_size_single_file(const char* file_name, int64_t column_idx);
 int64_t pq_read_single_file(const char* file_name, int64_t column_idx, uint8_t *out,
                 int out_dtype);
@@ -32,6 +36,9 @@ int pq_read_string_parallel_single_file(const char* file_name, int64_t column_id
 }  // extern "C"
 
 #endif  // _MSC_VER
+
+void* get_arrow_readers(std::string* file_name);
+void del_arrow_readers(std::vector< std::shared_ptr<FileReader> > *readers);
 
 PyObject* str_list_to_vec(PyObject* self, PyObject* str_list);
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
@@ -61,6 +68,10 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     if (m == NULL)
         return NULL;
 
+    PyObject_SetAttrString(m, "get_arrow_readers",
+                            PyLong_FromVoidPtr((void*)(&get_arrow_readers)));
+    PyObject_SetAttrString(m, "del_arrow_readers",
+                            PyLong_FromVoidPtr((void*)(&del_arrow_readers)));
     PyObject_SetAttrString(m, "read",
                             PyLong_FromVoidPtr((void*)(&pq_read)));
     PyObject_SetAttrString(m, "read_parallel",
@@ -77,7 +88,6 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
 
 PyObject* str_list_to_vec(PyObject* self, PyObject* str_list)
 {
-    PyObject *ret = NULL;
     Py_INCREF(str_list);  // needed?
     // TODO: need to acquire GIL?
     std::vector<std::string> *strs_vec = new std::vector<std::string>();
@@ -151,6 +161,28 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
     PyGILState_Release(gilstate);
     return paths;
 #undef CHECK
+}
+
+
+void* get_arrow_readers(std::string* file_name)
+{
+    std::vector< std::shared_ptr<FileReader> > *readers = new std::vector< std::shared_ptr<FileReader> >();
+
+    std::vector<std::string> all_files = get_pq_pieces(file_name);
+    for (const auto& inner_file : all_files)
+    {
+        std::shared_ptr<FileReader> arrow_reader;
+        pq_init_reader(inner_file.c_str(), &arrow_reader);
+        readers->push_back(arrow_reader);
+    }
+
+    return (void*) readers;
+}
+
+void del_arrow_readers(std::vector< std::shared_ptr<FileReader> > *readers)
+{
+    delete readers;
+    return;
 }
 
 int64_t pq_get_size(std::string* file_name, int64_t column_idx)
