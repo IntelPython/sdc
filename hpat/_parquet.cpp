@@ -33,6 +33,7 @@ int pq_read_string_parallel_single_file(const char* file_name, int64_t column_id
 
 #endif  // _MSC_VER
 
+PyObject* str_list_to_vec(PyObject* self, PyObject* str_list);
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
 int64_t pq_read(std::string* file_name, int64_t column_idx,
                 uint8_t *out_data, int out_dtype);
@@ -43,11 +44,19 @@ int pq_read_string(std::string* file_name, int64_t column_idx,
 int pq_read_string_parallel(std::string* file_name, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
 
+static PyMethodDef parquet_cpp_methods[] = {
+    {
+        "str_list_to_vec", str_list_to_vec, METH_O, // METH_STATIC
+        "convert Python string list to C++ std vector of strings"
+    },
+    {NULL, NULL, 0, NULL}
+};
+
 
 PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
-            PyModuleDef_HEAD_INIT, "parquet_cpp", "No docs", -1, NULL, };
+            PyModuleDef_HEAD_INIT, "parquet_cpp", "No docs", -1, parquet_cpp_methods, };
     m = PyModule_Create(&moduledef);
     if (m == NULL)
         return NULL;
@@ -66,6 +75,34 @@ PyMODINIT_FUNC PyInit_parquet_cpp(void) {
     return m;
 }
 
+PyObject* str_list_to_vec(PyObject* self, PyObject* str_list)
+{
+    PyObject *ret = NULL;
+    Py_INCREF(str_list);  // needed?
+    // TODO: need to acquire GIL?
+    std::vector<std::string> *strs_vec = new std::vector<std::string>();
+
+    PyObject *iterator = PyObject_GetIter(str_list);
+    Py_DECREF(str_list);
+    PyObject *l_str;
+
+    if (iterator == NULL) {
+        Py_DECREF(iterator);
+        return PyLong_FromVoidPtr((void*) strs_vec);
+    }
+
+    while (l_str = PyIter_Next(iterator)) {
+        const char *c_path = PyUnicode_AsUTF8(l_str);
+        // printf("str %s\n", c_path);
+        strs_vec->push_back(std::string(c_path));
+        Py_DECREF(l_str);
+    }
+
+    Py_DECREF(iterator);
+
+    // CHECK(!PyErr_Occurred(), "Python error during Parquet dataset metadata")
+    return PyLong_FromVoidPtr((void*) strs_vec);
+}
 
 std::vector<std::string> get_pq_pieces(std::string* file_name)
 {
