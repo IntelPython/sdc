@@ -105,6 +105,18 @@ class ParquetHandler(object):
             col_types = list(table_types.values())
 
         out_nodes = []
+        # get arrow readers once
+        def init_arrow_readers(fname):
+            arrow_readers = get_arrow_readers(fname)
+
+        f_block = compile_to_numba_ir(init_arrow_readers,
+                                     {'get_arrow_readers': _get_arrow_readers,
+                                     }).blocks.popitem()[1]
+
+        replace_arg_nodes(f_block, [file_name])
+        out_nodes += f_block.body[:-3]
+        arrow_readers_var = out_nodes[-1].target
+
         col_items = []
         for i, cname in enumerate(col_names):
             # get column type from schema
@@ -118,17 +130,25 @@ class ParquetHandler(object):
             cvar = ir.Var(scope, varname, loc)
             col_items.append((cname, cvar))
 
-            out_nodes += get_column_read_nodes(c_type, cvar, file_name, i)
+            out_nodes += get_column_read_nodes(c_type, cvar, arrow_readers_var, i)
 
+        # delete arrow readers
+        def cleanup_arrow_readers(readers):
+            s = del_arrow_readers(readers)
+
+        f_block = compile_to_numba_ir(cleanup_arrow_readers,
+                                     {'del_arrow_readers': _del_arrow_readers,
+                                     }).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arrow_readers_var])
+        out_nodes += f_block.body[:-3]
         return col_items, col_types, out_nodes
 
 
-def get_column_read_nodes(c_type, cvar, file_name, i):
+def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
 
     loc = cvar.loc
 
-    func_text = 'def f(fname):\n'
-    func_text += '  arrow_readers = get_arrow_readers(fname)\n'
+    func_text = 'def f(arrow_readers):\n'
     func_text += '  col_size = get_column_size_parquet(arrow_readers, {})\n'.format(i)
     # generate strings differently
     if c_type == string_array_type:
@@ -145,22 +165,19 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
                 el_type)
         func_text += '  status = read_parquet(arrow_readers, {}, column, np.int32({}))\n'.format(
             i, _type_to_pq_dtype_number[el_type])
-    func_text += '  del_arrow_readers(arrow_readers)\n'
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_parquet': get_column_size_parquet,
-                                      'get_arrow_readers': _get_arrow_readers,
-                                      'del_arrow_readers': _del_arrow_readers,
                                       'read_parquet': read_parquet,
                                       'read_parquet_str': read_parquet_str,
                                       'np': np,
                                       'hpat': hpat,
                                       'StringArray': StringArray}).blocks.popitem()
 
-    replace_arg_nodes(f_block, [file_name])
+    replace_arg_nodes(f_block, [arrow_readers_var])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("column"):
