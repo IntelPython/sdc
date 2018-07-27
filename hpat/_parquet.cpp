@@ -8,6 +8,8 @@
 #include "parquet/arrow/reader.h"
 using parquet::arrow::FileReader;
 
+typedef std::vector< std::shared_ptr<FileReader> > FileReaderVec;
+
 // just include parquet reader on Windows since the GCC ABI change issue
 // doesn't exist, and VC linker removes unused lib symbols
 #if defined(_MSC_VER) || defined(BUILTIN_PARQUET_READER)
@@ -37,8 +39,8 @@ int pq_read_string_parallel_single_file(const char* file_name, int64_t column_id
 
 #endif  // _MSC_VER
 
-void* get_arrow_readers(std::string* file_name);
-void del_arrow_readers(std::vector< std::shared_ptr<FileReader> > *readers);
+FileReaderVec* get_arrow_readers(std::string* file_name);
+void del_arrow_readers(FileReaderVec *readers);
 
 PyObject* str_list_to_vec(PyObject* self, PyObject* str_list);
 int64_t pq_get_size(std::string* file_name, int64_t column_idx);
@@ -164,9 +166,9 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
 }
 
 
-void* get_arrow_readers(std::string* file_name)
+FileReaderVec* get_arrow_readers(std::string* file_name)
 {
-    std::vector< std::shared_ptr<FileReader> > *readers = new std::vector< std::shared_ptr<FileReader> >();
+    FileReaderVec *readers = new FileReaderVec();
 
     std::vector<std::string> all_files = get_pq_pieces(file_name);
     for (const auto& inner_file : all_files)
@@ -176,10 +178,10 @@ void* get_arrow_readers(std::string* file_name)
         readers->push_back(arrow_reader);
     }
 
-    return (void*) readers;
+    return readers;
 }
 
-void del_arrow_readers(std::vector< std::shared_ptr<FileReader> > *readers)
+void del_arrow_readers(FileReaderVec *readers)
 {
     delete readers;
     return;
