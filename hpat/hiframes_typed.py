@@ -82,6 +82,7 @@ class HiFramesTyped(object):
             self.typemap.pop(vname)
             self.typemap[vname] = typ
 
+        replace_calltype = {}
         # replace sig of getitem/setitem/... series type with array
         for call, sig in self.calltypes.items():
             if sig is None:
@@ -102,11 +103,15 @@ class HiFramesTyped(object):
                 # be update for lowering to work
                 # XXX: new_sig could be None for things like np.int32()
                 if call in self.calltypes and new_sig is not None:
-                    old_sig = self.calltypes.pop(call)
+                    old_sig = self.calltypes[call]
                     # fix types with undefined dtypes in empty_inferred, etc.
                     return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
                     args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
-                    self.calltypes[call] = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
+                    replace_calltype[call] = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
+
+        for call, sig in replace_calltype.items():
+            self.calltypes.pop(call)
+            self.calltypes[call] = sig
 
         if debug_prints():  # pragma: no cover
             print("--- types after Series replacement:", self.typemap)
