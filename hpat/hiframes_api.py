@@ -835,6 +835,23 @@ def typeof_pd_str_series(val, c):
 
     return arr_to_boxed_series_type(arr_typ)
 
+def pd_dt_index_stub(data):  # pragma: no cover
+    return data
+
+@infer_global(pd.DatetimeIndex)
+class DatetimeIndexTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        pysig = numba.utils.pysignature(pd_dt_index_stub)
+        try:
+            bound = pysig.bind(*args, **kws)
+        except TypeError:  # pragma: no cover
+            msg = "Unsupported arguments for pd.DatetimeIndex()"
+            raise ValueError(msg)
+
+        sig = signature(
+            SeriesType(types.NPDatetime('ns'), 1, 'C'), bound.args).replace(
+                pysig=pysig)
+        return sig
 
 @overload(np.array)
 def np_array_array_overload(in_tp):

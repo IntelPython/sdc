@@ -154,6 +154,9 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
+                if fdef == ('DatetimeIndex', 'pandas'):
+                    return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
+
                 if func_mod == 'hpat.hiframes_api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
 
@@ -200,6 +203,31 @@ class HiFramesTyped(object):
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
+    def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
+        """transform pd.DatetimeIndex() call with string array argument
+        """
+        if len(rhs.args) != 1:  # pragma: no cover
+            raise ValueError(
+                "Invalid DatetimeIndex() arguments (one expected)")
+
+        data_arg = rhs.args[0]
+
+        def f(str_arr):
+            numba.parfor.init_prange()
+            n = len(str_arr)
+            S = numba.unsafe.ndarray.empty_inferred((n,))
+            for i in numba.parfor.internal_prange(n):
+                S[i] = hpat.pd_timestamp_ext.parse_datetime_str(str_arr[i])
+            ret = S
+
+        f_ir = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba},
+                                        self.typingctx,
+                                        (if_series_to_array_type(self.typemap[data_arg.name]),),
+                                        self.typemap, self.calltypes)
+        topo_order = find_topo_order(f_ir.blocks)
+        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [data_arg])
+        return f_ir.blocks
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
