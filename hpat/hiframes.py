@@ -80,6 +80,9 @@ class HiFrames(object):
         self.args = args
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
+        # replace inst variables as determined previously during the pass
+        # currently use to keep lhs of Arg nodes intact
+        self.replace_var_dict = {}
 
         # rolling call name -> [column_varname, win_size]
         self.rolling_calls = {}
@@ -114,6 +117,7 @@ class HiFrames(object):
             self._working_body = new_body
             old_body = self.func_ir.blocks[label].body
             for inst in old_body:
+                ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
@@ -315,7 +319,6 @@ class HiFrames(object):
 
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
-
 
         # df.column.shift(3)
         if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
@@ -1611,9 +1614,6 @@ class HiFrames(object):
                 # XXX hack for agg functions, replace with proper Series type
                 self.df_cols.add(arg_var.name)
                 return nodes
-            # replace assign target with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var(flag + "_input"), loc)
-            arg_assign.target = in_arr_tmp
             if flag == 'distributed':
                 def f(_dist_arr):  # pragma: no cover
                     _d_arr = hpat.distributed_api.dist_input(_dist_arr)
@@ -1624,29 +1624,32 @@ class HiFrames(object):
                 raise ValueError("Invalid input flag")
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr_tmp])
+            replace_arg_nodes(f_block, [arg_var])
             nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = arg_var
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            self._add_node_defs(nodes)
 
         # handle timestamp Series
         # transform to array[dt64]
         # could be combined with distributed/threaded input
         if self.args[arg_ind] == timestamp_series_type:
-            # replace arg var with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var("ts_series_input"), loc)
-            nodes[-1].target = in_arr_tmp
             # TODO: remove timestamp_series_type
             def f(_ts_series):  # pragma: no cover
                 _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.ts_series_to_arr_typ(_ts_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr_tmp])
+            replace_arg_nodes(f_block, [arg_var])
             nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = arg_var
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            self._add_node_defs(nodes)
             # remember that this variable is actually a Series
-            self.df_cols.add(arg_var.name)
-            self.ts_series_vars.add(arg_var.name)
+            self.df_cols.add(new_arg_var.name)
+            self.ts_series_vars.add(new_arg_var.name)
 
         # TODO: handle datetime.date() series
 
@@ -1685,21 +1688,29 @@ class HiFrames(object):
         if isinstance(arg_typ, BoxedSeriesType):
             # self.args[arg_ind] = SeriesType(arg_typ.dtype, 1, 'C')
             # replace arg var with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var("series_input"), loc)
-            nodes[-1].target = in_arr_tmp
             def f(_boxed_series):  # pragma: no cover
                 _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(_boxed_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr_tmp])
+            replace_arg_nodes(f_block, [arg_var])
             nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = arg_var
-            self.df_cols.add(arg_var.name)
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.df_cols.add(new_arg_var.name)
             if arg_typ.dtype == types.NPDatetime('ns'):
-                self.ts_series_vars.add(arg_var.name)
+                self.ts_series_vars.add(new_arg_var.name)
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            self._add_node_defs(nodes)
 
         return nodes
+
+    def _add_node_defs(self, nodes):
+        # TODO: add node defs for all new nodes
+        loc = ir.Loc("", -1)
+        dummy_block = ir.Block(ir.Scope(None, loc), loc)
+        dummy_block.body = nodes
+        build_definitions({0: dummy_block}, self.func_ir._definitions)
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"
