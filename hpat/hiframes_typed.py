@@ -206,11 +206,17 @@ class HiFramesTyped(object):
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
         """
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError(
-                "Invalid DatetimeIndex() arguments (one expected)")
-
-        data_arg = rhs.args[0]
+        kws = dict(rhs.kws)
+        if 'data' in kws:
+            data = kws['data']
+            if len(rhs.args) != 0:  # pragma: no cover
+                raise ValueError(
+                    "only data argument suppoted in pd.DatetimeIndex()")
+        else:
+            if len(rhs.args) != 1:  # pragma: no cover
+                raise ValueError(
+                    "data argument in pd.DatetimeIndex() expected")
+            data = rhs.args[0]
 
         def f(str_arr):
             numba.parfor.init_prange()
@@ -222,11 +228,11 @@ class HiFramesTyped(object):
 
         f_ir = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba},
                                         self.typingctx,
-                                        (if_series_to_array_type(self.typemap[data_arg.name]),),
+                                        (if_series_to_array_type(self.typemap[data.name]),),
                                         self.typemap, self.calltypes)
         topo_order = find_topo_order(f_ir.blocks)
         f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [data_arg])
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [data])
         return f_ir.blocks
 
     def _is_dt_index_binop(self, rhs):
