@@ -304,6 +304,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skip("Numba's perfmute generation needs to use np seed properly")
     def test_permuted_array_indexing(self):
 
         # Since Numba uses Python's PRNG for producing random numbers in NumPy,
