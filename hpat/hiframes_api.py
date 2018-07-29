@@ -699,6 +699,17 @@ class DummyToSeriesType(AbstractTemplate):
 def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
+    assert len(args) >= 1
+    numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
+
+if hasattr(numba.ir_utils, 'alias_func_extensions'):
+    numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
+
+
 # XXX: use infer_global instead of overload, since overload fails if the same
 # user function is compiled twice
 @infer_global(fix_df_array)
