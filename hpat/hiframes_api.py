@@ -824,9 +824,6 @@ class TsSeriesGetItemType(AbstractTemplate):
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    # TODO: replace timestamp type
-    if len(val) > 0 and isinstance(val[0], pd.Timestamp):
-        return timestamp_series_type
 
     if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
         arr_typ = string_array_type
@@ -834,6 +831,9 @@ def typeof_pd_str_series(val, c):
         arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
 
     return arr_to_boxed_series_type(arr_typ)
+
+# TODO: separate pd.DatetimeIndex type
+#@typeof_impl.register(pd.DatetimeIndex)
 
 def pd_dt_index_stub(data):  # pragma: no cover
     return data
