@@ -16,7 +16,8 @@ from numba.targets.arrayobj import _getitem_array1d
 import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series, is_str_arr_typ
+from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
+    unbox_str_series, is_str_arr_typ, box_str_arr)
 
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
@@ -27,7 +28,7 @@ import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
-    date_series_type)
+    date_series_type, UnBoxedSeriesType)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -487,7 +488,7 @@ class SortTyping(AbstractTemplate):
 
 
 import pandas as pd
-from numba.extending import typeof_impl, unbox, register_model, models, NativeValue
+from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
 from numba import numpy_support
 
 class PandasDataFrameType(types.Type):
@@ -652,6 +653,22 @@ def unbox_series(typ, val, c):
 
     c.pyapi.decref(arr_obj)
     return native_val
+
+@box(UnBoxedSeriesType)
+def box_series(typ, val, c):
+    """
+    """
+    if typ.dtype == string_type:
+        arr = box_str_arr(typ, val, c)
+    else:
+        arr = box_array(types.Array(typ.dtype, 1, 'C'), val, c)
+    mod_name = c.context.insert_const_string(c.builder.module, "pandas")
+    class_obj = c.pyapi.import_module_noblock(mod_name)
+    res = c.pyapi.call_method(class_obj, "Series", (arr,))
+    # class_obj = c.pyapi.unserialize(c.pyapi.serialize_object(pd.Series))
+    # res = c.pyapi.call_function_objargs(class_obj, (arr,))
+    c.pyapi.decref(class_obj)
+    return res
 
 
 def to_series_type(arr):

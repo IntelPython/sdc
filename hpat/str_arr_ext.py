@@ -657,7 +657,7 @@ def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_
     return types.void(string_array_type, string_array_type, types.intp, types.intp), codegen
 
 @box(StringArrayType)
-def box_str(typ, val, c):
+def box_str_arr(typ, val, c):
     """
     """
 

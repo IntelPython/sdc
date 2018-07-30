@@ -262,6 +262,22 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    def test_series_box(self):
+        def test_impl():
+            A = pd.Series([1,2,3])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_series_box2(self):
+        def test_impl():
+            A = pd.Series(['1','2','3'])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
     def test_np_typ_call_replace(self):
         # calltype replacement is tricky for np.typ() calls since variable
         # type can't provide calltype

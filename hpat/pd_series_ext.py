@@ -178,6 +178,17 @@ class BoxedSeriesType(types.Type):
 # register_model(BoxedSeriesType)(models.OpaqueModel)
 register_model(BoxedSeriesType)(SeriesModel)
 
+class UnBoxedSeriesType(types.Type):
+    """Series type before boxing. Using a different type to avoid data model
+    issues and confusion.
+    """
+    def __init__(self, dtype):
+        self.dtype = dtype
+        name = "UnBoxedSeriesType({})".format(dtype)
+        super(UnBoxedSeriesType, self).__init__(name)
+
+register_model(UnBoxedSeriesType)(SeriesModel)
+
 def series_to_array_type(typ, replace_boxed=False):
     if typ.dtype == string_type:
         new_typ = string_array_type
@@ -232,6 +243,21 @@ def if_arr_to_series_type(typ):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
     # TODO: other types than can have Arrays inside: list, set, etc.
     return typ
+
+def if_series_to_unbox(typ):
+    if isinstance(typ, SeriesType):
+        return UnBoxedSeriesType(typ.dtype)
+
+    if isinstance(typ, (types.Tuple, types.UniTuple)):
+        return types.Tuple(
+            [if_series_to_unbox(t) for t in typ.types])
+    # TODO: other types than can have Series inside: list, set, etc.
+    return typ
+
+@lower_cast(string_array_type, UnBoxedSeriesType)
+@lower_cast(types.Array, UnBoxedSeriesType)
+def cast_string_series_unbox(context, builder, fromty, toty, val):
+    return val
 
 @lower_cast(string_series_type, string_array_type)
 @lower_cast(string_array_type, string_series_type)

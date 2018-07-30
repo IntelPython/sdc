@@ -17,7 +17,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
-    if_series_to_array_type)
+    if_series_to_array_type, if_series_to_unbox)
 
 
 class HiFramesTyped(object):
@@ -118,7 +118,7 @@ class HiFramesTyped(object):
             print("calltypes: ", self.calltypes)
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
-        return if_series_to_array_type(self.return_type)
+        return if_series_to_unbox(self.return_type)
 
     def _run_assign(self, assign):
         lhs = assign.target.name
