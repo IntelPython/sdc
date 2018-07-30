@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 from collections import namedtuple
+import datetime
 
 import numba
 from numba import ir, ir_utils
@@ -20,7 +21,8 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, un
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower
+from hpat.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
+    set_df_datetime_date_lower, unbox_datetime_date_array)
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
@@ -642,6 +644,8 @@ def unbox_series(typ, val, c):
 
     if typ.dtype == string_type:
         native_val = unbox_str_series(string_array_type, arr_obj, c)
+    elif typ.dtype == datetime_date_type:
+        native_val = unbox_datetime_date_array(typ, val, c)
     else:
         # TODO: error handling like Numba callwrappers.py
         native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
@@ -834,9 +838,10 @@ def lower_ts_series_to_arr_typ(context, builder, sig, args):
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-
     if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
         arr_typ = string_array_type
+    elif len(val) > 0 and isinstance(val[0], datetime.date):
+        return BoxedSeriesType(datetime_date_type)
     else:
         arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
 
