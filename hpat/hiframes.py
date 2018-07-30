@@ -93,8 +93,6 @@ class HiFrames(object):
         self.df_labels = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
-        # remember datetime.date series due to special boxing, getitem etc.
-        self.dt_date_series_vars  = set()
 
         self.arrow_tables = {}
         self.reverse_copies = {}
@@ -162,8 +160,6 @@ class HiFrames(object):
                     and isinstance(rhs.index, str)):
                 assign.value = self._get_df_cols(rhs.value)[rhs.index]
                 self.df_cols.add(lhs)  # save lhs as column
-                if assign.value.name in self.dt_date_series_vars:
-                    self.dt_date_series_vars.add(lhs)
 
             # df1 = df[df.A > .5]
             if rhs.op == 'getitem' and self._is_df_var(rhs.value):
@@ -196,31 +192,10 @@ class HiFrames(object):
                 col_var = self._get_df_colvar(rhs.value, rhs.attr)
                 assign.value = col_var
                 self.df_cols.add(lhs)  # save lhs as column
-                if col_var.name in self.dt_date_series_vars:
-                    self.dt_date_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
-
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and rhs.value.name in self.dt_date_series_vars):
-                if rhs.op == 'getitem':
-                    ind_var = rhs.index
-                else:
-                    ind_var = rhs.index_var
-                def f(_dt_series, _ind):  # pragma: no cover
-                    _val = hpat.pd_timestamp_ext.int_to_datetime_date(_dt_series[_ind])
-
-                f_block = compile_to_numba_ir(
-                    f, {'hpat': hpat}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [rhs.value, ind_var])
-                nodes = f_block.body[:-3]  # remove none return
-                nodes[-1].target = assign.target
-                # output could be series in case of slice index
-                # FIXME: this is fragile
-                self.dt_date_series_vars.add(lhs)
-                return nodes
 
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
@@ -234,8 +209,6 @@ class HiFrames(object):
             self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
-        if isinstance(rhs, ir.Var) and rhs.name in self.dt_date_series_vars:
-            self.dt_date_series_vars.add(lhs)
         return [assign]
 
     def _run_call(self, assign, label):
@@ -880,11 +853,9 @@ class HiFrames(object):
         func_text += "  n = len(A)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        if col_var.name in self.dt_date_series_vars:
-            func_text += "    t = int_to_datetime_date(A[i])\n"
-        else:
-            func_text += "    t = A[i]\n"
+        func_text += "    t = A[i]\n"
         if out_typ == datetime_date_type:
+            # XXX: is this necessary?
             func_text += "    S[i] = datetime_date_to_int(map_func(t))\n"
         else:
             func_text += "    S[i] = map_func(t)\n"
@@ -925,10 +896,6 @@ class HiFrames(object):
         # wrapper function to get the output type
         def f(A):
             return map_func(A[0])
-        if col_var.name in self.dt_date_series_vars:
-            def f(A):
-                t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
-                return map_func(t)
 
         return self._get_func_output_typ(col_var, func, f, label)
 
@@ -1764,10 +1731,6 @@ class HiFrames(object):
 
             def f(_df, _cname, _arr):  # pragma: no cover
                 s = hpat.hiframes_api.set_df_col(_df, _cname, _arr)
-
-            if series_arr.name in self.dt_date_series_vars:
-                def f(_df, _cname, _arr):  # pragma: no cover
-                    s = hpat.pd_timestamp_ext.set_df_datetime_date(_df, _cname, _arr)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [inst.target, cname_var, series_arr])
