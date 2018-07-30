@@ -159,6 +159,7 @@ def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
         el_type = get_element_type(c_type.dtype)
         if el_type == 'datetime64(ns)':
             func_text += '  column_tmp = np.empty(col_size, dtype=np.int64)\n'
+            # TODO: fix alloc
             func_text += '  column = hpat.hiframes_api.ts_series_to_arr_typ(column_tmp)\n'
         else:
             func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(

@@ -4,7 +4,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
-from numba.targets.arrayobj import make_array
+from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
 from numba.targets.boxing import unbox_array
 from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
 
@@ -147,6 +147,45 @@ def unbox_datetime_date(typ, val, c):
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(nopython_date, is_error=is_error)
+
+
+def unbox_datetime_date_array(typ, val, c):
+    #
+    n = object_length(c, val)
+    #cgutils.printf(c.builder, "len %d\n", n)
+    arr_typ = types.Array(types.intp, 1, 'C')
+    out_arr = _empty_nd_impl(c.context, c.builder, arr_typ, [n])
+
+    with cgutils.for_range(c.builder, n) as loop:
+        dt_date = sequence_getitem(c, val, loop.index)
+        int_date = unbox_datetime_date(datetime_date_type, dt_date, c).value
+        dataptr, shapes, strides = basic_indexing(
+            c.context, c.builder, arr_typ, out_arr, (types.intp,), (loop.index,))
+        store_item(c.context, c.builder, arr_typ, int_date, dataptr)
+
+    is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+    return NativeValue(out_arr._getvalue(), is_error=is_error)
+
+# TODO: move to utils or Numba
+
+def object_length(c, obj):
+    """
+    len(obj)
+    """
+    pyobj_lltyp = c.context.get_argument_type(types.pyobject)
+    fnty = lir.FunctionType(lir.IntType(64), [pyobj_lltyp])
+    fn = c.builder.module.get_or_insert_function(fnty, name="PyObject_Length")
+    return c.builder.call(fn, (obj,))
+
+def sequence_getitem(c, obj, ind):
+    """
+    seq[ind]
+    """
+    pyobj_lltyp = c.context.get_argument_type(types.pyobject)
+    fnty = lir.FunctionType(pyobj_lltyp, [pyobj_lltyp, lir.IntType(64)])
+    fn = c.builder.module.get_or_insert_function(fnty, name="PySequence_GetItem")
+    return c.builder.call(fn, (obj, ind))
+
 
 @box(DatetimeDateType)
 def box_datetime_date(typ, val, c):
@@ -611,23 +650,6 @@ def parse_datetime_str(str):
 #     return integer_to_dt64(func_dts_to_dt(10, arg2ref))
 
 #----------------------------------------------------------------------------------------------
-
-class TimestampSeriesType(types.Array):
-    def __init__(self):
-        super(TimestampSeriesType, self).__init__(dtype=types.NPDatetime('ns'), ndim=1, layout='C')
-
-timestamp_series_type = TimestampSeriesType()
-
-@register_model(TimestampSeriesType)
-class TimestampSeriesModel(models.ArrayModel):
-    pass
-
-@unbox(TimestampSeriesType)
-def unbox_timestamp_series(typ, val, c):
-    arr_obj = c.pyapi.object_getattr_string(val, "values")
-    native_val = unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), arr_obj, c)
-    c.pyapi.decref(arr_obj)
-    return native_val
 
 
 # XXX: code for timestamp series getitem in regular Numba

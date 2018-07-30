@@ -14,7 +14,7 @@ import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.pd_timestamp_ext import pandas_timestamp_type
+from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -135,6 +135,7 @@ class SeriesType(types.IterableType):
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
+date_series_type = SeriesType(datetime_date_type, 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
@@ -377,6 +378,7 @@ class GetItemSeries(AbstractTemplate):
         [in_arr, in_idx] = args
         is_arr_series = False
         is_idx_series = False
+        is_arr_dt_index = False
 
         if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
             return None
@@ -384,6 +386,8 @@ class GetItemSeries(AbstractTemplate):
         if isinstance(in_arr, SeriesType):
             in_arr = series_to_array_type(in_arr)
             is_arr_series = True
+            if in_arr.dtype == types.NPDatetime('ns'):
+                is_arr_dt_index = True
 
         if isinstance(in_idx, SeriesType):
             in_idx = series_to_array_type(in_idx)
@@ -405,6 +409,9 @@ class GetItemSeries(AbstractTemplate):
             if is_idx_series:
                 arg2 = if_arr_to_series_type(arg2)
             sig.args = (arg1, arg2)
+            # dt_index and Series(dt64) should return Timestamp
+            if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
+                sig.return_type = pandas_timestamp_type
         return sig
 
 @infer

@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 from collections import namedtuple
+import datetime
 
 import numba
 from numba import ir, ir_utils
@@ -20,11 +21,13 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, un
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
+from hpat.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
+    set_df_datetime_date_lower, unbox_datetime_date_array)
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
-    series_to_array_type, if_series_to_array_type)
+    series_to_array_type, if_series_to_array_type, dt_index_series_type,
+    date_series_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -579,6 +582,8 @@ def set_df_col_lower(context, builder, sig, args):
     #
     col_name = sig.args[1].value
     arr_typ = sig.args[2]
+    if arr_typ.dtype == datetime_date_type:
+        return set_df_datetime_date_lower(context, builder, sig, args)
 
     # get boxed array
     pyapi = context.get_python_api(builder)
@@ -639,6 +644,8 @@ def unbox_series(typ, val, c):
 
     if typ.dtype == string_type:
         native_val = unbox_str_series(string_array_type, arr_obj, c)
+    elif typ.dtype == datetime_date_type:
+        native_val = unbox_datetime_date_array(typ, val, c)
     else:
         # TODO: error handling like Numba callwrappers.py
         native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
@@ -699,6 +706,26 @@ class DummyToSeriesType(AbstractTemplate):
 def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+
+def to_date_series_type(arr):
+    return arr
+
+@infer_global(to_date_series_type)
+class ToDateSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        assert (arr == types.Array(types.intp, 1, 'C')
+            or arr == types.Array(datetime_date_type, 1, 'C'))
+        return signature(date_series_type, arr)
+
+@lower_builtin(to_date_series_type, types.Any)
+def to_date_series_type_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
@@ -708,6 +735,7 @@ if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
 
 
 # XXX: use infer_global instead of overload, since overload fails if the same
@@ -798,43 +826,55 @@ class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == timestamp_series_type or args[0] == types.Array(types.int64, 1, 'C')
+        assert args[0] == dt_index_series_type or args[0] == types.Array(types.int64, 1, 'C')
         return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
 
-@lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
+@lower_builtin(ts_series_to_arr_typ, dt_index_series_type)
 @lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-def ts_series_getitem(arr, ind):
-    return arr[ind]
-
-@infer_global(ts_series_getitem)
-class TsSeriesGetItemType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        out = get_array_index_type(ary, idx)
-        # check result to be dt64 since it might be sliced array
-        # replace result with Timestamp
-        if out is not None and out.result == types.NPDatetime('ns'):
-            return signature(pandas_timestamp_type, ary, out.index)
 
 
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    # TODO: replace timestamp type
-    if len(val) > 0 and isinstance(val[0], pd.Timestamp):
-        return timestamp_series_type
-
     if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
         arr_typ = string_array_type
+    elif len(val) > 0 and isinstance(val[0], datetime.date):
+        return BoxedSeriesType(datetime_date_type)
     else:
         arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
 
     return arr_to_boxed_series_type(arr_typ)
 
+@typeof_impl.register(pd.Index)
+def typeof_pd_index(val, c):
+    if len(val) > 0 and isinstance(val[0], datetime.date):
+        return BoxedSeriesType(datetime_date_type)
+    else:
+        raise NotImplementedError("unsupported pd.Index type")
+
+
+# TODO: separate pd.DatetimeIndex type
+#@typeof_impl.register(pd.DatetimeIndex)
+
+def pd_dt_index_stub(data):  # pragma: no cover
+    return data
+
+@infer_global(pd.DatetimeIndex)
+class DatetimeIndexTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        pysig = numba.utils.pysignature(pd_dt_index_stub)
+        try:
+            bound = pysig.bind(*args, **kws)
+        except TypeError:  # pragma: no cover
+            msg = "Unsupported arguments for pd.DatetimeIndex()"
+            raise ValueError(msg)
+
+        sig = signature(
+            SeriesType(types.NPDatetime('ns'), 1, 'C'), bound.args).replace(
+                pysig=pysig)
+        return sig
 
 @overload(np.array)
 def np_array_array_overload(in_tp):
