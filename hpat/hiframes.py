@@ -854,11 +854,7 @@ class HiFrames(object):
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "    t = A[i]\n"
-        if out_typ == datetime_date_type:
-            # XXX: is this necessary?
-            func_text += "    S[i] = datetime_date_to_int(map_func(t))\n"
-        else:
-            func_text += "    S[i] = map_func(t)\n"
+        func_text += "    S[i] = map_func(t)\n"
         if out_typ == datetime_date_type:
             func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
         else:

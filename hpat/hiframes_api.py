@@ -712,7 +712,8 @@ class ToDateSeriesType(AbstractTemplate):
         assert not kws
         assert len(args) == 1
         arr = args[0]
-        assert arr == types.Array(types.intp, 1, 'C')
+        assert (arr == types.Array(types.intp, 1, 'C')
+            or arr == types.Array(datetime_date_type, 1, 'C'))
         return signature(date_series_type, arr)
 
 @lower_builtin(to_date_series_type, types.Any)
