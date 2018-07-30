@@ -562,7 +562,6 @@ class UnBoxDfCol(AbstractTemplate):
 
 UnBoxDfCol.support_literals = True
 
-
 def set_df_col(df, cname, arr):
     df[cname] = arr
 
@@ -609,6 +608,53 @@ def set_df_col_lower(context, builder, sig, args):
 
     return context.get_dummy_value()
 
+def box_df(names, arrs):
+    return pd.DataFrame()
+
+@infer_global(box_df)
+class BoxDfTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) % 2 == 0, "name and column pairs expected"
+        col_names = [a.value for a in args[:len(args)//2]]
+        col_types =  [a.dtype for a in args[len(args)//2:]]
+        df_typ = PandasDataFrameType(col_names, col_types)
+        return signature(df_typ, *args)
+
+BoxDfTyper.support_literals = True
+
+@lower_builtin(box_df, types.Const, types.VarArg(types.Any))
+def lower_box_df(context, builder, sig, args):
+    assert len(sig.args) % 2 == 0, "name and column pairs expected"
+    n_cols = len(sig.args)//2
+    col_names = [a.value for a in sig.args[:n_cols]]
+    col_arrs = [a for a in args[n_cols:]]
+    arr_typs = [a for a in sig.args[n_cols:]]
+
+    pyapi = context.get_python_api(builder)
+    env_manager = context.get_env_manager(builder)
+    c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
+    gil_state = pyapi.gil_ensure()  # acquire GIL
+
+    mod_name = context.insert_const_string(c.builder.module, "pandas")
+    class_obj = pyapi.import_module_noblock(mod_name)
+    res = pyapi.call_method(class_obj, "DataFrame", ())
+    for cname, arr, arr_typ in zip(col_names, col_arrs, arr_typs):
+        # df['cname'] = boxed_arr
+        arr_obj = box_array(arr_typ, arr, c)
+        name_str = context.insert_const_string(c.builder.module, cname)
+        cname_obj = pyapi.string_from_string(name_str)
+        pyapi.object_setitem(res, cname_obj, arr_obj)
+        # pyapi.decref(arr_obj)
+        pyapi.decref(cname_obj)
+
+    pyapi.decref(class_obj)
+    pyapi.gil_release(gil_state)    # release GIL
+    return res
+
+@box(PandasDataFrameType)
+def box_series(typ, val, c):
+    return val
 
 from numba.targets.boxing import unbox_array
 

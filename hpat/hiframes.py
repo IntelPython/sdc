@@ -197,6 +197,9 @@ class HiFrames(object):
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
 
+            if rhs.op == 'cast' and rhs.value.name in self.df_vars:
+                return self._box_return_df(assign, self.df_vars[rhs.value.name])
+
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
 
@@ -1573,6 +1576,30 @@ class HiFrames(object):
             self._add_node_defs(nodes)
 
         return nodes
+
+    def _box_return_df(self, cast_assign, df_map):
+        #
+        arrs = list(df_map.values())
+        names = list(df_map.keys())
+        n_cols = len(arrs)
+
+        arg_names = ", ".join(['in_{}'.format(i) for i in range(n_cols)])
+        col_names = ", ".join(['"{}"'.format(cname) for cname in names])
+
+        func_text = "def f({}):\n".format(arg_names)
+        func_text += "  _dt_arr = hpat.hiframes_api.box_df({}, {})\n".format(col_names, arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, arrs)
+        nodes = f_block.body[:-3]  # remove none return
+        cast_assign.value = nodes[-1].target
+        nodes.append(cast_assign)
+        return nodes
+
 
     def _add_node_defs(self, nodes):
         # TODO: add node defs for all new nodes

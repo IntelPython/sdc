@@ -25,6 +25,15 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_df_box(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
