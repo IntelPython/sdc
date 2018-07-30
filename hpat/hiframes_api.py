@@ -847,6 +847,14 @@ def typeof_pd_str_series(val, c):
 
     return arr_to_boxed_series_type(arr_typ)
 
+@typeof_impl.register(pd.Index)
+def typeof_pd_index(val, c):
+    if len(val) > 0 and isinstance(val[0], datetime.date):
+        return BoxedSeriesType(datetime_date_type)
+    else:
+        raise NotImplementedError("unsupported pd.Index type")
+
+
 # TODO: separate pd.DatetimeIndex type
 #@typeof_impl.register(pd.DatetimeIndex)
 

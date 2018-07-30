@@ -94,6 +94,15 @@ class TestDate(unittest.TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series().map(lambda x: x.date())
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    def test_date_series_unbox2(self):
+        def test_impl(A):
+            return A[0]
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        A = pd.DatetimeIndex(df['str_date']).map(lambda x: x.date())
+        self.assertEqual(hpat_func(A), test_impl(A))
+
     def test_datetime_index_set(self):
         def test_impl(df):
             df['hpat'] = pd.DatetimeIndex(df['str_date']).values
