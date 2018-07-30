@@ -641,7 +641,11 @@ def lower_box_df(context, builder, sig, args):
     res = pyapi.call_method(class_obj, "DataFrame", ())
     for cname, arr, arr_typ in zip(col_names, col_arrs, arr_typs):
         # df['cname'] = boxed_arr
-        arr_obj = box_array(arr_typ, arr, c)
+        # TODO: datetime.date, DatetimeIndex?
+        if arr_typ == string_array_type:
+            arr_obj = box_str_arr(arr_typ, arr, c)
+        else:
+            arr_obj = box_array(arr_typ, arr, c)
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
         pyapi.object_setitem(res, cname_obj, arr_obj)

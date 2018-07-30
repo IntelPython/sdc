@@ -34,6 +34,14 @@ class TestHiFrames(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
+    def test_df_box2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1,2,3], 'B': ['a', 'bb', 'ccc']})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
