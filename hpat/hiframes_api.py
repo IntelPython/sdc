@@ -24,7 +24,8 @@ from hpat.pd_timestamp_ext import pandas_timestamp_type
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
-    series_to_array_type, if_series_to_array_type, dt_index_series_type)
+    series_to_array_type, if_series_to_array_type, dt_index_series_type,
+    date_series_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -699,6 +700,25 @@ class DummyToSeriesType(AbstractTemplate):
 def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+
+def to_date_series_type(arr):
+    return arr
+
+@infer_global(to_date_series_type)
+class ToDateSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        assert arr == types.Array(types.intp, 1, 'C')
+        return signature(date_series_type, arr)
+
+@lower_builtin(to_date_series_type, types.Any)
+def to_date_series_type_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
@@ -708,6 +728,7 @@ if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
 
 
 # XXX: use infer_global instead of overload, since overload fails if the same

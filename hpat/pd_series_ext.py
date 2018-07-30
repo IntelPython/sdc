@@ -14,7 +14,7 @@ import hpat
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.pd_timestamp_ext import pandas_timestamp_type
+from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -135,6 +135,7 @@ class SeriesType(types.IterableType):
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
+date_series_type = SeriesType(datetime_date_type, 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code

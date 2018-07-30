@@ -872,9 +872,6 @@ class HiFrames(object):
             raise ValueError("lambda for map not found")
 
         out_typ = self._get_map_output_typ(col_var, func, label)
-        # remember datetime.date series due to special boxing, getitem etc.
-        if out_typ == datetime_date_type:
-            self.dt_date_series_vars.add(lhs.name)
 
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
@@ -891,7 +888,10 @@ class HiFrames(object):
             func_text += "    S[i] = datetime_date_to_int(map_func(t))\n"
         else:
             func_text += "    S[i] = map_func(t)\n"
-        func_text += "  ret = S\n"
+        if out_typ == datetime_date_type:
+            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
+        else:
+            func_text += "  ret = S\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
