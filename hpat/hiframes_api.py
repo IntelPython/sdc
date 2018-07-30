@@ -24,7 +24,7 @@ from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
-    series_to_array_type, if_series_to_array_type)
+    series_to_array_type, if_series_to_array_type, dt_index_series_type)
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -805,20 +805,6 @@ class TsSeriesToArrType(AbstractTemplate):
 @lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-def ts_series_getitem(arr, ind):
-    return arr[ind]
-
-@infer_global(ts_series_getitem)
-class TsSeriesGetItemType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        out = get_array_index_type(ary, idx)
-        # check result to be dt64 since it might be sliced array
-        # replace result with Timestamp
-        if out is not None and out.result == types.NPDatetime('ns'):
-            return signature(pandas_timestamp_type, ary, out.index)
 
 
 # register series types for import

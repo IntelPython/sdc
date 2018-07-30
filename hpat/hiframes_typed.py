@@ -140,6 +140,30 @@ class HiFramesTyped(object):
             if res is not None:
                 return res
 
+            # replace getitems on dt_index/dt64 series with Timestamp function
+            if (rhs.op in ['getitem', 'static_getitem']
+                    and self.typemap[rhs.value.name] == dt_index_series_type):
+                if rhs.op == 'getitem':
+                    ind_var = rhs.index
+                else:
+                    ind_var = rhs.index_var
+
+                in_arr = rhs.value
+                def f(_in_arr, _ind):
+                    dt = _in_arr[_ind]
+                    s = np.int64(dt)
+                    res = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+
+                assert self.typemap[ind_var.name] == types.intp
+                f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
+                                                'hpat': hpat}, self.typingctx,
+                                            (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
+                                            self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [in_arr, ind_var])
+                nodes = f_block.body[:-3]  # remove none return
+                nodes[-1].target = assign.target
+                return nodes
+
             if rhs.op == 'call':
 
                 fdef = guard(find_callname, self.func_ir, rhs)
@@ -406,23 +430,6 @@ class HiFramesTyped(object):
             return f_blocks
 
     def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
-
-        if func_name == 'ts_series_getitem':
-            in_arr = rhs.args[0]
-            ind = rhs.args[1]
-            def f(_in_arr, _ind):
-                dt = _in_arr[_ind]
-                s = np.int64(dt)
-                res = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
-
-            f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
-                                               'hpat': hpat}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
-                                           self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr, ind])
-            nodes = f_block.body[:-3]  # remove none return
-            nodes[-1].target = assign.target
-            return nodes
 
         if func_name == 'count':
             in_arr = rhs.args[0]

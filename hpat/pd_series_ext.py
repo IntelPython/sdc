@@ -377,6 +377,7 @@ class GetItemSeries(AbstractTemplate):
         [in_arr, in_idx] = args
         is_arr_series = False
         is_idx_series = False
+        is_arr_dt_index = False
 
         if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
             return None
@@ -384,6 +385,8 @@ class GetItemSeries(AbstractTemplate):
         if isinstance(in_arr, SeriesType):
             in_arr = series_to_array_type(in_arr)
             is_arr_series = True
+            if in_arr.dtype == types.NPDatetime('ns'):
+                is_arr_dt_index = True
 
         if isinstance(in_idx, SeriesType):
             in_idx = series_to_array_type(in_idx)
@@ -405,6 +408,9 @@ class GetItemSeries(AbstractTemplate):
             if is_idx_series:
                 arg2 = if_arr_to_series_type(arg2)
             sig.args = (arg1, arg2)
+            # dt_index and Series(dt64) should return Timestamp
+            if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
+                sig.return_type = pandas_timestamp_type
         return sig
 
 @infer

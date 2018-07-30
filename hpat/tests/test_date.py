@@ -38,6 +38,15 @@ class TestDate(unittest.TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    def test_datetime_getitem(self):
+        def test_impl(A):
+            return A[0]
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        A = pd.DatetimeIndex(df['str_date']).to_series()
+        self.assertEqual(hpat_func(A), test_impl(A))
+
     def test_datetime_index_set(self):
         def test_impl(df):
             df['hpat'] = pd.DatetimeIndex(df['str_date']).values

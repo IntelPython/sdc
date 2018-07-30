@@ -50,7 +50,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
-            'concat', 'count', 'mean', 'quantile', 'var', 'ts_series_getitem',
+            'concat', 'count', 'mean', 'quantile', 'var',
             'str_contains_regex', 'str_contains_noregex', 'column_sum',
             'nunique']):
         return True
@@ -210,27 +210,6 @@ class HiFrames(object):
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
-
-            # replace getitems on timestamp series with function
-            # for proper type inference
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and rhs.value.name in self.ts_series_vars):
-                if rhs.op == 'getitem':
-                    ind_var = rhs.index
-                else:
-                    ind_var = rhs.index_var
-                def f(_ts_series, _ind):  # pragma: no cover
-                    _val = hpat.hiframes_api.ts_series_getitem(_ts_series, _ind)
-
-                f_block = compile_to_numba_ir(
-                    f, {'hpat': hpat}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [rhs.value, ind_var])
-                nodes = f_block.body[:-3]  # remove none return
-                nodes[-1].target = assign.target
-                # output could be series in case of slice index
-                # FIXME: this is fragile
-                self.ts_series_vars.add(lhs)
-                return nodes
 
             if (rhs.op in ['getitem', 'static_getitem']
                     and rhs.value.name in self.dt_date_series_vars):
@@ -919,9 +898,7 @@ class HiFrames(object):
         func_text += "  n = len(A)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        if col_var.name in self.ts_series_vars:
-            func_text += "    t = hpat.hiframes_api.ts_series_getitem(A, i)\n"
-        elif col_var.name in self.dt_date_series_vars:
+        if col_var.name in self.dt_date_series_vars:
             func_text += "    t = int_to_datetime_date(A[i])\n"
         else:
             func_text += "    t = A[i]\n"
@@ -963,10 +940,6 @@ class HiFrames(object):
         # wrapper function to get the output type
         def f(A):
             return map_func(A[0])
-        if col_var.name in self.ts_series_vars:
-            def f(A):
-                t = hpat.hiframes_api.ts_series_getitem(A, 0)
-                return map_func(t)
         if col_var.name in self.dt_date_series_vars:
             def f(A):
                 t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
@@ -1671,8 +1644,6 @@ class HiFrames(object):
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
             self.df_cols.add(new_arg_var.name)
-            if arg_typ.dtype == types.NPDatetime('ns'):
-                self.ts_series_vars.add(new_arg_var.name)
             self.replace_var_dict[arg_var.name] = new_arg_var
             self._add_node_defs(nodes)
 
