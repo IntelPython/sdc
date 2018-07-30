@@ -612,23 +612,6 @@ def parse_datetime_str(str):
 
 #----------------------------------------------------------------------------------------------
 
-class TimestampSeriesType(types.Array):
-    def __init__(self):
-        super(TimestampSeriesType, self).__init__(dtype=types.NPDatetime('ns'), ndim=1, layout='C')
-
-timestamp_series_type = TimestampSeriesType()
-
-@register_model(TimestampSeriesType)
-class TimestampSeriesModel(models.ArrayModel):
-    pass
-
-@unbox(TimestampSeriesType)
-def unbox_timestamp_series(typ, val, c):
-    arr_obj = c.pyapi.object_getattr_string(val, "values")
-    native_val = unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), arr_obj, c)
-    c.pyapi.decref(arr_obj)
-    return native_val
-
 
 # XXX: code for timestamp series getitem in regular Numba
 
