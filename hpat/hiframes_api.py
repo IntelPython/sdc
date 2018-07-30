@@ -20,7 +20,7 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, un
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import pandas_timestamp_type
+from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
@@ -580,6 +580,8 @@ def set_df_col_lower(context, builder, sig, args):
     #
     col_name = sig.args[1].value
     arr_typ = sig.args[2]
+    if arr_typ.dtype == datetime_date_type:
+        return set_df_datetime_date_lower(context, builder, sig, args)
 
     # get boxed array
     pyapi = context.get_python_api(builder)
