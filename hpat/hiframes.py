@@ -28,7 +28,7 @@ from hpat.str_ext import string_type
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
-from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
+from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
@@ -93,10 +93,6 @@ class HiFrames(object):
         self.df_labels = {}
         # arrays that are df columns actually (pd.Series)
         self.df_cols = set()
-        # keep track of series that are timestamp to replace getitem
-        # FIXME: this is possibly fragile, maybe replace all series getitems
-        # with a function and handle this after type inference
-        self.ts_series_vars = set()
         # remember datetime.date series due to special boxing, getitem etc.
         self.dt_date_series_vars  = set()
 
@@ -166,8 +162,6 @@ class HiFrames(object):
                     and isinstance(rhs.index, str)):
                 assign.value = self._get_df_cols(rhs.value)[rhs.index]
                 self.df_cols.add(lhs)  # save lhs as column
-                if assign.value.name in self.ts_series_vars:
-                    self.ts_series_vars.add(lhs)
                 if assign.value.name in self.dt_date_series_vars:
                     self.dt_date_series_vars.add(lhs)
 
@@ -202,8 +196,6 @@ class HiFrames(object):
                 col_var = self._get_df_colvar(rhs.value, rhs.attr)
                 assign.value = col_var
                 self.df_cols.add(lhs)  # save lhs as column
-                if col_var.name in self.ts_series_vars:
-                    self.ts_series_vars.add(lhs)
                 if col_var.name in self.dt_date_series_vars:
                     self.dt_date_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
@@ -242,8 +234,6 @@ class HiFrames(object):
             self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
-        if isinstance(rhs, ir.Var) and rhs.name in self.ts_series_vars:
-            self.ts_series_vars.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.dt_date_series_vars:
             self.dt_date_series_vars.add(lhs)
         return [assign]
@@ -433,9 +423,6 @@ class HiFrames(object):
     def _gen_parquet_read(self, fname, lhs, label):
         col_items, col_types, nodes = self.pq_handler.gen_parquet_read(
             fname, lhs)
-        for v, t in zip(col_items, col_types):
-            if t == types.Array(types.NPDatetime('ns'), 1, 'C'):
-                self.ts_series_vars.add(v[1].name)
         df_nodes, col_map = self._process_df_build_map(col_items)
         nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
@@ -630,8 +617,6 @@ class HiFrames(object):
             nodes += f_block.body[:-3]  # remove none return
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
-            if item[1].name in self.ts_series_vars:
-                self.ts_series_vars.add(new_col_arr.name)
         return nodes, df_cols
 
     def _update_df_cols(self):
@@ -1577,26 +1562,6 @@ class HiFrames(object):
             self.replace_var_dict[arg_var.name] = new_arg_var
             self._add_node_defs(nodes)
 
-        # handle timestamp Series
-        # transform to array[dt64]
-        # could be combined with distributed/threaded input
-        if self.args[arg_ind] == timestamp_series_type:
-            # TODO: remove timestamp_series_type
-            def f(_ts_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.ts_series_to_arr_typ(_ts_series))
-
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [arg_var])
-            nodes += f_block.body[:-3]  # remove none return
-            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
-            nodes[-1].target = new_arg_var
-            self.replace_var_dict[arg_var.name] = new_arg_var
-            self._add_node_defs(nodes)
-            # remember that this variable is actually a Series
-            self.df_cols.add(new_arg_var.name)
-            self.ts_series_vars.add(new_arg_var.name)
-
         # TODO: handle datetime.date() series
 
         # input dataframe arg
@@ -1624,9 +1589,6 @@ class HiFrames(object):
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [arg_var])
                 nodes += f_block.body[:-3]
-                #
-                if col_dtype == types.NPDatetime('ns'):
-                    self.ts_series_vars.add(nodes[-1].target.name)
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)

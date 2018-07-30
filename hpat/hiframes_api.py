@@ -20,7 +20,7 @@ from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, un
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
+from hpat.pd_timestamp_ext import pandas_timestamp_type
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
@@ -798,10 +798,10 @@ class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == timestamp_series_type or args[0] == types.Array(types.int64, 1, 'C')
+        assert args[0] == dt_index_series_type or args[0] == types.Array(types.int64, 1, 'C')
         return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
 
-@lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
+@lower_builtin(ts_series_to_arr_typ, dt_index_series_type)
 @lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
