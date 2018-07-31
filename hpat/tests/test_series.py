@@ -336,5 +336,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_sum1(self):
+        def test_impl(S):
+            return S.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()

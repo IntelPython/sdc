@@ -461,7 +461,7 @@ class HiFramesTyped(object):
 
         if func_name == 'column_sum':
             in_arr = rhs.args[0]
-            f_blocks = compile_to_numba_ir(_column_sum_impl,
+            f_blocks = compile_to_numba_ir(_column_sum_impl_basic,
                                            {'numba': numba, 'np': np,
                                                'hpat': hpat}, self.typingctx,
                                            (if_series_to_array_type(self.typemap[in_arr.name]),),
@@ -561,8 +561,19 @@ def _sum_handle_nan(s, count):  # pragma: no cover
         s = np.nan
     return s
 
+def _column_sum_impl_basic(A):  # pragma: no cover
+    numba.parfor.init_prange()
+    s = 0
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s += val
 
-def _column_sum_impl(A):  # pragma: no cover
+    res = s
+    return res
+
+
+def _column_sum_impl_count(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = 0
