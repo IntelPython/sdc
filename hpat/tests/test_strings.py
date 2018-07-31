@@ -111,7 +111,7 @@ class TestString(unittest.TestCase):
         df = pd.DataFrame({'A': [1,2,3]*33, 'B': ['one', 'two', 'three']*33})
         ds, rs = hpat_func(df.B)
         gc.collect()
-        self.assertTrue(isinstance(ds, np.ndarray) and isinstance(rs, np.ndarray))
+        self.assertTrue(isinstance(ds, pd.Series) and isinstance(rs, pd.Series))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] == True and rs[2] == False)
 
     def test_string_array_bool_getitem(self):
