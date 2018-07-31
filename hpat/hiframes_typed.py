@@ -64,9 +64,9 @@ class HiFramesTyped(object):
 
         replace_series = {}
         for vname, typ in self.typemap.items():
-            if isinstance(typ, SeriesType):
+            new_typ = if_series_to_array_type(typ)
+            if new_typ != typ:
                 # print("replacing series type", vname)
-                new_typ = series_to_array_type(typ)
                 replace_series[vname] = new_typ
             # replace array.call() variable types
             if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
