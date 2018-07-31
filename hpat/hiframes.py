@@ -1380,7 +1380,7 @@ class HiFrames(object):
         return df_var, key_colname, as_index, out_colnames, explicit_select
 
     def _get_agg_func(self, func_name, rhs):
-        agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
+        agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl_basic,
                           'count': hpat.hiframes_typed._column_count_impl,
                           'mean': hpat.hiframes_typed._column_mean_impl,
                           'max': hpat.hiframes_typed._column_max_impl,
@@ -1870,7 +1870,7 @@ def remove_return_from_block(last_block):
         last_block.body.pop()
 
 
-def include_new_blocks(blocks, new_blocks, label, new_body):
+def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=True):
     inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
     blocks.update(inner_blocks)
     ir_utils._max_label = max(blocks.keys())
@@ -1879,12 +1879,14 @@ def include_new_blocks(blocks, new_blocks, label, new_body):
     inner_topo_order = find_topo_order(inner_blocks)
     inner_first_label = inner_topo_order[0]
     inner_last_label = inner_topo_order[-1]
-    remove_return_from_block(inner_blocks[inner_last_label])
+    if remove_non_return:
+        remove_return_from_block(inner_blocks[inner_last_label])
     new_body.append(ir.Jump(inner_first_label, loc))
     blocks[label].body = new_body
     label = ir_utils.next_label()
     blocks[label] = ir.Block(scope, loc)
-    inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
+    if remove_non_return:
+        inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
     # new_body.clear()
     return label
 

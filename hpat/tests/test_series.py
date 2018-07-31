@@ -346,5 +346,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_count1(self):
+        def test_impl(S):
+            return S.count()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()

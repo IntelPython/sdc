@@ -42,8 +42,12 @@ class HiFramesTyped(object):
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
-                        label = include_new_blocks(blocks, out_nodes, label,
-                                                   new_body)
+                        new_label = include_new_blocks(blocks, out_nodes,
+                            label, new_body, False)
+                        numba.inline_closurecall._replace_returns(
+                            out_nodes, inst.target, new_label)
+                        # TODO: add definitions?
+                        label = new_label
                         new_body = []
                     if isinstance(out_nodes, tuple):
                         gen_blocks, post_nodes = out_nodes
@@ -248,16 +252,9 @@ class HiFramesTyped(object):
             S = numba.unsafe.ndarray.empty_inferred((n,))
             for i in numba.parfor.internal_prange(n):
                 S[i] = hpat.pd_timestamp_ext.parse_datetime_str(str_arr[i])
-            ret = S
+            return S
 
-        f_ir = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba},
-                                        self.typingctx,
-                                        (if_series_to_array_type(self.typemap[data.name]),),
-                                        self.typemap, self.calltypes)
-        topo_order = find_topo_order(f_ir.blocks)
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [data])
-        return f_ir.blocks
+        return self._replace_func(f, [data])
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
@@ -291,21 +288,12 @@ class HiFramesTyped(object):
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}\n'.format(comp)
+        func_text += '  return S\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
         # print(func_text)
-        f_blocks = compile_to_numba_ir(f,
-                                        {'numba': numba, 'np': np, 'hpat': hpat},
-                                        self.typingctx,
-                                        (if_series_to_array_type(self.typemap[arg1.name]),
-                                        if_series_to_array_type(self.typemap[arg2.name])),
-                                        self.typemap, self.calltypes).blocks
-        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
-        # replace == expression with result of parfor (S)
-        # S is target of last statement in 1st block of f
-        assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
-        return (f_blocks, [assign])
+        return self._replace_func(f, [arg1, arg2])
 
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor
@@ -336,20 +324,12 @@ class HiFramesTyped(object):
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
                                                         arg2_access)
+            func_text += '  return S\n'
 
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
-            f_blocks = compile_to_numba_ir(f,
-                                           {'numba': numba, 'np': np}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[arg1.name]),
-                                            if_series_to_array_type(self.typemap[arg2.name])),
-                                           self.typemap, self.calltypes).blocks
-            replace_arg_nodes(f_blocks[min(f_blocks.keys())], [arg1, arg2])
-            # replace == expression with result of parfor (S)
-            # S is target of last statement in 1st block of f
-            assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
-            return (f_blocks, [assign])
+            return self._replace_func(f, [arg1, arg2])
 
         return None
 
@@ -383,27 +363,16 @@ class HiFramesTyped(object):
         else:
             assert False
 
-        str_arr = rhs.args[0]
-        pat = rhs.args[1]
         func_text = 'def f(str_arr, pat):\n'
         func_text += '  l = len(str_arr)\n'
         func_text += '  S = np.empty(l, dtype=np.bool_)\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}(str_arr[i], pat)\n'.format(comp_func)
+        func_text += '  return S\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
-        f_blocks = compile_to_numba_ir(f,
-                                       {'numba': numba, 'np': np,
-                                           'hpat': hpat}, self.typingctx,
-                                       (if_series_to_array_type(self.typemap[str_arr.name]),
-                                        if_series_to_array_type(self.typemap[pat.name])),
-                                       self.typemap, self.calltypes).blocks
-        replace_arg_nodes(f_blocks[min(f_blocks.keys())], [str_arr, pat])
-        # replace call with result of parfor (S)
-        # S is target of last statement in 1st block of f
-        assign.value = f_blocks[min(f_blocks.keys())].body[-2].target
-        return (f_blocks, [assign])
+        return self._replace_func(f, rhs.args)
 
     def _handle_df_col_filter(self, lhs_name, rhs, assign):
         # find df['col2'] = df['col1'][arr]
@@ -413,98 +382,40 @@ class HiFramesTyped(object):
                 and rhs.value.name in self.df_cols
                 and lhs_name in self.df_cols
                 and self.is_bool_arr(rhs.index.name)):
-            lhs = assign.target
             in_arr = rhs.value
             index_var = rhs.index
-            f_blocks = compile_to_numba_ir(_column_filter_impl_float,
-                                           {'numba': numba, 'np': np}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[lhs.name]), if_series_to_array_type(self.typemap[in_arr.name]),
-                                               self.typemap[index_var.name]),
-                                           self.typemap, self.calltypes).blocks
-            first_block = min(f_blocks.keys())
-            replace_arg_nodes(f_blocks[first_block], [lhs, in_arr, index_var])
-            alloc_nodes = gen_np_call('empty_like', np.empty_like, lhs, [in_arr],
-                                      self.typingctx, self.typemap, self.calltypes)
-            f_blocks[first_block].body = alloc_nodes + \
-                f_blocks[first_block].body
-            return f_blocks
+            # TODO: handle filter str arr, etc.
+            return self._replace_func(_column_filter_impl_float, [in_arr, index_var])
+
 
     def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
 
         if func_name == 'count':
-            in_arr = rhs.args[0]
-            f_blocks = compile_to_numba_ir(_column_count_impl,
-                                           {'numba': numba, 'np': np,
-                                               'hpat': hpat}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
-                                           self.typemap, self.calltypes).blocks
-            topo_order = find_topo_order(f_blocks)
-            first_block = topo_order[0]
-            last_block = topo_order[-1]
-            replace_arg_nodes(f_blocks[first_block], [in_arr])
-            # assign results to lhs output
-            f_blocks[last_block].body[-3].target = assign.target
-            return f_blocks
+            return self._replace_func(_column_count_impl, rhs.args)
 
         if func_name == 'fillna':
-            out_arr = rhs.args[0]
-            in_arr = rhs.args[1]
-            val = rhs.args[2]
-            f_blocks = compile_to_numba_ir(_column_fillna_impl,
-                                           {'numba': numba, 'np': np}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[out_arr.name]), if_series_to_array_type(self.typemap[in_arr.name]),
-                                               if_series_to_array_type(self.typemap[val.name])),
-                                           self.typemap, self.calltypes).blocks
-            first_block = min(f_blocks.keys())
-            replace_arg_nodes(f_blocks[first_block], [out_arr, in_arr, val])
-            return f_blocks
+            return self._replace_func(_column_fillna_impl, rhs.args)
 
         if func_name == 'column_sum':
-            in_arr = rhs.args[0]
-            f_blocks = compile_to_numba_ir(_column_sum_impl_basic,
-                                           {'numba': numba, 'np': np,
-                                               'hpat': hpat}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
-                                           self.typemap, self.calltypes).blocks
-            topo_order = find_topo_order(f_blocks)
-            first_block = topo_order[0]
-            last_block = topo_order[-1]
-            replace_arg_nodes(f_blocks[first_block], [in_arr])
-            # assign results to lhs output
-            f_blocks[last_block].body[-3].target = assign.target
-            return f_blocks
+            return self._replace_func(_column_sum_impl_basic, rhs.args)
 
         if func_name == 'mean':
-            in_arr = rhs.args[0]
-            f_blocks = compile_to_numba_ir(_column_mean_impl,
-                                           {'numba': numba, 'np': np,
-                                               'hpat': hpat}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
-                                           self.typemap, self.calltypes).blocks
-            topo_order = find_topo_order(f_blocks)
-            first_block = topo_order[0]
-            last_block = topo_order[-1]
-            replace_arg_nodes(f_blocks[first_block], [in_arr])
-            # assign results to lhs output
-            f_blocks[last_block].body[-3].target = assign.target
-            return f_blocks
+            return self._replace_func(_column_mean_impl, rhs.args)
 
         if func_name == 'var':
-            in_arr = rhs.args[0]
-            f_blocks = compile_to_numba_ir(_column_var_impl,
-                                           {'numba': numba, 'np': np,
-                                               'hpat': hpat}, self.typingctx,
-                                           (if_series_to_array_type(self.typemap[in_arr.name]),),
-                                           self.typemap, self.calltypes).blocks
-            topo_order = find_topo_order(f_blocks)
-            first_block = topo_order[0]
-            last_block = topo_order[-1]
-            replace_arg_nodes(f_blocks[first_block], [in_arr])
-            # assign results to lhs output
-            f_blocks[last_block].body[-3].target = assign.target
-            return f_blocks
+            return self._replace_func(_column_var_impl, rhs.args)
 
         return [assign]
+
+    def _replace_func(self, func, args):
+        glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
+        f_blocks = compile_to_numba_ir(func, glbls, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks
+        topo_order = find_topo_order(f_blocks)
+        first_block = topo_order[0]
+        replace_arg_nodes(f_blocks[first_block], args)
+        return f_blocks
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
@@ -525,7 +436,8 @@ def _fix_typ_undefs(new_typ, old_typ):
 # float columns can have regular np.nan
 
 
-def _column_filter_impl_float(A, B, ind):  # pragma: no cover
+def _column_filter_impl_float(B, ind):  # pragma: no cover
+    A = np.empty_like(B)
     for i in numba.parfor.internal_prange(len(A)):
         s = 0
         if ind[i]:
@@ -533,6 +445,7 @@ def _column_filter_impl_float(A, B, ind):  # pragma: no cover
         else:
             s = np.nan
         A[i] = s
+    return A
 
 
 def _column_count_impl(A):  # pragma: no cover
