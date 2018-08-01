@@ -20,8 +20,8 @@ from numba.analysis import compute_cfg_from_blocks
 
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
-                  hiframes_join, hiframes_aggregate, hiframes_sort)
-from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
+                  hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
+from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
 
@@ -32,8 +32,8 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'mean', 'var', 'std',
-                'quantile', 'count', 'describe', 'nunique']
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'std',
+                'quantile', 'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
 
@@ -1038,14 +1038,8 @@ class HiFrames(object):
     def _gen_column_call(self, out_var, args, col_var, func, kws):
         if func in ['fillna', 'pct_change', 'shift']:
             self.df_cols.add(out_var.name)  # output is Series except sum
-        if func == 'count':
-            return self._gen_col_count(out_var, args, col_var)
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'mean':
-            return self._gen_col_mean(out_var, args, col_var)
-        if func == 'var':
-            return self._gen_col_var(out_var, args, col_var)
         if func == 'std':
             return self._gen_col_std(out_var, args, col_var)
         if func == 'quantile':
@@ -1094,16 +1088,6 @@ class HiFrames(object):
 
         return stencil_nodes + setitem_nodes
 
-    def _gen_col_count(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.count(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
     def _gen_fillna(self, out_var, args, col_var, kws):
         inplace = False
         if 'inplace' in kws:
@@ -1125,26 +1109,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
         return alloc_nodes + nodes
-
-    def _gen_col_mean(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.mean(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_var(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.var(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
 
     def _gen_col_std(self, out_var, args, col_var):
         loc = out_var.loc
@@ -1379,15 +1343,9 @@ class HiFrames(object):
         return df_var, key_colname, as_index, out_colnames, explicit_select
 
     def _get_agg_func(self, func_name, rhs):
-        agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl_basic,
-                          'count': hpat.hiframes_typed._column_count_impl,
-                          'mean': hpat.hiframes_typed._column_mean_impl,
-                          'max': hpat.hiframes_typed._column_max_impl,
-                          'min': hpat.hiframes_typed._column_min_impl,
-                          }
 
-        if func_name in agg_func_table:
-            return agg_func_table[func_name]
+        if func_name in ['sum', 'count', 'mean', 'max', 'min']:
+            return hiframes_typed.series_replace_funcs[func_name]
 
         assert func_name in ['agg', 'aggregate']
         # agg case
@@ -1854,40 +1812,6 @@ def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
 
     return stencil_nodes
 
-
-def remove_return_from_block(last_block):
-    # remove const none, cast, return nodes
-    assert isinstance(last_block.body[-1], ir.Return)
-    last_block.body.pop()
-    assert (isinstance(last_block.body[-1], ir.Assign)
-            and isinstance(last_block.body[-1].value, ir.Expr)
-            and last_block.body[-1].value.op == 'cast')
-    last_block.body.pop()
-    if (isinstance(last_block.body[-1], ir.Assign)
-            and isinstance(last_block.body[-1].value, ir.Const)
-            and last_block.body[-1].value.value is None):
-        last_block.body.pop()
-
-
-def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=True):
-    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
-    blocks.update(inner_blocks)
-    ir_utils._max_label = max(blocks.keys())
-    scope = blocks[label].scope
-    loc = blocks[label].loc
-    inner_topo_order = find_topo_order(inner_blocks)
-    inner_first_label = inner_topo_order[0]
-    inner_last_label = inner_topo_order[-1]
-    if remove_non_return:
-        remove_return_from_block(inner_blocks[inner_last_label])
-    new_body.append(ir.Jump(inner_first_label, loc))
-    blocks[label].body = new_body
-    label = ir_utils.next_label()
-    blocks[label] = ir.Block(scope, loc)
-    if remove_non_return:
-        inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
-    # new_body.clear()
-    return label
 
 def simple_block_copy_propagate(block):
     """simple copy propagate for a single block before typing, without Parfor"""

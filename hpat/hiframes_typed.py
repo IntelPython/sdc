@@ -11,8 +11,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
-from hpat.utils import get_definitions, debug_prints
-from hpat.hiframes import include_new_blocks, gen_empty_like
+from hpat.utils import get_definitions, debug_prints, include_new_blocks
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
@@ -237,12 +236,14 @@ class HiFramesTyped(object):
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
-        if func_name == 'sum':
+        # single arg functions
+        if func_name in ['sum', 'count', 'mean', 'min', 'max']:
             if rhs.args or rhs.kws:
-                raise ValueError("unsupported Series.sum() arguments")
-
+                raise ValueError("unsupported Series.{}() arguments".format(
+                    func_name))
+            func = series_replace_funcs[func_name]
             # TODO: handle skipna, min_count arguments
-            return self._replace_func(_column_sum_impl_basic, [series_var])
+            return self._replace_func(func, [series_var])
 
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
@@ -592,3 +593,12 @@ def _column_max_impl(in_arr):
             count += 1
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
+
+series_replace_funcs = {
+    'sum': _column_sum_impl_basic,
+    'count': _column_count_impl,
+    'mean': _column_mean_impl,
+    'max': _column_max_impl,
+    'min': _column_min_impl,
+    'var': _column_var_impl,
+}

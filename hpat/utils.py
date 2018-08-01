@@ -272,6 +272,42 @@ def get_ctypes_ptr(typingctx, ctypes_typ=None):
 
     return types.voidptr(ctypes_typ), codegen
 
+
+def remove_return_from_block(last_block):
+    # remove const none, cast, return nodes
+    assert isinstance(last_block.body[-1], ir.Return)
+    last_block.body.pop()
+    assert (isinstance(last_block.body[-1], ir.Assign)
+            and isinstance(last_block.body[-1].value, ir.Expr)
+            and last_block.body[-1].value.op == 'cast')
+    last_block.body.pop()
+    if (isinstance(last_block.body[-1], ir.Assign)
+            and isinstance(last_block.body[-1].value, ir.Const)
+            and last_block.body[-1].value.value is None):
+        last_block.body.pop()
+
+
+def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=True):
+    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
+    blocks.update(inner_blocks)
+    ir_utils._max_label = max(blocks.keys())
+    scope = blocks[label].scope
+    loc = blocks[label].loc
+    inner_topo_order = find_topo_order(inner_blocks)
+    inner_first_label = inner_topo_order[0]
+    inner_last_label = inner_topo_order[-1]
+    if remove_non_return:
+        remove_return_from_block(inner_blocks[inner_last_label])
+    new_body.append(ir.Jump(inner_first_label, loc))
+    blocks[label].body = new_body
+    label = ir_utils.next_label()
+    blocks[label] = ir.Block(scope, loc)
+    if remove_non_return:
+        inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
+    # new_body.clear()
+    return label
+
+
 def is_call(stmt):
     """true if stmt is a getitem or static_getitem assignment"""
     return (isinstance(stmt, ir.Assign)
