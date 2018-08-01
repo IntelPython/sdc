@@ -1,6 +1,7 @@
 import numba
 from numba import ir_utils, ir, types, cgutils
-from numba.ir_utils import guard, get_definition, find_callname, require
+from numba.ir_utils import (guard, get_definition, find_callname, require,
+    add_offset_to_labels, find_topo_order)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate

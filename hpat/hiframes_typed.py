@@ -7,7 +7,7 @@ from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
-                            is_getitem)
+                            is_getitem, mk_unique_var)
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
@@ -193,7 +193,7 @@ class HiFramesTyped(object):
                 if (isinstance(func_mod, ir.Var)
                         and is_series_type(self.typemap[func_mod.name])):
                     return self._run_call_series(
-                        assign, lhs, rhs, func_mod, func_name)
+                        assign, assign.target, rhs, func_mod, func_name)
 
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
@@ -244,6 +244,25 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             # TODO: handle skipna, min_count arguments
             return self._replace_func(func, [series_var])
+
+        if func_name == 'std':
+            # std is sqrt(var)
+            # get var func blocks
+            var_blocks = self._replace_func(
+                series_replace_funcs['var'], [series_var])
+
+            # replace return with (var_val = ...)
+            var_var = ir.Var(lhs.scope, mk_unique_var("var_val"), lhs.loc)
+            topo_order = find_topo_order(var_blocks)
+            last_var_block = var_blocks[topo_order[-1]]
+            var_typ = self.typemap[last_var_block.body[-3].target.name]
+            self.typemap[var_var.name] = var_typ
+            last_var_block.body[-3].target = var_var
+            last_var_block.body.pop()  # remove return
+            last_var_block.body.pop()  # remove cast
+            std_block = self._replace_func(lambda a: a**0.5, [var_var]).popitem()[1]
+            last_var_block.body += std_block.body
+            return var_blocks
 
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]

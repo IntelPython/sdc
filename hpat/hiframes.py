@@ -32,7 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'std',
+df_col_funcs = ['shift', 'pct_change', 'fillna',
                 'quantile', 'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
@@ -1040,8 +1040,6 @@ class HiFrames(object):
             self.df_cols.add(out_var.name)  # output is Series except sum
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'std':
-            return self._gen_col_std(out_var, args, col_var)
         if func == 'quantile':
             return self._gen_col_quantile(out_var, args, col_var)
         if func == 'nunique':
@@ -1109,22 +1107,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
         return alloc_nodes + nodes
-
-    def _gen_col_std(self, out_var, args, col_var):
-        loc = out_var.loc
-        scope = out_var.scope
-        # calculate var() first
-        var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
-        v_nodes = self._gen_col_var(var_var, args, col_var)
-
-        def f(a):  # pragma: no cover
-            a ** 0.5
-        s_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(s_block, [var_var])
-        s_nodes = s_block.body[:-3]
-        assert len(s_nodes) == 3
-        s_nodes[-1].target = out_var
-        return v_nodes + s_nodes
 
     def _gen_col_quantile(self, out_var, args, col_var):
         def f(A, q):  # pragma: no cover
