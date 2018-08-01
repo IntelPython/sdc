@@ -298,6 +298,11 @@ class SeriesAttribute(AttributeTemplate):
         sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
+    @bound_function("series.quantile")
+    def resolve_quantile(self, ary, args, kws):
+        # TODO: fix quantile output type if not float64
+        return signature(types.float64, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

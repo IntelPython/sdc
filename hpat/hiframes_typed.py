@@ -69,9 +69,13 @@ class HiFramesTyped(object):
                 replace_series[vname] = new_typ
             # replace array.call() variable types
             if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
-                this = series_to_array_type(typ.this)
                 # TODO: handle string arrays, etc.
-                assert typ.typing_key.startswith('array.')
+                assert (typ.typing_key.startswith('array.')
+                    or typ.typing_key.startswith('series.'))
+                # skip if series.func since it is replaced here
+                if typ.typing_key.startswith('series.'):
+                    continue
+                this = series_to_array_type(typ.this)
                 attr = typ.typing_key[len('array.'):]
                 resolver = getattr(ArrayAttribute, 'resolve_'+attr)
                 # methods are either installed with install_array_method or
