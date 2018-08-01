@@ -33,7 +33,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
 df_col_funcs = ['shift', 'pct_change', 'fillna',
-                'quantile', 'describe', 'nunique']
+                'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
 
@@ -1040,8 +1040,6 @@ class HiFrames(object):
             self.df_cols.add(out_var.name)  # output is Series except sum
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'quantile':
-            return self._gen_col_quantile(out_var, args, col_var)
         if func == 'nunique':
             return self._gen_col_nunique(out_var, args, col_var)
         if func == 'describe':
@@ -1107,16 +1105,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
         return alloc_nodes + nodes
-
-    def _gen_col_quantile(self, out_var, args, col_var):
-        def f(A, q):  # pragma: no cover
-            s = hpat.hiframes_api.quantile(A, q)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var, args[0]])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
 
     def _gen_col_nunique(self, out_var, args, col_var):
         def f(A):  # pragma: no cover

@@ -264,6 +264,12 @@ class HiFramesTyped(object):
             last_var_block.body += std_block.body
             return var_blocks
 
+        if func_name == 'quantile':
+            return self._replace_func(
+                lambda A, q: hpat.hiframes_api.quantile(A, q),
+                [series_var, rhs.args[0]]
+            )
+
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
 
