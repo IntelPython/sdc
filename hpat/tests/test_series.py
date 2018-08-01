@@ -341,6 +341,18 @@ class TestSeries(unittest.TestCase):
             return S.sum()
 
         hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # all NA case should produce 0
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_sum2(self):
+        def test_impl(S):
+            return (S+S).sum()
+
+        hpat_func = hpat.jit(test_impl)
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
         S = pd.Series([np.nan, np.nan])

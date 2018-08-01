@@ -52,10 +52,6 @@ def fillna(A):  # pragma: no cover
     return 0
 
 
-def column_sum(A):  # pragma: no cover
-    return 0
-
-
 def var(A):  # pragma: no cover
     return 0
 
@@ -306,15 +302,6 @@ class FillNaType(AbstractTemplate):
         assert len(args) == 3
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
-
-
-@infer_global(column_sum)
-class SumType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        # arg: in_arr
-        return signature(_expand_integer(args[0].dtype), *args)
 
 
 # copied from numba/numba/typing/arraydecl.py:563

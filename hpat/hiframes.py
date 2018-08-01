@@ -32,7 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
+df_col_funcs = ['shift', 'pct_change', 'fillna', 'mean', 'var', 'std',
                 'quantile', 'count', 'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
@@ -51,7 +51,7 @@ def remove_hiframes(rhs, lives, call_list):
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
             'concat', 'count', 'mean', 'quantile', 'var',
-            'str_contains_regex', 'str_contains_noregex', 'column_sum',
+            'str_contains_regex', 'str_contains_noregex',
             'nunique']):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
@@ -1031,8 +1031,6 @@ class HiFrames(object):
             return self._gen_col_count(out_var, args, col_var)
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'sum':
-            return self._gen_col_sum(out_var, args, col_var)
         if func == 'mean':
             return self._gen_col_mean(out_var, args, col_var)
         if func == 'var':
@@ -1116,16 +1114,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
         return alloc_nodes + nodes
-
-    def _gen_col_sum(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.column_sum(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
 
     def _gen_col_mean(self, out_var, args, col_var):
         def f(A):  # pragma: no cover

@@ -203,6 +203,10 @@ def series_to_array_type(typ, replace_boxed=False):
         aligned=typ.aligned)
     return new_typ
 
+def is_series_type(typ):
+    # XXX: UnBoxedSeriesType only used in unboxing
+    assert not isinstance(typ, UnBoxedSeriesType)
+    return isinstance(typ, (SeriesType, BoxedSeriesType))
 
 def arr_to_series_type(arr):
     series_type = None

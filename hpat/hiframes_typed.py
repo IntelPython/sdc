@@ -17,7 +17,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
-    if_series_to_array_type, if_series_to_unbox)
+    if_series_to_array_type, if_series_to_unbox, is_series_type)
 
 
 class HiFramesTyped(object):
@@ -191,6 +191,11 @@ class HiFramesTyped(object):
                 if fdef == ('empty_like', 'numpy'):
                     return self._handle_empty_like(assign, lhs, rhs)
 
+                if (isinstance(func_mod, ir.Var)
+                        and is_series_type(self.typemap[func_mod.name])):
+                    return self._run_call_series(
+                        assign, lhs, rhs, func_mod, func_name)
+
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
@@ -230,6 +235,17 @@ class HiFramesTyped(object):
                 return nodes
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
+
+    def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
+        if func_name == 'sum':
+            if rhs.args or rhs.kws:
+                raise ValueError("unsupported Series.sum() arguments")
+
+            # TODO: handle skipna, min_count arguments
+            return self._replace_func(_column_sum_impl_basic, [series_var])
+
+        warnings.warn("unknown Series call, reverting to Numpy")
+        return [assign]
 
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
