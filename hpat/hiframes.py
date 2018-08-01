@@ -51,7 +51,7 @@ def remove_hiframes(rhs, lives, call_list):
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
             'concat', 'count', 'mean', 'quantile', 'var',
-            'str_contains_regex', 'str_contains_noregex',
+            'str_contains_regex', 'str_contains_noregex', 'column_sum',
             'nunique']):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
@@ -984,10 +984,21 @@ class HiFrames(object):
         if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
                 and func_def.value.name in self.rolling_calls):
             func_name = func_def.attr
+            tmp_out = ir.Var(lhs.scope, mk_unique_var("rolling_out"), lhs.loc)
             self.df_cols.add(lhs.name)  # output is Series
-            return self._gen_rolling_call(rhs.args,
+            nodes = self._gen_rolling_call(rhs.args,
                                     *self.rolling_calls[func_def.value.name]
-                                    + [func_name, lhs])
+                                    + [func_name, tmp_out])
+            def f(_arr):  # pragma: no cover
+                _dt_arr = hpat.hiframes_api.to_series_type(_arr)
+
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [tmp_out])
+            nodes += f_block.body[:-3]  # remove none return
+            nodes[-1].target = lhs
+            return nodes
+
         return None
 
     def _handle_str_contains(self, assign, lhs, rhs, str_col):
