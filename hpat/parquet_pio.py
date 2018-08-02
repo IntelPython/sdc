@@ -16,15 +16,6 @@ from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
-_pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
-                     'INT32': types.Array(types.int32, 1, 'C'),
-                     'INT64': types.Array(types.int64, 1, 'C'),
-                     'FLOAT': types.Array(types.float32, 1, 'C'),
-                     'DOUBLE': types.Array(types.float64, 1, 'C'),
-                     'BYTE_ARRAY': string_array_type,
-                     'INT96': types.Array(types.NPDatetime('ns'), 1, 'C'),
-                     }
-
 # boolean, int32, int64, int96, float, double
 # XXX arrow converts int96 timestamp to int64
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
@@ -122,7 +113,7 @@ class ParquetHandler(object):
             # get column type from schema
             c_type = col_types[i]
             if cname in convert_types:
-                c_type = convert_types[cname]
+                c_type = convert_types[cname].dtype
 
             # create a variable for column and assign type
             varname = mk_unique_var(cname)
@@ -151,12 +142,12 @@ def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
     func_text = 'def f(arrow_readers):\n'
     func_text += '  col_size = get_column_size_parquet(arrow_readers, {})\n'.format(i)
     # generate strings differently
-    if c_type == string_array_type:
+    if c_type == string_type:
         # pass size for easier allocation and distributed analysis
         func_text += '  column = read_parquet_str(arrow_readers, {}, col_size)\n'.format(
             i)
     else:
-        el_type = get_element_type(c_type.dtype)
+        el_type = get_element_type(c_type)
         if el_type == 'datetime64(ns)':
             func_text += '  column_tmp = np.empty(col_size, dtype=np.int64)\n'
             # TODO: fix alloc
@@ -195,11 +186,35 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
-def _get_numba_typ_from_pq_typ(pq_typ):
-    if pq_typ not in _pq_type_to_numba:
-        raise ValueError("parquet data type {} not supported yet".format(
-                                                                       pq_typ))
-    return _pq_type_to_numba[pq_typ]
+def _get_numba_typ_from_pa_typ(pa_typ):
+    import pyarrow as pa
+    _typ_map = {
+        # boolean
+        pa.bool_(): types.bool_,
+        # signed int types
+        pa.int8(): types.int8,
+        pa.int16(): types.int16,
+        pa.int32(): types.int32,
+        pa.int64(): types.int64,
+        # unsigned int types
+        pa.uint8(): types.uint8,
+        pa.uint16(): types.uint16,
+        pa.uint32(): types.uint32,
+        pa.uint64(): types.uint64,
+        # float types (TODO: float16?)
+        pa.float32(): types.float32,
+        pa.float64(): types.float64,
+        # String
+        pa.string(): string_type,
+        # date
+        pa.date32(): types.NPDatetime('ns'),
+        pa.date64(): types.NPDatetime('ns'),
+        # time (TODO: time32, time64, ...)
+        pa.timestamp('ns'): types.NPDatetime('ns'),
+    }
+    if pa_typ not in _typ_map:
+        raise ValueError("Arrow data type {} not supported yet".format(pa_typ))
+    return _typ_map[pa_typ]
 
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
@@ -208,10 +223,10 @@ def parquet_file_schema(file_name):
 
     pq_dataset = pq.ParquetDataset(file_name)
     col_names = pq_dataset.schema.names
-    num_cols = len(col_names)
-    col_types = [_get_numba_typ_from_pq_typ(
-                 pq_dataset.schema.column(i).physical_type)
-                 for i in range(num_cols)]
+    pa_schema = pq_dataset.schema.to_arrow_schema()
+
+    col_types = [_get_numba_typ_from_pa_typ(pa_schema.field_by_name(c).type)
+                 for c in col_names]
     # TODO: close file?
     return col_names, col_types
 
