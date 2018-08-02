@@ -9,12 +9,14 @@
 
 #include "parquet/api/reader.h"
 #include "parquet/arrow/reader.h"
+#include "parquet/arrow/schema.h"
 #include "arrow/table.h"
+#include "arrow/type.h"
 #include "arrow/io/hdfs.h"
 
 using parquet::arrow::FileReader;
 using parquet::ParquetFileReader;
-
+using arrow::Type;
 
 extern "C" {
 
@@ -33,8 +35,11 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
 
 }  // extern "C"
 
+Type::type get_arrow_type(std::shared_ptr<FileReader> arrow_reader,
+                                    int64_t column_idx);
+bool arrowPqTypesEqual(Type::type arrow_type, ::parquet::Type::type pq_type);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                    int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                    int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
                     const uint8_t* null_bitmap_buff, int out_dtype);
 
 void pq_init_reader(const char* file_name,
@@ -66,10 +71,9 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t co
 
     int64_t num_values = arr->length();
     // std::cout << "arr: " << arr->ToString() << std::endl;
-    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
-                                            ColumnChunk(column_idx)->type();
+    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
     int dtype_size = pq_type_sizes[out_dtype];
-    // printf("dtype %d out_dtype %d dtype_size %d\n", dtype, out_dtype, dtype_size);
+    // printf("arrow_type %d out_dtype %d dtype_size %d\n", arrow_type, out_dtype, dtype_size);
 
     auto buffers = arr->data()->buffers;
     // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
@@ -80,7 +84,7 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t co
     const uint8_t* buff = buffers[1]->data();
     const uint8_t* null_bitmap_buff = buffers[0]->data();
 
-    copy_data(out_data, buff, 0, num_values, dtype, null_bitmap_buff, out_dtype);
+    copy_data(out_data, buff, 0, num_values, arrow_type, null_bitmap_buff, out_dtype);
     // memcpy(out_data, buffers[1]->data(), buff_size);
     return num_values*dtype_size;
 }
@@ -104,7 +108,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
 
     auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
     int64_t nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
-    int dtype = rg_metadata->ColumnChunk(column_idx)->type();
+    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
     int dtype_size = pq_type_sizes[out_dtype];
 
     // skip whole row groups if no need to read any rows
@@ -144,7 +148,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
         int64_t rows_to_read = std::min(count-read_rows, nrows_in_group-rows_to_skip);
         // printf("rows_to_skip: %ld rows_to_read: %ld\n", rows_to_skip, rows_to_read);
 
-        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, dtype, null_bitmap_buff, out_dtype);
+        copy_data(out_data+read_rows*dtype_size, buff, rows_to_skip, rows_to_read, arrow_type, null_bitmap_buff, out_dtype);
         // memcpy(out_data+read_rows*dtype_size, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
 
         skipped_rows += rows_to_skip;
@@ -166,7 +170,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
 
 template <typename T_in, typename T_out>
 inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
                         int out_dtype)
 {
     T_out *out_data_cast = (T_out*)out_data;
@@ -178,60 +182,61 @@ inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
 }
 
 inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
                         int out_dtype)
 {
+    // TODO: rewrite in macros?
     // TODO: convert boolean
     // input is int32
-    if (dtype==1)
+    if (arrow_type == Type::INT32)
     {
         if (out_dtype==2)
-            copy_data_cast<int, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int, int64_t>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==4)
-            copy_data_cast<int, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int, float>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==5)
-            copy_data_cast<int, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is int64
-    if (dtype==2)
+    if (arrow_type == Type::INT64)
     {
         if (out_dtype==1)
-            copy_data_cast<int64_t, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int64_t, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==4)
-            copy_data_cast<int64_t, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int64_t, float>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==5)
-            copy_data_cast<int64_t, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<int64_t, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is float
-    if (dtype==4)
+    if (arrow_type == Type::FLOAT)
     {
         if (out_dtype==1)
-            copy_data_cast<float, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<float, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==2)
-            copy_data_cast<float, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<float, int64_t>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==5)
-            copy_data_cast<float, double>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<float, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is double
-    if (dtype==5)
+    if (arrow_type == Type::DOUBLE)
     {
         if (out_dtype==1)
-            copy_data_cast<double, int>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<double, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==2)
-            copy_data_cast<double, int64_t>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<double, int64_t>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
         if (out_dtype==4)
-            copy_data_cast<double, float>(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+            copy_data_cast<double, float>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
 }
 
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, int dtype,
+                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
                         const uint8_t* null_bitmap_buff, int out_dtype)
 {
     // unpack booleans from bits
     if (out_dtype==0)
     {
-        if (dtype!=0)
+        if (arrow_type != Type::BOOL)
             std::cerr << "boolean type error" << '\n';
 
         for(int64_t i=0; i<rows_to_read; i++)
@@ -241,15 +246,16 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         }
         return;
     }
-    int dtype_size = pq_type_sizes[dtype];
-    if (dtype==out_dtype)
+
+    if (arrowPqTypesEqual(arrow_type, (parquet::Type::type)out_dtype))
     {
+        int dtype_size = pq_type_sizes[out_dtype];
         // fast path if no conversion required
         memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
     }
     else
     {
-        copy_data_dispatch(out_data, buff, rows_to_skip, rows_to_read, dtype, out_dtype);
+        copy_data_dispatch(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // set NaNs for double values
     if (out_dtype==5)
@@ -294,9 +300,8 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         return -1;
     int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
-    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
-                                            ColumnChunk(column_idx)->type();
-    if (dtype!=6) // TODO: get constant from parquet-cpp
+    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
+    if (arrow_type != Type::STRING)
         std::cerr << "Invalid Parquet string data type" << '\n';
 
 
@@ -346,9 +351,8 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         return 0;
     }
 
-    int dtype = arrow_reader->parquet_reader()->metadata()->RowGroup(0)->
-                                            ColumnChunk(column_idx)->type();
-    if (dtype!=6) // TODO: get constant from parquet-cpp
+    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
+    if (arrow_type != Type::STRING)
         std::cerr << "Invalid Parquet string data type" << '\n';
 
     if (offset_vec==NULL)
@@ -514,4 +518,40 @@ void pq_init_reader(const char* file_name,
     // printf("file open for arrow reader done\n");
     // fflush(stdout);
     return;
+}
+
+// get type as enum values defined in arrow/cpp/src/arrow/type.h
+// TODO: handle more complex types
+Type::type get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
+{
+    // TODO: error checking
+    std::vector<int> column_indices;
+    column_indices.push_back(column_idx);
+
+    std::shared_ptr<::arrow::Schema> col_schema;
+    auto descr = arrow_reader->parquet_reader()->metadata()->schema();
+    auto parquet_key_value_metadata = arrow_reader->parquet_reader()->metadata()->key_value_metadata();
+    parquet::arrow::FromParquetSchema(descr, column_indices, parquet_key_value_metadata, &col_schema);
+    // std::cout<< col_schema->ToString() << std::endl;
+    std::shared_ptr<::arrow::DataType> arrow_dtype = col_schema->field(0)->type();
+    return arrow_dtype->id();
+}
+
+bool arrowPqTypesEqual(Type::type arrow_type, ::parquet::Type::type pq_type)
+{
+    if (arrow_type == Type::BOOL && pq_type == ::parquet::Type::BOOLEAN)
+        return true;
+    if (arrow_type == Type::INT32 && pq_type == ::parquet::Type::INT32)
+        return true;
+    if (arrow_type == Type::INT64 && pq_type == ::parquet::Type::INT64)
+        return true;
+    if (arrow_type == Type::FLOAT && pq_type == ::parquet::Type::FLOAT)
+        return true;
+    if (arrow_type == Type::DOUBLE && pq_type == ::parquet::Type::DOUBLE)
+        return true;
+    // XXX byte array is not always string?
+    if (arrow_type == Type::STRING && pq_type == ::parquet::Type::BYTE_ARRAY)
+        return true;
+    // TODO: add timestamp[ns]
+    return false;
 }
