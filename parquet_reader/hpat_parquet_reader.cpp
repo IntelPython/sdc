@@ -35,12 +35,15 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
 
 }  // extern "C"
 
-Type::type get_arrow_type(std::shared_ptr<FileReader> arrow_reader,
+std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arrow_reader,
                                     int64_t column_idx);
-bool arrowPqTypesEqual(Type::type arrow_type, ::parquet::Type::type pq_type);
+bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type);
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                    int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
+                    int64_t rows_to_skip, int64_t rows_to_read, std::shared_ptr<arrow::DataType> arrow_type,
                     const uint8_t* null_bitmap_buff, int out_dtype);
+
+template <typename T, int64_t SHIFT>
+inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t rows_to_skip, int64_t rows_to_read);
 
 void pq_init_reader(const char* file_name,
         std::shared_ptr<FileReader> *a_reader);
@@ -49,7 +52,8 @@ void pq_init_reader(const char* file_name,
 // boolean, int32, int64, int96, float, double
 // XXX assuming int96 is always converted to int64 since it's timestamp
 static int pq_type_sizes[] = {1, 4, 8, 8, 4, 8};
-
+#define PQ_DT64_TYPE 3 // using INT96 value as dt64, TODO: refactor
+#define kNanosecondsInDay 86400000000000LL // TODO: reuse from type_traits.h
 
 int64_t pq_get_size_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
 {
@@ -71,7 +75,7 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t co
 
     int64_t num_values = arr->length();
     // std::cout << "arr: " << arr->ToString() << std::endl;
-    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
+    std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
     int dtype_size = pq_type_sizes[out_dtype];
     // printf("arrow_type %d out_dtype %d dtype_size %d\n", arrow_type, out_dtype, dtype_size);
 
@@ -108,7 +112,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
 
     auto rg_metadata = arrow_reader->parquet_reader()->metadata()->RowGroup(row_group_index);
     int64_t nrows_in_group = rg_metadata->ColumnChunk(column_idx)->num_values();
-    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
+    std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
     int dtype_size = pq_type_sizes[out_dtype];
 
     // skip whole row groups if no need to read any rows
@@ -170,7 +174,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
 
 template <typename T_in, typename T_out>
 inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
+                        int64_t rows_to_skip, int64_t rows_to_read, std::shared_ptr<arrow::DataType> arrow_type,
                         int out_dtype)
 {
     T_out *out_data_cast = (T_out*)out_data;
@@ -182,13 +186,13 @@ inline void copy_data_cast(uint8_t* out_data, const uint8_t* buff,
 }
 
 inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
+                        int64_t rows_to_skip, int64_t rows_to_read, std::shared_ptr<arrow::DataType> arrow_type,
                         int out_dtype)
 {
     // TODO: rewrite in macros?
     // TODO: convert boolean
     // input is int32
-    if (arrow_type == Type::INT32)
+    if (arrow_type->id() == Type::INT32)
     {
         if (out_dtype==2)
             copy_data_cast<int, int64_t>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
@@ -198,7 +202,7 @@ inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
             copy_data_cast<int, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is int64
-    if (arrow_type == Type::INT64)
+    if (arrow_type->id() == Type::INT64)
     {
         if (out_dtype==1)
             copy_data_cast<int64_t, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
@@ -208,7 +212,7 @@ inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
             copy_data_cast<int64_t, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is float
-    if (arrow_type == Type::FLOAT)
+    if (arrow_type->id() == Type::FLOAT)
     {
         if (out_dtype==1)
             copy_data_cast<float, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
@@ -218,7 +222,7 @@ inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
             copy_data_cast<float, double>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // input is double
-    if (arrow_type == Type::DOUBLE)
+    if (arrow_type->id() == Type::DOUBLE)
     {
         if (out_dtype==1)
             copy_data_cast<double, int>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
@@ -227,16 +231,46 @@ inline void copy_data_dispatch(uint8_t* out_data, const uint8_t* buff,
         if (out_dtype==4)
             copy_data_cast<double, float>(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
+    // datetime64 cases
+    if (out_dtype == PQ_DT64_TYPE)
+    {
+        // similar to arrow_to_pandas.cc
+        if (arrow_type->id() == Type::DATE32) {
+            // days since epoch
+            convertArrowToDT64<int32_t, kNanosecondsInDay>(buff, out_data, rows_to_skip, rows_to_read);
+        } else if (arrow_type->id() == Type::DATE64) {
+            // Date64Type is millisecond timestamp stored as int64_t
+            convertArrowToDT64<int64_t, 1000000L>(buff, out_data, rows_to_skip, rows_to_read);
+        } else if (arrow_type->id() == Type::TIMESTAMP) {
+            const auto& ts_type = static_cast<const arrow::TimestampType&>(*arrow_type);
+
+            if (ts_type.unit() == arrow::TimeUnit::NANO) {
+                int dtype_size = sizeof(int64_t);
+                memcpy(out_data, buff+rows_to_skip*dtype_size, rows_to_read*dtype_size);
+            } else if (ts_type.unit() == arrow::TimeUnit::MICRO) {
+                convertArrowToDT64<int64_t, 1000L>(buff, out_data, rows_to_skip, rows_to_read);
+            } else if (ts_type.unit() == arrow::TimeUnit::MILLI) {
+                convertArrowToDT64<int64_t, 1000000L>(buff, out_data, rows_to_skip, rows_to_read);
+            } else if (ts_type.unit() == arrow::TimeUnit::SECOND) {
+                convertArrowToDT64<int64_t, 1000000000L>(buff, out_data, rows_to_skip, rows_to_read);
+            } else {
+                std::cerr << "Invalid datetime timeunit" << out_dtype << " " << arrow_type << std::endl;
+            }
+        } else {
+            //
+            std::cerr << "Invalid datetime conversion" << out_dtype << " " << arrow_type << std::endl;
+        }
+    }
 }
 
 inline void copy_data(uint8_t* out_data, const uint8_t* buff,
-                        int64_t rows_to_skip, int64_t rows_to_read, Type::type arrow_type,
+                        int64_t rows_to_skip, int64_t rows_to_read, std::shared_ptr<arrow::DataType> arrow_type,
                         const uint8_t* null_bitmap_buff, int out_dtype)
 {
     // unpack booleans from bits
     if (out_dtype==0)
     {
-        if (arrow_type != Type::BOOL)
+        if (arrow_type->id() != Type::BOOL)
             std::cerr << "boolean type error" << '\n';
 
         for(int64_t i=0; i<rows_to_read; i++)
@@ -300,8 +334,8 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         return -1;
     int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
-    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
-    if (arrow_type != Type::STRING)
+    std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
+    if (arrow_type->id() != Type::STRING)
         std::cerr << "Invalid Parquet string data type" << '\n';
 
 
@@ -351,8 +385,8 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         return 0;
     }
 
-    Type::type arrow_type = get_arrow_type(arrow_reader, column_idx);
-    if (arrow_type != Type::STRING)
+    std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
+    if (arrow_type->id() != Type::STRING)
         std::cerr << "Invalid Parquet string data type" << '\n';
 
     if (offset_vec==NULL)
@@ -522,7 +556,7 @@ void pq_init_reader(const char* file_name,
 
 // get type as enum values defined in arrow/cpp/src/arrow/type.h
 // TODO: handle more complex types
-Type::type get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
+std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
 {
     // TODO: error checking
     std::vector<int> column_indices;
@@ -534,24 +568,36 @@ Type::type get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t colu
     parquet::arrow::FromParquetSchema(descr, column_indices, parquet_key_value_metadata, &col_schema);
     // std::cout<< col_schema->ToString() << std::endl;
     std::shared_ptr<::arrow::DataType> arrow_dtype = col_schema->field(0)->type();
-    return arrow_dtype->id();
+    return arrow_dtype;
 }
 
-bool arrowPqTypesEqual(Type::type arrow_type, ::parquet::Type::type pq_type)
+bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type)
 {
-    if (arrow_type == Type::BOOL && pq_type == ::parquet::Type::BOOLEAN)
+    if (arrow_type->id() == Type::BOOL && pq_type == ::parquet::Type::BOOLEAN)
         return true;
-    if (arrow_type == Type::INT32 && pq_type == ::parquet::Type::INT32)
+    if (arrow_type->id() == Type::INT32 && pq_type == ::parquet::Type::INT32)
         return true;
-    if (arrow_type == Type::INT64 && pq_type == ::parquet::Type::INT64)
+    if (arrow_type->id() == Type::INT64 && pq_type == ::parquet::Type::INT64)
         return true;
-    if (arrow_type == Type::FLOAT && pq_type == ::parquet::Type::FLOAT)
+    if (arrow_type->id() == Type::FLOAT && pq_type == ::parquet::Type::FLOAT)
         return true;
-    if (arrow_type == Type::DOUBLE && pq_type == ::parquet::Type::DOUBLE)
+    if (arrow_type->id() == Type::DOUBLE && pq_type == ::parquet::Type::DOUBLE)
         return true;
     // XXX byte array is not always string?
-    if (arrow_type == Type::STRING && pq_type == ::parquet::Type::BYTE_ARRAY)
+    if (arrow_type->id() == Type::STRING && pq_type == ::parquet::Type::BYTE_ARRAY)
         return true;
     // TODO: add timestamp[ns]
     return false;
+}
+
+// similar to arrow/python/arrow_to_pandas.cc ConvertDatetimeNanos except with just buffer
+// TODO: reuse from arrow
+template <typename T, int64_t SHIFT>
+inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t rows_to_skip, int64_t rows_to_read)
+{
+    int64_t* out_values = (int64_t*)out_data;
+    const T* in_values = (const T*)buff;
+    for (int64_t i = 0; i < rows_to_read; ++i) {
+      *out_values++ = (static_cast<int64_t>(in_values[rows_to_skip+i]) * SHIFT);
+    }
 }
