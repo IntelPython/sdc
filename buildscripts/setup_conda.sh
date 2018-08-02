@@ -30,6 +30,7 @@ $CONDA_INSTALL pyarrow=0.9.*
 $CONDA_INSTALL h5py -c ehsantn
 $CONDA_INSTALL daal-devel daal-include daal -c intel --no-deps
 $CONDA_INSTALL tbb -c conda-forge
+$CONDA_INSTALL pyspark
 
 # install compilers
 if [[ "$unamestr" == 'Linux' ]]; then

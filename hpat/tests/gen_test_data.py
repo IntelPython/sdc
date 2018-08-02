@@ -46,3 +46,18 @@ df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
                           "large"],
                     "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 df.to_parquet("pivot2.pq")
+
+# test datetime64, spark dates
+dt1 = pd.DatetimeIndex(['2017-03-03 03:23', '1990-10-23', '1993-07-02 10:33:01'])
+df = pd.DataFrame({'DT64': dt1, 'DATE': dt1.copy()})
+df.to_parquet('pandas_dt.pq')
+
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, DateType, TimestampType
+
+spark = SparkSession.builder.appName("GenSparkData").getOrCreate()
+schema = StructType([StructField('DT64', DateType(), True), StructField('DATE', TimestampType(), True)])
+sdf = spark.createDataFrame(df, schema)
+sdf.write.parquet('sdf_dt.pq', 'overwrite')
+
+spark.stop()

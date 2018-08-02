@@ -8,7 +8,7 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                         count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
 
-class TestBasic(unittest.TestCase):
+class TestIO(unittest.TestCase):
     def test_h5_read_seq(self):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
@@ -108,6 +108,23 @@ class TestBasic(unittest.TestCase):
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_pq_pandas_date(self):
+        def test_impl():
+            df = pd.read_parquet('pandas_dt.pq')
+            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_pq_spark_date(self):
+        def test_impl():
+            df = pd.read_parquet('sdf_dt.pq')
+            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
