@@ -211,6 +211,9 @@ def _get_numba_typ_from_pa_typ(pa_typ):
         pa.date64(): types.NPDatetime('ns'),
         # time (TODO: time32, time64, ...)
         pa.timestamp('ns'): types.NPDatetime('ns'),
+        pa.timestamp('us'): types.NPDatetime('ns'),
+        pa.timestamp('ms'): types.NPDatetime('ns'),
+        pa.timestamp('s'): types.NPDatetime('ns'),
     }
     if pa_typ not in _typ_map:
         raise ValueError("Arrow data type {} not supported yet".format(pa_typ))
