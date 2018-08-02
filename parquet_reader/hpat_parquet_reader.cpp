@@ -292,7 +292,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         copy_data_dispatch(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // set NaNs for double values
-    if (out_dtype==5)
+    if (out_dtype == ::parquet::Type::DOUBLE)
     {
         double *double_data = (double*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
@@ -306,7 +306,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         }
     }
     // set NaNs for float values
-    if (out_dtype==4)
+    if (out_dtype == ::parquet::Type::FLOAT)
     {
         float *float_data = (float*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
