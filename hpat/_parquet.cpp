@@ -103,7 +103,7 @@ PyObject* str_list_to_vec(PyObject* self, PyObject* str_list)
         return PyLong_FromVoidPtr((void*) strs_vec);
     }
 
-    while (l_str = PyIter_Next(iterator)) {
+    while ((l_str = PyIter_Next(iterator))) {
         const char *c_path = PyUnicode_AsUTF8(l_str);
         // printf("str %s\n", c_path);
         strs_vec->push_back(std::string(c_path));
@@ -148,7 +148,7 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
         return paths;
     }
 
-    while (piece = PyIter_Next(iterator)) {
+    while ((piece = PyIter_Next(iterator))) {
         PyObject* p = PyObject_GetAttrString(piece, "path");
         const char *c_path = PyUnicode_AsUTF8(p);
         // printf("piece %s\n", c_path);
