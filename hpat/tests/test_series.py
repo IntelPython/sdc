@@ -384,5 +384,21 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_min1(self):
+        def test_impl(S):
+            return S.min()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_max1(self):
+        def test_impl(S):
+            return S.max()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()
