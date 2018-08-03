@@ -599,7 +599,7 @@ def _column_var_impl(A):  # pragma: no cover
     res = hpat.hiframes_typed._var_handle_nan(s, count)
     return res
 
-def _column_min_impl(in_arr):
+def _column_min_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = numba.targets.builtins.get_type_max_value(in_arr.dtype)
@@ -611,7 +611,7 @@ def _column_min_impl(in_arr):
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
-def _column_max_impl(in_arr):
+def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = numba.targets.builtins.get_type_min_value(in_arr.dtype)
