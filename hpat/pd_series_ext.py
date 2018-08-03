@@ -307,6 +307,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_count(self, ary, args, kws):
         return signature(types.intp, *args)
 
+    @bound_function("series.nunique")
+    def resolve_nunique(self, ary, args, kws):
+        return signature(types.intp, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)
