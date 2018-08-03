@@ -1067,10 +1067,12 @@ class HiFrames(object):
         exec(func_text, {}, loc_vars)
         kernel_func = loc_vars['g']
 
+        tmp_var = ir.Var(out_var.scope, mk_unique_var("tmp_shift"), out_var.loc)
+
         index_offsets = [0]
         fir_globals = self.func_ir.func_id.func.__globals__
         stencil_nodes = gen_stencil_call(
-            col_var, out_var, kernel_func, index_offsets, fir_globals)
+            col_var, tmp_var, kernel_func, index_offsets, fir_globals)
 
         border_text = 'def f(A):\n  A[0:{}] = np.nan\n'.format(shift_const)
         loc_vars = {}
@@ -1079,10 +1081,18 @@ class HiFrames(object):
 
         f_blocks = compile_to_numba_ir(border_func, {'np': np}).blocks
         block = f_blocks[min(f_blocks.keys())]
-        replace_arg_nodes(block, [out_var])
+        replace_arg_nodes(block, [tmp_var])
         setitem_nodes = block.body[:-3]  # remove none return
 
-        return stencil_nodes + setitem_nodes
+        def f(arr):  # pragma: no cover
+            df_arr = hpat.hiframes_api.to_series_type(arr)
+        f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [tmp_var])
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_var
+
+        return stencil_nodes + setitem_nodes + nodes
 
     def _gen_fillna(self, out_var, args, col_var, kws):
         inplace = False
