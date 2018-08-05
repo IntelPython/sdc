@@ -1,13 +1,15 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+from collections import namedtuple
 import warnings
 import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
-                            is_getitem, mk_unique_var)
+                            is_getitem, mk_unique_var, dprint_func_ir)
+from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
@@ -18,6 +20,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type)
 
+ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -32,15 +35,30 @@ class HiFramesTyped(object):
 
     def run(self):
         blocks = self.func_ir.blocks
-        topo_order = find_topo_order(blocks)
-        for label in topo_order:
+        work_list = list(blocks.items())
+        while work_list:
+            label, block = work_list.pop()
             new_body = []
-            for inst in blocks[label].body:
+            replaced = False
+            for i, inst in enumerate(block.body):
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst)
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
+                    if isinstance(out_nodes, ReplaceFunc):
+                        rp_func = out_nodes
+                        # replace inst.value to a call with target args
+                        # as expected by inline_closure_call
+                        inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                        block.body = new_body + block.body[i:]
+                        inline_closure_call(self.func_ir, rp_func.glbls,
+                            block, len(new_body), rp_func.func, self.typingctx,
+                            rp_func.arg_types,
+                            self.typemap, self.calltypes, work_list)
+                        replaced = True
+                        break
                     if isinstance(out_nodes, dict):
+                        work_list += list(out_nodes.items())
                         new_label = include_new_blocks(blocks, out_nodes,
                             label, new_body, False)
                         numba.inline_closurecall._replace_returns(
@@ -48,14 +66,10 @@ class HiFramesTyped(object):
                         # TODO: add definitions?
                         label = new_label
                         new_body = []
-                    if isinstance(out_nodes, tuple):
-                        gen_blocks, post_nodes = out_nodes
-                        label = include_new_blocks(blocks, gen_blocks, label,
-                                                   new_body)
-                        new_body = post_nodes
                 else:
                     new_body.append(inst)
-            blocks[label].body = new_body
+            if not replaced:
+                blocks[label].body = new_body
 
         if debug_prints():  # pragma: no cover
             print("--- types before Series replacement:", self.typemap)
@@ -125,6 +139,7 @@ class HiFramesTyped(object):
             print("calltypes: ", self.calltypes)
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        dprint_func_ir(self.func_ir, "after hiframes_typed")
         return if_series_to_unbox(self.return_type)
 
     def _run_assign(self, assign):
@@ -241,32 +256,13 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'min', 'max', 'nunique']:
+        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max', 'nunique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
             func = series_replace_funcs[func_name]
             # TODO: handle skipna, min_count arguments
             return self._replace_func(func, [series_var])
-
-        if func_name == 'std':
-            # std is sqrt(var)
-            # get var func blocks
-            var_blocks = self._replace_func(
-                series_replace_funcs['var'], [series_var])
-
-            # replace return with (var_val = ...)
-            var_var = ir.Var(lhs.scope, mk_unique_var("var_val"), lhs.loc)
-            topo_order = find_topo_order(var_blocks)
-            last_var_block = var_blocks[topo_order[-1]]
-            var_typ = self.typemap[last_var_block.body[-3].target.name]
-            self.typemap[var_var.name] = var_typ
-            last_var_block.body[-3].target = var_var
-            last_var_block.body.pop()  # remove return
-            last_var_block.body.pop()  # remove cast
-            std_block = self._replace_func(lambda a: a**0.5, [var_var]).popitem()[1]
-            last_var_block.body += std_block.body
-            return var_blocks
 
         if func_name == 'quantile':
             return self._replace_func(
@@ -456,12 +452,7 @@ class HiFramesTyped(object):
     def _replace_func(self, func, args):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
-        f_blocks = compile_to_numba_ir(func, glbls, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks
-        topo_order = find_topo_order(f_blocks)
-        first_block = topo_order[0]
-        replace_arg_nodes(f_blocks[first_block], args)
-        return f_blocks
+        return ReplaceFunc(func, arg_typs, args, glbls)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
@@ -599,6 +590,10 @@ def _column_var_impl(A):  # pragma: no cover
     res = hpat.hiframes_typed._var_handle_nan(s, count)
     return res
 
+def _column_std_impl(A):  # pragma: no cover
+    var = hpat.hiframes_api.var(A)
+    return var**0.5
+
 def _column_min_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
@@ -630,5 +625,6 @@ series_replace_funcs = {
     'max': _column_max_impl,
     'min': _column_min_impl,
     'var': _column_var_impl,
+    'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
 }
