@@ -311,6 +311,11 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_nunique(self, ary, args, kws):
         return signature(types.intp, *args)
 
+    @bound_function("series.describe")
+    def resolve_describe(self, ary, args, kws):
+        # TODO: return namedtuple or labeled Series
+        return signature(string_type, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

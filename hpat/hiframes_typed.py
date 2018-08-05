@@ -256,7 +256,7 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max', 'nunique']:
+        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max', 'nunique', 'describe']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -618,6 +618,30 @@ def _column_max_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+
+def _column_describe_impl(A):  # pragma: no cover
+    S = hpat.hiframes_api.to_series_type(A)
+    a_count = np.float64(hpat.hiframes_api.count(A))
+    a_min = S.min()
+    a_max = S.max()
+    a_mean = hpat.hiframes_api.mean(A)
+    a_std = hpat.hiframes_api.var(A)**0.5
+    q25 = hpat.hiframes_api.quantile(A, .25)
+    q50 = hpat.hiframes_api.quantile(A, .5)
+    q75 = hpat.hiframes_api.quantile(A, .75)
+    # TODO: pandas returns dataframe, maybe return namedtuple instread of
+    # string?
+    # TODO: fix string formatting to match python/pandas
+    res = "count    " + str(a_count) + "\n"\
+        "mean     " + str(a_mean) + "\n"\
+        "std      " + str(a_std) + "\n"\
+        "min      " + str(a_min) + "\n"\
+        "25%      " + str(q25) + "\n"\
+        "50%      " + str(q50) + "\n"\
+        "75%      " + str(q75) + "\n"\
+        "max      " + str(a_max) + "\n"
+    return res
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -627,4 +651,5 @@ series_replace_funcs = {
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
+    'describe': _column_describe_impl,
 }

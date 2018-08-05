@@ -32,8 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change', 'fillna',
-                'describe']
+df_col_funcs = ['shift', 'pct_change', 'fillna',]
 LARGE_WIN_SIZE = 10
 
 
@@ -1040,8 +1039,6 @@ class HiFrames(object):
             self.df_cols.add(out_var.name)  # output is Series except sum
         if func == 'fillna':
             return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'describe':
-            return self._gen_col_describe(out_var, args, col_var)
         else:
             assert func in ['pct_change', 'shift']
             return self._gen_column_shift_pct(out_var, args, col_var, func)
@@ -1113,35 +1110,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [out_var, col_var, val])
         nodes = f_block.body[:-3]  # remove none return
         return alloc_nodes + nodes
-
-    def _gen_col_describe(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            a_count = np.float64(hpat.hiframes_api.count(A))
-            a_min = np.min(A)
-            a_max = np.max(A)
-            a_mean = hpat.hiframes_api.mean(A)
-            a_std = hpat.hiframes_api.var(A)**0.5
-            q25 = hpat.hiframes_api.quantile(A, .25)
-            q50 = hpat.hiframes_api.quantile(A, .5)
-            q75 = hpat.hiframes_api.quantile(A, .75)
-            # TODO: pandas returns dataframe, maybe return namedtuple instread of
-            # string?
-            # TODO: fix string formatting to match python/pandas
-            s = "count    " + str(a_count) + "\n"\
-                "mean     " + str(a_mean) + "\n"\
-                "std      " + str(a_std) + "\n"\
-                "min      " + str(a_min) + "\n"\
-                "25%      " + str(q25) + "\n"\
-                "50%      " + str(q50) + "\n"\
-                "75%      " + str(q75) + "\n"\
-                "max      " + str(a_max) + "\n"
-
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
 
     def _is_groupby(self, agg_var):
         """determines whether variable is coming from groupby() or groupby()[]
