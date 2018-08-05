@@ -32,7 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change', 'fillna',]
+df_col_funcs = ['shift', 'pct_change',]
 LARGE_WIN_SIZE = 10
 
 
@@ -1035,10 +1035,8 @@ class HiFrames(object):
         return col
 
     def _gen_column_call(self, out_var, args, col_var, func, kws):
-        if func in ['fillna', 'pct_change', 'shift']:
+        if func in ['pct_change', 'shift']:
             self.df_cols.add(out_var.name)  # output is Series except sum
-        if func == 'fillna':
-            return self._gen_fillna(out_var, args, col_var, kws)
         else:
             assert func in ['pct_change', 'shift']
             return self._gen_column_shift_pct(out_var, args, col_var, func)
@@ -1088,28 +1086,6 @@ class HiFrames(object):
         nodes[-1].target = out_var
 
         return stencil_nodes + setitem_nodes + nodes
-
-    def _gen_fillna(self, out_var, args, col_var, kws):
-        inplace = False
-        if 'inplace' in kws:
-            inplace = get_constant(self.func_ir, kws['inplace'])
-            if inplace == NOT_CONSTANT:  # pragma: no cover
-                raise ValueError("inplace arg to fillna should be constant")
-
-        if inplace:
-            out_var = col_var  # output array is same as input array
-            alloc_nodes = []
-        else:
-            alloc_nodes = gen_empty_like(col_var, out_var)
-
-        val = args[0]
-
-        def f(A, B, fill):  # pragma: no cover
-            hpat.hiframes_api.fillna(A, B, fill)
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [out_var, col_var, val])
-        nodes = f_block.body[:-3]  # remove none return
-        return alloc_nodes + nodes
 
     def _is_groupby(self, agg_var):
         """determines whether variable is coming from groupby() or groupby()[]

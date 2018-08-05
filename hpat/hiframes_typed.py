@@ -270,6 +270,24 @@ class HiFramesTyped(object):
                 [series_var, rhs.args[0]]
             )
 
+        if func_name == 'fillna':
+            val = rhs.args[0]
+            kws = dict(rhs.kws)
+            inplace = False
+            if 'inplace' in kws:
+                inplace = guard(find_const, self.func_ir, kws['inplace'])
+                if inplace == None:  # pragma: no cover
+                    raise ValueError("inplace arg to fillna should be constant")
+
+            if inplace:
+                return self._replace_func(
+                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
+                    [series_var, series_var, val])
+            else:
+                func = series_replace_funcs['fillna_alloc']
+                return self._replace_func(func, [series_var, val])
+
+
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
 
@@ -642,6 +660,12 @@ def _column_describe_impl(A):  # pragma: no cover
         "max      " + str(a_max) + "\n"
     return res
 
+def _column_fillna_alloc_impl(S, val):
+    # TODO: handle string, etc.
+    B = np.empty(len(S), S.dtype)
+    hpat.hiframes_api.fillna(B, S, val)
+    return B
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -652,4 +676,5 @@ series_replace_funcs = {
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
     'describe': _column_describe_impl,
+    'fillna_alloc': _column_fillna_alloc_impl,
 }

@@ -316,6 +316,14 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: return namedtuple or labeled Series
         return signature(string_type, *args)
 
+    @bound_function("series.fillna", True)
+    def resolve_fillna(self, ary, args, kws):
+        out = ary
+        # output is None for inplace case
+        if 'inplace' in kws and kws['inplace'] == types.Const(True):
+            out = types.none
+        return signature(out, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)
