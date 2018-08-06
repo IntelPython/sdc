@@ -392,6 +392,15 @@ class SeriesRollingType(types.Type):
 class SeriesRollingAttribute(AttributeTemplate):
     key = SeriesRollingType
 
+    @bound_function("rolling.apply", True)
+    def resolve_apply(self, ary, args, kws):
+        code = args[0].value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.context, f_ir, (types.Array(ary.dtype, 1, 'C'),), None)
+
+        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+
 
 # similar to install_array_method in arraydecl.py
 def install_rolling_method(name, generic, support_literals=False):
