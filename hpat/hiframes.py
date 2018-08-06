@@ -32,7 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['shift', 'pct_change',]
+df_col_funcs = ['pct_change',]
 LARGE_WIN_SIZE = 10
 
 

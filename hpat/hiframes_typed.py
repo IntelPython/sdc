@@ -287,6 +287,10 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['fillna_alloc']
                 return self._replace_func(func, [series_var, val])
 
+        if func_name == 'shift':
+            shift_const = rhs.args[0]
+            func = series_replace_funcs['shift']
+            return self._replace_func(func, [series_var, shift_const])
 
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
@@ -666,6 +670,15 @@ def _column_fillna_alloc_impl(S, val):
     hpat.hiframes_api.fillna(B, S, val)
     return B
 
+def _column_shift_impl(A, shift):
+    # TODO: alloc_shift
+    #B = hpat.hiframes_api.alloc_shift(A)
+    B = np.empty_like(A)
+    #numba.stencil(lambda a, b: a[-b], out=B, neighborhood=((-shift, 1-shift), ))(A, shift)
+    numba.stencil(lambda a, b: a[-b], out=B)(A, shift)
+    B[0:shift] = np.nan
+    return B
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -677,4 +690,5 @@ series_replace_funcs = {
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
+    'shift': _column_shift_impl,
 }

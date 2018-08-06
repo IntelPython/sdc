@@ -324,6 +324,14 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
+    @bound_function("series.shift")
+    def resolve_shift(self, ary, args, kws):
+        out = ary
+        # integers are converted to float64 to store NaN
+        if isinstance(ary.dtype, types.Integer):
+            out.dtype = types.float64
+        return signature(out, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

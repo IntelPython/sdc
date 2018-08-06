@@ -347,6 +347,15 @@ class ContainsType(AbstractTemplate):
         # args: str_arr, pat
         return signature(types.Array(types.boolean, 1, 'C'), *args)
 
+def alloc_shift(A):
+    return np.empty_like(A)
+
+@overload(alloc_shift)
+def alloc_shift_overload(A_typ):
+    if isinstance(A_typ.dtype, types.Integer):
+        return lambda A: np.empty(len(A), np.float64)
+    return lambda A: np.empty(len(A), A.dtype)
+
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):
 #     s = "count    "+str(a_count)+"\n"\
