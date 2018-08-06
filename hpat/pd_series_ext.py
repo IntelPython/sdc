@@ -288,6 +288,10 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    @bound_function("series.rolling")
+    def resolve_rolling(self, ary, args, kws):
+        return signature(SeriesRollingType(ary.dtype), *args)
+
     @bound_function("array.argsort")
     def resolve_argsort(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_argsort.__wrapped__
@@ -375,6 +379,45 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     @bound_function("strmethod.contains")
     def resolve_contains(self, ary, args, kws):
         return signature(SeriesType(types.bool_, 1, 'C'), *args)
+
+
+class SeriesRollingType(types.Type):
+    def __init__(self, dtype):
+        self.dtype = dtype
+        name = "SeriesRollingType({})".format(dtype)
+        super(SeriesRollingType, self).__init__(name)
+
+
+@infer_getattr
+class SeriesRollingAttribute(AttributeTemplate):
+    key = SeriesRollingType
+
+
+# similar to install_array_method in arraydecl.py
+def install_rolling_method(name, generic, support_literals=False):
+    my_attr = {"key": "rolling." + name, "generic": generic}
+    temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
+    if support_literals:
+        temp_class.support_literals = support_literals
+    def rolling_attribute_attachment(self, ary):
+        return types.BoundFunction(temp_class, ary)
+
+    setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
+
+def rolling_generic(self, args, kws):
+    assert not args
+    assert not kws
+    # type function using Array typer
+    resolver = "resolve_" + self.key[len("rolling."):]
+    bound_func = getattr(ArrayAttribute, resolver)(None, self.this)
+    out_dtype = bound_func.get_call_type(None, args, kws).return_type
+    # output type is float64 due to NaNs
+    if isinstance(out_dtype, types.Integer):
+        out_dtype = types.float64
+    return signature(SeriesType(out_dtype, 1, 'C'), *args)
+
+for fname in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+    install_rolling_method(fname, rolling_generic)
 
 
 @infer

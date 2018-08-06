@@ -83,9 +83,6 @@ class HiFrames(object):
         # currently use to keep lhs of Arg nodes intact
         self.replace_var_dict = {}
 
-        # rolling call name -> [column_varname, win_size]
-        self.rolling_calls = {}
-
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
         # df_var -> label where it is defined
@@ -289,10 +286,6 @@ class HiFrames(object):
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'pivot_table'):
             return self._handle_df_pivot_table(lhs, rhs, func_mod, label)
-
-        res = self._handle_rolling_call(assign.target, rhs)
-        if res is not None:
-            return res
 
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
@@ -824,9 +817,6 @@ class HiFrames(object):
         if func_name in ['map', 'apply']:
             return self._handle_map(assign, lhs, rhs, col_var, label)
 
-        if func_name == 'rolling':
-            return self._handle_rolling_setup(assign, lhs, rhs, col_var)
-
         return [assign]
 
     def _handle_map(self, assign, lhs, rhs, col_var, label):
@@ -946,53 +936,6 @@ class HiFrames(object):
         # typemap, restype, calltypes = numba.compiler.type_inference_stage(self.typingctx, dummy_ir, self.args, None)
         return out_tp
 
-
-    def _handle_rolling_setup(self, assign, lhs, rhs, col_var):
-        """
-        Handle Series rolling calls like:
-          r = df.column.rolling(3)
-        """
-        center = False
-        kws = dict(rhs.kws)
-        if rhs.args:
-            window = rhs.args[0]
-        elif 'window' in kws:
-            window = kws['window']
-        else:  # pragma: no cover
-            raise ValueError("window argument to rolling() required")
-        window = get_constant(self.func_ir, window, window)
-        if 'center' in kws:
-            center = get_constant(self.func_ir, kws['center'], center)
-        self.rolling_calls[lhs.name] = [col_var, window, center]
-        return []  # remove
-
-    def _handle_rolling_call(self, lhs, rhs):
-        """
-        Handle Series rolling calls like:
-          A = df.column.rolling(3).sum()
-        """
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # df.column.rolling(3).sum()
-        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
-                and func_def.value.name in self.rolling_calls):
-            func_name = func_def.attr
-            tmp_out = ir.Var(lhs.scope, mk_unique_var("rolling_out"), lhs.loc)
-            self.df_cols.add(lhs.name)  # output is Series
-            nodes = self._gen_rolling_call(rhs.args,
-                                    *self.rolling_calls[func_def.value.name]
-                                    + [func_name, tmp_out])
-            def f(_arr):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.to_series_type(_arr)
-
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [tmp_out])
-            nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = lhs
-            return nodes
-
-        return None
 
     def _is_groupby(self, agg_var):
         """determines whether variable is coming from groupby() or groupby()[]
@@ -1178,80 +1121,6 @@ class HiFrames(object):
 
         return agg_func
 
-    def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
-        loc = col_var.loc
-        scope = col_var.scope
-        if func == 'apply':
-            if len(args) != 1:  # pragma: no cover
-                raise ValueError("One argument expected for rolling apply")
-            kernel_func = guard(get_definition, self.func_ir, args[0])
-        elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-            if len(args) != 0:  # pragma: no cover
-                raise ValueError("No argument expected for rolling {}".format(
-                    func))
-            g_pack = "np"
-            if func in ['std', 'var', 'mean']:
-                g_pack = "hpat.hiframes_api"
-            if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
-                # unroll if size is less than 5
-                kernel_args = ','.join(['a[{}]'.format(-i)
-                                        for i in range(win_size)])
-                kernel_expr = '{}.{}(np.array([{}]))'.format(
-                    g_pack, func, kernel_args)
-                if func == 'sum':  # simplify sum
-                    kernel_expr = '+'.join(['a[{}]'.format(-i)
-                                            for i in range(win_size)])
-            else:
-                kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
-            func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            kernel_func = loc_vars['g']
-
-        init_nodes = []
-        col_var, init_nodes = self._fix_rolling_array(col_var, func)
-
-        if isinstance(win_size, int):
-            win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
-            init_nodes.append(
-                ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
-            win_size = win_size_var
-
-        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(
-            win_size, func, center)
-
-        init_nodes += option_nodes
-        other_args = [win_size]
-        if func == 'apply':
-            other_args = None
-        options = {'neighborhood': win_tuple}
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func,
-                                         index_offsets, fir_globals, other_args,
-                                         options)
-
-        def f(A, w):  # pragma: no cover
-            A[0:w - 1] = np.nan
-        f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [out_var, win_size])
-        setitem_nodes = f_block.body[:-3]  # remove none return
-
-        if center:
-            def f1(A, w):  # pragma: no cover
-                A[0:w // 2] = np.nan
-
-            def f2(A, w):  # pragma: no cover
-                n = len(A)
-                A[n - (w // 2):n] = np.nan
-            f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes1 = f_block.body[:-3]  # remove none return
-            f_block = compile_to_numba_ir(f2, {'np': np}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes2 = f_block.body[:-3]  # remove none return
-            setitem_nodes = setitem_nodes1 + setitem_nodes2
-
-        return init_nodes + stencil_nodes + setitem_nodes
 
     def _fix_rolling_array(self, col_var, func):
         """
@@ -1585,51 +1454,6 @@ class HiFrames(object):
         # XXX placeholder for df variable renaming
         assert isinstance(df_var, ir.Var)
         return df_var
-
-
-def gen_empty_like(in_arr, out_arr):
-    def f(A):  # pragma: no cover
-        B = np.empty(A.shape, A.dtype)
-    f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [in_arr])
-    nodes = f_block.body[:-3]  # remove none return
-    nodes[-1].target = out_arr
-    return nodes
-
-
-def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
-                     other_args=None, options=None):
-    if other_args is None:
-        other_args = []
-    if options is None:
-        options = {}
-    if index_offsets != [0]:
-        options['index_offsets'] = index_offsets
-    scope = in_arr.scope
-    loc = in_arr.loc
-    stencil_nodes = []
-    stencil_nodes += gen_empty_like(in_arr, out_arr)
-
-    kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
-    if not isinstance(kernel_func, ir.Expr):
-        kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
-                                            kernel_func.__closure__,
-                                            kernel_func.__defaults__, loc)
-    stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
-
-    def f(A, B, f):  # pragma: no cover
-        in_arr = hpat.hiframes_api.to_arr_from_series(A)
-        numba.stencil(f)(in_arr, out=B)
-    f_block = compile_to_numba_ir(f, {'numba': numba,
-        'hpat': hpat}).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
-    stencil_nodes += f_block.body[:-3]  # remove none return
-    setup_call = stencil_nodes[-2].value
-    stencil_call = stencil_nodes[-1].value
-    setup_call.kws = list(options.items())
-    stencil_call.args += other_args
-
-    return stencil_nodes
 
 
 def simple_block_copy_propagate(block):

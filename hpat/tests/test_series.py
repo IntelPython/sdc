@@ -400,5 +400,13 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_rolling1(self):
+        def test_impl(S):
+            return S.rolling(3).sum()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()

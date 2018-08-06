@@ -356,6 +356,17 @@ def alloc_shift_overload(A_typ):
         return lambda A: np.empty(len(A), np.float64)
     return lambda A: np.empty(len(A), A.dtype)
 
+def shift_dtype(d):
+    return d
+
+@overload(shift_dtype)
+def shift_dtype_overload(d_typ):
+    if isinstance(d_typ.dtype, types.Integer):
+        return lambda a: np.float64
+    else:
+        return lambda a: a
+
+
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):
 #     s = "count    "+str(a_count)+"\n"\

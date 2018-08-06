@@ -19,9 +19,12 @@ from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
-    series_str_methods_type)
+    series_str_methods_type, SeriesRollingType)
 
 ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
+
+LARGE_WIN_SIZE = 10
+
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -215,6 +218,11 @@ class HiFramesTyped(object):
                     return self._run_call_series(
                         assign, assign.target, rhs, func_mod, func_name)
 
+                if (isinstance(func_mod, ir.Var) and isinstance(
+                        self.typemap[func_mod.name], SeriesRollingType)):
+                    return self._run_call_series_rolling(
+                        assign, assign.target, rhs, func_mod, func_name)
+
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
@@ -297,8 +305,275 @@ class HiFramesTyped(object):
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
 
+        if func_name == 'rolling':
+            # XXX: remove rolling setup call, assuming still available in definitions
+            return []
+
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
+
+    def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
+        """
+        Handle Series rolling calls like:
+          A = df.column.rolling(3).sum()
+        """
+        rolling_call = guard(get_definition, self.func_ir, rolling_var)
+        assert isinstance(rolling_call, ir.Expr) and rolling_call.op == 'call'
+        call_def = guard(get_definition, self.func_ir, rolling_call.func)
+        assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
+        series_var = call_def.value
+        window, center = self._get_rolling_setup_args(rolling_call)
+
+        nodes = self._gen_rolling_call(
+            rhs.args, series_var, window, center, func_name, lhs)
+        return nodes
+
+    def _get_rolling_setup_args(self, rhs):
+        """
+        Handle Series rolling calls like:
+          r = df.column.rolling(3)
+        """
+        center = False
+        kws = dict(rhs.kws)
+        if rhs.args:
+            window = rhs.args[0]
+        elif 'window' in kws:
+            window = kws['window']
+        else:  # pragma: no cover
+            raise ValueError("window argument to rolling() required")
+        window_const = guard(find_const, self.func_ir, window)
+        window = window_const if window_const is not None else window
+        if 'center' in kws:
+            center_const = guard(find_const, self.func_ir, kws['center'])
+            center = center_const if center_const is not None else center
+        return window, center
+
+    def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
+        loc = col_var.loc
+        scope = col_var.scope
+        if func == 'apply':
+            if len(args) != 1:  # pragma: no cover
+                raise ValueError("One argument expected for rolling apply")
+            kernel_func = guard(get_definition, self.func_ir, args[0])
+        elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+            if len(args) != 0:  # pragma: no cover
+                raise ValueError("No argument expected for rolling {}".format(
+                    func))
+            g_pack = "np"
+            if func in ['std', 'var', 'mean']:
+                g_pack = "hpat.hiframes_api"
+            if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
+                # unroll if size is less than 5
+                kernel_args = ','.join(['a[{}]'.format(-i)
+                                        for i in range(win_size)])
+                kernel_expr = '{}.{}(np.array([{}]))'.format(
+                    g_pack, func, kernel_args)
+                if func == 'sum':  # simplify sum
+                    kernel_expr = '+'.join(['a[{}]'.format(-i)
+                                            for i in range(win_size)])
+            else:
+                kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
+            func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            kernel_func = loc_vars['g']
+
+        init_nodes = []
+
+        if isinstance(win_size, int):
+            win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
+            self.typemap[win_size_var.name] = types.intp
+            init_nodes.append(
+                ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
+            win_size = win_size_var
+
+        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(
+            win_size, func, center)
+
+        init_nodes += option_nodes
+        other_args = [win_size]
+        if func == 'apply':
+            other_args = None
+        options = {'neighborhood': win_tuple}
+        fir_globals = self.func_ir.func_id.func.__globals__
+        stencil_nodes = self._gen_stencil_call(init_nodes, col_var, out_var, kernel_func,
+                                         index_offsets, fir_globals, other_args,
+                                         options)
+
+        def f(A, w):  # pragma: no cover
+            A[0:w - 1] = np.nan
+        fargs = [out_var, win_size]
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, fargs)
+        setitem_nodes = f_block.body[:-3]  # remove none return
+
+        if center:
+            def f1(A, w):  # pragma: no cover
+                A[0:w // 2] = np.nan
+
+            def f2(A, w):  # pragma: no cover
+                n = len(A)
+                A[n - (w // 2):n] = np.nan
+            f_block = compile_to_numba_ir(f1, {'np': np}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [out_var, win_size])
+            setitem_nodes1 = f_block.body[:-3]  # remove none return
+            f_block = compile_to_numba_ir(f2, {'np': np}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [out_var, win_size])
+            setitem_nodes2 = f_block.body[:-3]  # remove none return
+            setitem_nodes = setitem_nodes1 + setitem_nodes2
+
+        return stencil_nodes + setitem_nodes
+
+    def _gen_rolling_init(self, win_size, func, center):
+        nodes = []
+        right_length = 0
+        scope = win_size.scope
+        loc = win_size.loc
+        right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
+        self.typemap[right_length.name] = types.intp
+        nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
+
+        def f(w):  # pragma: no cover
+            return -w + 1
+
+        fargs = [win_size]
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, fargs)
+        nodes.extend(f_block.body[:-2])  # remove none return
+        left_length = nodes[-1].target
+
+        if center:
+            def f(w):  # pragma: no cover
+                return -(w // 2)
+            f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [win_size])
+            nodes.extend(f_block.body[:-2])  # remove none return
+            left_length = nodes[-1].target
+
+            def f(w):  # pragma: no cover
+                return (w // 2)
+            f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [win_size])
+            nodes.extend(f_block.body[:-2])  # remove none return
+            right_length = nodes[-1].target
+
+        def f(a, b):  # pragma: no cover
+            return ((a, b),)
+        fargs = [left_length, right_length]
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, fargs)
+        nodes.extend(f_block.body[:-2])  # remove none return
+        win_tuple = nodes[-1].target
+
+        index_offsets = [right_length]
+
+        if func == 'apply':
+            index_offsets = [left_length]
+
+        def f(a):  # pragma: no cover
+            return (a,)
+
+        fargs = index_offsets
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, index_offsets)
+        nodes.extend(f_block.body[:-2])  # remove none return
+        index_offsets = nodes[-1].target
+
+        return index_offsets, win_tuple, nodes
+
+    def _gen_stencil_call(self, init_nodes, in_arr, out_arr, kernel_func, index_offsets, fir_globals,
+                        other_args=None, options=None):
+        if other_args is None:
+            other_args = []
+        if options is None:
+            options = {}
+        if index_offsets != [0]:
+            options['index_offsets'] = index_offsets
+        scope = in_arr.scope
+        loc = in_arr.loc
+        stencil_nodes = []
+
+        # alloc output
+        stencil_nodes += self._gen_empty_like(in_arr, out_arr)
+
+        # make kernel_var mk_function expr
+        kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
+        self.typemap[kernel_var.name] = types.pyfunc_type
+        if not isinstance(kernel_func, ir.Expr):
+            kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
+                                                kernel_func.__closure__,
+                                                kernel_func.__defaults__, loc)
+        stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
+
+        # compile vanilla function without types
+        def f(A, B, f):  # pragma: no cover
+            numba.stencil(f)(A, out=B)
+
+        f_ir = compile_to_numba_ir(f, {'numba': numba,
+            'hpat': hpat, 'np': np},)
+        f_block = f_ir.blocks[min(f_ir.blocks.keys())]
+        fargs = [in_arr, out_arr, kernel_var]
+        replace_arg_nodes(f_block, fargs)
+
+        # create arguments with array + other args for type inference
+        other_arg_vars = [ir.Var(scope, mk_unique_var("w"), loc) for i in range(len(other_args))]
+        arg_nodes = ([ir.Assign(ir.Arg('A', 0, loc), stencil_nodes[0].value, loc)]
+            + [ir.Assign(ir.Arg('w'+str(i), i+1, loc), other_arg_vars[i], loc) for i in range(len(other_args))])
+        f_block.body = arg_nodes + init_nodes + stencil_nodes + f_block.body
+
+        # fix stencil call args
+        setup_call = f_block.body[-5].value
+        stencil_call = f_block.body[-4].value
+        setup_call.kws = list(options.items())
+        stencil_call.args += other_args
+
+        # run inlining and type inference
+        f_ir.arg_names = ['A'] + ["w"+str(i) for i in range(len(other_args))]
+        f_ir.arg_count = 1 + len(other_args)
+        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        inline_pass = numba.inline_closurecall.InlineClosureCallPass(
+        f_ir, numba.targets.cpu.ParallelOptions(False))
+        inline_pass.run()
+
+        fargs = [in_arr] + other_args
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.typingctx, f_ir, arg_typs, None)
+        # remove argument entries like arg.a from typemap
+        arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
+        for a in arg_names:
+            f_typemap.pop(a)
+        self.typemap.update(f_typemap)
+        self.calltypes.update(f_calltypes)
+        replace_arg_nodes(f_block, fargs)
+
+        return f_block.body[:-3]
+
+    def _gen_empty_like(self, in_arr, out_arr):
+        def f(A):  # pragma: no cover
+            dtype = hpat.hiframes_api.shift_dtype(A.dtype)
+            B = np.empty(A.shape, dtype)
+
+        fargs = [in_arr]
+        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}, self.typingctx, arg_typs,
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, fargs)
+        nodes = f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_arr
+        return nodes
 
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
