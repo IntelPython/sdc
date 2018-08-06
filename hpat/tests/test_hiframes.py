@@ -456,7 +456,7 @@ class TestHiFrames(unittest.TestCase):
     def test_shift2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df.A.pct_change()
+            Ac = df.A.pct_change(1)
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)

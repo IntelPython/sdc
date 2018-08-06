@@ -32,7 +32,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 
-df_col_funcs = ['pct_change',]
+
 LARGE_WIN_SIZE = 10
 
 
@@ -830,9 +830,6 @@ class HiFrames(object):
         if func_name == 'str.contains':
             return self._handle_str_contains(assign, lhs, rhs, col_var)
 
-        if func_name in df_col_funcs:
-            return self._gen_column_call(lhs, rhs.args, col_var, func_name,
-                                         dict(rhs.kws))
         return [assign]
 
     def _handle_map(self, assign, lhs, rhs, col_var, label):
@@ -1034,58 +1031,6 @@ class HiFrames(object):
         require(col.name in self.df_cols)
         return col
 
-    def _gen_column_call(self, out_var, args, col_var, func, kws):
-        if func in ['pct_change', 'shift']:
-            self.df_cols.add(out_var.name)  # output is Series except sum
-        else:
-            assert func in ['pct_change', 'shift']
-            return self._gen_column_shift_pct(out_var, args, col_var, func)
-
-    def _gen_column_shift_pct(self, out_var, args, col_var, func):
-        loc = col_var.loc
-        if func == 'pct_change':
-            shift_const = 1
-            if args:
-                shift_const = get_constant(self.func_ir, args[0])
-                assert shift_const is not NOT_CONSTANT
-            func_text = 'def g(a):\n  return (a[0]-a[{}])/a[{}]\n'.format(
-                -shift_const, -shift_const)
-        else:
-            assert func == 'shift'
-            shift_const = get_constant(self.func_ir, args[0])
-            assert shift_const is not NOT_CONSTANT
-            func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        kernel_func = loc_vars['g']
-
-        tmp_var = ir.Var(out_var.scope, mk_unique_var("tmp_shift"), out_var.loc)
-
-        index_offsets = [0]
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(
-            col_var, tmp_var, kernel_func, index_offsets, fir_globals)
-
-        border_text = 'def f(A):\n  A[0:{}] = np.nan\n'.format(shift_const)
-        loc_vars = {}
-        exec(border_text, {}, loc_vars)
-        border_func = loc_vars['f']
-
-        f_blocks = compile_to_numba_ir(border_func, {'np': np}).blocks
-        block = f_blocks[min(f_blocks.keys())]
-        replace_arg_nodes(block, [tmp_var])
-        setitem_nodes = block.body[:-3]  # remove none return
-
-        def f(arr):  # pragma: no cover
-            df_arr = hpat.hiframes_api.to_series_type(arr)
-        f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [tmp_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-
-        return stencil_nodes + setitem_nodes + nodes
 
     def _is_groupby(self, agg_var):
         """determines whether variable is coming from groupby() or groupby()[]
