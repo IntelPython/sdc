@@ -827,9 +827,6 @@ class HiFrames(object):
         if func_name == 'rolling':
             return self._handle_rolling_setup(assign, lhs, rhs, col_var)
 
-        if func_name == 'str.contains':
-            return self._handle_str_contains(assign, lhs, rhs, col_var)
-
         return [assign]
 
     def _handle_map(self, assign, lhs, rhs, col_var, label):
@@ -996,41 +993,6 @@ class HiFrames(object):
             return nodes
 
         return None
-
-    def _handle_str_contains(self, assign, lhs, rhs, str_col):
-        """
-        Handle string contains like:
-          B = df.column.str.contains('oo*', regex=True)
-        """
-        kws = dict(rhs.kws)
-        pat = rhs.args[0]
-        regex = True  # default regex arg is True
-        if 'regex' in kws:
-            regex = get_constant(self.func_ir, kws['regex'], regex)
-        if regex:
-            def f(str_arr, pat):  # pragma: no cover
-                e = hpat.str_ext.compile_regex(pat)
-                hpat.hiframes_api.str_contains_regex(str_arr, e)
-        else:
-            def f(str_arr, pat):  # pragma: no cover
-                hpat.hiframes_api.str_contains_noregex(str_arr, pat)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [str_col, pat])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
-
-    def _get_str_contains_col(self, func_def):
-        require(isinstance(func_def, ir.Expr) and func_def.op == 'getattr')
-        require(func_def.attr == 'contains')
-        str_def = get_definition(self.func_ir, func_def.value)
-        require(isinstance(str_def, ir.Expr) and str_def.op == 'getattr')
-        require(str_def.attr == 'str')
-        col = str_def.value
-        require(col.name in self.df_cols)
-        return col
-
 
     def _is_groupby(self, agg_var):
         """determines whether variable is coming from groupby() or groupby()[]

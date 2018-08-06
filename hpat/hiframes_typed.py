@@ -18,7 +18,8 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
-    if_series_to_array_type, if_series_to_unbox, is_series_type)
+    if_series_to_array_type, if_series_to_unbox, is_series_type,
+    series_str_methods_type)
 
 ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
 
@@ -293,6 +294,9 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, shift_const])
 
+        if func_name == 'str.contains':
+            return self._handle_series_str_contains(rhs, series_var)
+
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
 
@@ -397,6 +401,26 @@ class HiFramesTyped(object):
             return self._replace_func(f, [arg1, arg2])
 
         return None
+
+    def _handle_series_str_contains(self, rhs, series_var):
+        """
+        Handle string contains like:
+          B = df.column.str.contains('oo*', regex=True)
+        """
+        kws = dict(rhs.kws)
+        pat = rhs.args[0]
+        regex = True  # default regex arg is True
+        if 'regex' in kws:
+            regex = guard(find_const, self.func_ir, kws['regex'])
+            if regex is None:
+                raise ValueError("str.contains expects constant regex argument")
+        if regex:
+            fname = "str_contains_regex"
+        else:
+            fname = "str_contains_noregex"
+
+        return self._replace_func(series_replace_funcs[fname], [series_var, pat])
+
 
     def _handle_empty_like(self, assign, lhs, rhs):
         # B = empty_like(A) -> B = empty(len(A), dtype)
@@ -665,13 +689,13 @@ def _column_describe_impl(A):  # pragma: no cover
         "max      " + str(a_max) + "\n"
     return res
 
-def _column_fillna_alloc_impl(S, val):
+def _column_fillna_alloc_impl(S, val):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
     hpat.hiframes_api.fillna(B, S, val)
     return B
 
-def _column_shift_impl(A, shift):
+def _column_shift_impl(A, shift):  # pragma: no cover
     # TODO: alloc_shift
     #B = hpat.hiframes_api.alloc_shift(A)
     B = np.empty_like(A)
@@ -681,7 +705,7 @@ def _column_shift_impl(A, shift):
     return B
 
 
-def _column_pct_change_impl(A, shift):
+def _column_pct_change_impl(A, shift):  # pragma: no cover
     # TODO: alloc_shift
     #B = hpat.hiframes_api.alloc_shift(A)
     B = np.empty_like(A)
@@ -689,6 +713,15 @@ def _column_pct_change_impl(A, shift):
     numba.stencil(lambda a, b: (a[0]-a[-b])/a[-b], out=B)(A, shift)
     B[0:shift] = np.nan
     return B
+
+
+def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
+    e = hpat.str_ext.compile_regex(pat)
+    return hpat.hiframes_api.str_contains_regex(str_arr, e)
+
+def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
+    return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
+
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
@@ -703,4 +736,6 @@ series_replace_funcs = {
     'fillna_alloc': _column_fillna_alloc_impl,
     'shift': _column_shift_impl,
     'pct_change': _column_pct_change_impl,
+    'str_contains_regex': _str_contains_regex_impl,
+    'str_contains_noregex': _str_contains_noregex_impl,
 }

@@ -284,6 +284,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
+    def resolve_str(self, ary):
+        assert ary.dtype == string_type
+        return series_str_methods_type
+
     @bound_function("array.argsort")
     def resolve_argsort(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_argsort.__wrapped__
@@ -355,6 +359,23 @@ class SeriesAttribute(AttributeTemplate):
 #                                    layout=result.layout)
 
 #     return typer
+
+class SeriesStrMethodType(types.Type):
+    def __init__(self):
+        name = "SeriesStrMethodType"
+        super(SeriesStrMethodType, self).__init__(name)
+
+series_str_methods_type = SeriesStrMethodType()
+
+
+@infer_getattr
+class SeriesStrMethodAttribute(AttributeTemplate):
+    key = SeriesStrMethodType
+
+    @bound_function("strmethod.contains")
+    def resolve_contains(self, ary, args, kws):
+        return signature(SeriesType(types.bool_, 1, 'C'), *args)
+
 
 @infer
 class SeriesCompEqual(AbstractTemplate):
