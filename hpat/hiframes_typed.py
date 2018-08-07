@@ -162,10 +162,6 @@ class HiFramesTyped(object):
             if res is not None:
                 return res
 
-            res = self._handle_df_col_filter(lhs, rhs, assign)
-            if res is not None:
-                return res
-
             # replace getitems on dt_index/dt64 series with Timestamp function
             if (rhs.op in ['getitem', 'static_getitem']
                     and self.typemap[rhs.value.name] == dt_index_series_type):
@@ -260,6 +256,9 @@ class HiFramesTyped(object):
                 nodes = f_block.body[:-3]
                 nodes[-1].target = assign.target
                 return nodes
+
+        if func_name == 'set_df_col':
+            return self._handle_df_col_filter(assign, lhs, rhs)
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
@@ -738,18 +737,20 @@ class HiFramesTyped(object):
         f = loc_vars['f']
         return self._replace_func(f, rhs.args)
 
-    def _handle_df_col_filter(self, lhs_name, rhs, assign):
+    def _handle_df_col_filter(self, assign, lhs, rhs):
+        arr_def = guard(get_definition, self.func_ir, rhs.args[2])
         # find df['col2'] = df['col1'][arr]
         # since columns should have the same size, output is filled with NaNs
         # TODO: check for float, make sure col1 and col2 are in the same df
-        if (rhs.op == 'getitem'
-                and rhs.value.name in self.df_cols
-                and lhs_name in self.df_cols
-                and self.is_bool_arr(rhs.index.name)):
-            in_arr = rhs.value
-            index_var = rhs.index
+        if (isinstance(arr_def, ir.Expr)  and arr_def.op == 'getitem'
+                and is_series_type(self.typemap[arr_def.value.name])
+                and self.is_bool_arr(arr_def.index.name)):
             # TODO: handle filter str arr, etc.
-            return self._replace_func(_column_filter_impl_float, [in_arr, index_var])
+            # XXX: can't handle int64 to float64 nans properly since df column
+            # bookkeeping is before typing
+            return self._replace_func(_column_filter_impl_float,
+                [rhs.args[0], rhs.args[1], arr_def.value, arr_def.index], True)
+        return [assign]
 
 
     def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
@@ -771,14 +772,23 @@ class HiFramesTyped(object):
 
         return [assign]
 
-    def _replace_func(self, func, args):
+    def _replace_func(self, func, args, const=False):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
+        if const:
+            new_args = []
+            for i, arg in enumerate(args):
+                val = guard(find_const, self.func_ir, arg)
+                if val:
+                    new_args.append(types.Const(val))
+                else:
+                    new_args.append(arg_typs[i])
+            arg_typs = tuple(new_args)
         return ReplaceFunc(func, arg_typs, args, glbls)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
-        return isinstance(typ, types.npytypes.Array) and typ.dtype == types.bool_
+        return isinstance(if_series_to_array_type(typ), types.npytypes.Array) and typ.dtype == types.bool_
 
 def _fix_typ_undefs(new_typ, old_typ):
     if isinstance(old_typ, (types.Array, SeriesType)):
@@ -795,8 +805,9 @@ def _fix_typ_undefs(new_typ, old_typ):
 # float columns can have regular np.nan
 
 
-def _column_filter_impl_float(B, ind):  # pragma: no cover
-    A = np.empty_like(B)
+def _column_filter_impl_float(df, cname, B, ind):  # pragma: no cover
+    dtype = hpat.hiframes_api.shift_dtype(B.dtype)
+    A = np.empty(len(B), dtype)
     for i in numba.parfor.internal_prange(len(A)):
         s = 0
         if ind[i]:
@@ -804,7 +815,8 @@ def _column_filter_impl_float(B, ind):  # pragma: no cover
         else:
             s = np.nan
         A[i] = s
-    return A
+    hpat.hiframes_api.set_df_col(df, cname, A)
+    return
 
 
 def _column_count_impl(A):  # pragma: no cover

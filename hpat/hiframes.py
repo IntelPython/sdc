@@ -1386,6 +1386,7 @@ class HiFrames(object):
             raise ValueError("dataframe column name should be a string constant")
 
         df_name = inst.target.name
+        # TODO: handle case where type has to be converted due to int64 NaNs
         self.df_vars[df_name][inst.index] = inst.value
         self._update_df_cols()
 

@@ -70,6 +70,17 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_set_column_bool1(self):
+        def test_impl(df):
+            df['C'] = df['A'][df['B']]
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
+        df2 = df.copy()
+        test_impl(df2)
+        hpat_func(df)
+        pd.testing.assert_series_equal(df.C, df2.C)
+
     def test_len_df(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
