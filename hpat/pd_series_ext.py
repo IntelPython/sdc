@@ -350,23 +350,27 @@ class SeriesAttribute(AttributeTemplate):
             out.dtype = types.float64
         return signature(out, *args)
 
-    @bound_function("series.map", True)
-    def resolve_map(self, ary, args, kws):
+    def _resolve_map_func(self, ary, args, kws):
+        dtype = ary.dtype
+        # getitem returns Timestamp for dt_index and series(dt64)
+        if dtype == types.NPDatetime('ns'):
+            dtype = pandas_timestamp_type
         code = args[0].value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (ary.dtype,), None)
+                self.context, f_ir, (dtype,), None)
 
         return signature(SeriesType(f_return_type, 1, 'C'), *args)
+
+    @bound_function("series.map", True)
+    def resolve_map(self, ary, args, kws):
+        return self._resolve_map_func(ary, args, kws)
 
     @bound_function("series.apply", True)
     def resolve_apply(self, ary, args, kws):
-        code = args[0].value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (ary.dtype,), None)
+        # TODO: handle apply differences: extra args, np ufuncs etc.
+        return self._resolve_map_func(ary, args, kws)
 
-        return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
