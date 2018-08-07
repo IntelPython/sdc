@@ -941,8 +941,7 @@ class HiFrames(object):
         call_def = guard(find_callname, self.func_ir, var_def)
         if (call_def is not None and call_def[0] == 'groupby'
                 and isinstance(call_def[1], ir.Var)
-                and (call_def[1].name in self.df_cols
-                or self._is_df_var(call_def[1]))):
+                and self._is_df_var(call_def[1])):
             return True
         return False
 
