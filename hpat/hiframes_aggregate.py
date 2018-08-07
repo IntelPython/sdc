@@ -342,6 +342,20 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
 
     return
 
+def build_agg_definitions(agg_node, definitions=None):
+    """get variable definition table for parfors"""
+    if definitions is None:
+        definitions = defaultdict(list)
+
+    for col_var in agg_node.df_out_vars.values():
+        definitions[col_var.name].append(agg_node)
+
+    if agg_node.out_key_var is not None:
+        definitions[agg_node.out_key_var.name].append(agg_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[Aggregate] = build_agg_definitions
 
 distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
 
@@ -798,6 +812,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
             options
             )
     preparfor_pass.run()
+    f_ir._definitions = build_definitions(f_ir.blocks)
     df_t_pass = hpat.hiframes_typed.HiFramesTyped(f_ir, typingctx, typemap, calltypes)
     df_t_pass.run()
     numba.rewrites.rewrite_registry.apply('after-inference', pm, f_ir)
