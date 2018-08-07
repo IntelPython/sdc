@@ -87,8 +87,6 @@ class HiFrames(object):
         self.df_vars = {}
         # df_var -> label where it is defined
         self.df_labels = {}
-        # arrays that are df columns actually (pd.Series)
-        self.df_cols = set()
 
         self.arrow_tables = {}
         self.reverse_copies = {}
@@ -154,7 +152,6 @@ class HiFrames(object):
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
                     and isinstance(rhs.index, str)):
                 assign.value = self._get_df_cols(rhs.value)[rhs.index]
-                self.df_cols.add(lhs)  # save lhs as column
 
             # df1 = df[df.A > .5]
             if rhs.op == 'getitem' and self._is_df_var(rhs.value):
@@ -183,7 +180,6 @@ class HiFrames(object):
                 df = rhs.value.name
                 col_var = self._get_df_colvar(rhs.value, rhs.attr)
                 assign.value = col_var
-                self.df_cols.add(lhs)  # save lhs as column
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
@@ -200,8 +196,6 @@ class HiFrames(object):
             self.df_vars[lhs] = self.df_vars[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.df_labels:
             self.df_labels[lhs] = self.df_labels[rhs.name]
-        if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
-            self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
         return [assign]
@@ -351,7 +345,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [data])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
-        self.df_cols.add(lhs.name)
         return nodes
 
     def _df_len(self, lhs, df_var):
@@ -517,7 +510,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, rhs.args)
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
-        self.df_cols.add(lhs.name)
         return nodes
 
     def _handle_ros(self, assign, lhs, rhs):
@@ -574,12 +566,6 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
         return nodes, df_cols
-
-    def _update_df_cols(self):
-        for df_name, cols_map in self.df_vars.items():
-            for col_name, col_var in cols_map.items():
-                self.df_cols.add(col_var.name)
-        return
 
     def _handle_df_apply(self, assign, lhs, rhs, func_mod):
         # check for axis=1
@@ -951,7 +937,6 @@ class HiFrames(object):
         out_key_var = None
         if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
-            self.df_cols.add(lhs.name)  # output is series
         else:
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                                 for col in out_colnames})
@@ -1067,8 +1052,6 @@ class HiFrames(object):
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
             if flag== 'series':
-                # XXX hack for agg functions, replace with proper Series type
-                self.df_cols.add(arg_var.name)
                 return nodes
             if flag == 'distributed':
                 def f(_dist_arr):  # pragma: no cover
@@ -1130,7 +1113,6 @@ class HiFrames(object):
             nodes += f_block.body[:-3]  # remove none return
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
-            self.df_cols.add(new_arg_var.name)
             self.replace_var_dict[arg_var.name] = new_arg_var
             self._add_node_defs(nodes)
 
@@ -1302,7 +1284,6 @@ class HiFrames(object):
         df_name = inst.target.name
         # TODO: handle case where type has to be converted due to int64 NaNs
         self.df_vars[df_name][inst.index] = inst.value
-        self._update_df_cols()
 
         # set dataframe column if it is input and needs to be reflected
         df_def = guard(get_definition, self.func_ir, df_name)
@@ -1329,7 +1310,6 @@ class HiFrames(object):
         # starting pandas 0.23 and Python 3.6, regular dict order is OK
         # for <0.23 ordered_df_map = OrderedDict(sorted(df_col_map.items()))
         self.df_vars[df_varname] = df_col_map
-        self._update_df_cols()
         self.df_labels[df_varname] = label
 
     def _is_df_colname(self, df_var, cname):
