@@ -14,8 +14,8 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.utils import (get_constant, get_definitions, is_alloc_callname,
-                        is_whole_slice, update_node_definitions, is_array,
+from hpat.utils import (get_constant, is_alloc_callname,
+                        is_whole_slice, is_array,
                         is_np_array, find_build_tuple, debug_prints)
 
 from enum import Enum
@@ -675,7 +675,10 @@ class DistributedAnalysis(object):
                     replace_arg_nodes(f_block, [tmp_arr])
                     nodes += f_block.body[:-3]  # remove none return
                     nodes[-1].target = out_arr
-                    update_node_definitions(nodes, self.func_ir._definitions)
+                    # update definitions
+                    dumm_block = ir.Block(out_arr.scope, out_arr.loc)
+                    dumm_block.body = nodes
+                    build_definitions({0: dumm_block}, self.func_ir._definitions)
                     new_body += nodes
                 else:
                     new_body.append(inst)
@@ -709,7 +712,7 @@ def get_stencil_accesses(parfor, typemap):
 
     par_index_var = parfor.loop_nests[0].index_variable
     body = parfor.loop_body
-    body_defs = get_definitions(body)
+    body_defs = build_definitions(body)
 
     stencil_accesses = {}
 

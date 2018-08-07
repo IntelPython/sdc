@@ -8,12 +8,13 @@ from numba import ir, ir_utils, types
 from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
-                            is_getitem, mk_unique_var, dprint_func_ir)
+                            is_getitem, mk_unique_var, dprint_func_ir,
+                            build_definitions)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
-from hpat.utils import get_definitions, debug_prints, include_new_blocks
+from hpat.utils import debug_prints, include_new_blocks
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
@@ -148,7 +149,7 @@ class HiFramesTyped(object):
             print("--- types after Series replacement:", self.typemap)
             print("calltypes: ", self.calltypes)
 
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes_typed")
         return if_series_to_unbox(self.return_type)
 
@@ -362,7 +363,7 @@ class HiFramesTyped(object):
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
 
         # fix definitions to enable finding sentinel
-        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        f_ir._definitions = build_definitions(f_ir.blocks)
         topo_order = find_topo_order(f_ir.blocks)
 
         # find sentinel function and replace with user func
@@ -379,7 +380,7 @@ class HiFramesTyped(object):
 
         # remove sentinel global to avoid type inference issues
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
-        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        f_ir._definitions = build_definitions(f_ir.blocks)
         arg_typs = (self.typemap[series_var.name],)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.typingctx, f_ir, arg_typs, None)
@@ -622,7 +623,7 @@ class HiFramesTyped(object):
         # run inlining and type inference
         f_ir.arg_names = ['A'] + ["w"+str(i) for i in range(len(other_args))]
         f_ir.arg_count = 1 + len(other_args)
-        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        f_ir._definitions = build_definitions(f_ir.blocks)
         inline_pass = numba.inline_closurecall.InlineClosureCallPass(
         f_ir, numba.targets.cpu.ParallelOptions(False))
         inline_pass.run()

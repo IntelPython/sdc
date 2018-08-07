@@ -29,7 +29,7 @@ from hpat.distributed_analysis import (Distribution,
                                        get_stencil_accesses)
 # from mpi4py import MPI
 import hpat.utils
-from hpat.utils import (get_definitions, is_alloc_callname, is_whole_slice,
+from hpat.utils import (is_alloc_callname, is_whole_slice,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
                         debug_prints)
 from hpat.distributed_api import Reduce_Type
@@ -76,7 +76,7 @@ class DistributedPass(object):
     def run(self):
         remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
                                                  self.calltypes, self.typingctx)
         self._dist_analysis = dist_analysis_pass.run()
@@ -1542,7 +1542,7 @@ class DistributedPass(object):
 
     def _get_stencil_border_length(self, neighborhood):
         # XXX: hack to get lengths assuming they are constant
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         left_length = -self._get_var_const_val(neighborhood[0][0])
         # left_length = -neighborhood[0][0]
         left_length = max(left_length, 0)  # avoid negative value

@@ -21,7 +21,7 @@ from numba.analysis import compute_cfg_from_blocks
 import hpat
 from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
-from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints, include_new_blocks
+from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
 
@@ -133,7 +133,7 @@ class HiFrames(object):
                     new_body.append(inst)
             self.func_ir.blocks[label].body = new_body
 
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover

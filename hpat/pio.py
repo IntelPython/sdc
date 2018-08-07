@@ -5,13 +5,14 @@ import numba
 from numba import ir, analysis, types, config, numpy_support
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
-                            find_callname, guard, require, get_definition)
+                            find_callname, guard, require, get_definition,
+                            build_definitions)
 
 import numpy as np
 
 import hpat
 from hpat import pio_api, pio_lower, utils
-from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
+from hpat.utils import get_constant, NOT_CONSTANT, debug_prints
 import h5py
 
 
@@ -64,7 +65,7 @@ class PIO(object):
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
         while remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir):
             pass
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after IO")
         if debug_prints():
             print("h5 files: ", self.h5_files)
