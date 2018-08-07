@@ -36,6 +36,50 @@ def get_constant(func_ir, var, default=NOT_CONSTANT):
         return get_constant(func_ir, def_node, default)
     return default
 
+def inline_new_blocks(func_ir, block, i, callee_blocks, work_list=None):
+    # adopted from inline_closure_call
+    scope = block.scope
+    instr = block.body[i]
+
+    # 1. relabel callee_ir by adding an offset
+    callee_blocks = add_offset_to_labels(callee_blocks, ir_utils._max_label+1)
+    callee_blocks = ir_utils.simplify_CFG(callee_blocks)
+    max_label = max(callee_blocks.keys())
+    #    reset globals in ir_utils before we use it
+    ir_utils._max_label = max_label
+    topo_order = find_topo_order(callee_blocks)
+
+    # 5. split caller blocks into two
+    new_blocks = []
+    new_block = ir.Block(scope, block.loc)
+    new_block.body = block.body[i+1:]
+    new_label = ir_utils.next_label()
+    func_ir.blocks[new_label] = new_block
+    new_blocks.append((new_label, new_block))
+    block.body = block.body[:i]
+    min_label = topo_order[0]
+    block.body.append(ir.Jump(min_label, instr.loc))
+
+    # 6. replace Return with assignment to LHS
+    numba.inline_closurecall._replace_returns(callee_blocks, instr.target, new_label)
+    #    remove the old definition of instr.target too
+    if (instr.target.name in func_ir._definitions):
+        func_ir._definitions[instr.target.name] = []
+
+    # 7. insert all new blocks, and add back definitions
+    for label in topo_order:
+        # block scope must point to parent's
+        block = callee_blocks[label]
+        block.scope = scope
+        numba.inline_closurecall._add_definitions(func_ir, block)
+        func_ir.blocks[label] = block
+        new_blocks.append((label, block))
+
+    if work_list is not None:
+        for block in new_blocks:
+            work_list.append(block)
+    return callee_blocks
+
 
 def is_alloc_call(func_var, call_table):
     """

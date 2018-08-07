@@ -14,7 +14,7 @@ from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
-from hpat.utils import debug_prints, include_new_blocks
+from hpat.utils import debug_prints, inline_new_blocks
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
@@ -62,20 +62,9 @@ class HiFramesTyped(object):
                         replaced = True
                         break
                     if isinstance(out_nodes, dict):
-                        # TODO: refactor to a new func
-                        # remove the old definition of instr.target
-                        if (inst.target.name in self.func_ir._definitions):
-                            self.func_ir._definitions[inst.target.name] = []
-                        rest_body = block.body[i+1:]
-                        new_label = include_new_blocks(blocks, out_nodes,
-                            label, new_body, False, work_list, self.func_ir)
-                        numba.inline_closurecall._replace_returns(
-                            out_nodes, inst.target, new_label)
-                        label = new_label
-                        new_body = []
+                        block.body = new_body + block.body[i:]
+                        inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
                         replaced = True
-                        blocks[label].body = rest_body
-                        work_list += [(label, blocks[label])]
                         break
                 else:
                     new_body.append(inst)
