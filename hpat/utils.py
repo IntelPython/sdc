@@ -288,7 +288,7 @@ def remove_return_from_block(last_block):
         last_block.body.pop()
 
 
-def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=True, work_list=None):
+def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=True, work_list=None, func_ir=None):
     inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
     blocks.update(inner_blocks)
     ir_utils._max_label = max(blocks.keys())
@@ -309,7 +309,10 @@ def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=Tr
     if work_list is not None:
         topo_order = find_topo_order(inner_blocks)
         for _label in topo_order:
-            work_list.append((_label, inner_blocks[_label]))
+            block = inner_blocks[_label]
+            block.scope = scope
+            numba.inline_closurecall._add_definitions(func_ir, block)
+            work_list.append((_label, block))
     return label
 
 

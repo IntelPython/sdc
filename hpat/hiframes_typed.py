@@ -61,12 +61,15 @@ class HiFramesTyped(object):
                         replaced = True
                         break
                     if isinstance(out_nodes, dict):
+                        # TODO: refactor to a new func
+                        # remove the old definition of instr.target
+                        if (inst.target.name in self.func_ir._definitions):
+                            self.func_ir._definitions[inst.target.name] = []
                         rest_body = block.body[i+1:]
                         new_label = include_new_blocks(blocks, out_nodes,
-                            label, new_body, False, work_list)
+                            label, new_body, False, work_list, self.func_ir)
                         numba.inline_closurecall._replace_returns(
                             out_nodes, inst.target, new_label)
-                        # TODO: add definitions?
                         label = new_label
                         new_body = []
                         replaced = True
