@@ -342,8 +342,9 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
 
     return
 
+distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
+
 def build_agg_definitions(agg_node, definitions=None):
-    """get variable definition table for parfors"""
     if definitions is None:
         definitions = defaultdict(list)
 
@@ -356,8 +357,6 @@ def build_agg_definitions(agg_node, definitions=None):
     return definitions
 
 ir_utils.build_defs_extensions[Aggregate] = build_agg_definitions
-
-distributed_analysis.distributed_analysis_extensions[Aggregate] = aggregate_distributed_analysis
 
 def __update_redvars():
     pass

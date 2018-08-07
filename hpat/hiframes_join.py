@@ -1,5 +1,5 @@
 from __future__ import print_function, division, absolute_import
-
+from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.extending import overload
@@ -254,6 +254,17 @@ def apply_copies_join(join_node, var_dict, name_var_table,
 
 
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
+
+def build_join_definitions(join_node, definitions=None):
+    if definitions is None:
+        definitions = defaultdict(list)
+
+    for col_var in join_node.df_out_vars.values():
+        definitions[col_var.name].append(join_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[Join] = build_join_definitions
 
 
 def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, targetctx):

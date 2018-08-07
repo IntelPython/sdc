@@ -1,5 +1,5 @@
 from __future__ import print_function, division, absolute_import
-
+from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config
 from numba.ir_utils import visit_vars_inner, replace_vars_inner
@@ -114,6 +114,17 @@ def filter_distributed_analysis(filter_node, array_dists):
 
 
 distributed_analysis.distributed_analysis_extensions[Filter] = filter_distributed_analysis
+
+def build_filter_definitions(filter_node, definitions=None):
+    if definitions is None:
+        definitions = defaultdict(list)
+
+    for col_var in filter_node.df_out_vars.values():
+        definitions[col_var.name].append(filter_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[Filter] = build_filter_definitions
 
 
 def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx):

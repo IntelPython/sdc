@@ -371,7 +371,7 @@ class TestHiFrames(unittest.TestCase):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
             df1 = df[df.A > .5]
-            return np.sum(df1.B)
+            return df1.B.sum()
 
         hpat_func = hpat.jit(test_impl)
         n = 11
