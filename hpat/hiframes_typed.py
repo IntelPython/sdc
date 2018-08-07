@@ -314,7 +314,13 @@ class HiFramesTyped(object):
         if func_name in ('map', 'apply'):
             return self._handle_series_map(assign, lhs, rhs, series_var)
 
-        warnings.warn("unknown Series call, reverting to Numpy")
+        # functions we revert to Numpy for now, otherwise warning
+        # TODO: handle series-specific cases for this funcs
+        if (not func_name.startswith("values.") and func_name
+                not in ('copy', 'cumsum', 'cumprod', 'take', 'astype')):
+            warnings.warn("unknown Series call {}, reverting to Numpy".format(
+                func_name))
+
         return [assign]
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
