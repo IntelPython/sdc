@@ -254,10 +254,6 @@ class HiFrames(object):
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
-        # df.column.shift(3)
-        if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
-            return self._handle_column_call(assign, lhs, rhs, func_mod, func_name, label)
-
         # df.apply(lambda a:..., axis=1)
         if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
                 and func_name == 'apply'):
@@ -799,79 +795,6 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = lhs
         return nodes
-
-    def _handle_column_call(self, assign, lhs, rhs, col_var, func_name, label):
-        """
-        Handle Series calls like:
-          A = df.column.shift(3)
-        """
-        # TODO: handle map/apply differences
-        if func_name in ['map', 'apply']:
-            return self._handle_map(assign, lhs, rhs, col_var, label)
-
-        return [assign]
-
-    def _handle_map(self, assign, lhs, rhs, col_var, label):
-        """translate df.A.map(lambda a:...) to prange()
-        """
-        # error checking: make sure there is function input only
-        if len(rhs.args) != 1:
-            raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.func_ir, rhs.args[0])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
-
-        out_typ = self._get_map_output_typ(col_var, func, label)
-
-        # TODO: handle non numpy alloc types like string array
-        # prange func to inline
-        func_text = "def f(A):\n"
-        func_text += "  numba.parfor.init_prange()\n"
-        func_text += "  n = len(A)\n"
-        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
-        func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        func_text += "    t = A[i]\n"
-        func_text += "    S[i] = map_func(t)\n"
-        if out_typ == datetime_date_type:
-            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
-        else:
-            func_text += "  ret = S\n"
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat,
-            'datetime_date_to_int': datetime_date_to_int,
-            'int_to_datetime_date': int_to_datetime_date})
-        # fix definitions to enable finding sentinel
-        f_ir._definitions = build_definitions(f_ir.blocks)
-        topo_order = find_topo_order(f_ir.blocks)
-
-        # find sentinel function and replace with user func
-        for l in topo_order:
-            block = f_ir.blocks[l]
-            for i, stmt in enumerate(block.body):
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op == 'call'):
-                    fdef = guard(get_definition, f_ir, stmt.value.func)
-                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
-                        inline_closure_call(f_ir, _globals, block, i, func)
-                        break
-
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [col_var])
-        return f_ir.blocks
-
-    def _get_map_output_typ(self, col_var, func, label):
-        # wrapper function to get the output type
-        def f(A):
-            return map_func(A[0])
-
-        return self._get_func_output_typ(col_var, func, f, label)
 
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference

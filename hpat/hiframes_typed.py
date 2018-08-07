@@ -61,14 +61,18 @@ class HiFramesTyped(object):
                         replaced = True
                         break
                     if isinstance(out_nodes, dict):
-                        work_list += list(out_nodes.items())
+                        rest_body = block.body[i+1:]
                         new_label = include_new_blocks(blocks, out_nodes,
-                            label, new_body, False)
+                            label, new_body, False, work_list)
                         numba.inline_closurecall._replace_returns(
                             out_nodes, inst.target, new_label)
                         # TODO: add definitions?
                         label = new_label
                         new_body = []
+                        replaced = True
+                        blocks[label].body = rest_body
+                        work_list += [(label, blocks[label])]
+                        break
                 else:
                     new_body.append(inst)
             if not replaced:
@@ -307,8 +311,77 @@ class HiFramesTyped(object):
             # XXX: remove rolling setup call, assuming still available in definitions
             return []
 
+        if func_name in ('map', 'apply'):
+            return self._handle_series_map(assign, lhs, rhs, series_var)
+
         warnings.warn("unknown Series call, reverting to Numpy")
         return [assign]
+
+    def _handle_series_map(self, assign, lhs, rhs, series_var):
+        """translate df.A.map(lambda a:...) to prange()
+        """
+        # error checking: make sure there is function input only
+        if len(rhs.args) != 1:
+            raise ValueError("map expects 1 argument")
+        func = guard(get_definition, self.func_ir, rhs.args[0])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for map not found")
+
+        out_typ = self.typemap[lhs.name].dtype
+
+        # TODO: handle non numpy alloc types like string array
+        # prange func to inline
+        func_text = "def f(A):\n"
+        func_text += "  numba.parfor.init_prange()\n"
+        func_text += "  n = len(A)\n"
+        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
+        func_text += "  for i in numba.parfor.internal_prange(n):\n"
+        func_text += "    t = A[i]\n"
+        func_text += "    S[i] = map_func(t)\n"
+        if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
+            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
+        else:
+            func_text += "  ret = S\n"
+        func_text += "  return ret\n"
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
+
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        topo_order = find_topo_order(f_ir.blocks)
+
+        # find sentinel function and replace with user func
+        for l in topo_order:
+            block = f_ir.blocks[l]
+            for i, stmt in enumerate(block.body):
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'):
+                    fdef = guard(get_definition, f_ir, stmt.value.func)
+                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        inline_closure_call(f_ir, _globals, block, i, func)
+                        break
+
+        # remove sentinel global to avoid type inference issues
+        ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
+        f_ir._definitions = ir_utils.build_definitions(f_ir.blocks)
+        arg_typs = (self.typemap[series_var.name],)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.typingctx, f_ir, arg_typs, None)
+        # remove argument entries like arg.a from typemap
+        arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
+        for a in arg_names:
+            f_typemap.pop(a)
+        self.typemap.update(f_typemap)
+        self.calltypes.update(f_calltypes)
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [series_var])
+        return f_ir.blocks
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
         """

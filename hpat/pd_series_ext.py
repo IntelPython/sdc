@@ -350,6 +350,23 @@ class SeriesAttribute(AttributeTemplate):
             out.dtype = types.float64
         return signature(out, *args)
 
+    @bound_function("series.map", True)
+    def resolve_map(self, ary, args, kws):
+        code = args[0].value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.context, f_ir, (ary.dtype,), None)
+
+        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+
+    @bound_function("series.apply", True)
+    def resolve_apply(self, ary, args, kws):
+        code = args[0].value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.context, f_ir, (ary.dtype,), None)
+
+        return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
