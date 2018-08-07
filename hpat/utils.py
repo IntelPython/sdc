@@ -306,7 +306,7 @@ def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=Tr
     if remove_non_return:
         inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
     # new_body.clear()
-    if work_list:
+    if work_list is not None:
         topo_order = find_topo_order(inner_blocks)
         for _label in topo_order:
             work_list.append((_label, inner_blocks[_label]))
