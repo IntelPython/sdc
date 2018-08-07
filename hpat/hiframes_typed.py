@@ -34,7 +34,6 @@ class HiFramesTyped(object):
         self.typingctx = typingctx
         self.typemap = typemap
         self.calltypes = calltypes
-        self.df_cols = func_ir.df_cols
         self.return_type = return_type
 
     def run(self):

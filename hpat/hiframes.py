@@ -136,7 +136,6 @@ class HiFrames(object):
             self.func_ir.blocks[label].body = new_body
 
         self.func_ir._definitions = get_definitions(self.func_ir.blocks)
-        self.func_ir.df_cols = self.df_cols
         # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
@@ -177,9 +176,6 @@ class HiFrames(object):
                 # turns them into filter. Only boolean array is supported
                 self.df_vars[lhs] = self._get_df_cols(rhs.value)
                 return []
-
-            # if (rhs.op == 'getitem' and rhs.value.name in self.df_cols):
-            #     self.col_filters.add(assign)
 
             # d = df.column
             if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
@@ -448,14 +444,10 @@ class HiFrames(object):
             raise ValueError("No objects to concatenate")
 
         first_varname = df_list.items[0].name
-        # the inputs should be either dataframe or series
-        if not (first_varname in self.df_vars
-                or first_varname in self.df_cols):
-            raise ValueError("pd.concat input should be pd.Series or pd.DataFrame")
 
         if first_varname in self.df_vars:
             return self._handle_concat_df(lhs, df_list, label)
-        assert first_varname in self.df_cols
+
         # XXX convert build_list to build_tuple since Numba doesn't handle list of
         # arrays
         if df_list.op == 'build_list':

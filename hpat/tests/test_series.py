@@ -408,5 +408,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_concat1(self):
+        def test_impl(S1, S2):
+            return pd.concat([S1, S2]).values
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([1.0, 2., 3., 4., 5.])
+        S2 = pd.Series([6., 7.])
+        np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
 if __name__ == "__main__":
     unittest.main()
