@@ -601,14 +601,14 @@ def get_shuffle_send_buffs_overload(data_shuff_t):
     assert isinstance(data_shuff_t, (types.Tuple, types.UniTuple))
     count = data_shuff_t.count
 
-    func_text = "def f(data):\n"
+    func_text = "def send_buff_impl(data):\n"
     func_text += "  return ({}{})\n".format(','.join(["data[{}].send_buff".format(
         i) for i in range(count)]),
         "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    send_buff_impl = loc_vars['f']
+    send_buff_impl = loc_vars['send_buff_impl']
     return send_buff_impl
 
 def get_key_dict(arr):  # pragma: no cover
@@ -616,11 +616,11 @@ def get_key_dict(arr):  # pragma: no cover
 
 @overload(get_key_dict)
 def get_key_dict_overload(arr_t):
-    func_text = "def f(arr):\n"
+    func_text = "def k_dict_impl(arr):\n"
     func_text += "  return hpat.dict_ext.init_dict_{}_int64()\n".format(arr_t.dtype)
     loc_vars = {}
     exec(func_text, {'hpat': hpat}, loc_vars)
-    k_dict_impl = loc_vars['f']
+    k_dict_impl = loc_vars['k_dict_impl']
     return k_dict_impl
 
 
@@ -740,7 +740,7 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     # alloc_agg_output()
     return_key_p = "True" if return_key else "None"
 
-    func_text = "def f(key_arr{}, pivot_arr):\n".format(in_args)
+    func_text = "def agg_top(key_arr{}, pivot_arr):\n".format(in_args)
     func_text += "    data_redvar_dummy = ({}{})\n".format(
         ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
         "," if len(red_var_typs) == 1 else "")
@@ -769,8 +769,8 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
-    return f
+    agg_top = loc_vars['agg_top']
+    return agg_top
 
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
@@ -1149,15 +1149,15 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
     return_typ = pm.typemap[eval_nodes[-1].value.name]
 
     # TODO: non-numeric return
-    func_text = "def f({}):\n return np.{}(0)\n".format(", ".join(in_names), return_typ)
+    func_text = "def agg_eval({}):\n return np.{}(0)\n".format(", ".join(in_names), return_typ)
 
     # print(func_text)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
+    agg_eval = loc_vars['agg_eval']
 
     arg_typs = tuple(var_types)
-    f_ir = compile_to_numba_ir(f, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+    f_ir = compile_to_numba_ir(agg_eval, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
@@ -1181,7 +1181,7 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
             {}
     )
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_eval)
     imp_dis.add_overload(eval_func)
     return imp_dis
 
@@ -1192,7 +1192,7 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
     in_names = ["in{}".format(i) for i in range(num_red_vars)]
 
-    func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
+    func_text = "def agg_combine({}):\n".format(", ".join(redvar_in_names + in_names))
 
     for bl in parfor.loop_body.values():
         for stmt in bl.body:
@@ -1222,12 +1222,12 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     # print(func_text)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
+    agg_combine = loc_vars['agg_combine']
 
     # reduction variable types for new input and existing values
     arg_typs = tuple(2 * var_types)
 
-    f_ir = compile_to_numba_ir(f, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+    f_ir = compile_to_numba_ir(agg_combine, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
@@ -1245,7 +1245,7 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
             {}
     )
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_combine)
     imp_dis.add_overload(combine_func)
     return imp_dis
 
@@ -1276,19 +1276,19 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
     in_names = ["in{}".format(i) for i in range(num_in_vars)]
 
-    func_text = "def f({}):\n".format(", ".join(redvar_in_names + in_names))
+    func_text = "def agg_update({}):\n".format(", ".join(redvar_in_names + in_names))
     func_text += "    __update_redvars()\n"
     func_text += "    return {}".format(", ".join(["v{}".format(i)
                                                 for i in range(num_red_vars)]))
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
-    f = loc_vars['f']
+    agg_update = loc_vars['agg_update']
 
     # XXX input column type can be different than reduction variable type
     arg_typs = tuple(var_types + [in_col_typ.dtype]*num_in_vars)
 
-    f_ir = compile_to_numba_ir(f, {'__update_redvars': __update_redvars},  # TODO: add outside globals
+    f_ir = compile_to_numba_ir(agg_update, {'__update_redvars': __update_redvars},  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
@@ -1356,7 +1356,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
             {}
     )
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](f)
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_update)
     imp_dis.add_overload(agg_impl_func)
     return imp_dis
 
