@@ -263,7 +263,8 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max', 'nunique', 'describe']:
+        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
+                         'nunique', 'describe', 'abs']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -1099,4 +1100,5 @@ series_replace_funcs = {
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
+    'abs': lambda A: np.abs(A),  # TODO: timedelta
 }

@@ -431,6 +431,13 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([1.0, 2., 3., 4., 5.])
+
+    def test_series_abs1(self):
+        def test_impl(S):
+            return S.abs()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, -2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
 if __name__ == "__main__":
