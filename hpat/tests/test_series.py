@@ -440,5 +440,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, -2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_cov1(self):
+        def test_impl(S1, S2):
+            return S1.cov(S2)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([np.nan, -2., 3., 9.1])
+        S2 = pd.Series([np.nan, -2., 3., 5.0])
+        np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+
 if __name__ == "__main__":
     unittest.main()

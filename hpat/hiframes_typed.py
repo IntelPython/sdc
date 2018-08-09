@@ -301,6 +301,11 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, shift_const])
 
+        if func_name == 'cov':
+            S2 = rhs.args[0]
+            func = series_replace_funcs[func_name]
+            return self._replace_func(func, [series_var, S2])
+
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
 
@@ -1085,6 +1090,16 @@ def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
     return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
 
 
+def _column_cov_impl(A, B):  # pragma: no cover
+    S1 = hpat.hiframes_api.to_series_type(A)
+    S2 = hpat.hiframes_api.to_series_type(B)
+    # TODO: check lens
+    ma = S1.mean()
+    mb = S2.mean()
+    # TODO: check aligned nans, (S1.notna() != S2.notna()).any()
+    return ((S1-ma)*(S2-mb)).sum()/(S1.count()-1.0)
+
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -1101,4 +1116,5 @@ series_replace_funcs = {
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
+    'cov': _column_cov_impl,
 }
