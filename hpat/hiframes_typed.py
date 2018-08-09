@@ -1089,7 +1089,8 @@ def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
 def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
     return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
 
-
+# TODO: use online algorithm, e.g. StatFunctions.scala
+# https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_cov_impl(A, B):  # pragma: no cover
     S1 = hpat.hiframes_api.to_series_type(A)
     S2 = hpat.hiframes_api.to_series_type(B)
