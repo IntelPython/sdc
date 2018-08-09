@@ -264,7 +264,7 @@ class HiFramesTyped(object):
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
-                         'nunique', 'describe', 'abs']:
+                         'nunique', 'describe', 'abs', 'str.len']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -1089,6 +1089,17 @@ def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
 def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
     return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
 
+def _str_len_impl(str_arr):
+    numba.parfor.init_prange()
+    n = len(str_arr)
+    out_arr = np.empty(n, np.int64)
+    for i in numba.parfor.internal_prange(n):
+        val = str_arr[i]
+        out_arr[i] = len(val)
+    return out_arr
+
+
+
 # TODO: use online algorithm, e.g. StatFunctions.scala
 # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_cov_impl(A, B):  # pragma: no cover
@@ -1135,4 +1146,5 @@ series_replace_funcs = {
     'abs': lambda A: np.abs(A),  # TODO: timedelta
     'cov': _column_cov_impl,
     'corr': _column_corr_impl,
+    'str.len': _str_len_impl,
 }

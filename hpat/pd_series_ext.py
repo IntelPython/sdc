@@ -427,6 +427,9 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_contains(self, ary, args, kws):
         return signature(SeriesType(types.bool_, 1, 'C'), *args)
 
+    @bound_function("strmethod.len")
+    def resolve_len(self, ary, args, kws):
+        return signature(SeriesType(types.int64, 1, 'C'), *args)
 
 class SeriesRollingType(types.Type):
     def __init__(self, dtype):
