@@ -389,6 +389,15 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: complex numbers return complex
         return signature(types.float64, *args)
 
+    @bound_function("series.corr")
+    def resolve_corr(self, ary, args, kws):
+        # array is valid since hiframes_typed calls this after type replacement
+        assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
+        assert isinstance(ary.dtype, types.Number)
+        assert isinstance(args[0].dtype, types.Number)
+        # TODO: complex numbers return complex
+        return signature(types.float64, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

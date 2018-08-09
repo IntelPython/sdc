@@ -301,7 +301,7 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, shift_const])
 
-        if func_name == 'cov':
+        if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
@@ -1100,6 +1100,22 @@ def _column_cov_impl(A, B):  # pragma: no cover
     return ((S1-ma)*(S2-mb)).sum()/(S1.count()-1.0)
 
 
+def _column_corr_impl(A, B):  # pragma: no cover
+    S1 = hpat.hiframes_api.to_series_type(A)
+    S2 = hpat.hiframes_api.to_series_type(B)
+    n = S1.count()
+    # TODO: check lens
+    ma = S1.sum()
+    mb = S2.sum()
+    # TODO: check aligned nans, (S1.notna() != S2.notna()).any()
+    a = n * ((S1*S2).sum()) - ma * mb
+    b1 = n * (S1**2).sum() - ma**2
+    b2 = n * (S2**2).sum() - mb**2
+    # TODO: np.clip
+    # TODO: np.true_divide?
+    return a / np.sqrt(b1*b2)
+
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -1117,4 +1133,5 @@ series_replace_funcs = {
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
     'cov': _column_cov_impl,
+    'corr': _column_corr_impl,
 }
