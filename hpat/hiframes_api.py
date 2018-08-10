@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 from collections import namedtuple
+import pandas as pd
 import datetime
 
 import numba
@@ -10,9 +11,11 @@ from numba import types
 import numba.array_analysis
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 from numba.targets.arrayobj import _getitem_array1d
+from numba.targets.boxing import box_array, unbox_array
 import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
@@ -29,6 +32,19 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
+
+# quantile imports?
+from llvmlite import ir as lir
+import quantile_alg
+import llvmlite.binding as ll
+ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+from numba.targets.arrayobj import make_array
+from numba import cgutils
+from hpat.distributed_lower import _h5_typ_table
+
+# boxing/unboxing
+from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
+from numba import numpy_support
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -287,8 +303,6 @@ def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
 
     return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
 
-from numba.typing.arraydecl import _expand_integer
-
 
 @infer_global(count)
 class CountTyper(AbstractTemplate):
@@ -450,15 +464,6 @@ def array_std(context, builder, sig, args):
     return impl_ret_untracked(context, builder, sig.return_type, res)
 
 
-from llvmlite import ir as lir
-import quantile_alg
-import llvmlite.binding as ll
-ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
-from numba.targets.arrayobj import make_array
-from numba import cgutils
-from hpat.distributed_lower import _h5_typ_table
-
-
 @lower_builtin(quantile, types.npytypes.Array, types.float64)
 @lower_builtin(quantile_parallel, types.npytypes.Array, types.float64, types.intp)
 def lower_dist_quantile(context, builder, sig, args):
@@ -504,11 +509,6 @@ class SortTyping(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.none, *args)
-
-
-import pandas as pd
-from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
-from numba import numpy_support
 
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):
@@ -594,8 +594,6 @@ class SetDfColInfer(AbstractTemplate):
 
 SetDfColInfer.support_literals = True
 
-from numba.targets.boxing import box_array
-
 @lower_builtin(set_df_col, PandasDataFrameType, types.Const, types.Array)
 def set_df_col_lower(context, builder, sig, args):
     #
@@ -676,10 +674,9 @@ def lower_box_df(context, builder, sig, args):
     return res
 
 @box(PandasDataFrameType)
-def box_series(typ, val, c):
+def box_df_dummy(typ, val, c):
     return val
 
-from numba.targets.boxing import unbox_array
 
 @lower_builtin(unbox_df_column, PandasDataFrameType, types.Const, types.Any)
 def lower_unbox_df_column(context, builder, sig, args):
