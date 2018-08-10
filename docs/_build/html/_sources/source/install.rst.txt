@@ -42,6 +42,7 @@ A command line for running the Pi example on 4 cores::
 
 Running unit tests::
 
+    conda install pyspark
     python hpat/tests/gen_test_data.py
     python -m unittest
 

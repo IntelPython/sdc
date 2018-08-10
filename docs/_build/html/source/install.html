@@ -77,7 +77,8 @@ HDF5_DIR=$CONDA_PREFIX python setup.py develop
 </pre></div>
 </div>
 <p>Running unit tests:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">hpat</span><span class="o">/</span><span class="n">tests</span><span class="o">/</span><span class="n">gen_test_data</span><span class="o">.</span><span class="n">py</span>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">pyspark</span>
+<span class="n">python</span> <span class="n">hpat</span><span class="o">/</span><span class="n">tests</span><span class="o">/</span><span class="n">gen_test_data</span><span class="o">.</span><span class="n">py</span>
 <span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">unittest</span>
 </pre></div>
 </div>
