@@ -316,6 +316,15 @@ class HiFramesTyped(object):
         if func_name in ('map', 'apply'):
             return self._handle_series_map(assign, lhs, rhs, series_var)
 
+        if func_name == 'append':
+            other = rhs.args[0]
+            if isinstance(self.typemap[other.name], SeriesType):
+                func = series_replace_funcs['append_single']
+            else:
+                assert isinstance(self.typemap[other.name], types.BaseTuple)
+                func = series_replace_funcs['append_tuple']
+            return self._replace_func(func, [series_var, other])
+
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
@@ -1128,6 +1137,12 @@ def _column_corr_impl(A, B):  # pragma: no cover
     return a / np.sqrt(b1*b2)
 
 
+def _series_append_single_impl(arr, other):
+    return hpat.hiframes_api.concat((arr, other))
+
+def _series_append_tuple_impl(arr, other):
+    return hpat.hiframes_api.concat((arr, *other))
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -1147,4 +1162,6 @@ series_replace_funcs = {
     'cov': _column_cov_impl,
     'corr': _column_corr_impl,
     'str.len': _str_len_impl,
+    'append_single': _series_append_single_impl,
+    'append_tuple': _series_append_tuple_impl,
 }

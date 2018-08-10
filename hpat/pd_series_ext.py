@@ -398,6 +398,24 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: complex numbers return complex
         return signature(types.float64, *args)
 
+    @bound_function("series.append")
+    def resolve_append(self, ary, args, kws):
+        # TODO: ignore_index
+        assert not kws
+        arr_typ = if_series_to_array_type(ary)
+        other, = args
+        if isinstance(other, (SeriesType, types.Array)):
+            all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other)))
+        elif isinstance(other, types.BaseTuple):
+            all_arrs = types.Tuple((arr_typ, *[if_series_to_array_type(a) for a in other.types]))
+
+        # TODO: list
+        # call np.concatenate to handle type promotion e.g. int, float -> float
+        ret_typ = self.context.resolve_function_type(np.concatenate, (all_arrs,), kws).return_type
+        ret_typ = if_arr_to_series_type(ret_typ)
+        return signature(ret_typ, *args)
+
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

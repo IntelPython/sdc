@@ -466,6 +466,27 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_append1(self):
+        def test_impl(S, other):
+            return S.append(other).values
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([-2., 3., 9.1])
+        S2 = pd.Series([-2., 5.0])
+        # Test single series
+        np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    def test_series_append2(self):
+        def test_impl(S1, S2, S3):
+            return S1.append((S2,S3)).values
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([-2., 3., 9.1])
+        S2 = pd.Series([-2., 5.0])
+        S3 = pd.Series([1])
+        # Test series tuple
+        np.testing.assert_array_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
 
 if __name__ == "__main__":
     unittest.main()
