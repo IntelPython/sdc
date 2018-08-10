@@ -1,6 +1,6 @@
 # HPAT support for daal4py - an easy-to-use ML API (to Intel(R) DAAL).
 #
-# We provide a factory whcih creates all numba/HPAT code needed to compile/distribute daal4py code.
+# We provide a factory which creates all numba/HPAT code needed to compile/distribute daal4py code.
 # Given a algorithm specification (see list at end of the file) it generates numba types
 # and lowering stuff for function calls (construction and compute) and member accesses
 # (to attributes of Result/Model).
@@ -229,8 +229,6 @@ class algo_factory(object):
         Declare type and lowering code for constructing an algo object
         Lowers algo's constructor: we just call the C-function.
         We provide an @intrinsic which calls the C-function and an @overload which calls the former.
-        We need to add the extra boolean argument "distributed", it's not really used, though.
-        daal4py's HPAT support sets it true when calling compute and there are multiple processes initialized.
         '''
 
         if not self.spec or not self.spec.params:
