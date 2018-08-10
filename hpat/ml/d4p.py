@@ -9,6 +9,7 @@
 # Attribute access gets redirected to DAAL's actual accessor methods.
 #
 # FIXME:
+#   - sub-classing: parameters of '__interface__' types must accept derived types
 #   - boxing/unboxing
 #   - GC: result/model objects returned by daal4py wrappers are newly allocated shared pointers, need to get gc'ed
 #   - float32 tables, input type selection etc.
@@ -18,7 +19,7 @@
 import numpy as np
 from numpy import nan
 from numba import types, cgutils
-from numba.extending import intrinsic, typeof_impl, overload, overload_method, overload_attribute, box, unbox, make_attribute_wrapper, type_callable, models, register_model, lower_builtin, NativeValue
+from numba.extending import intrinsic, typeof_impl, overload, overload_method, overload_attribute, box, unbox, make_attribute_wrapper, type_callable, models, register_model, lower_builtin, NativeValue, lower_cast
 from numba.targets.imputils import impl_ret_new_ref
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
@@ -31,7 +32,7 @@ from numba.targets.arrayobj import _empty_nd_impl
 ##############################################################################
 ##############################################################################
 import daal4py
-from daal4py import NAN32, NAN64
+from daal4py import NAN32, NAN64, hpat_spec
 import llvmlite.binding as ll
 
 def open_daal4py():
@@ -60,6 +61,14 @@ d4ptypes = {
     itable_type: 2,
 }
 
+d4p_dtypes = {
+    'REP'     : DType.REP,
+    'Thread'  : DType.Thread,
+    'TwoD'    : DType.TwoD,
+    'OneD_Var': DType.OneD_Var,
+    'OneD'    : DType.OneD,
+}
+
 def get_lir_type(context, typ):
     '''Return llvm IR type for given numba type'''
     # some types have no or an incorrect built-in mapping
@@ -70,6 +79,8 @@ def get_lir_type(context, typ):
         ftable_type:   [lir.FloatType().as_pointer(), lir.IntType(64), lir.IntType(64)],
         itable_type:   [lir.IntType(32).as_pointer(), lir.IntType(64), lir.IntType(64)], # FIXME ILP
     }
+    if isinstance(typ, str):
+        typ = algo_factory.all_nbtypes[typ]
     return lirtypes[typ] if typ in lirtypes else context.get_data_type(typ)
 
 
@@ -98,35 +109,100 @@ def nt2nd(context, builder, ptr, ary_type):
     # we are done!
     return impl_ret_new_ref(context, builder, ary_type, ary._getvalue())
 
+##############################################################################
+##############################################################################
+# Class configs.
+# A specification definesa daal4py class, which can be an algorithm, a model or a result.
+# The following information is needed:
+#    - spec.pyclass is expected to be the actual daal4py class.
+#    - spec.c_name provides the name of the class name as used in C.
+#    - spec.params list of tuples (name, numba type, default) for the algo parameters (constructor) [algo only]
+#    - spec.input_types: list of pairs for input arguments to compute: (numba type, distribution type) [algo only]
+#    - spec.attrs: list of tuple (name, numba-type) representing result or model attributes [model/result only]
+#    - spec.result_dist: distribution type of result [algo only]
+# Note: input/attribute types can be actual numba types or strings.
+#       In the latter case, the type is looked up in the list of 'own' factory-created types
+#       At this point this requires that we can put the list in a canonical order...
 
+D4PSpec = namedtuple('D4PSpec',
+                     'pyclass c_name params input_types result_dist attrs')
+# default values, only name is required
+D4PSpec.__new__.__defaults__ = (None, None, None, DType.REP, None)
+
+##############################################################################
+##############################################################################
 class algo_factory(object):
     '''
-    This factory class accepts a configuration for a daal4py algorithm
-    and provides all the numba/lowering stuff needed to compile the given algo:
+    This factory class accepts a configuration for a daal4py class.
+    Providing all the numba/lowering stuff needed to compile the given algo:
       - algo construction
       - algo computation
-      - result attribute access
+      - attribute access (results and models)
     FIXME: GC for shared pointers of result/model objects
     '''
 
     # list of types, so that we can reference them when dealing others
-    all_nbtypes = {}
+    all_nbtypes = {
+        'dtable_type' : dtable_type,
+        'ftable_type' : ftable_type,
+        'itable_type' : itable_type,
+        'size_t'      : types.uint64,
+        'double'      : types.float64,
+        'bool'        : types.boolean,
+        'std::string&': string_type,
+    }
+
+    def from_d4p(self, spec):
+        '''
+        Import the raw daal4py spec and convert it to our needs
+        '''
+        assert any(x in spec for x in ['pyclass', 'c_name']), 'Missing required attribute in daal4py specification: ' + str(spec)
+        assert 'attrs' in spec or any(x in spec for x in ['params', 'input_types']) or '__iface__' in spec['c_name'], 'invalid daal4py specification: ' + str(spec)
+        if 'params' in spec:
+            return D4PSpec(spec['pyclass'],
+                           spec['c_name'],
+                           params = spec['params'],
+                           input_types = [(x[0], self.all_nbtypes[x[1].rstrip('*')], d4p_dtypes[x[2]]) for x in spec['input_types']])
+        elif 'attrs' in spec:
+            # filter out (do not support) properties for which we do not know the numba type
+            attrs = []
+            for x in spec['attrs']:
+                typ = x[1].rstrip('*')
+                if typ in self.all_nbtypes:
+                    attrs.append((x[0], self.all_nbtypes[typ]))
+                else:
+                    print("Warning: couldn't find numba type for '" + x[1] +"'. Ignored.")
+            return D4PSpec(spec['pyclass'],
+                           spec['c_name'],
+                           attrs = attrs)
+        return None
 
     def __init__(self, spec): #algo, c_name, params, input_types, result_attrs, result_dist):
         '''
-        factory to build the numba types and lowering stuff.
         See D4PSpec for input specification.
+        Defines numba type. To make it usable also call activate().
         '''
+        if 'alias' not in spec:
+            self.mk_type(spec)
+        else:
+            self.name = spec['c_name']
         self.spec = spec
-        self.mk_types()
+
+
+    def activate(self):
+        '''Bring class to life'''
+        if 'alias' in self.spec:
+            return
+        self.spec = self.from_d4p(self.spec)
         self.mk_ctor()
         self.mk_compute()
         self.mk_attrs()
 
 
-    def mk_types(self):
-        '''Make numba types (algo and result) and register opaque model'''
-        self.name = self.spec.algo.__name__
+    def mk_type(self, spec):
+        '''Make numba type and register opaque model'''
+        assert 'pyclass' in spec, "Missing required attribute 'pyclass' in daal4py spec: " + str(spec)
+        self.name = spec['pyclass'].__name__
         def mk_simple(name):
             class NbType(types.Opaque):
                 '''Our numba type for given algo class'''
@@ -136,18 +212,16 @@ class algo_factory(object):
 
         # make type and type instance for algo, its result and possibly model
         # also register their opaque data model
-        self.NbType_algo = mk_simple(self.name + '_nbtype')
-        self.all_nbtypes[self.name] = self.NbType_algo()
-        register_model(self.NbType_algo)(models.OpaqueModel)
+        self.NbType = mk_simple(self.name + '_nbtype')
+        self.all_nbtypes[self.name] = self.NbType()
+        register_model(self.NbType)(models.OpaqueModel)
 
-        self.NbType_res = mk_simple(self.name + '_result_nbtype')
-        self.all_nbtypes[self.name + '_result'] = self.NbType_res()
-        register_model(self.NbType_res)(models.OpaqueModel)
-
-        if self.spec.model_attrs:
-            self.NbType_model = mk_simple(self.name + '_model_nbtype')
-            self.all_nbtypes[self.name + '_model'] = self.NbType_model()
-            register_model(self.NbType_model)(models.OpaqueModel)
+        # some of the classes can be parameters to others and have a default NULL/None
+        # We need to cast Python None to C NULL
+        @lower_cast(types.none, self.NbType())
+        def none_to_nbtype(context, builder, fromty, toty, val):
+            zero = context.get_constant(types.intp, 0)
+            return builder.inttoptr(zero, context.get_value_type(toty))
 
 
     def mk_ctor(self):
@@ -158,6 +232,11 @@ class algo_factory(object):
         We need to add the extra boolean argument "distributed", it's not really used, though.
         daal4py's HPAT support sets it true when calling compute and there are multiple processes initialized.
         '''
+
+        if not self.spec or not self.spec.params:
+            # this must be a result or model, not an algo class
+            return
+
         # FIXME: check args
 
         # PR numba does not support kwargs when lowering/typing, so we need to fully expand arguments.
@@ -171,29 +250,28 @@ class algo_factory(object):
 @intrinsic
 def _cmm_{0}(typingctx, {2}):
     def codegen(context, builder, sig, args):
-        fls = context.get_constant(types.boolean, False)
         fnty = lir.FunctionType(lir.IntType(8).as_pointer(), # ctors always just return an opaque pointer
-                                [{3}, get_lir_type(context, types.boolean)])
+                                [{3}])
         fn = builder.module.get_or_insert_function(fnty, name='mk_{1}')
-        return builder.call(fn, args + (fls,))
+        return builder.call(fn, args)
     return algo_factory.all_nbtypes['{0}']({4}), codegen
 '''.format(self.name,
            self.spec.c_name,
            ', '.join([x[0] for x in self.spec.params]),
-           ', '.join(['get_lir_type(context, ' + x[1] + ')' for x in self.spec.params]),
-           ', '.join([x[1] for x in self.spec.params]))
+           ', '.join(['get_lir_type(context, "' + x[1] + '")' for x in self.spec.params]),
+           ', '.join(['algo_factory.all_nbtypes["' + x[1] + '"]' for x in self.spec.params]))
 
         loc_vars = {}
         exec(cmm_string, globals(), loc_vars)
         call_maker_maker = loc_vars['_cmm_'+self.name]
 
-        @overload(self.spec.algo)
+        @overload(self.spec.pyclass)
         def _ovld(*args, **kwargs):
-            assert len(self.spec.params) >= len(args) + len(kwargs), 'Invalid number of arguments to ' + str(self.spec.algo)
-            gstr = 'def _ovld_impl(' + ', '.join([x[0] + ('=' + ('"{}"'.format(x[2]) if x[1] == 'string_type' else str(x[2])) if x[2] != None else '') for x in self.spec.params]) + '):\n'
+            assert len(self.spec.params) >= len(args) + len(kwargs), 'Invalid number of arguments to ' + str(self.spec.pyclass)
+            gstr = 'def _ovld_impl(' + ', '.join([x[0] + ('=' + ('"{}"'.format(x[2]) if algo_factory.all_nbtypes[x[1]] == string_type else str(x[2])) if len(x) > 2 else '') for x in self.spec.params]) + '):\n'
             gstr += '    return _cmm_' + self.name + '(' + ', '.join([x[0] for x in self.spec.params]) + ')'
             loc_vars = {}
-            exec(gstr, {'nan': nan, 'intrinsic': intrinsic, '_cmm_'+self.name: call_maker_maker}, loc_vars) #, {'call_maker_maker': call_maker_maker}, loc_vars)
+            exec(gstr, {'nan': nan, 'intrinsic': intrinsic, '_cmm_'+self.name: call_maker_maker}, loc_vars)
             impl = loc_vars['_ovld_impl']
             return impl
 
@@ -201,9 +279,13 @@ def _cmm_{0}(typingctx, {2}):
     def mk_compute(self):
         '''provide the typing and lowering for calling compute on an algo object'''
 
-        algo_type = self.NbType_algo
+        if not self.spec or not self.spec.input_types:
+            # this must be a result or model, not an algo class
+            return
+
+        algo_type = self.NbType
         result_type = self.all_nbtypes[self.name+'_result']
-        compute_name = '.'.join([self.spec.algo.__module__.strip('_'), self.spec.algo.__name__, 'compute'])
+        compute_name = '.'.join([self.spec.pyclass.__module__.strip('_'), self.spec.pyclass.__name__, 'compute'])
 
         @infer_getattr
         class AlgoAttributes(AttributeTemplate):
@@ -217,7 +299,7 @@ def _cmm_{0}(typingctx, {2}):
                 return signature(result_type, *args)
 
 
-        @lower_builtin(compute_name, self.all_nbtypes[self.name], *[self.all_nbtypes[x[0]] if isinstance(x[0], str) else x[0] for x in self.spec.input_types])
+        @lower_builtin(compute_name, self.all_nbtypes[self.name], *[self.all_nbtypes[x[1]] if isinstance(x[1], str) else x[1] for x in self.spec.input_types])
         def lower_compute(context, builder, sig, args):
             '''lowers compute method algo objects'''
             # First prepare list of argument types
@@ -249,6 +331,7 @@ def _cmm_{0}(typingctx, {2}):
         Calls c_func to retrieve the attribute from the given result/model object.
         Converts to ndarray if attr_type is Array
         '''
+
         if isinstance(attr_type, str):
             attr_type = self.all_nbtypes[attr_type]
         is_array = isinstance(attr_type, types.Array)
@@ -280,98 +363,30 @@ def _cmm_{0}(typingctx, {2}):
 
     def mk_attrs(self):
         '''Make attributes of result and model known to numba and how to get their values.'''
-        for a in self.spec.result_attrs:
-            self.add_attr(self.NbType_res, a[0], a[1], '_'.join(['get', self.spec.c_name, 'ResultPtr', a[0]]))
-        if self.spec.model_attrs:
-            for a in self.spec.model_attrs:
-                self.add_attr(self.NbType_model, a[0], a[1], '_'.join(['get', self.spec.model_base, a[0]]))
+
+        if not self.spec or not self.spec.attrs:
+            # this must be algo class, which does not have attributes
+            # or it is an alias only
+            return
+
+        for a in self.spec.attrs:
+            self.add_attr(self.NbType, a[0], a[1], '_'.join(['get', self.spec.c_name, a[0]]))
 
 ##############################################################################
 ##############################################################################
+##############################################################################
+# finally let the factory do its job
 
 open_daal4py()
 
-##############################################################################
-##############################################################################
-# algorithm configs
-# A specification lists the following attributes of an algorithms:
-#    - spec.algo is expected to be the actual daal4py function.
-#    - spec.c_name provides the name of the algorithm name as used in C.
-#    - spec.params list of tuples (name, numba type, default) for the algo parameters
-#    - spec.input_types: list of pairs for input arguments to compute: (numba type, distribution type)
-#    - spec.result_attrs: list of tuple (name, numba-type) representing result attributes
-#    - spec.model_attrs: [optional] list of tuple (name, numba-type) representing model attributes
-#    - spec.model_base: [optional] base string for C lookup function, FIXME: should not be necessary
-# Note: input/attribute types can be actual numby types or strings.
-#       In the latter case, the type is looked up in the list of 'own' factory-created types
-#       At this point this requires that we can put the list in a canonical order...
-# At some point we might want this information to be provided by daal4py. At the same time
-# we could clean this up a little and make it a more general mechanism, like separating
-# classes (algo, model, result) rather than combining stuff from one namespace.
-
-
-D4PSpec = namedtuple('D4PSpec',
-                     'algo c_name params input_types result_attrs result_dist model_attrs model_base')
-D4PSpec.__new__.__defaults__ = (None, None) # the model data is optional
-
-# calling the factory for every algorithm.
-# See algo_factory.__init__ for arguments
-algo_specs = [
-    # K-Means
-    D4PSpec(algo         = daal4py.kmeans_init,
-            c_name       = 'kmeans_init',
-            params       = [('nClusters', 'types.uint64', None),
-                            ('fptype', 'string_type', 'double'),
-                            ('method', 'string_type', 'defaultDense'),
-                            ('seed', 'types.intp', -1),
-                            ('oversamplingFactor', 'types.float64', NAN64),
-                            ('nRounds', 'types.uint64', -1)],
-            input_types  = [(dtable_type, DType.OneD)],
-            result_attrs = [('centroids', dtable_type)],
-            result_dist  = DType.REP,
-    ),
-    D4PSpec(algo         = daal4py.kmeans,
-            c_name       = 'kmeans',
-            params       = [('nClusters', 'types.uint64', None),
-                            ('maxIterations', 'types.uint64', None),
-                            ('fptype', 'string_type', 'double'),
-                            ('method', 'string_type', 'lloydDense'),
-                            ('accuracyThreshold', 'types.float64', NAN64),
-                            ('gamma', 'types.float64', NAN64),
-                            ('assignFlag', 'types.boolean', False)],
-            input_types  = [(dtable_type, DType.OneD), (dtable_type, DType.REP)],
-            result_attrs = [('centroids', dtable_type),
-                            ('assignments', itable_type),
-                            ('objectiveFunction', dtable_type),
-                            ('goalFunction', dtable_type),
-                            ('nIterations', itable_type)],
-            result_dist  = DType.REP,
-    ),
-    # Linear Regression
-    D4PSpec(algo         = daal4py.linear_regression_training,
-            c_name       = 'linear_regression_training',
-            params       = [('fptype', 'string_type', 'double'),
-                            ('method', 'string_type', 'normEqDense'),
-                            ('interceptFlag',' types.boolean', False)],
-            input_types  = [(dtable_type, DType.OneD), (dtable_type, DType.OneD)],
-            result_attrs = [('model', 'linear_regression_training_model')],
-            result_dist  = DType.REP,
-            model_attrs  = [('NumberOfBetas', types.uint64),
-                            ('NumberOfResponses', types.uint64),
-                            ('InterceptFlag', types.boolean),
-                            ('Beta', dtable_type),
-                            ('NumberOfFeatures', types.uint64)],
-            model_base   = 'linear_regression_ModelPtr',
-            ),
-    D4PSpec(algo         = daal4py.linear_regression_prediction,
-            c_name       = 'linear_regression_prediction',
-            params       = [('fptype', 'string_type', 'double'),
-                            ('method', 'string_type', 'defaultDense')],
-            input_types  = [(dtable_type, DType.OneD), ('linear_regression_training_model', DType.REP)],
-            result_attrs = [('prediction', dtable_type)],
-            result_dist  = DType.REP,
-    ),
-]
-
-# finally let the factory do its job
-algos = [algo_factory(x) for x in algo_specs]
+# first define types
+algos = [algo_factory(x) for x in hpat_spec]
+# then setup aliases
+for s in hpat_spec:
+    if 'alias' in s:
+        # for assume we have no recurring aliasing
+        assert s['alias'] in algo_factory.all_nbtypes, "Recurring aliasing not supported"
+        algo_factory.all_nbtypes[s['c_name']] =  algo_factory.all_nbtypes[s['alias']]
+# now bring life to the classes
+for a in algos:
+    a.activate()

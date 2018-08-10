@@ -10,8 +10,7 @@ def linreg(N, D):
     gt = np.random.ranf((N,2))
     tres = daal4py.linear_regression_training(interceptFlag=True, method='qrDense').compute(data, gt)
     #FIXME res.model.InterceptFlag
-    pres = daal4py.linear_regression_prediction().compute(data, tres.model)
-    return (pres.prediction[0], tres.model.NumberOfBetas, tres.model.NumberOfResponses, tres.model.Beta, tres.model.NumberOfFeatures)
+    return (tres.model.NumberOfBetas, tres.model.NumberOfResponses, tres.model.Beta, tres.model.NumberOfFeatures)
 
 print(linreg(1000, 10))
 

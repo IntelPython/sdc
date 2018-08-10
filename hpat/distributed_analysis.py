@@ -322,16 +322,16 @@ class DistributedAnalysis(object):
                     # handle all input arguments and set their distribution as given by the spec
                     for i in range(len(args)):
                         aname = args[i].name
-                        adist = algo.spec.input_types[i][1]
+                        adist = algo.spec.input_types[i][2]
                         if aname not in array_dists:
                             array_dists[aname] = adist
                         else:
                             # bail out if there is a distribution conflict with some other use of the argument
                             # FIXME: handle Distribution.Thread and Disribution.REP as equivalent
                             assert array_dists[aname] == adist,\
-                                   'Distribution of argument {} to "daal4py.{}.compute" must be "{}". '\
+                                   'Distribution of argument {} ({}) to "daal4py.{}.compute" must be "{}". '\
                                    'Some other use of it demands "{}", though.'\
-                                   .format(i+1, algo.name, adist, array_dists[aname])
+                                   .format(i+1, algo.spec.input_types[i][0], algo.name, adist, array_dists[aname])
                     # handle distribution of the result
                     assert algo.spec.result_dist in [Distribution.Thread, Distribution.REP],\
                            'Cannot handle "{}" distribution of result of "daal4py.{}.compute"'\
