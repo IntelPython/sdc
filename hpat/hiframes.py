@@ -1116,6 +1116,30 @@ class HiFrames(object):
             self.replace_var_dict[arg_var.name] = new_arg_var
             self._add_node_defs(nodes)
 
+        # TODO: handle list(series), set(series), etc.
+        # handle tuples that include boxed series
+        if (isinstance(arg_typ, types.BaseTuple) and any(
+                [isinstance(a, BoxedSeriesType) for a in arg_typ.types])):
+            func_text = "def tuple_unpack_func(tup_arg):\n"
+            for i, t in enumerate(arg_typ.types):
+                if isinstance(t, BoxedSeriesType):
+                    func_text += "  _arg_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(tup_arg[{}]))\n".format(i, i)
+                else:
+                    func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
+            pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])
+            func_text += "  res = ({},)\n".format(pack_arg)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            tuple_unpack_func = loc_vars['tuple_unpack_func']
+            f_block = compile_to_numba_ir(tuple_unpack_func, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [arg_var])
+            nodes += f_block.body[:-3]  # remove none return
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            self._add_node_defs(nodes)
+
+
         return nodes
 
     def _box_return_df(self, cast_assign, df_map):
