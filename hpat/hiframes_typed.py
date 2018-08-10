@@ -36,6 +36,8 @@ class HiFramesTyped(object):
         self.typemap = typemap
         self.calltypes = calltypes
         self.return_type = return_type
+        # keep track of tuple variables change by to_const_tuple
+        self._type_changed_vars = []
 
     def run(self):
         blocks = self.func_ir.blocks
@@ -145,6 +147,12 @@ class HiFramesTyped(object):
     def _run_assign(self, assign):
         lhs = assign.target.name
         rhs = assign.value
+
+        # fix type of lhs if type of rhs has been changed
+        if isinstance(rhs, ir.Var) and rhs.name in self._type_changed_vars:
+            self.typemap.pop(lhs)
+            self.typemap[lhs] = self.typemap[rhs.name]
+            self._type_changed_vars.append(lhs)
 
         if isinstance(rhs, ir.Expr):
             # arr = S.values
@@ -259,6 +267,28 @@ class HiFramesTyped(object):
         if func_name == 'set_df_col':
             return self._handle_df_col_filter(assign, lhs, rhs)
 
+        if func_name == 'to_const_tuple':
+            tup = rhs.args[0]
+            tup_items = self._get_const_tup(tup)
+            new_tup = ir.Expr.build_tuple(tup_items, tup.loc)
+            assign.value = new_tup
+            # fix type and definition of lhs
+            self.typemap.pop(lhs.name)
+            self._type_changed_vars.append(lhs.name)
+            self.typemap[lhs.name] = types.Tuple(tuple(if_series_to_array_type(
+                                     self.typemap[a.name]) for a in tup_items))
+            self.func_ir._definitions[lhs.name] = [new_tup]
+            return [assign]
+
+        if func_name == 'concat':
+            # concat() case where tuple type changes by to_const_type()
+            if any([a.name in self._type_changed_vars for a in rhs.args]):
+                argtyps = tuple(self.typemap[a.name] for a in rhs.args)
+                old_sig = self.calltypes.pop(rhs)
+                new_sig = self.typemap[rhs.func.name].get_call_type(
+                    self.typingctx , argtyps, rhs.kws)
+                self.calltypes[rhs] = new_sig
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
@@ -321,7 +351,6 @@ class HiFramesTyped(object):
             if isinstance(self.typemap[other.name], SeriesType):
                 func = series_replace_funcs['append_single']
             else:
-                assert isinstance(self.typemap[other.name], types.BaseTuple)
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [series_var, other])
 
@@ -861,6 +890,16 @@ class HiFramesTyped(object):
 
         return [assign]
 
+    def _get_const_tup(self, tup_var):
+        tup_def = guard(get_definition, self.func_ir, tup_var)
+        if isinstance(tup_def, ir.Expr):
+            if tup_def.op == 'binop' and tup_def.fn == '+':
+                return (self._get_const_tup(tup_def.lhs)
+                        + self._get_const_tup(tup_def.rhs))
+            if tup_def.op in ('build_tuple', 'build_list'):
+                return tup_def.items
+        raise ValueError("constant tuple expected")
+
     def _replace_func(self, func, args, const=False):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
@@ -1141,7 +1180,10 @@ def _series_append_single_impl(arr, other):
     return hpat.hiframes_api.concat((arr, other))
 
 def _series_append_tuple_impl(arr, other):
-    return hpat.hiframes_api.concat((arr, *other))
+    tup_other = hpat.hiframes_api.to_const_tuple(other)
+    arrs = (arr, *tup_other)
+    c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
+    return hpat.hiframes_api.concat(c_arrs)
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,

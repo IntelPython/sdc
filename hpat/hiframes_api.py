@@ -808,6 +808,22 @@ def to_date_series_type_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
+# convert const tuple expressions or const list to tuple statically
+def to_const_tuple(arrs):  # pragma: no cover
+    return tuple(arrs)
+
+@infer_global(to_const_tuple)
+class ToConstTupleTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        ret_typ = arr
+        # XXX: returns a dummy type that should be fixed in hiframes_typed
+        if isinstance(arr, types.List):
+            ret_typ = types.Tuple((arr.dtype,))
+        return signature(ret_typ, arr)
+
 
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
