@@ -237,7 +237,11 @@ def if_series_to_array_type(typ, replace_boxed=False):
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple(
             [if_series_to_array_type(t, replace_boxed) for t in typ.types])
-    # TODO: other types than can have Series inside: list, set, etc.
+    if isinstance(typ, types.List):
+        return types.List(if_series_to_array_type(typ.dtype, replace_boxed))
+    if isinstance(typ, types.Set):
+        return types.Set(if_series_to_array_type(typ.dtype, replace_boxed))
+    # TODO: other types that can have Series inside?
     return typ
 
 def if_arr_to_series_type(typ):
@@ -245,7 +249,11 @@ def if_arr_to_series_type(typ):
         return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
-    # TODO: other types than can have Arrays inside: list, set, etc.
+    if isinstance(typ, types.List):
+        return types.List(if_arr_to_series_type(typ.dtype))
+    if isinstance(typ, types.Set):
+        return types.Set(if_arr_to_series_type(typ.dtype))
+    # TODO: other types that can have Arrays inside?
     return typ
 
 def if_series_to_unbox(typ):
@@ -255,7 +263,11 @@ def if_series_to_unbox(typ):
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple(
             [if_series_to_unbox(t) for t in typ.types])
-    # TODO: other types than can have Series inside: list, set, etc.
+    if isinstance(typ, types.List):
+        return types.List(if_series_to_unbox(typ.dtype))
+    if isinstance(typ, types.Set):
+        return types.Set(if_series_to_unbox(typ.dtype))
+    # TODO: other types that can have Series inside?
     return typ
 
 @lower_cast(string_array_type, UnBoxedSeriesType)
@@ -408,6 +420,12 @@ class SeriesAttribute(AttributeTemplate):
             all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other)))
         elif isinstance(other, types.BaseTuple):
             all_arrs = types.Tuple((arr_typ, *[if_series_to_array_type(a) for a in other.types]))
+        elif isinstance(other, (types.List, types.Set)):
+            # add only one value from the list for typing since it shouldn't
+            # matter for np.concatenate typing
+            all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other.dtype)))
+        else:
+            raise ValueError("Invalid input for Series.append (Series, or tuple/list of Series expected)")
 
         # TODO: list
         # call np.concatenate to handle type promotion e.g. int, float -> float
