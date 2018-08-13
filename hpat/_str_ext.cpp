@@ -68,6 +68,7 @@ void* str_from_int32(int in);
 void* str_from_int64(int64_t in);
 void* str_from_float32(float in);
 void* str_from_float64(double in);
+bool is_na(const uint8_t* bull_bitmap, int64_t ind);
 void del_str(std::string* in_str);
 int64_t hash_str(std::string* in_str);
 void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
@@ -153,6 +154,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_from_float32)));
     PyObject_SetAttrString(m, "str_from_float64",
                             PyLong_FromVoidPtr((void*)(&str_from_float64)));
+    PyObject_SetAttrString(m, "is_na",
+                            PyLong_FromVoidPtr((void*)(&is_na)));
     PyObject_SetAttrString(m, "del_str",
                             PyLong_FromVoidPtr((void*)(&del_str)));
     PyObject_SetAttrString(m, "hash_str",
@@ -434,6 +437,13 @@ void* str_from_float32(float in)
 void* str_from_float64(double in)
 {
     return new std::string(std::to_string(in));
+}
+
+bool is_na(const uint8_t* null_bitmap, int64_t i)
+{
+    printf("%p\n", null_bitmap);
+    static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
+    return (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
 }
 
 #if PY_VERSION_HEX >= 0x03000000

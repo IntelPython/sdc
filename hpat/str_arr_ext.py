@@ -79,6 +79,7 @@ class StringArrayPayloadModel(models.StructModel):
         members = [
             ('offsets', types.CPointer(offset_typ)),
             ('data', types.CPointer(char_typ)),
+            ('null_bitmap', types.CPointer(char_typ)),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
@@ -91,6 +92,7 @@ class StringArrayModel(models.StructModel):
             ('num_total_chars', types.uint64),
             ('offsets', types.CPointer(offset_typ)),
             ('data', types.CPointer(char_typ)),
+            ('null_bitmap', types.CPointer(char_typ)),
             ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
@@ -466,6 +468,7 @@ ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
 ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
+ll.add_symbol('is_na', hstr_ext.is_na)
 ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
 ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
@@ -675,11 +678,31 @@ def box_str_arr(typ, val, c):
     return arr #c.builder.load(arr)
 
 
+def lower_is_na(context, builder, bull_bitmap, ind):
+    fnty = lir.FunctionType(lir.IntType(1),
+                            [lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
+    fn_getitem = builder.module.get_or_insert_function(fnty,
+                                                       name="is_na")
+    return builder.call(fn_getitem, [bull_bitmap,
+                                     ind])
+
 @lower_builtin('getitem', StringArrayType, types.Integer)
 def lower_string_arr_getitem(context, builder, sig, args):
     typ = sig.args[0]
+    ind = args[1]
 
     string_array = context.make_helper(builder, typ, args[0])
+
+    # check for NA
+    # i/8, XXX: lshr since always positive
+    #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+    #bit_ind = builder.srem
+
+    # cgutils.printf(builder, "calling bitmap\n")
+    # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
+    #     cgutils.printf(builder, "%d \n", ind)
+    # cgutils.printf(builder, "calling bitmap done\n")
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(32).as_pointer(),
