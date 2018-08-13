@@ -86,7 +86,7 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t co
     }
     // int64_t buff_size = buffers[1]->size();
     const uint8_t* buff = buffers[1]->data();
-    const uint8_t* null_bitmap_buff = buffers[0]->data();
+    const uint8_t* null_bitmap_buff = arr->null_count() == 0 ? nullptr : arr->null_bitmap_data();
 
     copy_data(out_data, buff, 0, num_values, arrow_type, null_bitmap_buff, out_dtype);
     // memcpy(out_data, buffers[1]->data(), buff_size);
@@ -145,7 +145,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
             std::cerr << "invalid parquet number of array buffers" << std::endl;
         }
         const uint8_t* buff = buffers[1]->data();
-        const uint8_t* null_bitmap_buff = buffers[0]->data();
+        const uint8_t* null_bitmap_buff = arr->null_count() == 0 ? nullptr : arr->null_bitmap_data();
         /* ----------- read row group ------- */
 
         int64_t rows_to_skip = start - skipped_rows;
@@ -292,7 +292,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         copy_data_dispatch(out_data, buff, rows_to_skip, rows_to_read, arrow_type, out_dtype);
     }
     // set NaNs for double values
-    if (out_dtype == ::parquet::Type::DOUBLE)
+    if (null_bitmap_buff != nullptr && out_dtype == ::parquet::Type::DOUBLE)
     {
         double *double_data = (double*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
@@ -306,7 +306,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         }
     }
     // set NaNs for float values
-    if (out_dtype == ::parquet::Type::FLOAT)
+    if (null_bitmap_buff != nullptr && out_dtype == ::parquet::Type::FLOAT)
     {
         float *float_data = (float*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
