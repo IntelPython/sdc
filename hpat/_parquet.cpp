@@ -29,11 +29,11 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader>, int64_t column_idx, uin
 int pq_read_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
-                                uint32_t **out_offsets, uint8_t **out_data,
-    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+                                uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
+    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
-        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
+        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
 
 }  // extern "C"
 
@@ -49,9 +49,9 @@ int64_t pq_read(FileReaderVec *readers, int64_t column_idx,
 int pq_read_parallel(FileReaderVec *readers, int64_t column_idx,
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 int pq_read_string(FileReaderVec *readers, int64_t column_idx,
-                                    uint32_t **out_offsets, uint8_t **out_data);
+                                    uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls);
 int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count);
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count);
 
 static PyMethodDef parquet_cpp_methods[] = {
     {
@@ -300,7 +300,7 @@ int pq_read_parallel(FileReaderVec *readers, int64_t column_idx,
 }
 
 int pq_read_string(FileReaderVec *readers, int64_t column_idx,
-                                    uint32_t **out_offsets, uint8_t **out_data)
+                                    uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls)
 {
 
     if (readers->size() == 0) {
@@ -314,11 +314,12 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
 
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
+        std::vector<uint8_t> null_vec;
         int32_t last_offset = 0;
         int64_t res = 0;
         for (size_t i=0; i<readers->size(); i++)
         {
-            int64_t n_vals = pq_read_string_single_file(readers->at(i), column_idx, NULL, NULL, &offset_vec, &data_vec);
+            int64_t n_vals = pq_read_string_single_file(readers->at(i), column_idx, NULL, NULL, NULL, &offset_vec, &data_vec, &null_vec);
             if (n_vals==-1)
                 continue;
 
@@ -336,6 +337,14 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
 
         memcpy(*out_offsets, offset_vec.data(), offset_vec.size()*sizeof(uint32_t));
         memcpy(*out_data, data_vec.data(), data_vec.size());
+        if (null_vec.size()>0)
+        {
+            *out_nulls = new uint8_t[null_vec.size()];
+            memcpy(*out_nulls, null_vec.data(), null_vec.size());
+        }
+        else
+            *out_nulls = nullptr;
+
         // for(int i=0; i<offset_vec.size(); i++)
         //     std::cout << (*out_offsets)[i] << ' ';
         // std::cout << '\n';
@@ -344,13 +353,13 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
     }
     else
     {
-        return pq_read_string_single_file(readers->at(0), column_idx, out_offsets, out_data);
+        return pq_read_string_single_file(readers->at(0), column_idx, out_offsets, out_data, out_nulls);
     }
     return 0;
 }
 
 int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count)
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count)
 {
     // printf("read parquet parallel str file: %s column: %lld start: %lld count: %lld\n",
     //                                 file_name->c_str(), column_idx, start, count);
@@ -377,6 +386,7 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
         int64_t res = 0;
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
+        std::vector<uint8_t> null_vec;
 
         // read data
         int64_t last_offset = 0;
@@ -387,7 +397,7 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
             if (rows_to_read>0)
             {
                 pq_read_string_parallel_single_file(readers->at(file_ind), column_idx,
-                    NULL, NULL, start, rows_to_read, &offset_vec, &data_vec);
+                    NULL, NULL, NULL, start, rows_to_read, &offset_vec, &data_vec, &null_vec);
 
                 int size = offset_vec.size();
                 for(int64_t i=1; i<=rows_to_read+1; i++)
@@ -410,12 +420,19 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
 
         memcpy(*out_offsets, offset_vec.data(), offset_vec.size()*sizeof(uint32_t));
         memcpy(*out_data, data_vec.data(), data_vec.size());
+        if (null_vec.size()>0)
+        {
+            *out_nulls = new uint8_t[null_vec.size()];
+            memcpy(*out_nulls, null_vec.data(), null_vec.size());
+        }
+        else
+            *out_nulls = nullptr;
         return res;
     }
     else
     {
         return pq_read_string_parallel_single_file(readers->at(0), column_idx,
-                out_offsets, out_data, start, count);
+                out_offsets, out_data, out_nulls, start, count);
     }
     return 0;
 }

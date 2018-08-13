@@ -27,11 +27,11 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-                                uint32_t **out_offsets, uint8_t **out_data,
-    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+                                uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
+    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
-        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
+        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
 
 }  // extern "C"
 
@@ -323,10 +323,10 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
 }
 
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-                                    uint32_t **out_offsets, uint8_t **out_data,
-    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
+                                    uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
+    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec, std::vector<uint8_t> *null_vec)
 {
-    // std::cout << "string read file" << *file_name << '\n';
+    // std::cout << "string read file" << '\n';
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
@@ -345,12 +345,14 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         std::cerr << "invalid parquet string number of array buffers" << std::endl;
     }
 
+    int64_t null_size = buffers[0]->size();
     int64_t offsets_size = buffers[1]->size();
     int64_t data_size = buffers[2]->size();
     // std::cout << "offsets: " << offsets_size << " chars: " << data_size << std::endl;
 
     const uint32_t* offsets_buff = (const uint32_t*) buffers[1]->data();
     const uint8_t* data_buff = buffers[2]->data();
+    const uint8_t* null_buff = arr->null_bitmap_data();
 
     if (offset_vec==NULL)
     {
@@ -360,6 +362,15 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         *out_offsets = new uint32_t[offsets_size/sizeof(uint32_t)];
         *out_data = new uint8_t[data_size];
 
+        // printf("null size %p %d\n", null_buff, null_size);
+        if (null_buff != nullptr && null_size > 0) {
+            *out_nulls = new uint8_t[null_size];
+            memcpy(*out_nulls, null_buff, null_size);
+            // printf("bitmap %d\n", (*out_nulls)[0]);
+        }
+        else
+            *out_nulls = nullptr;
+
         memcpy(*out_offsets, offsets_buff, offsets_size);
         memcpy(*out_data, data_buff, data_size);
     }
@@ -367,14 +378,18 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
     {
         offset_vec->insert(offset_vec->end(), offsets_buff, offsets_buff+offsets_size/sizeof(uint32_t));
         data_vec->insert(data_vec->end(), data_buff, data_buff+data_size);
+
+        if (null_buff != nullptr && null_size > 0) {
+            null_vec->insert(null_vec->end(), null_buff, null_buff+null_size);
+        }
     }
 
     return num_values;
 }
 
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
-    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
+    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec, std::vector<uint8_t> *null_vec)
 {
     if (count==0) {
         if (offset_vec==NULL)
