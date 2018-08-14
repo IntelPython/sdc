@@ -22,10 +22,15 @@ using std::regex_search;
 
 extern "C" {
 
+// XXX: equivalent to payload data model in str_arr_ext.py
 struct str_arr_payload {
     uint32_t *offsets;
     char* data;
+    uint8_t* null_bitmap;
 };
+
+// taken from Arrow bin-util.h
+static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
 void* init_string(char*, int64_t);
 void* init_string_const(char* in_str);
@@ -42,7 +47,8 @@ void* str_substr_int(std::string* str, int64_t index);
 int64_t str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
 int64_t get_str_len(std::string* str);
-void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer);
+void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table,
+    char ** buffer, uint8_t **null_bitmap);
 void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_table,
     const char *buffer, const uint8_t *null_bitmap);
 void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
@@ -204,6 +210,8 @@ void dtor_string_array(str_arr_payload* in_str_arr, int64_t size, void* in)
     // printf("num chars: %d\n", in_str_arr->offsets[in_str_arr->size]);
     delete[] in_str_arr->offsets;
     delete[] in_str_arr->data;
+    if (in_str_arr->null_bitmap != nullptr)
+        delete[] in_str_arr->null_bitmap;
     return;
 }
 
@@ -443,7 +451,6 @@ void* str_from_float64(double in)
 bool is_na(const uint8_t* null_bitmap, int64_t i)
 {
     // printf("%d\n", *null_bitmap);
-    static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
     return (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
 }
 
@@ -460,7 +467,7 @@ bool is_na(const uint8_t* null_bitmap, int64_t i)
 /// @param[out] offset_table newly allocated array of no_strings+1 integers
 ///                          first no_strings entries denote offsets, last entry indicates size of output array
 /// @param[in]  obj Python Sequence object, intended to be a pandas series of string
-void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer)
+void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer, uint8_t **null_bitmap)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return;}
 
@@ -477,9 +484,14 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
     if(n == 0 ) {
         // empty sequence, this is not an error, need to set size
         PyGILState_Release(gilstate);
-        no_strings = 0;
+        *no_strings = 0;
         return;
     }
+
+    // allocate null bitmap
+    int64_t n_bytes = (n+sizeof(uint8_t)-1)/sizeof(uint8_t);
+    *null_bitmap = new uint8_t[n_bytes];
+    memset(*null_bitmap, 0, n_bytes);
 
     // if obj is a pd.Series, get the numpy array for better performance
     // TODO: check actual Series class
@@ -495,10 +507,20 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         offsets[i] = len;
         PyObject * s = PySequence_GetItem(obj, i);
         CHECK(s, "getting element failed");
-        CHECK(PyString_Check(s), "expecting a string");
-        tmp_store[i] = PyString_AsString(s);
-        CHECK(tmp_store[i], "string conversion failed");
-        len += strlen(tmp_store[i]);
+        if (s == Py_None)
+        {
+            // leave null bit as 0
+            tmp_store[i] = "";
+        }
+        else
+        {
+            // set null bit to 1 (Arrow bin-util.h)
+            (*null_bitmap)[i / 8] |= kBitmask[i % 8];
+            CHECK(PyString_Check(s), "expecting a string");
+            tmp_store[i] = PyString_AsString(s);
+            CHECK(tmp_store[i], "string conversion failed");
+            len += strlen(tmp_store[i]);
+        }
         Py_DECREF(s);
     }
     offsets[n] = len;

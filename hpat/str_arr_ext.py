@@ -73,6 +73,7 @@ class StringArrayPayloadType(types.Type):
 
 str_arr_payload_type = StringArrayPayloadType()
 
+# XXX: C equivalent in _str_ext.cpp
 @register_model(StringArrayPayloadType)
 class StringArrayPayloadModel(models.StructModel):
     def __init__(self, dmm, fe_type):
@@ -794,12 +795,16 @@ def unbox_str_series(typ, val, c):
                             [lir.IntType(8).as_pointer(),
                              lir.IntType(64).as_pointer(),
                              lir.IntType(32).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(),])
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             ])
     fn = c.builder.module.get_or_insert_function(fnty, name="string_array_from_sequence")
     c.builder.call(fn, [val,
                         string_array._get_ptr_by_name('num_items'),
                         payload._get_ptr_by_name('offsets'),
-                        payload._get_ptr_by_name('data'),])
+                        payload._get_ptr_by_name('data'),
+                        payload._get_ptr_by_name('null_bitmap'),
+                    ])
 
     # the raw data is now copied to payload
     # The native representation is a proxy to the payload, we need to
@@ -810,6 +815,7 @@ def unbox_str_series(typ, val, c):
     string_array.meminfo = meminfo
     string_array.offsets = payload.offsets
     string_array.data = payload.data
+    string_array.null_bitmap = payload.null_bitmap
     string_array.num_total_chars = c.builder.zext(c.builder.load(
         c.builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
