@@ -340,6 +340,7 @@ def pq_read_parallel_lower(context, builder, sig, args):
 
 @lower_builtin(read_parquet_str, types.Opaque('arrow_reader'), types.intp, types.intp)
 def pq_read_string_lower(context, builder, sig, args):
+
     typ = sig.return_type
     dtype = StringArrayPayloadType()
     meminfo, meminfo_data_ptr = construct_string_array(context, builder)
@@ -351,17 +352,20 @@ def pq_read_string_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
                              lir.IntType(32).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer()])
 
     fn = builder.module.get_or_insert_function(fnty, name="pq_read_string")
     res = builder.call(fn, [args[0], args[1],
                             str_arr_payload._get_ptr_by_name('offsets'),
-                            str_arr_payload._get_ptr_by_name('data')])
+                            str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap')])
     builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
 
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
     ret = string_array._getvalue()
@@ -380,13 +384,17 @@ def pq_read_string_parallel_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
                              lir.IntType(32).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64), lir.IntType(64)])
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(64), lir.IntType(64)])
 
     fn = builder.module.get_or_insert_function(
         fnty, name="pq_read_string_parallel")
     res = builder.call(fn, [args[0], args[1],
                             str_arr_payload._get_ptr_by_name('offsets'),
-                            str_arr_payload._get_ptr_by_name('data'), args[2],
+                            str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
+                            args[2],
                             args[3]])
 
     builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
@@ -394,6 +402,7 @@ def pq_read_string_parallel_lower(context, builder, sig, args):
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
     ret = string_array._getvalue()

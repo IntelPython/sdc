@@ -3,6 +3,7 @@ import hpat
 import numpy as np
 import pandas as pd
 import gc
+import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
 
 class TestString(unittest.TestCase):
@@ -122,6 +123,13 @@ class TestString(unittest.TestCase):
             return len(C) == 1 and C[0] == 'ABC'
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), True)
+
+    def test_string_NA_box(self):
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return df.five.values
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 if __name__ == "__main__":
     unittest.main()

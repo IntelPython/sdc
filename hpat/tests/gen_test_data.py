@@ -22,12 +22,15 @@ def gen_kde_pq(file_name, N):
     pq.write_table(table, file_name, row_group_size)
 
 def gen_pq_test(file_name):
-    df = pd.DataFrame({'one': [-1, np.nan, 2.5, 3., 4., 6.],
-                           'two': ['foo', 'bar', 'baz', 'foo', 'bar', 'baz'],
-                           'three': [True, False, True, True, True, False],
-                           'four': [-1, 5.1, 2.5, 3., 4., 6.],}) # float without NA
+    df = pd.DataFrame({'one': [-1, np.nan, 2.5, 3., 4., 6., 10.0],
+                           'two': ['foo', 'bar', 'baz', 'foo', 'bar', 'baz', 'foo'],
+                           'three': [True, False, True, True, True, False, False],
+                           'four': [-1, 5.1, 2.5, 3., 4., 6., 11.0], # float without NA
+                           'five': ['foo', 'bar', 'baz', None, 'bar', 'baz', 'foo'], # str with NA
+                     })
     table = pa.Table.from_pandas(df)
     pq.write_table(table, 'example.parquet')
+    pq.write_table(table, 'example2.parquet', row_group_size=2)
 
 N = 101
 D = 10

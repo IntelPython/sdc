@@ -27,14 +27,15 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-                                uint32_t **out_offsets, uint8_t **out_data,
-    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+                                uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
+    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<bool> *null_vec=NULL);
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
-        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL);
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
+        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<bool> *null_vec=NULL);
 
 }  // extern "C"
 
+void pack_null_bitmap(uint8_t **out_nulls, std::vector<bool> &null_vec, int64_t n_all_vals);
 std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arrow_reader,
                                     int64_t column_idx);
 bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type);
@@ -44,6 +45,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
 
 template <typename T, int64_t SHIFT>
 inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t rows_to_skip, int64_t rows_to_read);
+void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t offset, int64_t num_values);
 
 void pq_init_reader(const char* file_name,
         std::shared_ptr<FileReader> *a_reader);
@@ -323,10 +325,10 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
 }
 
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-                                    uint32_t **out_offsets, uint8_t **out_data,
-    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
+                                    uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
+    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec, std::vector<bool> *null_vec)
 {
-    // std::cout << "string read file" << *file_name << '\n';
+    // std::cout << "string read file" << '\n';
     //
     std::shared_ptr< ::arrow::Array > arr;
     arrow_reader->ReadColumn(column_idx, &arr);
@@ -345,12 +347,14 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         std::cerr << "invalid parquet string number of array buffers" << std::endl;
     }
 
+    int64_t null_size = buffers[0]->size();
     int64_t offsets_size = buffers[1]->size();
     int64_t data_size = buffers[2]->size();
     // std::cout << "offsets: " << offsets_size << " chars: " << data_size << std::endl;
 
     const uint32_t* offsets_buff = (const uint32_t*) buffers[1]->data();
     const uint8_t* data_buff = buffers[2]->data();
+    const uint8_t* null_buff = arr->null_bitmap_data();
 
     if (offset_vec==NULL)
     {
@@ -360,6 +364,15 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
         *out_offsets = new uint32_t[offsets_size/sizeof(uint32_t)];
         *out_data = new uint8_t[data_size];
 
+        // printf("null size %p %d\n", null_buff, null_size);
+        if (null_buff != nullptr && null_size > 0) {
+            *out_nulls = new uint8_t[null_size];
+            memcpy(*out_nulls, null_buff, null_size);
+            // printf("bitmap %d\n", (*out_nulls)[0]);
+        }
+        else
+            *out_nulls = nullptr;
+
         memcpy(*out_offsets, offsets_buff, offsets_size);
         memcpy(*out_data, data_buff, data_size);
     }
@@ -367,14 +380,15 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
     {
         offset_vec->insert(offset_vec->end(), offsets_buff, offsets_buff+offsets_size/sizeof(uint32_t));
         data_vec->insert(data_vec->end(), data_buff, data_buff+data_size);
+        append_bits_to_vec(null_vec, null_buff, null_size, 0, num_values);
     }
 
     return num_values;
 }
 
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx,
-        uint32_t **out_offsets, uint8_t **out_data, int64_t start, int64_t count,
-    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec)
+        uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
+    std::vector<uint32_t> *offset_vec, std::vector<uint8_t> *data_vec, std::vector<bool> *null_vec)
 {
     if (count==0) {
         if (offset_vec==NULL)
@@ -393,6 +407,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
     {
         *out_offsets = new uint32_t[count+1];
         data_vec = new std::vector<uint8_t>();
+        null_vec = new std::vector<bool>();
     }
 
     int64_t n_row_groups = arrow_reader->parquet_reader()->metadata()->num_row_groups();
@@ -433,14 +448,17 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         }
         std::shared_ptr< ::arrow::Array > arr = chunked_arr->chunk(0);
         // std::cout << arr->ToString() << std::endl;
+        int64_t num_values = arr->length();
         auto buffers = arr->data()->buffers;
         // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
         if (buffers.size()!=3) {
             std::cerr << "invalid parquet string number of array buffers" << std::endl;
         }
 
+        int64_t null_size = buffers[0]->size();
         const uint32_t* offsets_buff = (const uint32_t*) buffers[1]->data();
         const uint8_t* data_buff = buffers[2]->data();
+        const uint8_t* null_buff = arr->null_bitmap_data();
 
         /* ----------- read row group ------- */
 
@@ -463,6 +481,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         data_vec->insert(data_vec->end(),
             data_buff+offsets_buff[rows_to_skip],
             data_buff+offsets_buff[rows_to_skip]+data_size);
+        append_bits_to_vec(null_vec, null_buff, null_size, rows_to_skip, rows_to_read);
 
         skipped_rows += rows_to_skip;
         read_rows += rows_to_read;
@@ -485,7 +504,9 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         *out_data = new uint8_t[curr_offset];
         // printf("buffer size:%d curr_offset:%d\n", data_vec->size(), curr_offset);
         memcpy(*out_data, data_vec->data(), curr_offset);
+        pack_null_bitmap(out_nulls, *null_vec, count);
         delete data_vec;
+        delete null_vec;
     }
     else
         offset_vec->push_back(curr_offset);
@@ -600,4 +621,36 @@ inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t r
     for (int64_t i = 0; i < rows_to_read; ++i) {
       *out_values++ = (static_cast<int64_t>(in_values[rows_to_skip+i]) * SHIFT);
     }
+}
+
+void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t offset, int64_t num_values)
+{
+    if (null_buff != nullptr && null_size > 0) {
+        // to make packing portions of data easier, add data to vector in unpacked format then repack
+        for(int64_t i=offset; i<offset+num_values; i++) {
+            bool val = ::arrow::BitUtil::GetBit(null_buff, i);
+            // printf("packing %d %d\n", i, (int)val);
+            null_vec->push_back(val);
+        }
+        // null_vec->insert(null_vec->end(), null_buff, null_buff+null_size);
+    }
+}
+
+
+void pack_null_bitmap(uint8_t **out_nulls, std::vector<bool> &null_vec, int64_t n_all_vals)
+{
+    if (null_vec.size()>0)
+    {
+        int64_t n_bytes = (null_vec.size()+sizeof(uint8_t)-1)/sizeof(uint8_t);
+        *out_nulls = new uint8_t[n_bytes];
+        memset(*out_nulls, 0, n_bytes);
+        for(int64_t i=0; i<n_all_vals; i++)
+        {
+            // printf("null %d %d\n", i, (int)null_vec[i]);
+            if (null_vec[i])
+                ::arrow::BitUtil::SetBit(*out_nulls, i);
+        }
+    }
+    else
+        *out_nulls = nullptr;
 }

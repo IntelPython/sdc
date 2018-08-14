@@ -331,6 +331,7 @@ def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_ar
         string_array.meminfo = meminfo
         string_array.offsets = str_arr_payload.offsets
         string_array.data = str_arr_payload.data
+        # TODO: null_bitmap
         string_array.num_total_chars = builder.zext(builder.load(
             builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
         ret = string_array._getvalue()

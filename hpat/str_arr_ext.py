@@ -73,27 +73,31 @@ class StringArrayPayloadType(types.Type):
 
 str_arr_payload_type = StringArrayPayloadType()
 
+# XXX: C equivalent in _str_ext.cpp
 @register_model(StringArrayPayloadType)
 class StringArrayPayloadModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         members = [
             ('offsets', types.CPointer(offset_typ)),
             ('data', types.CPointer(char_typ)),
+            ('null_bitmap', types.CPointer(char_typ)),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+str_arr_model_members = [
+    ('num_items', types.uint64),
+    ('num_total_chars', types.uint64),
+    ('offsets', types.CPointer(offset_typ)),
+    ('data', types.CPointer(char_typ)),
+    ('null_bitmap', types.CPointer(char_typ)),
+    ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
+]
 
 @register_model(StringArrayType)
 class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
-        members = [
-            ('num_items', types.uint64),
-            ('num_total_chars', types.uint64),
-            ('offsets', types.CPointer(offset_typ)),
-            ('data', types.CPointer(char_typ)),
-            ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-        ]
-        models.StructModel.__init__(self, dmm, fe_type, members)
+
+        models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
 
 # TODO: fix overload for things like 'getitem'
 # @overload('getitem')
@@ -466,6 +470,7 @@ ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
 ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
 ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
+ll.add_symbol('is_na', hstr_ext.is_na)
 ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
 ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
@@ -547,12 +552,14 @@ def impl_string_array_single(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64),
                              lir.IntType(64)])
     fn_alloc = builder.module.get_or_insert_function(fnty,
                                                      name="allocate_string_array")
     builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
                             str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
                             string_list.size, builder.load(total_size)])
 
     # set string array values
@@ -577,6 +584,7 @@ def impl_string_array_single(context, builder, sig, args):
     #cgutils.printf(builder, "str %d %d\n", string_array.num_items, string_array.num_total_chars)
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.meminfo = meminfo
     ret = string_array._getvalue()
     #context.nrt.decref(builder, ty, ret)
@@ -596,12 +604,14 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(32).as_pointer().as_pointer(),
                                  lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(64),
                                  lir.IntType(64)])
         fn_alloc = builder.module.get_or_insert_function(fnty,
                                                          name="allocate_string_array")
         builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
                                 str_arr_payload._get_ptr_by_name('data'),
+                                str_arr_payload._get_ptr_by_name('null_bitmap'),
                                 num_strs,
                                 num_total_chars])
 
@@ -611,6 +621,7 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
         string_array.num_total_chars = num_total_chars
         string_array.offsets = str_arr_payload.offsets
         string_array.data = str_arr_payload.data
+        string_array.null_bitmap = str_arr_payload.null_bitmap
         string_array.meminfo = meminfo
         ret = string_array._getvalue()
         #context.nrt.decref(builder, ty, ret)
@@ -656,30 +667,52 @@ def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_
 
     return types.void(string_array_type, string_array_type, types.intp, types.intp), codegen
 
+# box series calls this too
 @box(StringArrayType)
 def box_str_arr(typ, val, c):
     """
     """
 
-    string_array = c.context.make_helper(c.builder, typ, val)
+    string_array = c.context.make_helper(c.builder, string_array_type, val)
 
     fnty = lir.FunctionType(c.context.get_argument_type(types.pyobject), #lir.IntType(8).as_pointer(),
                             [lir.IntType(64),
                              lir.IntType(32).as_pointer(),
-                             lir.IntType(8).as_pointer()])
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                            ])
     fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
-
-    arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data])
+    arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data, string_array.null_bitmap])
 
     c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
 
 
+def lower_is_na(context, builder, bull_bitmap, ind):
+    fnty = lir.FunctionType(lir.IntType(1),
+                            [lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
+    fn_getitem = builder.module.get_or_insert_function(fnty,
+                                                       name="is_na")
+    return builder.call(fn_getitem, [bull_bitmap,
+                                     ind])
+
 @lower_builtin('getitem', StringArrayType, types.Integer)
 def lower_string_arr_getitem(context, builder, sig, args):
     typ = sig.args[0]
+    ind = args[1]
 
     string_array = context.make_helper(builder, typ, args[0])
+
+    # check for NA
+    # i/8, XXX: lshr since always positive
+    #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+    #bit_ind = builder.srem
+
+    # cgutils.printf(builder, "calling bitmap\n")
+    # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
+    #     cgutils.printf(builder, "is_na %d \n", ind)
+    # cgutils.printf(builder, "calling bitmap done\n")
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(32).as_pointer(),
@@ -768,12 +801,16 @@ def unbox_str_series(typ, val, c):
                             [lir.IntType(8).as_pointer(),
                              lir.IntType(64).as_pointer(),
                              lir.IntType(32).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(),])
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             ])
     fn = c.builder.module.get_or_insert_function(fnty, name="string_array_from_sequence")
     c.builder.call(fn, [val,
                         string_array._get_ptr_by_name('num_items'),
                         payload._get_ptr_by_name('offsets'),
-                        payload._get_ptr_by_name('data'),])
+                        payload._get_ptr_by_name('data'),
+                        payload._get_ptr_by_name('null_bitmap'),
+                    ])
 
     # the raw data is now copied to payload
     # The native representation is a proxy to the payload, we need to
@@ -784,6 +821,7 @@ def unbox_str_series(typ, val, c):
     string_array.meminfo = meminfo
     string_array.offsets = payload.offsets
     string_array.data = payload.data
+    string_array.null_bitmap = payload.null_bitmap
     string_array.num_total_chars = c.builder.zext(c.builder.load(
         c.builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
@@ -832,6 +870,7 @@ def lower_glob(context, builder, sig, args):
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    # TODO: set null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
