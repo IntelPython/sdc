@@ -112,7 +112,7 @@ def nt2nd(context, builder, ptr, ary_type):
 ##############################################################################
 ##############################################################################
 # Class configs.
-# A specification definesa daal4py class, which can be an algorithm, a model or a result.
+# A specification defines a daal4py class, which can be an algorithm, a model or a result.
 # The following information is needed:
 #    - spec.pyclass is expected to be the actual daal4py class.
 #    - spec.c_name provides the name of the class name as used in C.
