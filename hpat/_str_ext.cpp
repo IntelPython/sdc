@@ -43,7 +43,8 @@ int64_t str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
 int64_t get_str_len(std::string* str);
 void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer);
-void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, char * buffer);
+void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_table,
+    const char *buffer, const uint8_t *null_bitmap);
 void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
                                                             int64_t total_size);
 
@@ -441,7 +442,7 @@ void* str_from_float64(double in)
 
 bool is_na(const uint8_t* null_bitmap, int64_t i)
 {
-    printf("%d\n", *null_bitmap);
+    // printf("%d\n", *null_bitmap);
     static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
     return (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
 }
@@ -522,7 +523,7 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
 /// @param[in] no_strings number of strings found in buffer
 /// @param[in] offset_table offsets for strings in buffer
 /// @param[in] buffer with concatenated strings (from StringArray)
-void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, char * buffer)
+void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_table, const char *buffer, const uint8_t *null_bitmap)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return NULL;}
     auto gilstate = PyGILState_Ensure();
@@ -530,13 +531,17 @@ void* np_array_from_string_array(int64_t no_strings, uint32_t * offset_table, ch
     npy_intp dims[] = {no_strings};
     PyObject* ret = PyArray_SimpleNew(1, dims, NPY_OBJECT);
     CHECK(ret, "allocating numpy array failed");
+    int err;
 
     for(int64_t i = 0; i < no_strings; ++i) {
         PyObject * s = PyString_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
         CHECK(s, "creating Python string/unicode object failed");
         auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
         CHECK(p, "getting offset in numpy array failed");
-        int err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        if (!is_na(null_bitmap, i))
+            err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+        else
+            err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, Py_None);
         CHECK(err==0, "setting item in numpy array failed");
         Py_DECREF(s);
     }

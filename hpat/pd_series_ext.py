@@ -144,13 +144,7 @@ class SeriesModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         # TODO: types other than Array and StringArray?
         if fe_type.dtype == string_type:
-            members = [
-                ('num_items', types.uint64),
-                ('num_total_chars', types.uint64),
-                ('offsets', types.CPointer(offset_typ)),
-                ('data', types.CPointer(char_typ)),
-                ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-            ]
+            members = hpat.str_arr_ext.str_arr_model_members
         else:
             ndim = 1
             members = [

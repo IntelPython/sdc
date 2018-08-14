@@ -83,19 +83,20 @@ class StringArrayPayloadModel(models.StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+str_arr_model_members = [
+    ('num_items', types.uint64),
+    ('num_total_chars', types.uint64),
+    ('offsets', types.CPointer(offset_typ)),
+    ('data', types.CPointer(char_typ)),
+    ('null_bitmap', types.CPointer(char_typ)),
+    ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
+]
 
 @register_model(StringArrayType)
 class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
-        members = [
-            ('num_items', types.uint64),
-            ('num_total_chars', types.uint64),
-            ('offsets', types.CPointer(offset_typ)),
-            ('data', types.CPointer(char_typ)),
-            ('null_bitmap', types.CPointer(char_typ)),
-            ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-        ]
-        models.StructModel.__init__(self, dmm, fe_type, members)
+
+        models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
 
 # TODO: fix overload for things like 'getitem'
 # @overload('getitem')
@@ -659,20 +660,22 @@ def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_
 
     return types.void(string_array_type, string_array_type, types.intp, types.intp), codegen
 
+# box series calls this too
 @box(StringArrayType)
 def box_str_arr(typ, val, c):
     """
     """
 
-    string_array = c.context.make_helper(c.builder, typ, val)
+    string_array = c.context.make_helper(c.builder, string_array_type, val)
 
     fnty = lir.FunctionType(c.context.get_argument_type(types.pyobject), #lir.IntType(8).as_pointer(),
                             [lir.IntType(64),
                              lir.IntType(32).as_pointer(),
-                             lir.IntType(8).as_pointer()])
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                            ])
     fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
-
-    arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data])
+    arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data, string_array.null_bitmap])
 
     c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
