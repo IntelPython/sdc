@@ -109,6 +109,17 @@ class TestIO(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_pq_str_with_nan_par_multigroup(self):
+        def test_impl():
+            df = pq.read_table('example2.parquet').to_pandas()
+            A = df.five.values=='foo'
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_pq_bool(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()

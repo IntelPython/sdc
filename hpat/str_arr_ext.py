@@ -701,7 +701,7 @@ def lower_string_arr_getitem(context, builder, sig, args):
 
     # cgutils.printf(builder, "calling bitmap\n")
     # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
-    #     cgutils.printf(builder, "%d \n", ind)
+    #     cgutils.printf(builder, "is_na %d \n", ind)
     # cgutils.printf(builder, "calling bitmap done\n")
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),

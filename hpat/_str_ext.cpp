@@ -441,7 +441,7 @@ void* str_from_float64(double in)
 
 bool is_na(const uint8_t* null_bitmap, int64_t i)
 {
-    printf("%p\n", null_bitmap);
+    printf("%d\n", *null_bitmap);
     static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
     return (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
 }

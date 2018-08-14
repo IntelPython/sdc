@@ -45,7 +45,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
 
 template <typename T, int64_t SHIFT>
 inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t rows_to_skip, int64_t rows_to_read);
-void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t num_values);
+void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t offset, int64_t num_values);
 
 void pq_init_reader(const char* file_name,
         std::shared_ptr<FileReader> *a_reader);
@@ -380,7 +380,7 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader, int
     {
         offset_vec->insert(offset_vec->end(), offsets_buff, offsets_buff+offsets_size/sizeof(uint32_t));
         data_vec->insert(data_vec->end(), data_buff, data_buff+data_size);
-        append_bits_to_vec(null_vec, null_buff, null_size, num_values);
+        append_bits_to_vec(null_vec, null_buff, null_size, 0, num_values);
     }
 
     return num_values;
@@ -481,7 +481,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         data_vec->insert(data_vec->end(),
             data_buff+offsets_buff[rows_to_skip],
             data_buff+offsets_buff[rows_to_skip]+data_size);
-        append_bits_to_vec(null_vec, null_buff, null_size, num_values);
+        append_bits_to_vec(null_vec, null_buff, null_size, rows_to_skip, rows_to_read);
 
         skipped_rows += rows_to_skip;
         read_rows += rows_to_read;
@@ -623,12 +623,14 @@ inline void convertArrowToDT64(const uint8_t *buff, uint8_t *out_data, int64_t r
     }
 }
 
-void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t num_values)
+void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, int64_t null_size, int64_t offset, int64_t num_values)
 {
     if (null_buff != nullptr && null_size > 0) {
         // to make packing portions of data easier, add data to vector in unpacked format then repack
-        for(int64_t i=0; i<num_values; i++) {
-            null_vec->push_back(::arrow::BitUtil::GetBit(null_buff, i));
+        for(int64_t i=offset; i<offset+num_values; i++) {
+            bool val = ::arrow::BitUtil::GetBit(null_buff, i);
+            // printf("packing %d %d\n", i, (int)val);
+            null_vec->push_back(val);
         }
         // null_vec->insert(null_vec->end(), null_buff, null_buff+null_size);
     }
@@ -643,8 +645,11 @@ void pack_null_bitmap(uint8_t **out_nulls, std::vector<bool> &null_vec, int64_t 
         *out_nulls = new uint8_t[n_bytes];
         memset(*out_nulls, 0, n_bytes);
         for(int64_t i=0; i<n_all_vals; i++)
+        {
+            // printf("null %d %d\n", i, (int)null_vec[i]);
             if (null_vec[i])
                 ::arrow::BitUtil::SetBit(*out_nulls, i);
+        }
     }
     else
         *out_nulls = nullptr;
