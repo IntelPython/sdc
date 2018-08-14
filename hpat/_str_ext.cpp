@@ -51,8 +51,8 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
     char ** buffer, uint8_t **null_bitmap);
 void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_table,
     const char *buffer, const uint8_t *null_bitmap);
-void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
-                                                            int64_t total_size);
+void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitmap,
+    int64_t num_strings, int64_t total_size);
 
 void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
                                                                 int64_t index);
@@ -304,7 +304,7 @@ int64_t get_str_len(std::string* str)
     return str->length();
 }
 
-void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
+void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t num_strings,
                                                             int64_t total_size)
 {
     // std::cout << "allocating string array: " << num_strings << " " <<
@@ -313,6 +313,11 @@ void allocate_string_array(uint32_t **offsets, char **data, int64_t num_strings,
     *data = new char[total_size];
     (*offsets)[0] = 0;
     (*offsets)[num_strings] = (uint32_t)total_size;  // in case total chars is read from here
+    // allocate nulls
+    int64_t n_bytes = (num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t);
+    *null_bitmap = new uint8_t[n_bytes];
+    // set all bits to 1 indicating non-null as default
+    memset(*null_bitmap, -1, n_bytes);
     // *data = (char*) new std::string("gggg");
     return;
 }

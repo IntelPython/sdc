@@ -552,12 +552,14 @@ def impl_string_array_single(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64),
                              lir.IntType(64)])
     fn_alloc = builder.module.get_or_insert_function(fnty,
                                                      name="allocate_string_array")
     builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
                             str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
                             string_list.size, builder.load(total_size)])
 
     # set string array values
@@ -582,6 +584,7 @@ def impl_string_array_single(context, builder, sig, args):
     #cgutils.printf(builder, "str %d %d\n", string_array.num_items, string_array.num_total_chars)
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.meminfo = meminfo
     ret = string_array._getvalue()
     #context.nrt.decref(builder, ty, ret)
@@ -601,12 +604,14 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(32).as_pointer().as_pointer(),
                                  lir.IntType(8).as_pointer().as_pointer(),
+                                 lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(64),
                                  lir.IntType(64)])
         fn_alloc = builder.module.get_or_insert_function(fnty,
                                                          name="allocate_string_array")
         builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
                                 str_arr_payload._get_ptr_by_name('data'),
+                                str_arr_payload._get_ptr_by_name('null_bitmap'),
                                 num_strs,
                                 num_total_chars])
 
@@ -616,6 +621,7 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
         string_array.num_total_chars = num_total_chars
         string_array.offsets = str_arr_payload.offsets
         string_array.data = str_arr_payload.data
+        string_array.null_bitmap = str_arr_payload.null_bitmap
         string_array.meminfo = meminfo
         ret = string_array._getvalue()
         #context.nrt.decref(builder, ty, ret)
@@ -864,6 +870,7 @@ def lower_glob(context, builder, sig, args):
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
+    # TODO: set null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
