@@ -30,10 +30,10 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx
                 uint8_t* out_data, int out_dtype, int64_t start, int64_t count);
 int64_t pq_read_string_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
                                 uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls,
-    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
+    std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<bool> *null_vec=NULL);
 int pq_read_string_parallel_single_file(std::shared_ptr<FileReader>, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count,
-        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<uint8_t> *null_vec=NULL);
+        std::vector<uint32_t> *offset_vec=NULL, std::vector<uint8_t> *data_vec=NULL, std::vector<bool> *null_vec=NULL);
 
 }  // extern "C"
 
@@ -52,6 +52,8 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
                                     uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls);
 int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
         uint32_t **out_offsets, uint8_t **out_data, uint8_t **out_nulls, int64_t start, int64_t count);
+
+void pack_null_bitmap(uint8_t **out_nulls, std::vector<bool> &null_vec, int64_t n_all_vals);
 
 static PyMethodDef parquet_cpp_methods[] = {
     {
@@ -314,9 +316,9 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
 
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
-        std::vector<uint8_t> null_vec;
+        std::vector<bool> null_vec;
         int32_t last_offset = 0;
-        int64_t res = 0;
+        int64_t n_all_vals = 0;
         for (size_t i=0; i<readers->size(); i++)
         {
             int64_t n_vals = pq_read_string_single_file(readers->at(i), column_idx, NULL, NULL, NULL, &offset_vec, &data_vec, &null_vec);
@@ -328,7 +330,7 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
                 offset_vec[size-i] += last_offset;
             last_offset = offset_vec[size-1];
             offset_vec.pop_back();
-            res += n_vals;
+            n_all_vals += n_vals;
         }
         offset_vec.push_back(last_offset);
 
@@ -337,19 +339,13 @@ int pq_read_string(FileReaderVec *readers, int64_t column_idx,
 
         memcpy(*out_offsets, offset_vec.data(), offset_vec.size()*sizeof(uint32_t));
         memcpy(*out_data, data_vec.data(), data_vec.size());
-        if (null_vec.size()>0)
-        {
-            *out_nulls = new uint8_t[null_vec.size()];
-            memcpy(*out_nulls, null_vec.data(), null_vec.size());
-        }
-        else
-            *out_nulls = nullptr;
+        pack_null_bitmap(out_nulls, null_vec, n_all_vals);
 
         // for(int i=0; i<offset_vec.size(); i++)
         //     std::cout << (*out_offsets)[i] << ' ';
         // std::cout << '\n';
         // std::cout << "string dir read done" << '\n';
-        return res;
+        return n_all_vals;
     }
     else
     {
@@ -383,10 +379,10 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
             file_size = pq_get_size_single_file(readers->at(file_ind), column_idx);
         }
 
-        int64_t res = 0;
+        int64_t n_all_vals = 0;
         std::vector<uint32_t> offset_vec;
         std::vector<uint8_t> data_vec;
-        std::vector<uint8_t> null_vec;
+        std::vector<bool> null_vec;
 
         // read data
         int64_t last_offset = 0;
@@ -404,7 +400,7 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
                     offset_vec[size-i] += last_offset;
                 last_offset = offset_vec[size-1];
                 offset_vec.pop_back();
-                res += rows_to_read;
+                n_all_vals += rows_to_read;
             }
 
             read_rows += rows_to_read;
@@ -420,14 +416,8 @@ int pq_read_string_parallel(FileReaderVec *readers, int64_t column_idx,
 
         memcpy(*out_offsets, offset_vec.data(), offset_vec.size()*sizeof(uint32_t));
         memcpy(*out_data, data_vec.data(), data_vec.size());
-        if (null_vec.size()>0)
-        {
-            *out_nulls = new uint8_t[null_vec.size()];
-            memcpy(*out_nulls, null_vec.data(), null_vec.size());
-        }
-        else
-            *out_nulls = nullptr;
-        return res;
+        pack_null_bitmap(out_nulls, null_vec, n_all_vals);
+        return n_all_vals;
     }
     else
     {
