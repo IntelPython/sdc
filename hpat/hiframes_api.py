@@ -380,6 +380,20 @@ def shift_dtype_overload(d_typ):
     else:
         return lambda a: a
 
+def isna(arr, i):
+    return False
+
+@overload(isna)
+def isna_overload(arr_typ, ind_typ):
+    if arr_typ == string_array_type:
+        return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+    # TODO: extend to other types
+    assert isinstance(arr_typ, types.Array)
+    dtype = arr_typ.dtype
+    if isinstance(dtype, types.Float):
+        return lambda arr,i: np.isnan(arr[i])
+    # XXX integers don't have nans, extend to boolean
+    return lambda arr,i: False
 
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):

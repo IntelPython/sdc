@@ -294,7 +294,8 @@ class HiFramesTyped(object):
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
-                         'nunique', 'describe', 'abs', 'str.len']:
+                         'nunique', 'describe', 'abs', 'str.len', 'isna',
+                         'isnull']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -353,17 +354,6 @@ class HiFramesTyped(object):
             else:
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [series_var, other])
-
-        # isnull is just alias of isna
-        func_name = 'isna' if func_name == 'isnull' else func_name
-
-        if func_name == 'isna':
-            dtype = self.typemap[series_var.name].dtype
-            if not dtype in (types.float32, types.float64):
-                raise ValueError("isna not support for type {}".format(dtype))
-            func = series_replace_funcs['isna_float']
-            # TODO: handle other types
-            return self._replace_func(func, [series_var])
 
         if func_name == 'notna':
             # TODO: make sure this is fused and optimized properly
@@ -1204,15 +1194,12 @@ def _series_append_tuple_impl(arr, other):
     c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
     return hpat.hiframes_api.concat(c_arrs)
 
-def _series_isna_float_impl(arr):
+def _series_isna_impl(arr):
     numba.parfor.init_prange()
     n = len(arr)
     out_arr = np.empty(n, np.bool_)
     for i in numba.parfor.internal_prange(n):
-        val = False
-        if np.isnan(arr[i]):
-            val = True
-        out_arr[i] = val
+        out_arr[i] = hpat.hiframes_api.isna(arr, i)
     return out_arr
 
 
@@ -1237,5 +1224,7 @@ series_replace_funcs = {
     'str.len': _str_len_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
-    'isna_float': _series_isna_float_impl,
+    'isna': _series_isna_impl,
+    # isnull is just alias of isna
+    'isnull': _series_isna_impl,
 }
