@@ -506,5 +506,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_notna1(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()

@@ -365,6 +365,12 @@ class HiFramesTyped(object):
             # TODO: handle other types
             return self._replace_func(func, [series_var])
 
+        if func_name == 'notna':
+            # TODO: make sure this is fused and optimized properly
+            return self._replace_func(
+                lambda S: S.isna()==False, [series_var],
+                array_typ_convert=False)
+
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
@@ -911,9 +917,11 @@ class HiFramesTyped(object):
                 return tup_def.items
         raise ValueError("constant tuple expected")
 
-    def _replace_func(self, func, args, const=False):
+    def _replace_func(self, func, args, const=False, array_typ_convert=True):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
+        arg_typs = tuple(self.typemap[v.name] for v in args)
+        if array_typ_convert:
+            arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
         if const:
             new_args = []
             for i, arg in enumerate(args):
