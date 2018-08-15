@@ -23,7 +23,7 @@ class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
     # array_priority = 1000
-    def __init__(self, dtype, ndim, layout, readonly=False, name=None,
+    def __init__(self, dtype, ndim=1, layout='C', readonly=False, name=None,
                  aligned=True):
         # same as types.Array, except name is Series, and buffer attributes
         # initialized here
@@ -426,6 +426,19 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = self.context.resolve_function_type(np.concatenate, (all_arrs,), kws).return_type
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
+
+    @bound_function("series.isna")
+    def resolve_isna(self, ary, args, kws):
+        assert not kws
+        assert not args
+        return signature(SeriesType(types.boolean))
+
+    # alias of isna
+    @bound_function("series.isnull")
+    def resolve_isnull(self, ary, args, kws):
+        assert not kws
+        assert not args
+        return signature(SeriesType(types.boolean))
 
 
 # TODO: use ops logic from pandas/core/ops.py

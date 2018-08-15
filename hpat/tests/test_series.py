@@ -488,6 +488,23 @@ class TestSeries(unittest.TestCase):
         # Test series tuple
         np.testing.assert_array_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
 
+    def test_series_isna1(self):
+        def test_impl(S):
+            return S.isna()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_isnull1(self):
+        def test_impl(S):
+            return S.isnull()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
 if __name__ == "__main__":
     unittest.main()

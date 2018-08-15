@@ -354,6 +354,17 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [series_var, other])
 
+        # isnull is just alias of isna
+        func_name = 'isna' if func_name == 'isnull' else func_name
+
+        if func_name == 'isna':
+            dtype = self.typemap[series_var.name].dtype
+            if not dtype in (types.float32, types.float64):
+                raise ValueError("isna not support for type {}".format(dtype))
+            func = series_replace_funcs['isna_float']
+            # TODO: handle other types
+            return self._replace_func(func, [series_var])
+
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
@@ -1185,6 +1196,18 @@ def _series_append_tuple_impl(arr, other):
     c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
     return hpat.hiframes_api.concat(c_arrs)
 
+def _series_isna_float_impl(arr):
+    numba.parfor.init_prange()
+    n = len(arr)
+    out_arr = np.empty(n, np.bool_)
+    for i in numba.parfor.internal_prange(n):
+        val = False
+        if np.isnan(arr[i]):
+            val = True
+        out_arr[i] = val
+    return out_arr
+
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'count': _column_count_impl,
@@ -1206,4 +1229,5 @@ series_replace_funcs = {
     'str.len': _str_len_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
+    'isna_float': _series_isna_float_impl,
 }
