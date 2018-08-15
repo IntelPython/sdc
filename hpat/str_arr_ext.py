@@ -687,6 +687,25 @@ def box_str_arr(typ, val, c):
     c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
 
+@intrinsic
+def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
+    # None default to make IntelliSense happy
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+
+        # (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
+        byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+        bit_ind = builder.urem(ind, lir.Constant(lir.IntType(64), 8))
+        byte = builder.load(builder.gep(string_array.null_bitmap, [byte_ind], inbounds=True))
+        ll_typ_mask = lir.ArrayType(lir.IntType(8), 8)
+        mask_tup = cgutils.alloca_once_value(builder, lir.Constant(ll_typ_mask, (1, 2, 4, 8, 16, 32, 64, 128)))
+        mask = builder.load(builder.gep(mask_tup, [lir.Constant(lir.IntType(64), 0), bit_ind], inbounds=True))
+        return builder.icmp_unsigned('==', builder.and_(byte, mask), lir.Constant(lir.IntType(8), 0))
+
+    return types.bool_(string_array_type, types.intp), codegen
+
 
 def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),
