@@ -28,7 +28,10 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
-from hpat.ml.d4p import algos as d4p_algos
+try:
+    from hpat.ml.d4p import algos as d4p_algos
+except:
+    d4p_algos = []
 
 _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')

@@ -1,3 +1,6 @@
 from .svc import SVC
 from .naive_bayes import MultinomialNB
-from . import d4p
+try:
+    from . import d4p
+except ImportError:
+    print("daal4py import error")
