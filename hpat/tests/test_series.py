@@ -358,6 +358,16 @@ class TestSeries(unittest.TestCase):
         # test_impl(S2)
         # np.testing.assert_array_equal(S1, S2)
 
+    def test_series_fillna_str_inplace_empty1(self):
+        def test_impl(A):
+            A.fillna("", inplace=True)
+            return A
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
     def test_series_sum1(self):
         def test_impl(S):
             return S.sum()

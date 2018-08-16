@@ -368,6 +368,11 @@ class HiFramesTyped(object):
 
         if inplace:
             if dtype == string_type:
+                # optimization: just set null bit if fill is empty
+                if guard(find_const, self.func_ir, val) == "":
+                    return self._replace_func(
+                        lambda A: hpat.str_arr_ext.set_null_bits(A),
+                        [series_var])
                 # Since string arrays can't be changed, we have to create a new
                 # array and assign it back to the same Series variable
                 # result back to the same variable

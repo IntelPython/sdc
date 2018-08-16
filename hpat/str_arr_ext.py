@@ -716,6 +716,19 @@ def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
 
     return types.bool_(string_array_type, types.intp), codegen
 
+@intrinsic
+def set_null_bits(typingctx, str_arr_typ=None):
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        # n_bytes = (num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t);
+        n_bytes = builder.udiv(builder.add(string_array.num_items, lir.Constant(lir.IntType(64), 7)), lir.Constant(lir.IntType(64), 8))
+        cgutils.memset(builder, string_array.null_bitmap, n_bytes, -1)
+        return context.get_dummy_value()
+
+    return types.none(string_array_type), codegen
+
 # XXX: setitem works only if value is same size as the previous value
 @lower_builtin('setitem', StringArrayType, types.Integer, StringType)
 def setitem_str_arr(context, builder, sig, args):
