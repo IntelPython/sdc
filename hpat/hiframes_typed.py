@@ -310,21 +310,7 @@ class HiFramesTyped(object):
             )
 
         if func_name == 'fillna':
-            val = rhs.args[0]
-            kws = dict(rhs.kws)
-            inplace = False
-            if 'inplace' in kws:
-                inplace = guard(find_const, self.func_ir, kws['inplace'])
-                if inplace == None:  # pragma: no cover
-                    raise ValueError("inplace arg to fillna should be constant")
-
-            if inplace:
-                return self._replace_func(
-                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
-                    [series_var, series_var, val])
-            else:
-                func = series_replace_funcs['fillna_alloc']
-                return self._replace_func(func, [series_var, val])
+            return self._run_call_series_fillna(assign, lhs, rhs, series_var)
 
         if func_name in ('shift', 'pct_change'):
             # TODO: support default period argument
@@ -369,6 +355,27 @@ class HiFramesTyped(object):
                 func_name))
 
         return [assign]
+
+    def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
+        dtype = self.typemap[series_var.name].dtype
+        val = rhs.args[0]
+        kws = dict(rhs.kws)
+        inplace = False
+        if 'inplace' in kws:
+            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            if inplace == None:  # pragma: no cover
+                raise ValueError("inplace arg to fillna should be constant")
+
+        if inplace:
+            return self._replace_func(
+                lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
+                [series_var, series_var, val])
+        else:
+            if dtype == string_type:
+                func = series_replace_funcs['fillna_str_alloc']
+            else:
+                func = series_replace_funcs['fillna_alloc']
+            return self._replace_func(func, [series_var, val])
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
         """translate df.A.map(lambda a:...) to prange()
@@ -971,10 +978,23 @@ def _column_count_impl(A):  # pragma: no cover
 def _column_fillna_impl(A, B, fill):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
-        if np.isnan(s):
+        if hpat.hiframes_api.isna(B, i):
             s = fill
         A[i] = s
 
+def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
+    n = len(B)
+    num_chars = 0
+    # get total chars in new array
+    for i in numba.parfor.internal_prange(n):
+        s = B[i]
+        if hpat.hiframes_api.isna(B, i):
+            num_chars += len(fill)
+        else:
+            num_chars += len(s)
+    A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
+    hpat.hiframes_api.fillna(A, B, fill)
+    return A
 
 @numba.njit
 def _sum_handle_nan(s, count):  # pragma: no cover
@@ -1214,6 +1234,7 @@ series_replace_funcs = {
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
+    'fillna_str_alloc': _series_fillna_str_alloc_impl,
     'shift': _column_shift_impl,
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
