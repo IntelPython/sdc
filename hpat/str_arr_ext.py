@@ -9,7 +9,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
-from hpat.str_ext import string_type, del_str
+from hpat.str_ext import string_type, StringType, del_str
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 import llvmlite.llvmpy.core as lc
 from glob import glob
@@ -331,6 +331,16 @@ class GetItemStringArray(AbstractTemplate):
                 return signature(string_array_type, *args)
             elif idx == types.Array(types.intp, 1, 'C'):
                 return signature(string_array_type, *args)
+
+@infer
+class SetItemStringArray(AbstractTemplate):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        ary, idx, val = args
+        if ary == string_array_type:
+            return signature(types.none, *args)
 
 
 @infer
@@ -706,6 +716,21 @@ def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
 
     return types.bool_(string_array_type, types.intp), codegen
 
+# XXX: setitem works only if value is same size as the previous value
+@lower_builtin('setitem', StringArrayType, types.Integer, StringType)
+def setitem_str_arr(context, builder, sig, args):
+    arr, ind, val = args
+    string_array = context.make_helper(builder, string_array_type, arr)
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(32).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
+    fn_setitem = builder.module.get_or_insert_function(fnty,
+                                                       name="setitem_string_array")
+    builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                                  val, ind])
+    return context.get_dummy_value()
 
 def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),
