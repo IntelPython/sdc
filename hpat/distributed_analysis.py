@@ -256,6 +256,9 @@ class DistributedAnalysis(object):
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
+        if fdef == ('isna', 'hpat.hiframes_api'):
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return
