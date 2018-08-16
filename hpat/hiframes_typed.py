@@ -416,7 +416,23 @@ class HiFramesTyped(object):
                 raise ValueError("inplace arg to dropna should be constant")
 
         if inplace:
-            pass  # TODO
+            # Since arrays can't resize inplace, we have to create a new
+            # array and assign it back to the same Series variable
+            # result back to the same variable
+            def dropna_impl(A):
+                # not using A.dropna since definition list is not working
+                # for A to find callname
+                res = hpat.hiframes_api.dropna(A)
+
+            arg_typs = (self.typemap[series_var.name],)
+            f_block = compile_to_numba_ir(dropna_impl,
+                                {'hpat': hpat},
+                                self.typingctx, arg_typs,
+                                self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [series_var])
+            # assign output back to series variable
+            f_block.body[-4].target = series_var
+            return {0: f_block}
         else:
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
@@ -945,6 +961,17 @@ class HiFramesTyped(object):
 
         if func_name == 'fillna_str_alloc':
             return self._replace_func(_series_fillna_str_alloc_impl, rhs.args)
+
+        if func_name == 'dropna':
+            dtype = self.typemap[rhs.args[0].name].dtype
+            if dtype == string_type:
+                func = series_replace_funcs['dropna_str_alloc']
+            elif isinstance(dtype, types.Float):
+                func = series_replace_funcs['dropna_float']
+            else:
+                # integer case, TODO: bool, date etc.
+                func = lambda A: A
+            return self._replace_func(func, rhs.args)
 
         if func_name == 'column_sum':
             return self._replace_func(_column_sum_impl_basic, rhs.args)
