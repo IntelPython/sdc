@@ -229,6 +229,48 @@ def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t=None):
 
     return types.void(string_array_type, string_array_type, ind_t), codegen
 
+@intrinsic
+def copy_data(typingctx, str_arr_typ, out_str_arr_typ=None):
+    # precondition: output is allocated with data the same size as input's data
+    def codegen(context, builder, sig, args):
+        out_str_arr, in_str_arr = args
+
+        in_string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        out_string_array = context.make_helper(builder, string_array_type, out_str_arr)
+
+        cgutils.memcpy(builder, out_string_array.data, in_string_array.data,
+                        in_string_array.num_total_chars)
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type), codegen
+
+@intrinsic
+def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
+    # precondition: output is allocated with offset the size non-nulls in input
+    def codegen(context, builder, sig, args):
+        out_str_arr, in_str_arr = args
+
+        in_string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        out_string_array = context.make_helper(builder, string_array_type, out_str_arr)
+        n = in_string_array.num_items
+        zero = context.get_constant(offset_typ, 0)
+        curr_offset_ptr = cgutils.alloca_once_value(builder, zero)
+        # XXX: assuming last offset is already set by allocate_string_array
+
+        # for i in range(n)
+        #   if not isna():
+        #     out_offset[curr] = offset[i]
+        with cgutils.for_range(builder, n) as loop:
+            isna = lower_is_na(context, builder, in_string_array.null_bitmap, loop.index)
+            with cgutils.if_likely(builder, builder.not_(isna)):
+                in_val = builder.load(builder.gep(in_string_array.offsets, [loop.index]))
+                curr_offset = builder.load(curr_offset_ptr)
+                builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
+                builder.store(builder.add(curr_offset, lir.Constant(context.get_data_type(offset_typ), 1)), curr_offset_ptr)
+
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type), codegen
 
 # convert array to list of strings if it is StringArray
 # just return it otherwise
@@ -603,7 +645,7 @@ def impl_string_array_single(context, builder, sig, args):
 
 @intrinsic
 def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
-    assert num_strs_typ == types.intp and num_total_chars_typ == types.intp
+    assert isinstance(num_strs_typ, types.Integer) and isinstance(num_total_chars_typ, types.Integer)
     def codegen(context, builder, sig, args):
         num_strs, num_total_chars = args
         meminfo, meminfo_data_ptr = construct_string_array(context, builder)

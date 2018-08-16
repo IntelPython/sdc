@@ -338,6 +338,14 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
+    @bound_function("series.dropna", True)
+    def resolve_dropna(self, ary, args, kws):
+        out = ary
+        # output is None for inplace case
+        if 'inplace' in kws and kws['inplace'] == types.Const(True):
+            out = types.none
+        return signature(out, *args)
+
     @bound_function("series.shift")
     def resolve_shift(self, ary, args, kws):
         # TODO: support default period argument

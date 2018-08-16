@@ -312,6 +312,9 @@ class HiFramesTyped(object):
         if func_name == 'fillna':
             return self._run_call_series_fillna(assign, lhs, rhs, series_var)
 
+        if func_name == 'dropna':
+            return self._run_call_series_dropna(assign, lhs, rhs, series_var)
+
         if func_name in ('shift', 'pct_change'):
             # TODO: support default period argument
             shift_const = rhs.args[0]
@@ -402,6 +405,27 @@ class HiFramesTyped(object):
             else:
                 func = series_replace_funcs['fillna_alloc']
             return self._replace_func(func, [series_var, val])
+
+    def _run_call_series_dropna(self, assign, lhs, rhs, series_var):
+        dtype = self.typemap[series_var.name].dtype
+        kws = dict(rhs.kws)
+        inplace = False
+        if 'inplace' in kws:
+            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            if inplace == None:  # pragma: no cover
+                raise ValueError("inplace arg to dropna should be constant")
+
+        if inplace:
+            pass  # TODO
+        else:
+            if dtype == string_type:
+                func = series_replace_funcs['dropna_str_alloc']
+            elif isinstance(dtype, types.Float):
+                func = series_replace_funcs['dropna_float']
+            else:
+                # integer case, TODO: bool, date etc.
+                func = lambda A: A
+            return self._replace_func(func, [series_var])
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
         """translate df.A.map(lambda a:...) to prange()
@@ -1025,6 +1049,30 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
     hpat.hiframes_api.fillna(A, B, fill)
     return A
 
+def _series_dropna_float_impl(S):  # pragma: no cover
+    old_len = len(S)
+    new_len = old_len - hpat.hiframes_api.to_series_type(S).isna().sum()
+    A = np.empty(new_len, S.dtype)
+    curr_ind = 0
+    for i in numba.parfor.internal_prange(old_len):
+        val = S[i]
+        if not np.isnan(val):
+            A[curr_ind] = val
+            curr_ind += 1
+
+    return A
+
+def _series_dropna_str_alloc_impl(B):  # pragma: no cover
+    old_len = len(B)
+    # TODO: more efficient null counting
+    new_len = old_len - hpat.hiframes_api.to_series_type(B).isna().sum()
+    num_chars = hpat.str_arr_ext.num_total_chars(B)
+    A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
+    hpat.str_arr_ext.copy_non_null_offsets(A, B)
+    hpat.str_arr_ext.copy_data(A, B)
+    return A
+
+
 @numba.njit
 def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
@@ -1264,6 +1312,8 @@ series_replace_funcs = {
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
+    'dropna_float': _series_dropna_float_impl,
+    'dropna_str_alloc': _series_dropna_str_alloc_impl,
     'shift': _column_shift_impl,
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
