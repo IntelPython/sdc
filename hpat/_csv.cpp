@@ -385,35 +385,38 @@ void ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dt
 // ***********************************************************************************
 // ***********************************************************************************
 
-static void printit(void ** r, size_t nr, size_t nc)
+static void printit(void ** r, size_t nr, size_t nc, size_t fr)
 {
     for(auto i=0; i<nr; ++i) {
+        std::stringstream f;
+        f << "row" << (fr+i) << " ";
         for(auto j=0; j<nc; ++j) {
             switch(reinterpret_cast<int*>(r[nc])[j]) {
             case NPY_INT32: // also NPY_INT
-                std::cout << (reinterpret_cast<int32_t*>(r[j]))[i];
+                f << (reinterpret_cast<int32_t*>(r[j]))[i];
                 break;
             case NPY_UINT32: // also NPY_UINT
-                std::cout << (reinterpret_cast<uint32_t*>(r[j]))[i];
+                f << (reinterpret_cast<uint32_t*>(r[j]))[i];
                 break;
             case NPY_INT64: // also NPY_INTP
-                std::cout << (reinterpret_cast<int64_t*>(r[j]))[i];
+                f << (reinterpret_cast<int64_t*>(r[j]))[i];
                 break;
             case NPY_UINT64: // also NPY_UINTP
-                std::cout << (reinterpret_cast<uint64_t*>(r[j]))[i];
+                f << (reinterpret_cast<uint64_t*>(r[j]))[i];
                 break;
             case NPY_FLOAT32: // also NPY_FLOAT
-                std::cout << (reinterpret_cast<float*>(r[j]))[i];
+                f << (reinterpret_cast<float*>(r[j]))[i];
                 break;
             case NPY_FLOAT64: // also NPY_DOUBLE
-                std::cout << (reinterpret_cast<double*>(r[j]))[i];
+                f << (reinterpret_cast<double*>(r[j]))[i];
                 break;
             default:
                 ;
             }
-            std::cout << ", ";
+            f << ", ";
         }
-        std::cout << std::endl;
+        f << std::endl;
+        std::cout << f.str();
     }
 }
 
@@ -437,7 +440,7 @@ int main()
     auto r = csv_read_string(&csv, cols, dtypes, ncols,
                              &first_row, &n_rows,
                              &delimiters, &quotes);
-    printit(r, n_rows, ncols);
+    printit(r, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nwhite-spaces, mis-predicted line-count, imbalance in the beginning\n";
@@ -450,7 +453,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols);
+    printit(r, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nwhite-spaces, imbalance in the end\n";
@@ -463,7 +466,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols);
+    printit(r, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
 
@@ -477,7 +480,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols);
+    printit(r, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nsyntax errors, no explicit quotes/delimiters\n";
@@ -489,7 +492,7 @@ int main()
         "3,2.3,4.6,\"47736\"\n";
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows);
-    printit(r, n_rows, ncols);
+    printit(r, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     csv_read_string(NULL, NULL, NULL, 4, NULL, NULL, NULL, NULL);
