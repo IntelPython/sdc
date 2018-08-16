@@ -333,9 +333,6 @@ class DistributedAnalysis(object):
                                    'Some other use of it demands "{}", though.'\
                                    .format(i+1, algo.spec.input_types[i][0], algo.name, adist, array_dists[aname])
                     # handle distribution of the result
-                    assert algo.spec.result_dist in [Distribution.Thread, Distribution.REP],\
-                           'Cannot handle "{}" distribution of result of "daal4py.{}.compute"'\
-                           .format(algo.spec.result_dist, algo.name)
                     if lhs not in array_dists:
                         array_dists[lhs] = algo.spec.result_dist
                     else:

@@ -24,6 +24,7 @@ from numba.targets.imputils import impl_ret_new_ref
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 from collections import namedtuple
+import warnings
 from hpat.str_ext import string_type
 from hpat.distributed_analysis import Distribution as DType
 from llvmlite import ir as lir
@@ -162,7 +163,8 @@ class algo_factory(object):
             return D4PSpec(spec['pyclass'],
                            spec['c_name'],
                            params = spec['params'],
-                           input_types = [(x[0], self.all_nbtypes[x[1].rstrip('*')], d4p_dtypes[x[2]]) for x in spec['input_types']])
+                           input_types = [(x[0], self.all_nbtypes[x[1].rstrip('*')], d4p_dtypes[x[2]]) for x in spec['input_types']],
+                           result_dist =  d4p_dtypes[spec['result_dist']])
         elif 'attrs' in spec:
             # filter out (do not support) properties for which we do not know the numba type
             attrs = []
@@ -171,7 +173,7 @@ class algo_factory(object):
                 if typ in self.all_nbtypes:
                     attrs.append((x[0], self.all_nbtypes[typ]))
                 else:
-                    print("Warning: couldn't find numba type for '" + x[1] +"'. Ignored.")
+                    warnings.warn("Warning: couldn't find numba type for '" + x[1] +"'. Ignored.")
             return D4PSpec(spec['pyclass'],
                            spec['c_name'],
                            attrs = attrs)
