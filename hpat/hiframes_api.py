@@ -67,6 +67,9 @@ def count(A):  # pragma: no cover
 def fillna(A):  # pragma: no cover
     return 0
 
+def fillna_str_alloc(A, fill):  # pragma: no cover
+    return 0
+
 def column_sum(A):  # pragma: no cover
     return 0
 
@@ -319,6 +322,14 @@ class FillNaType(AbstractTemplate):
         assert len(args) == 3
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
+
+@infer_global(fillna_str_alloc)
+class FillNaType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        # args: in_arr, value
+        return signature(string_array_type, *args)
 
 @infer_global(column_sum)
 class SumType(AbstractTemplate):

@@ -367,9 +367,30 @@ class HiFramesTyped(object):
                 raise ValueError("inplace arg to fillna should be constant")
 
         if inplace:
-            return self._replace_func(
-                lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
-                [series_var, series_var, val])
+            if dtype == string_type:
+                # Since string arrays can't be changed, we have to create a new
+                # array and assign it back to the same Series variable
+                # result back to the same variable
+                # TODO: handle string array reflection
+                def str_fillna_impl(A, fill):
+                    # not using A.fillna since definition list is not working
+                    # for A to find callname
+                    hpat.hiframes_api.fillna_str_alloc(A, fill)
+                    #A.fillna(fill)
+                fill_var = rhs.args[0]
+                arg_typs = (self.typemap[series_var.name], self.typemap[fill_var.name])
+                f_block = compile_to_numba_ir(str_fillna_impl,
+                                  {'hpat': hpat},
+                                  self.typingctx, arg_typs,
+                                  self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [series_var, fill_var])
+                # assign output back to series variable
+                f_block.body[-4].target = series_var
+                return {0: f_block}
+            else:
+                return self._replace_func(
+                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
+                    [series_var, series_var, val])
         else:
             if dtype == string_type:
                 func = series_replace_funcs['fillna_str_alloc']
@@ -892,6 +913,9 @@ class HiFramesTyped(object):
 
         if func_name == 'fillna':
             return self._replace_func(_column_fillna_impl, rhs.args)
+
+        if func_name == 'fillna_str_alloc':
+            return self._replace_func(_series_fillna_str_alloc_impl, rhs.args)
 
         if func_name == 'column_sum':
             return self._replace_func(_column_sum_impl_basic, rhs.args)
