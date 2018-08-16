@@ -20,7 +20,7 @@ from hpat.str_arr_ext import string_array_type
 # XXX arrow converts int96 timestamp to int64
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
                             'int96': 3, 'float32': 4, 'float64': 5,
-                            'datetime64(ns)': 3}
+                            repr(types.NPDatetime('ns')): 3}
 
 
 
@@ -148,7 +148,7 @@ def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
             i)
     else:
         el_type = get_element_type(c_type)
-        if el_type == 'datetime64(ns)':
+        if el_type == repr(types.NPDatetime('ns')):
             func_text += '  column_tmp = np.empty(col_size, dtype=np.int64)\n'
             # TODO: fix alloc
             func_text += '  column = hpat.hiframes_api.ts_series_to_arr_typ(column_tmp)\n'
