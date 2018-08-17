@@ -371,6 +371,7 @@ class HiFrames(object):
             typ_name = 'int64' if typ_name == 'int' else typ_name
             typ_name = 'float64' if typ_name == 'float' else typ_name
             typ = getattr(types, typ_name)
+            typ = types.Array(typ, 1, 'C')
             out_types.append(typ)
             col_map[col_name] = ir.Var(
                 lhs.scope, mk_unique_var(col_name), lhs.loc)
