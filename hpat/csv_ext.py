@@ -14,6 +14,7 @@ from hpat.hiframes_sort import (
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta,
     )
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
@@ -21,11 +22,13 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               getitem_str_offset, copy_str_arr_slice, setitem_string_array)
 from hpat.hiframes_api import str_copy_ptr
 from hpat.timsort import copyElement_tup, getitem_arr_tup
+from hpat.distributed_lower import _h5_typ_table
 import numpy as np
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, df_out, out_vars, out_types, loc):
+    def __init__(self, file_name, df_out, out_vars, out_types, loc):
+        self.file_name = file_name
         self.df_out = df_out
         self.out_vars = out_vars
         self.out_types = out_types
@@ -158,3 +161,42 @@ def build_csv_definitions(csv_node, definitions=None):
     return definitions
 
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
+
+def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx):
+    parallel = True
+    for v in csv_node.out_vars:
+        if (array_dists[v.name] != distributed.Distribution.OneD
+                and array_dists[v.name] != distributed.Distribution.OneD_Var):
+            parallel = False
+
+    n_cols = len(csv_node.out_vars)
+    # TODO: rebalance if output distributions are 1D instead of 1D_Var
+    # get column variables
+    arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
+    col_inds = ", ".join(str(i) for i in range(n_cols))
+    col_typs = ", ".join(
+        str(_h5_typ_table[arr_typ.dtype]) for arr_typ in csv_node.out_types)
+    func_text = "def csv_impl(fname):\n"
+    func_text += "    {} = _csv_read(fname, ({}), ({}), {})\n".format(
+        arg_names, col_inds, col_typs, n_cols)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    csv_impl = loc_vars['csv_impl']
+
+    # TODO: generate CSV reader function that returns tuple of arrays
+    csv_reader = numba.njit(lambda a,b,c,d: (1,2,3,4))
+
+    f_block = compile_to_numba_ir(csv_impl,
+                                  {'_csv_read':csv_reader},
+                                  typingctx, (string_type,),
+                                  typemap, calltypes).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [csv_node.file_name])
+    nodes = f_block.body[:-3]
+    for i in range(len(csv_node.out_vars)):
+        nodes[-len(csv_node.out_vars) + i].target = csv_node.out_vars[i]
+
+    return nodes
+
+
+distributed.distributed_run_extensions[CsvReader] = csv_distributed_run

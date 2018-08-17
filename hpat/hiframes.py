@@ -330,6 +330,8 @@ class HiFrames(object):
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
+        # TODO: check file name arg
+        fname = rhs.args[0]
         kws = dict(rhs.kws)
         if 'names' not in kws:
             raise ValueError("pd.read_csv() names argument expected")
@@ -378,7 +380,7 @@ class HiFrames(object):
 
         self._create_df(lhs.name, col_map, label)
         return [csv_ext.CsvReader(
-            lhs.name, list(col_map.values()), out_types, lhs.loc)]
+            fname, lhs.name, list(col_map.values()), out_types, lhs.loc)]
 
     def _handle_pd_Series(self, assign, lhs, rhs):
         """transform pd.Series(A) call
