@@ -65,3 +65,12 @@ sdf = spark.createDataFrame(df, schema)
 sdf.write.parquet('sdf_dt.pq', 'overwrite')
 
 spark.stop()
+
+# CSV reader test
+data = ("0,2.3,4.6,47736\n"
+        "1,2.3,4.6,47736\n"
+        "2,2.3,4.6,47736\n"
+        "4,2.3,4.6,47736\n")
+
+with open("csv_data1.csv", "w") as f:
+    f.write(data)
