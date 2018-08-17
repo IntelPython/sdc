@@ -74,7 +74,6 @@ distributed_analysis.distributed_analysis_extensions[CsvReader] = csv_distribute
 
 
 def csv_typeinfer(csv_node, typeinferer):
-    # TODO: consider keys with same name, cols with suffix
     for col_var, typ in zip(csv_node.out_vars, csv_node.out_types):
         typeinferer.lock_type(col_var.name, typ, loc=csv_node.loc)
     return
@@ -82,3 +81,80 @@ def csv_typeinfer(csv_node, typeinferer):
 
 typeinfer.typeinfer_extensions[CsvReader] = csv_typeinfer
 
+
+def visit_vars_csv(csv_node, callback, cbdata):
+    if debug_prints():  # pragma: no cover
+        print("visiting csv vars for:", csv_node)
+        print("cbdata: ", sorted(cbdata.items()))
+
+    # update output_vars
+    new_out_vars = []
+    for col_var in csv_node.out_vars:
+        new_var = visit_vars_inner(col_var, callback, cbdata)
+        new_out_vars.append(new_var)
+
+    csv_node.out_vars = new_out_vars
+    return
+
+# add call to visit csv variable
+ir_utils.visit_vars_extensions[CsvReader] = visit_vars_csv
+
+
+def remove_dead_csv(csv_node, lives, arg_aliases, alias_map, func_ir, typemap):
+    # TODO
+    return csv_node
+
+
+ir_utils.remove_dead_extensions[CsvReader] = remove_dead_csv
+
+
+def csv_usedefs(csv_node, use_set=None, def_set=None):
+    if use_set is None:
+        use_set = set()
+    if def_set is None:
+        def_set = set()
+
+    # output columns are defined
+    def_set.update({v.name for v in csv_node.out_vars})
+
+    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+
+
+numba.analysis.ir_extension_usedefs[CsvReader] = csv_usedefs
+
+
+def get_copies_csv(csv_node, typemap):
+    # csv doesn't generate copies, it just kills the output columns
+    kill_set = set(v.name for v in csv_node.out_vars)
+    return set(), kill_set
+
+
+ir_utils.copy_propagate_extensions[CsvReader] = get_copies_csv
+
+
+def apply_copies_csv(csv_node, var_dict, name_var_table,
+                      typemap, calltypes, save_copies):
+    """apply copy propagate in csv node"""
+
+    # update output_vars
+    new_out_vars = []
+    for col_var in csv_node.out_vars:
+        new_var = replace_vars_inner(col_var, var_dict)
+        new_out_vars.append(new_var)
+
+    csv_node.out_vars = new_out_vars
+    return
+
+
+ir_utils.apply_copy_propagate_extensions[CsvReader] = apply_copies_csv
+
+def build_csv_definitions(csv_node, definitions=None):
+    if definitions is None:
+        definitions = defaultdict(list)
+
+    for col_var in csv_node.out_vars:
+        definitions[col_var.name].append(csv_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
