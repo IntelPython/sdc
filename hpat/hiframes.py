@@ -24,6 +24,7 @@ from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
 from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
+from hpat import csv_ext
 
 import numpy as np
 import math
@@ -223,6 +224,9 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        if fdef == ('read_csv', 'pandas'):
+            return self._handle_pd_read_csv(assign, lhs, rhs, label)
+
         if fdef == ('Series', 'pandas'):
             return self._handle_pd_Series(assign, lhs, rhs)
 
@@ -322,6 +326,58 @@ class HiFrames(object):
         self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
         return nodes
+
+    def _handle_pd_read_csv(self, assign, lhs, rhs, label):
+        """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
+        """
+        kws = dict(rhs.kws)
+        if 'names' not in kws:
+            raise ValueError("pd.read_csv() names argument expected")
+
+        names_list = guard(get_definition, self.func_ir, kws['names'])
+
+        if not isinstance(names_list, ir.Expr) or names_list.op != 'build_list':
+            raise ValueError("pd.read_csv() names should be constant list")
+
+        col_names = []
+        for v in names_list.items:
+            col_name = guard(find_const, self.func_ir, v)
+            if col_name is None:
+                raise ValueError("pd.read_csv() names should be constant list")
+            col_names.append(col_name)
+
+        if 'dtype' not in kws:
+            raise ValueError("pd.read_csv() dtype argument expected")
+
+        dtype_map = guard(get_definition, self.func_ir, kws['dtype'])
+        if (not isinstance(dtype_map, ir.Expr)
+                 or dtype_map.op != 'build_map'):  # pragma: no cover
+            raise ValueError("pd.read_csv() dtype should be constant dictionary")
+
+        col_map = {}
+        out_types = []
+        for name_var, dtype_var in dtype_map.items:
+            col_name = guard(find_const, self.func_ir, name_var)
+            if col_name is None:  # pragma: no cover
+                raise ValueError("dtype column names should be constant")
+            dtype_def = guard(get_definition, self.func_ir, dtype_var)
+            if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
+                raise ValueError("pd.read_csv() invalid dtype")
+            glob_def = guard(get_definition, self.func_ir, dtype_def.value)
+            if not isinstance(glob_def, ir.Global) or glob_def.value != np:
+                raise ValueError("pd.read_csv() invalid dtype")
+            # TODO: extend to other types like string and date, check error
+            typ_name = dtype_def.attr
+            typ_name = 'int64' if typ_name == 'int' else typ_name
+            typ_name = 'float64' if typ_name == 'float' else typ_name
+            typ = getattr(types, typ_name)
+            out_types.append(typ)
+            col_map[col_name] = ir.Var(
+                lhs.scope, mk_unique_var(col_name), lhs.loc)
+
+        self._create_df(lhs.name, col_map, label)
+        return [csv_ext.CsvReader(
+            lhs.name, list(col_map.values()), out_types, lhs.loc)]
 
     def _handle_pd_Series(self, assign, lhs, rhs):
         """transform pd.Series(A) call
