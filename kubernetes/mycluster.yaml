@@ -41,6 +41,11 @@ spec:
     spec:
       securityContext:
         null
+      volumes:
+      - name: task-pv-storage
+        persistentVolumeClaim:
+         claimName: pv-claim-data
+         readOnly: true
       containers:
       - name: mpi-worker
         image: "ehsantn/hpat:latest"
@@ -48,7 +53,8 @@ spec:
         ports:
         - containerPort: 2022
         volumeMounts:
-          null
+          - mountPath: "/data"
+            name: task-pv-storage
 
         resources:
           null
