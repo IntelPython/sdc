@@ -553,8 +553,8 @@ from hpat.distributed_lower import _h5_typ_table
 import chiframes
 ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
 ll.add_symbol('timsort', chiframes.timsort)
-import hdist
-ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
+from hpat.bind import bind
+hdist = bind(ll, "libhdist.so", ['c_alltoallv',])
 
 @numba.njit
 def send_recv_counts_new(key_arr):

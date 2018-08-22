@@ -11,18 +11,15 @@ from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
 from hpat.utils import debug_prints, empty_like_type
 import time
 from llvmlite import ir as lir
-import hdist
 import llvmlite.binding as ll
-ll.add_symbol('c_alltoall', hdist.c_alltoall)
-ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
-ll.add_symbol('c_gatherv', hdist.c_gatherv)
-ll.add_symbol('c_bcast', hdist.c_bcast)
+from hpat.bind import bind
+
+hdist = bind(ll, "libhdist.so", ['c_alltoall', 'c_gather_scalar', 'c_gatherv', 'c_bcast',])
 
 from enum import Enum
 
 # get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
-import hdist
-mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.mpi_req_num_bytes))
+mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.get_mpi_req_num_bytes()))
 
 MPI_ROOT = 0
 
