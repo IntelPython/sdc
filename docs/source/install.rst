@@ -68,8 +68,8 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and 
     cd hpat
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat amd64"
-    "<mpi-install-root>\intel64\bin\mpivars.bat"
+    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
+    "%I_MPI_ROOT%"\intel64\bin\mpivars.bat
     python setup.py install
 
 Troubleshooting Windows Build
