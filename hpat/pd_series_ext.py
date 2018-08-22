@@ -294,6 +294,19 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    @bound_function("array.astype")
+    def resolve_astype(self, ary, args, kws):
+        # TODO: handle other types like datetime etc.
+        dtype, = args
+        if isinstance(dtype, types.Function) and dtype.typing_key == str:
+            ret_type = string_series_type
+            sig = signature(ret_type, *args)
+        else:
+            resolver = ArrayAttribute.resolve_astype.__wrapped__
+            sig = resolver(self, ary, args, kws)
+            sig.return_type = if_arr_to_series_type(sig.return_type)
+        return sig
+
     @bound_function("series.rolling")
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)

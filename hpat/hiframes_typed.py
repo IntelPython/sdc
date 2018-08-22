@@ -350,6 +350,14 @@ class HiFramesTyped(object):
                 lambda S: S.isna()==False, [series_var],
                 array_typ_convert=False)
 
+        # astype with string output
+        if func_name == 'astype' and self.typemap[lhs.name] == string_series_type:
+            # just return input if string
+            if self.typemap[series_var.name] == string_series_type:
+                return self._replace_func(lambda a: a, [series_var])
+            func = series_replace_funcs['astype_str']
+            return self._replace_func(func, [series_var])
+
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
@@ -1326,6 +1334,20 @@ def _series_isna_impl(arr):
         out_arr[i] = hpat.hiframes_api.isna(arr, i)
     return out_arr
 
+def _series_astype_str_impl(arr):
+    n = len(arr)
+    num_chars = 0
+    # get total chars in new array
+    for i in numba.parfor.internal_prange(n):
+        s = arr[i]
+        num_chars += len(str(s))  # TODO: check NA
+
+    A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
+    for i in numba.parfor.internal_prange(n):
+        s = arr[i]
+        A[i] = str(s)  # TODO: check NA
+    return A
+
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
@@ -1354,4 +1376,5 @@ series_replace_funcs = {
     'isna': _series_isna_impl,
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
+    'astype_str': _series_astype_str_impl,
 }
