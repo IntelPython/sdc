@@ -14,6 +14,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <numpy/ndarraytypes.h>
 
+#include "_distributed.h"
+#include "_meminfo.h"
+
 /**
    Read a CSV file.
    Returned pointer must be deallocated by calling csv_delete using the same n_cols_to_read.
@@ -33,57 +36,29 @@
    @param[in]  delimiters     Any character in the string is considered to be a separator.
    @param[in]  quotes         Any character in the string is considered to be a quote.
    @return 2d-array: array of n_cols_to_read arrays, each of given data type (dtypes)
-                     NULL if no data was read
+                     array of NULL pointers if no data was read
+                     NULL if an error ocurred.
  **/
-void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                      size_t * first_row, size_t * n_rows,
-                      std::string * delimiters = NULL, std::string * quotes = NULL);
+MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                         size_t * first_row, size_t * n_rows,
+                         std::string * delimiters = NULL, std::string * quotes = NULL);
 /**
    Like csv_read_file, but reading from a string.
  **/
-void ** csv_read_string(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                        size_t * first_row, size_t * n_rows,
-                        std::string * delimiters = NULL, std::string * quotes = NULL);
+MemInfo ** csv_read_string(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                           size_t * first_row, size_t * n_rows,
+                           std::string * delimiters = NULL, std::string * quotes = NULL);
 
 /**
    Delete memory returned by csv_read.
-   @param[in] cols   pointer returned by csv_read
-   @param[in] n_cols number of cols, must be identical to n_cols_to_read when calling read_csv
+   @param[in] cols    pointer returned by csv_read
+   @param[in] release If > 0, release given number of MemInfo pointers
 **/
-void csv_delete(void ** cols, size_t n_cols);
+void csv_delete(MemInfo ** cols, size_t release);
 
 
 // ***********************************************************************************
 // ***********************************************************************************
-
-int64_t hpat_dist_exscan_i8(int64_t value)
-{
-    // printf("sum value: %lld\n", value);
-    int64_t out=0;
-    MPI_Exscan(&value, &out, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
-    return out;
-}
-
-int hpat_dist_get_rank()
-{
-    int is_initialized;
-    MPI_Initialized(&is_initialized);
-    if (!is_initialized)
-        MPI_Init(NULL, NULL);
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // printf("my_rank:%d\n", rank);
-    return rank;
-}
-
-int hpat_dist_get_size()
-{
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    // printf("r size:%d\n", sizeof(MPI_Request));
-    // printf("mpi_size:%d\n", size);
-    return size;
-}
 
 template<int T> struct DTYPE;
 
@@ -154,63 +129,46 @@ struct DTYPE<NPY_DOUBLE> // also NPY_FLOAT64
 };
 
 
-// Allocating an array of given type and size, optionally copy from org buffer
-template< typename T >
-static T * dtype_alloc(size_t sz, void * org=NULL, size_t osz=0)
+static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_aligned");
+static MemInfo_release_type mi_release = (MemInfo_release_type) import_meminfo_func("MemInfo_release");
+static MemInfo_data_type mi_data = (MemInfo_data_type)import_meminfo_func("MemInfo_data");
+
+// Allocating an array of given typesize, optionally copy from org buffer
+static MemInfo* alloc_meminfo(int dtype_sz, size_t n, void * org=NULL, size_t on=0)
 {
-    T * tmp = new T[sz];
-    if(org) memcpy(tmp, org, std::min(sz, osz) * sizeof(T));
-    return tmp;
+    auto mi = mi_alloc(n*dtype_sz, dtype_sz);
+    if(org) memcpy(mi_data(mi), org, std::min(n, on) * dtype_sz);
+    return mi;
 }
-    
-static void * dtype_alloc(int dtype, size_t sz, void * org=NULL, size_t osz=0)
+
+// Allocating an array of given type and size, optionally copy from org buffer
+static MemInfo* dtype_alloc(int dtype, size_t n, void * org=NULL, size_t on=0)
 {
+    int sz = -1;
     switch(dtype) {
-    case NPY_INT32:
-    case NPY_UINT32: // also NPY_UINT NPY_INT
-        return dtype_alloc<DTYPE<NPY_INT32>::dtype>(sz, org, osz);
-    case NPY_INT64:
-    case NPY_UINT64: // also NPY_UINTP NPY_INTP
-        return dtype_alloc<DTYPE<NPY_INT64>::dtype>(sz, org, osz);
+    case NPY_INT32:   // also NPY_INT
+    case NPY_UINT32:  // also NPY_UINT
     case NPY_FLOAT32: // also NPY_FLOAT
-        return dtype_alloc<DTYPE<NPY_FLOAT32>::dtype>(sz, org, osz);
-    case NPY_FLOAT64:
-        return dtype_alloc<DTYPE<NPY_FLOAT64>::dtype>(sz, org, osz);
+        sz = 4;
+        break;
+    case NPY_INT64:   // also NPY_INTP
+    case NPY_UINT64:  // also NPY_UINTP
+    case NPY_FLOAT64: // also NPY_DOUBLE
+        sz = 8;
+        break;
     default:
-        std::cerr << "Error in CSV: unsupported dtype\n";
+        std::cerr << "unsupported dtype requested.";
         return NULL;
     }
+    return alloc_meminfo(sz, n, org, on);
 }
 
 
-// De-Allocating given array, requires its type
-template< typename T >
-static void dtype_dealloc(void * org)
+static void dtype_dealloc(MemInfo * mi)
 {
-    delete [] reinterpret_cast<T*>(org);
+    mi_release(mi);
 }
 
-static void dtype_dealloc(int dtype, void * ptr)
-{
-    switch(dtype) {
-    case NPY_INT32:
-    case NPY_UINT32: // also NPY_UINT NPY_INT
-        dtype_dealloc<DTYPE<NPY_INT32>::dtype>(ptr);
-        break;
-    case NPY_INT64:
-    case NPY_UINT64: // also NPY_UINTP NPY_INTP
-        dtype_dealloc<DTYPE<NPY_INT64>::dtype>(ptr);
-        break;
-    case NPY_FLOAT32: // also NPY_FLOAT
-        dtype_dealloc<DTYPE<NPY_FLOAT32>::dtype>(ptr);
-        break;
-    case NPY_FLOAT64:
-        dtype_dealloc<DTYPE<NPY_FLOAT64>::dtype>(ptr);
-        break;
-    default:
-        std::cerr << "Error in CSV: unsupported dtype\n";
-    }
-}
 
 // convert string to a dtype
 static void dtype_convert(int dtype, const std::string & from, void * to, size_t ln)
@@ -241,16 +199,14 @@ static void dtype_convert(int dtype, const std::string & from, void * to, size_t
 
 
 // we can use and then delete the extra dtype column
-void csv_delete(void ** cols, size_t n_cols)
+void csv_delete(MemInfo ** mi, size_t release)
 {
-    if(cols == NULL) return;
-    for(auto i=0; i<n_cols; ++i) {
-        if(cols[i]) {
-            dtype_dealloc(reinterpret_cast<int*>(cols[n_cols])[i], cols[i]);
+    for(auto i=0; i<release; ++i) {
+        if(mi[i]) {
+            dtype_dealloc(mi[i]);
         }
     }
-    if(cols[n_cols]) delete [] reinterpret_cast<int*>(cols[n_cols]);
-    delete [] cols;
+    delete [] mi;
 }
 
 
@@ -265,17 +221,15 @@ void csv_delete(void ** cols, size_t n_cols)
   Note that we assume all lines have the same numer of tokens/columns.
   We always read full lines until we read at least our chunk-size.
   This makes sure there are no gaps and no data duplication.
-
-  We store the dtypes in an extra array at the end of the returned result.
  */
-static void ** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                        size_t * first_row, size_t * n_rows,
-                        std::string * delimiters = NULL, std::string * quotes = NULL)
+static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                         size_t * first_row, size_t * n_rows,
+                         std::string * delimiters = NULL, std::string * quotes = NULL)
 {
     CHECK(dtypes, "Input parameter dtypes must not be NULL.");
     CHECK(first_row && n_rows, "Output parameters first_row and n_rows must not be NULL.");
 
-    void ** result = new void*[n_cols_to_read+1]();
+    MemInfo ** result = new MemInfo*[n_cols_to_read]();
     if(n_cols_to_read == 0 || fsz == 0) return result;
 
     int rank = hpat_dist_get_rank();
@@ -305,9 +259,6 @@ static void ** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int
     if(chunksize*rank < fsz) {
         // seems there is data for us to read, let's allocate the arrays
         for(auto i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(dtypes[i], linesperchunk);
-        // we append the dtypes array at the end
-        result[n_cols_to_read] = new int[n_cols_to_read];
-        memcpy(result[n_cols_to_read], dtypes, n_cols_to_read * sizeof(int));
  
         // let's prepare an mask fast checking if a column is requested
         std::vector<ssize_t> req(ncols, -1);
@@ -331,7 +282,7 @@ static void ** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int
                 for(auto i=0; i<n_cols_to_read; ++i) {
                     void * tmp = result[i];
                     result[i] = dtype_alloc(dtypes[i], new_lpc, tmp, linesperchunk);
-                    dtype_dealloc(dtypes[i], tmp);
+                    dtype_dealloc(reinterpret_cast<MemInfo*>(tmp));
                 }
                 linesperchunk = new_lpc;
             }
@@ -357,9 +308,9 @@ static void ** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int
 }
 
 
-void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                      size_t * first_row, size_t * n_rows,
-                      std::string * delimiters, std::string * quotes)
+MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                         size_t * first_row, size_t * n_rows,
+                         std::string * delimiters, std::string * quotes)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
@@ -370,9 +321,9 @@ void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dt
 }
 
 
-void ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                        size_t * first_row, size_t * n_rows,
-                        std::string * delimiters, std::string * quotes)
+MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                           size_t * first_row, size_t * n_rows,
+                           std::string * delimiters, std::string * quotes)
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
@@ -382,33 +333,35 @@ void ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dt
 }
 
 
+#if 0
 // ***********************************************************************************
 // ***********************************************************************************
 
-static void printit(void ** r, size_t nr, size_t nc, size_t fr)
+static void printit(MemInfo ** r, int * dtypes, size_t nr, size_t nc, size_t fr)
 {
     for(auto i=0; i<nr; ++i) {
         std::stringstream f;
         f << "row" << (fr+i) << " ";
         for(auto j=0; j<nc; ++j) {
-            switch(reinterpret_cast<int*>(r[nc])[j]) {
+            void * data = mi_data(r[j]);
+            switch(dtypes[j]) {
             case NPY_INT32: // also NPY_INT
-                f << (reinterpret_cast<int32_t*>(r[j]))[i];
+                f << (reinterpret_cast<int32_t*>(data))[i];
                 break;
             case NPY_UINT32: // also NPY_UINT
-                f << (reinterpret_cast<uint32_t*>(r[j]))[i];
+                f << (reinterpret_cast<uint32_t*>(data))[i];
                 break;
             case NPY_INT64: // also NPY_INTP
-                f << (reinterpret_cast<int64_t*>(r[j]))[i];
+                f << (reinterpret_cast<int64_t*>(data))[i];
                 break;
             case NPY_UINT64: // also NPY_UINTP
-                f << (reinterpret_cast<uint64_t*>(r[j]))[i];
+                f << (reinterpret_cast<uint64_t*>(data))[i];
                 break;
             case NPY_FLOAT32: // also NPY_FLOAT
-                f << (reinterpret_cast<float*>(r[j]))[i];
+                f << (reinterpret_cast<float*>(data))[i];
                 break;
             case NPY_FLOAT64: // also NPY_DOUBLE
-                f << (reinterpret_cast<double*>(r[j]))[i];
+                f << (reinterpret_cast<double*>(data))[i];
                 break;
             default:
                 ;
@@ -440,7 +393,7 @@ int main()
     auto r = csv_read_string(&csv, cols, dtypes, ncols,
                              &first_row, &n_rows,
                              &delimiters, &quotes);
-    printit(r, n_rows, ncols, first_row);
+    printit(r, dtypes, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nwhite-spaces, mis-predicted line-count, imbalance in the beginning\n";
@@ -453,7 +406,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols, first_row);
+    printit(r, dtypes, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nwhite-spaces, imbalance in the end\n";
@@ -466,7 +419,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols, first_row);
+    printit(r, dtypes, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
 
@@ -480,7 +433,7 @@ int main()
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows,
                         &delimiters, &quotes);
-    printit(r, n_rows, ncols, first_row);
+    printit(r, dtypes, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     if(!rank) std::cout << "\nsyntax errors, no explicit quotes/delimiters\n";
@@ -492,7 +445,7 @@ int main()
         "3,2.3,4.6,\"47736\"\n";
     r = csv_read_string(&csv, NULL, dtypes, ncols,
                         &first_row, &n_rows);
-    printit(r, n_rows, ncols, first_row);
+    printit(r, dtypes, n_rows, ncols, first_row);
     csv_delete(r, ncols);
 
     csv_read_string(NULL, NULL, NULL, 4, NULL, NULL, NULL, NULL);
@@ -552,3 +505,4 @@ int main()
 
 // NPY_USERDEF
 // The start of type numbers used for Custom Data types.
+#endif // 0
