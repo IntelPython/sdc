@@ -11,6 +11,15 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
+_pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                    "bar", "bar", "bar", "bar"],
+            "B": ["one", "one", "one", "two", "two",
+                    "one", "one", "two", "two"],
+            "C": ["small", "large", "large", "small",
+                    "small", "large", "small", "small",
+                    "large"],
+            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+
 class TestHiFrames(unittest.TestCase):
     def test_basics(self):
         def test_impl(n):
@@ -937,18 +946,11 @@ class TestHiFrames(unittest.TestCase):
             pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
             return (pt.small.values, pt.large.values)
 
-        df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
-                          "bar", "bar", "bar", "bar"],
-                    "B": ["one", "one", "one", "two", "two",
-                          "one", "one", "two", "two"],
-                    "C": ["small", "large", "large", "small",
-                          "small", "large", "small", "small",
-                          "large"],
-                    "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
-
         hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
-        self.assertEqual(set(hpat_func(df)[0]), set(test_impl(df)[0]))
-        self.assertEqual(set(hpat_func(df)[1]), set(test_impl(df)[1]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
     def test_pivot_parallel(self):
         def test_impl():
@@ -960,6 +962,17 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
+
+    def test_crosstab1(self):
+        def test_impl(df):
+            pt = pd.crosstab(df.A, df.C)
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
 
     def test_intraday(self):
