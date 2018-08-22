@@ -974,6 +974,16 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    def test_crosstab_parallel1(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = pd.crosstab(df.A, df.C)
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
 
     def test_intraday(self):
         def test_impl(nsyms):

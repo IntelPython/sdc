@@ -423,7 +423,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     agg_func_struct = get_agg_func_struct(
         agg_node.agg_func, in_col_typs, out_col_typs, typingctx, targetctx,
-        pivot_typ, agg_node.pivot_values)
+        pivot_typ, agg_node.pivot_values, agg_node.is_crosstab)
 
     return_key = agg_node.out_key_var is not None
     out_typs = list(agg_node.out_typs.values())
@@ -655,6 +655,7 @@ def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t,
 
     # return key is either True or None
     if return_key_t == types.boolean:
+        # TODO: handle pivot_table/crosstab with return key
         assert out_dummy_tup_t.count == data_in_t.count + 1
         key_typ = key_set_t.dtype
 
@@ -832,7 +833,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
 
 
 def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
-                                           targetctx, pivot_typ, pivot_values):
+                              targetctx, pivot_typ, pivot_values, is_crosstab):
     """find initialization, update, combine and final evaluation code of the
     aggregation function. Currently assuming that the function is single block
     and has one parfor.
@@ -848,6 +849,10 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
     # offsets of reduce vars
     curr_offset = 0
     redvar_offsets = [0]
+
+    if is_crosstab and len(in_col_types) == 0:
+        # use dummy int input type for crosstab since doesn't have input
+        in_col_types = [types.Array(types.intp, 1, 'C')]
 
     for in_col_typ in in_col_types:
         f_ir, pm = compile_to_optimized_ir(
@@ -887,7 +892,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
         var_types = [pm.typemap[v] for v in redvars]
 
         combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
-            var_types, arr_var, in_col_typ, pm, typingctx, targetctx)
+            var_types, arr_var, pm, typingctx, targetctx)
 
         # XXX: update mutates parfor body
         update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
@@ -914,7 +919,8 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
     init_func = gen_init_func(all_init_nodes, all_reduce_vars, all_vartypes,
         typingctx, targetctx)
     update_all_func = gen_all_update_func(all_update_funcs, all_vartypes,
-        in_col_types, redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values)
+        in_col_types, redvar_offsets, typingctx, targetctx, pivot_typ,
+        pivot_values, is_crosstab)
     combine_all_func = gen_all_combine_func(all_combine_funcs, all_vartypes,
         redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values)
     eval_all_func = gen_all_eval_func(all_eval_funcs, all_vartypes,
@@ -955,7 +961,8 @@ def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
     return imp_dis
 
 def gen_all_update_func(update_funcs, reduce_var_types, in_col_types,
-                redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values):
+        redvar_offsets, typingctx, targetctx, pivot_typ, pivot_values,
+        is_crosstab):
 
     num_cols = len(in_col_types)
     if pivot_values is not None:
@@ -979,7 +986,10 @@ def gen_all_update_func(update_funcs, reduce_var_types, in_col_types,
             init_offset = num_redvars * j
             redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
                         for i in range(init_offset + redvar_offsets[0], init_offset + redvar_offsets[1])])
-            func_text += "    {} = update_vars_0({},  data_in[0][i])\n".format(redvar_access, redvar_access)
+            data_access = "data_in[0][i]"
+            if is_crosstab:  # TODO: crosstab with values arg
+                data_access = "0"
+            func_text += "    {} = update_vars_0({}, {})\n".format(redvar_access, redvar_access, data_access)
     else:
         for j in range(num_cols):
             redvar_access = ", ".join(["redvar_arrs[{}][w_ind]".format(i)
@@ -1174,7 +1184,7 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
 
 
 def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
-                       in_col_typ, pm, typingctx, targetctx):
+                       pm, typingctx, targetctx):
     num_red_vars = len(redvars)
     redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
     in_names = ["in{}".format(i) for i in range(num_red_vars)]
