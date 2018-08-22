@@ -1314,7 +1314,7 @@ def _series_append_single_impl(arr, other):
 
 def _series_append_tuple_impl(arr, other):
     tup_other = hpat.hiframes_api.to_const_tuple(other)
-    arrs = (arr, *tup_other)
+    arrs = (arr,) + tup_other
     c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
     return hpat.hiframes_api.concat(c_arrs)
 
