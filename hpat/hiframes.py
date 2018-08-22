@@ -946,10 +946,12 @@ class HiFrames(object):
                 count += 1
             return count
 
+        # TODO: make out_key_var an index column
+
         return [hiframes_aggregate.Aggregate(
-            lhs.name, 'crosstab', index_arg, None, df_col_map,
+            lhs.name, 'crosstab', index_arg.name, None, df_col_map,
             in_vars, index_arg,
-            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values)]
+            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)]
 
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())

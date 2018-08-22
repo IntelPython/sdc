@@ -42,7 +42,8 @@ AggFuncStruct = namedtuple('AggFuncStruct',
 class Aggregate(ir.Stmt):
     def __init__(self, df_out, df_in, key_name, out_key_var, df_out_vars,
                                  df_in_vars, key_arr, agg_func, out_typs, loc,
-                                 pivot_arr=None, pivot_values=None):
+                                 pivot_arr=None, pivot_values=None,
+                                 is_crosstab=False):
         # name of output dataframe (just for printing purposes)
         self.df_out = df_out
         # name of input dataframe (just for printing purposes)
@@ -62,6 +63,7 @@ class Aggregate(ir.Stmt):
         # pivot_table handling
         self.pivot_arr = pivot_arr
         self.pivot_values = pivot_values
+        self.is_crosstab = is_crosstab
 
     def __repr__(self):  # pragma: no cover
         out_cols = ""
@@ -234,8 +236,8 @@ ir_utils.visit_vars_extensions[Aggregate] = visit_vars_aggregate
 def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
                                                             array_analysis):
     # empty aggregate nodes should be deleted in remove dead
-    assert len(aggregate_node.df_in_vars) > 0 or aggregate_node.out_key_var is not None, ("empty aggregate in array"
-                                                                   "analysis")
+    assert len(aggregate_node.df_in_vars) > 0 or aggregate_node.out_key_var is not None or aggregate_node.is_crosstab, (
+        "empty aggregate in array analysis")
 
     # arrays of input df have same size in first dimension as key array
     # string array doesn't have shape in array analysis
@@ -337,6 +339,9 @@ def aggregate_distributed_analysis(aggregate_node, array_dists):
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
         array_dists[aggregate_node.key_arr.name] = out_dist
+        # pivot case
+        if aggregate_node.pivot_arr is not None:
+            array_dists[aggregate_node.pivot_arr.name] = out_dist
         for _, col_var in aggregate_node.df_in_vars.items():
             array_dists[col_var.name] = out_dist
 
