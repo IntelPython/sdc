@@ -860,25 +860,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
         block = f_ir.blocks[0]
 
         # find and ignore arg and size/shape nodes for input arr
-        block_body = []
-        arr_var = None
-        for i, stmt in enumerate(block.body):
-            if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
-                arr_var = stmt.target
-                # XXX assuming shape/size nodes are right after arg
-                shape_nd = block.body[i+1]
-                assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)
-                    and shape_nd.value.op == 'getattr' and shape_nd.value.attr == 'shape'
-                    and shape_nd.value.value.name == arr_var.name)
-                shape_vr = shape_nd.target
-                size_nd = block.body[i+2]
-                assert (is_assign(size_nd) and isinstance(size_nd.value, ir.Expr)
-                    and size_nd.value.op == 'static_getitem'
-                    and size_nd.value.value.name == shape_vr.name)
-                # ignore size/shape vars
-                block_body += block.body[i+3:]
-                break
-            block_body.append(stmt)
+        block_body, arr_var = _rm_arg_agg_block(block)
 
         parfor_ind = -1
         for i, stmt in enumerate(block_body):
@@ -1364,6 +1346,31 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_update)
     imp_dis.add_overload(agg_impl_func)
     return imp_dis
+
+
+def _rm_arg_agg_block(block):
+    block_body = []
+    arr_var = None
+    for i, stmt in enumerate(block.body):
+        if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
+            arr_var = stmt.target
+            # XXX assuming shape/size nodes are right after arg
+            shape_nd = block.body[i+1]
+            assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)
+                and shape_nd.value.op == 'getattr' and shape_nd.value.attr == 'shape'
+                and shape_nd.value.value.name == arr_var.name)
+            shape_vr = shape_nd.target
+            size_nd = block.body[i+2]
+            assert (is_assign(size_nd) and isinstance(size_nd.value, ir.Expr)
+                and size_nd.value.op == 'static_getitem'
+                and size_nd.value.value.name == shape_vr.name)
+            # ignore size/shape vars
+            block_body += block.body[i+3:]
+            break
+        block_body.append(stmt)
+
+    return block_body, arr_var
+
 
 # adapted from numba/parfor.py
 def get_parfor_reductions(parfor, parfor_params, calltypes,
