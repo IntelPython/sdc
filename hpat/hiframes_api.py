@@ -456,6 +456,24 @@ def nlargest(A, k):
     min_heap_vals.sort()
     return np.ascontiguousarray(min_heap_vals[::-1])
 
+MPI_ROOT = 0
+
+@numba.njit
+def nlargest_parallel(A, k):
+    # parallel algorithm: assuming k << len(A), just call nlargest on chunks
+    # of A, gather the result and return the largest k
+    # TODO: support cases where k is not too small
+    my_rank = hpat.distributed_api.get_rank()
+    local_res = nlargest(A, k)
+    all_largest = hpat.distributed_api.gatherv(local_res)
+
+    if my_rank == MPI_ROOT:
+        res = nlargest(all_largest, k)
+    else:
+        res = np.empty(k, A.dtype)
+    hpat.distributed_api.bcast(res)
+    return res
+
 
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):

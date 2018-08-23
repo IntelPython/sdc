@@ -597,6 +597,20 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
+        if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+                                                                or self._is_1D_Var_arr(rhs.args[0].name)):
+            arr = rhs.args[0].name
+
+            def f(arr, k):  # pragma: no cover
+                s = hpat.hiframes_api.nlargest_parallel(arr, k)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (self.typemap[arr], self.typemap[rhs.args[1].name]),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-3]
+            out[-1].target = assign.target
+
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?

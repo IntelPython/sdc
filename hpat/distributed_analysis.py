@@ -251,6 +251,11 @@ class DistributedAnalysis(object):
             # nunique doesn't affect input's distribution
             return
 
+        if fdef == ('nlargest', 'hpat.hiframes_api'):
+            # output of nlargest is REP
+            array_dists[lhs] = Distribution.REP
+            return
+
         if fdef == ('concat', 'hpat.hiframes_api'):
             # hiframes concat is similar to np.concatenate
             self._analyze_call_np_concatenate(lhs, args, array_dists)
