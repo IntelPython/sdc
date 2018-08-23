@@ -446,7 +446,9 @@ def nlargest(A, k):
         B = np.sort(A)
         return np.ascontiguousarray(B[::-1])
 
-    min_heap_vals = A[:k].copy()
+    # heapify k/2-1 to 0 instead of sort?
+    min_heap_vals = np.sort(A[:k])
+
     for i in range(k, m):
         if A[i] > min_heap_vals[0]:
             min_heap_vals[0] = A[i]
