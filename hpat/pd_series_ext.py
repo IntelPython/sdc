@@ -467,6 +467,11 @@ class SeriesAttribute(AttributeTemplate):
         assert not args
         return signature(SeriesType(types.boolean))
 
+    @bound_function("series.nlargest")
+    def resolve_nlargest(self, ary, args, kws):
+        assert not kws
+        return signature(ary, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

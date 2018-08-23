@@ -417,6 +417,46 @@ def isna_overload(arr_typ, ind_typ):
     # XXX integers don't have nans, extend to boolean
     return lambda arr,i: False
 
+
+@numba.njit
+def min_heapify(arr, n, start):
+    min_ind = start
+    left = 2 * start + 1
+    right = 2 * start + 2
+
+    if left < n and arr[left] < arr[min_ind]:
+        min_ind = left
+
+    if right < n and arr[right] < arr[min_ind]:
+        min_ind = right
+
+    if min_ind != start:
+        arr[start], arr[min_ind] = arr[min_ind], arr[start]  # swap
+        min_heapify(arr, n, min_ind)
+
+@numba.njit
+def nlargest(A, k):
+    # algorithm: keep a min heap of k largest values, if a value is greater
+    # than the minimum (root) in heap, replace the minimum and rebuild the heap
+    # TODO: handle NAs
+    m = len(A)
+
+    # if all of A, just sort and reverse
+    if k >= m:
+        B = np.sort(A)
+        return np.ascontiguousarray(B[::-1])
+
+    min_heap_vals = A[:k].copy()
+    for i in range(k, m):
+        if A[i] > min_heap_vals[0]:
+            min_heap_vals[0] = A[i]
+            min_heapify(min_heap_vals, k, 0)
+
+    # sort and return the heap values
+    min_heap_vals.sort()
+    return np.ascontiguousarray(min_heap_vals[::-1])
+
+
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):
 #     s = "count    "+str(a_count)+"\n"\

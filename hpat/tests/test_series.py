@@ -610,6 +610,16 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_nlargest1(self):
+        def test_impl(S):
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
 
 if __name__ == "__main__":
     unittest.main()
