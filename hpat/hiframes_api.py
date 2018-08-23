@@ -434,22 +434,57 @@ def min_heapify(arr, n, start):
         arr[start], arr[min_ind] = arr[min_ind], arr[start]  # swap
         min_heapify(arr, n, min_ind)
 
+
+def select_k_nonan(A, m, k):  # pragma: no cover
+    return A
+
+@overload(select_k_nonan)
+def select_k_nonan_overload(A_t, m_t, k_t):
+    dtype = A_t.dtype
+    if isinstance(dtype, types.Integer):
+        # ints don't have nans
+        return lambda A,m,k: (A[:k], k)
+
+    assert isinstance(dtype, types.Float)
+
+    def select_k_nonan_float(A, m, k):
+        # select the first k elements but ignore NANs
+        min_heap_vals = np.empty(k, A.dtype)
+        i = 0
+        ind = 0
+        while i < m:
+            val = A[i]
+            i += 1
+            if not np.isnan(val):
+                min_heap_vals[ind] = val
+                ind += 1
+
+        # if couldn't fill with k values
+        if ind < k:
+            min_heap_vals = min_heap_vals[:ind]
+
+        return min_heap_vals, i
+
+    return select_k_nonan_float
+
 @numba.njit
 def nlargest(A, k):
     # algorithm: keep a min heap of k largest values, if a value is greater
     # than the minimum (root) in heap, replace the minimum and rebuild the heap
-    # TODO: handle NAs
     m = len(A)
 
     # if all of A, just sort and reverse
     if k >= m:
         B = np.sort(A)
+        B = B[~np.isnan(B)]
         return np.ascontiguousarray(B[::-1])
 
+    # create min heap but
+    min_heap_vals, start = select_k_nonan(A, m, k)
     # heapify k/2-1 to 0 instead of sort?
-    min_heap_vals = np.sort(A[:k])
+    min_heap_vals.sort()
 
-    for i in range(k, m):
+    for i in range(start, m):
         if A[i] > min_heap_vals[0]:
             min_heap_vals[0] = A[i]
             min_heapify(min_heap_vals, k, 0)
