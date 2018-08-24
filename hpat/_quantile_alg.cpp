@@ -6,6 +6,9 @@
 #include <cmath>
 #include <algorithm>
 #include <cassert>
+#include <iostream>
+
+#include "_hpat_common.h"
 
 #define root 0
 
@@ -55,25 +58,27 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
 
     double at = quantile * (total_size-1);
 
-    // FIXME: refactor constants
-    if (type_enum == 0)
-        return quantile_parallel_int((char *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 1)
-        return quantile_parallel_int((unsigned char *) data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 2)
-        return quantile_parallel_int((int *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 3)
-        return quantile_parallel_int((uint32_t *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 4)
-        return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 5)
-        return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
-    if (type_enum == 6)
-        return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
-    if (type_enum == 7)
-        return quantile_parallel_int((uint64_t*)data, local_size, quantile, type_enum, myrank, n_pes);
+    switch (type_enum) {
+        case HPAT_CTypes::INT8:
+            return quantile_parallel_int((char *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT8:
+            return quantile_parallel_int((unsigned char *) data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT32:
+            return quantile_parallel_int((int *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT32:
+            return quantile_parallel_int((uint32_t *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT64:
+            return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT64:
+            return quantile_parallel_int((uint64_t*)data, local_size, quantile, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT32:
+            return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT64:
+            return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
+        default:
+            std::cerr << "unknown quantile data type" << "\n";
+    }
 
-    printf("unknown quantile data type");
     return -1.0;
 }
 
