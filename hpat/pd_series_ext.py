@@ -472,6 +472,14 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(ary, *args)
 
+    @bound_function("series.median")
+    def resolve_median(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        # median converts integer output to float
+        dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
+        return signature(dtype, *args)
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

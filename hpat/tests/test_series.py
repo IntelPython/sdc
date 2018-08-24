@@ -637,7 +637,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-    @unittest.skip("TODO")
     def test_series_median1(self):
         def test_impl(S):
             return S.median()
@@ -646,7 +645,15 @@ class TestSeries(unittest.TestCase):
         m = 100
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(np.random.ranf(m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # odd size
+        m = 101
+        S = pd.Series(np.random.randint(-30, 30, m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(np.random.ranf(m))
+        self.assertEqual(hpat_func(S), test_impl(S))
 
 if __name__ == "__main__":
     unittest.main()

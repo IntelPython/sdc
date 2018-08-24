@@ -295,7 +295,7 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
                          'nunique', 'describe', 'abs', 'str.len', 'isna',
-                         'isnull']:
+                         'isnull', 'median']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -1384,4 +1384,5 @@ series_replace_funcs = {
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
     'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
+    'median': lambda A: hpat.hiframes_api.median(A),
 }

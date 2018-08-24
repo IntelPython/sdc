@@ -119,6 +119,21 @@ def nth_element(arr, k):
     nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
     return res[0]
 
+@numba.njit
+def median(arr):
+    # similar to numpy/lib/function_base.py:_median
+    # TODO: check return types, e.g. float32 -> float32
+    n = len(arr)
+    k = len(arr) // 2
+
+    # odd length case
+    if n % 2 == 1:
+        return nth_element(arr, k)
+
+    v1 = nth_element(arr, k-1)
+    v2 = nth_element(arr, k)
+    return (v1 + v2) / 2
+
 
 @infer_global(concat)
 class ConcatType(AbstractTemplate):
