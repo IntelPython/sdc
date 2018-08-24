@@ -452,7 +452,7 @@ def select_k_nonan_overload(A_t, m_t, k_t):
         min_heap_vals = np.empty(k, A.dtype)
         i = 0
         ind = 0
-        while i < m:
+        while i < m and ind < k:
             val = A[i]
             i += 1
             if not np.isnan(val):
@@ -504,6 +504,7 @@ def nlargest_parallel(A, k):
     local_res = nlargest(A, k)
     all_largest = hpat.distributed_api.gatherv(local_res)
 
+    # TODO: handle len(res) < k case
     if my_rank == MPI_ROOT:
         res = nlargest(all_largest, k)
     else:
