@@ -39,6 +39,7 @@ import quantile_alg
 import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
 ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
+ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
 from hpat.utils import _numba_to_c_type_map
@@ -48,6 +49,9 @@ from numba.extending import typeof_impl, unbox, register_model, models, NativeVa
 from numba import numpy_support
 
 nth_sequential = types.ExternalFunction("nth_sequential",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
+
+nth_parallel = types.ExternalFunction("nth_parallel",
     types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
@@ -113,14 +117,17 @@ def concat(arr_list):
 
 
 @numba.njit
-def nth_element(arr, k):
+def nth_element(arr, k, parallel=False):
     res = np.empty(1, arr.dtype)
     type_enum = hpat.distributed_api.get_type_enum(arr)
-    nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    if parallel:
+        nth_parallel(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    else:
+        nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
     return res[0]
 
 @numba.njit
-def median(arr):
+def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
     n = len(arr)
@@ -128,10 +135,10 @@ def median(arr):
 
     # odd length case
     if n % 2 == 1:
-        return nth_element(arr, k)
+        return nth_element(arr, k, parallel)
 
-    v1 = nth_element(arr, k-1)
-    v2 = nth_element(arr, k)
+    v1 = nth_element(arr, k-1, parallel)
+    v2 = nth_element(arr, k, parallel)
     return (v1 + v2) / 2
 
 

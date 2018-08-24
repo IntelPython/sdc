@@ -655,5 +655,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_median_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.median()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
 if __name__ == "__main__":
     unittest.main()

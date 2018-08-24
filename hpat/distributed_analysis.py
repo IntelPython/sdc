@@ -256,6 +256,9 @@ class DistributedAnalysis(object):
             array_dists[lhs] = Distribution.REP
             return
 
+        if fdef == ('median', 'hpat.hiframes_api'):
+            return
+
         if fdef == ('concat', 'hpat.hiframes_api'):
             # hiframes concat is similar to np.concatenate
             self._analyze_call_np_concatenate(lhs, args, array_dists)
