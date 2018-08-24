@@ -443,7 +443,7 @@ def select_k_nonan_overload(A_t, m_t, k_t):
     dtype = A_t.dtype
     if isinstance(dtype, types.Integer):
         # ints don't have nans
-        return lambda A,m,k: (A[:k], k)
+        return lambda A,m,k: (A[:k].copy(), k)
 
     assert isinstance(dtype, types.Float)
 
