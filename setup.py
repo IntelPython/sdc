@@ -101,7 +101,9 @@ if is_win:
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
                    libraries = MPI_LIBS + ['hdf5', 'boost_filesystem', 'boost_system'],
-                   include_dirs = [HDF5_DIR+'/include',] + ind + [PREFIX_DIR+'/lib/python3.6/site-packages'],
+                   include_dirs = ([HDF5_DIR+'/include',] + ind
+                     + np_compile_args['include_dirs']
+                     + [PREFIX_DIR+'/lib/python3.6/site-packages']),
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
