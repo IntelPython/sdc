@@ -204,7 +204,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         rptr = builder.call(fn, [arg[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
-    return types.Tuple([types.Array(types.float64, 1, 'C')])(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
+    return types.Tuple([types.Array(types.float64, 1, 'C')])(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ), codegen
 
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx):
