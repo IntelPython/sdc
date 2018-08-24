@@ -29,6 +29,9 @@ double quantile_parallel_int(T* data, int64_t local_size, double at, int type_en
 template<class T>
 double quantile_parallel_float(T* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes);
 
+void nth_sequential(void* res, void* data, int64_t local_size, int64_t k, int type_enum);
+
+
 PyMODINIT_FUNC PyInit_quantile_alg(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -39,6 +42,8 @@ PyMODINIT_FUNC PyInit_quantile_alg(void) {
 
     PyObject_SetAttrString(m, "quantile_parallel",
                             PyLong_FromVoidPtr((void*)(&quantile_parallel)));
+    PyObject_SetAttrString(m, "nth_sequential",
+                            PyLong_FromVoidPtr((void*)(&nth_sequential)));
     return m;
 }
 
@@ -354,3 +359,42 @@ T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
 / T select_probablity =  pow(local_size, -ep); // N^-e
 // MPI_Allreduce(&my_sample_size, &total_sample_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
 */
+
+template<class T>
+void get_nth_sequential(T* res, T* data, int64_t local_size, int64_t k, int type_enum, int myrank, int n_pes)
+{
+    // get nth element and store in res pointer
+    // assuming NA values of floats are already removed
+    std::vector<T> my_array(data, data+local_size);
+    std::nth_element(my_array.begin(), my_array.begin() + k, my_array.end());
+    *res = my_array[k];
+}
+
+
+void nth_sequential(void* res, void* data, int64_t local_size, int64_t k, int type_enum)
+{
+    int myrank, n_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    switch (type_enum) {
+        case HPAT_CTypes::INT8:
+            return get_nth_sequential((char *)res, (char *)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT8:
+            return get_nth_sequential((unsigned char *) res, (unsigned char *) data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT32:
+            return get_nth_sequential((int *) res, (int *)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT32:
+            return get_nth_sequential((uint32_t *) res, (uint32_t *)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT64:
+            return get_nth_sequential((int64_t *) res, (int64_t *)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT64:
+            return get_nth_sequential((uint64_t*) res, (uint64_t*)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT32:
+            return get_nth_sequential((float*) res, (float*)data, local_size, k, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT64:
+            return get_nth_sequential((double*) res, (double*)data, local_size, k, type_enum, myrank, n_pes);
+        default:
+            std::cerr << "unknown nth data type" << "\n";
+    }
+}

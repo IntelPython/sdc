@@ -38,6 +38,7 @@ from llvmlite import ir as lir
 import quantile_alg
 import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
 from hpat.utils import _numba_to_c_type_map
@@ -45,6 +46,9 @@ from hpat.utils import _numba_to_c_type_map
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
 from numba import numpy_support
+
+nth_sequential = types.ExternalFunction("nth_sequential",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -106,6 +110,15 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 
 def concat(arr_list):
     return pd.concat(arr_list)
+
+
+@numba.njit
+def nth_element(arr, k):
+    res = np.empty(1, arr.dtype)
+    type_enum = hpat.distributed_api.get_type_enum(arr)
+    nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    return res[0]
+
 
 @infer_global(concat)
 class ConcatType(AbstractTemplate):
