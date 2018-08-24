@@ -9,8 +9,9 @@ from numba.typing import signature
 from numba.extending import overload
 import hpat
 import hpat.timsort
+from hpat.utils import _numba_to_c_type_map
 from hpat import distributed, distributed_analysis
-from hpat.distributed_api import Reduce_Type, _h5_typ_table
+from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints, empty_like_type, get_ctypes_ptr
 from hpat.str_arr_ext import (string_array_type, to_string_list,
@@ -507,8 +508,8 @@ def alltoallv_impl(arr_t, metadata_t):
         return a2av_impl
 
     assert arr_t == string_array_type
-    int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-    char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+    int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+    char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
     def a2av_str_impl(arr, metadata):
         # TODO: increate refcount?
         offset_ptr = get_offset_ptr(metadata.out_arr)
@@ -755,8 +756,8 @@ def alltoallv_tup_overload(data_t, data_shuffle_meta_t, shuffle_meta_t):
         ','.join(['meta_tup[{}].out_arr'.format(i) for i in range(data_t.count)]),
         "," if data_t.count == 1 else "")
 
-    int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-    char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+    int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+    char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'get_offset_ptr': get_offset_ptr,
          'get_data_ptr': get_data_ptr, 'int32_typ_enum': int32_typ_enum,

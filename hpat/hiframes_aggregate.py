@@ -22,7 +22,7 @@ from hpat.utils import (is_call, is_var_assign, is_assign, debug_prints,
         alloc_arr_tup, empty_like_type)
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,

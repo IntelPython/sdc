@@ -112,7 +112,7 @@ double quantile_parallel_float(T* data, int64_t local_size, double quantile, int
     return res1 + (res2 - res1) * fraction;
 }
 
-// _h5_typ_table = {
+// _numba_to_c_type_map = {
 //     int8:0,
 //     uint8:1,
 //     int32:2,

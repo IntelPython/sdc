@@ -40,7 +40,7 @@ import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
@@ -203,8 +203,8 @@ def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     if is_str_arr_typ(arr_typ):
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+        int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+        char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
         def nunique_par_str(A):
             uniq_A = hpat.utils.to_array(set(A))
             n_strs = len(uniq_A)
@@ -600,7 +600,7 @@ def array_std(context, builder, sig, args):
 def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1

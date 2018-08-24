@@ -8,7 +8,7 @@ import hpat
 from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, del_str, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
-from hpat.utils import debug_prints, empty_like_type
+from hpat.utils import debug_prints, empty_like_type, _numba_to_c_type_map
 import time
 from llvmlite import ir as lir
 import hdist
@@ -34,23 +34,13 @@ class Reduce_Type(Enum):
     Argmin = 4
     Argmax = 5
 
-_h5_typ_table = {
-    types.int8: 0,
-    types.uint8: 1,
-    types.int32: 2,
-    types.uint32: 3,
-    types.int64: 4,
-    types.float32: 5,
-    types.float64: 6,
-    types.uint64: 7
-}
 
 def get_type_enum(arr):
     return np.int32(-1)
 
 @overload(get_type_enum)
 def get_type_enum_overload(arr_typ):
-    typ_val = _h5_typ_table[arr_typ.dtype]
+    typ_val = _numba_to_c_type_map[arr_typ.dtype]
     return lambda a: np.int32(typ_val)
 
 INT_MAX = np.iinfo(np.int32).max
@@ -73,7 +63,7 @@ c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voi
 def gather_scalar_overload(data_t):
     assert isinstance(data_t, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _h5_typ_table[data_t]
+    typ_val = _numba_to_c_type_map[data_t]
     func_text = (
     "def gather_scalar_impl(val):\n"
     "  n_pes = hpat.distributed_api.get_size()\n"
@@ -101,7 +91,7 @@ c_gatherv = types.ExternalFunction("c_gatherv",
 def gatherv_overload(data_t):
     if isinstance(data_t, types.Array):
         # TODO: other types like boolean
-        typ_val = _h5_typ_table[data_t.dtype]
+        typ_val = _numba_to_c_type_map[data_t.dtype]
 
         def gatherv_impl(data):
             rank = hpat.distributed_api.get_rank()
@@ -120,8 +110,8 @@ def gatherv_overload(data_t):
         return gatherv_impl
 
     if data_t == string_array_type:
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+        int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+        char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
         def gatherv_str_arr_impl(data):
             rank = hpat.distributed_api.get_rank()
@@ -183,8 +173,8 @@ def bcast_overload(data_t):
         return bcast_impl
 
     if data_t == string_array_type:
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+        int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+        char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
         def bcast_str_impl(data):
             rank = hpat.distributed_api.get_rank()
@@ -225,7 +215,7 @@ def bcast_scalar(val):  # pragma: no cover
 def bcast_scalar_overload(data_t):
     assert isinstance(data_t, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _h5_typ_table[data_t]
+    typ_val = _numba_to_c_type_map[data_t]
     # TODO: fix np.full and refactor
     func_text = (
     "def bcast_scalar_impl(val):\n"

@@ -110,6 +110,7 @@ ext_io = Extension(name="hio",
 
 ext_hdist = Extension(name="hdist",
                       sources=["hpat/_distributed.cpp"],
+                      depends=["hpat/_hpat_common.h"],
                       libraries = MPI_LIBS,
                       extra_compile_args = eca,
                       extra_link_args = ela,
