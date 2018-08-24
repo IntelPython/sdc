@@ -2,7 +2,7 @@
 from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
-from numba.extending import overload
+from numba.extending import overload, intrinsic
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
@@ -162,6 +162,51 @@ def build_csv_definitions(csv_node, definitions=None):
 
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 
+import hio
+import llvmlite.binding as ll
+ll.add_symbol('csv_read_file', hio.csv_read_file)
+
+@intrinsic(support_literals=True)
+def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
+    '''
+    This is creating the llvm wrapper calling the C function.
+    '''
+    # FIXME how to check types of const inputs?
+    assert fname_typ == string_type
+    assert isinstance(cols_to_read_typ, types.Const)
+    assert isinstance(dtypes_typ, types.Const)
+    # assert cols_to_read_typ.count == dtypes_typ.count
+    assert isinstance(n_cols_to_read_typ, types.Const)
+    assert delims_typ == string_type or isinstance(delims_typ, types.Const)
+    assert quotes_typ == string_type or isinstance(quotes_typ, types.Const)
+
+    def codegen(context, builder, sig, args):
+        # we simply cast the input tuples to a c-pointers
+        cols_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
+        builder.store(args[1], cols_ptr)
+        dtypes_ptr = cgutils.alloca_once(builder, lir.IntType(32).as_pointer())
+        builder.store(args[2], dtypes_ptr)
+        # we need extra pointers for output parameters
+        first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
+        n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
+        # define function type, it returns an array of MemInfo **
+        fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
+                                [lir.IntType(8).as_pointer(),  # const std::string * fname,
+                                 lir.IntType(64).as_pointer(), # size_t * cols_to_read
+                                 lir.IntType(32).as_pointer(), # int * dtypes
+                                 lir.IntType(64),              # size_t n_cols_to_read
+                                 lir.IntType(64).as_pointer(), # size_t * first_row,
+                                 lir.IntType(64).as_pointer(), # size_t * n_rows,
+                                 llir.IntType(8).as_pointer(), # std::string * delimiters
+                                 ir.IntType(8).as_pointer(),   # std::string * quotes
+                                ])
+        fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
+        rptr = builder.call(fn, [arg[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
+
+    #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
+    return types.Tuple([types.Array(types.float64, 1, 'C')])(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
+
+
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx):
     parallel = True
     for v in csv_node.out_vars:
@@ -177,7 +222,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     col_typs = ", ".join(
         str(_h5_typ_table[arr_typ.dtype]) for arr_typ in csv_node.out_types)
     func_text = "def csv_impl(fname):\n"
-    func_text += "    {} = _csv_read(fname, ({}), ({}), {})\n".format(
+    func_text += "    {} = _csv_read(fname, ({}), ({}), {}, ',', '\"')\n".format(
         arg_names, col_inds, col_typs, n_cols)
 
     loc_vars = {}
@@ -188,7 +233,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     csv_reader = numba.njit(lambda a,b,c,d: (1,2,3,4))
 
     f_block = compile_to_numba_ir(csv_impl,
-                                  {'_csv_read':csv_reader},
+                                  {'_csv_read': _csv_read},
                                   typingctx, (string_type,),
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [csv_node.file_name])

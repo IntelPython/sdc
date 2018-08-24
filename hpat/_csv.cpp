@@ -14,8 +14,40 @@
 #include <boost/filesystem/operations.hpp>
 #include <numpy/ndarraytypes.h>
 
-#include "_distributed.h"
+// #include "_distributed.h"
+
+static int hpat_dist_get_rank()
+{
+    int is_initialized;
+    MPI_Initialized(&is_initialized);
+    if (!is_initialized)
+        MPI_Init(NULL, NULL);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    // printf("my_rank:%d\n", rank);
+    return rank;
+}
+
+static int hpat_dist_get_size()
+{
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    // printf("r size:%d\n", sizeof(MPI_Request));
+    // printf("mpi_size:%d\n", size);
+    return size;
+}
+
+static int64_t hpat_dist_exscan_i8(int64_t value)
+{
+    // printf("sum value: %lld\n", value);
+    int64_t out=0;
+    MPI_Exscan(&value, &out, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
+    return out;
+}
+
 #include "_meminfo.h"
+
+extern "C" {
 
 /**
    Read a CSV file.
@@ -56,6 +88,7 @@ MemInfo ** csv_read_string(const std::string * fname, size_t * cols_to_read, int
 **/
 void csv_delete(MemInfo ** cols, size_t release);
 
+}
 
 // ***********************************************************************************
 // ***********************************************************************************
@@ -199,7 +232,7 @@ static void dtype_convert(int dtype, const std::string & from, void * to, size_t
 
 
 // we can use and then delete the extra dtype column
-void csv_delete(MemInfo ** mi, size_t release)
+extern "C" void csv_delete(MemInfo ** mi, size_t release)
 {
     for(auto i=0; i<release; ++i) {
         if(mi[i]) {
@@ -308,9 +341,9 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
 }
 
 
-MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                         size_t * first_row, size_t * n_rows,
-                         std::string * delimiters, std::string * quotes)
+extern "C" MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                                    size_t * first_row, size_t * n_rows,
+                                    std::string * delimiters, std::string * quotes)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
@@ -321,9 +354,9 @@ MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int *
 }
 
 
-MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                           size_t * first_row, size_t * n_rows,
-                           std::string * delimiters, std::string * quotes)
+extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+                                      size_t * first_row, size_t * n_rows,
+                                      std::string * delimiters, std::string * quotes)
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
