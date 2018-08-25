@@ -22,7 +22,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               getitem_str_offset, copy_str_arr_slice, setitem_string_array)
 from hpat.hiframes_api import str_copy_ptr
 from hpat.timsort import copyElement_tup, getitem_arr_tup
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 import numpy as np
 
 
@@ -182,7 +182,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
     assert isinstance(n_cols_to_read_typ, types.Const)
     assert delims_typ == string_type or isinstance(delims_typ, types.Const)
     assert quotes_typ == string_type or isinstance(quotes_typ, types.Const)
-    ctype_enum_to_nb_typ = {v: k for k, v in _h5_typ_table.items()}
+    ctype_enum_to_nb_typ = {v: k for k, v in _numba_to_c_type_map.items()}
     return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
         for t in dtypes_typ.value])
 
@@ -226,7 +226,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
     col_inds = ", ".join(str(i) for i in range(n_cols))
     col_typs = ", ".join(
-        str(_h5_typ_table[arr_typ.dtype]) for arr_typ in csv_node.out_types)
+        str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
     func_text = "def csv_impl(fname):\n"
     func_text += "    {} = _csv_read(fname, ({}), ({}), {}, ',', '\"')\n".format(
         arg_names, col_inds, col_typs, n_cols)
