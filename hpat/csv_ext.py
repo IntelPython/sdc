@@ -185,6 +185,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
     ctype_enum_to_nb_typ = {v: k for k, v in _numba_to_c_type_map.items()}
     return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
         for t in dtypes_typ.value])
+    ncols = len(cols_to_read_typ.value)
 
     def codegen(context, builder, sig, args):
         # we simply cast the input tuples to a c-pointers
@@ -210,7 +211,10 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         rptr = builder.call(fn, [arg[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
-    return return_typ(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ), codegen
+    cols_int_tup_typ = types.UniTuple(types.intp, ncols)
+    arg_typs = (string_type, cols_int_tup_typ, cols_int_tup_typ, types.intp,
+                string_type, string_type)
+    return return_typ(*arg_typs), codegen
 
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx):
