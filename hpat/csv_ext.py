@@ -97,6 +97,7 @@ def visit_vars_csv(csv_node, callback, cbdata):
         new_out_vars.append(new_var)
 
     csv_node.out_vars = new_out_vars
+    csv_node.file_name = visit_vars_inner(csv_node.file_name, callback, cbdata)
     return
 
 # add call to visit csv variable
@@ -119,6 +120,7 @@ def csv_usedefs(csv_node, use_set=None, def_set=None):
 
     # output columns are defined
     def_set.update({v.name for v in csv_node.out_vars})
+    use_set.add(csv_node.file_name.name)
 
     return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
@@ -146,6 +148,7 @@ def apply_copies_csv(csv_node, var_dict, name_var_table,
         new_out_vars.append(new_var)
 
     csv_node.out_vars = new_out_vars
+    csv_node.file_name = replace_vars_inner(csv_node.file_name, var_dict)
     return
 
 
