@@ -1,0 +1,60 @@
+
+# Source: kube-openmpi/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-hpat-cluster
+  labels:
+    app: my-hpat-test
+spec:
+  selector:
+    app: my-hpat-test
+  clusterIP: None
+  ports:
+  - name: dummy # Actually, no port is needed.
+    port: 1234
+    targetPort: 1234
+
+---
+# Source: kube-openmpi/templates/mpi-cluster.yaml
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: my-hpat-cluster-worker
+  labels:
+    app: my-hpat-test
+    role: worker
+spec:
+  selector:
+    matchLabels:
+      app: my-hpat-test
+      role: worker
+  serviceName: my-hpat-cluster
+  podManagementPolicy: Parallel
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: my-hpat-test
+        role: worker
+    spec:
+      securityContext:
+        null
+      volumes:
+      - name: task-pv-storage
+        persistentVolumeClaim:
+         claimName: pv-claim-data
+         readOnly: true
+      containers:
+      - name: mpi-worker
+        image: "ehsantn/hpat:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 2022
+        volumeMounts:
+          - mountPath: "/data"
+            name: task-pv-storage
+
+        resources:
+          null

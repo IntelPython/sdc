@@ -38,13 +38,21 @@ from llvmlite import ir as lir
 import quantile_alg
 import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
+ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
 from numba import numpy_support
+
+nth_sequential = types.ExternalFunction("nth_sequential",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
+
+nth_parallel = types.ExternalFunction("nth_parallel",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -65,6 +73,12 @@ def count(A):  # pragma: no cover
 
 
 def fillna(A):  # pragma: no cover
+    return 0
+
+def fillna_str_alloc(A, fill):  # pragma: no cover
+    return 0
+
+def dropna(A):  # pragma: no cover
     return 0
 
 def column_sum(A):  # pragma: no cover
@@ -100,6 +114,33 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 
 def concat(arr_list):
     return pd.concat(arr_list)
+
+
+@numba.njit
+def nth_element(arr, k, parallel=False):
+    res = np.empty(1, arr.dtype)
+    type_enum = hpat.distributed_api.get_type_enum(arr)
+    if parallel:
+        nth_parallel(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    else:
+        nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    return res[0]
+
+@numba.njit
+def median(arr, parallel=False):
+    # similar to numpy/lib/function_base.py:_median
+    # TODO: check return types, e.g. float32 -> float32
+    n = len(arr)
+    k = len(arr) // 2
+
+    # odd length case
+    if n % 2 == 1:
+        return nth_element(arr, k, parallel)
+
+    v1 = nth_element(arr, k-1, parallel)
+    v2 = nth_element(arr, k, parallel)
+    return (v1 + v2) / 2
+
 
 @infer_global(concat)
 class ConcatType(AbstractTemplate):
@@ -197,8 +238,8 @@ def nunique_overload_parallel(arr_typ):
     # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
     if is_str_arr_typ(arr_typ):
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
+        int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
+        char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
         def nunique_par_str(A):
             uniq_A = hpat.utils.to_array(set(A))
             n_strs = len(uniq_A)
@@ -320,6 +361,22 @@ class FillNaType(AbstractTemplate):
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
 
+@infer_global(fillna_str_alloc)
+class FillNaStrType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        # args: in_arr, value
+        return signature(string_array_type, *args)
+
+@infer_global(dropna)
+class DropNAType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        # args: in_arr
+        return signature(args[0], *args)
+
 @infer_global(column_sum)
 class SumType(AbstractTemplate):
     def generic(self, args, kws):
@@ -379,6 +436,116 @@ def shift_dtype_overload(d_typ):
         return lambda a: np.float64
     else:
         return lambda a: a
+
+def isna(arr, i):
+    return False
+
+@overload(isna)
+def isna_overload(arr_typ, ind_typ):
+    if arr_typ == string_array_type:
+        return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+    # TODO: extend to other types
+    assert isinstance(arr_typ, types.Array)
+    dtype = arr_typ.dtype
+    if isinstance(dtype, types.Float):
+        return lambda arr,i: np.isnan(arr[i])
+    # XXX integers don't have nans, extend to boolean
+    return lambda arr,i: False
+
+
+@numba.njit
+def min_heapify(arr, n, start):
+    min_ind = start
+    left = 2 * start + 1
+    right = 2 * start + 2
+
+    if left < n and arr[left] < arr[min_ind]:
+        min_ind = left
+
+    if right < n and arr[right] < arr[min_ind]:
+        min_ind = right
+
+    if min_ind != start:
+        arr[start], arr[min_ind] = arr[min_ind], arr[start]  # swap
+        min_heapify(arr, n, min_ind)
+
+
+def select_k_nonan(A, m, k):  # pragma: no cover
+    return A
+
+@overload(select_k_nonan)
+def select_k_nonan_overload(A_t, m_t, k_t):
+    dtype = A_t.dtype
+    if isinstance(dtype, types.Integer):
+        # ints don't have nans
+        return lambda A,m,k: (A[:k].copy(), k)
+
+    assert isinstance(dtype, types.Float)
+
+    def select_k_nonan_float(A, m, k):
+        # select the first k elements but ignore NANs
+        min_heap_vals = np.empty(k, A.dtype)
+        i = 0
+        ind = 0
+        while i < m and ind < k:
+            val = A[i]
+            i += 1
+            if not np.isnan(val):
+                min_heap_vals[ind] = val
+                ind += 1
+
+        # if couldn't fill with k values
+        if ind < k:
+            min_heap_vals = min_heap_vals[:ind]
+
+        return min_heap_vals, i
+
+    return select_k_nonan_float
+
+@numba.njit
+def nlargest(A, k):
+    # algorithm: keep a min heap of k largest values, if a value is greater
+    # than the minimum (root) in heap, replace the minimum and rebuild the heap
+    m = len(A)
+
+    # if all of A, just sort and reverse
+    if k >= m:
+        B = np.sort(A)
+        B = B[~np.isnan(B)]
+        return np.ascontiguousarray(B[::-1])
+
+    # create min heap but
+    min_heap_vals, start = select_k_nonan(A, m, k)
+    # heapify k/2-1 to 0 instead of sort?
+    min_heap_vals.sort()
+
+    for i in range(start, m):
+        if A[i] > min_heap_vals[0]:
+            min_heap_vals[0] = A[i]
+            min_heapify(min_heap_vals, k, 0)
+
+    # sort and return the heap values
+    min_heap_vals.sort()
+    return np.ascontiguousarray(min_heap_vals[::-1])
+
+MPI_ROOT = 0
+
+@numba.njit
+def nlargest_parallel(A, k):
+    # parallel algorithm: assuming k << len(A), just call nlargest on chunks
+    # of A, gather the result and return the largest k
+    # TODO: support cases where k is not too small
+    my_rank = hpat.distributed_api.get_rank()
+    local_res = nlargest(A, k)
+    all_largest = hpat.distributed_api.gatherv(local_res)
+
+    # TODO: handle len(res) < k case
+    if my_rank == MPI_ROOT:
+        res = nlargest(all_largest, k)
+    else:
+        res = np.empty(k, A.dtype)
+    hpat.distributed_api.bcast(res)
+    return res
 
 
 # @jit
@@ -469,7 +636,7 @@ def array_std(context, builder, sig, args):
 def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1

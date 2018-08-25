@@ -175,7 +175,7 @@ int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
 }
 
 
-// _h5_typ_table = {
+// _numba_to_c_type_map = {
 //     int8:0,
 //     uint8:1,
 //     int32:2,

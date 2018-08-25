@@ -2,7 +2,7 @@ from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 from hpat.pio_api import h5file_type
 from hpat.str_ext import StringType
 import h5py
@@ -77,7 +77,7 @@ def h5_read(context, builder, sig, args):
     size_ptr = cgutils.alloca_once(builder, args[4].type)
     builder.store(args[4], size_ptr)
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[6].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[6].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     call_args = [args[0], val2, args[2],
@@ -177,7 +177,7 @@ def h5_write(context, builder, sig, args):
     size_ptr = cgutils.alloca_once(builder, args[4].type)
     builder.store(args[4], size_ptr)
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[6].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[6].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     call_args = [args[0], args[1], args[2],

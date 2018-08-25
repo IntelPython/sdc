@@ -23,7 +23,7 @@ class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
     # array_priority = 1000
-    def __init__(self, dtype, ndim, layout, readonly=False, name=None,
+    def __init__(self, dtype, ndim=1, layout='C', readonly=False, name=None,
                  aligned=True):
         # same as types.Array, except name is Series, and buffer attributes
         # initialized here
@@ -294,6 +294,19 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    @bound_function("array.astype")
+    def resolve_astype(self, ary, args, kws):
+        # TODO: handle other types like datetime etc.
+        dtype, = args
+        if isinstance(dtype, types.Function) and dtype.typing_key == str:
+            ret_type = string_series_type
+            sig = signature(ret_type, *args)
+        else:
+            resolver = ArrayAttribute.resolve_astype.__wrapped__
+            sig = resolver(self, ary, args, kws)
+            sig.return_type = if_arr_to_series_type(sig.return_type)
+        return sig
+
     @bound_function("series.rolling")
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
@@ -332,6 +345,14 @@ class SeriesAttribute(AttributeTemplate):
 
     @bound_function("series.fillna", True)
     def resolve_fillna(self, ary, args, kws):
+        out = ary
+        # output is None for inplace case
+        if 'inplace' in kws and kws['inplace'] == types.Const(True):
+            out = types.none
+        return signature(out, *args)
+
+    @bound_function("series.dropna", True)
+    def resolve_dropna(self, ary, args, kws):
         out = ary
         # output is None for inplace case
         if 'inplace' in kws and kws['inplace'] == types.Const(True):
@@ -427,6 +448,37 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
+    @bound_function("series.isna")
+    def resolve_isna(self, ary, args, kws):
+        assert not kws
+        assert not args
+        return signature(SeriesType(types.boolean))
+
+    # alias of isna
+    @bound_function("series.isnull")
+    def resolve_isnull(self, ary, args, kws):
+        assert not kws
+        assert not args
+        return signature(SeriesType(types.boolean))
+
+    @bound_function("series.notna")
+    def resolve_notna(self, ary, args, kws):
+        assert not kws
+        assert not args
+        return signature(SeriesType(types.boolean))
+
+    @bound_function("series.nlargest")
+    def resolve_nlargest(self, ary, args, kws):
+        assert not kws
+        return signature(ary, *args)
+
+    @bound_function("series.median")
+    def resolve_median(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        # median converts integer output to float
+        dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
+        return signature(dtype, *args)
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type

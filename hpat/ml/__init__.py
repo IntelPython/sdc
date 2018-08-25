@@ -1,7 +1,9 @@
-from .svc import *
-from .naive_bayes import *
+from .svc import SVC
+from .naive_bayes import MultinomialNB
+from hpat.utils import debug_prints
 
-__all__ = '''
-SVC
-MultinomialNB
-'''.split()
+try:
+    from . import d4p
+except ImportError:
+    if debug_prints():  # pragma: no cover
+        print("daal4py import error")
