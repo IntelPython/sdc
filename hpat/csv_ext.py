@@ -1,7 +1,7 @@
 
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types
+from numba import typeinfer, ir, ir_utils, config, types, cgutils
 from numba.extending import overload, intrinsic
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
@@ -166,6 +166,7 @@ def build_csv_definitions(csv_node, definitions=None):
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 
 import hio
+from llvmlite import ir as lir
 import llvmlite.binding as ll
 ll.add_symbol('csv_read_file', hio.csv_read_file)
 
@@ -204,11 +205,11 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
                                  lir.IntType(64),              # size_t n_cols_to_read
                                  lir.IntType(64).as_pointer(), # size_t * first_row,
                                  lir.IntType(64).as_pointer(), # size_t * n_rows,
-                                 llir.IntType(8).as_pointer(), # std::string * delimiters
-                                 ir.IntType(8).as_pointer(),   # std::string * quotes
+                                 lir.IntType(8).as_pointer(),  # std::string * delimiters
+                                 lir.IntType(8).as_pointer(),  # std::string * quotes
                                 ])
         fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
-        rptr = builder.call(fn, [arg[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
+        rptr = builder.call(fn, [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
     cols_int_tup_typ = types.UniTuple(types.intp, ncols)
