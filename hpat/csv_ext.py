@@ -179,6 +179,9 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
     assert isinstance(n_cols_to_read_typ, types.Const)
     assert delims_typ == string_type or isinstance(delims_typ, types.Const)
     assert quotes_typ == string_type or isinstance(quotes_typ, types.Const)
+    ctype_enum_to_nb_typ = {v: k for k, v in _h5_typ_table.items()}
+    return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
+        for t in dtypes_typ.value])
 
     def codegen(context, builder, sig, args):
         # we simply cast the input tuples to a c-pointers
@@ -204,7 +207,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         rptr = builder.call(fn, [arg[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
-    return types.Tuple([types.Array(types.float64, 1, 'C')])(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ), codegen
+    return return_typ(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ), codegen
 
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx):
