@@ -190,13 +190,15 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
 
     def codegen(context, builder, sig, args):
         # we simply cast the input tuples to a c-pointers
-        cols_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
+        cols_ptr = cgutils.alloca_once(builder, args[1].type)
         builder.store(args[1], cols_ptr)
-        dtypes_ptr = cgutils.alloca_once(builder, lir.IntType(32).as_pointer())
+        cols_ptr = builder.bitcast(cols_ptr, lir.IntType(64).as_pointer())
+        dtypes_ptr = cgutils.alloca_once(builder, args[2].type)
         builder.store(args[2], dtypes_ptr)
+        dtypes_ptr = builder.bitcast(dtypes_ptr, lir.IntType(32).as_pointer())
         # we need extra pointers for output parameters
-        first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
-        n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64).as_pointer())
+        first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64))
+        n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64))
         # define function type, it returns an array of MemInfo **
         fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
                                 [lir.IntType(8).as_pointer(),  # const std::string * fname,
