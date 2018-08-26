@@ -195,7 +195,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         cols_ptr = builder.bitcast(cols_ptr, lir.IntType(64).as_pointer())
         dtypes_ptr = cgutils.alloca_once(builder, args[2].type)
         builder.store(args[2], dtypes_ptr)
-        dtypes_ptr = builder.bitcast(dtypes_ptr, lir.IntType(32).as_pointer())
+        dtypes_ptr = builder.bitcast(dtypes_ptr, lir.IntType(64).as_pointer())
         # we need extra pointers for output parameters
         first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64))
         n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64))
@@ -203,7 +203,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
                                 [lir.IntType(8).as_pointer(),  # const std::string * fname,
                                  lir.IntType(64).as_pointer(), # size_t * cols_to_read
-                                 lir.IntType(32).as_pointer(), # int * dtypes
+                                 lir.IntType(64).as_pointer(), # int64_t * dtypes
                                  lir.IntType(64),              # size_t n_cols_to_read
                                  lir.IntType(64).as_pointer(), # size_t * first_row,
                                  lir.IntType(64).as_pointer(), # size_t * n_rows,

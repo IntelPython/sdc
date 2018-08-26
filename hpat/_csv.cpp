@@ -71,13 +71,13 @@ extern "C" {
                      array of NULL pointers if no data was read
                      NULL if an error ocurred.
  **/
-MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                          size_t * first_row, size_t * n_rows,
                          std::string * delimiters = NULL, std::string * quotes = NULL);
 /**
    Like csv_read_file, but reading from a string.
  **/
-MemInfo ** csv_read_string(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+MemInfo ** csv_read_string(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                            size_t * first_row, size_t * n_rows,
                            std::string * delimiters = NULL, std::string * quotes = NULL);
 
@@ -255,7 +255,7 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
   We always read full lines until we read at least our chunk-size.
   This makes sure there are no gaps and no data duplication.
  */
-static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                          size_t * first_row, size_t * n_rows,
                          std::string * delimiters = NULL, std::string * quotes = NULL)
 {
@@ -291,7 +291,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     // we can skip reading alltogether if our chunk is past eof
     if(chunksize*rank < fsz) {
         // seems there is data for us to read, let's allocate the arrays
-        for(auto i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(dtypes[i], linesperchunk);
+        for(auto i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(static_cast<int>(dtypes[i]), linesperchunk);
  
         // let's prepare an mask fast checking if a column is requested
         std::vector<ssize_t> req(ncols, -1);
@@ -314,7 +314,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
                 size_t new_lpc = std::max(linesperchunk * 1.1, linesperchunk+2.0);
                 for(auto i=0; i<n_cols_to_read; ++i) {
                     void * tmp = result[i];
-                    result[i] = dtype_alloc(dtypes[i], new_lpc, tmp, linesperchunk);
+                    result[i] = dtype_alloc(static_cast<int>(dtypes[i]), new_lpc, tmp, linesperchunk);
                     dtype_dealloc(reinterpret_cast<MemInfo*>(tmp));
                 }
                 linesperchunk = new_lpc;
@@ -325,7 +325,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
             try{
                 for(auto i(tk.begin()); i!=tk.end(); ++c, ++i) {
                     if(req[c] >= 0) { // we only care about requested columns
-                        dtype_convert(dtypes[c], *i, result[req[c]], *n_rows);
+                        dtype_convert(static_cast<int>(dtypes[c]), *i, result[req[c]], *n_rows);
                     }
                 }
                 // we count/keep all lines except the first if it's incomplete
@@ -341,7 +341,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
 }
 
 
-extern "C" MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+extern "C" MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                                     size_t * first_row, size_t * n_rows,
                                     std::string * delimiters, std::string * quotes)
 {
@@ -354,7 +354,7 @@ extern "C" MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_
 }
 
 
-extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
+extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                                       size_t * first_row, size_t * n_rows,
                                       std::string * delimiters, std::string * quotes)
 {
@@ -370,7 +370,7 @@ extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_
 // ***********************************************************************************
 // ***********************************************************************************
 
-static void printit(MemInfo ** r, int * dtypes, size_t nr, size_t nc, size_t fr)
+static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr)
 {
     for(auto i=0; i<nr; ++i) {
         std::stringstream f;
