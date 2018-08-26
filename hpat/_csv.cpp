@@ -13,6 +13,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <numpy/ndarraytypes.h>
+#include "_hpat_common.h"
 
 // #include "_distributed.h"
 
@@ -179,14 +180,14 @@ static MemInfo* dtype_alloc(int dtype, size_t n, void * org=NULL, size_t on=0)
 {
     int sz = -1;
     switch(dtype) {
-    case NPY_INT32:   // also NPY_INT
-    case NPY_UINT32:  // also NPY_UINT
-    case NPY_FLOAT32: // also NPY_FLOAT
+    case HPAT_CTypes::INT32:   // also NPY_INT
+    case HPAT_CTypes::UINT32:  // also NPY_UINT
+    case HPAT_CTypes::FLOAT32: // also NPY_FLOAT
         sz = 4;
         break;
-    case NPY_INT64:   // also NPY_INTP
-    case NPY_UINT64:  // also NPY_UINTP
-    case NPY_FLOAT64: // also NPY_DOUBLE
+    case HPAT_CTypes::INT64:   // also NPY_INTP
+    case HPAT_CTypes::UINT64:  // also NPY_UINTP
+    case HPAT_CTypes::FLOAT64: // also NPY_DOUBLE
         sz = 8;
         break;
     default:
@@ -207,22 +208,22 @@ static void dtype_dealloc(MemInfo * mi)
 static void dtype_convert(int dtype, const std::string & from, void * to, size_t ln)
 {
     switch(dtype) {
-    case NPY_INT32: // also NPY_INT
+    case HPAT_CTypes::INT32: // also NPY_INT
         (reinterpret_cast<int32_t*>(to))[ln] = std::stoi(from.c_str());
         break;
-    case NPY_UINT32: // also NPY_UINT
+    case HPAT_CTypes::UINT32: // also NPY_UINT
         (reinterpret_cast<uint32_t*>(to))[ln] = (unsigned int)std::stoul(from.c_str());
         break;
-    case NPY_INT64: // also NPY_INTP
+    case HPAT_CTypes::INT64: // also NPY_INTP
         (reinterpret_cast<int64_t*>(to))[ln] = std::stoll(from.c_str());
         break;
-    case NPY_UINT64: // also NPY_UINTP
+    case HPAT_CTypes::UINT64: // also NPY_UINTP
         (reinterpret_cast<uint64_t*>(to))[ln] = std::stoull(from.c_str());
         break;
-    case NPY_FLOAT32: // also NPY_FLOAT
+    case HPAT_CTypes::FLOAT32: // also NPY_FLOAT
         (reinterpret_cast<float*>(to))[ln] = std::stof(from.c_str());
         break;
-    case NPY_FLOAT64: // also NPY_DOUBLE
+    case HPAT_CTypes::FLOAT64: // also NPY_DOUBLE
         (reinterpret_cast<double*>(to))[ln] = std::stof(from.c_str());
         break;
     default:

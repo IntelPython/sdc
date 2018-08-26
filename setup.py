@@ -100,6 +100,7 @@ if is_win:
 
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
+                   depends=["hpat/_hpat_common.h"],
                    libraries = MPI_LIBS + ['hdf5', 'boost_filesystem', 'boost_system'],
                    include_dirs = ([HDF5_DIR+'/include',] + ind
                      + np_compile_args['include_dirs']
