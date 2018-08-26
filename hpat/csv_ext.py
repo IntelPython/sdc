@@ -211,7 +211,34 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
                                  lir.IntType(8).as_pointer(),  # std::string * quotes
                                 ])
         fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
-        rptr = builder.call(fn, [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]])
+        call_args = [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr,
+                     n_rows_ptr, args[4], args[5]]
+        mi_ptrs = builder.call(fn, call_args)
+
+        # create a tuple of arrays from returned meminfo pointers
+        ll_ret_typ = context.get_data_type(sig.return_type)
+        out_arr_tup = cgutils.alloca_once(builder, ll_ret_typ)
+        num_rows = builder.load(n_rows_ptr)
+
+        for i, arr_typ in enumerate(sig.return_type.types):
+            meminfo = builder.load(cgutils.gep_inbounds(builder, mi_ptrs, i))
+            data = context.nrt.meminfo_data(builder, meminfo)
+            arr = context.make_array(arr_typ)(context, builder)
+            nb_dtype = arr_typ.dtype
+            ll_dtype = context.get_data_type(nb_dtype)
+            itemsize = context.get_constant(types.intp,
+                context.get_abi_sizeof(ll_dtype))
+            context.populate_array(arr,
+                        data=builder.bitcast(data, ll_dtype.as_pointer()),
+                        shape=[num_rows],
+                        strides=[itemsize],
+                        itemsize=itemsize,
+                        meminfo=meminfo)
+            builder.store(
+                arr._getvalue(),
+                cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
+
+        return builder.load(out_arr_tup)
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
     cols_int_tup_typ = types.UniTuple(types.intp, ncols)
