@@ -318,6 +318,10 @@ class SeriesAttribute(AttributeTemplate):
         sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
+    @bound_function("series.sort_values")
+    def resolve_sort_values(self, ary, args, kws):
+        return signature(ary, *args)
+
     @bound_function("array.take")
     def resolve_take(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_take.__wrapped__

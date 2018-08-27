@@ -692,5 +692,24 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    def test_series_sort_values1(self):
+        def test_impl(A):
+            return A.sort_values()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.sort_values()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 if __name__ == "__main__":
     unittest.main()

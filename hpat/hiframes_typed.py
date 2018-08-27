@@ -336,8 +336,9 @@ class HiFramesTyped(object):
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
 
-        if func_name == 'argsort':
-            return self._handle_series_argsort(lhs, rhs, series_var)
+        if func_name in ('argsort', 'sort_values'):
+            return self._handle_series_sort(
+                lhs, rhs, series_var, func_name == 'argsort')
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
@@ -377,13 +378,18 @@ class HiFramesTyped(object):
 
         return [assign]
 
-    def _handle_series_argsort(self, lhs, rhs, series_var):
+    def _handle_series_sort(self, lhs, rhs, series_var, is_argsort):
         """creates an index list and passes it to a Sort node as data
         """
-        def _get_arange(S):  # pragma: no cover
-            n = len(S)
-            A = np.arange(n)
-        f_block = compile_to_numba_ir(_get_arange,
+        if is_argsort:
+            def _get_data(S):  # pragma: no cover
+                n = len(S)
+                A = np.arange(n)
+        else:  # sort_values
+            def _get_data(S):  # pragma: no cover
+                A = S.copy()
+
+        f_block = compile_to_numba_ir(_get_data,
                                             {'np': np}, self.typingctx,
                                             (if_series_to_array_type(self.typemap[series_var.name]),),
                                             self.typemap, self.calltypes).blocks.popitem()[1]
