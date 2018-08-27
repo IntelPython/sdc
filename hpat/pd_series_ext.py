@@ -480,6 +480,17 @@ class SeriesAttribute(AttributeTemplate):
         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
         return signature(dtype, *args)
 
+    @bound_function("series.idxmin")
+    def resolve_idxmin(self, ary, args, kws):
+        assert not kws
+        return signature(types.intp, *args)
+
+    @bound_function("series.idxmax")
+    def resolve_idxmax(self, ary, args, kws):
+        assert not kws
+        return signature(types.intp, *args)
+
+
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
 # # similar to SmartArray (targets/smartarray.py)

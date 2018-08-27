@@ -672,5 +672,25 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_idxmin1(self):
+        def test_impl(A):
+            return A.idxmin()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_idxmax1(self):
+        def test_impl(A):
+            return A.idxmax()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()
