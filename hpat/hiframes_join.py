@@ -18,8 +18,9 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str, num_total_chars,
-                              getitem_str_offset, copy_str_arr_slice, setitem_string_array)
-from hpat.hiframes_api import str_copy_ptr
+                              getitem_str_offset, copy_str_arr_slice,
+                              setitem_string_array, str_copy_ptr)
+
 from hpat.timsort import copyElement_tup, getitem_arr_tup
 import numpy as np
 

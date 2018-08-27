@@ -272,6 +272,29 @@ def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
 
     return types.void(string_array_type, string_array_type), codegen
 
+@intrinsic
+def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        buff_arr, ind, str, len_str = args
+        buff_arr = context.make_array(sig.args[0])(context, builder, buff_arr)
+        ptr = builder.gep(buff_arr.data, [ind])
+        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
+
+
+@intrinsic
+def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        ptr, ind, _str, len_str = args
+        ptr = builder.gep(ptr, [ind])
+        cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
+
+
 # convert array to list of strings if it is StringArray
 # just return it otherwise
 def to_string_list(arr):

@@ -33,6 +33,13 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
 
+from hpat.hiframes_sort import (
+    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+    )
+from hpat.hiframes_join import write_send_buff
+
 # quantile imports?
 from llvmlite import ir as lir
 import quantile_alg
@@ -235,74 +242,35 @@ def lower_nunique_parallel(context, builder, sig, args):
 
 # @overload(nunique_parallel)
 def nunique_overload_parallel(arr_typ):
-    # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
-    if is_str_arr_typ(arr_typ):
-        int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
-        char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
-        def nunique_par_str(A):
-            uniq_A = hpat.utils.to_array(set(A))
-            n_strs = len(uniq_A)
-            n_pes = hpat.distributed_api.get_size()
-            # send recv counts for the number of strings
-            send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-            send_disp = hpat.hiframes_join.calc_disp(send_counts)
-            recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-            recv_size = recv_counts.sum()
-            # send recv counts for the number of chars
-            send_chars_count, recv_chars_count = set_recv_counts_chars(uniq_A)
-            send_disp_chars = hpat.hiframes_join.calc_disp(send_chars_count)
-            recv_disp_chars = hpat.hiframes_join.calc_disp(recv_chars_count)
-            recv_num_chars = recv_chars_count.sum()
-            n_all_chars = hpat.str_arr_ext.num_total_chars(uniq_A)
 
-            # allocate send recv arrays
-            send_arr_lens = np.empty(n_strs, np.uint32)  # XXX offset type is uint32
-            send_arr_chars = np.empty(n_all_chars, np.uint8)
-            recv_arr = hpat.str_arr_ext.pre_alloc_string_array(recv_size, recv_num_chars)
-
-            # populate send array
-            tmp_offset = np.zeros(n_pes, dtype=np.int64)
-            tmp_offset_chars = np.zeros(n_pes, dtype=np.int64)
-
-            for i in range(n_strs):
-                str = uniq_A[i]
-                node_id = hash(str) % n_pes
-                # lens
-                ind = send_disp[node_id] + tmp_offset[node_id]
-                send_arr_lens[ind] = len(str)
-                tmp_offset[node_id] += 1
-                # chars
-                indc = send_disp_chars[node_id] + tmp_offset_chars[node_id]
-                str_copy(send_arr_chars, indc, str.c_str(), len(str))
-                tmp_offset_chars[node_id] += len(str)
-                hpat.str_ext.del_str(str)
-
-            # shuffle len values
-            offset_ptr = hpat.str_arr_ext.get_offset_ptr(recv_arr)
-            c_alltoallv(send_arr_lens.ctypes, offset_ptr, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, int32_typ_enum)
-            data_ptr = hpat.str_arr_ext.get_data_ptr(recv_arr)
-            # shuffle char values
-            c_alltoallv(send_arr_chars.ctypes, data_ptr, send_chars_count.ctypes, recv_chars_count.ctypes, send_disp_chars.ctypes, recv_disp_chars.ctypes, char_typ_enum)
-            convert_len_arr_to_offset(offset_ptr, recv_size)
-            loc_nuniq = len(set(recv_arr))
-            return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
-        return nunique_par_str
-
-    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
     def nunique_par(A):
         uniq_A = hpat.utils.to_array(set(A))
-        send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-        send_disp = hpat.hiframes_join.calc_disp(send_counts)
-        recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-        recv_size = recv_counts.sum()
-        # (send_counts, recv_counts, send_disp, recv_disp,
-        #  recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
-        send_arr = np.empty_like(uniq_A)
-        recv_arr = np.empty(recv_size, uniq_A.dtype)
-        hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
-        loc_nuniq = len(set(recv_arr))
+
+        n_pes = hpat.distributed_api.get_size()
+        shuffle_meta = alloc_shuffle_metadata(uniq_A, n_pes, False)
+        # calc send/recv counts
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            update_shuffle_meta(shuffle_meta, node_id, i, val, False)
+
+        finalize_shuffle_meta(uniq_A, shuffle_meta, False)
+
+        # write send buffers
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            write_send_buff(shuffle_meta, node_id, val)
+            # update last since it is reused in data
+            shuffle_meta.tmp_offset[node_id] += 1
+
+        # shuffle
+        alltoallv(uniq_A, shuffle_meta)
+
+        loc_nuniq = len(set(shuffle_meta.out_arr))
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
+
     return nunique_par
 
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))
@@ -321,28 +289,6 @@ def set_recv_counts_chars(key_arr):
         hpat.str_ext.del_str(str)
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     return send_counts, recv_counts
-
-@intrinsic
-def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
-    def codegen(context, builder, sig, args):
-        buff_arr, ind, str, len_str = args
-        buff_arr = make_array(sig.args[0])(context, builder, buff_arr)
-        ptr = builder.gep(buff_arr.data, [ind])
-        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
-        return context.get_dummy_value()
-
-    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
-
-
-@intrinsic
-def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
-    def codegen(context, builder, sig, args):
-        ptr, ind, _str, len_str = args
-        ptr = builder.gep(ptr, [ind])
-        cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
-        return context.get_dummy_value()
-
-    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
 
 
 @infer_global(count)
