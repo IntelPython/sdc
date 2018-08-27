@@ -127,7 +127,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
-    @unittest.skip("needs argsort fix in canonicalize_array_math")
     def test_series_attr5(self):
         def test_impl(A):
             return A.argsort().values
