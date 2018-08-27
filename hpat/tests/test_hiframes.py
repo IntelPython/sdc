@@ -344,6 +344,45 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    def test_unique(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            df.A[2] = 0
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
+
+    def test_unique_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.four.unique() == 3.0).sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
+    def test_unique_str(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
+
+    def test_unique_str_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.two.unique() == 'foo').sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
     def test_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})

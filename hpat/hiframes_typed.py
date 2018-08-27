@@ -296,7 +296,8 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
                          'nunique', 'describe', 'abs', 'str.len', 'isna',
-                         'isnull', 'median', 'idxmin', 'idxmax', 'prod']:
+                         'isnull', 'median', 'idxmin', 'idxmax', 'prod',
+                         'unique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -1416,6 +1417,7 @@ series_replace_funcs = {
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
+    'unique': lambda A: hpat.hiframes_api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
     'fillna_str_alloc': _series_fillna_str_alloc_impl,

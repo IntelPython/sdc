@@ -597,6 +597,20 @@ class DistributedPass(object):
             out = f_block.body[:-3]
             out[-1].target = assign.target
 
+        if fdef == ('unique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+                                                                or self._is_1D_Var_arr(rhs.args[0].name)):
+            arr = rhs.args[0].name
+
+            def f(arr):  # pragma: no cover
+                s = hpat.hiframes_api.unique_parallel(arr)
+
+            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                          (self.typemap[arr],),
+                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args)
+            out = f_block.body[:-3]
+            out[-1].target = assign.target
+
         if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name

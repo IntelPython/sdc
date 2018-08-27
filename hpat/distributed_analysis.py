@@ -251,6 +251,16 @@ class DistributedAnalysis(object):
             # nunique doesn't affect input's distribution
             return
 
+        if fdef == ('unique', 'hpat.hiframes_api'):
+            # doesn't affect distribution of input since input can stay 1D
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+
+            new_dist = Distribution(min(array_dists[lhs].value,
+                                        array_dists[rhs.args[0].name].value))
+            array_dists[lhs] = new_dist
+            return
+
         if fdef == ('nlargest', 'hpat.hiframes_api'):
             # output of nlargest is REP
             array_dists[lhs] = Distribution.REP
