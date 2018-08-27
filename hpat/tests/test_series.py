@@ -444,6 +444,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_prod1(self):
+        def test_impl(S):
+            return S.prod()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # all NA case should produce 1
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_count1(self):
         def test_impl(S):
             return S.count()

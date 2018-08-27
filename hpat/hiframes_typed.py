@@ -296,7 +296,7 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
                          'nunique', 'describe', 'abs', 'str.len', 'isna',
-                         'isnull', 'median', 'idxmin', 'idxmax']:
+                         'isnull', 'median', 'idxmin', 'idxmax', 'prod']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -1149,6 +1149,7 @@ def _sum_handle_nan(s, count):  # pragma: no cover
 
 def _column_sum_impl_basic(A):  # pragma: no cover
     numba.parfor.init_prange()
+    # TODO: fix output type
     s = 0
     for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
@@ -1172,6 +1173,17 @@ def _column_sum_impl_count(A):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_prod_impl_basic(A):  # pragma: no cover
+    numba.parfor.init_prange()
+    # TODO: fix output type
+    s = 1
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s *= val
+
+    res = s
+    return res
 
 @numba.njit
 def _mean_handle_nan(s, count):  # pragma: no cover
@@ -1384,6 +1396,7 @@ def _series_astype_str_impl(arr):
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
+    'prod': _column_prod_impl_basic,
     'count': _column_count_impl,
     'mean': _column_mean_impl,
     'max': _column_max_impl,
