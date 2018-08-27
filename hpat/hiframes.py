@@ -93,6 +93,7 @@ class HiFrames(object):
         self.pq_handler = ParquetHandler(
             func_ir, typingctx, args, _locals, self.reverse_copies)
 
+
     def run(self):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
@@ -147,6 +148,12 @@ class HiFrames(object):
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
+
+            # fix type for f['A'][:] dset reads
+            if rhs.op in ('getitem', 'static_getitem'):
+                tp = self._get_h5_type(lhs)
+                if tp is not None:
+                    pass
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -1374,6 +1381,13 @@ class HiFrames(object):
             return nodes
 
         return []
+
+    def _get_h5_type(self, varname):
+        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':h5_types') not in self.locals:
+            return None
+        new_name = self.reverse_copies[varname]
+        typ = self.locals.pop(new_name + ":h5_types")
+        return typ
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

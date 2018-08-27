@@ -13,10 +13,10 @@ class TestIO(unittest.TestCase):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
             X = f['points'][:]
-            f.close()
+            #f.close()
             return X
 
-        hpat_func = hpat.jit(test_impl)
+        hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.float64[:]})
         np.testing.assert_allclose(hpat_func(), test_impl())
 
     def test_h5_read_parallel(self):
