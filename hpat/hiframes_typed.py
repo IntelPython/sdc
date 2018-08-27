@@ -331,6 +331,15 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, n_arg])
 
+        if func_name == 'head':
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs['head_default'], [series_var])
+            n_arg = rhs.args[0]
+            func = series_replace_funcs[func_name]
+            return self._replace_func(func, [series_var, n_arg])
+
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
@@ -1428,6 +1437,8 @@ series_replace_funcs = {
     'astype_str': _series_astype_str_impl,
     'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
     'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5),
+    'head': lambda A, k: A[:k],
+    'head_default': lambda A: A[:5],
     'median': lambda A: hpat.hiframes_api.median(A),
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),

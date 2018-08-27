@@ -658,6 +658,26 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
+    def test_series_head1(self):
+        def test_impl(S):
+            return S.head(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_head_default1(self):
+        def test_impl(S):
+            return S.head()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
     def test_series_median1(self):
         def test_impl(S):
             return S.median()

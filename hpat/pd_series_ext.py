@@ -476,6 +476,11 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(ary, *args)
 
+    @bound_function("series.head")
+    def resolve_head(self, ary, args, kws):
+        assert not kws
+        return signature(ary, *args)
+
     @bound_function("series.median")
     def resolve_median(self, ary, args, kws):
         assert not kws
