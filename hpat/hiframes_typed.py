@@ -323,7 +323,10 @@ class HiFramesTyped(object):
             return self._replace_func(func, [series_var, shift_const])
 
         if func_name == 'nlargest':
-            # TODO: support default n=5 argument
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs['nlargest_default'], [series_var])
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, n_arg])
@@ -1424,6 +1427,7 @@ series_replace_funcs = {
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
     'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
+    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5),
     'median': lambda A: hpat.hiframes_api.median(A),
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),
