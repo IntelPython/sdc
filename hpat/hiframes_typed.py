@@ -14,6 +14,7 @@ from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
+from hpat import hiframes_sort
 from hpat.utils import debug_prints, inline_new_blocks
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
@@ -335,6 +336,9 @@ class HiFramesTyped(object):
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
 
+        if func_name == 'argsort':
+            return self._handle_series_argsort(lhs, rhs, series_var)
+
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
             return []
@@ -372,6 +376,23 @@ class HiFramesTyped(object):
                 func_name))
 
         return [assign]
+
+    def _handle_series_argsort(self, lhs, rhs, series_var):
+        """creates an index list and passes it to a Sort node as data
+        """
+        def _get_arange(S):  # pragma: no cover
+            n = len(S)
+            A = np.arange(n)
+        f_block = compile_to_numba_ir(_get_arange,
+                                            {'np': np}, self.typingctx,
+                                            (if_series_to_array_type(self.typemap[series_var.name]),),
+                                            self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes = f_block.body[:-3]
+        nodes[-1].target = lhs
+        nodes.append(
+            hiframes_sort.Sort(series_var.name, series_var, {'inds': lhs}, lhs.loc))
+        return nodes
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype
