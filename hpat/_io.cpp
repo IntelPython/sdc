@@ -10,8 +10,8 @@
 extern "C" {
 
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
-int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
-int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
+int64_t hpat_h5_size(hid_t dataset_id, int dim);
+int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_close(hid_t file_id);
 hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
@@ -117,10 +117,8 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     return file_id;
 }
 
-int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim)
+int64_t hpat_h5_size(hid_t dataset_id, int dim)
 {
-    hid_t dataset_id;
-    dataset_id = H5Dopen2(file_id, dset_name, H5P_DEFAULT);
     assert(dataset_id != -1);
     hid_t space_id = H5Dget_space(dataset_id);
     assert(space_id != -1);
@@ -133,15 +131,13 @@ int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim)
     return ret;
 }
 
-int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
+int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
     //printf("dset_name:%s ndims:%d size:%d typ:%d\n", dset_name, ndims, counts[0], typ_enum);
     // fflush(stdout);
     // printf("start %lld end %lld\n", start_ind, end_ind);
-    hid_t dataset_id;
     herr_t ret;
-    dataset_id = H5Dopen2(file_id, dset_name, H5P_DEFAULT);
     assert(dataset_id != -1);
     hid_t space_id = H5Dget_space(dataset_id);
     assert(space_id != -1);

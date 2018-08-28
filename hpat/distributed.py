@@ -426,8 +426,8 @@ class DistributedPass(object):
 
         if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
                 and func_name in ['h5read', 'h5write'])
-                and self._is_1D_arr(rhs.args[6].name)):
-            arr = rhs.args[6].name
+                and self._is_1D_arr(rhs.args[5].name)):
+            arr = rhs.args[5].name
             ndims = len(self._array_starts[arr])
             starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
             self.typemap[starts_var.name] = types.containers.UniTuple(
@@ -435,7 +435,7 @@ class DistributedPass(object):
             start_tuple_call = ir.Expr.build_tuple(
                 self._array_starts[arr], loc)
             starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
-            rhs.args[3] = starts_var
+            rhs.args[2] = starts_var
             counts_var = ir.Var(scope, mk_unique_var("$h5_counts"), loc)
             self.typemap[counts_var.name] = types.containers.UniTuple(
                 types.int64, ndims)
@@ -443,8 +443,8 @@ class DistributedPass(object):
                 self._array_counts[arr], loc)
             counts_assign = ir.Assign(count_tuple_call, counts_var, loc)
             out = [starts_assign, counts_assign, assign]
-            rhs.args[4] = counts_var
-            rhs.args[5] = self._set1_var
+            rhs.args[3] = counts_var
+            rhs.args[4] = self._set1_var
             # set parallel arg in file open
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)

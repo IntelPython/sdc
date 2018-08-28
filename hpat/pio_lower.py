@@ -42,48 +42,39 @@ def h5_open(context, builder, sig, args):
     return builder.call(fn, [val1, val2, args[2]])
 
 
-@lower_builtin(pio_api.h5size, h5file_type, StringType, types.int32)
+@lower_builtin(pio_api.h5size, h5file_type, types.int32)
 def h5_size(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
-    val2 = builder.call(fn, [args[1]])
     fnty = lir.FunctionType(lir.IntType(
-        64), [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32)])
+        64), [h5file_lir_type, lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_size")
-    return builder.call(fn, [args[0], val2, args[2]])
+    return builder.call(fn, [args[0], args[1]])
 
 
-@lower_builtin(pio_api.h5read, h5file_type, StringType, types.int32,
-               types.containers.UniTuple, types.containers.UniTuple, types.int64,
+@lower_builtin(pio_api.h5read, h5file_type, types.int32,
+               types.UniTuple, types.UniTuple, types.int64,
                types.npytypes.Array)
 def h5_read(context, builder, sig, args):
-    # insert the dset_name string arg
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
-    val2 = builder.call(fn, [args[1]])
     # extra last arg type for type enum
-    arg_typs = [h5file_lir_type, lir.IntType(8).as_pointer(), lir.IntType(32),
+    arg_typs = [h5file_lir_type, lir.IntType(32),
                 lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
                 lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
 
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_read")
-    out = make_array(sig.args[6])(context, builder, args[6])
+    out = make_array(sig.args[5])(context, builder, args[5])
     # store size vars array struct to pointer
-    count_ptr = cgutils.alloca_once(builder, args[3].type)
-    builder.store(args[3], count_ptr)
-    size_ptr = cgutils.alloca_once(builder, args[4].type)
-    builder.store(args[4], size_ptr)
+    count_ptr = cgutils.alloca_once(builder, args[2].type)
+    builder.store(args[2], count_ptr)
+    size_ptr = cgutils.alloca_once(builder, args[3].type)
+    builder.store(args[3], size_ptr)
     # store an int to specify data type
-    typ_enum = _numba_to_c_type_map[sig.args[6].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[5].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
-    call_args = [args[0], val2, args[2],
+    call_args = [args[0], args[1],
                  builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
                  builder.bitcast(size_ptr, lir.IntType(
-                     64).as_pointer()), args[5],
+                     64).as_pointer()), args[4],
                  builder.bitcast(out.data, lir.IntType(8).as_pointer()),
                  builder.load(typ_arg)]
 
