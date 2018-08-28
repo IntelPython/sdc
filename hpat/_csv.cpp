@@ -1,7 +1,7 @@
 /*
   SPMD CSV reader. 
 */
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+//#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <mpi.h>
 #include <cstdint>
 #include <cinttypes>
@@ -12,7 +12,7 @@
 #include <vector>
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <numpy/ndarraytypes.h>
+//#include <numpy/ndarraytypes.h>
 #include "_hpat_common.h"
 
 // #include "_distributed.h"
@@ -97,67 +97,37 @@ void csv_delete(MemInfo ** cols, size_t release);
 template<int T> struct DTYPE;
 
 template<>
-struct DTYPE<NPY_BOOL>
-{
-    typedef bool dtype;
-};
-
-template<>
-struct DTYPE<NPY_BYTE> // also NPY_INT8
-{
-    typedef int8_t dtype;
-};
-
-template<>
-struct DTYPE<NPY_SHORT> // also NPY_INT16
-{
-    typedef int16_t dtype;
-};
-
-template<>
-struct DTYPE<NPY_INT> // also NPY_INT32
+struct DTYPE<HPAT_CTypes::INT32>
 {
     typedef int32_t dtype;
 };
 
 template<>
-struct DTYPE<NPY_INT64> // also NPY_INTP
+struct DTYPE<HPAT_CTypes::INT64>
 {
     typedef int64_t dtype;
 };
 
 template<>
-struct DTYPE<NPY_UBYTE> // also NPY_UINT8
-{
-    typedef int8_t dtype;
-};
-
-template<>
-struct DTYPE<NPY_USHORT> // also NPY_UINT16
-{
-    typedef uint16_t dtype;
-};
-
-template<>
-struct DTYPE<NPY_UINT> // also NPY_UINT32
+struct DTYPE<HPAT_CTypes::UINT32>
 {
     typedef uint32_t dtype;
 };
 
 template<>
-struct DTYPE<NPY_UINT64> // also NPY_INTUP
+struct DTYPE<HPAT_CTypes::UINT64>
 {
     typedef int64_t dtype;
 };
 
 template<>
-struct DTYPE<NPY_FLOAT> // also NPY_FLOAT32
+struct DTYPE<HPAT_CTypes::FLOAT32>
 {
     typedef float dtype;
 };
 
 template<>
-struct DTYPE<NPY_DOUBLE> // also NPY_FLOAT64
+struct DTYPE<HPAT_CTypes::FLOAT64>
 {
     typedef double dtype;
 };
@@ -165,29 +135,38 @@ struct DTYPE<NPY_DOUBLE> // also NPY_FLOAT64
 
 static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_aligned");
 static MemInfo_release_type mi_release = (MemInfo_release_type) import_meminfo_func("MemInfo_release");
+#if 0
 static MemInfo_data_type mi_data = (MemInfo_data_type)import_meminfo_func("MemInfo_data");
+#else
+static void * mi_data(MemInfo* mi)
+{
+    return reinterpret_cast<void*>(((char*)mi)+24);
+}
+#endif
 
 // Allocating an array of given typesize, optionally copy from org buffer
 static MemInfo* alloc_meminfo(int dtype_sz, size_t n, void * org=NULL, size_t on=0)
 {
     auto mi = mi_alloc(n*dtype_sz, dtype_sz);
+    std::cout << "kk " << mi << std::endl;
     if(org) memcpy(mi_data(mi), org, std::min(n, on) * dtype_sz);
     return mi;
 }
+
 
 // Allocating an array of given type and size, optionally copy from org buffer
 static MemInfo* dtype_alloc(int dtype, size_t n, void * org=NULL, size_t on=0)
 {
     int sz = -1;
     switch(dtype) {
-    case HPAT_CTypes::INT32:   // also NPY_INT
-    case HPAT_CTypes::UINT32:  // also NPY_UINT
-    case HPAT_CTypes::FLOAT32: // also NPY_FLOAT
+    case HPAT_CTypes::INT32:
+    case HPAT_CTypes::UINT32:
+    case HPAT_CTypes::FLOAT32:
         sz = 4;
         break;
-    case HPAT_CTypes::INT64:   // also NPY_INTP
-    case HPAT_CTypes::UINT64:  // also NPY_UINTP
-    case HPAT_CTypes::FLOAT64: // also NPY_DOUBLE
+    case HPAT_CTypes::INT64:
+    case HPAT_CTypes::UINT64:
+    case HPAT_CTypes::FLOAT64:
         sz = 8;
         break;
     default:
@@ -208,22 +187,22 @@ static void dtype_dealloc(MemInfo * mi)
 static void dtype_convert(int dtype, const std::string & from, void * to, size_t ln)
 {
     switch(dtype) {
-    case HPAT_CTypes::INT32: // also NPY_INT
+    case HPAT_CTypes::INT32:
         (reinterpret_cast<int32_t*>(to))[ln] = std::stoi(from.c_str());
         break;
-    case HPAT_CTypes::UINT32: // also NPY_UINT
+    case HPAT_CTypes::UINT32:
         (reinterpret_cast<uint32_t*>(to))[ln] = (unsigned int)std::stoul(from.c_str());
         break;
-    case HPAT_CTypes::INT64: // also NPY_INTP
+    case HPAT_CTypes::INT64:
         (reinterpret_cast<int64_t*>(to))[ln] = std::stoll(from.c_str());
         break;
-    case HPAT_CTypes::UINT64: // also NPY_UINTP
+    case HPAT_CTypes::UINT64:
         (reinterpret_cast<uint64_t*>(to))[ln] = std::stoull(from.c_str());
         break;
-    case HPAT_CTypes::FLOAT32: // also NPY_FLOAT
+    case HPAT_CTypes::FLOAT32:
         (reinterpret_cast<float*>(to))[ln] = std::stof(from.c_str());
         break;
-    case HPAT_CTypes::FLOAT64: // also NPY_DOUBLE
+    case HPAT_CTypes::FLOAT64:
         (reinterpret_cast<double*>(to))[ln] = std::stof(from.c_str());
         break;
     default:
@@ -246,6 +225,8 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
 
 #define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
 
+static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr);
+
 /* 
   We divide the file into chunks, one for each process.
   Lines generally have different lengths, so we might start int he middle of the line.
@@ -257,8 +238,8 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
   This makes sure there are no gaps and no data duplication.
  */
 static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                         size_t * first_row, size_t * n_rows,
-                         std::string * delimiters = NULL, std::string * quotes = NULL)
+                          size_t * first_row, size_t * n_rows,
+                          std::string * delimiters = NULL, std::string * quotes = NULL)
 {
     CHECK(dtypes, "Input parameter dtypes must not be NULL.");
     CHECK(first_row && n_rows, "Output parameters first_row and n_rows must not be NULL.");
@@ -326,7 +307,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
             try{
                 for(auto i(tk.begin()); i!=tk.end(); ++c, ++i) {
                     if(req[c] >= 0) { // we only care about requested columns
-                        dtype_convert(static_cast<int>(dtypes[c]), *i, result[req[c]], *n_rows);
+                        dtype_convert(static_cast<int>(dtypes[c]), *i, mi_data(result[req[c]]), *n_rows);
                     }
                 }
                 // we count/keep all lines except the first if it's incomplete
@@ -338,6 +319,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
         }
     }
     *first_row = hpat_dist_exscan_i8(*n_rows);
+    printit(result, dtypes, *n_rows, n_cols_to_read, *first_row);
     return result;
 }
 
@@ -367,7 +349,6 @@ extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_
 }
 
 
-#if 0
 // ***********************************************************************************
 // ***********************************************************************************
 
@@ -379,25 +360,26 @@ static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t
         for(auto j=0; j<nc; ++j) {
             void * data = mi_data(r[j]);
             switch(dtypes[j]) {
-            case NPY_INT32: // also NPY_INT
-                f << (reinterpret_cast<int32_t*>(data))[i];
+            case HPAT_CTypes::INT32:
+                f << "i32:" << (reinterpret_cast<int32_t*>(data))[i];
                 break;
-            case NPY_UINT32: // also NPY_UINT
-                f << (reinterpret_cast<uint32_t*>(data))[i];
+            case HPAT_CTypes::UINT32:
+                f << "ui32:" << (reinterpret_cast<uint32_t*>(data))[i];
                 break;
-            case NPY_INT64: // also NPY_INTP
-                f << (reinterpret_cast<int64_t*>(data))[i];
+            case HPAT_CTypes::INT64:
+                f << "i64:" << (reinterpret_cast<int64_t*>(data))[i];
                 break;
-            case NPY_UINT64: // also NPY_UINTP
-                f << (reinterpret_cast<uint64_t*>(data))[i];
+            case HPAT_CTypes::UINT64:
+                f << "ui64:" << (reinterpret_cast<uint64_t*>(data))[i];
                 break;
-            case NPY_FLOAT32: // also NPY_FLOAT
-                f << (reinterpret_cast<float*>(data))[i];
+            case HPAT_CTypes::FLOAT32:
+                f << "f32:" << (reinterpret_cast<float*>(data))[i];
                 break;
-            case NPY_FLOAT64: // also NPY_DOUBLE
-                f << (reinterpret_cast<double*>(data))[i];
+            case HPAT_CTypes::FLOAT64:
+                f << "f64:" << (reinterpret_cast<double*>(data))[i];
                 break;
             default:
+                f << "?";
                 ;
             }
             f << ", ";
@@ -407,13 +389,14 @@ static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t
     }
 }
 
+#if 0
 int main()
 {
     int rank = hpat_dist_get_rank();
     int ncols = 4;
 
     size_t cols[ncols] = {0,1,2,3};
-    int dtypes[ncols] = {NPY_INT, NPY_FLOAT, NPY_DOUBLE, NPY_UINT64};
+    int dtypes[ncols] = {HPAT_CTypes::INT, HPAT_CTypes::FLOAT32, HPAT_CTypes::FLOAT64, HPAT_CTypes::UINT64};
     size_t first_row, n_rows;
     std::string delimiters = ",";
     std::string quotes = "\"";
@@ -488,55 +471,4 @@ int main()
 
     MPI_Finalize();
 }
-
-// NPY_LONGDOUBLE
-// The enumeration value for a platform-specific floating point type which is at least as large as NPY_DOUBLE, but larger on many platforms.
-
-// NPY_CFLOAT
-// NPY_COMPLEX64
-// The enumeration value for a 64-bit/8-byte complex type made up of two NPY_FLOAT values.
-
-// NPY_CDOUBLE
-// NPY_COMPLEX128
-// The enumeration value for a 128-bit/16-byte complex type made up of two NPY_DOUBLE values.
-
-// NPY_CLONGDOUBLE
-// The enumeration value for a platform-specific complex floating point type which is made up of two NPY_LONGDOUBLE values.
-
-// NPY_DATETIME
-// The enumeration value for a data type which holds dates or datetimes with a precision based on selectable date or time units.
-
-// NPY_TIMEDELTA
-// The enumeration value for a data type which holds lengths of times in integers of selectable date or time units.
-
-// NPY_STRING
-// The enumeration value for ASCII strings of a selectable size. The strings have a fixed maximum size within a given array.
-
-// NPY_UNICODE
-// The enumeration value for UCS4 strings of a selectable size. The strings have a fixed maximum size within a given array.
-
-// NPY_OBJECT
-// The enumeration value for references to arbitrary Python objects.
-
-// NPY_VOID
-// Primarily used to hold struct dtypes, but can contain arbitrary binary data.
-
-// Some useful aliases of the above types are
-
-// NPY_MASK
-// The enumeration value of the type used for masks, such as with the NPY_ITER_ARRAYMASK iterator flag. This is equivalent to NPY_UINT8.
-
-// NPY_DEFAULT_TYPE
-// The default type to use when no dtype is explicitly specified, for example when calling np.zero(shape). This is equivalent to NPY_DOUBLE.
-
-// Other useful related constants are
-
-// NPY_NTYPES
-// The total number of built-in NumPy types. The enumeration covers the range from 0 to NPY_NTYPES-1.
-
-// NPY_NOTYPE
-// A signal value guaranteed not to be a valid type enumeration number.
-
-// NPY_USERDEF
-// The start of type numbers used for Custom Data types.
-#endif // 0
+#endif
