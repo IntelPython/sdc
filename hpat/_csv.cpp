@@ -1,7 +1,6 @@
 /*
   SPMD CSV reader. 
 */
-//#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <mpi.h>
 #include <cstdint>
 #include <cinttypes>
@@ -12,7 +11,6 @@
 #include <vector>
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem/operations.hpp>
-//#include <numpy/ndarraytypes.h>
 #include "_hpat_common.h"
 
 // #include "_distributed.h"
@@ -33,8 +31,6 @@ static int hpat_dist_get_size()
 {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    // printf("r size:%d\n", sizeof(MPI_Request));
-    // printf("mpi_size:%d\n", size);
     return size;
 }
 
@@ -94,45 +90,6 @@ void csv_delete(MemInfo ** cols, size_t release);
 // ***********************************************************************************
 // ***********************************************************************************
 
-template<int T> struct DTYPE;
-
-template<>
-struct DTYPE<HPAT_CTypes::INT32>
-{
-    typedef int32_t dtype;
-};
-
-template<>
-struct DTYPE<HPAT_CTypes::INT64>
-{
-    typedef int64_t dtype;
-};
-
-template<>
-struct DTYPE<HPAT_CTypes::UINT32>
-{
-    typedef uint32_t dtype;
-};
-
-template<>
-struct DTYPE<HPAT_CTypes::UINT64>
-{
-    typedef int64_t dtype;
-};
-
-template<>
-struct DTYPE<HPAT_CTypes::FLOAT32>
-{
-    typedef float dtype;
-};
-
-template<>
-struct DTYPE<HPAT_CTypes::FLOAT64>
-{
-    typedef double dtype;
-};
-
-
 static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_aligned");
 static MemInfo_release_type mi_release = (MemInfo_release_type) import_meminfo_func("MemInfo_release");
 #if 0
@@ -148,7 +105,6 @@ static void * mi_data(MemInfo* mi)
 static MemInfo* alloc_meminfo(int dtype_sz, size_t n, void * org=NULL, size_t on=0)
 {
     auto mi = mi_alloc(n*dtype_sz, dtype_sz);
-    std::cout << "kk " << mi << std::endl;
     if(org) memcpy(mi_data(mi), org, std::min(n, on) * dtype_sz);
     return mi;
 }
