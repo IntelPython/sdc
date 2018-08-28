@@ -50,8 +50,6 @@ static int64_t hpat_dist_exscan_i8(int64_t value)
 
 extern "C" {
 
-    void  __hpat_breakpoint() {};
-
 /**
    Read a CSV file.
    Returned pointer must be deallocated by calling csv_delete using the same n_cols_to_read.
