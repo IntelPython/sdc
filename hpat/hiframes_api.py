@@ -133,12 +133,15 @@ def nth_element(arr, k, parallel=False):
         nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
     return res[0]
 
+sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
 @numba.njit
 def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
     n = len(arr)
-    k = len(arr) // 2
+    n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))
+    k = n // 2
 
     # odd length case
     if n % 2 == 1:
