@@ -70,6 +70,10 @@ class FileAttribute(AttributeTemplate):
         assert not args
         return signature(string_list_type, *args)
 
+    @bound_function("h5file.close")
+    def resolve_close(self, f_id, args, kws):
+        return signature(types.none, *args)
+
 @infer
 class GetItemH5File(AbstractTemplate):
     key = "getitem"
@@ -162,7 +166,7 @@ class H5Close(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.int32, *args)
+        return signature(types.none, *args)
 
 
 @infer_global(h5create_dset)

@@ -13,7 +13,7 @@ class TestIO(unittest.TestCase):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
             X = f['points'][:]
-            #f.close()
+            f.close()
             return X
 
         hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.float64[:,:]})

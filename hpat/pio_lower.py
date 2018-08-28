@@ -97,10 +97,12 @@ def h5_read(context, builder, sig, args):
 
 
 @lower_builtin(pio_api.h5close, h5file_type)
+@lower_builtin("h5file.close", h5file_type)
 def h5_close(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [h5file_lir_type])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_close")
-    return builder.call(fn, args)
+    builder.call(fn, args)
+    return context.get_dummy_value()
 
 
 @lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
