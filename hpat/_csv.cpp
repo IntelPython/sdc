@@ -1,5 +1,5 @@
 /*
-  SPMD CSV reader. 
+  SPMD CSV reader.
 */
 #include <mpi.h>
 #include <cstdint>
@@ -43,6 +43,7 @@ static int64_t hpat_dist_exscan_i8(int64_t value)
 }
 
 #include "_meminfo.h"
+#define ALIGN 32
 
 extern "C" {
 
@@ -90,9 +91,9 @@ void csv_delete(MemInfo ** cols, size_t release);
 // ***********************************************************************************
 // ***********************************************************************************
 
-static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_aligned");
+static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_safe_aligned");
 static MemInfo_release_type mi_release = (MemInfo_release_type) import_meminfo_func("MemInfo_release");
-#if 0
+#if 1
 static MemInfo_data_type mi_data = (MemInfo_data_type)import_meminfo_func("MemInfo_data");
 #else
 static void * mi_data(MemInfo* mi)
@@ -104,7 +105,7 @@ static void * mi_data(MemInfo* mi)
 // Allocating an array of given typesize, optionally copy from org buffer
 static MemInfo* alloc_meminfo(int dtype_sz, size_t n, void * org=NULL, size_t on=0)
 {
-    auto mi = mi_alloc(n*dtype_sz, dtype_sz);
+    auto mi = mi_alloc(n*dtype_sz, ALIGN);
     if(org) memcpy(mi_data(mi), org, std::min(n, on) * dtype_sz);
     return mi;
 }
@@ -183,12 +184,12 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
 
 static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr);
 
-/* 
+/*
   We divide the file into chunks, one for each process.
   Lines generally have different lengths, so we might start int he middle of the line.
   Hence, we determine the number cols in the file and check if our first line is a full line.
   If not, we just throw it away.
-  Similary, our chunk might not end at a line boundary. 
+  Similary, our chunk might not end at a line boundary.
   Note that we assume all lines have the same numer of tokens/columns.
   We always read full lines until we read at least our chunk-size.
   This makes sure there are no gaps and no data duplication.
@@ -219,25 +220,25 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     }
     CHECK(n_cols_to_read <= ncols, "More columns requested than available.");
     if(cols_to_read) for(auto i=0; i<n_cols_to_read; ++i) CHECK(ncols > cols_to_read[i], "Invalid column index provided.");
-    
+
     // We evenly distribute the 'data' byte-wise
     auto chunksize = fsz/nranks;
     // and conservatively estimate #lines per chunk
     size_t linesperchunk = (size_t) std::max((1.1 * chunksize) / linesize, 1.0);
-    
+
     *n_rows = 0;
     // we can skip reading alltogether if our chunk is past eof
     if(chunksize*rank < fsz) {
         // seems there is data for us to read, let's allocate the arrays
         for(auto i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(static_cast<int>(dtypes[i]), linesperchunk);
- 
+
         // let's prepare an mask fast checking if a column is requested
         std::vector<ssize_t> req(ncols, -1);
         for(auto i=0; i<n_cols_to_read; ++i) {
             auto idx = cols_to_read ? cols_to_read[i] : i;
             req[idx] = i;
         }
-        
+
         // seek to our chunk and read it
         f.seekg(chunksize*rank, std::ios_base::beg);
         size_t chunkend = chunksize*(rank+1);
@@ -275,7 +276,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
         }
     }
     *first_row = hpat_dist_exscan_i8(*n_rows);
-    printit(result, dtypes, *n_rows, n_cols_to_read, *first_row);
+    // printit(result, dtypes, *n_rows, n_cols_to_read, *first_row);
     return result;
 }
 
@@ -356,7 +357,7 @@ int main()
     size_t first_row, n_rows;
     std::string delimiters = ",";
     std::string quotes = "\"";
-    
+
     if(!rank) std::cout << "\na regular case\n";
     std::string csv =
         "0,2.3,4.6,47736\n"
@@ -423,7 +424,7 @@ int main()
 
     csv_read_string(NULL, NULL, NULL, 4, NULL, NULL, NULL, NULL);
     csv_read_string(&csv, NULL, NULL, 4, NULL, NULL, NULL, NULL);
-    
+
 
     MPI_Finalize();
 }
