@@ -134,7 +134,6 @@ int64_t hpat_h5_size(hid_t dataset_id, int dim)
     hsize_t data_ndim = H5Sget_simple_extent_ndims(space_id);
     hsize_t *space_dims = new hsize_t[data_ndim];
     H5Sget_simple_extent_dims(space_id, space_dims, NULL);
-    H5Dclose(dataset_id);
     H5Sclose(space_id);
     hsize_t ret = space_dims[dim];
     delete[] space_dims;
