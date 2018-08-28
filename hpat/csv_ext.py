@@ -5,6 +5,7 @@ from numba import typeinfer, ir, ir_utils, config, types, cgutils
 from numba.extending import overload, intrinsic
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
+#from numba.unsafe.tuple import tuple_setitem
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
@@ -170,6 +171,15 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 ll.add_symbol('csv_read_file', hio.csv_read_file)
 
+
+ll.add_symbol('__hpat_breakpoint', hio.__hpat_breakpoint)
+
+def add_breakpoint(builder):
+    fnty = lir.FunctionType(lir.VoidType(), [])
+    fn = builder.module.get_or_insert_function(fnty, name='__hpat_breakpoint')
+    return builder.call(fn, [])
+
+
 @intrinsic(support_literals=True)
 def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
     '''
@@ -184,8 +194,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
     assert delims_typ == string_type or isinstance(delims_typ, types.Const)
     assert quotes_typ == string_type or isinstance(quotes_typ, types.Const)
     ctype_enum_to_nb_typ = {v: k for k, v in _numba_to_c_type_map.items()}
-    return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
-        for t in dtypes_typ.value])
+    return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C') for t in dtypes_typ.value])
     ncols = len(cols_to_read_typ.value)
 
     def codegen(context, builder, sig, args):
@@ -211,14 +220,18 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
                                  lir.IntType(8).as_pointer(),  # std::string * quotes
                                 ])
         fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
-        call_args = [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr,
-                     n_rows_ptr, args[4], args[5]]
+        call_args = [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr, n_rows_ptr, args[4], args[5]]
         mi_ptrs = builder.call(fn, call_args)
 
         # create a tuple of arrays from returned meminfo pointers
         ll_ret_typ = context.get_data_type(sig.return_type)
         out_arr_tup = cgutils.alloca_once(builder, ll_ret_typ)
+        #empty_tuple = context.get_constant_undef(return_typ)
         num_rows = builder.load(n_rows_ptr)
+
+        #def _setitem(et, i, v):
+        #    out = et
+        #    return tuple_setitem(out, i, v)
 
         for i, arr_typ in enumerate(sig.return_type.types):
             meminfo = builder.load(cgutils.gep_inbounds(builder, mi_ptrs, i))
@@ -226,24 +239,28 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
             arr = context.make_array(arr_typ)(context, builder)
             nb_dtype = arr_typ.dtype
             ll_dtype = context.get_data_type(nb_dtype)
-            itemsize = context.get_constant(types.intp,
-                context.get_abi_sizeof(ll_dtype))
+            itemsize = context.get_constant(types.intp, context.get_abi_sizeof(ll_dtype))
+            #zero = context.get_constant(types.intp, 0)
             context.populate_array(arr,
-                        data=builder.bitcast(data, ll_dtype.as_pointer()),
-                        shape=[num_rows],
-                        strides=[itemsize],
-                        itemsize=itemsize,
-                        meminfo=meminfo)
-            builder.store(
-                arr._getvalue(),
-                cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
+                                   data=builder.bitcast(data, ll_dtype.as_pointer()),
+                                   #shape=[zero],
+                                   shape=[itemsize],
+                                   strides=[itemsize],
+                                   itemsize=itemsize,
+                                   meminfo=meminfo)
+            #inner_argtypes = [return_typ, types.intp, arr_typ]
+            #inner_sig = return_typ(*inner_argtypes)
+            #inner_args = [empty_tuple, i, arr._getvalue()]
+            #empty_tuple = context.compile_internal(builder, _setitem, inner_sig, inner_args)
+            builder.store(arr._getvalue(),
+                          cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
 
-        return builder.load(out_arr_tup)
+        ret = builder.load(out_arr_tup)
+        add_breakpoint(builder)
+        return ret
 
-    #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
     cols_int_tup_typ = types.UniTuple(types.intp, ncols)
-    arg_typs = (string_type, cols_int_tup_typ, cols_int_tup_typ, types.intp,
-                string_type, string_type)
+    arg_typs = (string_type, cols_int_tup_typ, cols_int_tup_typ, types.intp, string_type, string_type)
     return return_typ(*arg_typs), codegen
 
 

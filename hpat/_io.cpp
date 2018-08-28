@@ -32,6 +32,8 @@ void file_write_parallel(std::string* file_name, char* buff, int64_t start, int6
 void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
                       size_t * first_row, size_t * n_rows,
                       std::string * delimiters, std::string * quotes);
+void  __hpat_breakpoint();
+
 #define ROOT 0
 #define LARGE_DTYPE_SIZE 1024
 
@@ -45,6 +47,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
 
     PyObject_SetAttrString(m, "csv_read_file",
                             PyLong_FromVoidPtr((void*)(&csv_read_file)));
+    PyObject_SetAttrString(m, "__hpat_breakpoint",
+                            PyLong_FromVoidPtr((void*)(&__hpat_breakpoint)));
 
     PyObject_SetAttrString(m, "hpat_h5_open",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_open)));
