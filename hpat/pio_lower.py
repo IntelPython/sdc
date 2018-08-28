@@ -3,13 +3,14 @@ from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
 from hpat.utils import _numba_to_c_type_map
-from hpat.pio_api import h5file_type
+from hpat.pio_api import h5file_type, h5dataset_or_group_type
 from hpat.str_ext import StringType
 import h5py
 from llvmlite import ir as lir
 import hio
 import llvmlite.binding as ll
 ll.add_symbol('hpat_h5_open', hio.hpat_h5_open)
+ll.add_symbol('hpat_h5_open_dset_or_group_obj', hio.hpat_h5_open_dset_or_group_obj)
 ll.add_symbol('hpat_h5_size', hio.hpat_h5_size)
 ll.add_symbol('hpat_h5_read', hio.hpat_h5_read)
 ll.add_symbol('hpat_h5_get_type_enum', hio.hpat_h5_get_type_enum)
@@ -29,6 +30,19 @@ else:
     assert h5py.version.hdf5_version_tuple[1] == 10
 
 
+@lower_builtin("getitem", h5file_type, StringType)
+def h5_open_dset_lower(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
+    val1 = builder.call(fn, [args[1]])
+
+    fnty = lir.FunctionType(h5file_lir_type, [h5file_lir_type, lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open_dset_or_group_obj")
+    return builder.call(fn, [args[0], val1])
+
+
+@lower_builtin(h5py.File, StringType, StringType)
 @lower_builtin(h5py.File, StringType, StringType, types.int64)
 def h5_open(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -36,13 +50,14 @@ def h5_open(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
     val1 = builder.call(fn, [args[0]])
     val2 = builder.call(fn, [args[1]])
+    is_parallel = context.get_constant(types.int64, 0) if len(args) < 3 else args[2]
     fnty = lir.FunctionType(h5file_lir_type, [lir.IntType(
         8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
-    return builder.call(fn, [val1, val2, args[2]])
+    return builder.call(fn, [val1, val2, is_parallel])
 
 
-@lower_builtin(pio_api.h5size, h5file_type, types.int32)
+@lower_builtin(pio_api.h5size, h5dataset_or_group_type, types.int32)
 def h5_size(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(
         64), [h5file_lir_type, lir.IntType(32)])
@@ -50,7 +65,7 @@ def h5_size(context, builder, sig, args):
     return builder.call(fn, [args[0], args[1]])
 
 
-@lower_builtin(pio_api.h5read, h5file_type, types.int32,
+@lower_builtin(pio_api.h5read, h5dataset_or_group_type, types.int32,
                types.UniTuple, types.UniTuple, types.int64,
                types.npytypes.Array)
 def h5_read(context, builder, sig, args):

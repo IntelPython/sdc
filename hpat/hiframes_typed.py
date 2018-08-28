@@ -214,7 +214,7 @@ class HiFramesTyped(object):
 
                     func_text = "def _h5_read_impl(dset_id, ndim, dtype_str):\n"
                     for i in range(ndim):
-                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, {})\n".format(i, i)
+                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
                     func_text += "  arr_shape = ({},)\n".format(
                         ", ".join(["size_{}".format(i) for i in range(ndim)]))
                     func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
