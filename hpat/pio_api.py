@@ -127,8 +127,8 @@ def h5_read_dummy():
 class H5ReadType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        ndim = args[2].value
-        dtype = getattr(types, args[3].value)
+        ndim = args[1].value
+        dtype = getattr(types, args[2].value)
         ret_typ = types.Array(dtype, ndim, 'C')
         return signature(ret_typ, *args)
 
@@ -145,7 +145,7 @@ class H5File(AbstractTemplate):
 class H5Size(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 3
+        assert len(args) == 2
         return signature(types.int64, *args)
 
 
@@ -153,7 +153,7 @@ class H5Size(AbstractTemplate):
 class H5Read(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 7
+        assert len(args) == 6
         return signature(types.int32, *args)
 
 

@@ -209,10 +209,10 @@ class HiFramesTyped(object):
                     func_name, func_mod = fdef
 
                 if fdef == ('h5_read_dummy', 'hpat.pio_api'):
-                    ndim = guard(find_const, self.func_ir, rhs.args[2])
-                    dtype_str = guard(find_const, self.func_ir, rhs.args[3])
+                    ndim = guard(find_const, self.func_ir, rhs.args[1])
+                    dtype_str = guard(find_const, self.func_ir, rhs.args[2])
 
-                    func_text = "def _h5_read_impl(dset_id, slice, ndim, dtype_str):\n"
+                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str):\n"
                     for i in range(ndim):
                         func_text += "  size_{} = hpat.pio_api.h5size(dset_id, {})\n".format(i, i)
                     func_text += "  arr_shape = ({},)\n".format(

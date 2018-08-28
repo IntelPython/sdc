@@ -135,7 +135,11 @@ class HiFrames(object):
             self.func_ir.blocks[label].body = new_body
 
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        # XXX: remove dead here fixes h5 slice issue
+        # iterative remove dead to make sure all extra code (e.g. df vars) is removed
+        while remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir):
+            pass
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
@@ -155,13 +159,13 @@ class HiFrames(object):
                 if tp is not None:
                     dtype_str = str(tp.dtype)
                     func_text = "def _h5_read_impl(dset, index):\n"
-                    func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, index, {}, '{}')\n".format(tp.ndim, dtype_str)
+                    # TODO: index arg?
+                    func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, {}, '{}')\n".format(tp.ndim, dtype_str)
                     loc_vars = {}
                     exec(func_text, {}, loc_vars)
                     _h5_read_impl = loc_vars['_h5_read_impl']
                     f_block = compile_to_numba_ir(
                             _h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
-                    #import pdb; pdb.set_trace()
                     replace_arg_nodes(f_block, [rhs.value, rhs.index_var])
                     nodes = f_block.body[:-3]  # remove none return
                     nodes[-1].target = assign.target
