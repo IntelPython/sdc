@@ -120,6 +120,19 @@ def h5write():
     """dummy function for C h5_write"""
     return
 
+def h5_read_dummy():
+    return
+
+@infer_global(h5_read_dummy)
+class H5ReadType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        ndim = args[2].value
+        dtype = getattr(types, args[3].value)
+        ret_typ = types.Array(dtype, ndim, 'C')
+        return signature(ret_typ, *args)
+
+H5ReadType.support_literals = True
 
 @infer_global(h5py.File)
 class H5File(AbstractTemplate):

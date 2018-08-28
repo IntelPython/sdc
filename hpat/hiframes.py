@@ -153,7 +153,19 @@ class HiFrames(object):
             if rhs.op in ('getitem', 'static_getitem'):
                 tp = self._get_h5_type(lhs)
                 if tp is not None:
-                    pass
+                    dtype_str = str(tp.dtype)
+                    func_text = "def _h5_read_impl(dset, index):\n"
+                    func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, index, {}, '{}')\n".format(tp.ndim, dtype_str)
+                    loc_vars = {}
+                    exec(func_text, {}, loc_vars)
+                    _h5_read_impl = loc_vars['_h5_read_impl']
+                    f_block = compile_to_numba_ir(
+                            _h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
+                    #import pdb; pdb.set_trace()
+                    replace_arg_nodes(f_block, [rhs.value, rhs.index_var])
+                    nodes = f_block.body[:-3]  # remove none return
+                    nodes[-1].target = assign.target
+                    return nodes
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)

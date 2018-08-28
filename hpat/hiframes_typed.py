@@ -208,6 +208,26 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
+                if fdef == ('h5_read_dummy', 'hpat.pio_api'):
+                    ndim = guard(find_const, self.func_ir, rhs.args[2])
+                    dtype_str = guard(find_const, self.func_ir, rhs.args[3])
+
+                    func_text = "def _h5_read_impl(dset_id, slice, ndim, dtype_str):\n"
+                    for i in range(ndim):
+                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, {})\n".format(i, i)
+                    func_text += "  arr_shape = ({},)\n".format(
+                        ", ".join(["size_{}".format(i) for i in range(ndim)]))
+                    func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+                    func_text += "  A = np.empty(arr_shape, np.{})\n".format(
+                        dtype_str)
+                    func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+                    func_text += "  return A\n"
+
+                    loc_vars = {}
+                    exec(func_text, {}, loc_vars)
+                    _h5_read_impl = loc_vars['_h5_read_impl']
+                    return self._replace_func(_h5_read_impl, rhs.args)
+
                 if fdef == ('DatetimeIndex', 'pandas'):
                     return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
