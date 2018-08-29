@@ -103,16 +103,16 @@ static void * mi_data(MemInfo* mi)
 #endif
 
 // Allocating an array of given typesize, optionally copy from org buffer
-static MemInfo* alloc_meminfo(int dtype_sz, size_t n, void * org=NULL, size_t on=0)
+static MemInfo* alloc_meminfo(int dtype_sz, size_t n, MemInfo * org=NULL, size_t on=0)
 {
     auto mi = mi_alloc(n*dtype_sz, ALIGN);
-    if(org) memcpy(mi_data(mi), org, std::min(n, on) * dtype_sz);
+    if(org) memcpy(mi_data(mi), mi_data(org), std::min(n, on) * dtype_sz);
     return mi;
 }
 
 
 // Allocating an array of given type and size, optionally copy from org buffer
-static MemInfo* dtype_alloc(int dtype, size_t n, void * org=NULL, size_t on=0)
+static MemInfo* dtype_alloc(int dtype, size_t n, MemInfo * org=NULL, size_t on=0)
 {
     int sz = -1;
     switch(dtype) {
@@ -171,7 +171,7 @@ static void dtype_convert(int dtype, const std::string & from, void * to, size_t
 // we can use and then delete the extra dtype column
 extern "C" void csv_delete(MemInfo ** mi, size_t release)
 {
-    for(auto i=0; i<release; ++i) {
+    for(size_t i=0; i<release; ++i) {
         if(mi[i]) {
             dtype_dealloc(mi[i]);
         }
@@ -181,8 +181,6 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
 
 
 #define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
-
-static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr);
 
 /*
   We divide the file into chunks, one for each process.
@@ -214,12 +212,16 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
 
     size_t ncols = 0;
     boost::escaped_list_separator<char> tokfunc("\\", delimiters ? *delimiters : ",", quotes ? *quotes : "\"\'");
-    {
+    try{
         boost::tokenizer<boost::escaped_list_separator<char> > tk(line, tokfunc);
         for(auto i(tk.begin()); i!=tk.end(); ++ncols, ++i) {}
+    } catch (...) {
+        // The first line must be correct
+        std::cerr << "Error parsing first line; giving up.\n";
+        return NULL;
     }
     CHECK(n_cols_to_read <= ncols, "More columns requested than available.");
-    if(cols_to_read) for(auto i=0; i<n_cols_to_read; ++i) CHECK(ncols > cols_to_read[i], "Invalid column index provided.");
+    if(cols_to_read) for(size_t i=0; i<n_cols_to_read; ++i) CHECK(ncols > cols_to_read[i], "Invalid column index provided.");
 
     // We evenly distribute the 'data' byte-wise
     auto chunksize = fsz/nranks;
@@ -230,11 +232,11 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     // we can skip reading alltogether if our chunk is past eof
     if(chunksize*rank < fsz) {
         // seems there is data for us to read, let's allocate the arrays
-        for(auto i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(static_cast<int>(dtypes[i]), linesperchunk);
+        for(size_t i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(static_cast<int>(dtypes[i]), linesperchunk);
 
         // let's prepare an mask fast checking if a column is requested
         std::vector<ssize_t> req(ncols, -1);
-        for(auto i=0; i<n_cols_to_read; ++i) {
+        for(size_t i=0; i<n_cols_to_read; ++i) {
             auto idx = cols_to_read ? cols_to_read[i] : i;
             req[idx] = i;
         }
@@ -242,26 +244,38 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
         // seek to our chunk and read it
         f.seekg(chunksize*rank, std::ios_base::beg);
         size_t chunkend = chunksize*(rank+1);
+        size_t curr_pos = f.tellg();
         // we stop reading when at least reached boundary of our chunk
         // we always stop on a line-boundary!
         // 2 cases: exact boundary: next rank will have full line
         //          behind boundary: next rank will skip incomplete line
         //          note that the next rank might be after its boundary after skipping the first line!
-        while(f.tellg() < chunkend && std::getline(f, line)) {
+        while(curr_pos < chunkend && std::getline(f, line)) {
+            // if the boundary of the chunk contains enough whitespace the actual data will be entirely in the next line
+            // in this case we must not read the line, we are done!
+            size_t my_pos = f.tellg();
+            if(my_pos > chunkend) {
+                int num_whitespaces(0);
+                for(char c : line) {
+                    if(!std::isspace(c)) break;
+                    ++num_whitespaces ;
+                }
+                // there is no more meaningfull data in our chunk -> we are done
+                if(curr_pos + num_whitespaces >= chunkend) break;
+            }
             // miss estimated number of lines?
             if(*n_rows >= linesperchunk) {
                 size_t new_lpc = std::max(linesperchunk * 1.1, linesperchunk+2.0);
-                for(auto i=0; i<n_cols_to_read; ++i) {
-                    void * tmp = result[i];
+                for(size_t i=0; i<n_cols_to_read; ++i) {
+                    MemInfo * tmp = result[i];
                     result[i] = dtype_alloc(static_cast<int>(dtypes[i]), new_lpc, tmp, linesperchunk);
                     dtype_dealloc(reinterpret_cast<MemInfo*>(tmp));
                 }
                 linesperchunk = new_lpc;
             }
-            // first line needs special attention
-            size_t c = 0;
-            boost::tokenizer<boost::escaped_list_separator<char> > tk(line, tokfunc);
             try{
+                size_t c = 0;
+                boost::tokenizer<boost::escaped_list_separator<char> > tk(line, tokfunc);
                 for(auto i(tk.begin()); i!=tk.end(); ++c, ++i) {
                     if(req[c] >= 0) { // we only care about requested columns
                         dtype_convert(static_cast<int>(dtypes[c]), *i, mi_data(result[req[c]]), *n_rows);
@@ -269,14 +283,15 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
                 }
                 // we count/keep all lines except the first if it's incomplete
                 if(*n_rows > 0 || c == ncols) ++(*n_rows);
+                else if(*n_rows == 0 && c != ncols) throw std::invalid_argument("Invalid format in first line");
             } catch (...) {
                 // The first line can easily be incorrect
                 if(*n_rows > 0 || rank == 0) std::cerr << "Error parsing line " << (*n_rows) << "; skipping.\n";
             }
+            curr_pos = my_pos;
         }
     }
     *first_row = hpat_dist_exscan_i8(*n_rows);
-    // printit(result, dtypes, *n_rows, n_cols_to_read, *first_row);
     return result;
 }
 
@@ -305,16 +320,19 @@ extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_
     return csv_read(f, str->size(), cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes);
 }
 
+#undef CHECK
 
 // ***********************************************************************************
 // ***********************************************************************************
+
+#if 0
 
 static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr)
 {
-    for(auto i=0; i<nr; ++i) {
+    for(size_t i=0; i<nr; ++i) {
         std::stringstream f;
         f << "row" << (fr+i) << " ";
-        for(auto j=0; j<nc; ++j) {
+        for(size_t j=0; j<nc; ++j) {
             void * data = mi_data(r[j]);
             switch(dtypes[j]) {
             case HPAT_CTypes::INT32:
@@ -346,7 +364,6 @@ static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t
     }
 }
 
-#if 0
 int main()
 {
     int rank = hpat_dist_get_rank();

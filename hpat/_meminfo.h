@@ -29,6 +29,7 @@ import_meminfo_func(const char * func) {
     Py_XDECREF(nrtmod);
     Py_XDECREF(helperdct);
     return fnptr;
+#undef CHECK
 }
 
 typedef void (*MemInfo_release_type)(void*);
