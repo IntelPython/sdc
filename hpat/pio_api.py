@@ -1,3 +1,4 @@
+import numba
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
@@ -73,6 +74,18 @@ class FileAttribute(AttributeTemplate):
     @bound_function("h5file.close")
     def resolve_close(self, f_id, args, kws):
         return signature(types.none, *args)
+
+    @bound_function("h5file.create_dataset")
+    def resolve_create_dataset(self, f_id, args, kws):
+        kwargs = dict(kws)
+        name = args[0] if len(args) > 0 else kwargs['name']
+        shape = args[1] if len(args) > 1 else kwargs['shape']
+        dtype = args[2] if len(args) > 2 else kwargs['dtype']
+        def create_dset_stub(name, shape, dtype):
+            pass
+        pysig = numba.utils.pysignature(create_dset_stub)
+        return signature(h5dataset_type, name, shape, dtype).replace(pysig=pysig)
+
 
 @infer
 class GetItemH5File(AbstractTemplate):

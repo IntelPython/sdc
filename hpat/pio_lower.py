@@ -104,9 +104,10 @@ def h5_close(context, builder, sig, args):
     builder.call(fn, args)
     return context.get_dummy_value()
 
-
+@lower_builtin("h5file.create_dataset", h5file_type, StringType,
+                types.UniTuple, StringType)
 @lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
-               types.containers.UniTuple, StringType)
+                types.UniTuple, StringType)
 def h5_create_dset(context, builder, sig, args):
     # insert the dset_name string arg
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
