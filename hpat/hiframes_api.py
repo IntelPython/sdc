@@ -140,7 +140,8 @@ def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
     n = len(arr)
-    n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))
+    if parallel:
+        n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))
     k = n // 2
 
     # odd length case
