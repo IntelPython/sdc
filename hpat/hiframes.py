@@ -19,7 +19,7 @@ from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
 
 import hpat
-from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
+from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
 from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
@@ -92,6 +92,7 @@ class HiFrames(object):
         self.reverse_copies = {}
         self.pq_handler = ParquetHandler(
             func_ir, typingctx, args, _locals, self.reverse_copies)
+        self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
 
 
     def run(self):
@@ -155,21 +156,10 @@ class HiFrames(object):
 
             # fix type for f['A'][:] dset reads
             if rhs.op in ('getitem', 'static_getitem'):
-                tp = self._get_h5_type(lhs)
-                if tp is not None:
-                    dtype_str = str(tp.dtype)
-                    func_text = "def _h5_read_impl(dset, index):\n"
-                    # TODO: index arg?
-                    func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, {}, '{}')\n".format(tp.ndim, dtype_str)
-                    loc_vars = {}
-                    exec(func_text, {}, loc_vars)
-                    _h5_read_impl = loc_vars['_h5_read_impl']
-                    f_block = compile_to_numba_ir(
-                            _h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
-                    replace_arg_nodes(f_block, [rhs.value, rhs.index_var])
-                    nodes = f_block.body[:-3]  # remove none return
-                    nodes[-1].target = assign.target
-                    return nodes
+                h5_nodes = self.h5_handler.handle_possible_h5_read(
+                    assign, lhs, rhs)
+                if h5_nodes is not None:
+                    return h5_nodes
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -1398,12 +1388,6 @@ class HiFrames(object):
 
         return []
 
-    def _get_h5_type(self, varname):
-        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':h5_types') not in self.locals:
-            return None
-        new_name = self.reverse_copies[varname]
-        typ = self.locals.pop(new_name + ":h5_types")
-        return typ
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

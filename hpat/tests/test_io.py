@@ -16,7 +16,7 @@ class TestIO(unittest.TestCase):
             f.close()
             return X
 
-        hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.float64[:,:]})
+        hpat_func = hpat.jit(test_impl)
         np.testing.assert_allclose(hpat_func(), test_impl())
 
     def test_h5_read_parallel(self):
