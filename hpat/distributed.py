@@ -430,14 +430,14 @@ class DistributedPass(object):
             arr = rhs.args[5].name
             ndims = len(self._array_starts[arr])
             starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
-            self.typemap[starts_var.name] = types.containers.UniTuple(
+            self.typemap[starts_var.name] = types.UniTuple(
                 types.int64, ndims)
             start_tuple_call = ir.Expr.build_tuple(
                 self._array_starts[arr], loc)
             starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
             rhs.args[2] = starts_var
             counts_var = ir.Var(scope, mk_unique_var("$h5_counts"), loc)
-            self.typemap[counts_var.name] = types.containers.UniTuple(
+            self.typemap[counts_var.name] = types.UniTuple(
                 types.int64, ndims)
             count_tuple_call = ir.Expr.build_tuple(
                 self._array_counts[arr], loc)
@@ -1960,18 +1960,25 @@ class DistributedPass(object):
         return new_blocks
 
     def _file_open_set_parallel(self, file_varname):
-        file_var_def = get_definition(self.func_ir, file_varname)
-        assert isinstance(file_var_def, ir.Expr) and file_var_def.op == 'call'
-        fdef = find_callname(self.func_ir, file_var_def)
-        # TODO: add group unittest
-        if fdef == ('h5create_group', 'hpat.pio_api'):
-            # if read/write call is on a group, find its actual file
-            f_varname = file_var_def.args[0].name
-            self._file_open_set_parallel(f_varname)
-            return
-        else:
-            assert fdef == ('File', 'h5py')
-            file_var_def.args[2] = self._set1_var
+        var = file_varname
+        while True:
+            var_def = get_definition(self.func_ir, var)
+            require(isinstance(var_def, ir.Expr))
+            if var_def.op == 'call':
+                fdef = find_callname(self.func_ir, var_def)
+                # TODO: add group unittest
+                if fdef == ('h5create_group', 'hpat.pio_api'):
+                    # if read/write call is on a group, find its actual file
+                    f_varname = var_def.args[0].name
+                    self._file_open_set_parallel(f_varname)
+                    return
+                else:
+                    assert fdef == ('File', 'h5py')
+                    var_def.args[2] = self._set1_var
+                    return
+            # TODO: handle control flow
+            require(var_def.op in ('getitem', 'static_getitem'))
+            var = var_def.value.name
 
         # for label, block in self.func_ir.blocks.items():
         #     for stmt in block.body:
