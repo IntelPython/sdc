@@ -24,6 +24,7 @@ int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
 int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
+void hpat_h5g_close(hid_t group_id);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
 void file_write(std::string* file_name, void* buff, int64_t size);
@@ -63,6 +64,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&h5g_get_num_objs)));
     PyObject_SetAttrString(m, "h5g_get_objname_by_idx",
                             PyLong_FromVoidPtr((void*)(&h5g_get_objname_by_idx)));
+    PyObject_SetAttrString(m, "hpat_h5g_close",
+                            PyLong_FromVoidPtr((void*)(&hpat_h5g_close)));
 
     // numpy read
     PyObject_SetAttrString(m, "get_file_size",
@@ -253,6 +256,7 @@ hid_t hpat_h5_create_group(hid_t file_id, char* group_name)
     hid_t group_id;
     group_id = H5Gcreate2(file_id, group_name,
                                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(group_id != -1);
     return group_id;
 }
 
@@ -311,6 +315,11 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
     std::string *outstr = new std::string(name);
     // std::cout<<"out: "<<*outstr<<std::endl;
     return outstr;
+}
+
+void hpat_h5g_close(hid_t group_id)
+{
+    herr_t err = H5Gclose(group_id);
 }
 
 uint64_t get_file_size(std::string* file_name)

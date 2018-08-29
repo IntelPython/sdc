@@ -60,6 +60,15 @@ string_list_type = types.List(string_type)
 
 #################################################
 
+def _create_dataset_typer(args, kws):
+    kwargs = dict(kws)
+    name = args[0] if len(args) > 0 else kwargs['name']
+    shape = args[1] if len(args) > 1 else kwargs['shape']
+    dtype = args[2] if len(args) > 2 else kwargs['dtype']
+    def create_dset_stub(name, shape, dtype):
+        pass
+    pysig = numba.utils.pysignature(create_dset_stub)
+    return signature(h5dataset_type, name, shape, dtype).replace(pysig=pysig)
 
 @infer_getattr
 class FileAttribute(AttributeTemplate):
@@ -77,15 +86,20 @@ class FileAttribute(AttributeTemplate):
 
     @bound_function("h5file.create_dataset")
     def resolve_create_dataset(self, f_id, args, kws):
-        kwargs = dict(kws)
-        name = args[0] if len(args) > 0 else kwargs['name']
-        shape = args[1] if len(args) > 1 else kwargs['shape']
-        dtype = args[2] if len(args) > 2 else kwargs['dtype']
-        def create_dset_stub(name, shape, dtype):
-            pass
-        pysig = numba.utils.pysignature(create_dset_stub)
-        return signature(h5dataset_type, name, shape, dtype).replace(pysig=pysig)
+        return _create_dataset_typer(args, kws)
 
+    @bound_function("h5file.create_group")
+    def resolve_create_group(self, f_id, args, kws):
+        return signature(h5group_type, *args)
+
+
+@infer_getattr
+class GroupAttribute(AttributeTemplate):
+    key = h5group_type
+
+    @bound_function("h5group.create_dataset")
+    def resolve_create_dataset(self, f_id, args, kws):
+        return _create_dataset_typer(args, kws)
 
 @infer
 class GetItemH5File(AbstractTemplate):

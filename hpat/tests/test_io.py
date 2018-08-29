@@ -77,7 +77,28 @@ class TestIO(unittest.TestCase):
         f.close()
         np.testing.assert_almost_equal(X, np.ones((N,D)))
         np.testing.assert_almost_equal(Y, np.arange(N)+1.0)
+
+    def test_h5_write_group(self):
+        def test_impl(n, fname):
+            arr = np.arange(n)
+            n = len(arr)
+            f = h5py.File(fname, "w")
+            g1 = f.create_group("G")
+            dset1 = g1.create_dataset("data", (n,), dtype='i8')
+            dset1[:] = arr
+            # TODO: close groups automatically
+            hpat.pio_lower.h5g_close(g1)
+            f.close()
+
+        n = 101
+        arr = np.arange(n)
+        fname = "test_group.hdf5"
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(n, fname)
+        f = h5py.File(fname, "r")
+        X = f['G']['data'][:]
         f.close()
+        np.testing.assert_almost_equal(X, arr)
 
     def test_pq_read(self):
         def test_impl():

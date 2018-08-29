@@ -3,7 +3,8 @@ from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
 from hpat.utils import _numba_to_c_type_map
-from hpat.pio_api import h5file_type, h5dataset_or_group_type, h5dataset_type
+from hpat.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type,
+                          h5group_type)
 from hpat.str_ext import StringType
 import h5py
 from llvmlite import ir as lir
@@ -20,6 +21,7 @@ ll.add_symbol('hpat_h5_write', hio.hpat_h5_write)
 ll.add_symbol('hpat_h5_close', hio.hpat_h5_close)
 ll.add_symbol('h5g_get_num_objs', hio.h5g_get_num_objs)
 ll.add_symbol('h5g_get_objname_by_idx', hio.h5g_get_objname_by_idx)
+ll.add_symbol('h5g_close', hio.hpat_h5g_close)
 
 h5file_lir_type = lir.IntType(64)
 
@@ -29,6 +31,7 @@ if h5py.version.hdf5_version_tuple[1] == 8:
 else:
     assert h5py.version.hdf5_version_tuple[1] == 10
 
+h5g_close = types.ExternalFunction("h5g_close", types.none(h5group_type))
 
 @lower_builtin("getitem", h5file_type, StringType)
 def h5_open_dset_lower(context, builder, sig, args):
@@ -104,6 +107,8 @@ def h5_close(context, builder, sig, args):
     builder.call(fn, args)
     return context.get_dummy_value()
 
+@lower_builtin("h5group.create_dataset", h5group_type, StringType,
+                types.UniTuple, StringType)
 @lower_builtin("h5file.create_dataset", h5file_type, StringType,
                 types.UniTuple, StringType)
 @lower_builtin(pio_api.h5create_dset, h5file_type, StringType,
@@ -142,7 +147,8 @@ def h5_create_dset(context, builder, sig, args):
 
     return builder.call(fn, call_args)
 
-
+@lower_builtin("h5group.create_group", h5group_type, StringType)
+@lower_builtin("h5file.create_group", h5file_type, StringType)
 @lower_builtin(pio_api.h5create_group, h5file_type, StringType)
 def h5_create_group(context, builder, sig, args):
     # insert the group_name string arg

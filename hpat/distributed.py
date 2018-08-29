@@ -20,7 +20,7 @@ from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
 import hpat
-from hpat.pio_api import h5file_type
+from hpat.pio_api import h5file_type, h5group_type
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
 from hpat.str_ext import string_type
@@ -1967,15 +1967,10 @@ class DistributedPass(object):
             require(isinstance(var_def, ir.Expr))
             if var_def.op == 'call':
                 fdef = find_callname(self.func_ir, var_def)
-                if (fdef[0] == 'create_dataset' and isinstance(fdef[1], ir.Var)
-                        and self.typemap[fdef[1].name] == h5file_type):
+                if (fdef[0] in ('create_dataset', 'create_group')
+                        and isinstance(fdef[1], ir.Var)
+                        and self.typemap[fdef[1].name] in (h5file_type, h5group_type)):
                     self._file_open_set_parallel(fdef[1].name)
-                    return
-                # TODO: add group unittest
-                if fdef == ('h5create_group', 'hpat.pio_api'):
-                    # if read/write call is on a group, find its actual file
-                    f_varname = var_def.args[0].name
-                    self._file_open_set_parallel(f_varname)
                     return
                 else:
                     assert fdef == ('File', 'h5py')
