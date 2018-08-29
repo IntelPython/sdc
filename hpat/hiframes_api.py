@@ -249,7 +249,7 @@ def nunique_overload_parallel(arr_typ):
 
     def nunique_par(A):
         uniq_A = hpat.hiframes_api.unique_parallel(A)
-        loc_nuniq = len(set(uniq_A))
+        loc_nuniq = len(uniq_A)
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
 
     return nunique_par
@@ -316,7 +316,7 @@ def unique_overload_parallel(arr_typ):
         # shuffle
         alltoallv(uniq_A, shuffle_meta)
 
-        return shuffle_meta.out_arr
+        return hpat.utils.to_array(set(shuffle_meta.out_arr))
 
     return unique_par
 
