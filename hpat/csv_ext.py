@@ -262,15 +262,12 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     col_typs = ", ".join(
         str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
     func_text = "def csv_impl(fname):\n"
-    func_text += "    {} = _csv_read(fname, ({}), ({}), {}, ',', '\"')\n".format(
+    func_text += "    ({},) = _csv_read(fname, ({},), ({},), {}, ',', '\"')\n".format(
         arg_names, col_inds, col_typs, n_cols)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     csv_impl = loc_vars['csv_impl']
-
-    # TODO: generate CSV reader function that returns tuple of arrays
-    csv_reader = numba.njit(lambda a,b,c,d: (1,2,3,4))
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_read': _csv_read},
