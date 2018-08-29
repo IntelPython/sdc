@@ -3,7 +3,7 @@ from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
 from hpat import pio_api
 from hpat.utils import _numba_to_c_type_map
-from hpat.pio_api import h5file_type, h5dataset_or_group_type
+from hpat.pio_api import h5file_type, h5dataset_or_group_type, h5dataset_type
 from hpat.str_ext import StringType
 import h5py
 from llvmlite import ir as lir
@@ -168,31 +168,30 @@ def h5_create_group(context, builder, sig, args):
 #     }
 
 
-@lower_builtin(pio_api.h5write, h5file_type, h5file_type, types.int32,
-               types.containers.UniTuple, types.containers.UniTuple, types.int64,
-               types.npytypes.Array)
+@lower_builtin(pio_api.h5write, h5dataset_type, types.int32,
+               types.UniTuple, types.UniTuple, types.int64, types.Array)
 def h5_write(context, builder, sig, args):
     # extra last arg type for type enum
-    arg_typs = [h5file_lir_type, h5file_lir_type, lir.IntType(32),
+    arg_typs = [h5file_lir_type, lir.IntType(32),
                 lir.IntType(64).as_pointer(), lir.IntType(64).as_pointer(),
                 lir.IntType(64), lir.IntType(8).as_pointer(), lir.IntType(32)]
     fnty = lir.FunctionType(lir.IntType(32), arg_typs)
 
     fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_write")
-    out = make_array(sig.args[6])(context, builder, args[6])
+    out = make_array(sig.args[5])(context, builder, args[5])
     # store size vars array struct to pointer
-    count_ptr = cgutils.alloca_once(builder, args[3].type)
-    builder.store(args[3], count_ptr)
-    size_ptr = cgutils.alloca_once(builder, args[4].type)
-    builder.store(args[4], size_ptr)
+    count_ptr = cgutils.alloca_once(builder, args[2].type)
+    builder.store(args[2], count_ptr)
+    size_ptr = cgutils.alloca_once(builder, args[3].type)
+    builder.store(args[3], size_ptr)
     # store an int to specify data type
-    typ_enum = _numba_to_c_type_map[sig.args[6].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[5].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
-    call_args = [args[0], args[1], args[2],
+    call_args = [args[0], args[1],
                  builder.bitcast(count_ptr, lir.IntType(64).as_pointer()),
                  builder.bitcast(size_ptr, lir.IntType(
-                     64).as_pointer()), args[5],
+                     64).as_pointer()), args[4],
                  builder.bitcast(out.data, lir.IntType(8).as_pointer()),
                  builder.load(typ_arg)]
 

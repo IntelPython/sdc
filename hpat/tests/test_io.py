@@ -32,6 +32,30 @@ class TestIO(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_h5_write_seq(self):
+        def test_impl(points, responses):
+            N, D = points.shape
+            f = h5py.File("lr_w.hdf5", "w")
+            dset1 = f.create_dataset("points", (N,D), dtype='f8')
+            dset1[:] = points
+            dset2 = f.create_dataset("responses", (N,), dtype='f8')
+            dset2[:] = responses
+            f.close()
+
+        N = 101
+        D = 10
+        points = np.ones((N,D))
+        responses = np.arange(N)+1.0
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(points, responses)
+        f = h5py.File("lr_w.hdf5", "r")
+        X = f['points'][:]
+        Y = f['responses'][:]
+        f.close()
+        np.testing.assert_almost_equal(X, points)
+        np.testing.assert_almost_equal(Y, responses)
+        f.close()
+
     def test_h5_write_parallel(self):
         def test_impl(N, D):
             points = np.ones((N,D))

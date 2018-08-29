@@ -100,6 +100,15 @@ class GetItemH5File(AbstractTemplate):
         if in_f == h5dataset_or_group_type and in_idx == string_type:
             return signature(h5dataset_or_group_type, in_f, in_idx)
 
+@infer
+class SetItemH5Dset(AbstractTemplate):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        if args[0] == h5dataset_type:
+            return signature(types.none, *args)
+
 def h5g_get_num_objs():
     return
 
@@ -202,7 +211,7 @@ class H5CreateGroup(AbstractTemplate):
 class H5Write(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 7
+        assert len(args) == 6
         return signature(types.int32, *args)
 
 

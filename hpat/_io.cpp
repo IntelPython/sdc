@@ -18,7 +18,7 @@ int hpat_h5_close(hid_t file_id);
 hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
 hid_t hpat_h5_create_group(hid_t file_id, char* group_name);
-int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
@@ -256,7 +256,7 @@ hid_t hpat_h5_create_group(hid_t file_id, char* group_name)
     return group_id;
 }
 
-int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
     //printf("dset_id:%s ndims:%d size:%d typ:%d\n", dset_id, ndims, counts[0], typ_enum);
@@ -283,6 +283,7 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dwrite(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
     assert(ret != -1);
+    // XXX fix close properly, refcount dset_id?
     H5Dclose(dataset_id);
     return ret;
 }
