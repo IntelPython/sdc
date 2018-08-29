@@ -225,9 +225,49 @@ int hpat_h5_get_type_enum(std::string *s)
     return typ;
 }
 
+void h5_close_object(hid_t obj_id)
+{
+    H5O_info_t object_info;
+    H5Oget_info(obj_id, &object_info);
+    if (object_info.type == H5O_TYPE_GROUP)
+    {
+        // printf("close group %lld\n", obj_id);
+        H5Gclose(obj_id);
+    }
+    if (object_info.type == H5F_OBJ_DATASET)
+    {
+        // printf("close dset %lld\n", obj_id);
+        H5Dclose(obj_id);
+    }
+}
+
+void h5_close_file_objects(hid_t file_id, unsigned types)
+{
+    // get object id list
+    size_t count = H5Fget_obj_count(file_id, types);
+    hid_t* obj_list = (hid_t*)malloc(sizeof(hid_t)*count);
+    H5Fget_obj_ids(file_id, types, count, obj_list);
+    // TODO: check file_id of objects like h5py/files.py:close
+    // for(size_t i=0; i<count; i++)
+    //     if (H5Iget_file_id(obj_list[i])!=file_id)
+    //         obj_list[i] = -1;
+    // close objs
+    for(size_t i=0; i<count; i++)
+    {
+        hid_t obj_id = obj_list[i];
+        //if (H5Iget_file_id(obj_id)==file_id)
+        if (obj_id != -1)
+            h5_close_object(obj_id);
+    }
+    delete[] obj_list;
+}
+
 int hpat_h5_close(hid_t file_id)
 {
     // printf("closing: %d\n", file_id);
+    // close file objects similar to h5py/files.py:close
+    h5_close_file_objects(file_id, ~H5F_OBJ_FILE);
+    h5_close_file_objects(file_id, H5F_OBJ_FILE);
     H5Fclose(file_id);
     return 0;
 }
