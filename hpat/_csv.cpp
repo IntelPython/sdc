@@ -210,6 +210,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     CHECK(std::getline(f,line), "could not read first line");
     auto linesize = line.size();
 
+    size_t curr_row = 0;
     size_t ncols = 0;
     boost::escaped_list_separator<char> tokfunc("\\", delimiters ? *delimiters : ",", quotes ? *quotes : "\"\'");
     try{
@@ -281,14 +282,15 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
                         dtype_convert(static_cast<int>(dtypes[c]), *i, mi_data(result[req[c]]), *n_rows);
                     }
                 }
-                // we count/keep all lines except the first if it's incomplete
-                if(*n_rows > 0 || c == ncols) ++(*n_rows);
-                else if(*n_rows == 0 && c != ncols) throw std::invalid_argument("Invalid format in first line");
+                // we count/keep only complete lines
+                if(c == ncols) ++(*n_rows);
+                else throw std::invalid_argument("Too few columns");
             } catch (...) {
                 // The first line can easily be incorrect
-                if(*n_rows > 0 || rank == 0) std::cerr << "Error parsing line " << (*n_rows) << "; skipping.\n";
+                if(curr_row > 0 || rank == 0) std::cerr << "Error parsing line " << curr_row << "; skipping.\n";
             }
             curr_pos = my_pos;
+            ++curr_row;
         }
     }
     *first_row = hpat_dist_exscan_i8(*n_rows);
