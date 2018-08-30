@@ -123,10 +123,26 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     return file_id;
 }
 
-hid_t hpat_h5_open_dset_or_group_obj(hid_t file_id, char* obj_name)
+hid_t hpat_h5_open_dset_or_group_obj(hid_t file_or_group_id, char* obj_name)
 {
-    hid_t dataset_id = H5Dopen2(file_id, obj_name, H5P_DEFAULT);
-    return dataset_id;
+    // handle obj['A'] call, the output can be group or dataset
+    // printf("open dset or group: %s\n", obj_name);
+    hid_t obj_id = -1;
+    H5O_info_t object_info;
+    herr_t err = H5Oget_info_by_name(file_or_group_id, obj_name, &object_info, H5P_DEFAULT);
+    assert(err != -1);
+    if (object_info.type == H5O_TYPE_GROUP)
+    {
+        // printf("open group: %s\n", obj_name);
+        obj_id = H5Gopen2(file_or_group_id, obj_name, H5P_DEFAULT);
+    }
+    if (object_info.type == H5O_TYPE_DATASET)
+    {
+        // printf("open dset: %s\n", obj_name);
+        obj_id = H5Dopen2(file_or_group_id, obj_name, H5P_DEFAULT);
+    }
+    assert(obj_id != -1);
+    return obj_id;
 }
 
 int64_t hpat_h5_size(hid_t dataset_id, int dim)
@@ -146,7 +162,7 @@ int64_t hpat_h5_size(hid_t dataset_id, int dim)
 int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
-    //printf("dset_name:%s ndims:%d size:%d typ:%d\n", dset_name, ndims, counts[0], typ_enum);
+    // printf("h5read ndims:%d size:%d typ:%d\n", ndims, counts[0], typ_enum);
     // fflush(stdout);
     // printf("start %lld end %lld\n", start_ind, end_ind);
     herr_t ret;

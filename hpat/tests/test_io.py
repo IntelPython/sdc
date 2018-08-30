@@ -74,6 +74,17 @@ class TestIO(unittest.TestCase):
         f.close()
         np.testing.assert_almost_equal(X, arr)
 
+    def test_h5_read_group(self):
+        def test_impl():
+            f = h5py.File("test_group_read.hdf5", "r")
+            g1 = f['G']
+            X = g1['data'][:]
+            f.close()
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_pq_read(self):
         def test_impl():
             t = pq.read_table('kde.parquet')
