@@ -92,6 +92,16 @@ class FileAttribute(AttributeTemplate):
     def resolve_create_group(self, f_id, args, kws):
         return signature(h5group_type, *args)
 
+@infer_getattr
+class GroupOrDatasetAttribute(AttributeTemplate):
+    key = h5dataset_or_group_type
+
+    @bound_function("h5group.keys")
+    def resolve_keys(self, dict, args, kws):
+        assert not kws
+        assert not args
+        return signature(string_list_type, *args)
+
 
 @infer_getattr
 class GroupAttribute(AttributeTemplate):

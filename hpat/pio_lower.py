@@ -205,7 +205,8 @@ def h5_write(context, builder, sig, args):
     return builder.call(fn, call_args)
 
 
-@lower_builtin("h5file.keys", pio_api.h5file_type)
+@lower_builtin("h5file.keys", h5file_type)
+@lower_builtin("h5group.keys", h5dataset_or_group_type)
 def lower_dict_get(context, builder, sig, args):
     def h5f_keys_imp(file_id):
         obj_name_list = []
@@ -220,6 +221,7 @@ def lower_dict_get(context, builder, sig, args):
 
 
 @lower_builtin(pio_api.h5g_get_num_objs, h5file_type)
+@lower_builtin(pio_api.h5g_get_num_objs, h5dataset_or_group_type)
 def h5g_get_num_objs_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [h5file_lir_type])
@@ -228,6 +230,7 @@ def h5g_get_num_objs_lower(context, builder, sig, args):
 
 
 @lower_builtin(pio_api.h5g_get_objname_by_idx, h5file_type, types.int64)
+@lower_builtin(pio_api.h5g_get_objname_by_idx, h5dataset_or_group_type, types.int64)
 def h5g_get_objname_by_idx_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [h5file_lir_type, lir.IntType(64)])
