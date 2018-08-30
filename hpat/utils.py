@@ -11,7 +11,7 @@ import collections
 import numpy as np
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
-
+from hpat.pd_timestamp_ext import pandas_dts_type
 from enum import Enum
 
 
@@ -26,6 +26,7 @@ class CTypeEnum(Enum):
     UInt64 = 7
     Float32 = 5
     Float64 = 6
+    DateTime = 33
 
 
 _numba_to_c_type_map = {
@@ -37,6 +38,7 @@ _numba_to_c_type_map = {
     types.uint64: CTypeEnum.UInt64.value,
     types.float32: CTypeEnum.Float32.value,
     types.float64: CTypeEnum.Float64.value,
+    pandas_dts_type: CTypeEnum.DateTime.value,
 }
 
 
