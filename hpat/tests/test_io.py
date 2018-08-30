@@ -85,6 +85,19 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_h5_file_keys(self):
+        def test_impl():
+            f = h5py.File("test_group_read.hdf5", "r")
+            s = 0
+            for gname in f.keys():
+                X = f[gname]['data'][:]
+                s += X.sum()
+            f.close()
+            return s
+
+        hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.int64[:]})
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_pq_read(self):
         def test_impl():
             t = pq.read_table('kde.parquet')
