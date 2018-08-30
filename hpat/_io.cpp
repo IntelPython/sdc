@@ -81,18 +81,23 @@ PyMODINIT_FUNC PyInit_hio(void) {
     return m;
 }
 
+// TODO: raise Python error
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl;}
+
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
 {
     // printf("h5_open file_name: %s mode:%s\n", file_name, mode);
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
-    assert(plist_id != -1);
-    herr_t ret;
+    CHECK(plist_id != -1, "h5 open property create error");
+    herr_t ret = 0;
     hid_t file_id = -1;
     unsigned flag = H5F_ACC_RDWR;
 
     if(is_parallel)
+    {
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
-    assert(ret != -1);
+        CHECK(ret != -1, "h5 open MPI driver set error");
+    }
 
     // TODO: handle 'a' mode
     if(strcmp(mode, "r")==0)
@@ -117,9 +122,9 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
         // printf("w- fid:%d\n", file_id);
     }
 
-    assert(file_id != -1);
+    CHECK(file_id != -1, "h5 open file error");
     ret = H5Pclose(plist_id);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 open property close error");
     return file_id;
 }
 
@@ -130,7 +135,7 @@ hid_t hpat_h5_open_dset_or_group_obj(hid_t file_or_group_id, char* obj_name)
     hid_t obj_id = -1;
     H5O_info_t object_info;
     herr_t err = H5Oget_info_by_name(file_or_group_id, obj_name, &object_info, H5P_DEFAULT);
-    assert(err != -1);
+    CHECK(err != -1, "h5 open dset or group get_info_by_name error");
     if (object_info.type == H5O_TYPE_GROUP)
     {
         // printf("open group: %s\n", obj_name);
@@ -141,15 +146,15 @@ hid_t hpat_h5_open_dset_or_group_obj(hid_t file_or_group_id, char* obj_name)
         // printf("open dset: %s\n", obj_name);
         obj_id = H5Dopen2(file_or_group_id, obj_name, H5P_DEFAULT);
     }
-    assert(obj_id != -1);
+    CHECK(obj_id != -1, "h5 open dset or group error");
     return obj_id;
 }
 
 int64_t hpat_h5_size(hid_t dataset_id, int dim)
 {
-    assert(dataset_id != -1);
+    CHECK(dataset_id != -1, "h5 invalid dataset_id input to size call");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 size get_space error");
     hsize_t data_ndim = H5Sget_simple_extent_ndims(space_id);
     hsize_t *space_dims = new hsize_t[data_ndim];
     H5Sget_simple_extent_dims(space_id, space_dims, NULL);
@@ -166,9 +171,9 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     // fflush(stdout);
     // printf("start %lld end %lld\n", start_ind, end_ind);
     herr_t ret;
-    assert(dataset_id != -1);
+    CHECK(dataset_id != -1, "h5 read invalid dataset_id");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 read get_space error");
 
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
@@ -181,13 +186,14 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     }
 
     ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 read select_hyperslab error");
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
-    assert (mem_dataspace != -1);
+    CHECK (mem_dataspace != -1, "h5 read create_simple error");
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dread(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 read call error");
     // printf("out: %lf %lf ...\n", ((double*)out)[0], ((double*)out)[1]);
+    // TODO: close here?
     H5Dclose(dataset_id);
     return ret;
 }
@@ -308,11 +314,11 @@ hid_t hpat_h5_create_group(hid_t file_id, char* group_name)
 {
     // printf("group_name:%s\n", group_name);
     // fflush(stdout);
-
+    CHECK(file_id != -1, "h5 create_group invalid file_id");
     hid_t group_id;
     group_id = H5Gcreate2(file_id, group_name,
                                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    assert(group_id != -1);
+    CHECK(group_id != -1, "h5 create_group error");
     return group_id;
 }
 
@@ -322,9 +328,9 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     //printf("dset_id:%s ndims:%d size:%d typ:%d\n", dset_id, ndims, counts[0], typ_enum);
     // fflush(stdout);
     herr_t ret;
-    assert(dataset_id != -1);
+    CHECK(dataset_id != -1, "h5 write invalid dataset_id");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 write get_space error");
 
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
@@ -337,12 +343,12 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     }
 
     ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 write select_hyperslab error");
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
-    assert (mem_dataspace != -1);
+    CHECK (mem_dataspace != -1, "h5 write create_simple error");
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dwrite(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 write call error");
     // XXX fix close properly, refcount dset_id?
     H5Dclose(dataset_id);
     return ret;
@@ -521,5 +527,7 @@ void file_write_parallel(std::string* file_name, char* buff, int64_t start, int6
     MPI_File_close(&fh);
     return;
 }
+
+#undef CHECK
 
 } // extern "C"
