@@ -12,39 +12,13 @@ from hpat.utils import _numba_to_c_type_map
 from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
 import time
 from llvmlite import ir as lir
-import hdist
 import llvmlite.binding as ll
-ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
-ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
-ll.add_symbol('hpat_dist_get_start', hdist.hpat_dist_get_start)
-ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
-ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
-ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
-ll.add_symbol('hpat_get_time', hdist.hpat_get_time)
-ll.add_symbol('hpat_barrier', hdist.hpat_barrier)
-ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
-ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
-ll.add_symbol('hpat_dist_exscan_i4', hdist.hpat_dist_exscan_i4)
-ll.add_symbol('hpat_dist_exscan_i8', hdist.hpat_dist_exscan_i8)
-ll.add_symbol('hpat_dist_exscan_f4', hdist.hpat_dist_exscan_f4)
-ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
-ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
-ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
-ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
-ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
-ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
-ll.add_symbol('allgather', hdist.allgather)
-ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
-ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
-ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
-ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
-ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
-ll.add_symbol('permutation_int', hdist.permutation_int)
-ll.add_symbol('permutation_array_index', hdist.permutation_array_index)
+from hpat.bind import bind
+
+hdist = bind(ll, "libhdist.so", [])
 
 # get size dynamically from C code
-mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
-
+mpi_req_llvm_type = lir.IntType(8 * hdist.get_mpi_req_num_bytes())
 
 
 @lower_builtin(distributed_api.get_rank)
@@ -548,9 +522,9 @@ def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
     permutation_array_index(lhs.ctypes, lhs_len, elem_size, c_rhs.ctypes,
                             p.ctypes, p_len)
 
+_fix_i_malloc = hdist.fix_i_malloc
+_fix_i_malloc.argtypes = []
 
-ll.add_symbol('fix_i_malloc', hdist.fix_i_malloc)
-_fix_i_malloc = types.ExternalFunction("fix_i_malloc",  types.void())
 @numba.njit
 def fix_i_malloc():
     _fix_i_malloc()
@@ -563,24 +537,12 @@ def hpat_finalize():
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.typing import signature
 
-@infer_global(hpat_finalize)
-class FinalizeInfer(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 0
-        return signature(types.int32, *args)
-
-ll.add_symbol('hpat_finalize', hdist.hpat_finalize)
-
-@lower_builtin(hpat_finalize)
-def lower_hpat_finalize(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_finalize")
-    return builder.call(fn, args)
+_hpat_finalize = hdist.hpat_finalize
+_hpat_finalize.argtypes = []
 
 @numba.njit
 def call_finalize():
-    hpat_finalize()
+    return _hpat_finalize()
 
 import atexit
 import sys

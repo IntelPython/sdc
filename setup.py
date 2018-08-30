@@ -1,5 +1,8 @@
-from setuptools import setup, Extension
-import platform, os
+from setuptools import setup, Extension, Distribution
+from setuptools.command.build_ext import build_ext
+from collections import namedtuple
+import sysconfig
+import platform, os, sys
 
 # Note we don't import Numpy at the toplevel, since setup.py
 # should be able to run without Numpy for pip to discover the
@@ -16,6 +19,25 @@ is_win = platform.system() == 'Windows'
 def readme():
     with open('README.rst') as f:
         return f.read()
+
+def _get_distutils_build_directory():
+    """
+    Returns the directory distutils uses to build its files.
+    We need this directory since we build extensions which have to link
+    other ones.
+    """
+    pattern = "lib.{platform}-{major}.{minor}"
+    return os.path.abspath(os.path.join('build', pattern.format(platform=sysconfig.get_platform(),
+                                                                major=sys.version_info[0],
+                                                                minor=sys.version_info[1])))
+
+def _get_libname(libname):
+    builder = build_ext(Distribution())
+    libfn = builder.get_ext_filename(libname).split('lib', 1)[-1]
+    if is_win:
+        return libfn.rsplit('.dll', 1)[0]
+    else:
+        return libfn.rsplit('.so', 1)[0]
 
 
 _has_h5py = False
@@ -98,6 +120,64 @@ if is_win:
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
 
+####################################################################################################
+####################################################################################################
+# Defining DLLs
+# We want to build pure dlls, not C extensions, so that we can link against them
+
+# We define a named tuple that looks similar to Extension
+LibSpec = namedtuple('LibSpec',
+                     'name sources macros include_dirs extra_compile_args extra_link_args library_dirs libraries language debug')
+LibSpec.__new__.__defaults__ = (None, None, None, None, None, None, None, 0) # no default for name and sources
+
+# We simply define a list of LibSpecs, one for each DLL
+DLLS = [LibSpec(name = 'hdist',
+                sources = ["hpat/_distributed.cpp"],
+                include_dirs = ind,
+                extra_compile_args = eca,
+                extra_link_args = ela,
+                library_dirs = lid,
+                libraries = MPI_LIBS,
+                language="c++")
+]
+
+# To actually build the dlls we subclass the build_cxt command
+class Build_lib_and_ext(build_ext):
+    def build_extensions(self):
+        for dll in DLLS:
+            objs = self.compiler.compile(dll.sources,
+                                         output_dir=self.build_temp,
+                                         macros=dll.macros,
+                                         include_dirs=dll.include_dirs,
+                                         debug=dll.debug,
+                                         extra_postargs=dll.extra_compile_args)
+            # extra_preargs=None, depends=None
+            so = self.compiler.link_shared_lib(objs,
+                                               dll.name,
+                                               output_dir=self.build_lib,
+                                               libraries=dll.libraries,
+                                               library_dirs=dll.library_dirs,
+                                               extra_postargs=dll.extra_link_args,
+                                               debug=dll.debug,
+                                               target_lang=dll.language)
+            # runtime_library_dirs=None, export_symbols=None, build_temp=None, ): extra_preargs=None, output_dir=None,
+        return build_ext.build_extensions(self)
+
+    # for 'develop' command we need to copy the built dlls explicitly,
+    # by default only extensions get copied
+    def copy_extensions_to_source(self):
+        from distutils.file_util import copy_file
+        build_ext.copy_extensions_to_source(self)
+        for dll in DLLS:
+            libname = 'lib'+dll.name+'.so'
+            src_filename = os.path.join(self.build_lib, libname)
+            dest_filename = os.path.join('.', libname)
+            copy_file(src_filename, dest_filename, verbose=self.verbose, dry_run=self.dry_run)
+
+####################################################################################################
+####################################################################################################
+
+
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp"],
                    libraries = MPI_LIBS + ['hdf5'] + ['boost_filesystem'],
@@ -106,16 +186,6 @@ ext_io = Extension(name="hio",
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
                    extra_link_args = ela,
-)
-
-ext_hdist = Extension(name="hdist",
-                      sources=["hpat/_distributed.cpp"],
-                      depends=["hpat/_hpat_common.h"],
-                      libraries = MPI_LIBS,
-                      extra_compile_args = eca,
-                      extra_link_args = ela,
-                      include_dirs = ind,
-                      library_dirs = lid,
 )
 
 ext_chiframes = Extension(name="chiframes",
@@ -127,7 +197,6 @@ ext_chiframes = Extension(name="chiframes",
                           include_dirs = ind,
                           library_dirs = lid,
 )
-
 
 ext_dict = Extension(name="hdict_ext",
                      sources=["hpat/_dict_ext.cpp"],
@@ -241,7 +310,7 @@ ext_xenon_wrapper = Extension(name="hxe_ext",
                               extra_link_args = ela,
 )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt]
+_ext_mods = [ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt]
 
 if _has_h5py:
     _ext_mods.append(ext_io)
@@ -256,6 +325,7 @@ if _has_opencv:
 
 if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
+
 
 setup(name='hpat',
       version='0.23.3',
@@ -276,4 +346,6 @@ setup(name='hpat',
       packages=['hpat'],
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
-      ext_modules = _ext_mods)
+      ext_modules = _ext_mods,
+      cmdclass = {'build_ext' : Build_lib_and_ext},
+)
