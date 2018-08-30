@@ -12,6 +12,34 @@ import numpy as np
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 
+from enum import Enum
+
+
+# int values for types to pass to C code
+# XXX: _hpat_common.h
+class CTypeEnum(Enum):
+    Int8 = 0
+    UInt8 = 1
+    Int32 = 2
+    UInt32 = 3
+    Int64 = 4
+    UInt64 = 7
+    Float32 = 5
+    Float64 = 6
+
+
+_numba_to_c_type_map = {
+    types.int8: CTypeEnum.Int8.value,
+    types.uint8: CTypeEnum.UInt8.value,
+    types.int32: CTypeEnum.Int32.value,
+    types.uint32: CTypeEnum.UInt32.value,
+    types.int64: CTypeEnum.Int64.value,
+    types.uint64: CTypeEnum.UInt64.value,
+    types.float32: CTypeEnum.Float32.value,
+    types.float64: CTypeEnum.Float64.value,
+}
+
+
 # silence Numba error messages for now
 # TODO: customize through @hpat.jit
 numba.errors.error_extras = {'unsupported_error': '', 'typing': '', 'reportable': '', 'interpreter': '', 'constant_inference': ''}

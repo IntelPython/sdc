@@ -11,6 +11,15 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
+_pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                    "bar", "bar", "bar", "bar"],
+            "B": ["one", "one", "one", "two", "two",
+                    "one", "one", "two", "two"],
+            "C": ["small", "large", "large", "small",
+                    "small", "large", "small", "small",
+                    "large"],
+            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+
 class TestHiFrames(unittest.TestCase):
     def test_basics(self):
         def test_impl(n):
@@ -295,6 +304,20 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    def test_nunique_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return df.four.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
     def test_nunique_str(self):
         def test_impl(n):
             df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
@@ -317,6 +340,45 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
+    def test_unique(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        S = pd.Series(np.arange(n))
+        S[2] = 0
+        self.assertEqual(set(hpat_func(S)), set(test_impl(S)))
+
+    def test_unique_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.four.unique() == 3.0).sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
+    def test_unique_str(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
+
+    def test_unique_str_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.two.unique() == 'foo').sum()
+
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
@@ -937,18 +999,11 @@ class TestHiFrames(unittest.TestCase):
             pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
             return (pt.small.values, pt.large.values)
 
-        df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
-                          "bar", "bar", "bar", "bar"],
-                    "B": ["one", "one", "one", "two", "two",
-                          "one", "one", "two", "two"],
-                    "C": ["small", "large", "large", "small",
-                          "small", "large", "small", "small",
-                          "large"],
-                    "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
-
         hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
-        self.assertEqual(set(hpat_func(df)[0]), set(test_impl(df)[0]))
-        self.assertEqual(set(hpat_func(df)[1]), set(test_impl(df)[1]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
     def test_pivot_parallel(self):
         def test_impl():
@@ -961,6 +1016,27 @@ class TestHiFrames(unittest.TestCase):
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_crosstab1(self):
+        def test_impl(df):
+            pt = pd.crosstab(df.A, df.C)
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
+
+    def test_crosstab_parallel1(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = pd.crosstab(df.A, df.C)
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
 
     def test_intraday(self):
         def test_impl(nsyms):

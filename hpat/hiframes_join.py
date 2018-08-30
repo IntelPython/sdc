@@ -18,8 +18,9 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str, num_total_chars,
-                              getitem_str_offset, copy_str_arr_slice, setitem_string_array)
-from hpat.hiframes_api import str_copy_ptr
+                              getitem_str_offset, copy_str_arr_slice,
+                              setitem_string_array, str_copy_ptr)
+
 from hpat.timsort import copyElement_tup, getitem_arr_tup
 import numpy as np
 
@@ -549,7 +550,7 @@ LocalMergeTyper.support_literals = True
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.arrayobj import make_array
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 import chiframes
 ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
 ll.add_symbol('timsort', chiframes.timsort)
@@ -593,7 +594,7 @@ def lower_get_sendrecv_counts(context, builder, sig, args):
     arr_len = builder.extract_value(key_arr.shape, 0)
     # TODO: extend to other key types
     assert sig.args[0].dtype == types.intp
-    key_typ_enum = _h5_typ_table[sig.args[0].dtype]
+    key_typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     key_typ_arg = builder.load(cgutils.alloca_once_value(builder,
                                                          lir.Constant(lir.IntType(32), key_typ_enum)))
     key_arr_data = builder.bitcast(key_arr.data, lir.IntType(8).as_pointer())
@@ -672,7 +673,7 @@ def lower_shuffle(context, builder, sig, args):
 def gen_alltoallv(context, builder, arr_typ, send_arg, recv_arg, send_counts,
                   recv_counts, send_disp, recv_disp):
     #
-    typ_enum = _h5_typ_table[arr_typ.dtype]
+    typ_enum = _numba_to_c_type_map[arr_typ.dtype]
     typ_arg = builder.load(cgutils.alloca_once_value(builder,
                                                      lir.Constant(lir.IntType(32), typ_enum)))
     send_data = make_array(arr_typ)(context, builder, send_arg).data

@@ -9,7 +9,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
-from hpat.str_ext import string_type, del_str
+from hpat.str_ext import string_type, StringType, del_str
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 import llvmlite.llvmpy.core as lc
 from glob import glob
@@ -229,6 +229,71 @@ def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t=None):
 
     return types.void(string_array_type, string_array_type, ind_t), codegen
 
+@intrinsic
+def copy_data(typingctx, str_arr_typ, out_str_arr_typ=None):
+    # precondition: output is allocated with data the same size as input's data
+    def codegen(context, builder, sig, args):
+        out_str_arr, in_str_arr = args
+
+        in_string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        out_string_array = context.make_helper(builder, string_array_type, out_str_arr)
+
+        cgutils.memcpy(builder, out_string_array.data, in_string_array.data,
+                        in_string_array.num_total_chars)
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type), codegen
+
+@intrinsic
+def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
+    # precondition: output is allocated with offset the size non-nulls in input
+    def codegen(context, builder, sig, args):
+        out_str_arr, in_str_arr = args
+
+        in_string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        out_string_array = context.make_helper(builder, string_array_type, out_str_arr)
+        n = in_string_array.num_items
+        zero = context.get_constant(offset_typ, 0)
+        curr_offset_ptr = cgutils.alloca_once_value(builder, zero)
+        # XXX: assuming last offset is already set by allocate_string_array
+
+        # for i in range(n)
+        #   if not isna():
+        #     out_offset[curr] = offset[i]
+        with cgutils.for_range(builder, n) as loop:
+            isna = lower_is_na(context, builder, in_string_array.null_bitmap, loop.index)
+            with cgutils.if_likely(builder, builder.not_(isna)):
+                in_val = builder.load(builder.gep(in_string_array.offsets, [loop.index]))
+                curr_offset = builder.load(curr_offset_ptr)
+                builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
+                builder.store(builder.add(curr_offset, lir.Constant(context.get_data_type(offset_typ), 1)), curr_offset_ptr)
+
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, string_array_type), codegen
+
+@intrinsic
+def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        buff_arr, ind, str, len_str = args
+        buff_arr = context.make_array(sig.args[0])(context, builder, buff_arr)
+        ptr = builder.gep(buff_arr.data, [ind])
+        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
+
+
+@intrinsic
+def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        ptr, ind, _str, len_str = args
+        ptr = builder.gep(ptr, [ind])
+        cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
+
 
 # convert array to list of strings if it is StringArray
 # just return it otherwise
@@ -331,6 +396,16 @@ class GetItemStringArray(AbstractTemplate):
                 return signature(string_array_type, *args)
             elif idx == types.Array(types.intp, 1, 'C'):
                 return signature(string_array_type, *args)
+
+@infer
+class SetItemStringArray(AbstractTemplate):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        assert not kws
+        ary, idx, val = args
+        if ary == string_array_type:
+            return signature(types.none, *args)
 
 
 @infer
@@ -593,7 +668,7 @@ def impl_string_array_single(context, builder, sig, args):
 
 @intrinsic
 def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
-    assert num_strs_typ == types.intp and num_total_chars_typ == types.intp
+    assert isinstance(num_strs_typ, types.Integer) and isinstance(num_total_chars_typ, types.Integer)
     def codegen(context, builder, sig, args):
         num_strs, num_total_chars = args
         meminfo, meminfo_data_ptr = construct_string_array(context, builder)
@@ -687,6 +762,53 @@ def box_str_arr(typ, val, c):
     c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
 
+@intrinsic
+def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
+    # None default to make IntelliSense happy
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+
+        # (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
+        byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+        bit_ind = builder.urem(ind, lir.Constant(lir.IntType(64), 8))
+        byte = builder.load(builder.gep(string_array.null_bitmap, [byte_ind], inbounds=True))
+        ll_typ_mask = lir.ArrayType(lir.IntType(8), 8)
+        mask_tup = cgutils.alloca_once_value(builder, lir.Constant(ll_typ_mask, (1, 2, 4, 8, 16, 32, 64, 128)))
+        mask = builder.load(builder.gep(mask_tup, [lir.Constant(lir.IntType(64), 0), bit_ind], inbounds=True))
+        return builder.icmp_unsigned('==', builder.and_(byte, mask), lir.Constant(lir.IntType(8), 0))
+
+    return types.bool_(string_array_type, types.intp), codegen
+
+@intrinsic
+def set_null_bits(typingctx, str_arr_typ=None):
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        # n_bytes = (num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t);
+        n_bytes = builder.udiv(builder.add(string_array.num_items, lir.Constant(lir.IntType(64), 7)), lir.Constant(lir.IntType(64), 8))
+        cgutils.memset(builder, string_array.null_bitmap, n_bytes, -1)
+        return context.get_dummy_value()
+
+    return types.none(string_array_type), codegen
+
+# XXX: setitem works only if value is same size as the previous value
+@lower_builtin('setitem', StringArrayType, types.Integer, StringType)
+def setitem_str_arr(context, builder, sig, args):
+    arr, ind, val = args
+    string_array = context.make_helper(builder, string_array_type, arr)
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(32).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64)])
+    fn_setitem = builder.module.get_or_insert_function(fnty,
+                                                       name="setitem_string_array")
+    builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                                  val, ind])
+    return context.get_dummy_value()
 
 def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),

@@ -33,18 +33,33 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
 
+from hpat.hiframes_sort import (
+    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+    )
+from hpat.hiframes_join import write_send_buff
+
 # quantile imports?
 from llvmlite import ir as lir
 import quantile_alg
 import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
+ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
-from hpat.distributed_lower import _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
 
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
 from numba import numpy_support
+
+nth_sequential = types.ExternalFunction("nth_sequential",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
+
+nth_parallel = types.ExternalFunction("nth_parallel",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -65,6 +80,12 @@ def count(A):  # pragma: no cover
 
 
 def fillna(A):  # pragma: no cover
+    return 0
+
+def fillna_str_alloc(A, fill):  # pragma: no cover
+    return 0
+
+def dropna(A):  # pragma: no cover
     return 0
 
 def column_sum(A):  # pragma: no cover
@@ -100,6 +121,37 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 
 def concat(arr_list):
     return pd.concat(arr_list)
+
+
+@numba.njit
+def nth_element(arr, k, parallel=False):
+    res = np.empty(1, arr.dtype)
+    type_enum = hpat.distributed_api.get_type_enum(arr)
+    if parallel:
+        nth_parallel(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    else:
+        nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    return res[0]
+
+sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
+@numba.njit
+def median(arr, parallel=False):
+    # similar to numpy/lib/function_base.py:_median
+    # TODO: check return types, e.g. float32 -> float32
+    n = len(arr)
+    if parallel:
+        n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))
+    k = n // 2
+
+    # odd length case
+    if n % 2 == 1:
+        return nth_element(arr, k, parallel)
+
+    v1 = nth_element(arr, k-1, parallel)
+    v2 = nth_element(arr, k, parallel)
+    return (v1 + v2) / 2
+
 
 @infer_global(concat)
 class ConcatType(AbstractTemplate):
@@ -194,75 +246,82 @@ def lower_nunique_parallel(context, builder, sig, args):
 
 # @overload(nunique_parallel)
 def nunique_overload_parallel(arr_typ):
-    # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
-    if is_str_arr_typ(arr_typ):
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
-        def nunique_par_str(A):
-            uniq_A = hpat.utils.to_array(set(A))
-            n_strs = len(uniq_A)
-            n_pes = hpat.distributed_api.get_size()
-            # send recv counts for the number of strings
-            send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-            send_disp = hpat.hiframes_join.calc_disp(send_counts)
-            recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-            recv_size = recv_counts.sum()
-            # send recv counts for the number of chars
-            send_chars_count, recv_chars_count = set_recv_counts_chars(uniq_A)
-            send_disp_chars = hpat.hiframes_join.calc_disp(send_chars_count)
-            recv_disp_chars = hpat.hiframes_join.calc_disp(recv_chars_count)
-            recv_num_chars = recv_chars_count.sum()
-            n_all_chars = hpat.str_arr_ext.num_total_chars(uniq_A)
 
-            # allocate send recv arrays
-            send_arr_lens = np.empty(n_strs, np.uint32)  # XXX offset type is uint32
-            send_arr_chars = np.empty(n_all_chars, np.uint8)
-            recv_arr = hpat.str_arr_ext.pre_alloc_string_array(recv_size, recv_num_chars)
-
-            # populate send array
-            tmp_offset = np.zeros(n_pes, dtype=np.int64)
-            tmp_offset_chars = np.zeros(n_pes, dtype=np.int64)
-
-            for i in range(n_strs):
-                str = uniq_A[i]
-                node_id = hash(str) % n_pes
-                # lens
-                ind = send_disp[node_id] + tmp_offset[node_id]
-                send_arr_lens[ind] = len(str)
-                tmp_offset[node_id] += 1
-                # chars
-                indc = send_disp_chars[node_id] + tmp_offset_chars[node_id]
-                str_copy(send_arr_chars, indc, str.c_str(), len(str))
-                tmp_offset_chars[node_id] += len(str)
-                hpat.str_ext.del_str(str)
-
-            # shuffle len values
-            offset_ptr = hpat.str_arr_ext.get_offset_ptr(recv_arr)
-            c_alltoallv(send_arr_lens.ctypes, offset_ptr, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, int32_typ_enum)
-            data_ptr = hpat.str_arr_ext.get_data_ptr(recv_arr)
-            # shuffle char values
-            c_alltoallv(send_arr_chars.ctypes, data_ptr, send_chars_count.ctypes, recv_chars_count.ctypes, send_disp_chars.ctypes, recv_disp_chars.ctypes, char_typ_enum)
-            convert_len_arr_to_offset(offset_ptr, recv_size)
-            loc_nuniq = len(set(recv_arr))
-            return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
-        return nunique_par_str
-
-    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
     def nunique_par(A):
-        uniq_A = hpat.utils.to_array(set(A))
-        send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-        send_disp = hpat.hiframes_join.calc_disp(send_counts)
-        recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-        recv_size = recv_counts.sum()
-        # (send_counts, recv_counts, send_disp, recv_disp,
-        #  recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
-        send_arr = np.empty_like(uniq_A)
-        recv_arr = np.empty(recv_size, uniq_A.dtype)
-        hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
-        loc_nuniq = len(set(recv_arr))
+        uniq_A = hpat.hiframes_api.unique_parallel(A)
+        loc_nuniq = len(uniq_A)
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
+
     return nunique_par
+
+
+def unique(A):  # pragma: no cover
+    return np.array([a for a in set(A)]).astype(A.dtype)
+
+def unique_parallel(A):  # pragma: no cover
+    return np.array([a for a in set(A)]).astype(A.dtype)
+
+@infer_global(unique)
+@infer_global(unique_parallel)
+class uniqueType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        return signature(arr, arr)
+
+@lower_builtin(unique, types.Any)  # TODO: replace Any with types
+def lower_unique(context, builder, sig, args):
+    func = unique_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(unique)
+def unique_overload(arr_typ):
+    # TODO: extend to other types like datetime?
+    def unique_seq(A):
+        return hpat.utils.to_array(set(A))
+    return unique_seq
+
+@lower_builtin(unique_parallel, types.Any)  # TODO: replace Any with types
+def lower_unique_parallel(context, builder, sig, args):
+    func = unique_overload_parallel(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(unique_parallel)
+def unique_overload_parallel(arr_typ):
+
+    def unique_par(A):
+        uniq_A = hpat.utils.to_array(set(A))
+
+        n_pes = hpat.distributed_api.get_size()
+        shuffle_meta = alloc_shuffle_metadata(uniq_A, n_pes, False)
+        # calc send/recv counts
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            update_shuffle_meta(shuffle_meta, node_id, i, val, False)
+
+        finalize_shuffle_meta(uniq_A, shuffle_meta, False)
+
+        # write send buffers
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            write_send_buff(shuffle_meta, node_id, val)
+            # update last since it is reused in data
+            shuffle_meta.tmp_offset[node_id] += 1
+
+        # shuffle
+        alltoallv(uniq_A, shuffle_meta)
+
+        return hpat.utils.to_array(set(shuffle_meta.out_arr))
+
+    return unique_par
+
+
 
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
@@ -281,28 +340,6 @@ def set_recv_counts_chars(key_arr):
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     return send_counts, recv_counts
 
-@intrinsic
-def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
-    def codegen(context, builder, sig, args):
-        buff_arr, ind, str, len_str = args
-        buff_arr = make_array(sig.args[0])(context, builder, buff_arr)
-        ptr = builder.gep(buff_arr.data, [ind])
-        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
-        return context.get_dummy_value()
-
-    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
-
-
-@intrinsic
-def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
-    def codegen(context, builder, sig, args):
-        ptr, ind, _str, len_str = args
-        ptr = builder.gep(ptr, [ind])
-        cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
-        return context.get_dummy_value()
-
-    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
-
 
 @infer_global(count)
 class CountTyper(AbstractTemplate):
@@ -319,6 +356,22 @@ class FillNaType(AbstractTemplate):
         assert len(args) == 3
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
+
+@infer_global(fillna_str_alloc)
+class FillNaStrType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        # args: in_arr, value
+        return signature(string_array_type, *args)
+
+@infer_global(dropna)
+class DropNAType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        # args: in_arr
+        return signature(args[0], *args)
 
 @infer_global(column_sum)
 class SumType(AbstractTemplate):
@@ -379,6 +432,116 @@ def shift_dtype_overload(d_typ):
         return lambda a: np.float64
     else:
         return lambda a: a
+
+def isna(arr, i):
+    return False
+
+@overload(isna)
+def isna_overload(arr_typ, ind_typ):
+    if arr_typ == string_array_type:
+        return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+    # TODO: extend to other types
+    assert isinstance(arr_typ, types.Array)
+    dtype = arr_typ.dtype
+    if isinstance(dtype, types.Float):
+        return lambda arr,i: np.isnan(arr[i])
+    # XXX integers don't have nans, extend to boolean
+    return lambda arr,i: False
+
+
+@numba.njit
+def min_heapify(arr, n, start):
+    min_ind = start
+    left = 2 * start + 1
+    right = 2 * start + 2
+
+    if left < n and arr[left] < arr[min_ind]:
+        min_ind = left
+
+    if right < n and arr[right] < arr[min_ind]:
+        min_ind = right
+
+    if min_ind != start:
+        arr[start], arr[min_ind] = arr[min_ind], arr[start]  # swap
+        min_heapify(arr, n, min_ind)
+
+
+def select_k_nonan(A, m, k):  # pragma: no cover
+    return A
+
+@overload(select_k_nonan)
+def select_k_nonan_overload(A_t, m_t, k_t):
+    dtype = A_t.dtype
+    if isinstance(dtype, types.Integer):
+        # ints don't have nans
+        return lambda A,m,k: (A[:k].copy(), k)
+
+    assert isinstance(dtype, types.Float)
+
+    def select_k_nonan_float(A, m, k):
+        # select the first k elements but ignore NANs
+        min_heap_vals = np.empty(k, A.dtype)
+        i = 0
+        ind = 0
+        while i < m and ind < k:
+            val = A[i]
+            i += 1
+            if not np.isnan(val):
+                min_heap_vals[ind] = val
+                ind += 1
+
+        # if couldn't fill with k values
+        if ind < k:
+            min_heap_vals = min_heap_vals[:ind]
+
+        return min_heap_vals, i
+
+    return select_k_nonan_float
+
+@numba.njit
+def nlargest(A, k):
+    # algorithm: keep a min heap of k largest values, if a value is greater
+    # than the minimum (root) in heap, replace the minimum and rebuild the heap
+    m = len(A)
+
+    # if all of A, just sort and reverse
+    if k >= m:
+        B = np.sort(A)
+        B = B[~np.isnan(B)]
+        return np.ascontiguousarray(B[::-1])
+
+    # create min heap but
+    min_heap_vals, start = select_k_nonan(A, m, k)
+    # heapify k/2-1 to 0 instead of sort?
+    min_heap_vals.sort()
+
+    for i in range(start, m):
+        if A[i] > min_heap_vals[0]:
+            min_heap_vals[0] = A[i]
+            min_heapify(min_heap_vals, k, 0)
+
+    # sort and return the heap values
+    min_heap_vals.sort()
+    return np.ascontiguousarray(min_heap_vals[::-1])
+
+MPI_ROOT = 0
+
+@numba.njit
+def nlargest_parallel(A, k):
+    # parallel algorithm: assuming k << len(A), just call nlargest on chunks
+    # of A, gather the result and return the largest k
+    # TODO: support cases where k is not too small
+    my_rank = hpat.distributed_api.get_rank()
+    local_res = nlargest(A, k)
+    all_largest = hpat.distributed_api.gatherv(local_res)
+
+    # TODO: handle len(res) < k case
+    if my_rank == MPI_ROOT:
+        res = nlargest(all_largest, k)
+    else:
+        res = np.empty(k, A.dtype)
+    hpat.distributed_api.bcast(res)
+    return res
 
 
 # @jit
@@ -469,7 +632,7 @@ def array_std(context, builder, sig, args):
 def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1

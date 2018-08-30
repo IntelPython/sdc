@@ -242,6 +242,7 @@ ext_dt = Extension(name="hdatetime_ext",
 
 ext_quantile = Extension(name="quantile_alg",
                          sources=["hpat/_quantile_alg.cpp"],
+                         depends=["hpat/_hpat_common.h"],
                          libraries = MPI_LIBS,
                          extra_compile_args = eca,
                          extra_link_args = ela,

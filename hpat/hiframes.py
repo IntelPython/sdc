@@ -245,6 +245,9 @@ class HiFrames(object):
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
 
+        if fdef == ('crosstab', 'pandas'):
+            return self._handle_crosstab(lhs, rhs, label)
+
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
@@ -905,7 +908,50 @@ class HiFrames(object):
                              "constant string").format(f_name, arg_name))
         return arg
 
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = args[arg_no]
+        elif arg_name in kws:
+            arg = kws[arg_name]
 
+        if arg is None:
+            if default is not None:
+                return default
+            raise ValueError("{} requires '{}' argument".format(
+                f_name, arg_name))
+        return arg
+
+    def _handle_crosstab(self, lhs, rhs, label):
+        kws = dict(rhs.kws)
+        index_arg = self._get_arg('crosstab', rhs.args, kws, 0, 'index')
+        columns_arg = self._get_arg('crosstab', rhs.args, kws, 1, 'columns')
+        # TODO: handle values and aggfunc options
+
+        in_vars = {}
+        out_typ = types.intp
+        out_types = {'__dummy__': out_typ}
+
+        pivot_values = self._get_pivot_values(lhs.name)
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        out_df = df_col_map.copy()
+        self._create_df(lhs.name, out_df, label)
+        pivot_arr = columns_arg
+
+        def _agg_len_impl(in_arr):  # pragma: no cover
+            numba.parfor.init_prange()
+            count = 0
+            for i in numba.parfor.internal_prange(len(in_arr)):
+                count += 1
+            return count
+
+        # TODO: make out_key_var an index column
+
+        return [hiframes_aggregate.Aggregate(
+            lhs.name, 'crosstab', index_arg.name, None, df_col_map,
+            in_vars, index_arg,
+            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)]
 
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())

@@ -127,7 +127,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
-    @unittest.skip("needs argsort fix in canonicalize_array_math")
     def test_series_attr5(self):
         def test_impl(A):
             return A.argsort().values
@@ -154,6 +153,23 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_astype_str1(self):
+        def test_impl(A):
+            return A.astype(str)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str2(self):
+        def test_impl(A):
+            return A.astype(str)
+
+        S = pd.Series(['aa', 'bb', 'cc'])
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     def test_np_call_on_series1(self):
         def test_impl(A):
@@ -328,13 +344,83 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    def test_series_fillna(self):
+    def test_series_fillna1(self):
         def test_impl(A):
             return A.fillna(5.0)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_fillna_str1(self):
+        def test_impl(A):
+            return A.fillna("dd")
+
+        df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_fillna_str_inplace1(self):
+        def test_impl(A):
+            A.fillna("dd", inplace=True)
+            return A
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+        # TODO: handle string array reflection
+        # hpat_func(S1)
+        # test_impl(S2)
+        # np.testing.assert_array_equal(S1, S2)
+
+    def test_series_fillna_str_inplace_empty1(self):
+        def test_impl(A):
+            A.fillna("", inplace=True)
+            return A
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    def test_series_dropna_float1(self):
+        def test_impl(A):
+            return A.dropna().values
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+
+    def test_series_dropna_str1(self):
+        def test_impl(A):
+            return A.dropna().values
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+
+    def test_series_dropna_float_inplace1(self):
+        def test_impl(A):
+            A.dropna(inplace=True)
+            return A.values
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+
+    def test_series_dropna_str_inplace1(self):
+        def test_impl(A):
+            A.dropna(inplace=True)
+            return A.values
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S2 = S1.copy()
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
     def test_series_sum1(self):
         def test_impl(S):
@@ -355,6 +441,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_prod1(self):
+        def test_impl(S):
+            return S.prod()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # all NA case should produce 1
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
@@ -488,6 +586,172 @@ class TestSeries(unittest.TestCase):
         # Test series tuple
         np.testing.assert_array_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
 
+    def test_series_isna1(self):
+        def test_impl(S):
+            return S.isna()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_isnull1(self):
+        def test_impl(S):
+            return S.isnull()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_notna1(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_str_isna1(self):
+        def test_impl(S):
+            return S.isna()
+
+        S = pd.Series(['aa', None, 'c', 'cccd'])
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_nlargest1(self):
+        def test_impl(S):
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nlargest_default1(self):
+        def test_impl(S):
+            return S.nlargest()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nlargest_nan1(self):
+        def test_impl(S):
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nlargest_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+
+    def test_series_head1(self):
+        def test_impl(S):
+            return S.head(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_head_default1(self):
+        def test_impl(S):
+            return S.head()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_median1(self):
+        def test_impl(S):
+            return S.median()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(np.random.ranf(m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # odd size
+        m = 101
+        S = pd.Series(np.random.randint(-30, 30, m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(np.random.ranf(m))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_median_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.median()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_series_argsort_parallel(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.argsort().values
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_idxmin1(self):
+        def test_impl(A):
+            return A.idxmin()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_idxmax1(self):
+        def test_impl(A):
+            return A.idxmax()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values1(self):
+        def test_impl(A):
+            return A.sort_values()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.sort_values()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 if __name__ == "__main__":
     unittest.main()

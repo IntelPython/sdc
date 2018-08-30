@@ -1,5 +1,6 @@
 import numba
 import hpat
+from hpat.utils import debug_prints
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
                     signature, AttributeTemplate, infer_getattr, bound_function)
@@ -90,7 +91,8 @@ try:
     ll.add_symbol('svc_predict', daal_wrapper.svc_predict)
     ll.add_symbol('dtor_svc', daal_wrapper.dtor_svc)
 except ImportError:
-    print("daal import error")
+    if debug_prints():  # pragma: no cover
+        print("daal import error")
 
 @lower_builtin(SVC, types.intp)
 def impl_svc_constructor(context, builder, sig, args):

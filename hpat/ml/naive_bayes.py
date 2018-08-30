@@ -1,5 +1,6 @@
 import numba
 import hpat
+from hpat.utils import debug_prints
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
                     signature, AttributeTemplate, infer_getattr, bound_function)
@@ -90,7 +91,8 @@ try:
     ll.add_symbol('mnb_predict', daal_wrapper.mnb_predict)
     ll.add_symbol('dtor_mnb', daal_wrapper.dtor_mnb)
 except ImportError:
-    print("daal import error")
+    if debug_prints():  # pragma: no cover
+        print("daal import error")
 
 @lower_builtin(MultinomialNB, types.intp)
 def impl_mnb_constructor(context, builder, sig, args):

@@ -8,7 +8,8 @@ from numba.typing.builtins import IndexValueType
 import numpy as np
 import hpat
 from hpat import distributed_api
-from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type, _h5_typ_table
+from hpat.utils import _numba_to_c_type_map
+from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
 import time
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -90,7 +91,7 @@ def lower_dist_reduce(context, builder, sig, args):
     in_ptr = builder.bitcast(in_ptr, lir.IntType(8).as_pointer())
     out_ptr = builder.bitcast(out_ptr, lir.IntType(8).as_pointer())
 
-    typ_enum = _h5_typ_table[target_typ]
+    typ_enum = _numba_to_c_type_map[target_typ]
     typ_arg = cgutils.alloca_once_value(builder, lir.Constant(lir.IntType(32),
                                                               typ_enum))
 
@@ -109,7 +110,7 @@ def lower_dist_arr_reduce(context, builder, sig, args):
     op_typ = args[1].type
 
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     ndims = sig.args[0].ndim
@@ -200,7 +201,7 @@ def lower_dist_exscan(context, builder, sig, args):
                types.int32, types.int32, types.boolean)
 def lower_dist_irecv(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = context.get_constant(types.int32, typ_enum)
     out = make_array(sig.args[0])(context, builder, args[0])
     size_arg = args[1]
@@ -230,7 +231,7 @@ def lower_dist_irecv(context, builder, sig, args):
                types.int32, types.int32, types.boolean)
 def lower_dist_isend(context, builder, sig, args):
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = context.get_constant(types.int32, typ_enum)
     out = make_array(sig.args[0])(context, builder, args[0])
 
@@ -345,8 +346,8 @@ def lower_dist_allgather(context, builder, sig, args):
     assert val_typ == arr_typ.dtype
 
     # type enum arg
-    assert val_typ in _h5_typ_table, "invalid allgather type"
-    typ_enum = _h5_typ_table[val_typ]
+    assert val_typ in _numba_to_c_type_map, "invalid allgather type"
+    typ_enum = _numba_to_c_type_map[val_typ]
     typ_arg = context.get_constant(types.int32, typ_enum)
 
     # size arg is 1 for now
@@ -527,7 +528,7 @@ _fix_i_malloc.argtypes = []
 @numba.njit
 def fix_i_malloc():
     _fix_i_malloc()
-    
+
 ########### finalize MPI when exiting ####################
 
 def hpat_finalize():

@@ -10,6 +10,7 @@
 #include <random>
 
 #include "_distributed.h"
+#include "_hpat_common.h"
 
 extern "C" {
 
@@ -251,7 +252,7 @@ void hpat_dist_waitall(int size, MPI_Request *req_arr)
     return;
 }
 
-// _h5_typ_table = {
+// _numba_to_c_type_map = {
 //     int8:0,
 //     uint8:1,
 //     int32:2,
@@ -264,16 +265,29 @@ void hpat_dist_waitall(int size, MPI_Request *req_arr)
 
 MPI_Datatype get_MPI_typ(int typ_enum)
 {
-    // printf("h5 type enum:%d\n", typ_enum);
-    if (typ_enum < 0 || typ_enum > 7)
-    {
-        std::cerr << "Invalid MPI_Type" << "\n";
-        return MPI_LONG_LONG_INT;
+    switch (typ_enum) {
+        case HPAT_CTypes::INT8:
+            return MPI_CHAR;
+        case HPAT_CTypes::UINT8:
+            return MPI_UNSIGNED_CHAR;
+        case HPAT_CTypes::INT32:
+            return MPI_INT;
+        case HPAT_CTypes::UINT32:
+            return MPI_UNSIGNED;
+        case HPAT_CTypes::INT64:
+            return MPI_LONG_LONG_INT;
+        case HPAT_CTypes::UINT64:
+            return MPI_UNSIGNED_LONG_LONG;
+        case HPAT_CTypes::FLOAT32:
+            return MPI_FLOAT;
+        case HPAT_CTypes::FLOAT64:
+            return MPI_DOUBLE;
+        default:
+            std::cerr << "Invalid MPI_Type" << "\n";
     }
-    MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_UNSIGNED, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE,
-            MPI_UNSIGNED_LONG_LONG};
-    return types_list[typ_enum];
+    // dummy value in case of error
+    // TODO: raise error properly
+    return MPI_LONG_LONG_INT;
 }
 
 MPI_Datatype get_val_rank_MPI_typ(int typ_enum)

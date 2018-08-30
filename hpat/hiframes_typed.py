@@ -14,6 +14,7 @@ from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
+from hpat import hiframes_sort
 from hpat.utils import debug_prints, inline_new_blocks
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
@@ -294,7 +295,9 @@ class HiFramesTyped(object):
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
         if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
-                         'nunique', 'describe', 'abs', 'str.len']:
+                         'nunique', 'describe', 'abs', 'str.len', 'isna',
+                         'isnull', 'median', 'idxmin', 'idxmax', 'prod',
+                         'unique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -309,27 +312,34 @@ class HiFramesTyped(object):
             )
 
         if func_name == 'fillna':
-            val = rhs.args[0]
-            kws = dict(rhs.kws)
-            inplace = False
-            if 'inplace' in kws:
-                inplace = guard(find_const, self.func_ir, kws['inplace'])
-                if inplace == None:  # pragma: no cover
-                    raise ValueError("inplace arg to fillna should be constant")
+            return self._run_call_series_fillna(assign, lhs, rhs, series_var)
 
-            if inplace:
-                return self._replace_func(
-                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
-                    [series_var, series_var, val])
-            else:
-                func = series_replace_funcs['fillna_alloc']
-                return self._replace_func(func, [series_var, val])
+        if func_name == 'dropna':
+            return self._run_call_series_dropna(assign, lhs, rhs, series_var)
 
         if func_name in ('shift', 'pct_change'):
             # TODO: support default period argument
             shift_const = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, shift_const])
+
+        if func_name == 'nlargest':
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs['nlargest_default'], [series_var])
+            n_arg = rhs.args[0]
+            func = series_replace_funcs[func_name]
+            return self._replace_func(func, [series_var, n_arg])
+
+        if func_name == 'head':
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs['head_default'], [series_var])
+            n_arg = rhs.args[0]
+            func = series_replace_funcs[func_name]
+            return self._replace_func(func, [series_var, n_arg])
 
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
@@ -338,6 +348,10 @@ class HiFramesTyped(object):
 
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
+
+        if func_name in ('argsort', 'sort_values'):
+            return self._handle_series_sort(
+                lhs, rhs, series_var, func_name == 'argsort')
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
@@ -354,6 +368,20 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [series_var, other])
 
+        if func_name == 'notna':
+            # TODO: make sure this is fused and optimized properly
+            return self._replace_func(
+                lambda S: S.isna()==False, [series_var],
+                array_typ_convert=False)
+
+        # astype with string output
+        if func_name == 'astype' and self.typemap[lhs.name] == string_series_type:
+            # just return input if string
+            if self.typemap[series_var.name] == string_series_type:
+                return self._replace_func(lambda a: a, [series_var])
+            func = series_replace_funcs['astype_str']
+            return self._replace_func(func, [series_var])
+
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
@@ -362,6 +390,112 @@ class HiFramesTyped(object):
                 func_name))
 
         return [assign]
+
+    def _handle_series_sort(self, lhs, rhs, series_var, is_argsort):
+        """creates an index list and passes it to a Sort node as data
+        """
+        if is_argsort:
+            def _get_data(S):  # pragma: no cover
+                n = len(S)
+                A = np.arange(n)
+        else:  # sort_values
+            def _get_data(S):  # pragma: no cover
+                A = S.copy()
+
+        f_block = compile_to_numba_ir(_get_data,
+                                            {'np': np}, self.typingctx,
+                                            (if_series_to_array_type(self.typemap[series_var.name]),),
+                                            self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes = f_block.body[:-3]
+        nodes[-1].target = lhs
+        nodes.append(
+            hiframes_sort.Sort(series_var.name, series_var, {'inds': lhs}, lhs.loc))
+        return nodes
+
+    def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
+        dtype = self.typemap[series_var.name].dtype
+        val = rhs.args[0]
+        kws = dict(rhs.kws)
+        inplace = False
+        if 'inplace' in kws:
+            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            if inplace == None:  # pragma: no cover
+                raise ValueError("inplace arg to fillna should be constant")
+
+        if inplace:
+            if dtype == string_type:
+                # optimization: just set null bit if fill is empty
+                if guard(find_const, self.func_ir, val) == "":
+                    return self._replace_func(
+                        lambda A: hpat.str_arr_ext.set_null_bits(A),
+                        [series_var])
+                # Since string arrays can't be changed, we have to create a new
+                # array and assign it back to the same Series variable
+                # result back to the same variable
+                # TODO: handle string array reflection
+                def str_fillna_impl(A, fill):
+                    # not using A.fillna since definition list is not working
+                    # for A to find callname
+                    hpat.hiframes_api.fillna_str_alloc(A, fill)
+                    #A.fillna(fill)
+                fill_var = rhs.args[0]
+                arg_typs = (self.typemap[series_var.name], self.typemap[fill_var.name])
+                f_block = compile_to_numba_ir(str_fillna_impl,
+                                  {'hpat': hpat},
+                                  self.typingctx, arg_typs,
+                                  self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [series_var, fill_var])
+                # assign output back to series variable
+                f_block.body[-4].target = series_var
+                return {0: f_block}
+            else:
+                return self._replace_func(
+                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
+                    [series_var, series_var, val])
+        else:
+            if dtype == string_type:
+                func = series_replace_funcs['fillna_str_alloc']
+            else:
+                func = series_replace_funcs['fillna_alloc']
+            return self._replace_func(func, [series_var, val])
+
+    def _run_call_series_dropna(self, assign, lhs, rhs, series_var):
+        dtype = self.typemap[series_var.name].dtype
+        kws = dict(rhs.kws)
+        inplace = False
+        if 'inplace' in kws:
+            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            if inplace == None:  # pragma: no cover
+                raise ValueError("inplace arg to dropna should be constant")
+
+        if inplace:
+            # Since arrays can't resize inplace, we have to create a new
+            # array and assign it back to the same Series variable
+            # result back to the same variable
+            def dropna_impl(A):
+                # not using A.dropna since definition list is not working
+                # for A to find callname
+                res = hpat.hiframes_api.dropna(A)
+
+            arg_typs = (self.typemap[series_var.name],)
+            f_block = compile_to_numba_ir(dropna_impl,
+                                {'hpat': hpat},
+                                self.typingctx, arg_typs,
+                                self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [series_var])
+            # assign output back to series variable
+            f_block.body[-4].target = series_var
+            return {0: f_block}
+        else:
+            if dtype == string_type:
+                func = series_replace_funcs['dropna_str_alloc']
+            elif isinstance(dtype, types.Float):
+                func = series_replace_funcs['dropna_float']
+            else:
+                # integer case, TODO: bool, date etc.
+                func = lambda A: A
+            return self._replace_func(func, [series_var])
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
         """translate df.A.map(lambda a:...) to prange()
@@ -879,6 +1013,20 @@ class HiFramesTyped(object):
         if func_name == 'fillna':
             return self._replace_func(_column_fillna_impl, rhs.args)
 
+        if func_name == 'fillna_str_alloc':
+            return self._replace_func(_series_fillna_str_alloc_impl, rhs.args)
+
+        if func_name == 'dropna':
+            dtype = self.typemap[rhs.args[0].name].dtype
+            if dtype == string_type:
+                func = series_replace_funcs['dropna_str_alloc']
+            elif isinstance(dtype, types.Float):
+                func = series_replace_funcs['dropna_float']
+            else:
+                # integer case, TODO: bool, date etc.
+                func = lambda A: A
+            return self._replace_func(func, rhs.args)
+
         if func_name == 'column_sum':
             return self._replace_func(_column_sum_impl_basic, rhs.args)
 
@@ -900,9 +1048,11 @@ class HiFramesTyped(object):
                 return tup_def.items
         raise ValueError("constant tuple expected")
 
-    def _replace_func(self, func, args, const=False):
+    def _replace_func(self, func, args, const=False, array_typ_convert=True):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in args)
+        arg_typs = tuple(self.typemap[v.name] for v in args)
+        if array_typ_convert:
+            arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
         if const:
             new_args = []
             for i, arg in enumerate(args):
@@ -962,9 +1112,46 @@ def _column_count_impl(A):  # pragma: no cover
 def _column_fillna_impl(A, B, fill):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
-        if np.isnan(s):
+        if hpat.hiframes_api.isna(B, i):
             s = fill
         A[i] = s
+
+def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
+    n = len(B)
+    num_chars = 0
+    # get total chars in new array
+    for i in numba.parfor.internal_prange(n):
+        s = B[i]
+        if hpat.hiframes_api.isna(B, i):
+            num_chars += len(fill)
+        else:
+            num_chars += len(s)
+    A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
+    hpat.hiframes_api.fillna(A, B, fill)
+    return A
+
+def _series_dropna_float_impl(S):  # pragma: no cover
+    old_len = len(S)
+    new_len = old_len - hpat.hiframes_api.to_series_type(S).isna().sum()
+    A = np.empty(new_len, S.dtype)
+    curr_ind = 0
+    for i in numba.parfor.internal_prange(old_len):
+        val = S[i]
+        if not np.isnan(val):
+            A[curr_ind] = val
+            curr_ind += 1
+
+    return A
+
+def _series_dropna_str_alloc_impl(B):  # pragma: no cover
+    old_len = len(B)
+    # TODO: more efficient null counting
+    new_len = old_len - hpat.hiframes_api.to_series_type(B).isna().sum()
+    num_chars = hpat.str_arr_ext.num_total_chars(B)
+    A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
+    hpat.str_arr_ext.copy_non_null_offsets(A, B)
+    hpat.str_arr_ext.copy_data(A, B)
+    return A
 
 
 @numba.njit
@@ -975,6 +1162,7 @@ def _sum_handle_nan(s, count):  # pragma: no cover
 
 def _column_sum_impl_basic(A):  # pragma: no cover
     numba.parfor.init_prange()
+    # TODO: fix output type
     s = 0
     for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
@@ -998,6 +1186,17 @@ def _column_sum_impl_count(A):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_prod_impl_basic(A):  # pragma: no cover
+    numba.parfor.init_prange()
+    # TODO: fix output type
+    s = 1
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s *= val
+
+    res = s
+    return res
 
 @numba.njit
 def _mean_handle_nan(s, count):  # pragma: no cover
@@ -1181,12 +1380,36 @@ def _series_append_single_impl(arr, other):
 
 def _series_append_tuple_impl(arr, other):
     tup_other = hpat.hiframes_api.to_const_tuple(other)
-    arrs = (arr, *tup_other)
+    arrs = (arr,) + tup_other
     c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
     return hpat.hiframes_api.concat(c_arrs)
 
+def _series_isna_impl(arr):
+    numba.parfor.init_prange()
+    n = len(arr)
+    out_arr = np.empty(n, np.bool_)
+    for i in numba.parfor.internal_prange(n):
+        out_arr[i] = hpat.hiframes_api.isna(arr, i)
+    return out_arr
+
+def _series_astype_str_impl(arr):
+    n = len(arr)
+    num_chars = 0
+    # get total chars in new array
+    for i in numba.parfor.internal_prange(n):
+        s = arr[i]
+        num_chars += len(str(s))  # TODO: check NA
+
+    A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
+    for i in numba.parfor.internal_prange(n):
+        s = arr[i]
+        A[i] = str(s)  # TODO: check NA
+    return A
+
+
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
+    'prod': _column_prod_impl_basic,
     'count': _column_count_impl,
     'mean': _column_mean_impl,
     'max': _column_max_impl,
@@ -1194,8 +1417,12 @@ series_replace_funcs = {
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
+    'unique': lambda A: hpat.hiframes_api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
+    'fillna_str_alloc': _series_fillna_str_alloc_impl,
+    'dropna_float': _series_dropna_float_impl,
+    'dropna_str_alloc': _series_dropna_str_alloc_impl,
     'shift': _column_shift_impl,
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
@@ -1206,4 +1433,16 @@ series_replace_funcs = {
     'str.len': _str_len_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
+    'isna': _series_isna_impl,
+    # isnull is just alias of isna
+    'isnull': _series_isna_impl,
+    'astype_str': _series_astype_str_impl,
+    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
+    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5),
+    'head': lambda A, k: A[:k],
+    'head_default': lambda A: A[:5],
+    'median': lambda A: hpat.hiframes_api.median(A),
+    # TODO: handle NAs in argmin/argmax
+    'idxmin': lambda A: A.argmin(),
+    'idxmax': lambda A: A.argmax(),
 }
