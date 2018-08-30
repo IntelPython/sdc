@@ -36,6 +36,10 @@ def jit(signature_or_function=None, **options):
     for var, vals in pivots.items():
         _locals[var+":pivot"] = vals
 
+    h5_types = options.pop('h5_types', {})
+    for var, vals in h5_types.items():
+        _locals[var+":h5_types"] = vals
+
     options['locals'] = _locals
 
     #options['parallel'] = True

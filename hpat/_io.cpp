@@ -10,19 +10,21 @@
 extern "C" {
 
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel);
-int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim);
-int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
+hid_t hpat_h5_open_dset_or_group_obj(hid_t file_id, char* obj_name);
+int64_t hpat_h5_size(hid_t dataset_id, int dim);
+int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_close(hid_t file_id);
 hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
 hid_t hpat_h5_create_group(hid_t file_id, char* group_name);
-int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
 int hpat_h5_get_type_enum(std::string *s);
 hid_t get_h5_typ(int typ_enum);
 int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
+void hpat_h5g_close(hid_t group_id);
 uint64_t get_file_size(std::string* file_name);
 void file_read(std::string* file_name, void* buff, int64_t size);
 void file_write(std::string* file_name, void* buff, int64_t size);
@@ -42,6 +44,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
 
     PyObject_SetAttrString(m, "hpat_h5_open",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_open)));
+    PyObject_SetAttrString(m, "hpat_h5_open_dset_or_group_obj",
+                            PyLong_FromVoidPtr((void*)(&hpat_h5_open_dset_or_group_obj)));
     PyObject_SetAttrString(m, "hpat_h5_size",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_size)));
     PyObject_SetAttrString(m, "hpat_h5_read",
@@ -60,6 +64,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&h5g_get_num_objs)));
     PyObject_SetAttrString(m, "h5g_get_objname_by_idx",
                             PyLong_FromVoidPtr((void*)(&h5g_get_objname_by_idx)));
+    PyObject_SetAttrString(m, "hpat_h5g_close",
+                            PyLong_FromVoidPtr((void*)(&hpat_h5g_close)));
 
     // numpy read
     PyObject_SetAttrString(m, "get_file_size",
@@ -75,18 +81,23 @@ PyMODINIT_FUNC PyInit_hio(void) {
     return m;
 }
 
+// TODO: raise Python error
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl;}
+
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
 {
     // printf("h5_open file_name: %s mode:%s\n", file_name, mode);
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
-    assert(plist_id != -1);
-    herr_t ret;
+    CHECK(plist_id != -1, "h5 open property create error");
+    herr_t ret = 0;
     hid_t file_id = -1;
     unsigned flag = H5F_ACC_RDWR;
 
     if(is_parallel)
+    {
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
-    assert(ret != -1);
+        CHECK(ret != -1, "h5 open MPI driver set error");
+    }
 
     // TODO: handle 'a' mode
     if(strcmp(mode, "r")==0)
@@ -111,40 +122,58 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
         // printf("w- fid:%d\n", file_id);
     }
 
-    assert(file_id != -1);
+    CHECK(file_id != -1, "h5 open file error");
     ret = H5Pclose(plist_id);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 open property close error");
     return file_id;
 }
 
-int64_t hpat_h5_size(hid_t file_id, char* dset_name, int dim)
+hid_t hpat_h5_open_dset_or_group_obj(hid_t file_or_group_id, char* obj_name)
 {
-    hid_t dataset_id;
-    dataset_id = H5Dopen2(file_id, dset_name, H5P_DEFAULT);
-    assert(dataset_id != -1);
+    // handle obj['A'] call, the output can be group or dataset
+    // printf("open dset or group: %s\n", obj_name);
+    hid_t obj_id = -1;
+    H5O_info_t object_info;
+    herr_t err = H5Oget_info_by_name(file_or_group_id, obj_name, &object_info, H5P_DEFAULT);
+    CHECK(err != -1, "h5 open dset or group get_info_by_name error");
+    if (object_info.type == H5O_TYPE_GROUP)
+    {
+        // printf("open group: %s\n", obj_name);
+        obj_id = H5Gopen2(file_or_group_id, obj_name, H5P_DEFAULT);
+    }
+    if (object_info.type == H5O_TYPE_DATASET)
+    {
+        // printf("open dset: %s\n", obj_name);
+        obj_id = H5Dopen2(file_or_group_id, obj_name, H5P_DEFAULT);
+    }
+    CHECK(obj_id != -1, "h5 open dset or group error");
+    return obj_id;
+}
+
+int64_t hpat_h5_size(hid_t dataset_id, int dim)
+{
+    CHECK(dataset_id != -1, "h5 invalid dataset_id input to size call");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 size get_space error");
     hsize_t data_ndim = H5Sget_simple_extent_ndims(space_id);
     hsize_t *space_dims = new hsize_t[data_ndim];
     H5Sget_simple_extent_dims(space_id, space_dims, NULL);
-    H5Dclose(dataset_id);
+    H5Sclose(space_id);
     hsize_t ret = space_dims[dim];
     delete[] space_dims;
     return ret;
 }
 
-int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
+int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
-    //printf("dset_name:%s ndims:%d size:%d typ:%d\n", dset_name, ndims, counts[0], typ_enum);
+    // printf("h5read ndims:%d size:%d typ:%d\n", ndims, counts[0], typ_enum);
     // fflush(stdout);
     // printf("start %lld end %lld\n", start_ind, end_ind);
-    hid_t dataset_id;
     herr_t ret;
-    dataset_id = H5Dopen2(file_id, dset_name, H5P_DEFAULT);
-    assert(dataset_id != -1);
+    CHECK(dataset_id != -1, "h5 read invalid dataset_id");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 read get_space error");
 
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
@@ -157,13 +186,14 @@ int hpat_h5_read(hid_t file_id, char* dset_name, int ndims, int64_t* starts,
     }
 
     ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 read select_hyperslab error");
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
-    assert (mem_dataspace != -1);
+    CHECK (mem_dataspace != -1, "h5 read create_simple error");
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dread(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 read call error");
     // printf("out: %lf %lf ...\n", ((double*)out)[0], ((double*)out)[1]);
+    // TODO: close here?
     H5Dclose(dataset_id);
     return ret;
 }
@@ -217,9 +247,49 @@ int hpat_h5_get_type_enum(std::string *s)
     return typ;
 }
 
+void h5_close_object(hid_t obj_id)
+{
+    H5O_info_t object_info;
+    H5Oget_info(obj_id, &object_info);
+    if (object_info.type == H5O_TYPE_GROUP)
+    {
+        // printf("close group %lld\n", obj_id);
+        H5Gclose(obj_id);
+    }
+    if (object_info.type == H5F_OBJ_DATASET)
+    {
+        // printf("close dset %lld\n", obj_id);
+        H5Dclose(obj_id);
+    }
+}
+
+void h5_close_file_objects(hid_t file_id, unsigned types)
+{
+    // get object id list
+    size_t count = H5Fget_obj_count(file_id, types);
+    hid_t* obj_list = (hid_t*)malloc(sizeof(hid_t)*count);
+    H5Fget_obj_ids(file_id, types, count, obj_list);
+    // TODO: check file_id of objects like h5py/files.py:close
+    // for(size_t i=0; i<count; i++)
+    //     if (H5Iget_file_id(obj_list[i])!=file_id)
+    //         obj_list[i] = -1;
+    // close objs
+    for(size_t i=0; i<count; i++)
+    {
+        hid_t obj_id = obj_list[i];
+        //if (H5Iget_file_id(obj_id)==file_id)
+        if (obj_id != -1)
+            h5_close_object(obj_id);
+    }
+    delete[] obj_list;
+}
+
 int hpat_h5_close(hid_t file_id)
 {
     // printf("closing: %d\n", file_id);
+    // close file objects similar to h5py/files.py:close
+    h5_close_file_objects(file_id, ~H5F_OBJ_FILE);
+    h5_close_file_objects(file_id, H5F_OBJ_FILE);
     H5Fclose(file_id);
     return 0;
 }
@@ -244,22 +314,23 @@ hid_t hpat_h5_create_group(hid_t file_id, char* group_name)
 {
     // printf("group_name:%s\n", group_name);
     // fflush(stdout);
-
+    CHECK(file_id != -1, "h5 create_group invalid file_id");
     hid_t group_id;
     group_id = H5Gcreate2(file_id, group_name,
                                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    CHECK(group_id != -1, "h5 create_group error");
     return group_id;
 }
 
-int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
+int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
     //printf("dset_id:%s ndims:%d size:%d typ:%d\n", dset_id, ndims, counts[0], typ_enum);
     // fflush(stdout);
     herr_t ret;
-    assert(dataset_id != -1);
+    CHECK(dataset_id != -1, "h5 write invalid dataset_id");
     hid_t space_id = H5Dget_space(dataset_id);
-    assert(space_id != -1);
+    CHECK(space_id != -1, "h5 write get_space error");
 
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
@@ -272,12 +343,13 @@ int hpat_h5_write(hid_t file_id, hid_t dataset_id, int ndims, int64_t* starts,
     }
 
     ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 write select_hyperslab error");
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
-    assert (mem_dataspace != -1);
+    CHECK (mem_dataspace != -1, "h5 write create_simple error");
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dwrite(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
-    assert(ret != -1);
+    CHECK(ret != -1, "h5 write call error");
+    // XXX fix close properly, refcount dset_id?
     H5Dclose(dataset_id);
     return ret;
 }
@@ -305,6 +377,11 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
     std::string *outstr = new std::string(name);
     // std::cout<<"out: "<<*outstr<<std::endl;
     return outstr;
+}
+
+void hpat_h5g_close(hid_t group_id)
+{
+    herr_t err = H5Gclose(group_id);
 }
 
 uint64_t get_file_size(std::string* file_name)
@@ -450,5 +527,7 @@ void file_write_parallel(std::string* file_name, char* buff, int64_t start, int6
     MPI_File_close(&fh);
     return;
 }
+
+#undef CHECK
 
 } // extern "C"

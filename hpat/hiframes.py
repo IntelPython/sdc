@@ -19,7 +19,7 @@ from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
 
 import hpat
-from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
+from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
 from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
@@ -92,6 +92,8 @@ class HiFrames(object):
         self.reverse_copies = {}
         self.pq_handler = ParquetHandler(
             func_ir, typingctx, args, _locals, self.reverse_copies)
+        self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
+
 
     def run(self):
         # FIXME: see why this breaks test_kmeans
@@ -134,7 +136,11 @@ class HiFrames(object):
             self.func_ir.blocks[label].body = new_body
 
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        # XXX: remove dead here fixes h5 slice issue
+        # iterative remove dead to make sure all extra code (e.g. df vars) is removed
+        while remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir):
+            pass
+        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
@@ -147,6 +153,13 @@ class HiFrames(object):
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
+
+            # fix type for f['A'][:] dset reads
+            if rhs.op in ('getitem', 'static_getitem'):
+                h5_nodes = self.h5_handler.handle_possible_h5_read(
+                    assign, lhs, rhs)
+                if h5_nodes is not None:
+                    return h5_nodes
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -280,6 +293,9 @@ class HiFrames(object):
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
         if isinstance(func_mod, ir.Var) and self._is_groupby(func_mod):
             return self._handle_aggregate(lhs, rhs, func_mod, func_name, label)
+
+        if fdef == ('File', 'h5py'):
+            return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
         if fdef == ('fromfile', 'numpy'):
             return hpat.io._handle_np_fromfile(assign, lhs, rhs)
@@ -1374,6 +1390,7 @@ class HiFrames(object):
             return nodes
 
         return []
+
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

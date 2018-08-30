@@ -53,7 +53,64 @@ class TestIO(unittest.TestCase):
         f.close()
         np.testing.assert_almost_equal(X, np.ones((N,D)))
         np.testing.assert_almost_equal(Y, np.arange(N)+1.0)
+
+    def test_h5_write_group(self):
+        def test_impl(n, fname):
+            arr = np.arange(n)
+            n = len(arr)
+            f = h5py.File(fname, "w")
+            g1 = f.create_group("G")
+            dset1 = g1.create_dataset("data", (n,), dtype='i8')
+            dset1[:] = arr
+            f.close()
+
+        n = 101
+        arr = np.arange(n)
+        fname = "test_group.hdf5"
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(n, fname)
+        f = h5py.File(fname, "r")
+        X = f['G']['data'][:]
         f.close()
+        np.testing.assert_almost_equal(X, arr)
+
+    def test_h5_read_group(self):
+        def test_impl():
+            f = h5py.File("test_group_read.hdf5", "r")
+            g1 = f['G']
+            X = g1['data'][:]
+            f.close()
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_h5_file_keys(self):
+        def test_impl():
+            f = h5py.File("test_group_read.hdf5", "r")
+            s = 0
+            for gname in f.keys():
+                X = f[gname]['data'][:]
+                s += X.sum()
+            f.close()
+            return s
+
+        hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.int64[:]})
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_h5_group_keys(self):
+        def test_impl():
+            f = h5py.File("test_group_read.hdf5", "r")
+            g1 = f['G']
+            s = 0
+            for dname in g1.keys():
+                X = g1[dname][:]
+                s += X.sum()
+            f.close()
+            return s
+
+        hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.int64[:]})
+        self.assertEqual(hpat_func(), test_impl())
 
     def test_pq_read(self):
         def test_impl():

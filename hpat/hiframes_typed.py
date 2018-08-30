@@ -22,6 +22,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType)
+from hpat.pio_api import h5dataset_type
 
 ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
 
@@ -69,6 +70,10 @@ class HiFramesTyped(object):
                         inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
                         replaced = True
                         break
+                elif (isinstance(inst, ir.StaticSetItem)
+                        and self.typemap[inst.target.name] == h5dataset_type):
+                    out_nodes = self._handle_h5_write(inst.target, inst.index, inst.value)
+                    new_body.extend(out_nodes)
                 else:
                     new_body.append(inst)
             if not replaced:
@@ -207,6 +212,26 @@ class HiFramesTyped(object):
                     return [assign]
                 else:
                     func_name, func_mod = fdef
+
+                if fdef == ('h5_read_dummy', 'hpat.pio_api'):
+                    ndim = guard(find_const, self.func_ir, rhs.args[1])
+                    dtype_str = guard(find_const, self.func_ir, rhs.args[2])
+
+                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str):\n"
+                    for i in range(ndim):
+                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
+                    func_text += "  arr_shape = ({},)\n".format(
+                        ", ".join(["size_{}".format(i) for i in range(ndim)]))
+                    func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+                    func_text += "  A = np.empty(arr_shape, np.{})\n".format(
+                        dtype_str)
+                    func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+                    func_text += "  return A\n"
+
+                    loc_vars = {}
+                    exec(func_text, {}, loc_vars)
+                    _h5_read_impl = loc_vars['_h5_read_impl']
+                    return self._replace_func(_h5_read_impl, rhs.args)
 
                 if fdef == ('DatetimeIndex', 'pandas'):
                     return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
@@ -1037,6 +1062,30 @@ class HiFramesTyped(object):
             return self._replace_func(_column_var_impl, rhs.args)
 
         return [assign]
+
+    def _handle_h5_write(self, dset, index, arr):
+        if index != slice(None):
+            raise ValueError("Only HDF5 write of full array supported")
+        assert isinstance(self.typemap[arr.name], types.Array)
+        ndim = self.typemap[arr.name].ndim
+
+        func_text = "def _h5_write_impl(dset_id, arr):\n"
+        func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+        # TODO: remove after support arr.shape in parallel
+        func_text += "  arr_shape = ({},)\n".format(
+            ", ".join(["arr.shape[{}]".format(i) for i in range(ndim)]))
+        func_text += "  err = hpat.pio_api.h5write(dset_id, np.int32({}), zero_tup, arr_shape, 0, arr)\n".format(ndim)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _h5_write_impl = loc_vars['_h5_write_impl']
+        f_block = compile_to_numba_ir(_h5_write_impl, {'np': np,
+                                        'hpat': hpat}, self.typingctx,
+                                    (self.typemap[dset.name], self.typemap[arr.name]),
+                                    self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [dset, arr])
+        nodes = f_block.body[:-3]  # remove none return
+        return nodes
 
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)

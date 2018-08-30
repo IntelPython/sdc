@@ -35,6 +35,14 @@ def gen_pq_test(file_name):
 N = 101
 D = 10
 gen_lr("lr.hdf5", N, D)
+
+arr = np.arange(N)
+f = h5py.File("test_group_read.hdf5", "w")
+g1 = f.create_group("G")
+dset1 = g1.create_dataset("data", (N,), dtype='i8')
+dset1[:] = arr
+f.close()
+
 gen_kde_pq('kde.parquet', N)
 gen_pq_test('example.parquet')
 
