@@ -37,7 +37,7 @@ _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
 
 distributed_analysis_extensions = {}
-
+auto_rebalance = False
 
 class DistributedAnalysis(object):
     """analyze program for to distributed transfromation"""
@@ -67,7 +67,7 @@ class DistributedAnalysis(object):
         self._run_analysis(self.func_ir.blocks, topo_order,
                            array_dists, parfor_dists)
         # rebalance arrays if necessary
-        if Distribution.OneD_Var in array_dists.values():
+        if auto_rebalance and Distribution.OneD_Var in array_dists.values():
             changed = self._rebalance_arrs(array_dists, parfor_dists)
             if changed:
                 return self.run()
@@ -703,6 +703,7 @@ class DistributedAnalysis(object):
 
         for label, block in self.func_ir.blocks.items():
             for inst in block.body:
+                # TODO: handle hiframes filter etc.
                 if (isinstance(inst, Parfor)
                         and parfor_dists[inst.id] == Distribution.OneD_Var):
                     array_accesses = ir_utils.get_array_accesses(inst.loop_body)
@@ -723,6 +724,7 @@ class DistributedAnalysis(object):
         for block in blocks.values():
             new_body = []
             for inst in block.body:
+                # TODO: handle hiframes filter etc.
                 if isinstance(inst, Parfor):
                     self._gen_rebalances(rebalance_arrs, {0: inst.init_block})
                     self._gen_rebalances(rebalance_arrs, inst.loop_body)
