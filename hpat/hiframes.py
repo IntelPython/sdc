@@ -360,13 +360,26 @@ class HiFrames(object):
                  or dtype_map.op != 'build_map'):  # pragma: no cover
             raise ValueError("pd.read_csv() dtype should be constant dictionary")
 
+        date_cols = []
+        if 'parse_dates' in kws:
+            date_list = guard(get_definition, self.func_ir, kws['parse_dates'])
+            if not isinstance(date_list, ir.Expr) or date_list.op != 'build_list':
+                raise ValueError("pd.read_csv() parse_dates should be constant list")
+            for v in date_list.items:
+                col_val = guard(find_const, self.func_ir, v)
+                if col_val is None:
+                    raise ValueError("pd.read_csv() parse_dates expects constant column numbers")
+                date_cols.append(col_val)
+
         col_map = {}
         out_types = []
-        for name_var, dtype_var in dtype_map.items:
+        for i, (name_var, dtype_var) in enumerate(dtype_map.items):
             col_name = guard(find_const, self.func_ir, name_var)
             if col_name is None:  # pragma: no cover
                 raise ValueError("dtype column names should be constant")
             typ = self._get_const_dtype(dtype_var)
+            if i in date_cols:
+                typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
             col_map[col_name] = ir.Var(
                 lhs.scope, mk_unique_var(col_name), lhs.loc)

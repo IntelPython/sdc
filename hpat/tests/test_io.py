@@ -177,7 +177,7 @@ class TestIO(unittest.TestCase):
 
     def test_csv_date1(self):
         def test_impl():
-            return pd.read_csv("csv_data1.csv",
+            return pd.read_csv("csv_data_date1.csv",
                 names=['A', 'B', 'C', 'D'],
                 dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int},
                 parse_dates=[2])
