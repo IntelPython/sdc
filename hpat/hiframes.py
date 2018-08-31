@@ -24,6 +24,7 @@ from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
 from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
+from hpat.str_arr_ext import string_array_type
 from hpat import csv_ext
 
 import numpy as np
@@ -365,18 +366,7 @@ class HiFrames(object):
             col_name = guard(find_const, self.func_ir, name_var)
             if col_name is None:  # pragma: no cover
                 raise ValueError("dtype column names should be constant")
-            dtype_def = guard(get_definition, self.func_ir, dtype_var)
-            if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
-                raise ValueError("pd.read_csv() invalid dtype")
-            glob_def = guard(get_definition, self.func_ir, dtype_def.value)
-            if not isinstance(glob_def, ir.Global) or glob_def.value != np:
-                raise ValueError("pd.read_csv() invalid dtype")
-            # TODO: extend to other types like string and date, check error
-            typ_name = dtype_def.attr
-            typ_name = 'int64' if typ_name == 'int' else typ_name
-            typ_name = 'float64' if typ_name == 'float' else typ_name
-            typ = getattr(types, typ_name)
-            typ = types.Array(typ, 1, 'C')
+            typ = self._get_const_dtype(dtype_var)
             out_types.append(typ)
             col_map[col_name] = ir.Var(
                 lhs.scope, mk_unique_var(col_name), lhs.loc)
@@ -384,6 +374,24 @@ class HiFrames(object):
         self._create_df(lhs.name, col_map, label)
         return [csv_ext.CsvReader(
             fname, lhs.name, list(col_map.values()), out_types, lhs.loc)]
+
+    def _get_const_dtype(self, dtype_var):
+        dtype_def = guard(get_definition, self.func_ir, dtype_var)
+        # str case
+        if isinstance(dtype_def, ir.Global) or dtype_def.value == str:
+            return string_array_type
+        if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
+            raise ValueError("pd.read_csv() invalid dtype")
+        glob_def = guard(get_definition, self.func_ir, dtype_def.value)
+        if not isinstance(glob_def, ir.Global) or glob_def.value != np:
+            raise ValueError("pd.read_csv() invalid dtype")
+        # TODO: extend to other types like string and date, check error
+        typ_name = dtype_def.attr
+        typ_name = 'int64' if typ_name == 'int' else typ_name
+        typ_name = 'float64' if typ_name == 'float' else typ_name
+        typ = getattr(types, typ_name)
+        typ = types.Array(typ, 1, 'C')
+        return typ
 
     def _handle_pd_Series(self, assign, lhs, rhs):
         """transform pd.Series(A) call
