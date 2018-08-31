@@ -258,7 +258,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.23.3',
+      version='0.24.0',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[
