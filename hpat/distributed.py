@@ -562,6 +562,15 @@ class DistributedPass(object):
             replace_arg_nodes(f_block, rhs.args)
             out = f_block.body[:-2]
 
+        if (func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+                'to_arr_from_series', 'ts_series_to_arr_typ',
+                'to_date_series_type')
+                and self._is_1D_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
