@@ -175,6 +175,14 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_csv_date1(self):
+        def test_impl():
+            return pd.read_csv("csv_data1.csv",
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int},
+                parse_dates=[2])
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
 if __name__ == "__main__":
     unittest.main()
