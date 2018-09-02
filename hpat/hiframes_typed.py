@@ -315,6 +315,19 @@ class HiFramesTyped(object):
                     self.typingctx , argtyps, rhs.kws)
                 self.calltypes[rhs] = new_sig
 
+        # replace isna early to enable more optimization in PA
+        # TODO: handle more types
+        if func_name == 'isna':
+            arr = rhs.args[0]
+            ind = rhs.args[1]
+            arr_typ = self.typemap[arr.name]
+            if isinstance(arr_typ, (types.Array, SeriesType)):
+                if isinstance(arr_typ.dtype, types.Float):
+                    func = lambda arr,i: np.isnan(arr[i])
+                    return self._replace_func(func, [arr, ind])
+                elif arr_typ.dtype != string_type:
+                    return self._replace_func(lambda arr,i: False, [arr, ind])
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
