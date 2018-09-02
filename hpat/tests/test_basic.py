@@ -269,11 +269,15 @@ class TestBasic(BaseTest):
             C = hpat.distributed_api.rebalance_array(B)
             return C.sum()
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 3)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        try:
+            hpat.distributed_analysis.auto_rebalance = True
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 3)
+            self.assertEqual(count_parfor_OneDs(), 2)
+        finally:
+            hpat.distributed_analysis.auto_rebalance = False
 
     def test_rebalance_loop(self):
         def test_impl(N):
@@ -284,12 +288,16 @@ class TestBasic(BaseTest):
                 s += B.sum()
             return s
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 4)
-        self.assertEqual(count_parfor_OneDs(), 2)
-        self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
+        try:
+            hpat.distributed_analysis.auto_rebalance = True
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 4)
+            self.assertEqual(count_parfor_OneDs(), 2)
+            self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
+        finally:
+            hpat.distributed_analysis.auto_rebalance = False
 
     def test_transpose(self):
         def test_impl(n):
