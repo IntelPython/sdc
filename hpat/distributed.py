@@ -571,6 +571,14 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
+        if fdef == ('isna', 'hpat.hiframes_api') and self._is_1D_arr(rhs.args[0].name):
+            # fix index in call to isna
+            arr = rhs.args[0]
+            ind = rhs.args[1]
+            out = self._get_ind_sub(ind, self._array_starts[arr.name][0])
+            rhs.args[1] = out[-1].target
+            out.append(assign)
+
         if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
