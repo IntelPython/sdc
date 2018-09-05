@@ -15,8 +15,8 @@ class Filter(ir.Stmt):
     def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
         self.df_out = df_out
         self.df_in = df_in
-        self.df_out_vars = df_vars[self.df_out]
-        self.df_in_vars = df_vars[self.df_in]
+        self.df_out_vars = df_vars[self.df_out].copy()
+        self.df_in_vars = df_vars[self.df_in].copy()
         self.bool_arr = bool_arr
         # needs df columns for type inference stage
         self.df_vars = df_vars

@@ -32,9 +32,9 @@ class Join(ir.Stmt):
         self.right_df = right_df
         self.left_key = left_key
         self.right_key = right_key
-        self.df_out_vars = df_vars[self.df_out]
-        self.left_vars = df_vars[left_df]
-        self.right_vars = df_vars[right_df]
+        self.df_out_vars = df_vars[self.df_out].copy()
+        self.left_vars = df_vars[left_df].copy()
+        self.right_vars = df_vars[right_df].copy()
         # needs df columns for type inference stage
         self.df_vars = df_vars
         self.loc = loc
