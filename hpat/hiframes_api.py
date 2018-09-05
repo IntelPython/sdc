@@ -40,6 +40,10 @@ from hpat.hiframes_sort import (
     )
 from hpat.hiframes_join import write_send_buff
 
+# XXX: used in agg func output to avoid mutating filter, agg, join, etc.
+# TODO: fix type inferrer and remove this
+enable_hiframes_remove_dead = True
+
 # quantile imports?
 from llvmlite import ir as lir
 import quantile_alg

@@ -4,6 +4,7 @@ import numba
 from numba import typeinfer, ir, ir_utils, config
 from numba.ir_utils import visit_vars_inner, replace_vars_inner
 from numba.typing import signature
+import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
@@ -182,7 +183,9 @@ ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 
 def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, func_ir, typemap):
-    #
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return filter_node
+
     dead_cols = []
 
     for col_name, col_var in filter_node.df_out_vars.items():

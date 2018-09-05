@@ -174,6 +174,8 @@ ir_utils.visit_vars_extensions[Join] = visit_vars_join
 
 
 def remove_dead_join(join_node, lives, arg_aliases, alias_map, func_ir, typemap):
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return join_node
     # if an output column is dead, the related input column is not needed
     # anymore in the join
     dead_cols = []
