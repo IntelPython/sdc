@@ -831,6 +831,20 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_muti_hiframes_node_filter_agg(self):
+        def test_impl(df, cond):
+            df2 = df[cond]
+            c = df2.groupby('A')['B'].count()
+            return df2.C, c
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7], 'C': [2,3,-1,1,2,3,-1]})
+        cond = df.A > 1
+        res = test_impl(df, cond)
+        h_res = hpat_func(df, cond)
+        self.assertEqual(set(res[1]), set(h_res[1]))
+        np.testing.assert_array_equal(res[0], h_res[0])
+
     def test_itertuples(self):
         def test_impl(df):
             res = 0.0
