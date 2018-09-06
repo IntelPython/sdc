@@ -759,7 +759,8 @@ def box_str_arr(typ, val, c):
     fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
     arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data, string_array.null_bitmap])
 
-    c.context.nrt.decref(c.builder, typ, val)
+    # TODO: double check refcounting here
+    # c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
 
 @intrinsic
