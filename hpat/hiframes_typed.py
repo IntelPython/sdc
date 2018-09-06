@@ -23,6 +23,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType)
 from hpat.pio_api import h5dataset_type
+from hpat.hiframes_rolling import get_rolling_setup_args
 
 ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
 
@@ -611,31 +612,11 @@ class HiFramesTyped(object):
         call_def = guard(get_definition, self.func_ir, rolling_call.func)
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
-        window, center = self._get_rolling_setup_args(rolling_call)
+        window, center = _get_rolling_setup_args(self.func_ir, rolling_call)
 
         nodes = self._gen_rolling_call(
             rhs.args, series_var, window, center, func_name, lhs)
         return nodes
-
-    def _get_rolling_setup_args(self, rhs):
-        """
-        Handle Series rolling calls like:
-          r = df.column.rolling(3)
-        """
-        center = False
-        kws = dict(rhs.kws)
-        if rhs.args:
-            window = rhs.args[0]
-        elif 'window' in kws:
-            window = kws['window']
-        else:  # pragma: no cover
-            raise ValueError("window argument to rolling() required")
-        window_const = guard(find_const, self.func_ir, window)
-        window = window_const if window_const is not None else window
-        if 'center' in kws:
-            center_const = guard(find_const, self.func_ir, kws['center'])
-            center = center_const if center_const is not None else center
-        return window, center
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc

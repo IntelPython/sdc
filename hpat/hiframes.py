@@ -31,7 +31,7 @@ from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
-
+from hpat.hiframes_rolling import get_rolling_setup_args
 
 LARGE_WIN_SIZE = 10
 
@@ -64,6 +64,8 @@ def remove_hiframes(rhs, lives, call_list):
     if call_list == [list]:
         return True
     if call_list == ['groupby']:
+        return True
+    if call_list == ['rolling']:
         return True
     return False
 
@@ -1100,8 +1102,44 @@ class HiFrames(object):
         return df_var, out_colnames, explicit_select, obj_var
 
 
-    def _handle_rolling(self, lhs, rhs, func_mod, func_name, label):
-        pass
+    def _handle_rolling(self, lhs, rhs, obj_var, func_name, label):
+        # format df.rolling(w)['B'].sum()
+        _supported_rolling_funcs = ['sum']
+        # TODO: support aggregation functions sum, count, etc.
+        if func_name not in _supported_rolling_funcs:
+            raise ValueError("only {} supported in rolling".format(
+                                             ", ".join(_supported_rolling_funcs)))
+
+        # find selected output columns
+        df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
+        rolling_call = guard(get_definition, self.func_ir, obj_var)
+        window, center = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        # TODO: get 'on' arg for offset case
+        if out_colnames is None:
+            out_colnames = list(self.df_vars[df_var.name].keys())
+            # TODO: remove index col for offset case
+
+        # output column map, create dataframe if multiple outputs
+        if len(out_colnames) == 1 and explicit_select:
+            df_col_map = {out_colnames[0]: lhs}
+        else:
+            df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in out_colnames})
+            out_df = df_col_map.copy()
+            # TODO: add datetime index for offset case
+            self._create_df(lhs.name, out_df, label)
+
+        nodes = []
+        for cname, out_col_var in df_col_map.items():
+            in_col_var = self.df_vars[df_var.name][cname]
+            def f(arr, w):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, _func_name)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_col_var, window])
+            nodes += f_block.body[:-3]  # remove none return
+            nodes[-1].target = out_col_var
+
+        return nodes
 
     def _fix_rolling_array(self, col_var, func):
         """
