@@ -296,8 +296,14 @@ class HiFrames(object):
 
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-        if isinstance(func_mod, ir.Var) and self._is_groupby(func_mod):
+        if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'groupby'):
             return self._handle_aggregate(lhs, rhs, func_mod, func_name, label)
+
+        # rolling window
+        # e.g. df.rolling(2).sum
+        if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
+            return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
+
 
         if fdef == ('File', 'h5py'):
             return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
@@ -866,17 +872,18 @@ class HiFrames(object):
         return out_tp
 
 
-    def _is_groupby(self, agg_var):
-        """determines whether variable is coming from groupby() or groupby()[]
+    def _is_df_obj_call(self, call_var, obj_name):
+        """determines whether variable is coming from groupby() or groupby()[],
+        rolling(), rolling()[]
         """
-        var_def = guard(get_definition, self.func_ir, agg_var)
+        var_def = guard(get_definition, self.func_ir, call_var)
         # groupby()['B'] case
         if (isinstance(var_def, ir.Expr)
                 and var_def.op in ['getitem', 'static_getitem']):
-            return self._is_groupby(var_def.value)
+            return self._is_df_obj_call(var_def.value, obj_name)
         # groupby() called on column or df
         call_def = guard(find_callname, self.func_ir, var_def)
-        if (call_def is not None and call_def[0] == 'groupby'
+        if (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1])):
             return True
@@ -990,8 +997,13 @@ class HiFrames(object):
         agg_func = self._get_agg_func(func_name, rhs)
 
         # find selected output columns
-        df_var, key_colname, as_index, out_colnames, explicit_select = self._analyze_agg_select(
-                                                                       obj_var)
+        df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
+        key_colname, as_index = self._get_agg_obj_args(obj_var)
+        if out_colnames is None:
+            out_colnames = list(self.df_vars[df_var.name].keys())
+            # key arr is not output by default
+            # as_index should be handled separately since it just returns keys
+            out_colnames.remove(key_colname)
 
         # find input vars and output types
         out_types = {}
@@ -1023,24 +1035,7 @@ class HiFrames(object):
             in_vars, self.df_vars[df_var.name][key_colname],
             agg_func, out_types, lhs.loc)]
 
-    def _analyze_agg_select(self, obj_var):
-        """analyze selection of columns in after groupby()
-        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
-        """
-        select_def = guard(get_definition, self.func_ir, obj_var)
-        out_colnames = None
-        explicit_select = False
-        if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
-            agg_var = select_def.value
-            out_colnames = guard(find_const, self.func_ir, select_def.index)
-            if not isinstance(out_colnames, (str, tuple)):
-                raise ValueError("Groupby output column names should be constant")
-            if isinstance(out_colnames, str):
-                out_colnames = [out_colnames]
-            explicit_select = True
-        else:
-            agg_var = obj_var
-
+    def _get_agg_obj_args(self, agg_var):
         # find groupby key and as_index
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
@@ -1059,20 +1054,7 @@ class HiFrames(object):
             raise ValueError("by argument for groupby() required")
         key_colname = guard(find_const, self.func_ir, by_arg)
 
-        # find dataframe
-        call_def = guard(find_callname, self.func_ir, groubpy_call)
-        assert (call_def is not None and call_def[0] == 'groupby'
-                and isinstance(call_def[1], ir.Var)
-                and self._is_df_var(call_def[1]))
-        df_var = call_def[1]
-
-        if out_colnames is None:
-            out_colnames = list(self.df_vars[df_var.name].keys())
-            # key arr is not output by default
-            # as_index should be handled separately since it just returns keys
-            out_colnames.remove(key_colname)
-
-        return df_var, key_colname, as_index, out_colnames, explicit_select
+        return key_colname, as_index
 
     def _get_agg_func(self, func_name, rhs):
 
@@ -1091,6 +1073,35 @@ class HiFrames(object):
 
         return agg_func
 
+    def _get_df_obj_select(self, obj_var, obj_name):
+        """analyze selection of columns in after groupby() or rolling()
+        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
+        """
+        select_def = guard(get_definition, self.func_ir, obj_var)
+        out_colnames = None
+        explicit_select = False
+        if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
+            obj_var = select_def.value
+            out_colnames = guard(find_const, self.func_ir, select_def.index)
+            if not isinstance(out_colnames, (str, tuple)):
+                raise ValueError("{} output column names should be constant".format(obj_name))
+            if isinstance(out_colnames, str):
+                out_colnames = [out_colnames]
+            explicit_select = True
+
+        obj_call = guard(get_definition, self.func_ir, obj_var)
+        # find dataframe
+        call_def = guard(find_callname, self.func_ir, obj_call)
+        assert (call_def is not None and call_def[0] == obj_name
+                and isinstance(call_def[1], ir.Var)
+                and self._is_df_var(call_def[1]))
+        df_var = call_def[1]
+
+        return df_var, out_colnames, explicit_select, obj_var
+
+
+    def _handle_rolling(self, lhs, rhs, func_mod, func_name, label):
+        pass
 
     def _fix_rolling_array(self, col_var, func):
         """
