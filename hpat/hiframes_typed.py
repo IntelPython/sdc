@@ -268,7 +268,7 @@ class HiFramesTyped(object):
         # arr = fix_df_array(col) -> arr=col if col is array
         if (func_name == 'fix_df_array'
                 and isinstance(self.typemap[rhs.args[0].name],
-                               (types.Array, StringArrayType))):
+                               (types.Array, StringArrayType, SeriesType))):
             assign.value = rhs.args[0]
             return [assign]
 
