@@ -417,23 +417,22 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
-    @bound_function("series.cov")
-    def resolve_cov(self, ary, args, kws):
+    def _resolve_cov_func(self, ary, args, kws):
         # array is valid since hiframes_typed calls this after type replacement
         assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
         assert isinstance(ary.dtype, types.Number)
         assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        is_complex_op = isinstance(ary.dtype, types.Complex) or isinstance(args[0].dtype, types.Complex)
+        ret_typ = types.complex128 if is_complex_op else types.float64
+        return signature(ret_typ, *args)
+
+    @bound_function("series.cov")
+    def resolve_cov(self, ary, args, kws):
+        return self._resolve_cov_func(ary, args, kws)
 
     @bound_function("series.corr")
     def resolve_corr(self, ary, args, kws):
-        # array is valid since hiframes_typed calls this after type replacement
-        assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
-        assert isinstance(ary.dtype, types.Number)
-        assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        return self._resolve_cov_func(ary, args, kws)
 
     @bound_function("series.append")
     def resolve_append(self, ary, args, kws):
