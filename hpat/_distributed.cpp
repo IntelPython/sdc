@@ -444,13 +444,13 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
 MPI_Op get_MPI_op(int op_enum)
 {
     // printf("op type enum:%d\n", op_enum);
-    if (op_enum < 0 || op_enum > 5)
+    if (op_enum < 0 || op_enum > 6)
     {
         std::cerr << "Invalid MPI_Op" << "\n";
         return MPI_SUM;
     }
     MPI_Op ops_list[] = {MPI_SUM, MPI_PROD, MPI_MIN, MPI_MAX, MPI_MINLOC,
-            MPI_MAXLOC};
+            MPI_MAXLOC, MPI_BOR};
 
     return ops_list[op_enum];
 }
