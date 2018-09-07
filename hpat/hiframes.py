@@ -198,6 +198,11 @@ class HiFrames(object):
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
 
+            # A = df.values
+            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
+                    and rhs.attr == 'values'):
+                return self._handle_df_values(assign.target, rhs.value)
+
             if rhs.op == 'cast' and rhs.value.name in self.df_vars:
                 return self._box_return_df(assign, self.df_vars[rhs.value.name])
 
@@ -1395,6 +1400,24 @@ class HiFrames(object):
 
         return []
 
+    def _handle_df_values(self, lhs, df):
+        col_vars = self._get_df_col_vars(df)
+        n_cols = len(col_vars)
+        arg_names = ["C{}".format(i) for i in range(n_cols)]
+        func_text = "def f({}):\n".format(", ".join(arg_names))
+        func_text += "    A = np.stack(({}), 1)\n".format(
+            ",".join([s+".values" for s in arg_names]))
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_block = compile_to_numba_ir(f,
+                    {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, col_vars)
+        nodes = f_block.body[:-3]
+        nodes[-1].target = lhs
+        return nodes
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.
