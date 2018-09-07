@@ -209,11 +209,11 @@ class TestBasic(BaseTest):
         for (op,typ) in zip(binops,dtypes):
             func_text = """def f(n):
                   A = np.arange(np.{}(10));
-                  B = np.arange(np.{}(10));
+                  B = np.arange(np.{}(3), np.{}(3+10));
                   for i in numba.prange(n):
                       A {} B
                   return A
-            """.format(typ, typ, op)
+            """.format(typ, typ, typ, op)
             loc_vars = {}
             exec(func_text, {'np': np, 'numba': numba}, loc_vars)
             test_impl = loc_vars['f']
