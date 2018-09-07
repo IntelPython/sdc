@@ -12,7 +12,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             get_call_table, get_tuple_table, remove_dels,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
-                            find_callname, build_definitions)
+                            find_callname, build_definitions,
+                            find_build_sequence)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                           wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -811,6 +812,14 @@ class DistributedPass(object):
 
         if func_name == 'dot':
             return self._run_call_np_dot(lhs, assign, args)
+
+        if func_name == 'stack' and self._is_1D_arr(lhs):
+            # TODO: generalize
+            in_arrs, _ = guard(find_build_sequence, self.func_ir, args[0])
+            arr0 = in_arrs[0].name
+            self._array_starts[lhs] = [self._array_starts[arr0][0], None]
+            self._array_counts[lhs] = [self._array_counts[arr0][0], None]
+            self._array_sizes[lhs] = [self._array_sizes[arr0][0], None]
 
         return out
 

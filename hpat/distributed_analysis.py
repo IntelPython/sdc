@@ -7,7 +7,8 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (find_topo_order, guard, get_definition, require,
                             find_callname, mk_unique_var, compile_to_numba_ir,
-                            replace_arg_nodes, build_definitions)
+                            replace_arg_nodes, build_definitions,
+                            find_build_sequence, find_const)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -333,6 +334,11 @@ class DistributedAnalysis(object):
         if isinstance(func_mod, ir.Var) and self._analyze_call_d4p(lhs, func_name, self.typemap[func_mod.name], args, array_dists):
             return
 
+        # TODO: make sure assert_equiv is not generated unnecessarily
+        # TODO: fix assert_equiv for np.stack from df.value
+        if fdef == ('assert_equiv', 'numba.array_analysis'):
+            return
+
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists)
 
@@ -403,6 +409,26 @@ class DistributedAnalysis(object):
             self._analyze_call_np_dot(lhs, args, array_dists)
             return
 
+        # used in df.values
+        if func_name == 'stack':
+            seq_info = guard(find_build_sequence, self.func_ir, args[0])
+            if seq_info is None:
+                self._analyze_call_set_REP(lhs, args, array_dists)
+                return
+            in_arrs, _ = seq_info
+
+            axis = 0
+            # TODO: support kws
+            # if 'axis' in kws:
+            #     axis = find_const(self.func_ir, kws['axis'])
+            if len(args) > 1:
+                axis = find_const(self.func_ir, args[1])
+
+            # parallel if args are 1D and output is 2D and axis == 1
+            if axis is not None and axis == 1 and self.typemap[lhs].ndim == 2:
+                for v in in_arrs:
+                    self._meet_array_dists(lhs, v.name, array_dists)
+                return
 
         if (func_name in ['cumsum', 'cumprod', 'empty_like',
                           'zeros_like', 'ones_like', 'full_like', 'copy']):
