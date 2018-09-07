@@ -547,6 +547,10 @@ class TestSeries(unittest.TestCase):
         S1 = pd.Series([np.nan, -2., 3., 9.1])
         S2 = pd.Series([np.nan, -2., 3., 5.0])
         np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        complex_S1 = pd.Series([complex(-2., 1.), complex(3., 1.)])
+        complex_S2 = pd.Series([complex(-2., 1.), complex(3., 1.)])
+        # TODO(quasilyte): more intricate data for complex-typed series.
+        np.testing.assert_almost_equal(hpat_func(complex_S1, complex_S2), test_impl(complex_S1, complex_S2))
 
     def test_series_corr1(self):
         def test_impl(S1, S2):
@@ -556,6 +560,11 @@ class TestSeries(unittest.TestCase):
         S1 = pd.Series([np.nan, -2., 3., 9.1])
         S2 = pd.Series([np.nan, -2., 3., 5.0])
         np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        complex_S1 = pd.Series([complex(-2., 1.), complex(3., 1.)])
+        complex_S2 = pd.Series([complex(-2., 1.), complex(3., 1.)])
+        # TODO(quasilyte): more intricate data for complex-typed series when _column_corr_impl
+        # is fixed and returns "almost equal" results to np.corrcoef.
+        np.testing.assert_almost_equal(hpat_func(complex_S1, complex_S2), test_impl(complex_S1, complex_S2))
 
     def test_series_str_len1(self):
         def test_impl(S):

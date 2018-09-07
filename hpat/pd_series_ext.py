@@ -423,8 +423,8 @@ class SeriesAttribute(AttributeTemplate):
         assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
         assert isinstance(ary.dtype, types.Number)
         assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        ret_typ = types.complex128 if isinstance(args[0].dtype, types.Complex) else types.float64
+        return signature(ret_typ, *args)
 
     @bound_function("series.corr")
     def resolve_corr(self, ary, args, kws):
@@ -432,8 +432,8 @@ class SeriesAttribute(AttributeTemplate):
         assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
         assert isinstance(ary.dtype, types.Number)
         assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        ret_typ = types.complex128 if isinstance(args[0].dtype, types.Complex) else types.float64
+        return signature(ret_typ, *args)
 
     @bound_function("series.append")
     def resolve_append(self, ary, args, kws):
