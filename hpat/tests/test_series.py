@@ -11,6 +11,28 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
+_cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
+    (
+        [np.nan, -2., 3., 9.1],
+        [np.nan, -2., 3., 5.0],
+    ),
+    # TODO(quasilyte): more intricate data for complex-typed series.
+    # Some arguments make assert_almost_equal fail.
+    # Functions that yield mismaching results: _column_corr_impl and _column_cov_impl.
+    (
+        [complex(-2., 1.0), complex(3.0, 1.0)],
+        [complex(-3., 1.0), complex(2.0, 1.0)],
+    ),
+    (
+        [complex(-2.0, 1.0), complex(3.0, 1.0)],
+        [1.0, -2.0],
+    ),
+    (
+        [1.0, -4.5],
+        [complex(-4.5, 1.0), complex(3.0, 1.0)],
+    ),
+]]
+
 class TestSeries(unittest.TestCase):
     def test_create1(self):
         def test_impl():
@@ -544,27 +566,20 @@ class TestSeries(unittest.TestCase):
             return S1.cov(S2)
 
         hpat_func = hpat.jit(test_impl)
-        S1 = pd.Series([np.nan, -2., 3., 9.1])
-        S2 = pd.Series([np.nan, -2., 3., 5.0])
-        np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
-        complex_S1 = pd.Series([complex(-2., 1.), complex(3., 1.)])
-        complex_S2 = pd.Series([complex(-2., 1.), complex(3., 1.)])
-        # TODO(quasilyte): more intricate data for complex-typed series.
-        np.testing.assert_almost_equal(hpat_func(complex_S1, complex_S2), test_impl(complex_S1, complex_S2))
+        for pair in _cov_corr_series:
+            S1, S2 = pair
+            np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
+                                           err_msg='S1={}\nS2={}'.format(S1, S2))
 
     def test_series_corr1(self):
         def test_impl(S1, S2):
             return S1.corr(S2)
 
         hpat_func = hpat.jit(test_impl)
-        S1 = pd.Series([np.nan, -2., 3., 9.1])
-        S2 = pd.Series([np.nan, -2., 3., 5.0])
-        np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
-        complex_S1 = pd.Series([complex(-2., 1.), complex(3., 1.)])
-        complex_S2 = pd.Series([complex(-2., 1.), complex(3., 1.)])
-        # TODO(quasilyte): more intricate data for complex-typed series when _column_corr_impl
-        # is fixed and returns "almost equal" results to np.corrcoef.
-        np.testing.assert_almost_equal(hpat_func(complex_S1, complex_S2), test_impl(complex_S1, complex_S2))
+        for pair in _cov_corr_series:
+            S1, S2 = pair
+            np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
+                                           err_msg='S1={}\nS2={}'.format(S1, S2))
 
     def test_series_str_len1(self):
         def test_impl(S):
