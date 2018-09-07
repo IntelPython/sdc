@@ -102,34 +102,44 @@ numba.array_analysis.array_analysis_extensions[Join] = join_array_analysis
 
 def join_distributed_analysis(join_node, array_dists):
 
+    # TODO: can columns of the same input table have diffrent dists?
+    # left and right inputs can have 1D or 1D_Var seperately (q26 case)
     # input columns have same distribution
-    in_dist = Distribution.OneD
-    for _, col_var in (list(join_node.left_vars.items())
-                       + list(join_node.right_vars.items())):
-        in_dist = Distribution(
-            min(in_dist.value, array_dists[col_var.name].value))
+    left_dist = Distribution.OneD
+    right_dist = Distribution.OneD
+    for col_var in join_node.left_vars.values():
+        left_dist = Distribution(
+            min(left_dist.value, array_dists[col_var.name].value))
+
+    for col_var in join_node.right_vars.values():
+        right_dist = Distribution(
+            min(right_dist.value, array_dists[col_var.name].value))
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
-    for _, col_var in join_node.df_out_vars.items():
+    for col_var in join_node.df_out_vars.values():
         # output dist might not be assigned yet
         if col_var.name in array_dists:
             out_dist = Distribution(
                 min(out_dist.value, array_dists[col_var.name].value))
 
     # out dist should meet input dist (e.g. REP in causes REP out)
-    out_dist = Distribution(min(out_dist.value, in_dist.value))
-    for _, col_var in join_node.df_out_vars.items():
+    out_dist = Distribution(min(out_dist.value, left_dist.value))
+    out_dist = Distribution(min(out_dist.value, right_dist.value))
+    for col_var in join_node.df_out_vars.values():
         array_dists[col_var.name] = out_dist
 
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
-        in_dist = out_dist
+        left_dist = out_dist
+        right_dist = out_dist
 
     # assign input distributions
-    for _, col_var in (list(join_node.left_vars.items())
-                       + list(join_node.right_vars.items())):
-        array_dists[col_var.name] = in_dist
+    for col_var in join_node.left_vars.values():
+        array_dists[col_var.name] = left_dist
+
+    for col_var in join_node.right_vars.values():
+        array_dists[col_var.name] = right_dist
 
     return
 
