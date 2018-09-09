@@ -580,6 +580,19 @@ class DistributedPass(object):
             rhs.args[1] = out[-1].target
             out.append(assign)
 
+        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling') and (
+                    self._is_1D_arr(rhs.args[0].name)
+                    or self._is_1D_Var_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            # set parallel flag to true
+            true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
+            self.typemap[true_var.name] = types.boolean
+            rhs.args[3] = true_var
+            out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
+
         if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name

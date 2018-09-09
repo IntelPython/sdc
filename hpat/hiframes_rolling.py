@@ -48,33 +48,40 @@ class RollingType(AbstractTemplate):
         arr = args[0]  # array or series
         # result is always float64 in pandas
         # see _prep_values() in window.py
-        return signature(arr.copy(dtype=types.float64), *args)
+        return signature(arr.copy(dtype=types.float64), arr, types.intp,
+                         types.bool_, types.bool_, args[4])
 
 RollingType.support_literals = True
 
 
-@lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean, types.Const)
+@lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
+               types.Boolean, types.Const)
 def lower_rolling_fixed(context, builder, sig, args):
     func_name = sig.args[-1].value
     if func_name == 'sum':
         func = roll_sum_fixed
 
-    res = context.compile_internal(builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
+    res = context.compile_internal(
+        builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 
 #### adapted from pandas window.pyx ####
 
-def roll_sum_fixed(in_arr, win, center):
+def roll_sum_fixed(in_arr, win, center, parallel):
     sum_x = 0.0
     nobs = 0
     N = len(in_arr)
     output = np.empty(N, dtype=np.float64)
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
 
     # TODO: support minp arg end_range etc.
     minp = win
     offset = (win - 1) // 2 if center else 0
     range_endpoint = max(minp, 1) - 1
+    # in case window is smaller than array
+    range_endpoint = min(range_endpoint, N)
 
     for i in range(0, range_endpoint):
         nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
