@@ -27,9 +27,10 @@ def get_rolling_setup_args(func_ir, rhs, get_consts=True):
         window_const = guard(find_const, func_ir, window)
         window = window_const if window_const is not None else window
     if 'center' in kws:
-        # TODO: fix center
-        center_const = guard(find_const, func_ir, kws['center'])
-        center = center_const if center_const is not None else center
+        center = kws['center']
+        if get_consts:
+            center_const = guard(find_const, func_ir, center)
+            center = center_const if center_const is not None else center
     return window, center
 
 
@@ -52,9 +53,9 @@ class RollingType(AbstractTemplate):
 RollingType.support_literals = True
 
 
-@lower_builtin(rolling_fixed, types.Array, types.Integer, types.Const)
+@lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean, types.Const)
 def lower_rolling_fixed(context, builder, sig, args):
-    func_name = sig.args[2].value
+    func_name = sig.args[-1].value
     if func_name == 'sum':
         func = roll_sum_fixed
 
@@ -64,7 +65,7 @@ def lower_rolling_fixed(context, builder, sig, args):
 
 #### adapted from pandas window.pyx ####
 
-def roll_sum_fixed(in_arr, win):
+def roll_sum_fixed(in_arr, win, center):
     sum_x = 0.0
     nobs = 0
     N = len(in_arr)
@@ -72,11 +73,13 @@ def roll_sum_fixed(in_arr, win):
 
     # TODO: support minp arg end_range etc.
     minp = win
+    offset = (win - 1) // 2 if center else 0
     range_endpoint = max(minp, 1) - 1
 
     for i in range(0, range_endpoint):
         nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
-        output[i] = np.nan
+        if i >= offset:
+            output[i - offset] = np.nan
 
     for i in range(range_endpoint, N):
         val = in_arr[i]
@@ -86,7 +89,10 @@ def roll_sum_fixed(in_arr, win):
             prev_x = in_arr[i - win]
             nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
 
-        output[i] = calc_sum(minp, nobs, sum_x)
+        output[i - offset] = calc_sum(minp, nobs, sum_x)
+
+    for j in range(N - offset, N):
+        output[j] = np.nan
 
     return output
 

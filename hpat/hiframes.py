@@ -1110,10 +1110,15 @@ class HiFrames(object):
             raise ValueError("only {} supported in rolling".format(
                                              ", ".join(_supported_rolling_funcs)))
 
+        nodes = []
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
         rolling_call = guard(get_definition, self.func_ir, obj_var)
         window, center = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        if not isinstance(center, ir.Var):
+            center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
+            nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
+            center = center_var
         # TODO: get 'on' arg for offset case
         if out_colnames is None:
             out_colnames = list(self.df_vars[df_var.name].keys())
@@ -1129,13 +1134,12 @@ class HiFrames(object):
             # TODO: add datetime index for offset case
             self._create_df(lhs.name, out_df, label)
 
-        nodes = []
         for cname, out_col_var in df_col_map.items():
             in_col_var = self.df_vars[df_var.name][cname]
-            def f(arr, w):  # pragma: no cover
-                df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, _func_name)
+            def f(arr, w, center):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, _func_name)
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_col_var, window])
+            replace_arg_nodes(f_block, [in_col_var, window, center])
             nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = out_col_var
 
