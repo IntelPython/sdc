@@ -103,6 +103,22 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_box_dist_return(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        n = 11
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1)  # run to compile
+        np.testing.assert_allclose(
+            dist_sum(hpat_func(n).B.sum()), test_impl(n).B.sum())
+        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 2)
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):

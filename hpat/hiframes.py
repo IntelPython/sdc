@@ -1266,7 +1266,7 @@ class HiFrames(object):
 
         return nodes
 
-    def _box_return_df(self, cast_assign, df_map):
+    def _box_return_df(self, df_map):
         #
         arrs = list(df_map.values())
         names = list(df_map.keys())
@@ -1285,8 +1285,6 @@ class HiFrames(object):
             f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, arrs)
         nodes = f_block.body[:-3]  # remove none return
-        cast_assign.value = nodes[-1].target
-        nodes.append(cast_assign)
         return nodes
 
 
@@ -1315,7 +1313,30 @@ class HiFrames(object):
         loc = cast.loc
         # XXX: using split('.') since the variable might be renamed (e.g. A.2)
         ret_name = cast.value.name.split('.')[0]
-        if ret_name in flagged_returns.keys():
+        # if boxing df is required
+        if self._is_df_var(cast.value):
+            col_map = self.df_vars[cast.value.name]
+
+            # dist return arrays first
+            if ret_name in flagged_returns.keys():
+                new_col_map = {}
+                flag = flagged_returns[ret_name]
+                nodes = []
+                for cname, var in col_map.items():
+                    nodes += self._gen_replace_dist_return(var, flag)
+                    new_col_map[cname] = nodes[-1].target
+                col_map = new_col_map
+
+            nodes += self._box_return_df(col_map)
+            new_arr = nodes[-1].target
+            new_cast = ir.Expr.cast(new_arr, loc)
+            new_out = ir.Var(scope, mk_unique_var(flag + "_return"), loc)
+            nodes.append(ir.Assign(new_cast, new_out, loc))
+            ret_node.value = new_out
+            nodes.append(ret_node)
+            return nodes
+
+        elif ret_name in flagged_returns.keys():
             flag = flagged_returns[ret_name]
             nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
