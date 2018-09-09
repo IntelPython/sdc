@@ -1303,9 +1303,6 @@ class HiFrames(object):
         for v in flagged_returns.keys():
             self.locals.pop(v + ":return")
         nodes = [ret_node]
-        # shortcut if no dist return
-        if len(flagged_returns) == 0:
-            return nodes
         cast = guard(get_definition, self.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
@@ -1316,12 +1313,11 @@ class HiFrames(object):
         # if boxing df is required
         if self._is_df_var(cast.value):
             col_map = self.df_vars[cast.value.name]
-
+            nodes = []
             # dist return arrays first
             if ret_name in flagged_returns.keys():
                 new_col_map = {}
                 flag = flagged_returns[ret_name]
-                nodes = []
                 for cname, var in col_map.items():
                     nodes += self._gen_replace_dist_return(var, flag)
                     new_col_map[cname] = nodes[-1].target
@@ -1330,7 +1326,7 @@ class HiFrames(object):
             nodes += self._box_return_df(col_map)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
-            new_out = ir.Var(scope, mk_unique_var(flag + "_return"), loc)
+            new_out = ir.Var(scope, mk_unique_var("df_return"), loc)
             nodes.append(ir.Assign(new_cast, new_out, loc))
             ret_node.value = new_out
             nodes.append(ret_node)
@@ -1345,6 +1341,10 @@ class HiFrames(object):
             nodes.append(ir.Assign(new_cast, new_out, loc))
             ret_node.value = new_out
             nodes.append(ret_node)
+            return nodes
+
+        # shortcut if no dist return
+        if len(flagged_returns) == 0:
             return nodes
 
         cast_def = guard(get_definition, self.func_ir, cast.value)
