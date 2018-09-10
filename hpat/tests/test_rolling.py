@@ -17,12 +17,6 @@ class TestRolling(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'B': [0, 1, 2, np.nan, 4]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_fixed2(self):
-        def test_impl(df):
-            return df.rolling(2).sum()
-
-        hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
