@@ -80,7 +80,8 @@ def roll_sum_fixed(in_arr, win, center, parallel):
     offset = (win - 1) // 2 if center else 0
 
     if parallel:
-        halo_size = np.int32((win - 1) // 2) if center else np.int32(win-1)
+        # halo length is w/2 to handle even w such as w=4
+        halo_size = np.int32(win // 2) if center else np.int32(win-1)
         if _is_small_for_parallel(N, halo_size):
             return _handle_small_data(in_arr, win, center, rank, n_pes)
 
