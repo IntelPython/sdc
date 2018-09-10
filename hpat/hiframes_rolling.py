@@ -75,6 +75,7 @@ def roll_sum_fixed(in_arr, win, center, parallel):
     output = np.empty(N, dtype=np.float64)
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
+    comm_tag = np.int32(22)  # arbitrary
 
     # TODO: support minp arg end_range etc.
     minp = win
@@ -82,6 +83,17 @@ def roll_sum_fixed(in_arr, win, center, parallel):
     range_endpoint = max(minp, 1) - 1
     # in case window is smaller than array
     range_endpoint = min(range_endpoint, N)
+
+    if parallel:
+        # TODO: center
+        halo_size = np.int32(win-1)
+        recv_buff = np.empty(halo_size, in_arr.dtype)
+        # send right
+        if rank != n_pes - 1:
+            send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank+1), comm_tag, True)
+        # recv left
+        if rank != 0:
+            recv_req = hpat.distributed_api.irecv(recv_buff, halo_size, np.int32(rank-1), comm_tag, True)
 
     for i in range(0, range_endpoint):
         nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
@@ -100,6 +112,28 @@ def roll_sum_fixed(in_arr, win, center, parallel):
 
     for j in range(N - offset, N):
         output[j] = np.nan
+
+    if parallel:
+        # wait on send right
+        if rank != n_pes - 1:
+            hpat.distributed_api.wait(send_req, True)
+        # recv right
+        if rank != 0:
+            hpat.distributed_api.wait(recv_req, True)
+            sum_x = 0.0
+            nobs = 0
+            for i in range(0, halo_size):
+                nobs, sum_x = add_sum(recv_buff[i], nobs, sum_x)
+
+            for i in range(0, halo_size):
+                nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
+
+                if i > 0:
+                    prev_x = recv_buff[i-1]
+                    nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
+
+                if i >= offset:
+                    output[i - offset] = calc_sum(minp, nobs, sum_x)
 
     return output
 

@@ -43,5 +43,17 @@ class TestRolling(unittest.TestCase):
         df = pd.DataFrame({'B': np.arange(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_fixed_parallel1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'B': np.arange(n)})
+            R = df.rolling(5).sum()
+            return R.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 121
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 if __name__ == "__main__":
     unittest.main()
