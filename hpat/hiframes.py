@@ -31,7 +31,7 @@ from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
-from hpat.hiframes_rolling import get_rolling_setup_args
+from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
 
 LARGE_WIN_SIZE = 10
 
@@ -1104,11 +1104,10 @@ class HiFrames(object):
 
     def _handle_rolling(self, lhs, rhs, obj_var, func_name, label):
         # format df.rolling(w)['B'].sum()
-        _supported_rolling_funcs = ['sum']
         # TODO: support aggregation functions sum, count, etc.
-        if func_name not in _supported_rolling_funcs:
+        if func_name not in supported_rolling_funcs:
             raise ValueError("only {} supported in rolling".format(
-                                             ", ".join(_supported_rolling_funcs)))
+                                             ", ".join(supported_rolling_funcs)))
 
         nodes = []
         # find selected output columns
