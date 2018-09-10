@@ -217,7 +217,7 @@ def _is_small_for_parallel(N, halo_size):
     # highly imbalanced
     # TODO: avoid reduce for obvious cases like no center and large 1D_Block
     num_small = hpat.distributed_api.dist_reduce(
-        int(N<halo_size), np.int32(Reduce_Type.Sum.value))
+        int(N<=halo_size), np.int32(Reduce_Type.Sum.value))
     return num_small != 0
 
 @numba.njit
