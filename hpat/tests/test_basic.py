@@ -205,15 +205,15 @@ class TestBasic(BaseTest):
 
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
-        dtypes = ['float32', 'float32', 'float64', 'float64', 'int32', 'int64']
+        dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
         for (op,typ) in zip(binops,dtypes):
             func_text = """def f(n):
-                  A = np.arange(np.{}(10));
-                  B = np.arange(np.{}(3), np.{}(3+10));
+                  A = np.arange(0, 10, 1, {})
+                  B = np.arange(0 +  3, 10 + 3, 1, {})
                   for i in numba.prange(n):
                       A {} B
                   return A
-            """.format(typ, typ, typ, op)
+            """.format(typ, typ, op)
             loc_vars = {}
             exec(func_text, {'np': np, 'numba': numba}, loc_vars)
             test_impl = loc_vars['f']
