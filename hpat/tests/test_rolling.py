@@ -7,36 +7,39 @@ import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
-
+from hpat.hiframes_rolling import supported_rolling_funcs
 
 class TestRolling(unittest.TestCase):
     def test_fixed1(self):
-        def test_impl(df):
-            return df.rolling(2).sum()
+        # test sequentially with manually created dfs
+        for func_name in supported_rolling_funcs:
+            func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            wins = (2, 3, 5)
+            centers = (False, True)
+            for args in itertools.product(wins, centers):
+                df = pd.DataFrame({'B': [0, 1, 2, np.nan, 4]})
+                pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
+                df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
+                pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
 
-        hpat_func = hpat.jit(test_impl)
-        df = pd.DataFrame({'B': [0, 1, 2, np.nan, 4]})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-        df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_fixed_center1(self):
-        def test_impl(df):
-            return df.rolling(5, center=True).sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 111
-        df = pd.DataFrame({'B': np.arange(n)})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_fixed_center2(self):
-        def test_impl(df):
-            return df.rolling(5, center=False).sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 111
-        df = pd.DataFrame({'B': np.arange(n)})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+    def test_fixed2(self):
+        # test sequentially with generated dfs
+        for func_name in supported_rolling_funcs:
+            func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            sizes = (1, 2, 10, 11, 121, 1000)
+            wins = (2, 3, 5)
+            centers = (False, True)
+            for n, w, c in itertools.product(sizes, wins, centers):
+                df = pd.DataFrame({'B': np.arange(n)})
+                pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
