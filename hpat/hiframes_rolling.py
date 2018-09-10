@@ -86,14 +86,23 @@ def roll_sum_fixed(in_arr, win, center, parallel):
 
     if parallel:
         # TODO: center
-        halo_size = np.int32(win-1)
+        halo_size = np.int32((win - 1) // 2) if center else np.int32(win-1)
         recv_buff = np.empty(halo_size, in_arr.dtype)
+        if center:
+            r_recv_buff = np.empty(halo_size, in_arr.dtype)
         # send right
         if rank != n_pes - 1:
             send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank+1), comm_tag, True)
         # recv left
         if rank != 0:
             recv_req = hpat.distributed_api.irecv(recv_buff, halo_size, np.int32(rank-1), comm_tag, True)
+        # center cases
+        # send left
+        if center and rank != 0:
+            l_send_req = hpat.distributed_api.isend(in_arr[:halo_size], halo_size, np.int32(rank-1), comm_tag, True)
+        # recv right
+        if center and rank != n_pes - 1:
+            r_recv_req = hpat.distributed_api.irecv(r_recv_buff, halo_size, np.int32(rank+1), comm_tag, True)
 
     for i in range(0, range_endpoint):
         nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
@@ -117,7 +126,22 @@ def roll_sum_fixed(in_arr, win, center, parallel):
         # wait on send right
         if rank != n_pes - 1:
             hpat.distributed_api.wait(send_req, True)
+        # wait on send left
+        if center and rank != 0:
+            hpat.distributed_api.wait(l_send_req, True)
         # recv right
+        if center and rank != n_pes - 1:
+            hpat.distributed_api.wait(r_recv_req, True)
+
+            for i in range(0, halo_size):
+                nobs, sum_x = add_sum(r_recv_buff[i], nobs, sum_x)
+
+                prev_x = in_arr[N + i - win]
+                nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
+
+                output[N + i - offset] = calc_sum(minp, nobs, sum_x)
+
+        # recv left
         if rank != 0:
             hpat.distributed_api.wait(recv_req, True)
             sum_x = 0.0
@@ -125,11 +149,11 @@ def roll_sum_fixed(in_arr, win, center, parallel):
             for i in range(0, halo_size):
                 nobs, sum_x = add_sum(recv_buff[i], nobs, sum_x)
 
-            for i in range(0, halo_size):
+            for i in range(0, win - 1):
                 nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
 
-                if i > 0:
-                    prev_x = recv_buff[i-1]
+                if i > offset:
+                    prev_x = recv_buff[i - offset - 1]
                     nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
 
                 if i >= offset:
