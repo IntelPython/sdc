@@ -68,6 +68,8 @@ def lower_rolling_fixed(context, builder, sig, args):
 
 #### adapted from pandas window.pyx ####
 
+comm_border_tag = 22  # arbitrary, TODO: revisit comm tags
+
 def roll_sum_fixed(in_arr, win, center, parallel):
     sum_x = 0.0
     nobs = 0
@@ -75,7 +77,6 @@ def roll_sum_fixed(in_arr, win, center, parallel):
     output = np.empty(N, dtype=np.float64)
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
-    comm_tag = np.int32(22)  # arbitrary
 
     # TODO: support minp arg end_range etc.
     minp = win
@@ -87,22 +88,11 @@ def roll_sum_fixed(in_arr, win, center, parallel):
     if parallel:
         # TODO: center
         halo_size = np.int32((win - 1) // 2) if center else np.int32(win-1)
-        l_recv_buff = np.empty(halo_size, in_arr.dtype)
-        if center:
-            r_recv_buff = np.empty(halo_size, in_arr.dtype)
-        # send right
-        if rank != n_pes - 1:
-            r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank+1), comm_tag, True)
-        # recv left
-        if rank != 0:
-            l_recv_req = hpat.distributed_api.irecv(l_recv_buff, halo_size, np.int32(rank-1), comm_tag, True)
-        # center cases
-        # send left
-        if center and rank != 0:
-            l_send_req = hpat.distributed_api.isend(in_arr[:halo_size], halo_size, np.int32(rank-1), comm_tag, True)
-        # recv right
-        if center and rank != n_pes - 1:
-            r_recv_req = hpat.distributed_api.irecv(r_recv_buff, halo_size, np.int32(rank+1), comm_tag, True)
+        comm_data = _border_icomm(
+            in_arr, rank, n_pes, halo_size, in_arr.dtype, center)
+        (l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req,
+            r_recv_req) = comm_data
+
 
     for i in range(0, range_endpoint):
         nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
@@ -123,12 +113,8 @@ def roll_sum_fixed(in_arr, win, center, parallel):
         output[j] = np.nan
 
     if parallel:
-        # wait on send right
-        if rank != n_pes - 1:
-            hpat.distributed_api.wait(r_send_req, True)
-        # wait on send left
-        if center and rank != 0:
-            hpat.distributed_api.wait(l_send_req, True)
+        _border_send_wait(r_send_req, l_send_req, rank, n_pes, center)
+
         # recv right
         if center and rank != n_pes - 1:
             hpat.distributed_api.wait(r_recv_req, True)
@@ -178,3 +164,34 @@ def remove_sum(val, nobs, sum_x):
 @numba.njit
 def calc_sum(minp, nobs, sum_x):
     return sum_x if nobs >= minp else np.nan
+
+@numba.njit
+def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):
+    comm_tag = np.int32(comm_border_tag)
+    l_recv_buff = np.empty(halo_size, dtype)
+    if center:
+        r_recv_buff = np.empty(halo_size, dtype)
+    # send right
+    if rank != n_pes - 1:
+        r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank+1), comm_tag, True)
+    # recv left
+    if rank != 0:
+        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, halo_size, np.int32(rank-1), comm_tag, True)
+    # center cases
+    # send left
+    if center and rank != 0:
+        l_send_req = hpat.distributed_api.isend(in_arr[:halo_size], halo_size, np.int32(rank-1), comm_tag, True)
+    # recv right
+    if center and rank != n_pes - 1:
+        r_recv_req = hpat.distributed_api.irecv(r_recv_buff, halo_size, np.int32(rank+1), comm_tag, True)
+
+    return l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req, r_recv_req
+
+@numba.njit
+def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):
+    # wait on send right
+    if rank != n_pes - 1:
+        hpat.distributed_api.wait(r_send_req, True)
+    # wait on send left
+    if center and rank != 0:
+        hpat.distributed_api.wait(l_send_req, True)
