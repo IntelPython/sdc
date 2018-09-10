@@ -2061,6 +2061,8 @@ class DistributedPass(object):
         if rhs.op == 'inplace_binop':
             if rhs.fn == '+=':
                 return Reduce_Type.Sum
+            if rhs.fn == '|=':
+                return Reduce_Type.Or
             if rhs.fn == '*=':
                 return Reduce_Type.Prod
 
@@ -2090,7 +2092,7 @@ class DistributedPass(object):
         init_val = None
         pre_init_val = ""
 
-        if reduce_op == Reduce_Type.Sum:
+        if reduce_op in [Reduce_Type.Sum, Reduce_Type.Or]:
             init_val = str(el_typ(0))
         if reduce_op == Reduce_Type.Prod:
             init_val = str(el_typ(1))

@@ -204,18 +204,25 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     def test_array_reduce(self):
-        def test_impl(N):
-            A = np.ones(3);
-            B = np.ones(3);
-            for i in numba.prange(N):
-                A += B
-            return A
+        binops = ['+=', '*=', '+=', '*=', '|=', '|=']
+        dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
+        for (op,typ) in zip(binops,dtypes):
+            func_text = """def f(n):
+                  A = np.arange(0, 10, 1, {})
+                  B = np.arange(0 +  3, 10 + 3, 1, {})
+                  for i in numba.prange(n):
+                      A {} B
+                  return A
+            """.format(typ, typ, op)
+            loc_vars = {}
+            exec(func_text, {'np': np, 'numba': numba}, loc_vars)
+            test_impl = loc_vars['f']
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 0)
+            self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_dist_return(self):
         def test_impl(N):

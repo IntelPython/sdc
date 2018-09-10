@@ -33,6 +33,7 @@ class Reduce_Type(Enum):
     Max = 3
     Argmin = 4
     Argmax = 5
+    Or = 6
 
 
 def get_type_enum(arr):
