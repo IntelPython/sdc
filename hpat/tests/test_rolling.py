@@ -1,4 +1,5 @@
 import unittest
+import itertools
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
@@ -44,28 +45,18 @@ class TestRolling(unittest.TestCase):
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_fixed_parallel1(self):
-        def test_impl(n):
+        def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
-            R = df.rolling(5).sum()
+            R = df.rolling(w, center=center).sum()
             return R.B.sum()
 
         hpat_func = hpat.jit(test_impl)
-        for n in (1, 2, 10, 11, 121, 1000):
-            self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    def test_fixed_center_parallel1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'B': np.arange(n)})
-            R = df.rolling(5, center=True).sum()
-            return R.B.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        for n in (1, 2, 10, 11, 121, 1000):
-            self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(hpat_func(n), test_impl(n))
+        sizes = (1, 2, 10, 11, 121, 1000)
+        wins = (2, 4, 5, 10, 11)
+        centers = (False, True)
+        for args in itertools.product(sizes, wins, centers):
+            self.assertEqual(hpat_func(*args), test_impl(*args),
+                             "rolling fixed window with {}".format(args))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
