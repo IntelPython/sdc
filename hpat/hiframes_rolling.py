@@ -9,6 +9,7 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.ir_utils import guard, find_const
 
+from hpat.distributed_api import Reduce_Type
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):
     """
@@ -71,46 +72,24 @@ def lower_rolling_fixed(context, builder, sig, args):
 comm_border_tag = 22  # arbitrary, TODO: revisit comm tags
 
 def roll_sum_fixed(in_arr, win, center, parallel):
-    sum_x = 0.0
-    nobs = 0
-    N = len(in_arr)
-    output = np.empty(N, dtype=np.float64)
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
-
+    N = len(in_arr)
     # TODO: support minp arg end_range etc.
     minp = win
     offset = (win - 1) // 2 if center else 0
-    range_endpoint = max(minp, 1) - 1
-    # in case window is smaller than array
-    range_endpoint = min(range_endpoint, N)
 
     if parallel:
-        # TODO: center
         halo_size = np.int32((win - 1) // 2) if center else np.int32(win-1)
+        if _is_small_for_parallel(N, halo_size):
+            return _handle_small_data(in_arr, win, center, rank, n_pes)
+
         comm_data = _border_icomm(
             in_arr, rank, n_pes, halo_size, in_arr.dtype, center)
         (l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req,
             r_recv_req) = comm_data
 
-
-    for i in range(0, range_endpoint):
-        nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
-        if i >= offset:
-            output[i - offset] = np.nan
-
-    for i in range(range_endpoint, N):
-        val = in_arr[i]
-        nobs, sum_x = add_sum(val, nobs, sum_x)
-
-        if i > win - 1:
-            prev_x = in_arr[i - win]
-            nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
-
-        output[i - offset] = calc_sum(minp, nobs, sum_x)
-
-    for j in range(N - offset, N):
-        output[j] = np.nan
+    output, nobs, sum_x = roll_sum_fixed_seq(in_arr, win, center)
 
     if parallel:
         _border_send_wait(r_send_req, l_send_req, rank, n_pes, center)
@@ -146,6 +125,39 @@ def roll_sum_fixed(in_arr, win, center, parallel):
                     output[i - offset] = calc_sum(minp, nobs, sum_x)
 
     return output
+
+@numba.njit
+def roll_sum_fixed_seq(in_arr, win, center):
+    sum_x = 0.0
+    nobs = 0
+    N = len(in_arr)
+    # TODO: support minp arg end_range etc.
+    minp = win
+    offset = (win - 1) // 2 if center else 0
+    output = np.empty(N, dtype=np.float64)
+    range_endpoint = max(minp, 1) - 1
+    # in case window is smaller than array
+    range_endpoint = min(range_endpoint, N)
+
+    for i in range(0, range_endpoint):
+        nobs, sum_x = add_sum(in_arr[i], nobs, sum_x)
+        if i >= offset:
+            output[i - offset] = np.nan
+
+    for i in range(range_endpoint, N):
+        val = in_arr[i]
+        nobs, sum_x = add_sum(val, nobs, sum_x)
+
+        if i > win - 1:
+            prev_x = in_arr[i - win]
+            nobs, sum_x = remove_sum(prev_x, nobs, sum_x)
+
+        output[i - offset] = calc_sum(minp, nobs, sum_x)
+
+    for j in range(N - offset, N):
+        output[j] = np.nan
+
+    return output, nobs, sum_x
 
 @numba.njit
 def add_sum(val, nobs, sum_x):
@@ -195,3 +207,28 @@ def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):
     # wait on send left
     if center and rank != 0:
         hpat.distributed_api.wait(l_send_req, True)
+
+@numba.njit
+def _is_small_for_parallel(N, halo_size):
+    # gather data on one processor and compute sequentially if data of any
+    # processor is too small for halo size
+    # TODO: handle 1D_Var or other cases where data is actually large but
+    # highly imbalanced
+    # TODO: avoid reduce for obvious cases like no center and large 1D_Block
+    num_small = hpat.distributed_api.dist_reduce(
+        int(N<halo_size), np.int32(Reduce_Type.Sum.value))
+    return num_small != 0
+
+@numba.njit
+def _handle_small_data(in_arr, win, center, rank, n_pes):
+    all_N = hpat.distributed_api.dist_reduce(
+        len(in_arr), np.int32(Reduce_Type.Sum.value))
+    all_in_arr = hpat.distributed_api.gatherv(in_arr)
+    if rank == 0:
+        all_out, _, _ = roll_sum_fixed_seq(all_in_arr, win, center)
+    else:
+        all_out = np.empty(all_N, np.float64)
+    hpat.distributed_api.bcast(all_out)
+    start = hpat.distributed_api.get_start(all_N, n_pes, rank)
+    end = hpat.distributed_api.get_end(all_N, n_pes, rank)
+    return all_out[start:end]

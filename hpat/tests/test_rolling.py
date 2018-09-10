@@ -50,7 +50,8 @@ class TestRolling(unittest.TestCase):
             return R.B.sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 121
+        for n in (1, 2, 10, 11, 121, 1000):
+            self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -62,7 +63,8 @@ class TestRolling(unittest.TestCase):
             return R.B.sum()
 
         hpat_func = hpat.jit(test_impl)
-        n = 121
+        for n in (1, 2, 10, 11, 121, 1000):
+            self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
