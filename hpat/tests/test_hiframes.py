@@ -567,8 +567,7 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
-        # small input array to mean is REP
-        self.assertEqual(count_array_REPs(), 1)
+        self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_rolling3(self):
