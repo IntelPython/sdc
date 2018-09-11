@@ -610,8 +610,40 @@ class HiFramesTyped(object):
         assert func_name == 'rolling_fixed'
         assert len(rhs.args) == 5
         if self.typemap[rhs.args[4].name] == types.pyfunc_type:
+            # for apply case, create a dispatcher for the kernel and pass it
+            # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
-            # TODO
+            func_node = guard(get_definition, self.func_ir, rhs.args[4])
+            if func_node is None:
+                raise ValueError(
+                    "cannot find kernel function for rolling.apply() call")
+            # TODO: more error checking on the kernel to make sure it doesn't
+            # use global/closure variables
+            f_ir = numba.ir_utils.get_ir_of_code({}, func_node.code)
+            kernel_func = numba.compiler.compile_ir(
+                self.typingctx,
+                numba.targets.registry.cpu_target.target_context,
+                f_ir,
+                (types.Array(dtype, 1, 'C'),),
+                types.float64,
+                numba.compiler.DEFAULT_FLAGS,
+                {}
+            )
+            imp_dis = numba.targets.registry.dispatcher_registry['cpu'](
+                                                                lambda a: None)
+            imp_dis.add_overload(kernel_func)
+            def f(arr, w, center):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_fixed(
+                                                arr, w, center, False, _func)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
+                        self.typingctx,
+                        tuple(self.typemap[v.name] for v in rhs.args[:-2]),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args[:-2])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = lhs
+            return nodes
+        return [assign]
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
         """

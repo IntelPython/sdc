@@ -53,8 +53,15 @@ class RollingType(AbstractTemplate):
         arr = args[0]  # array or series
         # result is always float64 in pandas
         # see _prep_values() in window.py
+        f_type = args[4]
+        # Const of CPUDispatcher needs to be converted to type since lowerer
+        # cannot handle it
+        if (isinstance(f_type, types.Const)
+                and isinstance(f_type.value,
+                numba.targets.registry.CPUDispatcher)):
+            f_type = types.functions.Dispatcher(f_type.value)
         return signature(arr.copy(dtype=types.float64), arr, types.intp,
-                         types.bool_, types.bool_, args[4])
+                         types.bool_, types.bool_, f_type)
 
 RollingType.support_literals = True
 
@@ -72,6 +79,12 @@ def lower_rolling_fixed(context, builder, sig, args):
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
+@lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
+               types.Boolean, types.functions.Dispatcher)
+def lower_rolling_fixed_apply(context, builder, sig, args):
+    func = roll_fixed_apply
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 #### adapted from pandas window.pyx ####
 
@@ -169,6 +182,14 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
         output[j] = np.nan
 
     return output, data
+
+#@numba.njit
+def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
+    # TODO
+    N = len(in_arr)
+    output = np.empty(N, dtype=np.float64)
+    output[0] = kernel_func(in_arr)
+    return output
 
 @numba.njit
 def init_data_sum():
