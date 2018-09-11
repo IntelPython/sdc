@@ -221,7 +221,6 @@ def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
         # recv left
         if rank != 0:
             hpat.distributed_api.wait(l_recv_req, True)
-            print(rank, "left border:", l_recv_buff)
             border_data = np.concatenate((l_recv_buff, in_arr[:win-1]))
             for i in range(0, win - offset - 1):
                 output[i] = kernel_func(border_data[i:i+win])

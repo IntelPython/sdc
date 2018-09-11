@@ -614,24 +614,7 @@ class HiFramesTyped(object):
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
             func_node = guard(get_definition, self.func_ir, rhs.args[4])
-            if func_node is None:
-                raise ValueError(
-                    "cannot find kernel function for rolling.apply() call")
-            # TODO: more error checking on the kernel to make sure it doesn't
-            # use global/closure variables
-            f_ir = numba.ir_utils.get_ir_of_code({}, func_node.code)
-            kernel_func = numba.compiler.compile_ir(
-                self.typingctx,
-                numba.targets.registry.cpu_target.target_context,
-                f_ir,
-                (types.Array(dtype, 1, 'C'),),
-                types.float64,
-                numba.compiler.DEFAULT_FLAGS,
-                {}
-            )
-            imp_dis = numba.targets.registry.dispatcher_registry['cpu'](
-                                                                lambda a: None)
-            imp_dis.add_overload(kernel_func)
+            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
             def f(arr, w, center):  # pragma: no cover
                 df_arr = hpat.hiframes_rolling.rolling_fixed(
                                                 arr, w, center, False, _func)
@@ -655,11 +638,54 @@ class HiFramesTyped(object):
         call_def = guard(get_definition, self.func_ir, rolling_call.func)
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
-        window, center = _get_rolling_setup_args(self.func_ir, rolling_call)
+        nodes = []
+        window, center = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        if not isinstance(center, ir.Var):
+            center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
+            self.typemap[center_var.name] = types.bool_
+            nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
+            center = center_var
 
-        nodes = self._gen_rolling_call(
-            rhs.args, series_var, window, center, func_name, lhs)
+        if func_name == 'apply':
+            func_node = guard(get_definition, self.func_ir, rhs.args[0])
+            dtype = self.typemap[series_var.name].dtype
+            func_global = self._handle_rolling_apply_func(func_node, dtype)
+        else:
+            func_global = func_name
+        def f(arr, w, center):  # pragma: no cover
+            df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func)
+        args = [series_var, window, center]
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': func_global},
+                        self.typingctx,
+                        tuple(self.typemap[v.name] for v in args),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, args)
+        nodes += f_block.body[:-3]  # remove none return
+        nodes[-1].target = lhs
+        # nodes = self._gen_rolling_call(
+        #     rhs.args, series_var, window, center, func_name, lhs)
         return nodes
+
+    def _handle_rolling_apply_func(self, func_node, dtype):
+        if func_node is None:
+                raise ValueError(
+                    "cannot find kernel function for rolling.apply() call")
+        # TODO: more error checking on the kernel to make sure it doesn't
+        # use global/closure variables
+        f_ir = numba.ir_utils.get_ir_of_code({}, func_node.code)
+        kernel_func = numba.compiler.compile_ir(
+            self.typingctx,
+            numba.targets.registry.cpu_target.target_context,
+            f_ir,
+            (types.Array(dtype, 1, 'C'),),
+            types.float64,
+            numba.compiler.DEFAULT_FLAGS,
+            {}
+        )
+        imp_dis = numba.targets.registry.dispatcher_registry['cpu'](
+                                                            lambda a: None)
+        imp_dis.add_overload(kernel_func)
+        return imp_dis
 
     def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
         loc = col_var.loc
