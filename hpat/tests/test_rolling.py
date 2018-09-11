@@ -43,6 +43,19 @@ class TestRolling(unittest.TestCase):
                 df = pd.DataFrame({'B': np.arange(n)})
                 pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
+    def test_fixed_apply1(self):
+        # test sequentially with manually created dfs
+            def test_impl(df, w, c):
+                return df.rolling(w, center=c).apply(lambda a: a.sum())
+            hpat_func = hpat.jit(test_impl)
+            wins = (2, 3, 5)
+            centers = (False, True)
+            for args in itertools.product(wins, centers):
+                df = pd.DataFrame({'B': [0, 1, 2, np.nan, 4]})
+                pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
+                df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
+                pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
+
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})

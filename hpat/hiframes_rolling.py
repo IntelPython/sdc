@@ -188,7 +188,20 @@ def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
     # TODO
     N = len(in_arr)
     output = np.empty(N, dtype=np.float64)
-    output[0] = kernel_func(in_arr)
+    # minp = win
+    offset = (win - 1) // 2 if center else 0
+    output = np.empty(N, dtype=np.float64)
+
+    # TODO: handle count and minp
+    for i in range(0, min(win - 1, N) - offset):
+        output[i] = np.nan
+    ind = 0
+    for i in range(win - 1 - offset, N - offset):
+        output[i] = kernel_func(in_arr[ind:ind+win])
+        ind += 1
+    for i in range(max(N - offset, 0), N):
+        output[i] = np.nan
+
     return output
 
 @numba.njit
