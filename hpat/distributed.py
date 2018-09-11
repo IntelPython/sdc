@@ -593,9 +593,10 @@ class DistributedPass(object):
             rhs.args[3] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if fdef == ('shift', 'hpat.hiframes_rolling') and (
-                    self._is_1D_arr(rhs.args[0].name)
-                    or self._is_1D_Var_arr(rhs.args[0].name)):
+        if (func_mod == 'hpat.hiframes_rolling'
+                    and func_name in ('shift', 'pct_change')
+                    and (self._is_1D_arr(rhs.args[0].name)
+                    or self._is_1D_Var_arr(rhs.args[0].name))):
             in_arr = rhs.args[0].name
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]

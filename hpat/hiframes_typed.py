@@ -1542,7 +1542,8 @@ series_replace_funcs = {
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
     'shift': lambda A, shift: hpat.hiframes_rolling.shift(A, shift, False),
     'shift_default': lambda A: hpat.hiframes_rolling.shift(A, 1, False),
-    'pct_change': _column_pct_change_impl,
+    'pct_change': lambda A, shift: hpat.hiframes_rolling.pct_change(A, shift, False),
+    'pct_change_default': lambda A: hpat.hiframes_rolling.pct_change(A, 1, False),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
