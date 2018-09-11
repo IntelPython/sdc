@@ -437,8 +437,10 @@ def _is_small_for_parallel(N, halo_size):
     # TODO: handle 1D_Var or other cases where data is actually large but
     # highly imbalanced
     # TODO: avoid reduce for obvious cases like no center and large 1D_Block
+    # using 2*halo_size+1 to accomodate center cases with data on more than
+    # 2 processor
     num_small = hpat.distributed_api.dist_reduce(
-        int(N<=halo_size), np.int32(Reduce_Type.Sum.value))
+        int(N<=2*halo_size+1), np.int32(Reduce_Type.Sum.value))
     return num_small != 0
 
 # TODO: refactor small data functions
