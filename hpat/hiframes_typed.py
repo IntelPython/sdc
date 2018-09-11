@@ -361,9 +361,15 @@ class HiFramesTyped(object):
 
         if func_name in ('shift', 'pct_change'):
             # TODO: support default period argument
-            shift_const = rhs.args[0]
-            func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, shift_const])
+            if len(rhs.args) == 0:
+                args = [series_var]
+                func = series_replace_funcs[func_name + "_default"]
+            else:
+                assert len(rhs.args) == 1, "invalid args for " + func_name
+                shift_const = rhs.args[0]
+                args = [series_var, shift_const]
+                func = series_replace_funcs[func_name]
+            return self._replace_func(func, args)
 
         if func_name == 'nlargest':
             # TODO: kws
@@ -1535,6 +1541,7 @@ series_replace_funcs = {
     'dropna_float': _series_dropna_float_impl,
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
     'shift': lambda A, shift: hpat.hiframes_rolling.shift(A, shift, False),
+    'shift_default': lambda A: hpat.hiframes_rolling.shift(A, 1, False),
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,

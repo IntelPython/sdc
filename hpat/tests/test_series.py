@@ -777,5 +777,13 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_shift_default1(self):
+        def test_impl(S):
+            return S.shift()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
 if __name__ == "__main__":
     unittest.main()
