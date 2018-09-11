@@ -266,6 +266,10 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
+        if fdef == ('shift', 'hpat.hiframes_rolling'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
         if fdef == ('nlargest', 'hpat.hiframes_api'):
             # output of nlargest is REP
             array_dists[lhs] = Distribution.REP

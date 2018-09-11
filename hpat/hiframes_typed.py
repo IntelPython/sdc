@@ -607,9 +607,8 @@ class HiFramesTyped(object):
 
     def _run_call_rolling(self, assign, lhs, rhs, func_name):
         # replace apply function with dispatcher obj, now the type is known
-        assert func_name == 'rolling_fixed'
-        assert len(rhs.args) == 5
-        if self.typemap[rhs.args[4].name] == types.pyfunc_type:
+        if (func_name == 'rolling_fixed'
+                and self.typemap[rhs.args[4].name] == types.pyfunc_type):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
@@ -1535,7 +1534,7 @@ series_replace_funcs = {
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
     'dropna_float': _series_dropna_float_impl,
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
-    'shift': _column_shift_impl,
+    'shift': lambda A, shift: hpat.hiframes_rolling.shift(A, shift, False),
     'pct_change': _column_pct_change_impl,
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,

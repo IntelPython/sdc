@@ -310,6 +310,48 @@ def calc_mean(minp, nobs, sum_x, neg_ct):
         result = np.nan
     return result
 
+# shift and pct_change -------------
+@numba.njit
+def shift(in_arr, shift, parallel):
+    N = len(in_arr)
+    if parallel:
+        rank = hpat.distributed_api.get_rank()
+        n_pes = hpat.distributed_api.get_size()
+        halo_size = np.int32(shift)
+        if _is_small_for_parallel(N, halo_size):
+            return _handle_small_data_shift(in_arr, shift, rank, n_pes)
+
+        comm_data = _border_icomm(
+            in_arr, rank, n_pes, halo_size, in_arr.dtype, False)
+        (l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req,
+            r_recv_req) = comm_data
+
+    output = shift_seq(in_arr, shift)
+
+    if parallel:
+        _border_send_wait(r_send_req, l_send_req, rank, n_pes, False)
+
+        # recv left
+        if rank != 0:
+            hpat.distributed_api.wait(l_recv_req, True)
+
+            for i in range(0, halo_size):
+                output[i] = l_recv_buff[i]
+
+    return output
+
+@numba.njit
+def shift_seq(in_arr, shift):
+    N = len(in_arr)
+    output = hpat.hiframes_api.alloc_shift(in_arr)
+    shift = min(shift, N)
+    output[:shift] = np.nan
+
+    for i in range(shift, N):
+        output[i] = in_arr[i-shift]
+
+    return output
+
 
 # communication calls -----------
 
@@ -355,6 +397,7 @@ def _is_small_for_parallel(N, halo_size):
         int(N<=halo_size), np.int32(Reduce_Type.Sum.value))
     return num_small != 0
 
+# TODO: refactor small data functions
 @numba.njit
 def _handle_small_data(in_arr, win, center, rank, n_pes, init_data, add_obs,
                                                          remove_obs, calc_out):
@@ -379,6 +422,20 @@ def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):
     if rank == 0:
         all_out = roll_fixed_apply_seq(all_in_arr, win, center,
                                                    kernel_func)
+    else:
+        all_out = np.empty(all_N, np.float64)
+    hpat.distributed_api.bcast(all_out)
+    start = hpat.distributed_api.get_start(all_N, n_pes, rank)
+    end = hpat.distributed_api.get_end(all_N, n_pes, rank)
+    return all_out[start:end]
+
+@numba.njit
+def _handle_small_data_shift(in_arr, shift, rank, n_pes):
+    all_N = hpat.distributed_api.dist_reduce(
+        len(in_arr), np.int32(Reduce_Type.Sum.value))
+    all_in_arr = hpat.distributed_api.gatherv(in_arr)
+    if rank == 0:
+        all_out = shift_seq(in_arr, shift)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
