@@ -12,7 +12,7 @@ from numba.ir_utils import guard, find_const
 from hpat.distributed_api import Reduce_Type
 
 
-supported_rolling_funcs = ('sum', 'mean')
+supported_rolling_funcs = ('sum', 'mean', 'apply')
 
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):

@@ -1106,7 +1106,7 @@ class HiFrames(object):
         # format df.rolling(w)['B'].sum()
         # TODO: support aggregation functions sum, count, etc.
         if func_name not in supported_rolling_funcs:
-            raise ValueError("only {} supported in rolling".format(
+            raise ValueError("only ({}) supported in rolling".format(
                                              ", ".join(supported_rolling_funcs)))
 
         nodes = []
@@ -1135,10 +1135,17 @@ class HiFrames(object):
 
         for cname, out_col_var in df_col_map.items():
             in_col_var = self.df_vars[df_var.name][cname]
-            def f(arr, w, center):  # pragma: no cover
-                df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func_name)
+            # apply case takes the passed function instead of just name
+            if func_name == 'apply':
+                def f(arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, func)
+                args = [in_col_var, window, center, rhs.args[0]]
+            else:
+                def f(arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func_name)
+                args = [in_col_var, window, center]
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_col_var, window, center])
+            replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = out_col_var
 

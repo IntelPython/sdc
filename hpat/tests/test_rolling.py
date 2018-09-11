@@ -12,7 +12,8 @@ from hpat.hiframes_rolling import supported_rolling_funcs
 class TestRolling(unittest.TestCase):
     def test_fixed1(self):
         # test sequentially with manually created dfs
-        for func_name in supported_rolling_funcs:
+        # all functions except apply
+        for func_name in supported_rolling_funcs[:-1]:
             func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
@@ -28,7 +29,8 @@ class TestRolling(unittest.TestCase):
 
     def test_fixed2(self):
         # test sequentially with generated dfs
-        for func_name in supported_rolling_funcs:
+        # all functions except apply
+        for func_name in supported_rolling_funcs[:-1]:
             func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)

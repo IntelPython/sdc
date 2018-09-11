@@ -240,6 +240,9 @@ class HiFramesTyped(object):
                 if func_mod == 'hpat.hiframes_api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
 
+                if func_mod == 'hpat.hiframes_rolling':
+                    return self._run_call_rolling(assign, assign.target, rhs, func_name)
+
                 if fdef == ('empty_like', 'numpy'):
                     return self._handle_empty_like(assign, lhs, rhs)
 
@@ -601,6 +604,14 @@ class HiFramesTyped(object):
         self.calltypes.update(f_calltypes)
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [series_var])
         return f_ir.blocks
+
+    def _run_call_rolling(self, assign, lhs, rhs, func_name):
+        # replace apply function with dispatcher obj, now the type is known
+        assert func_name == 'rolling_fixed'
+        assert len(rhs.args) == 5
+        if self.typemap[rhs.args[4].name] == types.pyfunc_type:
+            dtype = self.typemap[rhs.args[0].name].dtype
+            # TODO
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
         """
