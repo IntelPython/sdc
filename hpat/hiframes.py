@@ -205,9 +205,6 @@ class HiFrames(object):
                     and rhs.attr == 'values'):
                 return self._handle_df_values(assign.target, rhs.value)
 
-            if rhs.op == 'cast' and rhs.value.name in self.df_vars:
-                return self._box_return_df(assign, self.df_vars[rhs.value.name])
-
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
 
