@@ -91,9 +91,9 @@ class TestRolling(unittest.TestCase):
             return R.B.sum()
 
         hpat_func = hpat.jit(test_impl)
-        sizes = (10,)#(1, 2, 10, 11, 121, 1000)
-        wins = (4,)#(2, 4, 5, 10, 11)
-        centers = (True,)#(False, True)
+        sizes = (1, 2, 10, 11, 121, 1000)
+        wins = (2, 4, 5, 10, 11)
+        centers = (False, True)
         for args in itertools.product(sizes, wins, centers):
             self.assertEqual(hpat_func(*args), test_impl(*args),
                              "rolling fixed window with {}".format(args))
