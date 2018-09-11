@@ -84,6 +84,21 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_fixed_parallel_apply1(self):
+        def test_impl(n, w, center):
+            df = pd.DataFrame({'B': np.arange(n)})
+            R = df.rolling(w, center=center).apply(lambda a: a.sum())
+            return R.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        sizes = (10,)#(1, 2, 10, 11, 121, 1000)
+        wins = (4,)#(2, 4, 5, 10, 11)
+        centers = (True,)#(False, True)
+        for args in itertools.product(sizes, wins, centers):
+            self.assertEqual(hpat_func(*args), test_impl(*args),
+                             "rolling fixed window with {}".format(args))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
 
 if __name__ == "__main__":
     unittest.main()

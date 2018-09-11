@@ -82,7 +82,7 @@ def lower_rolling_fixed(context, builder, sig, args):
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
                types.Boolean, types.functions.Dispatcher)
 def lower_rolling_fixed_apply(context, builder, sig, args):
-    func = roll_fixed_apply
+    func = lambda a,w,c,p,f: roll_fixed_apply(a,w,c,p,f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
@@ -183,8 +183,53 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
 
     return output, data
 
-#@numba.njit
+@numba.njit
 def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    N = len(in_arr)
+    # TODO: support minp arg end_range etc.
+    minp = win
+    offset = (win - 1) // 2 if center else 0
+
+    if parallel:
+        # halo length is w/2 to handle even w such as w=4
+        halo_size = np.int32(win // 2) if center else np.int32(win-1)
+        if _is_small_for_parallel(N, halo_size):
+            return _handle_small_data_apply(in_arr, win, center, rank, n_pes,
+                                      kernel_func)
+
+        comm_data = _border_icomm(
+            in_arr, rank, n_pes, halo_size, in_arr.dtype, center)
+        (l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req,
+            r_recv_req) = comm_data
+
+    output = roll_fixed_apply_seq(in_arr, win, center, kernel_func)
+
+    if parallel:
+        _border_send_wait(r_send_req, l_send_req, rank, n_pes, center)
+
+        # recv right
+        if center and rank != n_pes - 1:
+            hpat.distributed_api.wait(r_recv_req, True)
+            border_data = np.concatenate((in_arr[N-win+1:], r_recv_buff))
+            ind = 0
+            for i in range(max(N-offset, 0), N):
+                output[i] = kernel_func(border_data[ind:ind+win])
+                ind += 1
+
+        # recv left
+        if rank != 0:
+            hpat.distributed_api.wait(l_recv_req, True)
+            print(rank, "left border:", l_recv_buff)
+            border_data = np.concatenate((l_recv_buff, in_arr[:win-1]))
+            for i in range(0, win - offset - 1):
+                output[i] = kernel_func(border_data[i:i+win])
+
+    return output
+
+@numba.njit
+def roll_fixed_apply_seq(in_arr, win, center, kernel_func):
     # TODO
     N = len(in_arr)
     output = np.empty(N, dtype=np.float64)
@@ -320,6 +365,21 @@ def _handle_small_data(in_arr, win, center, rank, n_pes, init_data, add_obs,
     if rank == 0:
         all_out, _ = roll_fixed_linear_generic_seq(all_in_arr, win, center,
                                       init_data, add_obs, remove_obs, calc_out)
+    else:
+        all_out = np.empty(all_N, np.float64)
+    hpat.distributed_api.bcast(all_out)
+    start = hpat.distributed_api.get_start(all_N, n_pes, rank)
+    end = hpat.distributed_api.get_end(all_N, n_pes, rank)
+    return all_out[start:end]
+
+@numba.njit
+def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):
+    all_N = hpat.distributed_api.dist_reduce(
+        len(in_arr), np.int32(Reduce_Type.Sum.value))
+    all_in_arr = hpat.distributed_api.gatherv(in_arr)
+    if rank == 0:
+        all_out = roll_fixed_apply_seq(all_in_arr, win, center,
+                                                   kernel_func)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
