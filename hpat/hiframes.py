@@ -1116,6 +1116,10 @@ class HiFrames(object):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
+        if not isinstance (window, ir.Var):
+            window_var = ir.Var(lhs.scope, mk_unique_var("window"), lhs.loc)
+            nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
+            window = window_var
         # TODO: get 'on' arg for offset case
         if out_colnames is None:
             out_colnames = list(self.df_vars[df_var.name].keys())

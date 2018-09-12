@@ -41,6 +41,15 @@ def get_rolling_setup_args(func_ir, rhs, get_consts=True):
         on = guard(find_const, func_ir, kws['on'])
         if on is None:
             raise ValueError("'on' argument to rolling() should be constant string")
+    # convert string offset window statically to nanos
+    # TODO: support dynamic conversion
+    # TODO: support other offsets types (time delta, etc.)
+    if on is not None:
+        window = guard(find_const, func_ir, window)
+        if not isinstance(window, str):
+            raise ValueError("window argument to rolling should be constant"
+                             "string in the offset case (variable window)")
+        window = pd.tseries.frequencies.to_offset(window).nanos
     return window, center, on
 
 
