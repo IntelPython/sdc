@@ -644,7 +644,7 @@ class HiFramesTyped(object):
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
         nodes = []
-        window, center = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
         if not isinstance(center, ir.Var):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
             self.typemap[center_var.name] = types.bool_
