@@ -1388,57 +1388,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [var])
         return f_block.body[:-3]  # remove none return
 
-    def _gen_rolling_init(self, win_size, func, center):
-        nodes = []
-        right_length = 0
-        scope = win_size.scope
-        loc = win_size.loc
-        right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
-        nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
-
-        def f(w):  # pragma: no cover
-            return -w + 1
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [win_size])
-        nodes.extend(f_block.body[:-2])  # remove none return
-        left_length = nodes[-1].target
-
-        if center:
-            def f(w):  # pragma: no cover
-                return -(w // 2)
-            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            left_length = nodes[-1].target
-
-            def f(w):  # pragma: no cover
-                return (w // 2)
-            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            right_length = nodes[-1].target
-
-        def f(a, b):  # pragma: no cover
-            return ((a, b),)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [left_length, right_length])
-        nodes.extend(f_block.body[:-2])  # remove none return
-        win_tuple = nodes[-1].target
-
-        index_offsets = [right_length]
-
-        if func == 'apply':
-            index_offsets = [left_length]
-
-        def f(a):  # pragma: no cover
-            return (a,)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, index_offsets)
-        nodes.extend(f_block.body[:-2])  # remove none return
-        index_offsets = nodes[-1].target
-
-        return index_offsets, win_tuple, nodes
-
     def _run_df_set_column(self, inst, label, cfg):
         """handle setitem: df['col_name'] = arr
         """
