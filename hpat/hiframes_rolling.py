@@ -21,6 +21,7 @@ def get_rolling_setup_args(func_ir, rhs, get_consts=True):
         r = df.column.rolling(3)
     """
     center = False
+    on = None
     kws = dict(rhs.kws)
     if rhs.args:
         window = rhs.args[0]
@@ -36,7 +37,11 @@ def get_rolling_setup_args(func_ir, rhs, get_consts=True):
         if get_consts:
             center_const = guard(find_const, func_ir, center)
             center = center_const if center_const is not None else center
-    return window, center
+    if 'on' in kws:
+        on = guard(find_const, func_ir, kws['on'])
+        if on is None:
+            raise ValueError("'on' argument to rolling() should be constant string")
+    return window, center, on
 
 
 def rolling_fixed(arr, win):  # pragma: no cover

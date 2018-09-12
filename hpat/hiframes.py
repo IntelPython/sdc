@@ -1110,7 +1110,8 @@ class HiFrames(object):
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
         rolling_call = guard(get_definition, self.func_ir, obj_var)
-        window, center = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        on_arr = self.df_vars[df_var.name][on] if on is not None else None
         if not isinstance(center, ir.Var):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
@@ -1126,26 +1127,46 @@ class HiFrames(object):
         else:
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                                 for col in out_colnames})
+            if on is not None:
+                df_col_map[on] = on_arr
             out_df = df_col_map.copy()
             # TODO: add datetime index for offset case
             self._create_df(lhs.name, out_df, label)
 
         for cname, out_col_var in df_col_map.items():
+            if cname == on:
+                continue
             in_col_var = self.df_vars[df_var.name][cname]
+            nodes += self._gen_rolling_call(in_col_var, out_col_var, window, center, rhs.args, func_name, on_arr)
+
+        return nodes
+
+    def _gen_rolling_call(self, in_col_var, out_col_var, window, center, args, func_name, on_arr):
+        nodes = []
+        # variable window case
+        if on_arr is not None:
+            if func_name == 'apply':
+                def f(arr, on_arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, func)
+                args = [in_col_var, on_arr, window, center, args[0]]
+            else:
+                def f(arr, on_arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, _func_name)
+                args = [in_col_var, on_arr, window, center]
+        else:  # fixed window
             # apply case takes the passed function instead of just name
             if func_name == 'apply':
                 def f(arr, w, center, func):  # pragma: no cover
                     df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, func)
-                args = [in_col_var, window, center, rhs.args[0]]
+                args = [in_col_var, window, center, args[0]]
             else:
                 def f(arr, w, center):  # pragma: no cover
                     df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func_name)
                 args = [in_col_var, window, center]
-            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, args)
-            nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = out_col_var
-
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, args)
+        nodes += f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_col_var
         return nodes
 
     def _fix_rolling_array(self, col_var, func):
