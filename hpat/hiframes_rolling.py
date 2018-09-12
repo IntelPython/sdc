@@ -12,7 +12,7 @@ from numba.ir_utils import guard, find_const
 from hpat.distributed_api import Reduce_Type
 
 
-supported_rolling_funcs = ('sum', 'mean', 'apply')
+supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'apply')
 
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):
@@ -74,6 +74,10 @@ def lower_rolling_fixed(context, builder, sig, args):
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
     elif func_name == 'mean':
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_mean, add_mean, remove_mean, calc_mean)
+    elif func_name == 'var':
+        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_var)
+    elif func_name == 'std':
+        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_std)
 
     res = context.compile_internal(
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
@@ -248,6 +252,9 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):
 
     return output
 
+# -------------------
+# sum
+
 @numba.njit
 def init_data_sum():
     return 0, 0.0
@@ -309,6 +316,63 @@ def calc_mean(minp, nobs, sum_x, neg_ct):
     else:
         result = np.nan
     return result
+
+
+# -------------------
+# var
+
+# TODO: combine add/remove similar to pandas?
+
+@numba.njit
+def init_data_var():
+    return 0, 0.0, 0.0
+
+@numba.njit
+def add_var(val, nobs, mean_x, ssqdm_x):
+    if not np.isnan(val):
+        nobs += 1
+        delta = val - mean_x
+        mean_x += delta / nobs
+        ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+    return nobs, mean_x, ssqdm_x
+
+@numba.njit
+def remove_var(val, nobs, mean_x, ssqdm_x):
+    if not np.isnan(val):
+        nobs -= 1
+        if nobs != 0:
+            delta = val - mean_x
+            mean_x -= delta / nobs
+            ssqdm_x -= ((nobs + 1) * delta ** 2) / nobs
+        else:
+            mean_x = 0.0
+            ssqdm_x = 0.0
+    return nobs, mean_x, ssqdm_x
+
+@numba.njit
+def calc_var(minp, nobs, mean_x, ssqdm_x):
+    ddof = 1.0  # TODO: make argument
+    result = np.nan
+    if nobs >= minp and nobs > ddof:
+        # pathological case
+        if nobs == 1:
+            result = 0.0
+        else:
+            result = ssqdm_x / (nobs - ddof)
+            if result < 0.0:
+                result = 0.0
+
+    return result
+
+
+# --------------------------
+# std
+
+@numba.njit
+def calc_std(minp, nobs, mean_x, ssqdm_x):
+    v = calc_var(minp, nobs, mean_x, ssqdm_x)
+    return np.sqrt(v)
+
 
 # shift -------------
 @numba.njit
