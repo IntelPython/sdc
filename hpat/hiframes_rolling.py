@@ -97,7 +97,7 @@ comm_border_tag = 22  # arbitrary, TODO: revisit comm tags
 
 @numba.njit
 def roll_fixed_linear_generic(in_arr, win, center, parallel, init_data,
-                              add_obs, remove_obs, calc_out):
+                              add_obs, remove_obs, calc_out):  # pragma: no cover
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
     N = len(in_arr)
@@ -156,7 +156,7 @@ def roll_fixed_linear_generic(in_arr, win, center, parallel, init_data,
 
 @numba.njit
 def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
-                                  remove_obs, calc_out):
+                                  remove_obs, calc_out):  # pragma: no cover
     data = init_data()
     N = len(in_arr)
     # TODO: support minp arg end_range etc.
@@ -188,7 +188,7 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
     return output, data
 
 @numba.njit
-def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
+def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):  # pragma: no cover
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
     N = len(in_arr)
@@ -232,7 +232,7 @@ def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):
     return output
 
 @numba.njit
-def roll_fixed_apply_seq(in_arr, win, center, kernel_func):
+def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
     # TODO
     N = len(in_arr)
     output = np.empty(N, dtype=np.float64)
@@ -256,25 +256,25 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):
 # sum
 
 @numba.njit
-def init_data_sum():
+def init_data_sum():  # pragma: no cover
     return 0, 0.0
 
 @numba.njit
-def add_sum(val, nobs, sum_x):
+def add_sum(val, nobs, sum_x):  # pragma: no cover
     if not np.isnan(val):
         nobs += 1
         sum_x += val
     return nobs, sum_x
 
 @numba.njit
-def remove_sum(val, nobs, sum_x):
+def remove_sum(val, nobs, sum_x):  # pragma: no cover
     if not np.isnan(val):
         nobs -= 1
         sum_x -= val
     return nobs, sum_x
 
 @numba.njit
-def calc_sum(minp, nobs, sum_x):
+def calc_sum(minp, nobs, sum_x):  # pragma: no cover
     return sum_x if nobs >= minp else np.nan
 
 
@@ -282,11 +282,11 @@ def calc_sum(minp, nobs, sum_x):
 # mean
 
 @numba.njit
-def init_data_mean():
+def init_data_mean():  # pragma: no cover
     return 0, 0.0, 0
 
 @numba.njit
-def add_mean(val, nobs, sum_x, neg_ct):
+def add_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
     if not np.isnan(val):
         nobs += 1
         sum_x += val
@@ -295,7 +295,7 @@ def add_mean(val, nobs, sum_x, neg_ct):
     return nobs, sum_x, neg_ct
 
 @numba.njit
-def remove_mean(val, nobs, sum_x, neg_ct):
+def remove_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
     if not np.isnan(val):
         nobs -= 1
         sum_x -= val
@@ -304,7 +304,7 @@ def remove_mean(val, nobs, sum_x, neg_ct):
     return nobs, sum_x, neg_ct
 
 @numba.njit
-def calc_mean(minp, nobs, sum_x, neg_ct):
+def calc_mean(minp, nobs, sum_x, neg_ct):  # pragma: no cover
     if nobs >= minp:
         result = sum_x / nobs
         if neg_ct == 0 and result < 0.0:
@@ -324,11 +324,11 @@ def calc_mean(minp, nobs, sum_x, neg_ct):
 # TODO: combine add/remove similar to pandas?
 
 @numba.njit
-def init_data_var():
+def init_data_var():  # pragma: no cover
     return 0, 0.0, 0.0
 
 @numba.njit
-def add_var(val, nobs, mean_x, ssqdm_x):
+def add_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
     if not np.isnan(val):
         nobs += 1
         delta = val - mean_x
@@ -337,7 +337,7 @@ def add_var(val, nobs, mean_x, ssqdm_x):
     return nobs, mean_x, ssqdm_x
 
 @numba.njit
-def remove_var(val, nobs, mean_x, ssqdm_x):
+def remove_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
     if not np.isnan(val):
         nobs -= 1
         if nobs != 0:
@@ -350,7 +350,7 @@ def remove_var(val, nobs, mean_x, ssqdm_x):
     return nobs, mean_x, ssqdm_x
 
 @numba.njit
-def calc_var(minp, nobs, mean_x, ssqdm_x):
+def calc_var(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
     ddof = 1.0  # TODO: make argument
     result = np.nan
     if nobs >= minp and nobs > ddof:
@@ -369,14 +369,14 @@ def calc_var(minp, nobs, mean_x, ssqdm_x):
 # std
 
 @numba.njit
-def calc_std(minp, nobs, mean_x, ssqdm_x):
+def calc_std(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
     v = calc_var(minp, nobs, mean_x, ssqdm_x)
     return np.sqrt(v)
 
 
 # shift -------------
 @numba.njit
-def shift(in_arr, shift, parallel):
+def shift(in_arr, shift, parallel):  # pragma: no cover
     N = len(in_arr)
     if parallel:
         rank = hpat.distributed_api.get_rank()
@@ -405,7 +405,7 @@ def shift(in_arr, shift, parallel):
     return output
 
 @numba.njit
-def shift_seq(in_arr, shift):
+def shift_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
     output = hpat.hiframes_api.alloc_shift(in_arr)
     shift = min(shift, N)
@@ -419,7 +419,7 @@ def shift_seq(in_arr, shift):
 # pct_change -------------
 
 @numba.njit
-def pct_change(in_arr, shift, parallel):
+def pct_change(in_arr, shift, parallel):  # pragma: no cover
     N = len(in_arr)
     if parallel:
         rank = hpat.distributed_api.get_rank()
@@ -449,7 +449,7 @@ def pct_change(in_arr, shift, parallel):
     return output
 
 @numba.njit
-def pct_change_seq(in_arr, shift):
+def pct_change_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
     output = hpat.hiframes_api.alloc_shift(in_arr)
     shift = min(shift, N)
@@ -464,7 +464,7 @@ def pct_change_seq(in_arr, shift):
 # communication calls -----------
 
 @numba.njit
-def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):
+def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):  # pragma: no cover
     comm_tag = np.int32(comm_border_tag)
     l_recv_buff = np.empty(halo_size, dtype)
     if center:
@@ -486,7 +486,7 @@ def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):
     return l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req, r_recv_req
 
 @numba.njit
-def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):
+def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):  # pragma: no cover
     # wait on send right
     if rank != n_pes - 1:
         hpat.distributed_api.wait(r_send_req, True)
@@ -495,7 +495,7 @@ def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):
         hpat.distributed_api.wait(l_send_req, True)
 
 @numba.njit
-def _is_small_for_parallel(N, halo_size):
+def _is_small_for_parallel(N, halo_size):  # pragma: no cover
     # gather data on one processor and compute sequentially if data of any
     # processor is too small for halo size
     # TODO: handle 1D_Var or other cases where data is actually large but
@@ -510,7 +510,7 @@ def _is_small_for_parallel(N, halo_size):
 # TODO: refactor small data functions
 @numba.njit
 def _handle_small_data(in_arr, win, center, rank, n_pes, init_data, add_obs,
-                                                         remove_obs, calc_out):
+                                                         remove_obs, calc_out):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
@@ -525,7 +525,7 @@ def _handle_small_data(in_arr, win, center, rank, n_pes, init_data, add_obs,
     return all_out[start:end]
 
 @numba.njit
-def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):
+def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
@@ -540,7 +540,7 @@ def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):
     return all_out[start:end]
 
 @numba.njit
-def _handle_small_data_shift(in_arr, shift, rank, n_pes):
+def _handle_small_data_shift(in_arr, shift, rank, n_pes):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
@@ -554,7 +554,7 @@ def _handle_small_data_shift(in_arr, shift, rank, n_pes):
     return all_out[start:end]
 
 @numba.njit
-def _handle_small_data_pct_change(in_arr, shift, rank, n_pes):
+def _handle_small_data_pct_change(in_arr, shift, rank, n_pes):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
