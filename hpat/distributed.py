@@ -27,8 +27,7 @@ from hpat import (distributed_api,
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
-                                       DistributedAnalysis,
-                                       get_stencil_accesses)
+                                       DistributedAnalysis)
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice,
@@ -68,8 +67,6 @@ class DistributedPass(object):
         self._shape_attrs = {}
         # keep array sizes of parallel arrays to handle shape attrs
         self._array_sizes = {}
-        self._stencil_left_border = {}
-        self._stencil_right_border = {}
         # save output of converted 1DVar array len() variables
         # which are global sizes, in order to recover local
         # size for 1DVar allocs and parfors
@@ -228,14 +225,6 @@ class DistributedPass(object):
                 new_body.append(inst)
             blocks[label].body = new_body
 
-        if self._stencil_left_border:
-            blocks = self._add_stencil_border(
-                blocks, self._stencil_left_border, is_left=True)
-
-        if self._stencil_right_border:
-            blocks = self._add_stencil_border(
-                blocks, self._stencil_right_border, is_left=False)
-
         return blocks
 
     def _gen_1D_Var_len(self, arr):
@@ -249,59 +238,6 @@ class DistributedPass(object):
             f_block, [arr, ir.Const(Reduce_Type.Sum.value, arr.loc)])
         nodes = f_block.body[:-3]  # remove none return
         return nodes
-
-    def _add_stencil_border(self, blocks, border_dict, is_left):
-        new_blocks = {}
-        for (block_label, block) in blocks.items():
-            scope = block.scope
-            for i, stmt in enumerate(block.body):
-                if not isinstance(stmt, Parfor) or stmt.id not in border_dict:
-                    continue
-                # find last wait call
-                for j in reversed(range(i + 1, len(block.body))):
-                    inst = block.body[j]
-                    if isinstance(inst, ir.Assign) and inst.target.name.startswith('wait_err'):
-                        break
-                border_block = border_dict.pop(stmt.id)
-                loc = stmt.loc
-                # split block after parfor wait
-                prev_block = ir.Block(scope, loc)
-                new_blocks[block_label] = prev_block
-                block_label = ir_utils.next_label()
-                border_label = ir_utils.next_label()
-
-                prev_block.body = block.body[:j + 1]
-                rank_comp_var = ir.Var(scope, mk_unique_var("$rank_comp"), loc)
-                self.typemap[rank_comp_var.name] = types.boolean
-                if is_left:
-                    border_rank = self._set0_var
-                else:
-                    border_rank = ir.Var(
-                        scope, mk_unique_var("$border_rank"), loc)
-                    self.typemap[border_rank.name] = types.intp
-                    last_pe_call = ir.Expr.binop(
-                        '-', self._size_var, self._set1_var, loc)
-                    if last_pe_call not in self.calltypes:
-                        self.calltypes[last_pe_call] = find_op_typ(
-                            '-', [types.int32, types.int64])
-                    prev_block.body.append(
-                        ir.Assign(last_pe_call, border_rank, loc))
-
-                comp_expr = ir.Expr.binop(
-                    '!=', self._rank_var, border_rank, loc)
-                expr_typ = find_op_typ('!=', [types.int32, types.int64])
-                self.calltypes[comp_expr] = expr_typ
-                comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
-                prev_block.body.append(comp_assign)
-                border_branch = ir.Branch(
-                    rank_comp_var, border_label, block_label, loc)
-                prev_block.body.append(border_branch)
-
-                border_block.body.append(ir.Jump(block_label, loc))
-                new_blocks[border_label] = border_block
-                block.body = block.body[j + 1:]
-            new_blocks[block_label] = block
-        return new_blocks
 
     def _gen_dist_inits(self):
         # add initializations
@@ -579,6 +515,33 @@ class DistributedPass(object):
             out = self._get_ind_sub(ind, self._array_starts[arr.name][0])
             rhs.args[1] = out[-1].target
             out.append(assign)
+
+        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling') and (
+                    self._is_1D_arr(rhs.args[0].name)
+                    or self._is_1D_Var_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            # set parallel flag to true
+            true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
+            self.typemap[true_var.name] = types.boolean
+            rhs.args[3] = true_var
+            out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
+
+        if (func_mod == 'hpat.hiframes_rolling'
+                    and func_name in ('shift', 'pct_change')
+                    and (self._is_1D_arr(rhs.args[0].name)
+                    or self._is_1D_Var_arr(rhs.args[0].name))):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            # set parallel flag to true
+            true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
+            self.typemap[true_var.name] = types.boolean
+            rhs.args[2] = true_var
+            out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
         if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
@@ -1415,8 +1378,8 @@ class DistributedPass(object):
         return out
 
     def _run_parfor(self, parfor, namevar_table):
-        stencil_accesses, neighborhood = get_stencil_accesses(
-            parfor, self.typemap)
+        # stencil_accesses, neighborhood = get_stencil_accesses(
+        #     parfor, self.typemap)
 
         # Thread and 1D parfors turn to gufunc in multithread mode
         if (hpat.multithread_mode
@@ -1458,23 +1421,23 @@ class DistributedPass(object):
         out = []
 
         # return range to original size of array
-        if stencil_accesses:
-            #right_length = neighborhood[1][0]
-            left_length, right_length = self._get_stencil_border_length(
-                neighborhood)
-            if right_length:
-                new_range_size = ir.Var(
-                    scope, mk_unique_var("new_range_size"), loc)
-                self.typemap[new_range_size.name] = types.intp
-                index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
-                self.typemap[index_const.name] = types.intp
-                out.append(
-                    ir.Assign(ir.Const(right_length, loc), index_const, loc))
-                calc_call = ir.Expr.binop('+', range_size, index_const, loc)
-                self.calltypes[calc_call] = ir_utils.find_op_typ('+',
-                                                                 [types.intp, types.intp])
-                out.append(ir.Assign(calc_call, new_range_size, loc))
-                range_size = new_range_size
+        # if stencil_accesses:
+        #     #right_length = neighborhood[1][0]
+        #     left_length, right_length = self._get_stencil_border_length(
+        #         neighborhood)
+        #     if right_length:
+        #         new_range_size = ir.Var(
+        #             scope, mk_unique_var("new_range_size"), loc)
+        #         self.typemap[new_range_size.name] = types.intp
+        #         index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
+        #         self.typemap[index_const.name] = types.intp
+        #         out.append(
+        #             ir.Assign(ir.Const(right_length, loc), index_const, loc))
+        #         calc_call = ir.Expr.binop('+', range_size, index_const, loc)
+        #         self.calltypes[calc_call] = ir_utils.find_op_typ('+',
+        #                                                          [types.intp, types.intp])
+        #         out.append(ir.Assign(calc_call, new_range_size, loc))
+        #         range_size = new_range_size
 
         div_nodes, start_var, end_var = self._gen_1D_div(range_size, scope, loc,
                                                          "$loop", "get_end", distributed_api.get_end)
@@ -1486,15 +1449,16 @@ class DistributedPass(object):
         parfor.loop_nests[0].start = start_var
         parfor.loop_nests[0].stop = end_var
 
-        if stencil_accesses:
-            # TODO assuming single array in stencil
-            arr_set = set(stencil_accesses.values())
-            arr = arr_set.pop()
-            assert not arr_set  # only one array
-            self._run_parfor_stencil(parfor, out, start_var, end_var,
-                                     neighborhood, namevar_table[arr])
-        else:
-            out.append(parfor)
+        # if stencil_accesses:
+        #     # TODO assuming single array in stencil
+        #     arr_set = set(stencil_accesses.values())
+        #     arr = arr_set.pop()
+        #     assert not arr_set  # only one array
+        #     self._run_parfor_stencil(parfor, out, start_var, end_var,
+        #                              neighborhood, namevar_table[arr])
+        # else:
+        #     out.append(parfor)
+        out.append(parfor)
 
         init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(
             parfor, namevar_table)
@@ -1519,357 +1483,26 @@ class DistributedPass(object):
 
         return pre, out
 
-    def _run_parfor_stencil(self, parfor, out, start_var, end_var,
-                            neighborhood, arr_var):
-        #
-        scope = parfor.init_block.scope
-        loc = parfor.init_block.loc
+    # def _get_var_const_val(self, var):
+    #     if isinstance(var, int):
+    #         return var
+    #     node = guard(get_definition, self.func_ir, var)
+    #     if isinstance(node, ir.Const):
+    #         return node.value
+    #     if isinstance(node, ir.Expr):
+    #         if node.op == 'unary' and node.fn == '-':
+    #             return -self._get_var_const_val(node.value)
+    #         if node.op == 'binop':
+    #             lhs = self._get_var_const_val(node.lhs)
+    #             rhs = self._get_var_const_val(node.rhs)
+    #             if node.fn == '+':
+    #                 return lhs + rhs
+    #             if node.fn == '-':
+    #                 return lhs - rhs
+    #             if node.fn == '//':
+    #                 return lhs // rhs
+    #     return None
 
-        left_length, right_length = self._get_stencil_border_length(
-            neighborhood)
-
-        dtype = self.typemap[arr_var.name].dtype
-
-        # post left send/receive
-        if left_length != 0:
-            left_recv_buff, left_recv_req, left_send_req = self._gen_stencil_halo(
-                left_length, arr_var, out, is_left=True)
-
-            # add stencil length to parfor start
-            index_const = ir.Var(
-                scope, mk_unique_var("stencil_const_var"), loc)
-            self.typemap[index_const.name] = types.intp
-            const_assign = ir.Assign(ir.Const(left_length, loc),
-                                     index_const, loc)
-            out.append(const_assign)
-            start_ind = ir.Var(scope, mk_unique_var("start_ind"), loc)
-            self.typemap[start_ind.name] = types.intp
-            index_call = ir.Expr.binop(
-                '+', parfor.loop_nests[0].start, index_const, loc)
-            self.calltypes[index_call] = ir_utils.find_op_typ('+',
-                                                              [types.intp, types.intp])
-            index_assign = ir.Assign(index_call, start_ind, loc)
-            out.append(index_assign)
-            parfor.loop_nests[0].start = start_ind
-
-        # post right send/receive
-        if right_length != 0:
-            right_recv_buff, right_recv_req, right_send_req = self._gen_stencil_halo(
-                right_length, arr_var, out, is_left=False)
-
-            # subtract stencil length from parfor end
-            index_const = ir.Var(
-                scope, mk_unique_var("stencil_const_var"), loc)
-            self.typemap[index_const.name] = types.intp
-            const_assign = ir.Assign(ir.Const(right_length, loc),
-                                     index_const, loc)
-            out.append(const_assign)
-            end_ind = ir.Var(scope, mk_unique_var("end_ind"), loc)
-            self.typemap[end_ind.name] = types.intp
-            index_call = ir.Expr.binop(
-                '-', parfor.loop_nests[0].stop, index_const, loc)
-            self.calltypes[index_call] = ir_utils.find_op_typ('-',
-                                                              [types.intp, types.intp])
-            index_assign = ir.Assign(index_call, end_ind, loc)
-            out.append(index_assign)
-            parfor.loop_nests[0].stop = end_ind
-
-        out.append(parfor)
-
-        # wait on isend/irecv
-        if left_length != 0:
-            self._gen_stencil_wait(left_recv_req, out, is_left=True)
-            self._gen_stencil_wait(left_send_req, out, is_left=False)
-
-        if right_length != 0:
-            #
-            self._gen_stencil_wait(right_recv_req, out, is_left=False)
-            self._gen_stencil_wait(right_send_req, out, is_left=True)
-
-        # generate border blocks
-        assert len(parfor.loop_body) == 1  # only one block supported
-        body_block = parfor.loop_body[min(parfor.loop_body.keys())]
-        # set parfor index to right border
-        # buffer index starts from length
-        parfor_index = parfor.loop_nests[0].index_variable
-        buff_index = ir.Var(scope, mk_unique_var("buff_index"), loc)
-        self.typemap[buff_index.name] = types.intp
-
-        if left_length != 0:
-            border_block_left = copy.copy(body_block)
-            border_block_left.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                                                              left_recv_buff, left_length, end_var, arr_var, is_left=True)
-            self._stencil_left_border[parfor.id] = border_block_left
-
-        if right_length != 0:
-            border_block_right = copy.copy(body_block)
-            border_block_right.body = self._gen_stencil_border(parfor_index, buff_index, body_block.body,
-                                                               right_recv_buff, right_length, end_var, arr_var, is_left=False)
-            self._stencil_right_border[parfor.id] = border_block_right
-
-        return
-
-    def _get_stencil_border_length(self, neighborhood):
-        # XXX: hack to get lengths assuming they are constant
-        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        left_length = -self._get_var_const_val(neighborhood[0][0])
-        # left_length = -neighborhood[0][0]
-        left_length = max(left_length, 0)  # avoid negative value
-        #right_length = neighborhood[1][0]
-        right_length = self._get_var_const_val(neighborhood[1][0])
-        right_length = max(right_length, 0)  # avoid negative value
-
-        return left_length, right_length
-        # def f(w):
-        #     return max(-w, 0)
-        # f_block = compile_to_numba_ir(f, {}, self.typingctx, (types.intp,),
-        #                     self.typemap, self.calltypes).blocks.popitem()[1]
-        # replace_arg_nodes(f_block, [neighborhood[0][0]])
-        # out.extend(f_block.body[:-2])  # remove none return
-        # left_length = out[-1].target
-        #
-        # def f(w):
-        #     return max(w, 0)
-        # f_block = compile_to_numba_ir(f, {}, self.typingctx, (types.intp,),
-        #                     self.typemap, self.calltypes).blocks.popitem()[1]
-        # replace_arg_nodes(f_block, [neighborhood[1][0]])
-        # out.extend(f_block.body[:-2])  # remove none return
-        # right_length = out[-1].target
-
-    def _get_var_const_val(self, var):
-        if isinstance(var, int):
-            return var
-        node = guard(get_definition, self.func_ir, var)
-        if isinstance(node, ir.Const):
-            return node.value
-        if isinstance(node, ir.Expr):
-            if node.op == 'unary' and node.fn == '-':
-                return -self._get_var_const_val(node.value)
-            if node.op == 'binop':
-                lhs = self._get_var_const_val(node.lhs)
-                rhs = self._get_var_const_val(node.rhs)
-                if node.fn == '+':
-                    return lhs + rhs
-                if node.fn == '-':
-                    return lhs - rhs
-                if node.fn == '//':
-                    return lhs // rhs
-        return None
-
-    def _gen_stencil_border(self, parfor_index, buff_index, body,
-                            halo_recv_buff, halo_length, end_var, arr_var, is_left):
-        scope = parfor_index.scope
-        loc = parfor_index.loc
-        new_body = []
-        for i in range(halo_length):
-
-            if is_left:
-                new_body.append(ir.Assign(ir.Const(i, loc), parfor_index, loc))
-            else:
-                index_const = ir.Var(scope, mk_unique_var("index_const"), loc)
-                self.typemap[index_const.name] = types.intp
-                new_body.append(
-                    ir.Assign(ir.Const(i + 1, loc), index_const, loc))
-
-                def f(end_var, alloc_start, index_const):  # pragma: no cover
-                    parfor_ind = end_var - alloc_start - index_const
-
-                f_block = compile_to_numba_ir(f, {}, self.typingctx,
-                                              (types.intp, types.intp, types.intp),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(
-                    f_block, [end_var, self._array_starts[arr_var.name][0], index_const])
-                new_body += f_block.body[:-3]
-                new_body[-1].target = parfor_index
-
-            if is_left:
-                buff_index_start = halo_length + i
-            else:
-                buff_index_start = -(i + 1)
-
-            new_body.append(
-                ir.Assign(ir.Const(buff_index_start, loc), buff_index, loc))
-            # replace index calculations with halo constants with buff index
-            # replace halo array accesses with buff access
-            if is_left:
-                def index_com(a): return a < -i
-            else:
-                def index_com(a): return a > i
-
-            buff_indices = set()
-            for st in body:
-                stmt = copy.deepcopy(st)
-                if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
-                    expr = stmt.value
-                    if (expr.op == 'binop' and expr.fn == '+'
-                            and expr.lhs.name == parfor_index.name
-                            and index_com(self._get_var_const_val(expr.rhs))):
-                        expr.lhs = buff_index
-                        buff_indices.add(stmt.target.name)
-                    if expr.op == 'getitem' and expr.index.name in buff_indices:
-                        expr.value = halo_recv_buff
-                    if st.value in self.calltypes:
-                        self.calltypes[expr] = self.calltypes[st.value]
-                if isinstance(stmt, ir.SetItem):
-                    self.calltypes[stmt] = self.calltypes[st]
-                new_body.append(stmt)
-                # if isinstance(stmt, ir.SetItem):
-                #     print_node = ir.Print([self._rank_var, stmt.target, stmt.index, stmt.value], None, loc)
-                #     self.calltypes[print_node] = signature(types.none, types.int64,
-                #         types.Array(types.float64,1,'C'), types.int64, types.float64)
-                #     new_body.append(print_node)
-        return new_body
-
-    def _gen_stencil_halo(self, halo_length, arr_var, out, is_left):
-        scope = arr_var.scope
-        loc = arr_var.loc
-        dtype = self.typemap[arr_var.name].dtype
-        # allocate halo tmp buffer for irecv
-        halo_recv_buff = ir.Var(scope, mk_unique_var("halo_recv_buff"), loc)
-        self.typemap[halo_recv_buff.name] = self.typemap[arr_var.name]
-        out += mk_alloc(self.typemap, self.calltypes, halo_recv_buff,
-                        (halo_length,), dtype, scope, loc)
-
-        # recv from halo
-        halo_recv_req = self._gen_stencil_comm(halo_recv_buff, halo_length,
-                                               out, is_left=is_left, is_send=False)
-
-        # send to match recv
-        if is_left:
-            # copy array's last elements to buffer
-            halo_send_buff = ir.Var(
-                scope, mk_unique_var("halo_send_buff"), loc)
-            self.typemap[halo_send_buff.name] = self.typemap[arr_var.name]
-            # const = -size
-            const_msize = ir.Var(scope, mk_unique_var("const_msize"), loc)
-            self.typemap[const_msize.name] = types.intp
-            out.append(ir.Assign(ir.Const(-halo_length, loc), const_msize, loc))
-            # const = none
-            const_none = ir.Var(scope, mk_unique_var("const_none"), loc)
-            self.typemap[const_none.name] = types.none
-            out.append(ir.Assign(ir.Const(None, loc), const_none, loc))
-            # g_slice = Global(slice)
-            g_slice_var = ir.Var(scope, mk_unique_var("g_slice_var"), loc)
-            self.typemap[g_slice_var.name] = get_global_func_typ(slice)
-            out.append(ir.Assign(ir.Global('slice', slice, loc),
-                                 g_slice_var, loc))
-            # slice_ind_out = slice(-size, none)
-            slice_ind_out = ir.Var(scope, mk_unique_var("slice_ind_out"), loc)
-            slice_call = ir.Expr.call(g_slice_var, [const_msize,
-                                                    const_none], (), loc)
-            self.calltypes[slice_call] = self.typemap[g_slice_var.name].get_call_type(self.typingctx,
-                                                                                      [types.intp, types.none], {})
-            self.typemap[slice_ind_out.name] = self.calltypes[slice_call].return_type
-            out.append(ir.Assign(slice_call, slice_ind_out, loc))
-            # halo_send_buff = A[slice]
-            getslice_call = ir.Expr.static_getitem(arr_var, slice(-halo_length, None, None),
-                                                   slice_ind_out, loc)
-            self.calltypes[getslice_call] = signature(
-                self.typemap[halo_send_buff.name],
-                self.typemap[arr_var.name],
-                self.typemap[slice_ind_out.name])
-            out.append(ir.Assign(getslice_call, halo_send_buff, loc))
-        else:
-            halo_send_buff = arr_var
-
-        halo_send_req = self._gen_stencil_comm(halo_send_buff, halo_length, out,
-                                               is_left=(not is_left), is_send=True)
-        return halo_recv_buff, halo_recv_req, halo_send_req
-
-    def _gen_stencil_wait(self, req, out, is_left):
-        scope = req.scope
-        loc = req.loc
-        wait_cond = self._get_comm_cond(out, scope, loc, is_left)
-        # wait_err = wait(req)
-        wait_err = ir.Var(scope, mk_unique_var("wait_err"), loc)
-        self.typemap[wait_err.name] = types.int32
-        # attr call: wait_attr = getattr(g_dist_var, irecv)
-        wait_attr_call = ir.Expr.getattr(self._g_dist_var, "wait", loc)
-        wait_attr_var = ir.Var(scope, mk_unique_var("$get_wait_attr"), loc)
-        self.typemap[wait_attr_var.name] = get_global_func_typ(
-            distributed_api.wait)
-        out.append(ir.Assign(wait_attr_call, wait_attr_var, loc))
-        wait_call = ir.Expr.call(wait_attr_var, [req, wait_cond], (), loc)
-        self.calltypes[wait_call] = self.typemap[wait_attr_var.name].get_call_type(
-            self.typingctx, [distributed_api.mpi_req_numba_type, types.boolean], {})
-        out.append(ir.Assign(wait_call, wait_err, loc))
-
-    def _gen_stencil_comm(self, buff, size, out, is_left, is_send):
-        scope = buff.scope
-        loc = buff.loc
-        rank_op = '+'
-        if is_left:
-            rank_op = '-'
-        comm_name = 'irecv'
-        comm_call = distributed_api.irecv
-        if is_send:
-            comm_name = 'isend'
-            comm_call = distributed_api.isend
-        comm_tag_const = 22
-
-        # comm_size = size
-        comm_size = ir.Var(scope, mk_unique_var("comm_size"), loc)
-        self.typemap[comm_size.name] = types.int32
-        out.append(ir.Assign(ir.Const(size, loc), comm_size, loc))
-
-        # comm_pe = rank +/- 1
-        comm_pe = ir.Var(scope, mk_unique_var("comm_pe"), loc)
-        self.typemap[comm_pe.name] = types.int32
-        comm_pe_call = ir.Expr.binop(
-            rank_op, self._rank_var, self._set1_var, loc)
-        if comm_pe_call not in self.calltypes:
-            self.calltypes[comm_pe_call] = find_op_typ(
-                rank_op, [types.int32, types.int64])
-        out.append(ir.Assign(comm_pe_call, comm_pe, loc))
-
-        # comm_tag = 22
-        comm_tag = ir.Var(scope, mk_unique_var("comm_tag"), loc)
-        self.typemap[comm_tag.name] = types.int32
-        out.append(ir.Assign(ir.Const(comm_tag_const, loc), comm_tag, loc))
-
-        comm_cond = self._get_comm_cond(out, scope, loc, is_left)
-
-        # comm_req = irecv()
-        comm_req = ir.Var(scope, mk_unique_var("comm_req"), loc)
-        self.typemap[comm_req.name] = distributed_api.mpi_req_numba_type
-        # attr call: icomm_attr = getattr(g_dist_var, irecv)
-        icomm_attr_call = ir.Expr.getattr(self._g_dist_var, comm_name, loc)
-        icomm_attr_var = ir.Var(scope, mk_unique_var(
-            "$get_" + comm_name + "_attr"), loc)
-        self.typemap[icomm_attr_var.name] = get_global_func_typ(comm_call)
-        out.append(ir.Assign(icomm_attr_call, icomm_attr_var, loc))
-        icomm_call = ir.Expr.call(icomm_attr_var, [buff, comm_size,
-                                                   comm_pe, comm_tag, comm_cond], (), loc)
-        self.calltypes[icomm_call] = self.typemap[icomm_attr_var.name].get_call_type(
-            self.typingctx, [self.typemap[buff.name], types.int32,
-                             types.int32, types.int32, types.boolean], {})
-        out.append(ir.Assign(icomm_call, comm_req, loc))
-        return comm_req
-
-    def _get_comm_cond(self, out, scope, loc, is_left):
-        if is_left:
-            last_pe = self._set0_var
-        else:
-            # last_pe = num_pes - 1
-            last_pe = ir.Var(scope, mk_unique_var("last_pe"), loc)
-            self.typemap[last_pe.name] = types.intp
-            last_pe_call = ir.Expr.binop(
-                '-', self._size_var, self._set1_var, loc)
-            if last_pe_call not in self.calltypes:
-                self.calltypes[last_pe_call] = find_op_typ(
-                    '-', [types.int32, types.int64])
-            out.append(ir.Assign(last_pe_call, last_pe, loc))
-
-        # comm_cond = rank != 0
-        comm_cond = ir.Var(scope, mk_unique_var("comm_cond"), loc)
-        self.typemap[comm_cond.name] = types.boolean
-        comm_cond_call = ir.Expr.binop('!=', self._rank_var, last_pe, loc)
-        if comm_cond_call not in self.calltypes:
-            self.calltypes[comm_cond_call] = find_op_typ(
-                '!=', [types.int32, types.int64])
-        out.append(ir.Assign(comm_cond_call, comm_cond, loc))
-
-        return comm_cond
 
     def _gen_1D_div(self, size_var, scope, loc, prefix, end_call_name, end_call):
         div_nodes = []

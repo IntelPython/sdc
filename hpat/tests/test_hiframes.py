@@ -103,6 +103,23 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_box_dist_return(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        n = 11
+        hres, res = hpat_func(n), test_impl(n)
+        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 2)
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1)  # run to compile
+        np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
+        np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
@@ -550,8 +567,7 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
-        # small input array to mean is REP
-        self.assertEqual(count_array_REPs(), 1)
+        self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_rolling3(self):
