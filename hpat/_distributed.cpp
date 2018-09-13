@@ -35,6 +35,8 @@ double hpat_dist_exscan_f8(double value);
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int type_enum);
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
+void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag);
+void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag);
 int hpat_dist_wait(MPI_Request req, bool cond);
 void hpat_dist_waitall(int size, MPI_Request *req);
 
@@ -115,6 +117,10 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_irecv)));
     PyObject_SetAttrString(m, "hpat_dist_isend",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_isend)));
+    PyObject_SetAttrString(m, "hpat_dist_recv",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_recv)));
+    PyObject_SetAttrString(m, "hpat_dist_send",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_send)));
     PyObject_SetAttrString(m, "hpat_dist_wait",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_wait)));
     PyObject_SetAttrString(m, "hpat_dist_get_item_pointer",
@@ -330,6 +336,19 @@ double hpat_dist_exscan_f8(double value)
     MPI_Exscan(&value, &out, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     return out;
 }
+
+void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+    MPI_Recv(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+ }
+
+void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+    MPI_Send(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD);
+}
+
 
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
