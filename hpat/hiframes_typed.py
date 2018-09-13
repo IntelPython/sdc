@@ -163,11 +163,17 @@ class HiFramesTyped(object):
 
         if isinstance(rhs, ir.Expr):
             # arr = S.values
-            if (rhs.op == 'getattr' and isinstance(self.typemap[rhs.value.name], SeriesType)
-                    and rhs.attr == 'values'):
-                # simply return the column
-                assign.value = rhs.value
-                return [assign]
+            if (rhs.op == 'getattr'):
+                rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
+
+                if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
+                    # simply return the column
+                    assign.value = rhs.value
+                    return [assign]
+
+                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
+                    if rhs.attr in hpat.pd_timestamp_ext.date_fields:
+                        return self._run_DatetimeIndex_field(assign, assign.target, rhs)
 
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
@@ -689,6 +695,27 @@ class HiFramesTyped(object):
                                                             lambda a: None)
         imp_dis.add_overload(kernel_func)
         return imp_dis
+
+    def _run_DatetimeIndex_field(self, assign, lhs, rhs):
+        """transform DatetimeIndex.<field>
+        """
+        arr = rhs.value
+        field = rhs.attr
+
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        S[i] = ts.' + field + '\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, [arr])
 
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument

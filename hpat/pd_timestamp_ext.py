@@ -31,6 +31,8 @@ ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
 ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
 ll.add_symbol('np_datetime_date_array_from_packed_ints', hdatetime_ext.np_datetime_date_array_from_packed_ints)
 
+date_fields = ['year', 'month', 'day', 'hour', 'min', 'sec', 'us', 'ps', 'as']
+
 #--------------------------------------------------------------
 
 class PANDAS_DATETIMESTRUCT(ctypes.Structure):
@@ -116,11 +118,11 @@ def datetime_get_year(context, builder, typ, val):
     return builder.lshr(val, lir.Constant(lir.IntType(64), 32))
 
 @lower_getattr(DatetimeDateType, 'month')
-def datetime_get_year(context, builder, typ, val):
+def datetime_get_month(context, builder, typ, val):
     return builder.and_(builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF))
 
 @lower_getattr(DatetimeDateType, 'day')
-def datetime_get_year(context, builder, typ, val):
+def datetime_get_day(context, builder, typ, val):
     return builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF))
 
 @numba.njit
@@ -590,6 +592,19 @@ def type_int_to_dt64(context):
 
 @lower_builtin(integer_to_dt64, types.int64)
 def impl_int_to_dt64(context, builder, sig, args):
+    return args[0]
+
+def dt64_to_integer(val):
+    return int(val)
+
+@type_callable(dt64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(dt64_to_integer, types.NPDatetime('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
     return args[0]
 
 @lower_builtin(myref, types.int32)

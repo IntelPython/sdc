@@ -294,6 +294,42 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    def resolve_year(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_month(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_day(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_hour(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_min(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_sec(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_us(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_ps(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_as(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
     @bound_function("array.astype")
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.
