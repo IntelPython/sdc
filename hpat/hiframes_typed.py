@@ -631,6 +631,24 @@ class HiFramesTyped(object):
             nodes = f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
             return nodes
+        elif (func_name == 'rolling_variable'
+                and self.typemap[rhs.args[5].name] == types.pyfunc_type):
+            # for apply case, create a dispatcher for the kernel and pass it
+            # TODO: automatically handle lambdas in Numba
+            dtype = self.typemap[rhs.args[0].name].dtype
+            func_node = guard(get_definition, self.func_ir, rhs.args[5])
+            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
+            def f(arr, on_arr, w, center):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_variable(
+                                                arr, on_arr, w, center, False, _func)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
+                        self.typingctx,
+                        tuple(self.typemap[v.name] for v in rhs.args[:-2]),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args[:-2])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = lhs
+            return nodes
         return [assign]
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):

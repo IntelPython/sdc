@@ -140,6 +140,46 @@ class TestRolling(unittest.TestCase):
             df = pd.DataFrame({'B': np.arange(n), 'time': time})
             pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_variable_apply1(self):
+        # test sequentially with manually created dfs
+        df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
+                'time': [pd.Timestamp('20130101 09:00:00'),
+                        pd.Timestamp('20130101 09:00:02'),
+                        pd.Timestamp('20130101 09:00:03'),
+                        pd.Timestamp('20130101 09:00:05'),
+                        pd.Timestamp('20130101 09:00:06')]})
+        df2 = pd.DataFrame({'B': [0, 1, 2, -2, 4],
+                    'time': [pd.Timestamp('20130101 09:00:01'),
+                        pd.Timestamp('20130101 09:00:02'),
+                        pd.Timestamp('20130101 09:00:03'),
+                        pd.Timestamp('20130101 09:00:04'),
+                        pd.Timestamp('20130101 09:00:09')]})
+        wins = ('1s', '2s', '3s', '4s')
+        # all functions except apply
+        for w in wins:
+            func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(df1), test_impl(df1))
+            pd.testing.assert_frame_equal(hpat_func(df2), test_impl(df2))
+
+    def test_variable_apply2(self):
+        # test sequentially with generated dfs
+        wins = ('1s', '2s', '3s', '4s')
+        sizes = (1, 2, 10, 11, 121, 1000)
+        # all functions except apply
+        for w, n in itertools.product(wins, sizes):
+            func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            time = pd.date_range(start='1/1/2018', periods=n, freq='s')
+            df = pd.DataFrame({'B': np.arange(n), 'time': time})
+            pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
 
 if __name__ == "__main__":
     unittest.main()

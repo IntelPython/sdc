@@ -146,6 +146,12 @@ def lower_rolling_variable(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 
+@lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
+               types.Boolean, types.functions.Dispatcher)
+def lower_rolling_variable_apply(context, builder, sig, args):
+    func = lambda a,o,w,c,p,f: roll_variable_apply(a,o,w,c,p,f)
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 #### adapted from pandas window.pyx ####
 
@@ -347,6 +353,26 @@ def roll_var_linear_generic(in_arr, on_arr, win, center, parallel, init_data,
         output[i] = calc_out(minp, *data)
 
     return output
+
+@numba.njit
+def roll_variable_apply(in_arr, on_arr, win, center, parallel, kernel_func):  # pragma: no cover
+    # TODO
+    N = len(in_arr)
+    minp = 1
+    output = np.empty(N, dtype=np.float64)
+    start, end = _build_indexer(on_arr, N, win, False, True)
+
+    # TODO: handle count and minp
+    for i in range(0, N):
+        s = start[i]
+        e = end[i]
+        if e - s >= minp:
+            output[i] = kernel_func(in_arr[s:e])
+        else:
+            output[i] = np.nan
+
+    return output
+
 
 @numba.njit
 def _build_indexer(on_arr, N, win, left_closed, right_closed):
