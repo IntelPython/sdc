@@ -102,7 +102,6 @@ class TestRolling(unittest.TestCase):
 
     def test_variable1(self):
         # test sequentially with manually created dfs
-        # all functions except apply
         df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
                 'time': [pd.Timestamp('20130101 09:00:00'),
                         pd.Timestamp('20130101 09:00:02'),
@@ -116,6 +115,7 @@ class TestRolling(unittest.TestCase):
                         pd.Timestamp('20130101 09:00:04'),
                         pd.Timestamp('20130101 09:00:09')]})
         wins = ('1s', '2s', '3s', '4s')
+        # all functions except apply
         for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
             func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').{}()\n".format(w, func_name)
             loc_vars = {}
@@ -124,6 +124,22 @@ class TestRolling(unittest.TestCase):
             hpat_func = hpat.jit(test_impl)
             pd.testing.assert_frame_equal(hpat_func(df1), test_impl(df1))
             pd.testing.assert_frame_equal(hpat_func(df2), test_impl(df2))
+
+    def test_variable2(self):
+        # test sequentially with generated dfs
+        wins = ('1s', '2s', '3s', '4s')
+        sizes = (1, 2, 10, 11, 121, 1000)
+        # all functions except apply
+        for w, n, func_name in itertools.product(wins, sizes, supported_rolling_funcs[:-1]):
+            func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').{}()\n".format(w, func_name)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            time = pd.date_range(start='1/1/2018', periods=n, freq='s')
+            df = pd.DataFrame({'B': np.arange(n), 'time': time})
+            pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
 
 if __name__ == "__main__":
     unittest.main()
