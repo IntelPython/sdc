@@ -320,7 +320,112 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
 # variable window
 
 @numba.njit
-def roll_var_linear_generic(in_arr, on_arr, win, center, parallel, init_data,
+def roll_var_linear_generic(in_arr, on_arr_dt, win, center, parallel, init_data,
+                              add_obs, remove_obs, calc_out):  # pragma: no cover
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    on_arr = cast_dt64_arr_to_int(on_arr_dt)
+    N = len(in_arr)
+    # TODO: support minp arg end_range etc.
+    minp = 1
+    # Pandas is right closed by default, TODO: extend to support arg
+    left_closed = False
+    right_closed = True
+
+    if parallel:
+        if _is_small_for_parallel_variable(on_arr, win):
+            return _handle_small_data_variable(in_arr, on_arr, win, rank,
+                               n_pes, init_data, add_obs, remove_obs, calc_out)
+
+        comm_data = _border_icomm_var(
+            in_arr, on_arr, rank, n_pes, win, in_arr.dtype)
+        (l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req,
+        l_recv_t_req) = comm_data
+
+    start, end = _build_indexer(on_arr, N, win, left_closed, right_closed)
+    output = roll_var_linear_generic_seq(in_arr, on_arr, win, start, end,
+                            init_data, add_obs, remove_obs, calc_out)
+
+    if parallel:
+        _border_send_wait(r_send_req, r_send_req, rank, n_pes, False)
+        _border_send_wait(r_send_t_req, r_send_t_req, rank, n_pes, False)
+
+        # recv left
+        if rank != 0:
+            hpat.distributed_api.wait(l_recv_req, True)
+            hpat.distributed_api.wait(l_recv_t_req, True)
+
+            # values with start == 0 could potentially have left halo starts
+            num_zero_starts = 0
+            for i in range(0, N):
+                if start[i] != 0:
+                    break
+                num_zero_starts += 1
+
+            if num_zero_starts == 0:
+                return output
+
+            recv_starts = _get_var_recv_starts(on_arr, l_recv_t_buff, num_zero_starts, win)
+            data = init_data()
+            # setup (first element)
+            for j in range(recv_starts[0], len(l_recv_t_buff)):
+                data = add_obs(l_recv_buff[j], *data)
+            if right_closed:
+                data = add_obs(in_arr[0], *data)
+            output[0] = calc_out(minp, *data)
+
+            for i in range(1, num_zero_starts):
+                s = recv_starts[i]
+                e = end[i]
+
+                # calculate deletes (can only happen in left recv buffer)
+                for j in range(recv_starts[i - 1], s):
+                    data = remove_obs(l_recv_buff[j], *data)
+
+                # calculate adds (can only happen in local data)
+                for j in range(end[i - 1], e):
+                    data = add_obs(in_arr[j], *data)
+
+                output[i] = calc_out(minp, *data)
+
+    return output
+
+
+@numba.njit
+def _get_var_recv_starts(on_arr, l_recv_t_buff, num_zero_starts, win):
+    recv_starts = np.zeros(num_zero_starts, np.int64)
+    halo_size = len(l_recv_t_buff)
+    index = cast_dt64_arr_to_int(on_arr)
+    left_closed = False
+
+    # handle first element
+    start_bound = index[0] - win
+    # left endpoint is closed
+    if left_closed:
+        start_bound -= 1
+    recv_starts[0] = halo_size
+    for j in range(0, halo_size):
+        if l_recv_t_buff[j] > start_bound:
+            recv_starts[0] = j
+            break
+
+    # rest of elements
+    for i in range(1, num_zero_starts):
+        start_bound = index[i] - win
+        # left endpoint is closed
+        if left_closed:
+            start_bound -= 1
+        recv_starts[i] = halo_size
+        for j in range(recv_starts[i - 1], halo_size):
+            if l_recv_t_buff[j] > start_bound:
+                recv_starts[i] = j
+                break
+
+    return recv_starts
+
+
+@numba.njit
+def roll_var_linear_generic_seq(in_arr, on_arr, win, start, end, init_data,
                               add_obs, remove_obs, calc_out):  # pragma: no cover
     #
     N = len(in_arr)
@@ -328,8 +433,6 @@ def roll_var_linear_generic(in_arr, on_arr, win, center, parallel, init_data,
     minp = 1
     output = np.empty(N, np.float64)
 
-    # Pandas is right closed by default, TODO: extend to arg
-    start, end = _build_indexer(on_arr, N, win, False, True)
     data = init_data()
 
     # setup (first element)
@@ -356,6 +459,12 @@ def roll_var_linear_generic(in_arr, on_arr, win, center, parallel, init_data,
 
 @numba.njit
 def roll_variable_apply(in_arr, on_arr, win, center, parallel, kernel_func):  # pragma: no cover
+    # TODO
+    return roll_variable_apply_seq(in_arr, on_arr, win, kernel_func)
+
+
+@numba.njit
+def roll_variable_apply_seq(in_arr, on_arr, win, kernel_func):  # pragma: no cover
     # TODO
     N = len(in_arr)
     minp = 1
@@ -652,6 +761,36 @@ def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):  # pragma: no 
 
     return l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req, r_recv_req
 
+
+@numba.njit
+def _border_icomm_var(in_arr, on_arr, rank, n_pes, win_size, dtype):  # pragma: no cover
+    comm_tag = np.int32(comm_border_tag)
+    # find halo size from time array
+    N = len(on_arr)
+    halo_size = N
+    end = on_arr[-1]
+    for j in range(-2, -N, -1):
+        t = on_arr[j]
+        if end - t >= win_size:
+            halo_size = -j
+            break
+
+    # send right
+    if rank != n_pes - 1:
+        hpat.distributed_api.send(halo_size, np.int32(rank+1), comm_tag)
+        r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], np.int32(halo_size), np.int32(rank+1), comm_tag, True)
+        r_send_t_req = hpat.distributed_api.isend(on_arr[-halo_size:], np.int32(halo_size), np.int32(rank+1), comm_tag, True)
+    # recv left
+    if rank != 0:
+        halo_size = hpat.distributed_api.recv(np.int64, np.int32(rank-1), comm_tag)
+        l_recv_buff = np.empty(halo_size, dtype)
+        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, np.int32(halo_size), np.int32(rank-1), comm_tag, True)
+        l_recv_t_buff = np.empty(halo_size, np.int64)
+        l_recv_t_req = hpat.distributed_api.irecv(l_recv_t_buff, np.int32(halo_size), np.int32(rank-1), comm_tag, True)
+
+    return l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req, l_recv_t_req
+
+
 @numba.njit
 def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):  # pragma: no cover
     # wait on send right
@@ -742,10 +881,46 @@ class DtArrToIntType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == types.Array(types.NPDatetime('ns'), 1, 'C')
+        assert (args[0] == types.Array(types.NPDatetime('ns'), 1, 'C')
+                or args[0] == types.Array(types.int64, 1, 'C'))
         return signature(types.Array(types.int64, 1, 'C'), *args)
 
 @lower_builtin(cast_dt64_arr_to_int, types.Array(types.NPDatetime('ns'), 1, 'C'))
+@lower_builtin(cast_dt64_arr_to_int, types.Array(types.int64, 1, 'C'))
 def lower_cast_dt64_arr_to_int(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+
+# ----------------------------------------
+# variable window comm routines
+
+
+@numba.njit
+def _is_small_for_parallel_variable(on_arr, win_size):  # pragma: no cover
+    # assume small if current processor's whole range is smaller than win_size
+    if len(on_arr) < 2:
+        return True
+    start = on_arr[0]
+    end = on_arr[-1]
+    pe_range = end - start
+    num_small = hpat.distributed_api.dist_reduce(
+        int(pe_range<=win_size), np.int32(Reduce_Type.Sum.value))
+    return num_small != 0
+
+@numba.njit
+def _handle_small_data_variable(in_arr, on_arr, win, rank, n_pes, init_data,
+                                                add_obs, remove_obs, calc_out):  # pragma: no cover
+    all_N = hpat.distributed_api.dist_reduce(
+        len(in_arr), np.int32(Reduce_Type.Sum.value))
+    all_in_arr = hpat.distributed_api.gatherv(in_arr)
+    all_on_arr = hpat.distributed_api.gatherv(on_arr)
+    if rank == 0:
+        start, end = _build_indexer(all_on_arr, all_N, win, False, True)
+        all_out = roll_var_linear_generic_seq(all_in_arr, all_on_arr, win,
+                          start, end, init_data, add_obs, remove_obs, calc_out)
+    else:
+        all_out = np.empty(all_N, np.float64)
+    hpat.distributed_api.bcast(all_out)
+    start = hpat.distributed_api.get_start(all_N, n_pes, rank)
+    end = hpat.distributed_api.get_end(all_N, n_pes, rank)
+    return all_out[start:end]
