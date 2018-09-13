@@ -830,6 +830,8 @@ def lower_box_df(context, builder, sig, args):
             arr_obj = box_str_arr(arr_typ, arr, c)
         else:
             arr_obj = box_array(arr_typ, arr, c)
+            # TODO: is incref required?
+            context.nrt.incref(builder, arr_typ, arr)
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
         pyapi.object_setitem(res, cname_obj, arr_obj)
