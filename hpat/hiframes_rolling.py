@@ -10,7 +10,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.ir_utils import guard, find_const
 
 from hpat.distributed_api import Reduce_Type
-
+from hpat.pd_timestamp_ext import integer_to_dt64
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'apply')
 
@@ -59,6 +59,9 @@ def rolling_fixed(arr, win):  # pragma: no cover
 def rolling_fixed_parallel(arr, win):  # pragma: no cover
     return arr
 
+def rolling_variable(arr, on_arr, win):  # pragma: no cover
+    return arr
+
 
 @infer_global(rolling_fixed)
 @infer_global(rolling_fixed_parallel)
@@ -78,6 +81,26 @@ class RollingType(AbstractTemplate):
                          types.bool_, types.bool_, f_type)
 
 RollingType.support_literals = True
+
+
+@infer_global(rolling_variable)
+class RollingVarType(AbstractTemplate):
+    def generic(self, args, kws):
+        arr = args[0]  # array or series
+        on_arr = args[1]
+        # result is always float64 in pandas
+        # see _prep_values() in window.py
+        f_type = args[5]
+        # Const of CPUDispatcher needs to be converted to type since lowerer
+        # cannot handle it
+        if (isinstance(f_type, types.Const)
+                and isinstance(f_type.value,
+                numba.targets.registry.CPUDispatcher)):
+            f_type = types.functions.Dispatcher(f_type.value)
+        return signature(arr.copy(dtype=types.float64), arr, on_arr, types.intp,
+                         types.bool_, types.bool_, f_type)
+
+RollingVarType.support_literals = True
 
 
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
@@ -103,6 +126,26 @@ def lower_rolling_fixed_apply(context, builder, sig, args):
     func = lambda a,w,c,p,f: roll_fixed_apply(a,w,c,p,f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
+@lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
+               types.Boolean, types.Const)
+def lower_rolling_variable(context, builder, sig, args):
+    func_name = sig.args[-1].value
+    if func_name == 'sum':
+        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
+    elif func_name == 'mean':
+        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_mean, add_mean, remove_mean, calc_mean)
+    elif func_name == 'var':
+        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_var)
+    elif func_name == 'std':
+        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_std)
+
+    res = context.compile_internal(
+        builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
 
 #### adapted from pandas window.pyx ####
 
@@ -265,6 +308,90 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
         output[i] = np.nan
 
     return output
+
+
+# -----------------------------
+# variable window
+
+@numba.njit
+def roll_var_linear_generic(in_arr, on_arr, win, center, parallel, init_data,
+                              add_obs, remove_obs, calc_out):  # pragma: no cover
+    #
+    N = len(in_arr)
+    # TODO: support minp arg end_range etc.
+    minp = 1
+    output = np.empty(N, np.float64)
+
+    # Pandas is right closed by default, TODO: extend to arg
+    start, end = _build_indexer(on_arr, N, win, False, True)
+    data = init_data()
+
+    # setup (first element)
+    for j in range(start[0], end[0]):
+        data = add_obs(in_arr[j], *data)
+
+    output[0] = calc_out(minp, *data)
+
+    for i in range(1, N):
+        s = start[i]
+        e = end[i]
+
+        # calculate deletes
+        for j in range(start[i - 1], s):
+            data = remove_obs(in_arr[j], *data)
+
+        # calculate adds
+        for j in range(end[i - 1], e):
+            data = add_obs(in_arr[j], *data)
+
+        output[i] = calc_out(minp, *data)
+
+    return output
+
+@numba.njit
+def _build_indexer(on_arr, N, win, left_closed, right_closed):
+    index = cast_dt64_arr_to_int(on_arr)
+    start = np.empty(N, np.int64)  # XXX pandas inits to -1 but doesn't seem required?
+    end = np.empty(N, np.int64)
+    start[0] = 0
+
+    # right endpoint is closed
+    if right_closed:
+        end[0] = 1
+    # right endpoint is open
+    else:
+        end[0] = 0
+
+    # start is start of slice interval (including)
+    # end is end of slice interval (not including)
+    for i in range(1, N):
+        end_bound = index[i]
+        start_bound = index[i] - win
+
+        # left endpoint is closed
+        if left_closed:
+            start_bound -= 1
+
+        # advance the start bound until we are
+        # within the constraint
+        start[i] = i
+        for j in range(start[i - 1], i):
+            if index[j] > start_bound:
+                start[i] = j
+                break
+
+        # end bound is previous end
+        # or current index
+        if index[end[i - 1]] <= end_bound:
+            end[i] = i + 1
+        else:
+            end[i] = end[i - 1]
+
+        # right endpoint is open
+        if not right_closed:
+            end[i] -= 1
+
+    return start, end
 
 # -------------------
 # sum
@@ -580,3 +707,19 @@ def _handle_small_data_pct_change(in_arr, shift, rank, n_pes):  # pragma: no cov
     start = hpat.distributed_api.get_start(all_N, n_pes, rank)
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
+
+def cast_dt64_arr_to_int(arr):  # pragma: no cover
+    return arr
+
+@infer_global(cast_dt64_arr_to_int)
+class DtArrToIntType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        assert args[0] == types.Array(types.NPDatetime('ns'), 1, 'C')
+        return signature(types.Array(types.int64, 1, 'C'), *args)
+
+@lower_builtin(cast_dt64_arr_to_int, types.Array(types.NPDatetime('ns'), 1, 'C'))
+def lower_cast_dt64_arr_to_int(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
