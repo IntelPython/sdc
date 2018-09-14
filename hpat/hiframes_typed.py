@@ -723,6 +723,13 @@ class HiFramesTyped(object):
                     "data argument in pd.DatetimeIndex() expected")
             data = rhs.args[0]
 
+        in_typ = self.typemap[data.name]
+        if not (in_typ == string_array_type or in_typ == string_series_type):
+            # already dt_index or int64
+            # TODO: check for other types
+            f = lambda A: hpat.hiframes_api.ts_series_to_arr_typ(A)
+            return self._replace_func(f, [data])
+
         def f(str_arr):
             numba.parfor.init_prange()
             n = len(str_arr)
