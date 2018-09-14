@@ -13,6 +13,16 @@ import random
 
 
 class TestDate(unittest.TestCase):
+    @unittest.skip("needs support for boxing/unboxing DatetimeIndex")
+    def test_datetime_index_in(self):
+        def test_impl(dti):
+            return dti
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        dti = pd.DatetimeIndex(df['str_date'])
+        np.testing.assert_array_equal(hpat_func(dti).values, test_impl(dti).values)
+
     def test_datetime_index(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).values
@@ -138,6 +148,78 @@ class TestDate(unittest.TestCase):
         df = pd.DataFrame({'A': pd.DatetimeIndex(['2015-01-03', '2010-10-11'])})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_year(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).year
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_month(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).month
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_day(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).day
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_hour(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).hour
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_minute(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).minute
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_second(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).second
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_microsecond(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).microsecond
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_nanosecond(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).nanosecond
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
 
     def _gen_str_date_df(self):
         rows = 10
