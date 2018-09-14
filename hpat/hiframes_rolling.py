@@ -458,18 +458,68 @@ def roll_var_linear_generic_seq(in_arr, on_arr, win, start, end, init_data,
     return output
 
 @numba.njit
-def roll_variable_apply(in_arr, on_arr, win, center, parallel, kernel_func):  # pragma: no cover
-    # TODO
-    return roll_variable_apply_seq(in_arr, on_arr, win, kernel_func)
+def roll_variable_apply(in_arr, on_arr_dt, win, center, parallel, kernel_func):  # pragma: no cover
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    on_arr = cast_dt64_arr_to_int(on_arr_dt)
+    N = len(in_arr)
+    # TODO: support minp arg end_range etc.
+    minp = 1
+    # Pandas is right closed by default, TODO: extend to support arg
+    left_closed = False
+    right_closed = True
+
+    if parallel:
+        if _is_small_for_parallel_variable(on_arr, win):
+            return _handle_small_data_variable_apply(in_arr, on_arr, win, rank,
+                               n_pes, kernel_func)
+
+        comm_data = _border_icomm_var(
+            in_arr, on_arr, rank, n_pes, win, in_arr.dtype)
+        (l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req,
+        l_recv_t_req) = comm_data
+
+    start, end = _build_indexer(on_arr, N, win, left_closed, right_closed)
+    output = roll_variable_apply_seq(in_arr, on_arr, win, start, end, kernel_func)
+
+    if parallel:
+        _border_send_wait(r_send_req, r_send_req, rank, n_pes, False)
+        _border_send_wait(r_send_t_req, r_send_t_req, rank, n_pes, False)
+
+        # recv left
+        if rank != 0:
+            hpat.distributed_api.wait(l_recv_req, True)
+            hpat.distributed_api.wait(l_recv_t_req, True)
+
+            # values with start == 0 could potentially have left halo starts
+            num_zero_starts = 0
+            for i in range(0, N):
+                if start[i] != 0:
+                    break
+                num_zero_starts += 1
+
+            if num_zero_starts == 0:
+                return output
+
+            recv_starts = _get_var_recv_starts(on_arr, l_recv_t_buff, num_zero_starts, win)
+            for i in range(0, num_zero_starts):
+                halo_ind = recv_starts[i]
+                sub_arr = np.concatenate(
+                    (l_recv_buff[halo_ind:], in_arr[:i+1]))
+                if len(sub_arr) >= minp:
+                    output[i] = kernel_func(sub_arr)
+                else:
+                    output[i] = np.nan
+
+    return output
 
 
 @numba.njit
-def roll_variable_apply_seq(in_arr, on_arr, win, kernel_func):  # pragma: no cover
+def roll_variable_apply_seq(in_arr, on_arr, win, start, end, kernel_func):  # pragma: no cover
     # TODO
     N = len(in_arr)
     minp = 1
     output = np.empty(N, dtype=np.float64)
-    start, end = _build_indexer(on_arr, N, win, False, True)
 
     # TODO: handle count and minp
     for i in range(0, N):
@@ -918,6 +968,24 @@ def _handle_small_data_variable(in_arr, on_arr, win, rank, n_pes, init_data,
         start, end = _build_indexer(all_on_arr, all_N, win, False, True)
         all_out = roll_var_linear_generic_seq(all_in_arr, all_on_arr, win,
                           start, end, init_data, add_obs, remove_obs, calc_out)
+    else:
+        all_out = np.empty(all_N, np.float64)
+    hpat.distributed_api.bcast(all_out)
+    start = hpat.distributed_api.get_start(all_N, n_pes, rank)
+    end = hpat.distributed_api.get_end(all_N, n_pes, rank)
+    return all_out[start:end]
+
+@numba.njit
+def _handle_small_data_variable_apply(in_arr, on_arr, win, rank, n_pes,
+                                        kernel_func):  # pragma: no cover
+    all_N = hpat.distributed_api.dist_reduce(
+        len(in_arr), np.int32(Reduce_Type.Sum.value))
+    all_in_arr = hpat.distributed_api.gatherv(in_arr)
+    all_on_arr = hpat.distributed_api.gatherv(on_arr)
+    if rank == 0:
+        start, end = _build_indexer(all_on_arr, all_N, win, False, True)
+        all_out = roll_variable_apply_seq(all_in_arr, all_on_arr, win,
+                          start, end, kernel_func)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
