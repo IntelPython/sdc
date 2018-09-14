@@ -310,23 +310,15 @@ class SeriesAttribute(AttributeTemplate):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 
-    def resolve_min(self, ary):
+    def resolve_minute(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 
-    def resolve_sec(self, ary):
+    def resolve_second(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 
-    def resolve_us(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_ps(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_as(self, ary):
+    def resolve_nanosecond(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 

@@ -13,6 +13,7 @@ import random
 
 
 class TestDate(unittest.TestCase):
+    @unittest.skip("needs support for boxing/unboxing DatetimeIndex")
     def test_datetime_index_in(self):
         def test_impl(dti):
             return dti
@@ -184,18 +185,27 @@ class TestDate(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         out = hpat_func(df)
 
-    def test_datetime_index_min(self):
+    def test_datetime_index_minute(self):
         def test_impl(df):
-            return pd.DatetimeIndex(df['str_date']).min
+            return pd.DatetimeIndex(df['str_date']).minute
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         out = hpat_func(df)
 
-    def test_datetime_index_sec(self):
+    def test_datetime_index_second(self):
         def test_impl(df):
-            return pd.DatetimeIndex(df['str_date']).sec
+            return pd.DatetimeIndex(df['str_date']).second
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
+    def test_datetime_index_nanosecond(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).nanosecond
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
