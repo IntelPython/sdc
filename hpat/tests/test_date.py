@@ -203,6 +203,15 @@ class TestDate(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         out = hpat_func(df)
 
+    def test_datetime_index_microsecond(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).microsecond
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        out = hpat_func(df)
+
     def test_datetime_index_nanosecond(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).nanosecond

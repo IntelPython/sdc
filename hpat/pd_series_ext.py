@@ -318,6 +318,10 @@ class SeriesAttribute(AttributeTemplate):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 
+    def resolve_microsecond(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
     def resolve_nanosecond(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
