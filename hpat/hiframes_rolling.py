@@ -249,6 +249,8 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
 
         output[i - offset] = calc_out(minp, *data)
 
+    border_data = data  # used for parallel case with center=True
+
     for i in range(N, N + offset):
         if i > win - 1:
             prev_x = in_arr[i - win]
@@ -256,7 +258,7 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
 
         output[i - offset] = calc_out(minp, *data)
 
-    return output, data
+    return output, border_data
 
 @numba.njit
 def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):  # pragma: no cover
