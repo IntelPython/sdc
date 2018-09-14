@@ -12,7 +12,8 @@ from numba.ir_utils import guard, find_const
 from hpat.distributed_api import Reduce_Type
 from hpat.pd_timestamp_ext import integer_to_dt64
 
-supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'apply')
+supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',
+                           'min', 'max', 'apply')
 
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):
@@ -117,6 +118,19 @@ def lower_rolling_fixed(context, builder, sig, args):
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_std)
     elif func_name == 'count':
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_count, add_count, remove_count, calc_count)
+    elif func_name in ['median', 'min', 'max']:
+        # just using 'apply' since we don't have streaming/linear support
+        # TODO: implement linear support similar to others
+        func_text = "def kernel_func(A):\n"
+        func_text += "  if np.isnan(A).sum() != 0: return np.nan\n"
+        func_text += "  return np.{}(A)\n".format(func_name)
+        loc_vars = {}
+        exec(func_text, {'np': np}, loc_vars)
+        kernel_func = numba.njit(loc_vars['kernel_func'])
+        def func(a,w,c,p):
+            return roll_fixed_apply(a,w,c,p, kernel_func)
+    else:
+        raise ValueError("invalid rolling (fixed) function {}".format(func_name))
 
     res = context.compile_internal(
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
@@ -144,6 +158,19 @@ def lower_rolling_variable(context, builder, sig, args):
         func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_std)
     elif func_name == 'count':
         func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_count, add_count, remove_count, calc_count_var)
+    elif func_name in ['median', 'min', 'max']:
+        # TODO: linear support
+        func_text = "def kernel_func(A):\n"
+        func_text += "  arr  = dropna(A)\n"
+        func_text += "  if len(arr) == 0: return np.nan\n"
+        func_text += "  return np.{}(arr)\n".format(func_name)
+        loc_vars = {}
+        exec(func_text, {'np': np, 'dropna': _dropna}, loc_vars)
+        kernel_func = numba.njit(loc_vars['kernel_func'])
+        def func(a,o,w,c,p,):
+            return roll_variable_apply(a,o,w,c,p, kernel_func)
+    else:
+        raise ValueError("invalid rolling (variable) function {}".format(func_name))
 
     res = context.compile_internal(
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
@@ -1031,3 +1058,17 @@ def _handle_small_data_variable_apply(in_arr, on_arr, win, rank, n_pes,
     start = hpat.distributed_api.get_start(all_N, n_pes, rank)
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
+
+@numba.njit
+def _dropna(arr):  # pragma: no cover
+    old_len = len(arr)
+    new_len = old_len - np.isnan(arr).sum()
+    A = np.empty(new_len, arr.dtype)
+    curr_ind = 0
+    for i in range(old_len):
+        val = arr[i]
+        if not np.isnan(val):
+            A[curr_ind] = val
+            curr_ind += 1
+
+    return A
