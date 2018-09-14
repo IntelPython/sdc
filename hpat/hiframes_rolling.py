@@ -12,7 +12,7 @@ from numba.ir_utils import guard, find_const
 from hpat.distributed_api import Reduce_Type
 from hpat.pd_timestamp_ext import integer_to_dt64
 
-supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'apply')
+supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'apply')
 
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):
@@ -115,6 +115,8 @@ def lower_rolling_fixed(context, builder, sig, args):
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_var)
     elif func_name == 'std':
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_std)
+    elif func_name == 'count':
+        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_count, add_count, remove_count, calc_count)
 
     res = context.compile_internal(
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
@@ -140,6 +142,8 @@ def lower_rolling_variable(context, builder, sig, args):
         func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_var)
     elif func_name == 'std':
         func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_std)
+    elif func_name == 'count':
+        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_count, add_count, remove_count, calc_count_var)
 
     res = context.compile_internal(
         builder, func, signature(sig.return_type, *sig.args[:-1]), args[:-1])
@@ -233,7 +237,7 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
     for i in range(0, range_endpoint):
         data = add_obs(in_arr[i], *data)
         if i >= offset:
-            output[i - offset] = np.nan
+            output[i - offset] = calc_out(minp, *data)
 
     for i in range(range_endpoint, N):
         val = in_arr[i]
@@ -245,8 +249,12 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
 
         output[i - offset] = calc_out(minp, *data)
 
-    for j in range(N - offset, N):
-        output[j] = np.nan
+    for i in range(N, N + offset):
+        if i > win - 1:
+            prev_x = in_arr[i - win]
+            data = remove_obs(prev_x, *data)
+
+        output[i - offset] = calc_out(minp, *data)
 
     return output, data
 
@@ -698,6 +706,35 @@ def calc_var(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
 def calc_std(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
     v = calc_var(minp, nobs, mean_x, ssqdm_x)
     return np.sqrt(v)
+
+# -------------------
+# count
+
+@numba.njit
+def init_data_count():  # pragma: no cover
+    return (0.0,)
+
+@numba.njit
+def add_count(val, count_x):  # pragma: no cover
+    if not np.isnan(val):
+        count_x += 1.0
+    return (count_x,)
+
+@numba.njit
+def remove_count(val, count_x):  # pragma: no cover
+    if not np.isnan(val):
+        count_x -= 1.0
+    return (count_x,)
+
+# XXX: pandas uses minp=0 for fixed window count but minp=1 for variable window
+
+@numba.njit
+def calc_count(minp, count_x):  # pragma: no cover
+    return count_x
+
+@numba.njit
+def calc_count_var(minp, count_x):  # pragma: no cover
+    return count_x if count_x >= minp else np.nan
 
 
 # shift -------------
