@@ -180,6 +180,24 @@ class TestRolling(unittest.TestCase):
             df = pd.DataFrame({'B': np.arange(n), 'time': time})
             pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_variable_parallel1(self):
+        wins = ('1s', '2s', '3s', '4s')
+        # XXX: Pandas returns time = [np.nan] for size==1 for some reason
+        sizes = (2, 10, 11, 121, 1000)
+        # all functions except apply
+        for w, n, func_name in itertools.product(wins, sizes, supported_rolling_funcs[:-1]):
+            func_text = "def test_impl(n):\n"
+            func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
+            func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
+            func_text += "  res = df.rolling('{}', on='time').{}()\n".format(w, func_name)
+            func_text += "  return res.B.sum()\n"
+            loc_vars = {}
+            exec(func_text, {'pd': pd, 'np': np}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
 
 if __name__ == "__main__":
     unittest.main()
