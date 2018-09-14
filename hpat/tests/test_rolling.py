@@ -130,15 +130,16 @@ class TestRolling(unittest.TestCase):
         wins = ('1s', '2s', '3s', '4s')
         sizes = (1, 2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, n, func_name in itertools.product(wins, sizes, supported_rolling_funcs[:-1]):
+        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
             func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').{}()\n".format(w, func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
             hpat_func = hpat.jit(test_impl)
-            time = pd.date_range(start='1/1/2018', periods=n, freq='s')
-            df = pd.DataFrame({'B': np.arange(n), 'time': time})
-            pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+            for n in sizes:
+                time = pd.date_range(start='1/1/2018', periods=n, freq='s')
+                df = pd.DataFrame({'B': np.arange(n), 'time': time})
+                pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_variable_apply1(self):
         # test sequentially with manually created dfs
@@ -170,22 +171,23 @@ class TestRolling(unittest.TestCase):
         wins = ('1s', '2s', '3s', '4s')
         sizes = (1, 2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, n in itertools.product(wins, sizes):
+        for w in wins:
             func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
             hpat_func = hpat.jit(test_impl)
-            time = pd.date_range(start='1/1/2018', periods=n, freq='s')
-            df = pd.DataFrame({'B': np.arange(n), 'time': time})
-            pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+            for n in sizes:
+                time = pd.date_range(start='1/1/2018', periods=n, freq='s')
+                df = pd.DataFrame({'B': np.arange(n), 'time': time})
+                pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_variable_parallel1(self):
         wins = ('1s', '2s', '3s', '4s')
         # XXX: Pandas returns time = [np.nan] for size==1 for some reason
         sizes = (2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, n, func_name in itertools.product(wins, sizes, supported_rolling_funcs[:-1]):
+        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
             func_text = "def test_impl(n):\n"
             func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
             func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
@@ -195,7 +197,8 @@ class TestRolling(unittest.TestCase):
             exec(func_text, {'pd': pd, 'np': np}, loc_vars)
             test_impl = loc_vars['test_impl']
             hpat_func = hpat.jit(test_impl)
-            np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+            for n in sizes:
+                np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
@@ -204,7 +207,7 @@ class TestRolling(unittest.TestCase):
         # XXX: Pandas returns time = [np.nan] for size==1 for some reason
         sizes = (2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, n in itertools.product(wins, sizes):
+        for w in wins:
             func_text = "def test_impl(n):\n"
             func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
             func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
@@ -214,7 +217,8 @@ class TestRolling(unittest.TestCase):
             exec(func_text, {'pd': pd, 'np': np}, loc_vars)
             test_impl = loc_vars['test_impl']
             hpat_func = hpat.jit(test_impl)
-            np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+            for n in sizes:
+                np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
