@@ -443,9 +443,8 @@ class CmpOpLEStringArray(CmpOpEqStringArray):
 class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
 
-from hpat.pd_series_ext import string_series_type
-
 def is_str_arr_typ(typ):
+    from hpat.pd_series_ext import string_series_type
     return typ == string_array_type or typ == string_series_type
 
 # @infer_global(len)

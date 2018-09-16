@@ -15,6 +15,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.hiframes_rolling import supported_rolling_funcs
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -606,18 +607,10 @@ def install_rolling_method(name, generic, support_literals=False):
     setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
 
 def rolling_generic(self, args, kws):
-    assert not args
-    assert not kws
-    # type function using Array typer
-    resolver = "resolve_" + self.key[len("rolling."):]
-    bound_func = getattr(ArrayAttribute, resolver)(None, self.this)
-    out_dtype = bound_func.get_call_type(None, args, kws).return_type
-    # output type is float64 due to NaNs
-    if isinstance(out_dtype, types.Integer):
-        out_dtype = types.float64
-    return signature(SeriesType(out_dtype, 1, 'C'), *args)
+    # output is always float64
+    return signature(SeriesType(types.float64, 1, 'C'), *args)
 
-for fname in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
 
 
