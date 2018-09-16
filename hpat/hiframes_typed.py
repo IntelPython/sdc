@@ -708,16 +708,10 @@ class HiFramesTyped(object):
         else:
             func_global = func_name
         def f(arr, w, center):  # pragma: no cover
-            df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func)
+            return hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func)
         args = [series_var, window, center]
-        f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': func_global},
-                        self.typingctx,
-                        tuple(self.typemap[v.name] for v in args),
-                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, args)
-        nodes += f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(
+            f, args, pre_nodes=nodes, extra_globals={'_func': func_global})
 
     def _handle_rolling_apply_func(self, func_node, dtype):
         if func_node is None:
@@ -1015,8 +1009,10 @@ class HiFramesTyped(object):
         raise ValueError("constant tuple expected")
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,
-                      pre_nodes=None):
+                      pre_nodes=None, extra_globals=None):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        if extra_globals is not None:
+            glbls.update(extra_globals)
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
             arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
