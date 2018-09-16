@@ -583,12 +583,8 @@ class SeriesRollingAttribute(AttributeTemplate):
 
     @bound_function("rolling.apply", True)
     def resolve_apply(self, ary, args, kws):
-        code = args[0].value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (types.Array(ary.dtype, 1, 'C'),), None)
-
-        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+        # result is always float64 (see Pandas window.pyx:roll_generic)
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
 
     @bound_function("rolling.cov", True)
     def resolve_cov(self, ary, args, kws):
