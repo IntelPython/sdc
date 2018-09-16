@@ -621,6 +621,13 @@ class HiFramesTyped(object):
         return f_ir.blocks
 
     def _run_call_rolling(self, assign, lhs, rhs, func_name):
+        if func_name == 'rolling_corr':
+            def rolling_corr_impl(arr, other, win, center):
+                cov = hpat.hiframes_rolling.rolling_cov(arr, other, win, center)
+                a_std = hpat.hiframes_rolling.rolling_fixed(arr, win, center, False, 'std')
+                b_std = hpat.hiframes_rolling.rolling_fixed(other, win, center, False, 'std')
+                return cov / (a_std * b_std)
+            return self._replace_func(rolling_corr_impl, rhs.args)
         if func_name == 'rolling_cov':
             def rolling_cov_impl(arr, other, w, center):  # pragma: no cover
                 ddof = 1
@@ -692,13 +699,16 @@ class HiFramesTyped(object):
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
 
-        if func_name == 'cov':
+        if func_name in ('cov', 'corr'):
             # TODO: variable window
             if len(rhs.args) == 1:
                 other = rhs.args[0]
             else:
                 other = series_var
-            f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_cov(a,b,w,c)
+            if func_name == 'cov':
+                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_cov(a,b,w,c)
+            if func_name == 'corr':
+                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_corr(a,b,w,c)
             return self._replace_func(f, [series_var, other, window, center],
                                       pre_nodes=nodes)
         elif func_name == 'apply':

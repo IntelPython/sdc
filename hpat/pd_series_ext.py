@@ -594,6 +594,10 @@ class SeriesRollingAttribute(AttributeTemplate):
     def resolve_cov(self, ary, args, kws):
         return signature(SeriesType(types.float64, 1, 'C'), *args)
 
+    @bound_function("rolling.corr", True)
+    def resolve_corr(self, ary, args, kws):
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
+
 # similar to install_array_method in arraydecl.py
 def install_rolling_method(name, generic, support_literals=False):
     my_attr = {"key": "rolling." + name, "generic": generic}
