@@ -590,6 +590,9 @@ class SeriesRollingAttribute(AttributeTemplate):
 
         return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
+    @bound_function("rolling.cov", True)
+    def resolve_cov(self, ary, args, kws):
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
 
 # similar to install_array_method in arraydecl.py
 def install_rolling_method(name, generic, support_literals=False):

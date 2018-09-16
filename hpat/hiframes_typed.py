@@ -25,7 +25,8 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 
-ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
+ReplaceFunc = namedtuple("ReplaceFunc",
+    ["func", "arg_types", "args", "glbls", "pre_nodes"])
 
 LARGE_WIN_SIZE = 10
 
@@ -56,6 +57,8 @@ class HiFramesTyped(object):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, ReplaceFunc):
                         rp_func = out_nodes
+                        if rp_func.pre_nodes is not None:
+                            new_body.extend(rp_func.pre_nodes)
                         # replace inst.value to a call with target args
                         # as expected by inline_closure_call
                         inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
@@ -618,6 +621,20 @@ class HiFramesTyped(object):
         return f_ir.blocks
 
     def _run_call_rolling(self, assign, lhs, rhs, func_name):
+        if func_name == 'rolling_cov':
+            def rolling_cov_impl(arr, other, w, center):  # pragma: no cover
+                ddof = 1
+                X = arr.astype(np.float64)
+                Y = other.astype(np.float64)
+                XpY = X + Y
+                XtY = X * Y
+                count = hpat.hiframes_rolling.rolling_fixed(XpY, w, center, False, 'count')
+                mean_XtY = hpat.hiframes_rolling.rolling_fixed(XtY, w, center, False, 'mean')
+                mean_X = hpat.hiframes_rolling.rolling_fixed(X, w, center, False, 'mean')
+                mean_Y = hpat.hiframes_rolling.rolling_fixed(Y, w, center, False, 'mean')
+                bias_adj = count / (count - ddof)
+                return (mean_XtY - mean_X * mean_Y) * bias_adj
+            return self._replace_func(rolling_cov_impl, rhs.args)
         # replace apply function with dispatcher obj, now the type is known
         if (func_name == 'rolling_fixed'
                 and self.typemap[rhs.args[4].name] == types.pyfunc_type):
@@ -675,7 +692,16 @@ class HiFramesTyped(object):
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
 
-        if func_name == 'apply':
+        if func_name == 'cov':
+            # TODO: variable window
+            if len(rhs.args) == 1:
+                other = rhs.args[0]
+            else:
+                other = series_var
+            f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_cov(a,b,w,c)
+            return self._replace_func(f, [series_var, other, window, center],
+                                      pre_nodes=nodes)
+        elif func_name == 'apply':
             func_node = guard(get_definition, self.func_ir, rhs.args[0])
             dtype = self.typemap[series_var.name].dtype
             func_global = self._handle_rolling_apply_func(func_node, dtype)
@@ -988,7 +1014,8 @@ class HiFramesTyped(object):
                 return tup_def.items
         raise ValueError("constant tuple expected")
 
-    def _replace_func(self, func, args, const=False, array_typ_convert=True):
+    def _replace_func(self, func, args, const=False, array_typ_convert=True,
+                      pre_nodes=None):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
@@ -1002,7 +1029,7 @@ class HiFramesTyped(object):
                 else:
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
-        return ReplaceFunc(func, arg_typs, args, glbls)
+        return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]

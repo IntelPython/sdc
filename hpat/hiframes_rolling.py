@@ -63,6 +63,8 @@ def rolling_fixed_parallel(arr, win):  # pragma: no cover
 def rolling_variable(arr, on_arr, win):  # pragma: no cover
     return arr
 
+def rolling_cov(arr, arr2, win):  # pragma: no cover
+    return arr
 
 @infer_global(rolling_fixed)
 @infer_global(rolling_fixed_parallel)
@@ -102,6 +104,13 @@ class RollingVarType(AbstractTemplate):
                          types.bool_, types.bool_, f_type)
 
 RollingVarType.support_literals = True
+
+
+@infer_global(rolling_cov)
+class RollingCovType(AbstractTemplate):
+    def generic(self, args, kws):
+        arr = args[0]  # array or series
+        return signature(arr.copy(dtype=types.float64), *args)
 
 
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
