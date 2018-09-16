@@ -13,7 +13,7 @@ class TestRolling(unittest.TestCase):
     def test_fixed1(self):
         # test sequentially with manually created dfs
         # all functions except apply
-        for func_name in supported_rolling_funcs[:-1]:
+        for func_name in supported_rolling_funcs[:-3]:
             func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
@@ -30,7 +30,7 @@ class TestRolling(unittest.TestCase):
     def test_fixed2(self):
         # test sequentially with generated dfs
         # all functions except apply
-        for func_name in supported_rolling_funcs[:-1]:
+        for func_name in supported_rolling_funcs[:-3]:
             func_text = "def test_impl(df, w, c):\n  return df.rolling(w, center=c).{}()\n".format(func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
@@ -116,7 +116,7 @@ class TestRolling(unittest.TestCase):
                         pd.Timestamp('20130101 09:00:09')]})
         wins = ('1s', '2s', '3s', '4s')
         # all functions except apply
-        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
+        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-3]):
             func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').{}()\n".format(w, func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
@@ -133,7 +133,7 @@ class TestRolling(unittest.TestCase):
         wins = ('1s', '2s', '3s', '4s')
         sizes = (1, 2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
+        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-3]):
             func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').{}()\n".format(w, func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
@@ -190,7 +190,7 @@ class TestRolling(unittest.TestCase):
         # XXX: Pandas returns time = [np.nan] for size==1 for some reason
         sizes = (2, 10, 11, 121, 1000)
         # all functions except apply
-        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-1]):
+        for w, func_name in itertools.product(wins, supported_rolling_funcs[:-3]):
             func_text = "def test_impl(n):\n"
             func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
             func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
@@ -232,7 +232,7 @@ class TestRolling(unittest.TestCase):
         S2 = pd.Series([0, 1, 2, -2, 4])
         wins = (2, 3, 5)
         centers = (False, True)
-        for func_name in supported_rolling_funcs[:-1]:
+        for func_name in supported_rolling_funcs[:-3]:
             func_text = "def test_impl(S, w, c):\n  return S.rolling(w, center=c).{}()\n".format(func_name)
             loc_vars = {}
             exec(func_text, {}, loc_vars)

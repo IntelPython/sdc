@@ -13,7 +13,7 @@ from hpat.distributed_api import Reduce_Type
 from hpat.pd_timestamp_ext import integer_to_dt64
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',
-                           'min', 'max', 'apply')
+                           'min', 'max', 'cov', 'corr', 'apply')
 
 
 def get_rolling_setup_args(func_ir, rhs, get_consts=True):

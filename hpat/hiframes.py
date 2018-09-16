@@ -1147,8 +1147,26 @@ class HiFrames(object):
 
     def _gen_rolling_call(self, in_col_var, out_col_var, window, center, args, func_name, on_arr):
         nodes = []
+        if func_name in ('cov', 'corr'):
+            other = args[0]
+            if on_arr is not None:
+                if func_name == 'cov':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, on_arr, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, on_arr, w, center)
+                args = [in_col_var, other, on_arr, window, center]
+            else:
+                if func_name == 'cov':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, w, center)
+                args = [in_col_var, other, window, center]
         # variable window case
-        if on_arr is not None:
+        elif on_arr is not None:
             if func_name == 'apply':
                 def f(arr, on_arr, w, center, func):  # pragma: no cover
                     df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, func)
