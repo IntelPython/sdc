@@ -225,5 +225,29 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_series_fixed1(self):
+        # test series rolling functions
+        # all functions except apply
+        S1 = pd.Series([0, 1, 2, np.nan, 4])
+        S2 = pd.Series([0, 1, 2, -2, 4])
+        wins = (2, 3, 5)
+        centers = (False, True)
+        for func_name in supported_rolling_funcs[:-1]:
+            func_text = "def test_impl(S, w, c):\n  return S.rolling(w, center=c).{}()\n".format(func_name)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            for args in itertools.product(wins, centers):
+                pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
+                pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
+        # test apply
+        def test_impl(S, w, c):
+            return S.rolling(w, center=c).apply(lambda a: a.sum())
+        hpat_func = hpat.jit(test_impl)
+        for args in itertools.product(wins, centers):
+            pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
+            pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
+
 if __name__ == "__main__":
     unittest.main()
