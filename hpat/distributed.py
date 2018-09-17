@@ -466,12 +466,7 @@ class DistributedPass(object):
             def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
                 return hpat.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
 
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (hpat.xenon_ext.xe_connect_type, hpat.xenon_ext.xe_dset_type, types.intp,
-                                           self.typemap[arr], self.typemap[rhs.args[4].name], types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-2]
+            return self._replace_func(f, rhs.args)
 
         if hpat.config._has_xenon and (fdef == ('read_xenon_str', 'numba.extending')
                 and self._is_1D_arr(lhs)):
@@ -512,13 +507,7 @@ class DistributedPass(object):
                 return hpat.ros.read_ros_images_inner_parallel(arr, bag,
                                                                start, count)
 
-            #import hpat.ros
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr], hpat.ros.bag_file_type,
-                                           types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-2]
+            return self._replace_func(f, rhs.args)
 
         if (func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
@@ -589,15 +578,9 @@ class DistributedPass(object):
             rhs.args += [size_var]
 
             def f(arr, q, size):  # pragma: no cover
-                s = hpat.hiframes_api.quantile_parallel(arr, q, size)
+                return hpat.hiframes_api.quantile_parallel(arr, q, size)
 
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr],
-                                           types.float64, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('nunique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
