@@ -1125,6 +1125,16 @@ class HiFrames(object):
             out_colnames = list(self.df_vars[df_var.name].keys())
             # TODO: remove index col for offset case
 
+        if func_name in ('cov', 'corr'):
+            if len(rhs.args) != 1:
+                raise ValueError("rolling {} requires one argument (other)".format(func_name))
+            # XXX pandas only accepts variable window cov/corr
+            # when both inputs have time index
+            if on_arr is not None:
+                raise ValueError("variable window rolling {} not supported yet.".format(func_name))
+            # TODO: support variable window rolling cov/corr which is only
+            # possible in pandas with time index
+
         # output column map, create dataframe if multiple outputs
         if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
