@@ -1468,16 +1468,13 @@ class HiFrames(object):
     def _gen_replace_dist_return(self, var, flag):
         if flag == 'distributed':
             def f(_dist_arr):  # pragma: no cover
-                _d_arr = hpat.distributed_api.dist_return(_dist_arr)
+                return hpat.distributed_api.dist_return(_dist_arr)
         elif flag == 'threaded':
             def f(_threaded_arr):  # pragma: no cover
-                _th_arr = hpat.distributed_api.threaded_return(_threaded_arr)
+                return hpat.distributed_api.threaded_return(_threaded_arr)
         else:
             raise ValueError("Invalid return flag {}".format(flag))
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [var])
-        return f_block.body[:-3]  # remove none return
+        return self._replace_func(f, [var])
 
     def _run_df_set_column(self, inst, label, cfg):
         """handle setitem: df['col_name'] = arr
