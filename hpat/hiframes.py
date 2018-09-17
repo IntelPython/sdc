@@ -1177,7 +1177,9 @@ class HiFrames(object):
             nodes += f_block.body[:-3]  # remove none return
             out_df[cname] = nodes[-1].target
         if out_df is not None:
-            self._create_df(lhs.name, out_df, label)
+            # Pandas sorts the output column names _flex_binary_moment
+            # line: res_columns = arg1.columns.union(arg2.columns)
+            self._create_df(lhs.name, dict(sorted(out_df.items())), label)
 
         return nodes
 
