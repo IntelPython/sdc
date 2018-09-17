@@ -13,7 +13,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
                             find_callname, build_definitions,
-                            find_build_sequence)
+                            find_build_sequence, find_const)
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                           wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -32,7 +32,7 @@ from hpat.distributed_analysis import (Distribution,
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints)
+                        debug_prints, ReplaceFunc)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -118,114 +118,122 @@ class DistributedPass(object):
         for label in topo_order:
             new_body = []
             for inst in blocks[label].body:
+                out_nodes = None
                 if type(inst) in distributed_run_extensions:
                     f = distributed_run_extensions[type(inst)]
-                    new_body += f(inst, self._dist_analysis.array_dists,
+                    out_nodes = f(inst, self._dist_analysis.array_dists,
                                   self.typemap, self.calltypes, self.typingctx, self.targetctx)
-                    continue
-                if isinstance(inst, Parfor):
-                    new_body += self._run_parfor(inst, namevar_table)
+                elif isinstance(inst, Parfor):
+                    out_nodes = self._run_parfor(inst, namevar_table)
                     # run dist pass recursively
                     p_blocks = wrap_parfor_blocks(inst)
                     # build_definitions(p_blocks, self.func_ir._definitions)
                     self._run_dist_pass(p_blocks)
                     unwrap_parfor_blocks(inst)
-                    continue
-                if isinstance(inst, ir.Assign):
+                elif isinstance(inst, ir.Assign):
                     lhs = inst.target.name
                     rhs = inst.value
                     if isinstance(rhs, ir.Expr):
-                        if rhs.op == 'call':
-                            new_body += self._run_call(inst)
-                            continue
-                        # we save array start/count for data pointer to enable
-                        # file read
-                        if (rhs.op == 'getattr' and rhs.attr == 'ctypes'
-                                and (self._is_1D_arr(rhs.value.name))):
-                            arr_name = rhs.value.name
-                            self._array_starts[lhs] = self._array_starts[arr_name]
-                            self._array_counts[lhs] = self._array_counts[arr_name]
-                            self._array_sizes[lhs] = self._array_sizes[arr_name]
-                        if (rhs.op == 'getattr'
-                                and (self._is_1D_arr(rhs.value.name)
-                                     or self._is_1D_Var_arr(rhs.value.name))
-                                and rhs.attr == 'size'):
-                            new_body += self._run_array_size(
-                                inst.target, rhs.value)
-                            continue
-                        if (rhs.op == 'static_getitem'
-                                and rhs.value.name in self._shape_attrs):
-                            arr = self._shape_attrs[rhs.value.name]
-                            ndims = self.typemap[arr].ndim
-                            if arr not in self._T_arrs and rhs.index == 0:
-                                # return parallel size
-                                if self._is_1D_arr(arr):
-                                    inst.value = self._array_sizes[arr][rhs.index]
-                                else:
-                                    assert self._is_1D_Var_arr(arr)
-                                    arr_var = namevar_table[arr]
-                                    new_body += self._gen_1D_Var_len(arr_var)
-                                    new_body[-1].target = inst.target
-                                    # save output of converted 1DVar array len() variables
-                                    # which are global sizes, in order to recover local
-                                    # size for 1DVar allocs and parfors
-                                    self.oneDVar_len_vars[inst.target.name] = arr_var
-                                    continue
-                            # last dimension of transposed arrays is partitioned
-                            if arr in self._T_arrs and rhs.index == ndims - 1:
-                                assert not self._is_1D_Var_arr(
-                                    arr), "1D_Var arrays cannot transpose"
-                                inst.value = self._array_sizes[arr][rhs.index]
-                        if rhs.op in ['getitem', 'static_getitem']:
-                            if rhs.op == 'getitem':
-                                index = rhs.index
-                            else:
-                                index = rhs.index_var
-                            new_body += self._run_getsetitem(rhs.value,
-                                                             index, rhs, inst)
-                            continue
-                        if (rhs.op == 'getattr'
-                                and (self._is_1D_arr(rhs.value.name)
-                                     or self._is_1D_Var_arr(rhs.value.name))
-                                and rhs.attr == 'shape'):
-                            # XXX: return a new tuple using sizes here?
-                            self._shape_attrs[lhs] = rhs.value.name
-                        if (rhs.op == 'getattr'
-                                and self._is_1D_arr(rhs.value.name)
-                                and rhs.attr == 'T'):
-                            assert lhs in self._T_arrs
-                            orig_arr = rhs.value.name
-                            self._array_starts[lhs] = copy.copy(
-                                self._array_starts[orig_arr]).reverse()
-                            self._array_counts[lhs] = copy.copy(
-                                self._array_counts[orig_arr]).reverse()
-                            self._array_sizes[lhs] = copy.copy(
-                                self._array_sizes[orig_arr]).reverse()
-                        if (rhs.op == 'exhaust_iter'
-                                and rhs.value.name in self._shape_attrs):
-                            self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
-                        if rhs.op == 'inplace_binop' and self._is_1D_arr(rhs.lhs.name):
-                            self._array_starts[lhs] = self._array_starts[rhs.lhs.name]
-                            self._array_counts[lhs] = self._array_counts[rhs.lhs.name]
-                            self._array_sizes[lhs] = self._array_sizes[rhs.lhs.name]
-                    if isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
+                        out_nodes = self._run_expr(inst, namevar_table)
+                    elif isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
-                if isinstance(inst, (ir.StaticSetItem, ir.SetItem)):
+                elif isinstance(inst, (ir.StaticSetItem, ir.SetItem)):
                     if isinstance(inst, ir.SetItem):
                         index = inst.index
                     else:
                         index = inst.index_var
-                    new_body += self._run_getsetitem(inst.target,
+                    out_nodes = self._run_getsetitem(inst.target,
                                                      index, inst, inst)
-                    continue
-                if isinstance(inst, ir.Return):
-                    new_body += self._gen_barrier()
-                new_body.append(inst)
+                elif isinstance(inst, ir.Return):
+                    out_nodes = self._gen_barrier() + [inst]
+
+                if out_nodes is None:
+                    new_body.append(inst)
+                elif isinstance(out_nodes, list):
+                    new_body += out_nodes
+                else:
+                    assert False, "invalid dist pass out nodes"
+
             blocks[label].body = new_body
 
         return blocks
+
+    def _run_expr(self, inst, namevar_table):
+        lhs = inst.target.name
+        rhs = inst.value
+        nodes = [inst]
+        if rhs.op == 'call':
+            return self._run_call(inst)
+        # we save array start/count for data pointer to enable
+        # file read
+        if (rhs.op == 'getattr' and rhs.attr == 'ctypes'
+                and (self._is_1D_arr(rhs.value.name))):
+            arr_name = rhs.value.name
+            self._array_starts[lhs] = self._array_starts[arr_name]
+            self._array_counts[lhs] = self._array_counts[arr_name]
+            self._array_sizes[lhs] = self._array_sizes[arr_name]
+        if (rhs.op == 'getattr'
+                and (self._is_1D_arr(rhs.value.name)
+                        or self._is_1D_Var_arr(rhs.value.name))
+                and rhs.attr == 'size'):
+            return self._run_array_size(inst.target, rhs.value)
+        if (rhs.op == 'static_getitem'
+                and rhs.value.name in self._shape_attrs):
+            arr = self._shape_attrs[rhs.value.name]
+            ndims = self.typemap[arr].ndim
+            if arr not in self._T_arrs and rhs.index == 0:
+                # return parallel size
+                if self._is_1D_arr(arr):
+                    inst.value = self._array_sizes[arr][rhs.index]
+                else:
+                    assert self._is_1D_Var_arr(arr)
+                    arr_var = namevar_table[arr]
+                    nodes = self._gen_1D_Var_len(arr_var)
+                    nodes[-1].target = inst.target
+                    # save output of converted 1DVar array len() variables
+                    # which are global sizes, in order to recover local
+                    # size for 1DVar allocs and parfors
+                    self.oneDVar_len_vars[inst.target.name] = arr_var
+                    return nodes
+            # last dimension of transposed arrays is partitioned
+            if arr in self._T_arrs and rhs.index == ndims - 1:
+                assert not self._is_1D_Var_arr(
+                    arr), "1D_Var arrays cannot transpose"
+                inst.value = self._array_sizes[arr][rhs.index]
+        if rhs.op in ['getitem', 'static_getitem']:
+            if rhs.op == 'getitem':
+                index = rhs.index
+            else:
+                index = rhs.index_var
+            return self._run_getsetitem(rhs.value, index, rhs, inst)
+        if (rhs.op == 'getattr'
+                and (self._is_1D_arr(rhs.value.name)
+                        or self._is_1D_Var_arr(rhs.value.name))
+                and rhs.attr == 'shape'):
+            # XXX: return a new tuple using sizes here?
+            self._shape_attrs[lhs] = rhs.value.name
+        if (rhs.op == 'getattr'
+                and self._is_1D_arr(rhs.value.name)
+                and rhs.attr == 'T'):
+            assert lhs in self._T_arrs
+            orig_arr = rhs.value.name
+            self._array_starts[lhs] = copy.copy(
+                self._array_starts[orig_arr]).reverse()
+            self._array_counts[lhs] = copy.copy(
+                self._array_counts[orig_arr]).reverse()
+            self._array_sizes[lhs] = copy.copy(
+                self._array_sizes[orig_arr]).reverse()
+        if (rhs.op == 'exhaust_iter'
+                and rhs.value.name in self._shape_attrs):
+            self._shape_attrs[lhs] = self._shape_attrs[rhs.value.name]
+        if rhs.op == 'inplace_binop' and self._is_1D_arr(rhs.lhs.name):
+            self._array_starts[lhs] = self._array_starts[rhs.lhs.name]
+            self._array_counts[lhs] = self._array_counts[rhs.lhs.name]
+            self._array_sizes[lhs] = self._array_sizes[rhs.lhs.name]
+
+        return nodes
 
     def _gen_1D_Var_len(self, arr):
         def f(A, op):  # pragma: no cover
@@ -1803,6 +1811,23 @@ class DistributedPass(object):
                 vals_list.append(stmt.target)
         out += nodes
         return vals_list
+
+    def _replace_func(self, func, args, const=False,
+                      pre_nodes=None, extra_globals=None):
+        glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        if extra_globals is not None:
+            glbls.update(extra_globals)
+        arg_typs = tuple(self.typemap[v.name] for v in args)
+        if const:
+            new_args = []
+            for i, arg in enumerate(args):
+                val = guard(find_const, self.func_ir, arg)
+                if val:
+                    new_args.append(types.Const(val))
+                else:
+                    new_args.append(arg_typs[i])
+            arg_typs = tuple(new_args)
+        return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def _get_arr_ndim(self, arrname):
         if self.typemap[arrname] == string_array_type:
