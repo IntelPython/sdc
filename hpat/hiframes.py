@@ -716,7 +716,7 @@ class HiFrames(object):
 
 
         col_header = "      ".join([c for c in col_names])
-        func_text += "  res = '        {}\\n' + \\\n".format(col_header)
+        func_text += "  return '        {}\\n' + \\\n".format(col_header)
         count_strs = "+ '   ' + ".join(["str({}_count)".format(c) for c in col_name_args])
         func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
         mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
@@ -738,13 +738,8 @@ class HiFrames(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         col_vars = self._get_df_col_vars(func_mod)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
 
     def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)
