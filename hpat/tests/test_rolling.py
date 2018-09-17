@@ -242,12 +242,52 @@ class TestRolling(unittest.TestCase):
                 pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
                 pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
         # test apply
-        def test_impl(S, w, c):
+        def apply_test_impl(S, w, c):
             return S.rolling(w, center=c).apply(lambda a: a.sum())
-        hpat_func = hpat.jit(test_impl)
+        hpat_func = hpat.jit(apply_test_impl)
         for args in itertools.product(wins, centers):
-            pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
-            pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
+            pd.testing.assert_series_equal(hpat_func(S1, *args), apply_test_impl(S1, *args))
+            pd.testing.assert_series_equal(hpat_func(S2, *args), apply_test_impl(S2, *args))
+
+    def test_series_cov1(self):
+        # test series rolling functions
+        # all functions except apply
+        S1 = pd.Series([0, 1, 2, np.nan, 4])
+        S2 = pd.Series([0, 1, 2, -2, 4])
+        wins = (2, 3, 5)
+        centers = (False, True)
+        def test_impl(S, S2, w, c):
+            return S.rolling(w, center=c).cov(S2)
+        hpat_func = hpat.jit(test_impl)
+        for args in itertools.product([S1, S2], [S1, S2], wins, centers):
+            pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
+            pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
+        def test_impl2(S, S2, w, c):
+            return S.rolling(w, center=c).corr(S2)
+        hpat_func = hpat.jit(test_impl2)
+        for args in itertools.product([S1, S2], [S1, S2], wins, centers):
+            pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
+            pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
+
+    def test_df_cov1(self):
+        # test series rolling functions
+        # all functions except apply
+        df1 = pd.DataFrame({'A': [0, 1, 2, np.nan, 4], 'B': np.ones(5)})
+        df2 = pd.DataFrame({'A': [0, 1, 2, -2, 4], 'C': np.ones(5)})
+        wins = (2, 3, 5)
+        centers = (False, True)
+        def test_impl(df, df2, w, c):
+            return df.rolling(w, center=c).cov(df2)
+        hpat_func = hpat.jit(test_impl)
+        for args in itertools.product([df1, df2], [df1, df2], wins, centers):
+            pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
+            pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
+        def test_impl2(df, df2, w, c):
+            return df.rolling(w, center=c).corr(df2)
+        hpat_func = hpat.jit(test_impl2)
+        for args in itertools.product([df1, df2], [df1, df2], wins, centers):
+            pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
+            pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
 
 if __name__ == "__main__":
     unittest.main()
