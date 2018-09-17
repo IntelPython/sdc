@@ -577,38 +577,19 @@ class DistributedPass(object):
                 size_var = self._set0_var
             rhs.args += [size_var]
 
-            def f(arr, q, size):  # pragma: no cover
-                return hpat.hiframes_api.quantile_parallel(arr, q, size)
-
+            f = lambda arr, q, size: hpat.hiframes_api.quantile_parallel(
+                                                                  arr, q, size)
             return self._replace_func(f, rhs.args)
 
         if fdef == ('nunique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr):  # pragma: no cover
-                s = hpat.hiframes_api.nunique_parallel(arr)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr],),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr: hpat.hiframes_api.nunique_parallel(arr)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('unique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr):  # pragma: no cover
-                s = hpat.hiframes_api.unique_parallel(arr)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr],),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr: hpat.hiframes_api.unique_parallel(arr)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
