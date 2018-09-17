@@ -541,12 +541,8 @@ class HiFrames(object):
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            concat_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, rhs.args)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+            return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
+        return self._replace_func(f, rhs.args)
 
     def _handle_ros(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
