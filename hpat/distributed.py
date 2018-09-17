@@ -14,6 +14,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             guard, get_definition, require, GuardException,
                             find_callname, build_definitions,
                             find_build_sequence, find_const)
+from numba.inline_closurecall import inline_closure_call
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
                           wrap_parfor_blocks, unwrap_parfor_blocks)
@@ -114,10 +115,12 @@ class DistributedPass(object):
     def _run_dist_pass(self, blocks):
         topo_order = find_topo_order(blocks)
         namevar_table = get_name_var_table(blocks)
-        #
-        for label in topo_order:
+        work_list = list((l, blocks[l]) for l in reversed(topo_order))
+        while work_list:
+            label, block = work_list.pop()
             new_body = []
-            for inst in blocks[label].body:
+            replaced = False
+            for i, inst in enumerate(block.body):
                 out_nodes = None
                 if type(inst) in distributed_run_extensions:
                     f = distributed_run_extensions[type(inst)]
@@ -153,10 +156,25 @@ class DistributedPass(object):
                     new_body.append(inst)
                 elif isinstance(out_nodes, list):
                     new_body += out_nodes
+                elif isinstance(out_nodes, ReplaceFunc):
+                    rp_func = out_nodes
+                    if rp_func.pre_nodes is not None:
+                        new_body.extend(rp_func.pre_nodes)
+                    # replace inst.value to a call with target args
+                    # as expected by inline_closure_call
+                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    block.body = new_body + block.body[i:]
+                    inline_closure_call(self.func_ir, rp_func.glbls,
+                        block, len(new_body), rp_func.func, self.typingctx,
+                        rp_func.arg_types,
+                        self.typemap, self.calltypes, work_list)
+                    replaced = True
+                    break
                 else:
                     assert False, "invalid dist pass out nodes"
 
-            blocks[label].body = new_body
+            if not replaced:
+                blocks[label].body = new_body
 
         return blocks
 
@@ -408,12 +426,7 @@ class DistributedPass(object):
                 return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
                                                               arr, out_dtype, start, count)
 
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[rhs.args[0].name], types.intp,
-                                           self.typemap[arr], types.int32, types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-2]
+            return self._replace_func(f, rhs.args)
 
         if (hpat.config._has_pyarrow
                 and fdef == ('read_parquet_str', 'hpat.parquet_pio')
