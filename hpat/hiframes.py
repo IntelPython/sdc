@@ -792,21 +792,15 @@ class HiFrames(object):
         name_consts = ', '.join(["'{}'".format(c) for c in col_names])
 
         func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  it = hpat.hiframes_api.get_itertuples({}, {})\n"\
+        func_text += "  return hpat.hiframes_api.get_itertuples({}, {})\n"\
                                             .format(name_consts, col_name_args)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-
         col_vars = self._get_df_col_vars(df_var)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
 
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference
