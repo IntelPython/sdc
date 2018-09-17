@@ -101,13 +101,15 @@ class HiFrames(object):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
-        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
-        topo_order = find_topo_order(self.func_ir.blocks)
+        blocks = self.func_ir.blocks
+        cfg = compute_cfg_from_blocks(blocks)
+        # TODO: is topo_order necessary?
+        topo_order = find_topo_order(blocks)
         for label in topo_order:
-            self._get_reverse_copies(self.func_ir.blocks[label].body)
+            self._get_reverse_copies(blocks[label].body)
             new_body = []
             self._working_body = new_body
-            old_body = self.func_ir.blocks[label].body
+            old_body = blocks[label].body
             for inst in old_body:
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
                 # df['col'] = arr
@@ -119,15 +121,14 @@ class HiFrames(object):
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
-                        old_label = label
                         label = include_new_blocks(
-                            self.func_ir.blocks, out_nodes, label, new_body)
+                            blocks, out_nodes, label, new_body)
                         # cfg needs to be updated since label is updated
                         # needed for set df column
                         # new block will have the same jump as old block
-                        self.func_ir.blocks[label].body.append(old_body[-1])
-                        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
-                        self.func_ir.blocks[label].body.pop()
+                        blocks[label].body.append(old_body[-1])
+                        cfg = compute_cfg_from_blocks(blocks)
+                        blocks[label].body.pop()
                         new_body = []
                         self._working_body = new_body
                 elif isinstance(inst, ir.Return):
@@ -135,14 +136,14 @@ class HiFrames(object):
                     new_body += nodes
                 else:
                     new_body.append(inst)
-            self.func_ir.blocks[label].body = new_body
+            blocks[label].body = new_body
 
-        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
-        while remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir):
+        while remove_dead(blocks, self.func_ir.arg_names, self.func_ir):
             pass
-        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
+        self.func_ir._definitions = build_definitions(blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
