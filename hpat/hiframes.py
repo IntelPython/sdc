@@ -1125,6 +1125,7 @@ class HiFrames(object):
             out_colnames = list(self.df_vars[df_var.name].keys())
             # TODO: remove index col for offset case
 
+        nan_cols = []
         if func_name in ('cov', 'corr'):
             if len(rhs.args) != 1:
                 raise ValueError("rolling {} requires one argument (other)".format(func_name))
@@ -1134,8 +1135,19 @@ class HiFrames(object):
                 raise ValueError("variable window rolling {} not supported yet.".format(func_name))
             # TODO: support variable window rolling cov/corr which is only
             # possible in pandas with time index
+            other = rhs.args[0]
+            if self._is_df_var(other):
+                # df on df cov/corr returns common columns only (without
+                # pairwise flag)
+                # TODO: support pairwise arg
+                col_set1 = set(out_colnames)
+                col_set2 = set(self._get_df_col_names(other))
+                out_colnames = list(col_set1 & col_set2)
+                # Pandas makes non-common columns NaNs
+                nan_cols = list(col_set1 ^ col_set2)
 
         # output column map, create dataframe if multiple outputs
+        out_df = None
         if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
         else:
@@ -1145,13 +1157,27 @@ class HiFrames(object):
                 df_col_map[on] = on_arr
             out_df = df_col_map.copy()
             # TODO: add datetime index for offset case
-            self._create_df(lhs.name, out_df, label)
 
+        args = rhs.args
         for cname, out_col_var in df_col_map.items():
             if cname == on:
                 continue
             in_col_var = self.df_vars[df_var.name][cname]
-            nodes += self._gen_rolling_call(in_col_var, out_col_var, window, center, rhs.args, func_name, on_arr)
+            if func_name in ('cov', 'corr'):
+                args[0] = self.df_vars[other.name][cname]
+            nodes += self._gen_rolling_call(in_col_var, out_col_var, window, center, args, func_name, on_arr)
+
+        # create NaN columns for cov/corr case
+        len_arr = self.df_vars[df_var.name][out_colnames[0]]
+        for cname in nan_cols:
+            def f(arr):
+                nan_arr = np.full(len(arr), np.nan)
+            f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [len_arr])
+            nodes += f_block.body[:-3]  # remove none return
+            out_df[cname] = nodes[-1].target
+        if out_df is not None:
+            self._create_df(lhs.name, out_df, label)
 
         return nodes
 
