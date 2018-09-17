@@ -383,14 +383,9 @@ class HiFrames(object):
                     "data argument in pd.Series() expected")
             data = rhs.args[0]
 
-        def f(arr):  # pragma: no cover
-            df_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.fix_df_array(arr))
-        f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [data])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
+                hpat.hiframes_api.fix_df_array(arr)),
+            [data])
 
     def _df_len(self, lhs, df_var):
         # run len on one of the columns
@@ -402,12 +397,8 @@ class HiFrames(object):
             return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
         arr = df_arrs[0]
         def f(df_arr):  # pragma: no cover
-            df_len = len(df_arr)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [arr])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+            return len(df_arr)
+        return self._replace_func(f, [arr])
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
@@ -550,12 +541,8 @@ class HiFrames(object):
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            concat_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, rhs.args)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+            return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
+        return self._replace_func(f, rhs.args)
 
     def _handle_ros(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
@@ -729,7 +716,7 @@ class HiFrames(object):
 
 
         col_header = "      ".join([c for c in col_names])
-        func_text += "  res = '        {}\\n' + \\\n".format(col_header)
+        func_text += "  return '        {}\\n' + \\\n".format(col_header)
         count_strs = "+ '   ' + ".join(["str({}_count)".format(c) for c in col_name_args])
         func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
         mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
@@ -751,13 +738,8 @@ class HiFrames(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         col_vars = self._get_df_col_vars(func_mod)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
 
     def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)
@@ -810,21 +792,15 @@ class HiFrames(object):
         name_consts = ', '.join(["'{}'".format(c) for c in col_names])
 
         func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  it = hpat.hiframes_api.get_itertuples({}, {})\n"\
+        func_text += "  return hpat.hiframes_api.get_itertuples({}, {})\n"\
                                             .format(name_consts, col_name_args)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-
         col_vars = self._get_df_col_vars(df_var)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
 
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference
