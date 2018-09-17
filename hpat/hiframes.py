@@ -21,7 +21,7 @@ from numba.analysis import compute_cfg_from_blocks
 import hpat
 from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
-from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, include_new_blocks
+from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, inline_new_blocks
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
 
@@ -102,41 +102,42 @@ class HiFrames(object):
         # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
         blocks = self.func_ir.blocks
-        cfg = compute_cfg_from_blocks(blocks)
-        # TODO: is topo_order necessary?
+        # topo_order necessary since df vars need to be found before use
         topo_order = find_topo_order(blocks)
-        for label in topo_order:
+        work_list = list((l, blocks[l]) for l in reversed(topo_order))
+        while work_list:
+            label, block = work_list.pop()
             self._get_reverse_copies(blocks[label].body)
             new_body = []
+            replaced = False
             self._working_body = new_body
-            old_body = blocks[label].body
-            for inst in old_body:
+            for i, inst in enumerate(block.body):
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
+                    # cfg needed for set df column
+                    cfg = compute_cfg_from_blocks(blocks)
                     new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, label)
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, dict):
-                        label = include_new_blocks(
-                            blocks, out_nodes, label, new_body)
-                        # cfg needs to be updated since label is updated
-                        # needed for set df column
-                        # new block will have the same jump as old block
-                        blocks[label].body.append(old_body[-1])
-                        cfg = compute_cfg_from_blocks(blocks)
-                        blocks[label].body.pop()
-                        new_body = []
-                        self._working_body = new_body
+                        block.body = new_body + block.body[i:]
+                        # TODO: insert new blocks in current spot of work_list
+                        # instead of append?
+                        # TODO: rename variables, fix scope/loc
+                        inline_new_blocks(self.func_ir, block, len(new_body), out_nodes, work_list)
+                        replaced = True
+                        break
                 elif isinstance(inst, ir.Return):
                     nodes = self._run_return(inst)
                     new_body += nodes
                 else:
                     new_body.append(inst)
-            blocks[label].body = new_body
+            if not replaced:
+                blocks[label].body = new_body
 
         self.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
@@ -658,7 +659,7 @@ class HiFrames(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "     row = Row({})\n".format(row_args)
         func_text += "     S[i] = map_func(row)\n"
-        func_text += "  ret = S\n"
+        func_text += "  return S\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -681,7 +682,6 @@ class HiFrames(object):
                         inline_closure_call(f_ir, _globals, block, i, func)
                         break
 
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
         df_col_map = self._get_df_cols(func_mod)
         col_vars = [df_col_map[c] for c in used_cols]
         replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
