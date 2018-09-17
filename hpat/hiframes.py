@@ -397,12 +397,8 @@ class HiFrames(object):
             return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
         arr = df_arrs[0]
         def f(df_arr):  # pragma: no cover
-            df_len = len(df_arr)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [arr])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+            return len(df_arr)
+        return self._replace_func(f, [arr])
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
