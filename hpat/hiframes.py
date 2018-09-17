@@ -383,14 +383,9 @@ class HiFrames(object):
                     "data argument in pd.Series() expected")
             data = rhs.args[0]
 
-        def f(arr):  # pragma: no cover
-            df_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.fix_df_array(arr))
-        f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [data])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
+                hpat.hiframes_api.fix_df_array(arr)),
+            [data])
 
     def _df_len(self, lhs, df_var):
         # run len on one of the columns
