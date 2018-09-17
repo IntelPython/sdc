@@ -1,3 +1,4 @@
+from collections import namedtuple
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
@@ -50,6 +51,9 @@ class NotConstant:
 
 
 NOT_CONSTANT = NotConstant()
+
+ReplaceFunc = namedtuple("ReplaceFunc",
+    ["func", "arg_types", "args", "glbls", "pre_nodes"])
 
 np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 

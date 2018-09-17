@@ -21,7 +21,8 @@ from numba.analysis import compute_cfg_from_blocks
 import hpat
 from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
-from hpat.utils import get_constant, NOT_CONSTANT, debug_prints, inline_new_blocks
+from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
+    inline_new_blocks, ReplaceFunc)
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
 
@@ -122,7 +123,20 @@ class HiFrames(object):
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, label)
                     if isinstance(out_nodes, list):
+                        # TODO: fix scope/loc
                         new_body.extend(out_nodes)
+                    if isinstance(out_nodes, ReplaceFunc):
+                        rp_func = out_nodes
+                        if rp_func.pre_nodes is not None:
+                            new_body.extend(rp_func.pre_nodes)
+                        # replace inst.value to a call with target args
+                        # as expected by inline_closure_call
+                        inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                        block.body = new_body + block.body[i:]
+                        inline_closure_call(self.func_ir, rp_func.glbls,
+                            block, len(new_body), rp_func.func, work_list=work_list)
+                        replaced = True
+                        break
                     if isinstance(out_nodes, dict):
                         block.body = new_body + block.body[i:]
                         # TODO: insert new blocks in current spot of work_list
@@ -1513,19 +1527,21 @@ class HiFrames(object):
         n_cols = len(col_vars)
         arg_names = ["C{}".format(i) for i in range(n_cols)]
         func_text = "def f({}):\n".format(", ".join(arg_names))
-        func_text += "    A = np.stack(({}), 1)\n".format(
+        func_text += "    return np.stack(({}), 1)\n".format(
             ",".join([s+".values" for s in arg_names]))
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(f,
-                    {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
+
+    def _replace_func(self, func, args, const=False, array_typ_convert=True,
+                      pre_nodes=None, extra_globals=None):
+        glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        if extra_globals is not None:
+            glbls.update(extra_globals)
+        return ReplaceFunc(func, None, args, glbls, pre_nodes)
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

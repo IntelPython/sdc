@@ -15,7 +15,7 @@ from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
 from hpat import hiframes_sort
-from hpat.utils import debug_prints, inline_new_blocks
+from hpat.utils import debug_prints, inline_new_blocks, ReplaceFunc
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
@@ -24,9 +24,6 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_str_methods_type, SeriesRollingType)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
-
-ReplaceFunc = namedtuple("ReplaceFunc",
-    ["func", "arg_types", "args", "glbls", "pre_nodes"])
 
 LARGE_WIN_SIZE = 10
 
