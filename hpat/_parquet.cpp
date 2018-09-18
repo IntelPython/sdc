@@ -5,6 +5,10 @@
 #include <cstring>
 #include <cmath>
 
+#if _MSC_VER >= 1900
+  #undef timezone
+#endif
+
 #include "parquet/arrow/reader.h"
 using parquet::arrow::FileReader;
 
