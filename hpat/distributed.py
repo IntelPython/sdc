@@ -791,16 +791,9 @@ class DistributedPass(object):
                 _count = self._array_counts[arr.name][0]
 
                 def f(fname, arr, start, count):  # pragma: no cover
-                    hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                              (self.typemap[_fname.name],
-                                              self.typemap[arr.name],
-                                               types.intp, types.intp),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [_fname, arr, _start, _count])
-                out = f_block.body[:-3]
-                out[-1].target = assign.target
+                return self._replace_func(f, [_fname, arr, _start, _count])
 
             if self._is_1D_Var_arr(arr.name):
                 _fname = args[0]
@@ -808,15 +801,9 @@ class DistributedPass(object):
                 def f(fname, arr):  # pragma: no cover
                     count = len(arr)
                     start = hpat.distributed_api.dist_exscan(count)
-                    hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                              (self.typemap[_fname.name],
-                                              self.typemap[arr.name]),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [_fname, arr])
-                out = f_block.body[:-3]
-                out[-1].target = assign.target
+                return self._replace_func(f, [_fname, arr])
 
         return out
 
