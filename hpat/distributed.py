@@ -1226,16 +1226,8 @@ class DistributedPass(object):
                     hpat.distributed_lower._set_if_in_range(
                         A, val, index, chunk_start, chunk_count)
 
-                f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                           (self.typemap[arr.name],
-                                            self.typemap[node.value.name],
-                                            types.intp, types.intp, types.intp),
-                                           self.typemap, self.calltypes)
-                _, block = f_ir.blocks.popitem()
-                replace_arg_nodes(
-                    block, [arr, node.value, index_var, start, count])
-                out = block.body[:-3]
-                return out
+                return self._replace_func(
+                    f, [arr, node.value, index_var, start, count])
 
             assert isinstance(self.typemap[index_var.name],
                               types.misc.SliceType), "slice index expected"
@@ -1247,18 +1239,11 @@ class DistributedPass(object):
                     start, stop, chunk_start, chunk_count)
                 A[loc_start:loc_stop] = val
 
-            f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                       (self.typemap[arr.name],
-                                        self.typemap[node.value.name],
-                                        types.intp, types.intp, types.intp, types.intp),
-                                       self.typemap, self.calltypes)
-            _, block = f_ir.blocks.popitem()
             slice_call = get_definition(self.func_ir, index_var)
             slice_start = slice_call.args[0]
             slice_stop = slice_call.args[1]
-            replace_arg_nodes(
-                block, [arr, node.value, slice_start, slice_stop, start, count])
-            out = block.body[:-3]
+            return self._replace_func(
+                f, [arr, node.value, slice_start, slice_stop, start, count])
             # print_node = ir.Print([start_var, end_var], None, loc)
             # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
             # out.append(print_node)
