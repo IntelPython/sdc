@@ -160,9 +160,19 @@ class DistributedPass(object):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
-                    # replace inst.value to a call with target args
-                    # as expected by inline_closure_call
-                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    # inline_closure_call expects a call assignment
+                    dummy_call = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    if isinstance(inst, ir.Assign):
+                        # replace inst.value to a call with target args
+                        # as expected by inline_closure_call
+                        inst.value = dummy_call
+                    else:
+                        # replace inst with dummy assignment
+                        # for cases like SetItem
+                        loc = block.loc
+                        dummy_var = ir.Var(
+                            block.scope, mk_unique_var("r_dummy"), loc)
+                        block.body[i] = ir.Assign(dummy_call, dummy_var, loc)
                     block.body = new_body + block.body[i:]
                     inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
