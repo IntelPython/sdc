@@ -593,31 +593,13 @@ class DistributedPass(object):
 
         if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr, k):  # pragma: no cover
-                s = hpat.hiframes_api.nlargest_parallel(arr, k)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr], self.typemap[rhs.args[1].name]),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr, k: hpat.hiframes_api.nlargest_parallel(arr, k)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('median', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr):  # pragma: no cover
-                s = hpat.hiframes_api.median(arr, True)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr],),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr: hpat.hiframes_api.median(arr, True)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
@@ -683,16 +665,8 @@ class DistributedPass(object):
             _count = self._array_counts[_data_ptr.name][0]
 
             def f(fname, data_ptr, start, count):  # pragma: no cover
-                s = hpat.io.file_read_parallel(fname, data_ptr, start, count)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[_fname.name],
-                                          self.typemap[_data_ptr.name],
-                                           types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [_fname, _data_ptr, _start, _count])
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+                return hpat.io.file_read_parallel(fname, data_ptr, start, count)
+            return self._replace_func(f, [_fname, _data_ptr, _start, _count])
 
         return out
 
