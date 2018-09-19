@@ -57,6 +57,7 @@ class Aggregate(ir.Stmt):
         self.key_arr = key_arr
 
         self.agg_func = agg_func
+        # XXX update tp_vars in copy propagate etc.?
         self.out_typer_vars = tp_vars
 
         self.loc = loc
@@ -82,13 +83,14 @@ class Aggregate(ir.Stmt):
 
 def aggregate_typeinfer(aggregate_node, typeinferer):
     for out_name, out_var in aggregate_node.df_out_vars.items():
-        # if aggregate_node.pivot_arr is not None:
-        #     typ = list(aggregate_node.out_typs.values())[0]
-        # else:
-        #     typ = aggregate_node.out_typs[out_name]
+        if aggregate_node.pivot_arr is not None:
+            tp_var = list(aggregate_node.out_typer_vars.values())[0]
+        else:
+            tp_var = aggregate_node.out_typer_vars[out_name]
 
-        typeinferer.constraints.append(typeinfer.Propagate(dst=out_var.name,
-                                                           src=aggregate_node.out_typer_vars[out_name].name, loc=aggregate_node.loc))
+        typeinferer.constraints.append(
+            typeinfer.Propagate(
+                dst=out_var.name, src=tp_var.name, loc=aggregate_node.loc))
 
     # return key case
     if aggregate_node.out_key_var is not None:
