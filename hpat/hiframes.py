@@ -62,6 +62,8 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
         return True
+    if call_list == ['agg_typer', 'hiframes_api', hpat]:
+        return True
     if call_list == [list]:
         return True
     if call_list == ['groupby']:
@@ -891,12 +893,14 @@ class HiFrames(object):
         in_vars = {values_arg: self.df_vars[df_var.name][values_arg]}
         # get output type
         agg_func_dis = numba.njit(agg_func)
-        def to_arr(a):
+        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
+        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
+        def to_arr(a, _agg_f):
             b = hpat.hiframes_api.to_arr_from_series(a)
-            res = hpat.hiframes_api.to_series_type(np.full(1, _agg_f(b)))
-        f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np, '_agg_f': agg_func_dis}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [in_vars[values_arg]])
-        nodes = f_block.body[:-3]  # remove none return
+            res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+        f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [in_vars[values_arg], agg_gb_var])
+        nodes += f_block.body[:-3]  # remove none return
         out_types = {values_arg: nodes[-1].target}
 
         pivot_values = self._get_pivot_values(lhs.name)
@@ -1012,15 +1016,16 @@ class HiFrames(object):
         out_types = {}
         in_vars = {}
         agg_func_dis = numba.njit(agg_func)
-        nodes = []
+        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
+        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         for out_cname in out_colnames:
             in_var = self.df_vars[df_var.name][out_cname]
             in_vars[out_cname] = in_var
-            def to_arr(a):
+            def to_arr(a, _agg_f):
                 b = hpat.hiframes_api.to_arr_from_series(a)
-                res = hpat.hiframes_api.to_series_type(np.full(1, _agg_f(b)))
-            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np, '_agg_f': agg_func_dis}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_var])
+                res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, agg_gb_var])
             nodes += f_block.body[:-3]  # remove none return
             out_types[out_cname] = nodes[-1].target
 
