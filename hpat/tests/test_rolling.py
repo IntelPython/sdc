@@ -171,7 +171,7 @@ class TestRolling(unittest.TestCase):
 
     def test_variable_apply2(self):
         # test sequentially with generated dfs
-        wins = ('1s', '2s', '3s', '4s')
+        wins = ('3s', '4s',)#('1s', '2s', '3s', '4s')
         sizes = (1, 2, 10, 11, 121, 1000)
         # all functions except apply
         for w in wins:
@@ -183,6 +183,7 @@ class TestRolling(unittest.TestCase):
             for n in sizes:
                 time = pd.date_range(start='1/1/2018', periods=n, freq='s')
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
+                print("input size:", n)
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_variable_parallel1(self):

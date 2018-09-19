@@ -529,8 +529,11 @@ def roll_variable_apply(in_arr, on_arr_dt, win, center, parallel, kernel_func): 
         (l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req,
         l_recv_t_req) = comm_data
 
+    print(rank, N, win, parallel,)# in_arr, on_arr)
     start, end = _build_indexer(on_arr, N, win, left_closed, right_closed)
+    print(rank, "start end", start, end)
     output = roll_variable_apply_seq(in_arr, on_arr, win, start, end, kernel_func)
+    print(rank, "out", output)
 
     if parallel:
         _border_send_wait(r_send_req, r_send_req, rank, n_pes, False)
