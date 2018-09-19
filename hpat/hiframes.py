@@ -995,7 +995,7 @@ class HiFrames(object):
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
         _supported_agg_funcs = ['agg', 'aggregate', 'sum', 'count', 'mean',
-                                'min', 'max']
+                                'min', 'max', 'prod']
         # TODO: support aggregation functions sum, count, etc.
         if func_name not in _supported_agg_funcs:
             raise ValueError("only {} supported in groupby".format(
@@ -1073,7 +1073,7 @@ class HiFrames(object):
 
     def _get_agg_func(self, func_name, rhs):
 
-        if func_name in ['sum', 'count', 'mean', 'max', 'min']:
+        if func_name in ['sum', 'count', 'mean', 'max', 'min', 'prod']:
             return hiframes_typed.series_replace_funcs[func_name]
 
         assert func_name in ['agg', 'aggregate']
