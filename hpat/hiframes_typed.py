@@ -351,13 +351,7 @@ class HiFramesTyped(object):
             series_dtype = series_typ.dtype
             func = series_replace_funcs[func_name]
             if isinstance(func, dict):
-                print("isdict", func, series_dtype)
                 func = func[series_dtype]
-#            if isinstance(series_dtype, numba.types.scalars.NPDatetime):
-#                #print("series_dtype", series_dtype, type(series_dtype))
-#                func = series_replace_funcs[func_name][1]
-#            else:
-#                func = series_replace_funcs[func_name][0]
             return self._replace_func(func, [series_var])
 
         if func_name in ['std', 'nunique', 'describe', 'abs', 'str.len', 'isna',
@@ -837,7 +831,6 @@ class HiFramesTyped(object):
             print("replacing with new func")
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
-        print("handle_dib", arg1, arg2, self.typemap[arg1.name], self.typemap[arg2.name])
         if (self.typemap[arg1.name] not in allowed_types
                 or self.typemap[arg2.name] not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
@@ -856,7 +849,6 @@ class HiFramesTyped(object):
         func_text += '    S[i] = {}\n'.format(comp)
         func_text += '  return S\n'
         loc_vars = {}
-        print("func_text", func_text)
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
         # print(func_text)
@@ -1268,15 +1260,11 @@ def _column_min_impl(in_arr):  # pragma: no cover
 
 def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
-    #s = hpat.pd_timestamp_ext.dt64_to_integer(numba.targets.builtins.get_type_min_value(in_arr.dtype))
-    print("bbbbb", in_arr[0])
-    s = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[0])
+    s = numba.targets.builtins.get_type_max_value(numba.types.int64)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i])
-        print("aaaaa", s, val)
         s = min(s, val)
     return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
-#    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(hpat.pd_timestamp_ext.integer_to_dt64(s))
 
 def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
@@ -1292,13 +1280,11 @@ def _column_max_impl(in_arr):  # pragma: no cover
 
 def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
-    #s = hpat.pd_timestamp_ext.dt64_to_integer(numba.targets.builtins.get_type_min_value(in_arr.dtype))
-    s = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[0])
+    s = numba.targets.builtins.get_type_min_value(numba.types.int64)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
         s = max(s, hpat.pd_timestamp_ext.dt64_to_integer(val))
     return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
-#    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(hpat.pd_timestamp_ext.integer_to_dt64(s))
 
 def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     numba.parfor.init_prange()
