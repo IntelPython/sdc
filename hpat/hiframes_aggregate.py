@@ -41,7 +41,7 @@ AggFuncStruct = namedtuple('AggFuncStruct',
 
 class Aggregate(ir.Stmt):
     def __init__(self, df_out, df_in, key_name, out_key_var, df_out_vars,
-                                 df_in_vars, key_arr, agg_func, out_typs, loc,
+                                 df_in_vars, key_arr, agg_func, tp_vars, loc,
                                  pivot_arr=None, pivot_values=None,
                                  is_crosstab=False):
         # name of output dataframe (just for printing purposes)
@@ -57,7 +57,7 @@ class Aggregate(ir.Stmt):
         self.key_arr = key_arr
 
         self.agg_func = agg_func
-        self.out_typs = out_typs
+        self.out_typer_vars = tp_vars
 
         self.loc = loc
         # pivot_table handling
@@ -82,21 +82,13 @@ class Aggregate(ir.Stmt):
 
 def aggregate_typeinfer(aggregate_node, typeinferer):
     for out_name, out_var in aggregate_node.df_out_vars.items():
-        if aggregate_node.pivot_arr is not None:
-            typ = list(aggregate_node.out_typs.values())[0]
-        else:
-            typ = aggregate_node.out_typs[out_name]
-
-        # TODO: are there other non-numpy array types?
-        # if typ == string_type:
-        #     arr_type = string_array_type
+        # if aggregate_node.pivot_arr is not None:
+        #     typ = list(aggregate_node.out_typs.values())[0]
         # else:
-        #     arr_type = types.Array(typ, 1, 'C')
+        #     typ = aggregate_node.out_typs[out_name]
 
-        # output is Series in type inference
-        arr_type = SeriesType(typ, 1, 'C')
-
-        typeinferer.lock_type(out_var.name, arr_type, loc=aggregate_node.loc)
+        typeinferer.constraints.append(typeinfer.Propagate(dst=out_var.name,
+                                                           src=aggregate_node.out_typer_vars[out_name].name, loc=aggregate_node.loc))
 
     # return key case
     if aggregate_node.out_key_var is not None:
@@ -116,6 +108,10 @@ def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
     if def_set is None:
         def_set = set()
 
+    if aggregate_node.out_typer_vars is not None:
+        # typer vars are used before typing (hiframes_typed should set None)
+        for v in aggregate_node.out_typer_vars.values():
+            use_set.add(v.name)
     # key array and input columns are used
     use_set.add(aggregate_node.key_arr.name)
     use_set.update({v.name for v in aggregate_node.df_in_vars.values()})
@@ -151,7 +147,7 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
         aggregate_node.df_out_vars.pop(cname)
         if aggregate_node.pivot_arr is None:
             aggregate_node.df_in_vars.pop(cname)
-            aggregate_node.out_typs.pop(cname)
+            aggregate_node.out_typer_vars.pop(cname)
         else:
             aggregate_node.pivot_values.remove(cname)
 
@@ -429,9 +425,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         pivot_typ, agg_node.pivot_values, agg_node.is_crosstab)
 
     return_key = agg_node.out_key_var is not None
-    out_typs = list(agg_node.out_typs.values())
-    if agg_node.pivot_arr is not None:
-        out_typs = out_typs * len(agg_node.pivot_values)
+    out_typs = [t.dtype for t in out_col_typs]
 
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, out_typs,

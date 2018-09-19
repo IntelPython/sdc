@@ -998,13 +998,23 @@ class HiFrames(object):
         # find input vars and output types
         out_types = {}
         in_vars = {}
+        if isinstance(agg_func, ir.Expr):
+            def agg_func_wrapper(A):
+                return A
+            agg_func_wrapper.__code__ = agg_func.code
+            agg_func = agg_func_wrapper
+        agg_func_dis = numba.njit(agg_func)
+        nodes = []
         for out_cname in out_colnames:
             in_var = self.df_vars[df_var.name][out_cname]
             in_vars[out_cname] = in_var
-            def f(A):
-                return map_func(A)
-            out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
-            out_types[out_cname] = out_typ
+            def to_arr(a):
+                b = hpat.hiframes_api.to_arr_from_series(a)
+                res = hpat.hiframes_api.to_series_type(np.full(1, _agg_f(b)))
+            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np, '_agg_f': agg_func_dis}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var])
+            nodes += f_block.body[:-3]  # remove none return
+            out_types[out_cname] = nodes[-1].target
 
         # output column map, create dataframe if multiple outputs
         out_key_var = None
@@ -1020,7 +1030,7 @@ class HiFrames(object):
 
             self._create_df(lhs.name, out_df, label)
 
-        return [hiframes_aggregate.Aggregate(
+        return nodes + [hiframes_aggregate.Aggregate(
             lhs.name, df_var.name, key_colname, out_key_var, df_col_map,
             in_vars, self.df_vars[df_var.name][key_colname],
             agg_func, out_types, lhs.loc)]
