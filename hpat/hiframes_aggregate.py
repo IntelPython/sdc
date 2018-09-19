@@ -34,9 +34,36 @@ from hpat.hiframes_sort import (
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
     )
 from hpat.hiframes_join import write_send_buff
+
 AggFuncStruct = namedtuple('AggFuncStruct',
     ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
      'eval_all_func'])
+
+supported_agg_funcs = ['sum', 'count', 'mean',
+                       'min', 'max', 'prod', 'agg', 'aggregate']
+
+
+def get_agg_func(func_ir, func_name, rhs):
+    from hpat.hiframes_typed import series_replace_funcs
+    if func_name in supported_agg_funcs[:-2]:
+        return series_replace_funcs[func_name]
+
+    assert func_name in ['agg', 'aggregate']
+    # agg case
+    # error checking: make sure there is function input only
+    if len(rhs.args) != 1:
+        raise ValueError("agg expects 1 argument")
+    agg_func = guard(get_definition, func_ir, rhs.args[0])
+    if agg_func is None or not (isinstance(agg_func, ir.Expr)
+                            and agg_func.op == 'make_function'):
+        raise ValueError("lambda for map not found")
+
+    def agg_func_wrapper(A):
+        return A
+    agg_func_wrapper.__code__ = agg_func.code
+    agg_func = agg_func_wrapper
+    return agg_func
+
 
 
 class Aggregate(ir.Stmt):

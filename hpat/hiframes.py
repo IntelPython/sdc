@@ -33,6 +33,7 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
+from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
 
 LARGE_WIN_SIZE = 10
 
@@ -888,7 +889,7 @@ class HiFrames(object):
         columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 2, 'columns')
         agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 3, 'aggfunc', 'mean')
 
-        agg_func = self._get_agg_func(agg_func_arg, rhs)
+        agg_func = get_agg_func(self.func_ir, agg_func_arg, rhs)
 
         in_vars = {values_arg: self.df_vars[df_var.name][values_arg]}
         # get output type
@@ -994,14 +995,12 @@ class HiFrames(object):
 
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-        _supported_agg_funcs = ['agg', 'aggregate', 'sum', 'count', 'mean',
-                                'min', 'max', 'prod']
         # TODO: support aggregation functions sum, count, etc.
-        if func_name not in _supported_agg_funcs:
+        if func_name not in supported_agg_funcs:
             raise ValueError("only {} supported in groupby".format(
-                                             ", ".join(_supported_agg_funcs)))
+                                             ", ".join(supported_agg_funcs)))
 
-        agg_func = self._get_agg_func(func_name, rhs)
+        agg_func = get_agg_func(self.func_ir, func_name, rhs)
 
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
@@ -1070,27 +1069,6 @@ class HiFrames(object):
         key_colname = guard(find_const, self.func_ir, by_arg)
 
         return key_colname, as_index
-
-    def _get_agg_func(self, func_name, rhs):
-
-        if func_name in ['sum', 'count', 'mean', 'max', 'min', 'prod']:
-            return hiframes_typed.series_replace_funcs[func_name]
-
-        assert func_name in ['agg', 'aggregate']
-        # agg case
-        # error checking: make sure there is function input only
-        if len(rhs.args) != 1:
-            raise ValueError("agg expects 1 argument")
-        agg_func = guard(get_definition, self.func_ir, rhs.args[0])
-        if agg_func is None or not (isinstance(agg_func, ir.Expr)
-                                and agg_func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
-
-        def agg_func_wrapper(A):
-            return A
-        agg_func_wrapper.__code__ = agg_func.code
-        agg_func = agg_func_wrapper
-        return agg_func
 
     def _get_df_obj_select(self, obj_var, obj_name):
         """analyze selection of columns in after groupby() or rolling()
