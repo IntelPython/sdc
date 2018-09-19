@@ -160,9 +160,19 @@ class DistributedPass(object):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
-                    # replace inst.value to a call with target args
-                    # as expected by inline_closure_call
-                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    # inline_closure_call expects a call assignment
+                    dummy_call = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    if isinstance(inst, ir.Assign):
+                        # replace inst.value to a call with target args
+                        # as expected by inline_closure_call
+                        inst.value = dummy_call
+                    else:
+                        # replace inst with dummy assignment
+                        # for cases like SetItem
+                        loc = block.loc
+                        dummy_var = ir.Var(
+                            block.scope, mk_unique_var("r_dummy"), loc)
+                        block.body[i] = ir.Assign(dummy_call, dummy_var, loc)
                     block.body = new_body + block.body[i:]
                     inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
@@ -593,31 +603,13 @@ class DistributedPass(object):
 
         if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr, k):  # pragma: no cover
-                s = hpat.hiframes_api.nlargest_parallel(arr, k)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr], self.typemap[rhs.args[1].name]),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr, k, i, f: hpat.hiframes_api.nlargest_parallel(arr, k, i, f)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('median', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-
-            def f(arr):  # pragma: no cover
-                s = hpat.hiframes_api.median(arr, True)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[arr],),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+            f = lambda arr: hpat.hiframes_api.median(arr, True)
+            return self._replace_func(f, rhs.args)
 
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
@@ -683,16 +675,8 @@ class DistributedPass(object):
             _count = self._array_counts[_data_ptr.name][0]
 
             def f(fname, data_ptr, start, count):  # pragma: no cover
-                s = hpat.io.file_read_parallel(fname, data_ptr, start, count)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (self.typemap[_fname.name],
-                                          self.typemap[_data_ptr.name],
-                                           types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [_fname, _data_ptr, _start, _count])
-            out = f_block.body[:-3]
-            out[-1].target = assign.target
+                return hpat.io.file_read_parallel(fname, data_ptr, start, count)
+            return self._replace_func(f, [_fname, _data_ptr, _start, _count])
 
         return out
 
@@ -817,16 +801,9 @@ class DistributedPass(object):
                 _count = self._array_counts[arr.name][0]
 
                 def f(fname, arr, start, count):  # pragma: no cover
-                    hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                              (self.typemap[_fname.name],
-                                              self.typemap[arr.name],
-                                               types.intp, types.intp),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [_fname, arr, _start, _count])
-                out = f_block.body[:-3]
-                out[-1].target = assign.target
+                return self._replace_func(f, [_fname, arr, _start, _count])
 
             if self._is_1D_Var_arr(arr.name):
                 _fname = args[0]
@@ -834,15 +811,9 @@ class DistributedPass(object):
                 def f(fname, arr):  # pragma: no cover
                     count = len(arr)
                     start = hpat.distributed_api.dist_exscan(count)
-                    hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.file_write_parallel(fname, arr, start, count)
 
-                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                              (self.typemap[_fname.name],
-                                              self.typemap[arr.name]),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [_fname, arr])
-                out = f_block.body[:-3]
-                out[-1].target = assign.target
+                return self._replace_func(f, [_fname, arr])
 
         return out
 
@@ -1265,16 +1236,8 @@ class DistributedPass(object):
                     hpat.distributed_lower._set_if_in_range(
                         A, val, index, chunk_start, chunk_count)
 
-                f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                           (self.typemap[arr.name],
-                                            self.typemap[node.value.name],
-                                            types.intp, types.intp, types.intp),
-                                           self.typemap, self.calltypes)
-                _, block = f_ir.blocks.popitem()
-                replace_arg_nodes(
-                    block, [arr, node.value, index_var, start, count])
-                out = block.body[:-3]
-                return out
+                return self._replace_func(
+                    f, [arr, node.value, index_var, start, count])
 
             assert isinstance(self.typemap[index_var.name],
                               types.misc.SliceType), "slice index expected"
@@ -1286,18 +1249,11 @@ class DistributedPass(object):
                     start, stop, chunk_start, chunk_count)
                 A[loc_start:loc_stop] = val
 
-            f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                       (self.typemap[arr.name],
-                                        self.typemap[node.value.name],
-                                        types.intp, types.intp, types.intp, types.intp),
-                                       self.typemap, self.calltypes)
-            _, block = f_ir.blocks.popitem()
             slice_call = get_definition(self.func_ir, index_var)
             slice_start = slice_call.args[0]
             slice_stop = slice_call.args[1]
-            replace_arg_nodes(
-                block, [arr, node.value, slice_start, slice_stop, start, count])
-            out = block.body[:-3]
+            return self._replace_func(
+                f, [arr, node.value, slice_start, slice_stop, start, count])
             # print_node = ir.Print([start_var, end_var], None, loc)
             # self.calltypes[print_node] = signature(types.none, types.int64, types.int64)
             # out.append(print_node)

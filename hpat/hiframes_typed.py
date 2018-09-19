@@ -393,14 +393,16 @@ class HiFramesTyped(object):
                 func = series_replace_funcs[func_name]
             return self._replace_func(func, args)
 
-        if func_name == 'nlargest':
+        if func_name in ('nlargest', 'nsmallest'):
             # TODO: kws
             if len(rhs.args) == 0 and not rhs.kws:
                 return self._replace_func(
-                    series_replace_funcs['nlargest_default'], [series_var])
+                    series_replace_funcs[func_name + '_default'], [series_var],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, n_arg])
+            return self._replace_func(func, [series_var, n_arg],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
 
         if func_name == 'head':
             # TODO: kws
@@ -1415,6 +1417,13 @@ def _series_astype_str_impl(arr):
     return A
 
 from collections import defaultdict
+@numba.njit
+def lt_f(a, b):
+    return a < b
+
+@numba.njit
+def gt_f(a, b):
+    return a > b
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
@@ -1448,8 +1457,10 @@ series_replace_funcs = {
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
-    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
-    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5),
+    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k, True, gt_f),
+    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, True, gt_f),
+    'nsmallest': lambda A, k: hpat.hiframes_api.nlargest(A, k, False, lt_f),
+    'nsmallest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, False, lt_f),
     'head': lambda A, k: A[:k],
     'head_default': lambda A: A[:5],
     'median': lambda A: hpat.hiframes_api.median(A),
