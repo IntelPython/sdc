@@ -185,7 +185,7 @@ class TestRolling(unittest.TestCase):
                 for n in sizes:
                     time = pd.date_range(start='1/1/2018', periods=n, freq='s')
                     df = pd.DataFrame({'B': np.arange(n), 'time': time})
-                    print("input size:", n)
+                    print("input size:", w, n)
                     pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_variable_parallel1(self):
