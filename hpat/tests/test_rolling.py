@@ -172,20 +172,21 @@ class TestRolling(unittest.TestCase):
 
     def test_variable_apply2(self):
         # test sequentially with generated dfs
-        wins = ('3s', '4s',)#('1s', '2s', '3s', '4s')
-        sizes = (1, 2, 10, 11, 121, 1000)
-        # all functions except apply
-        for w in wins:
-            func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
-            hpat_func = hpat.jit(test_impl)
-            for n in sizes:
-                time = pd.date_range(start='1/1/2018', periods=n, freq='s')
-                df = pd.DataFrame({'B': np.arange(n), 'time': time})
-                print("input size:", n)
-                pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+        for i in range(10):
+            wins = ('1s', '2s', '3s', '4s')
+            sizes = (1, 2, 10, 11, 121, 1000)
+            # all functions except apply
+            for w in wins:
+                func_text = "def test_impl(df):\n  return df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
+                loc_vars = {}
+                exec(func_text, {}, loc_vars)
+                test_impl = loc_vars['test_impl']
+                hpat_func = hpat.jit(test_impl)
+                for n in sizes:
+                    time = pd.date_range(start='1/1/2018', periods=n, freq='s')
+                    df = pd.DataFrame({'B': np.arange(n), 'time': time})
+                    print("input size:", n)
+                    pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_variable_parallel1(self):
         wins = ('1s', '2s', '3s', '4s')
