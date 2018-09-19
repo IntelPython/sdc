@@ -10,5 +10,7 @@ if [ "$RUN_COVERAGE" == "yes" ]; then
     coverage erase
     coverage run --source=./hpat --omit ./hpat/ml/*,./hpat/xenon_ext.py,./hpat/ros.py,./hpat/cv_ext.py,./hpat/tests/gen_test_data.py -m unittest
 else
-    mpiexec -n $NUM_PES python -u hpat/tests/test_rolling.py TestRolling.test_variable_apply2
+    mpiexec -n $NUM_PES python -u -m unittest -v
+    mpiexec -n $NUM_PES python -u -m unittest -v
+    mpiexec -n $NUM_PES python -u -m unittest -v
 fi

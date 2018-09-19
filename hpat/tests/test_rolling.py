@@ -7,8 +7,8 @@ import numba
 import hpat
 # from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
 #     count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
-# import hpat.hiframes_rolling
-# from hpat.hiframes_rolling import supported_rolling_funcs
+import hpat.hiframes_rolling
+from hpat.hiframes_rolling import supported_rolling_funcs
 
 class TestRolling(unittest.TestCase):
     def test_fixed1(self):
