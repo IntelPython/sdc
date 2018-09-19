@@ -603,7 +603,7 @@ class DistributedPass(object):
 
         if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr, k: hpat.hiframes_api.nlargest_parallel(arr, k)
+            f = lambda arr, k, i, f: hpat.hiframes_api.nlargest_parallel(arr, k, i, f)
             return self._replace_func(f, rhs.args)
 
         if fdef == ('median', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
