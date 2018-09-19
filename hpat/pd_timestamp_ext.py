@@ -548,7 +548,6 @@ def convert_datetime64_to_timestamp(dt64):
     # pandas 0.23 np_datetime.c:762
     perday = 24 * 60 * 60 * 1000 * 1000 * 1000
 
-    print("zzzzz", dt64)
     if dt64 >= 0:
         in_day = dt64 % perday
         dt64 = dt64 // perday
@@ -593,7 +592,6 @@ def convert_datetime64_to_timestamp(dt64):
         else:
             days = days - month_len[i]
 
-    print("ttttt", in_day, in_day // (60 * 60 * 1000000000))
     return pd.Timestamp(year, month, day,
                         in_day // (60 * 60 * 1000000000), #hour
                         (in_day // (60 * 1000000000)) % 60, #minute
@@ -612,6 +610,23 @@ def type_myref(context):
         return types.voidptr
     return typer
 
+#-----------------------------------------------------------
+
+def integer_to_timedelta64(val):
+    return np.timedelta64(val)
+
+@type_callable(integer_to_timedelta64)
+def type_int_to_timedelta64(context):
+    def typer(val):
+        return types.NPTimedelta('ns')
+    return typer
+
+@lower_builtin(integer_to_timedelta64, types.int64)
+def impl_int_to_timedelta64(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+
 def integer_to_dt64(val):
     return np.datetime64(val)
 
@@ -624,6 +639,8 @@ def type_int_to_dt64(context):
 @lower_builtin(integer_to_dt64, types.int64)
 def impl_int_to_dt64(context, builder, sig, args):
     return args[0]
+
+#-----------------------------------------------------------
 
 def dt64_to_integer(val):
     return int(val)

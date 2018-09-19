@@ -136,6 +136,7 @@ class SeriesType(types.IterableType):
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
+timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'), 1, 'C')
 date_series_type = SeriesType(datetime_date_type, 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
@@ -856,9 +857,7 @@ class LenSeriesType(AbstractTemplate):
 @type_callable('-')
 def type_sub(context):
     def typer(val1, val2):
-        print("type_sub", val1, val2)
         if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
-            print("type_sub found timestamp")
-            return dt_index_series_type
+            return timedelta_index_series_type
     return typer
 

@@ -163,13 +163,20 @@ class TestDate(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
-        print(df['str_date'])
         self.assertEqual(hpat_func(df), test_impl(df))
 
     def test_datetime_index_timedelta(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
             return s - s.min()
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_ret(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date'])
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()

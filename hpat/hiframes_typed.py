@@ -825,10 +825,10 @@ class HiFramesTyped(object):
         arg1, arg2 = rhs.lhs, rhs.rhs
         allowed_types = (dt_index_series_type, string_type)
 
+        # TODO: this has to be more generic to support all combinations.
         if (self.typemap[arg1.name] == dt_index_series_type and
             self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
             rhs.fn == '-'):
-            print("replacing with new func")
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
         if (self.typemap[arg1.name] not in allowed_types
@@ -1292,7 +1292,7 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     S = numba.unsafe.ndarray.empty_inferred((n,))
     tsint = hpat.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
     for i in numba.parfor.internal_prange(n):
-        S[i] = hpat.pd_timestamp_ext.integer_to_dt64(hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+        S[i] = hpat.pd_timestamp_ext.integer_to_timedelta64(hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
     return S
 
 def _column_describe_impl(A):  # pragma: no cover
