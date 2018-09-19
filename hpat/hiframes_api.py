@@ -520,6 +520,8 @@ def nlargest(A, k, is_largest, cmp_f):
     min_heap_vals, start = select_k_nonan(A, m, k)
     # heapify k/2-1 to 0 instead of sort?
     min_heap_vals.sort()
+    if not is_largest:
+        min_heap_vals = np.ascontiguousarray(min_heap_vals[::-1])
 
     for i in range(start, m):
         if cmp_f(A[i], min_heap_vals[0]):  # > for nlargest
