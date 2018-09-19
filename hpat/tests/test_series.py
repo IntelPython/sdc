@@ -692,7 +692,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip("debug nsmallest equal")
     def test_series_nsmallest_default1(self):
         def test_impl(S):
             return S.nsmallest()
@@ -703,7 +702,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip("debug nsmallest equal")
     def test_series_nsmallest_nan1(self):
         def test_impl(S):
             return S.nsmallest(4)
@@ -712,7 +710,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip("debug nsmallest equal")
     def test_series_nsmallest_parallel1(self):
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
