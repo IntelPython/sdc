@@ -24,6 +24,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_str_methods_type, SeriesRollingType)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
+from hpat.hiframes_aggregate import Aggregate
 
 LARGE_WIN_SIZE = 10
 
@@ -48,6 +49,9 @@ class HiFramesTyped(object):
             new_body = []
             replaced = False
             for i, inst in enumerate(block.body):
+                if isinstance(inst, Aggregate):
+                    #import pdb; pdb.set_trace()
+                    inst.out_typer_vars = None
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst)
                     if isinstance(out_nodes, list):

@@ -1011,6 +1011,10 @@ if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
 
+@numba.njit
+def agg_typer(a, _agg_f):
+    return np.full(1, _agg_f(a))
+
 
 # XXX: use infer_global instead of overload, since overload fails if the same
 # user function is compiled twice
