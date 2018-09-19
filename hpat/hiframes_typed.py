@@ -1284,7 +1284,7 @@ def _column_max_impl(in_arr):  # pragma: no cover
     s = numba.targets.builtins.get_type_min_value(in_arr.dtype)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
-        if not nan_check or not np.isnan(val):
+        if not np.isnan(val):
             s = max(s, val)
             count += 1
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
