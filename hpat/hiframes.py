@@ -957,8 +957,13 @@ class HiFrames(object):
         # TODO: handle values and aggfunc options
 
         in_vars = {}
-        out_typ = types.intp
-        out_types = {'__dummy__': out_typ}
+        # output of crosstab is array[int64]
+        def to_arr():
+            res = hpat.hiframes_api.to_series_type(np.empty(1, np.int64))
+        f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        nodes = f_block.body[:-3]  # remove none return
+        out_tp_var = nodes[-1].target
+        out_types = {'__dummy__': out_tp_var}
 
         pivot_values = self._get_pivot_values(lhs.name)
         df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
@@ -976,10 +981,12 @@ class HiFrames(object):
 
         # TODO: make out_key_var an index column
 
-        return [hiframes_aggregate.Aggregate(
+        agg_node = hiframes_aggregate.Aggregate(
             lhs.name, 'crosstab', index_arg.name, None, df_col_map,
             in_vars, index_arg,
-            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)]
+            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)
+        nodes.append(agg_node)
+        return nodes
 
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
