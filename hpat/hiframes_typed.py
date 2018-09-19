@@ -342,10 +342,26 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
-                         'nunique', 'describe', 'abs', 'str.len', 'isna',
-                         'isnull', 'median', 'idxmin', 'idxmax', 'prod',
-                         'unique']:
+        if func_name in ['sum', 'count', 'mean', 'var', 'min', 'max', 'prod']:
+            if rhs.args or rhs.kws:
+                raise ValueError("unsupported Series.{}() arguments".format(
+                    func_name))
+            # TODO: handle skipna, min_count arguments
+            series_typ = self.typemap[series_var.name]
+            series_dtype = series_typ.dtype
+            func = series_replace_funcs[func_name]
+            if isinstance(func, dict):
+                print("isdict", func, series_dtype)
+                func = func[series_dtype]
+#            if isinstance(series_dtype, numba.types.scalars.NPDatetime):
+#                #print("series_dtype", series_dtype, type(series_dtype))
+#                func = series_replace_funcs[func_name][1]
+#            else:
+#                func = series_replace_funcs[func_name][0]
+            return self._replace_func(func, [series_var])
+
+        if func_name in ['std', 'nunique', 'describe', 'abs', 'str.len', 'isna',
+                         'isnull', 'median', 'idxmin', 'idxmax', 'unique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -795,7 +811,10 @@ class HiFramesTyped(object):
         return self._replace_func(f, [data])
 
     def _is_dt_index_binop(self, rhs):
-        if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
+        if rhs.op != 'binop':
+            return False
+
+        if rhs.fn not in ('==', '!=', '>=', '>', '<=', '<', '-'):
             return False
 
         arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
@@ -810,6 +829,13 @@ class HiFramesTyped(object):
         arg1, arg2 = rhs.lhs, rhs.rhs
         allowed_types = (dt_index_series_type, string_type)
 
+        if (self.typemap[arg1.name] == dt_index_series_type and
+            self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
+            rhs.fn == '-'):
+            print("replacing with new func")
+            return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
+
+        print("handle_dib", arg1, arg2, self.typemap[arg1.name], self.typemap[arg2.name])
         if (self.typemap[arg1.name] not in allowed_types
                 or self.typemap[arg2.name] not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
@@ -828,6 +854,7 @@ class HiFramesTyped(object):
         func_text += '    S[i] = {}\n'.format(comp)
         func_text += '  return S\n'
         loc_vars = {}
+        print("func_text", func_text)
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
         # print(func_text)
@@ -1237,18 +1264,48 @@ def _column_min_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
+    numba.parfor.init_prange()
+    #s = hpat.pd_timestamp_ext.dt64_to_integer(numba.targets.builtins.get_type_min_value(in_arr.dtype))
+    print("bbbbb", in_arr[0])
+    s = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[0])
+    for i in numba.parfor.internal_prange(len(in_arr)):
+        val = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i])
+        print("aaaaa", s, val)
+        s = min(s, val)
+    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+#    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(hpat.pd_timestamp_ext.integer_to_dt64(s))
+
 def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     s = numba.targets.builtins.get_type_min_value(in_arr.dtype)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
-        if not np.isnan(val):
+        if not nan_check or not np.isnan(val):
             s = max(s, val)
             count += 1
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
+    numba.parfor.init_prange()
+    #s = hpat.pd_timestamp_ext.dt64_to_integer(numba.targets.builtins.get_type_min_value(in_arr.dtype))
+    s = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[0])
+    for i in numba.parfor.internal_prange(len(in_arr)):
+        val = in_arr[i]
+        s = max(s, hpat.pd_timestamp_ext.dt64_to_integer(val))
+    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+#    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(hpat.pd_timestamp_ext.integer_to_dt64(s))
+
+def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
+    numba.parfor.init_prange()
+    n = len(in_arr)
+    S = numba.unsafe.ndarray.empty_inferred((n,))
+    tsint = hpat.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
+    for i in numba.parfor.internal_prange(n):
+        S[i] = hpat.pd_timestamp_ext.integer_to_dt64(hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+    return S
 
 def _column_describe_impl(A):  # pragma: no cover
     S = hpat.hiframes_api.to_series_type(A)
@@ -1357,14 +1414,15 @@ def _series_astype_str_impl(arr):
         A[i] = str(s)  # TODO: check NA
     return A
 
+from collections import defaultdict
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
     'prod': _column_prod_impl_basic,
     'count': _column_count_impl,
     'mean': _column_mean_impl,
-    'max': _column_max_impl,
-    'min': _column_min_impl,
+    'max': defaultdict(lambda: _column_max_impl, [(numba.types.scalars.NPDatetime('ns'), _column_max_impl_no_isnan)]),
+    'min': defaultdict(lambda: _column_min_impl, [(numba.types.scalars.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),

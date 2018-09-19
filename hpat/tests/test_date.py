@@ -149,6 +149,36 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    def test_datetime_index_max(self):
+        def test_impl(df):
+            return pd.DatetimeIndex(df['str_date']).max()
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_min(self):
+        def test_impl(df):
+            dti = pd.DatetimeIndex(df['str_date'])
+            #pass
+            #print("dti", dti[0])
+            return dti.min()
+            #return pd.DatetimeIndex(df['str_date']).min()
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        print(df['str_date'])
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_timedelta(self):
+        def test_impl(df):
+            s = pd.DatetimeIndex(df['str_date'])
+            return s - s.min()
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
     def test_datetime_index_year(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).year
@@ -156,7 +186,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_month(self):
         def test_impl(df):
@@ -165,7 +194,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_day(self):
         def test_impl(df):
@@ -174,7 +202,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_hour(self):
         def test_impl(df):
@@ -183,7 +210,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_minute(self):
         def test_impl(df):
@@ -192,7 +218,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_second(self):
         def test_impl(df):
@@ -201,7 +226,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_microsecond(self):
         def test_impl(df):
@@ -210,7 +234,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def test_datetime_index_nanosecond(self):
         def test_impl(df):
@@ -219,7 +242,6 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-        out = hpat_func(df)
 
     def _gen_str_date_df(self):
         rows = 10

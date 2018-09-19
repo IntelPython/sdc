@@ -537,6 +537,20 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
+    @bound_function("series.max")
+    def resolve_max(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
+
+    @bound_function("series.min")
+    def resolve_min(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
+
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
@@ -833,3 +847,13 @@ class LenSeriesType(AbstractTemplate):
 #         return wrapper
 
 #@infer_global(np.full_like)
+
+@type_callable('-')
+def type_sub(context):
+    def typer(val1, val2):
+        print("type_sub", val1, val2)
+        if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
+            print("type_sub found timestamp")
+            return dt_index_series_type
+    return typer
+
