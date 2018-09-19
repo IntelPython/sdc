@@ -159,11 +159,7 @@ class TestDate(unittest.TestCase):
 
     def test_datetime_index_min(self):
         def test_impl(df):
-            dti = pd.DatetimeIndex(df['str_date'])
-            #pass
-            #print("dti", dti[0])
-            return dti.min()
-            #return pd.DatetimeIndex(df['str_date']).min()
+            return pd.DatetimeIndex(df['str_date']).min()
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
