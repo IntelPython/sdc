@@ -287,30 +287,9 @@ class HiFrames(object):
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
-        # df.apply(lambda a:..., axis=1)
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'apply'):
-            return self._handle_df_apply(assign, lhs, rhs, func_mod)
-
-        # df.describe()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'describe'):
-            return self._handle_df_describe(assign, lhs, rhs, func_mod)
-
-        # df.sort_values()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'sort_values'):
-            return self._handle_df_sort_values(assign, lhs, rhs, func_mod, label)
-
-        # df.itertuples()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'itertuples'):
-            return self._handle_df_itertuples(assign, lhs, rhs, func_mod)
-
-        # df.pivot_table()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'pivot_table'):
-            return self._handle_df_pivot_table(lhs, rhs, func_mod, label)
+        if isinstance(func_mod, ir.Var) and self._is_df_var(func_mod):
+            return self._run_call_df(
+                assign, lhs, rhs, func_mod, func_name, label)
 
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
@@ -335,6 +314,33 @@ class HiFrames(object):
             self._create_df(lhs.name, col_map, label)
             nodes += df_nodes
             return nodes
+
+        return [assign]
+
+    def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
+        # df.apply(lambda a:..., axis=1)
+        if func_name == 'apply':
+            return self._handle_df_apply(assign, lhs, rhs, df_var)
+
+        # df.describe()
+        if func_name == 'describe':
+            return self._handle_df_describe(assign, lhs, rhs, df_var)
+
+        # df.sort_values()
+        if func_name == 'sort_values':
+            return self._handle_df_sort_values(assign, lhs, rhs, df_var, label)
+
+        # df.itertuples()
+        if func_name == 'itertuples':
+            return self._handle_df_itertuples(assign, lhs, rhs, df_var)
+
+        # df.pivot_table()
+        if func_name == 'pivot_table':
+            return self._handle_df_pivot_table(lhs, rhs, df_var, label)
+
+        if func_name not in ('groupby', 'rolling'):
+            raise NotImplementedError(
+                "data frame function {} not implemented yet".format(func_name))
 
         return [assign]
 
