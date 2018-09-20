@@ -328,6 +328,22 @@ class SeriesAttribute(AttributeTemplate):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
 
+    def resolve_days(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_seconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_microseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_nanoseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
     @bound_function("array.astype")
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.

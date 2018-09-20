@@ -175,6 +175,10 @@ class HiFramesTyped(object):
                     if rhs.attr in hpat.pd_timestamp_ext.date_fields:
                         return self._run_DatetimeIndex_field(assign, assign.target, rhs)
 
+                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
+                    if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
+                        return self._run_Timedelta_field(assign, assign.target, rhs)
+
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
                 return res
@@ -767,6 +771,35 @@ class HiFramesTyped(object):
         func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
         func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
         func_text += '        S[i] = ts.' + field + '\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, [arr])
+
+    def _run_Timedelta_field(self, assign, lhs, rhs):
+        """transform Timedelta.<field>
+        """
+        arr = rhs.value
+        field = rhs.attr
+
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.timedelta64_to_integer(dti[i])\n'
+        if field == 'nanoseconds':
+            func_text += '        S[i] = dt64 % 1000\n'
+        elif field == 'microseconds':
+            func_text += '        S[i] = dt64 // 1000 % 100000\n'
+        elif field == 'seconds':
+            func_text += '        S[i] = dt64 // (1000 * 1000000) % (60 * 60 * 24)\n'
+        elif field == 'days':
+            func_text += '        S[i] = dt64 // (1000 * 1000000 * 60 * 60 * 24)\n'
+        else:
+            assert(0)
         func_text += '    return S\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)

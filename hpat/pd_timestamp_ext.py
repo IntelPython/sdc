@@ -32,6 +32,7 @@ ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_dateti
 ll.add_symbol('np_datetime_date_array_from_packed_ints', hdatetime_ext.np_datetime_date_array_from_packed_ints)
 
 date_fields = ['year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond', 'nanosecond']
+timedelta_fields = ['days', 'seconds', 'microseconds', 'nanoseconds']
 
 #--------------------------------------------------------------
 
@@ -365,6 +366,10 @@ pandas_timestamp_type = PandasTimestampType()
 def typeof_pd_timestamp(val, c):
     return pandas_timestamp_type
 
+@typeof_impl.register(datetime.datetime)
+def typeof_datetime_datetime(val, c):
+    return pandas_timestamp_type
+
 ts_field_typ = types.int64
 
 
@@ -492,6 +497,20 @@ def type_timestamp(context):
         return pandas_timestamp_type
     return typer
 
+@type_callable(pd.Timestamp)
+def type_timestamp(context):
+    def typer(datetime_type):
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
+@type_callable(datetime.datetime)
+def type_timestamp(context):
+    def typer(year, month, day):  # how to handle optional hour, minute, second, us, ns?
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
 @lower_builtin(pd.Timestamp, types.int64, types.int64, types.int64, types.int64,
                 types.int64, types.int64, types.int64, types.int64)
 def impl_ctor_timestamp(context, builder, sig, args):
@@ -507,6 +526,39 @@ def impl_ctor_timestamp(context, builder, sig, args):
     ts.microsecond = us
     ts.nanosecond = ns
     return ts._getvalue()
+
+@lower_builtin(pd.Timestamp, pandas_timestamp_type)
+def impl_ctor_ts_ts(context, builder, sig, args):
+    typ = sig.return_type
+    rhs = args[0]
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy._setvalue(rhs)
+    cgutils.copy_struct(ts, rhsproxy)
+    return ts._getvalue()
+
+#              , types.int64, types.int64, types.int64, types.int64, types.int64)
+@lower_builtin(datetime.datetime, types.int64, types.int64, types.int64)
+def impl_ctor_datetime(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day = args
+    #year, month, day, hour, minute, second, us, ns = args
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    ts.year = year
+    ts.month = month
+    ts.day = day
+    ts.hour = lir.Constant(lir.IntType(64), 0)
+    ts.minute = lir.Constant(lir.IntType(64), 0)
+    ts.second = lir.Constant(lir.IntType(64), 0)
+    ts.microsecond = lir.Constant(lir.IntType(64), 0)
+    ts.nanosecond = lir.Constant(lir.IntType(64), 0)
+    #ts.hour = hour
+    #ts.minute = minute
+    #ts.second = second
+    #ts.microsecond = us
+    #ts.nanosecond = ns
+    return ts._getvalue()
+
 
 
 @lower_cast(types.NPDatetime('ns'), types.int64)
@@ -654,6 +706,22 @@ def type_dt64_to_int(context):
 @lower_builtin(dt64_to_integer, types.NPDatetime('ns'))
 def impl_dt64_to_int(context, builder, sig, args):
     return args[0]
+
+#-----------------------------------------------------------
+def timedelta64_to_integer(val):
+    return int(val)
+
+@type_callable(timedelta64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(timedelta64_to_integer, types.NPTimedelta('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
 
 @lower_builtin(myref, types.int32)
 @lower_builtin(myref, types.int64)

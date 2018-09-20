@@ -124,6 +124,15 @@ class TestDate(unittest.TestCase):
         allequal = (df['std'].equals(df['hpat']))
         self.assertTrue(allequal)
 
+    def test_timestamp(self):
+        def test_impl():
+            dt = datetime(2017, 4, 26)
+            ts = pd.Timestamp(dt)
+            return ts.day + ts.hour + ts.microsecond + ts.month + ts.nanosecond + ts.second + ts.year
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_extract(self):
         def test_impl(s):
             return s.month
@@ -165,10 +174,41 @@ class TestDate(unittest.TestCase):
         df = self._gen_str_date_df()
         self.assertEqual(hpat_func(df), test_impl(df))
 
-    def test_datetime_index_timedelta(self):
+    def test_datetime_index_timedelta_days(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
-            return s - s.min()
+            t = s - s.min()
+            return t.days
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_timedelta_seconds(self):
+        def test_impl(df):
+            s = pd.DatetimeIndex(df['str_date'])
+            t = s - s.min()
+            return t.seconds
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_timedelta_microseconds(self):
+        def test_impl(df):
+            s = pd.DatetimeIndex(df['str_date'])
+            t = s - s.min()
+            return t.microseconds
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_index_timedelta_nanoseconds(self):
+        def test_impl(df):
+            s = pd.DatetimeIndex(df['str_date'])
+            t = s - s.min()
+            return t.nanoseconds
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
