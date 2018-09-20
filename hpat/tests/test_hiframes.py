@@ -120,6 +120,15 @@ class TestHiFrames(unittest.TestCase):
         np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
         np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
 
+    def test_df_head1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):

@@ -338,11 +338,37 @@ class HiFrames(object):
         if func_name == 'pivot_table':
             return self._handle_df_pivot_table(lhs, rhs, df_var, label)
 
+        # df.head()
+        if func_name == 'head':
+            return self._handle_df_head(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
 
         return [assign]
+
+    def _handle_df_head(self, lhs, rhs, df_var, label):
+        nodes = []
+        out_df_map = {}
+
+        if len(rhs.args) == 0:
+            def series_head(a):
+                res = a.head()
+        else:
+            if len(rhs.args) != 1:
+                raise ValueError("invalid df.head args")
+            def series_head(a, n):
+                res = a.head(n)
+
+        for cname, in_var in self.df_vars[df_var.name].items():
+            f_block = compile_to_numba_ir(series_head, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var] + rhs.args)
+            nodes += f_block.body[:-3]  # remove none return
+            out_df_map[cname] = nodes[-1].target
+
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
 
     def _get_reverse_copies(self, body):
         for inst in body:
