@@ -66,18 +66,37 @@ def get_agg_func(func_ir, func_name, rhs):
     agg_func = agg_func_wrapper
     return agg_func
 
+# combine function takes the reduce vars in reverse order of their user
+@numba.njit
+def _var_combine(ssqdm_a, mean_a, nobs_a, ssqdm_b, mean_b, nobs_b):  # pragma: no cover
+    nobs = (nobs_a + nobs_b)
+    mean_x = (nobs_a * mean_a + nobs_b * mean_b) / nobs
+    delta = mean_b - mean_a
+    M2 = ssqdm_a + ssqdm_b + delta * delta * nobs_a * nobs_b / nobs
+    return M2, mean_x, nobs
+
+@numba.njit
+def __special_combine(*args):
+    return
+
+# https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_var_impl_linear(A):  # pragma: no cover
     nobs = 0
     mean_x = 0.0
     ssqdm_x = 0.0
     N = len(A)
     for i in numba.parfor.internal_prange(N):
+        hpat.hiframes_aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
         val = A[i]
         if not np.isnan(val):
             nobs += 1
             delta = val - mean_x
             mean_x += delta / nobs
-            ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+            # TODO: Pandas formula is better or Welford?
+            # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+            delta2 = val - mean_x
+            ssqdm_x += delta * delta2
     return hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
 
 
@@ -1232,12 +1251,44 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
 
     func_text = "def agg_combine({}):\n".format(", ".join(redvar_in_names + in_names))
 
-    for bl in parfor.loop_body.values():
+    blocks = wrap_parfor_blocks(parfor)
+    topo_order = find_topo_order(blocks)
+    topo_order = topo_order[1:]  # ignore init block
+    unwrap_parfor_blocks(parfor)
+
+    special_combines = {}
+    ignore_redvar_inds = []
+
+    for label in topo_order:
+        bl = parfor.loop_body[label]
         for stmt in bl.body:
+            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__special_combine', 'hpat.hiframes_aggregate')):
+                args = stmt.value.args
+                l_argnames = []
+                r_argnames = []
+                for v in args[:-1]:
+                    ind = redvars.index(v.name)
+                    ignore_redvar_inds.append(ind)
+                    l_argnames.append("v{}".format(ind))
+                    r_argnames.append("in{}".format(ind))
+                comb_name = "__special_combine__{}".format(len(special_combines))
+                func_text += "    ({},) = {}({})\n".format(
+                    ", ".join(l_argnames), comb_name, ", ".join(l_argnames + r_argnames))
+                dummy_call = ir.Expr.call(args[-1], [], (), bl.loc)
+                sp_func = guard(find_callname, f_ir, dummy_call)
+                # XXX: only var supported for now
+                # TODO: support general functions
+                assert sp_func == ('_var_combine', 'hpat.hiframes_aggregate')
+                sp_func = hpat.hiframes_aggregate._var_combine
+                special_combines[comb_name] = sp_func
+
             # reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 red_var = stmt.target.name
                 ind = redvars.index(red_var)
+                if ind in ignore_redvar_inds:
+                    continue
                 if len(f_ir._definitions[red_var]) == 2:
                     # 0 is the actual func since init_block is traversed later
                     # in parfor.py:3039, TODO: make this detection more robust
@@ -1265,7 +1316,9 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     # reduction variable types for new input and existing values
     arg_typs = tuple(2 * var_types)
 
-    f_ir = compile_to_numba_ir(agg_combine, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+    glbs = {'numba': numba, 'hpat':hpat, 'np': np}
+    glbs.update(special_combines)
+    f_ir = compile_to_numba_ir(agg_combine, glbs,  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
