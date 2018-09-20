@@ -40,13 +40,15 @@ AggFuncStruct = namedtuple('AggFuncStruct',
      'eval_all_func'])
 
 supported_agg_funcs = ['sum', 'count', 'mean',
-                       'min', 'max', 'prod', 'var', 'agg', 'aggregate']
+                       'min', 'max', 'prod', 'var', 'std', 'agg', 'aggregate']
 
 
 def get_agg_func(func_ir, func_name, rhs):
     from hpat.hiframes_typed import series_replace_funcs
     if func_name == 'var':
         return _column_var_impl_linear
+    if func_name == 'std':
+        return _column_std_impl_linear
     if func_name in supported_agg_funcs[:-2]:
         return series_replace_funcs[func_name]
 
@@ -98,6 +100,27 @@ def _column_var_impl_linear(A):  # pragma: no cover
             delta2 = val - mean_x
             ssqdm_x += delta * delta2
     return hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+
+# TODO: avoid code duplication
+def _column_std_impl_linear(A):  # pragma: no cover
+    nobs = 0
+    mean_x = 0.0
+    ssqdm_x = 0.0
+    N = len(A)
+    for i in numba.parfor.internal_prange(N):
+        hpat.hiframes_aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
+        val = A[i]
+        if not np.isnan(val):
+            nobs += 1
+            delta = val - mean_x
+            mean_x += delta / nobs
+            # TODO: Pandas formula is better or Welford?
+            # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+            delta2 = val - mean_x
+            ssqdm_x += delta * delta2
+    v = hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+    return v**0.5
 
 
 class Aggregate(ir.Stmt):
