@@ -142,6 +142,14 @@ class TestDate(unittest.TestCase):
         month = hpat_func(ts)
         self.assertEqual(month, 4)
 
+    def test_timestamp_date(self):
+        def test_impl(s):
+            return s.date()
+
+        hpat_func = hpat.jit(test_impl)
+        ts = pd.Timestamp(datetime(2017, 4, 26).isoformat())
+        self.assertEqual(hpat_func(ts), test_impl(ts))
+
     def test_datetimeindex_str_comp(self):
         def test_impl(df):
             return (df.A >= '2011-10-23').values
