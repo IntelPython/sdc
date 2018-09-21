@@ -136,6 +136,7 @@ class SeriesType(types.IterableType):
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
+timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'), 1, 'C')
 date_series_type = SeriesType(datetime_date_type, 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
@@ -325,6 +326,22 @@ class SeriesAttribute(AttributeTemplate):
 
     def resolve_nanosecond(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_days(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_seconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_microseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_nanoseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
             return types.Array(types.int64, 1, 'C')
 
     @bound_function("array.astype")
@@ -541,6 +558,20 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_idxmax(self, ary, args, kws):
         assert not kws
         return signature(types.intp, *args)
+
+    @bound_function("series.max")
+    def resolve_max(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
+
+    @bound_function("series.min")
+    def resolve_min(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
 
 
 # TODO: use ops logic from pandas/core/ops.py
@@ -838,3 +869,11 @@ class LenSeriesType(AbstractTemplate):
 #         return wrapper
 
 #@infer_global(np.full_like)
+
+@type_callable('-')
+def type_sub(context):
+    def typer(val1, val2):
+        if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
+            return timedelta_index_series_type
+    return typer
+
