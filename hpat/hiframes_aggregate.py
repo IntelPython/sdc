@@ -50,7 +50,12 @@ def get_agg_func(func_ir, func_name, rhs):
     if func_name == 'std':
         return _column_std_impl_linear
     if func_name in supported_agg_funcs[:-2]:
-        return series_replace_funcs[func_name]
+        func = series_replace_funcs[func_name]
+        # returning generic function
+        # TODO: support type-specific funcs e.g. for dt64
+        if isinstance(func, dict):
+            func = func[types.float64]
+        return func
 
     assert func_name in ['agg', 'aggregate']
     # agg case
