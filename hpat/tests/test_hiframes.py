@@ -153,6 +153,15 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
         self.assertEqual(hpat_func(df, n), test_impl(df, n))
 
+    def test_df_iat_set1(self):
+        def test_impl(df, n):
+            df.iat[n-1, 1] = n**2
+            return df
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df, n))
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):

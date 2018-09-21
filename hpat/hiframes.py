@@ -117,8 +117,12 @@ class HiFrames(object):
             self._working_body = new_body
             for i, inst in enumerate(block.body):
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+                if (isinstance(inst, (ir.StaticSetItem, ir.SetItem)) and self._is_iat(inst.target)):
+                    ind = inst.index if isinstance(inst, ir.SetItem) else inst.index_var
+                    out_nodes = self._handle_iat_setitem(inst.target, ind, inst.value, inst.loc)
+                    new_body.extend(out_nodes)
                 # df['col'] = arr
-                if (isinstance(inst, ir.StaticSetItem)
+                elif (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
                     # cfg needed for set df column
                     cfg = compute_cfg_from_blocks(blocks)
@@ -390,6 +394,14 @@ class HiFrames(object):
         getitem_node = ir.Expr.getitem(col_var, row_ind, rhs.loc)
         assign.value = getitem_node
         nodes.append(assign)
+        return nodes
+
+    def _handle_iat_setitem(self, target, index_var, val, loc):
+        val_def = guard(get_definition, self.func_ir, target)
+        df = val_def.value  # check already done in _is_iat
+        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
+        setitem_node = ir.SetItem(col_var, row_ind, val, loc)
+        nodes.append(setitem_node)
         return nodes
 
     def _get_iat_col_ind(self, df, index_var):
