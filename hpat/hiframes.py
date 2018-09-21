@@ -177,13 +177,12 @@ class HiFrames(object):
 
             # fix type for f['A'][:] dset reads
             if rhs.op in ('getitem', 'static_getitem'):
+                if self._is_iat(rhs.value):
+                    return self._handle_iat_getitem(assign, lhs, rhs)
                 h5_nodes = self.h5_handler.handle_possible_h5_read(
                     assign, lhs, rhs)
                 if h5_nodes is not None:
                     return h5_nodes
-                iat_nodes = self._handle_possible_iat(assign, lhs, rhs)
-                if iat_nodes is not None:
-                    return iat_nodes
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -373,21 +372,30 @@ class HiFrames(object):
         self._create_df(lhs.name, out_df_map, label)
         return nodes
 
-    def _handle_possible_iat(self, assign, lhs, rhs):
-        # TODO: setitem
+    def _is_iat(self, var):
+        val_def = guard(get_definition, self.func_ir, var)
         # check for df.at[] pattern
-        val_def = guard(get_definition, self.func_ir, rhs.value)
-        if not (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
-                and val_def.attr == 'iat' and self._is_df_var(val_def.value)):
-            return None
-        df = val_def.value
-        nodes = []
-        scope = assign.target.scope
-        loc = assign.target.loc
+        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr == 'iat' and self._is_df_var(val_def.value))
+
+    def _handle_iat_getitem(self, assign, lhs, rhs):
         if rhs.op == 'static_getitem':
             index_var = rhs.index_var
         else:
             index_var = rhs.index
+
+        val_def = guard(get_definition, self.func_ir, rhs.value)
+        df = val_def.value  # check already done in _is_iat
+        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
+        getitem_node = ir.Expr.getitem(col_var, row_ind, rhs.loc)
+        assign.value = getitem_node
+        nodes.append(assign)
+        return nodes
+
+    def _get_iat_col_ind(self, df, index_var):
+        nodes = []
+        scope = index_var.scope
+        loc = index_var.loc
         # find column/row indices
         col_ind = None
         row_ind = None
@@ -421,11 +429,8 @@ class HiFrames(object):
         if not col_ind < len(col_var_list):
             raise ValueError("invalid column index in iat[]")
         col_var = col_var_list[col_ind]
-        getitem_node = ir.Expr.getitem(col_var, row_ind, loc)
-        assign.value = getitem_node
-        nodes.append(assign)
-        return nodes
 
+        return col_var, row_ind, nodes
 
     def _get_reverse_copies(self, body):
         for inst in body:
