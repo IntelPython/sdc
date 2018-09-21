@@ -541,7 +541,7 @@ class TestHiFrames(unittest.TestCase):
 
     def test_filter1(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
             df1 = df[df.A > .5]
             return df1.B.sum()
 
@@ -553,7 +553,7 @@ class TestHiFrames(unittest.TestCase):
 
     def test_filter2(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
             df1 = df.loc[df.A > .5]
             return np.sum(df1.B)
 
@@ -565,7 +565,7 @@ class TestHiFrames(unittest.TestCase):
 
     def test_filter3(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
             df1 = df.iloc[(df.A > .5).values]
             return np.sum(df1.B)
 
@@ -574,6 +574,24 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_iloc1(self):
+        def test_impl(df, n):
+            return df.iloc[1:n].B.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
+
+    def test_iloc2(self):
+        def test_impl(df, n):
+            return df.iloc[np.array([1,4,9])].B.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
 
     def test_1D_Var_len(self):
         def test_impl(n):
