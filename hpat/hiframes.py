@@ -392,6 +392,7 @@ class HiFrames(object):
         col_ind = None
         row_ind = None
         ind_def = guard(get_definition, self.func_ir, index_var)
+
         # index is constant tuple
         if isinstance(ind_def, ir.Const):
             val = ind_def.value
@@ -401,6 +402,19 @@ class HiFrames(object):
             r_var = ir.Var(scope, mk_unique_var(index_var.name), loc)
             nodes.append(ir.Assign(ir.Const(row_ind, loc), r_var, loc))
             row_ind = r_var
+
+        # index is variable tuple
+        elif isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple':
+            if len(ind_def.items) != 2:
+                raise ValueError("invalid index length for df.iat[], "
+                                 "[row, column] expected")
+            row_ind = ind_def.items[0]
+            col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+            if col_ind is None:
+                raise ValueError("column index in iat[] should be constant")
+        else:
+            raise ValueError("invalid index in iat[]")
+
         # XXX assuming the order of the dictionary is the same as Pandas
         # TODO: check dictionary order
         col_var_list = list(self._get_df_cols(df).values())
