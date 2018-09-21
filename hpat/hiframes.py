@@ -181,6 +181,9 @@ class HiFrames(object):
                     assign, lhs, rhs)
                 if h5_nodes is not None:
                     return h5_nodes
+                iat_nodes = self._handle_possible_iat(assign, lhs, rhs)
+                if iat_nodes is not None:
+                    return iat_nodes
 
             # d = df['column']
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
@@ -369,6 +372,46 @@ class HiFrames(object):
 
         self._create_df(lhs.name, out_df_map, label)
         return nodes
+
+    def _handle_possible_iat(self, assign, lhs, rhs):
+        # TODO: setitem
+        # check for df.at[] pattern
+        val_def = guard(get_definition, self.func_ir, rhs.value)
+        if not (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr == 'iat' and self._is_df_var(val_def.value)):
+            return None
+        df = val_def.value
+        nodes = []
+        scope = assign.target.scope
+        loc = assign.target.loc
+        if rhs.op == 'static_getitem':
+            index_var = rhs.index_var
+        else:
+            index_var = rhs.index
+        # find column/row indices
+        col_ind = None
+        row_ind = None
+        ind_def = guard(get_definition, self.func_ir, index_var)
+        # index is constant tuple
+        if isinstance(ind_def, ir.Const):
+            val = ind_def.value
+            if not isinstance(val, tuple) or not len(val) == 2:
+                raise ValueError("invalid index {} for df.iat[]".format(val))
+            row_ind, col_ind = val
+            r_var = ir.Var(scope, mk_unique_var(index_var.name), loc)
+            nodes.append(ir.Assign(ir.Const(row_ind, loc), r_var, loc))
+            row_ind = r_var
+        # XXX assuming the order of the dictionary is the same as Pandas
+        # TODO: check dictionary order
+        col_var_list = list(self._get_df_cols(df).values())
+        if not col_ind < len(col_var_list):
+            raise ValueError("invalid column index in iat[]")
+        col_var = col_var_list[col_ind]
+        getitem_node = ir.Expr.getitem(col_var, row_ind, loc)
+        assign.value = getitem_node
+        nodes.append(assign)
+        return nodes
+
 
     def _get_reverse_copies(self, body):
         for inst in body:
