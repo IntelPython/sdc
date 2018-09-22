@@ -683,6 +683,17 @@ class SortTyping(AbstractTemplate):
         assert not kws
         return signature(types.none, *args)
 
+def df_isin(A, B):  # pragma: no cover
+    return A
+
+@infer_global(df_isin)
+class DfIsinCol(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(SeriesType(types.bool_, 1, 'C'), *args)
+
+
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):
         self.col_names = col_names

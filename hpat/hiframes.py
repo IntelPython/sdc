@@ -352,6 +352,10 @@ class HiFrames(object):
         if func_name == 'head':
             return self._handle_df_head(lhs, rhs, df_var, label)
 
+        # df.isin()
+        if func_name == 'isin':
+            return self._handle_df_isin(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -375,6 +379,43 @@ class HiFrames(object):
             f_block = compile_to_numba_ir(series_head, {}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_var] + rhs.args)
             nodes += f_block.body[:-3]  # remove none return
+            out_df_map[cname] = nodes[-1].target
+
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
+
+
+    def _handle_df_isin(self, lhs, rhs, df_var, label):
+        other = self._get_arg('isin', rhs.args, dict(rhs.kws), 0, 'values')
+        other_colmap = {}
+        df_col_map = self._get_df_cols(df_var)
+        nodes = []
+
+        # dataframe case
+        if self._is_df_var(other):
+            arg_df_map = self._get_df_cols(other)
+            for cname in df_col_map:
+                if cname in arg_df_map:
+                    other_colmap[cname] = arg_df_map[cname]
+
+        out_df_map = {}
+        isin_func = lambda A, B: hpat.hiframes_api.df_isin(A, B)
+        # create array of False values used when other col not available
+        bool_arr_func = lambda A: hpat.hiframes_api.to_series_type(np.zeros(len(A), np.bool_))
+        # use the first array of df to get len. TODO: check for empty df
+        false_arr_args = [list(df_col_map.values())[0]]
+
+        for cname, in_var in self.df_vars[df_var.name].items():
+            if cname in arg_df_map:
+                func = isin_func
+                other_col_var = other_colmap[cname]
+                args = [in_var, other_col_var]
+            else:
+                func = bool_arr_func
+                args = false_arr_args
+            f_block = compile_to_numba_ir(func, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
             out_df_map[cname] = nodes[-1].target
 
         self._create_df(lhs.name, out_df_map, label)

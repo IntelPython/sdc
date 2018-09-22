@@ -346,6 +346,21 @@ class HiFramesTyped(object):
                 elif arr_typ.dtype != string_type:
                     return self._replace_func(lambda arr,i: False, [arr, ind])
 
+        if func_name == 'df_isin':
+            # XXX df isin is different than Series.isin, df.isin considers
+            #  index but Series.isin ignores it (everything is set)
+            # TODO: support strings and other types
+            def _isin_series(A, B):
+                numba.parfor.init_prange()
+                n = len(A)
+                m = len(B)
+                S = np.empty(n, np.bool_)
+                for i in numba.parfor.internal_prange(n):
+                    S[i] = (A[i] == B[i] if i < m else False)
+                return S
+
+            return self._replace_func(_isin_series, rhs.args)
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
