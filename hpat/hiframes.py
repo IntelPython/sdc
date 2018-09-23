@@ -390,24 +390,43 @@ class HiFrames(object):
         other_colmap = {}
         df_col_map = self._get_df_cols(df_var)
         nodes = []
+        df_case = False
 
         # dataframe case
         if self._is_df_var(other):
+            df_case = True
             arg_df_map = self._get_df_cols(other)
             for cname in df_col_map:
                 if cname in arg_df_map:
                     other_colmap[cname] = arg_df_map[cname]
+        else:
+            other_def = guard(get_definition, self.func_ir, other)
+            # dict case
+            if isinstance(other_def, ir.Expr) and other_def.op == 'build_map':
+                for c, v in other_def.items:
+                    cname = guard(find_const, self.func_ir, c)
+                    if not isinstance(cname, str):
+                        raise ValueError("dictionary argument to isin() should have constant keys")
+                    other_colmap[cname] = v
+            else:
+                # general iterable (e.g. list, set) case
+                # TODO: handle passed in dict case (pass colname to func?)
+                other_colmap = {c: other for c in df_col_map.keys()}
 
         out_df_map = {}
         isin_func = lambda A, B: hpat.hiframes_api.df_isin(A, B)
+        isin_vals_func = lambda A, B: hpat.hiframes_api.df_isin_vals(A, B)
         # create array of False values used when other col not available
         bool_arr_func = lambda A: hpat.hiframes_api.to_series_type(np.zeros(len(A), np.bool_))
         # use the first array of df to get len. TODO: check for empty df
         false_arr_args = [list(df_col_map.values())[0]]
 
         for cname, in_var in self.df_vars[df_var.name].items():
-            if cname in arg_df_map:
-                func = isin_func
+            if cname in other_colmap:
+                if df_case:
+                    func = isin_func
+                else:
+                    func = isin_vals_func
                 other_col_var = other_colmap[cname]
                 args = [in_var, other_col_var]
             else:

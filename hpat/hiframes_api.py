@@ -686,7 +686,11 @@ class SortTyping(AbstractTemplate):
 def df_isin(A, B):  # pragma: no cover
     return A
 
+def df_isin_vals(A, B):  # pragma: no cover
+    return A
+
 @infer_global(df_isin)
+@infer_global(df_isin_vals)
 class DfIsinCol(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws

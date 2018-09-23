@@ -361,6 +361,17 @@ class HiFramesTyped(object):
 
             return self._replace_func(_isin_series, rhs.args)
 
+        if func_name == 'df_isin_vals':
+            def _isin_series(A, vals):
+                numba.parfor.init_prange()
+                n = len(A)
+                S = np.empty(n, np.bool_)
+                for i in numba.parfor.internal_prange(n):
+                    S[i] = A[i] in vals
+                return S
+
+            return self._replace_func(_isin_series, rhs.args)
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
