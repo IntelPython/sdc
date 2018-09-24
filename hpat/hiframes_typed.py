@@ -79,6 +79,13 @@ class HiFramesTyped(object):
                         and self.typemap[inst.target.name] == h5dataset_type):
                     out_nodes = self._handle_h5_write(inst.target, inst.index, inst.value)
                     new_body.extend(out_nodes)
+                elif (isinstance(inst, (ir.SetItem, ir.StaticSetItem))
+                        and isinstance(self.typemap[inst.target.name], SeriesIatType)):
+                    val_def = guard(get_definition, self.func_ir, inst.target)
+                    assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr == 'iat'
+                    series_var = val_def.value
+                    inst.target = series_var
+                    new_body.append(inst)
                 else:
                     new_body.append(inst)
             if not replaced:

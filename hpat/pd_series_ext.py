@@ -816,6 +816,15 @@ class SetItemSeries(SetItemBuffer):
             res.args = (new_series, res.args[1], res.args[2])
             return res
 
+@infer
+class SetItemSeriesIat(SetItemSeries):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        # iat[] is the same as regular setitem
+        return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+
+
 def series_op_generic(cls, self, args, kws):
     # return if no Series
     if not any(isinstance(arg, SeriesType) for arg in args):

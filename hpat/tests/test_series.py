@@ -281,6 +281,16 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_iat2(self):
+        def test_impl(A):
+            A.iat[3] = 1
+            return A
+
+        n = 11
+        S = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_op1(self):
         def test_impl(A, i):
             return A+A
