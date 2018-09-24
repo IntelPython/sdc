@@ -1076,17 +1076,25 @@ class HiFramesTyped(object):
                      for i in range(len(in_vars))]
         out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
                      for i in range(len(in_vars))]
+        str_colnames = [in_names[i] for i, t in enumerate(in_typ.types) if t == string_series_type]
         isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
         func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
         func_text += "  old_len = len({})\n".format(in_names[0])
         func_text += "  new_len = 0\n"
+        for c in str_colnames:
+            func_text += "  num_chars_{} = 0\n".format(c)
         func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
         func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
         func_text += "      new_len += 1\n"
+        for c in str_colnames:
+            func_text += "      num_chars_{} += len({}[i])\n".format(c, c)
         for v, out in zip(in_names, out_names):
-            func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
+            if v in str_colnames:
+                func_text += "  {} = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars_{})\n".format(out, v)
+            else:
+                func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
         func_text += "  curr_ind = 0\n"
         func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
         func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
