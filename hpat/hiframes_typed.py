@@ -1045,7 +1045,7 @@ class HiFramesTyped(object):
 
         if func_name == 'dropna':
             # df.dropna case
-            if isinstance(self.typemap[rhs.args[0].name], types.Tuple):
+            if isinstance(self.typemap[rhs.args[0].name], types.BaseTuple):
                 return self._handle_df_dropna(assign, lhs, rhs)
             dtype = self.typemap[rhs.args[0].name].dtype
             if dtype == string_type:

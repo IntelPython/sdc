@@ -283,6 +283,16 @@ class TestHiFrames(unittest.TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    def test_df_dropna2(self):
+        def test_impl(df):
+            return df.dropna()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df)
+        pd.testing.assert_frame_equal(out, h_out)
+
     def test_df_dropna_inplace1(self):
         # TODO: fix error when no df is returned
         def test_impl(df):
