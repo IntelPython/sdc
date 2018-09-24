@@ -296,6 +296,9 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    def resolve_iat(self, ary):
+        return SeriesIatType(ary)
+
     def resolve_year(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')
@@ -649,6 +652,19 @@ def rolling_generic(self, args, kws):
 for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
 
+class SeriesIatType(types.Type):
+    def __init__(self, stype):
+        self.stype = stype
+        name = "SeriesIatType({})".format(stype)
+        super(SeriesIatType, self).__init__(name)
+
+@infer
+class GetItemSeriesIat(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        # iat[] is the same as regular getitem
+        return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 @infer
 class SeriesCompEqual(AbstractTemplate):

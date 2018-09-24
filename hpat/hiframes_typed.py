@@ -21,7 +21,7 @@ from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
-    series_str_methods_type, SeriesRollingType)
+    series_str_methods_type, SeriesRollingType, SeriesIatType)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
@@ -186,6 +186,14 @@ class HiFramesTyped(object):
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
                 return res
+
+            # replace getitems on Series.iat
+            if (rhs.op in ['getitem', 'static_getitem']
+                    and isinstance(self.typemap[rhs.value.name], SeriesIatType)):
+                val_def = guard(get_definition, self.func_ir, rhs.value)
+                assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr == 'iat'
+                series_var = val_def.value
+                rhs.value = series_var
 
             # replace getitems on dt_index/dt64 series with Timestamp function
             if (rhs.op in ['getitem', 'static_getitem']
