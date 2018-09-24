@@ -636,7 +636,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip("pending concat() bugfix")
     def test_append1(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)

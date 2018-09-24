@@ -681,58 +681,50 @@ class HiFrames(object):
     def _handle_concat_df(self, lhs, df_list, label):
         # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
-        done_cols = {}
-        i = 0
+
+        # get output column names
+        all_colnames = []
         for df in df_list:
-            df_col_map = self._get_df_cols(df)
-            for (c, v) in df_col_map.items():
-                if c in done_cols:
-                    continue
-                # arguments to the generated function
-                args = [v]
-                # names of arguments to the generated function
-                arg_names = ['_hpat_c' + str(i)]
-                # arguments to the concatenate function
-                conc_arg_names = ['_hpat_c' + str(i)]
-                allocs = ""
-                i += 1
-                for other_df in df_list:
-                    if other_df.name == df.name:
-                        continue
-                    if self._is_df_colname(other_df, c):
-                        other_var = self._get_df_colvar(other_df, c)
-                        args.append(other_var)
-                        arg_names.append('_hpat_c' + str(i))
-                        conc_arg_names.append('_hpat_c' + str(i))
-                        i += 1
-                    else:
-                        # use a df column variable just for computing length
-                        len_arg = self._get_df_col_vars(other_df)[0]
-                        len_name = '_hpat_len' + str(i)
-                        args.append(len_arg)
-                        arg_names.append(len_name)
-                        i += 1
-                        out_name = '_hpat_out' + str(i)
-                        conc_arg_names.append(out_name)
-                        i += 1
-                        # TODO: fix type
-                        # TODO: allocate string array of NAs
-                        allocs += "    {} = np.full(len({}), np.nan)\n".format(
-                            out_name, len_name)
+            all_colnames.extend(self._get_df_col_names(df))
+        # TODO: verify how Pandas sorts column names
+        all_colnames = sorted(set(all_colnames))
 
-                func_text = "def f({}):\n".format(",".join(arg_names))
-                func_text += allocs
-                func_text += "    s = hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
-                    ",".join(conc_arg_names))
-                loc_vars = {}
-                exec(func_text, {}, loc_vars)
-                f = loc_vars['f']
+        # generate a concat call for each output column
+        # TODO: support non-numericals like string
+        gen_nan_func = lambda A: np.full(len(A), np.nan)
+        # gen concat function
+        arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
+        func_text = "def _concat_imp({}):\n".format(arg_names)
+        func_text += "    return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
+            arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _concat_imp = loc_vars['_concat_imp']
 
-                f_block = compile_to_numba_ir(f,
+        done_cols = {}
+        for cname in all_colnames:
+            # arguments to the generated function
+            args = []
+            # get input columns
+            for df in df_list:
+                df_col_map = self._get_df_cols(df)
+                # generate full NaN column
+                if cname not in df_col_map:
+                    # use a df column just for len()
+                    len_arr = list(df_col_map.values())[0]
+                    f_block = compile_to_numba_ir(gen_nan_func,
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, args)
-                nodes += f_block.body[:-3]
-                done_cols[c] = nodes[-1].target
+                    replace_arg_nodes(f_block, [len_arr])
+                    nodes += f_block.body[:-2]
+                    args.append(nodes[-1].target)
+                else:
+                    args.append(df_col_map[cname])
+
+            f_block = compile_to_numba_ir(_concat_imp,
+                        {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            done_cols[cname] = nodes[-1].target
 
         self._create_df(lhs.name, done_cols, label)
         return nodes
