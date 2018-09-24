@@ -852,6 +852,34 @@ class SeriesOpUfuncs(NumpyRulesArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesOpUfuncs, self, args, kws)
 
+def install_series_method(op, name, generic, support_literals=False):
+    # taken from arraydecl.py, Series instead of Array
+    my_attr = {"key": op, "generic": generic}
+    temp_class = type("Series_" + name, (SeriesOpUfuncs,), my_attr)
+    if support_literals:
+        temp_class.support_literals = support_literals
+    def array_attribute_attachment(self, ary):
+        return types.BoundFunction(temp_class, ary)
+
+    setattr(SeriesAttribute, "resolve_" + name, array_attribute_attachment)
+
+explicit_binop_funcs = {
+    '+': 'add',
+    '-': 'sub',
+    '*': 'mul',
+    '/': 'div',
+    '/': 'truediv',
+    '//': 'floordiv',
+    '%': 'mod',
+    '**': 'pow'
+    }
+
+def ex_binop_generic(self, args, kws):
+    return SeriesOpUfuncs.generic(self, (self.this,) + args, kws)
+
+for op, fname in explicit_binop_funcs.items():
+    install_series_method(op, fname, ex_binop_generic)
+
 class SeriesInplaceOpUfuncs(NumpyRulesInplaceArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesInplaceOpUfuncs, self, args, kws)

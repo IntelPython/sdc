@@ -21,7 +21,8 @@ from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
-    series_str_methods_type, SeriesRollingType, SeriesIatType)
+    series_str_methods_type, SeriesRollingType, SeriesIatType,
+    explicit_binop_funcs)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
@@ -105,9 +106,10 @@ class HiFramesTyped(object):
             if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
                 # TODO: handle string arrays, etc.
                 assert (typ.typing_key.startswith('array.')
-                    or typ.typing_key.startswith('series.'))
+                    or typ.typing_key.startswith('series.')
+                    or typ.typing_key in explicit_binop_funcs.keys())
                 # skip if series.func since it is replaced here
-                if typ.typing_key.startswith('series.'):
+                if not typ.typing_key.startswith('array.'):
                     continue
                 this = series_to_array_type(typ.this)
                 attr = typ.typing_key[len('array.'):]
@@ -496,6 +498,16 @@ class HiFramesTyped(object):
                 return self._replace_func(lambda a: a, [series_var])
             func = series_replace_funcs['astype_str']
             return self._replace_func(func, [series_var])
+
+        if func_name in explicit_binop_funcs.values():
+            binop_map = {v: k for k, v in explicit_binop_funcs.items()}
+            func_text = "def _binop_impl(A, B):\n"
+            func_text += "  return A {} B\n".format(binop_map[func_name])
+
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            _binop_impl = loc_vars['_binop_impl']
+            return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
