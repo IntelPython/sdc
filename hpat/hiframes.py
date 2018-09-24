@@ -360,6 +360,10 @@ class HiFrames(object):
         if func_name == 'append':
             return self._handle_df_append(lhs, rhs, df_var, label)
 
+        # df.fillna()
+        if func_name == 'fillna':
+            return self._handle_df_fillna(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -458,6 +462,27 @@ class HiFrames(object):
             return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
         raise ValueError("invalid df.append() input. Only dataframe and list"
                          " of dataframes supported")
+
+    def _handle_df_fillna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("fillna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        val_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 0, 'value')
+        inplace_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
+
+        _fillna_func = lambda A, val, inplace: A.fillna(val, inplace=inplace)
+        out_col_map = {}
+        for cname, in_var in self._get_df_cols(df_var).items():
+            f_block = compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, val_var, inplace_var])
+            nodes += f_block.body[:-2]
+            out_col_map[cname] = nodes[-1].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        return nodes
 
     def _is_iloc_loc(self, var):
         val_def = guard(get_definition, self.func_ir, var)
