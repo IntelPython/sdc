@@ -31,6 +31,9 @@ ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
 ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
 ll.add_symbol('np_datetime_date_array_from_packed_ints', hdatetime_ext.np_datetime_date_array_from_packed_ints)
 
+date_fields = ['year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond', 'nanosecond']
+timedelta_fields = ['days', 'seconds', 'microseconds', 'nanoseconds']
+
 #--------------------------------------------------------------
 
 class PANDAS_DATETIMESTRUCT(ctypes.Structure):
@@ -116,11 +119,11 @@ def datetime_get_year(context, builder, typ, val):
     return builder.lshr(val, lir.Constant(lir.IntType(64), 32))
 
 @lower_getattr(DatetimeDateType, 'month')
-def datetime_get_year(context, builder, typ, val):
+def datetime_get_month(context, builder, typ, val):
     return builder.and_(builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF))
 
 @lower_getattr(DatetimeDateType, 'day')
-def datetime_get_year(context, builder, typ, val):
+def datetime_get_day(context, builder, typ, val):
     return builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF))
 
 @numba.njit
@@ -363,6 +366,10 @@ pandas_timestamp_type = PandasTimestampType()
 def typeof_pd_timestamp(val, c):
     return pandas_timestamp_type
 
+@typeof_impl.register(datetime.datetime)
+def typeof_datetime_datetime(val, c):
+    return pandas_timestamp_type
+
 ts_field_typ = types.int64
 
 
@@ -490,6 +497,20 @@ def type_timestamp(context):
         return pandas_timestamp_type
     return typer
 
+@type_callable(pd.Timestamp)
+def type_timestamp(context):
+    def typer(datetime_type):
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
+@type_callable(datetime.datetime)
+def type_timestamp(context):
+    def typer(year, month, day):  # how to handle optional hour, minute, second, us, ns?
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
 @lower_builtin(pd.Timestamp, types.int64, types.int64, types.int64, types.int64,
                 types.int64, types.int64, types.int64, types.int64)
 def impl_ctor_timestamp(context, builder, sig, args):
@@ -506,11 +527,73 @@ def impl_ctor_timestamp(context, builder, sig, args):
     ts.nanosecond = ns
     return ts._getvalue()
 
+@lower_builtin(pd.Timestamp, pandas_timestamp_type)
+def impl_ctor_ts_ts(context, builder, sig, args):
+    typ = sig.return_type
+    rhs = args[0]
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy._setvalue(rhs)
+    cgutils.copy_struct(ts, rhsproxy)
+    return ts._getvalue()
+
+#              , types.int64, types.int64, types.int64, types.int64, types.int64)
+@lower_builtin(datetime.datetime, types.int64, types.int64, types.int64)
+def impl_ctor_datetime(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day = args
+    #year, month, day, hour, minute, second, us, ns = args
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    ts.year = year
+    ts.month = month
+    ts.day = day
+    ts.hour = lir.Constant(lir.IntType(64), 0)
+    ts.minute = lir.Constant(lir.IntType(64), 0)
+    ts.second = lir.Constant(lir.IntType(64), 0)
+    ts.microsecond = lir.Constant(lir.IntType(64), 0)
+    ts.nanosecond = lir.Constant(lir.IntType(64), 0)
+    #ts.hour = hour
+    #ts.minute = minute
+    #ts.second = second
+    #ts.microsecond = us
+    #ts.nanosecond = ns
+    return ts._getvalue()
+
+
 
 @lower_cast(types.NPDatetime('ns'), types.int64)
 def dt64_to_integer(context, builder, fromty, toty, val):
     # dt64 is stored as int64 so just return value
     return val
+
+@numba.njit
+def convert_timestamp_to_datetime64(ts):
+    year = ts.year - 1970
+    days = year * 365
+    if days >= 0:
+        year += 1
+        days += year // 4
+        year += 68
+        days -= year // 100
+        year += 300
+        days += year // 400
+    else:
+        year -= 2
+        days += year // 4
+        year -= 28
+        days -= year // 100
+        days += year // 400
+    leapyear = (ts.year % 400 == 0) or (ts.year %4 == 0 and ts.year %100 != 0)
+    month_len = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if leapyear:
+        month_len[1] = 29
+
+    for i in range(ts.month - 1):
+        days += month_len[i]
+
+    days += ts.day - 1
+
+    return ((((days * 24 + ts.hour) * 60 + ts.minute) * 60 + ts.second) * 1000000 + ts.microsecond) * 1000 + ts.nanosecond
 
 @numba.njit
 def convert_datetime64_to_timestamp(dt64):
@@ -579,6 +662,23 @@ def type_myref(context):
         return types.voidptr
     return typer
 
+#-----------------------------------------------------------
+
+def integer_to_timedelta64(val):
+    return np.timedelta64(val)
+
+@type_callable(integer_to_timedelta64)
+def type_int_to_timedelta64(context):
+    def typer(val):
+        return types.NPTimedelta('ns')
+    return typer
+
+@lower_builtin(integer_to_timedelta64, types.int64)
+def impl_int_to_timedelta64(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+
 def integer_to_dt64(val):
     return np.datetime64(val)
 
@@ -591,6 +691,37 @@ def type_int_to_dt64(context):
 @lower_builtin(integer_to_dt64, types.int64)
 def impl_int_to_dt64(context, builder, sig, args):
     return args[0]
+
+#-----------------------------------------------------------
+
+def dt64_to_integer(val):
+    return int(val)
+
+@type_callable(dt64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(dt64_to_integer, types.NPDatetime('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+def timedelta64_to_integer(val):
+    return int(val)
+
+@type_callable(timedelta64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(timedelta64_to_integer, types.NPTimedelta('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
 
 @lower_builtin(myref, types.int32)
 @lower_builtin(myref, types.int64)

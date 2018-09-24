@@ -139,7 +139,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         self.add_pre_typing_stage(pm)
         pm.add_stage(self.stage_inline_pass, "inline funcs")
         pm.add_stage(self.stage_df_pass, "convert DataFrames")
-        pm.add_stage(self.stage_io_pass, "replace IO calls")
+        # pm.add_stage(self.stage_io_pass, "replace IO calls")
         # repeat inline closure pass to inline df stencils
         pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
         self.add_typing_stage(pm)

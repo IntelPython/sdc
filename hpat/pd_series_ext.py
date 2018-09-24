@@ -15,6 +15,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.hiframes_rolling import supported_rolling_funcs
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -135,6 +136,7 @@ class SeriesType(types.IterableType):
 string_series_type = SeriesType(string_type, 1, 'C', True)
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
+timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'), 1, 'C')
 date_series_type = SeriesType(datetime_date_type, 1, 'C')
 
 # register_model(SeriesType)(models.ArrayModel)
@@ -294,6 +296,54 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    def resolve_year(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_month(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_day(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_hour(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_minute(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_second(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_microsecond(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_nanosecond(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_days(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_seconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_microseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
+    def resolve_nanoseconds(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPTimedelta):
+            return types.Array(types.int64, 1, 'C')
+
     @bound_function("array.astype")
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.
@@ -318,6 +368,10 @@ class SeriesAttribute(AttributeTemplate):
         sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
+    @bound_function("series.sort_values")
+    def resolve_sort_values(self, ary, args, kws):
+        return signature(ary, *args)
+
     @bound_function("array.take")
     def resolve_take(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_take.__wrapped__
@@ -337,6 +391,12 @@ class SeriesAttribute(AttributeTemplate):
     @bound_function("series.nunique")
     def resolve_nunique(self, ary, args, kws):
         return signature(types.intp, *args)
+
+    @bound_function("series.unique")
+    def resolve_unique(self, ary, args, kws):
+        # unique returns ndarray for some reason
+        arr_typ = series_to_array_type(ary)
+        return signature(arr_typ, *args)
 
     @bound_function("series.describe")
     def resolve_describe(self, ary, args, kws):
@@ -407,23 +467,22 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
-    @bound_function("series.cov")
-    def resolve_cov(self, ary, args, kws):
+    def _resolve_cov_func(self, ary, args, kws):
         # array is valid since hiframes_typed calls this after type replacement
         assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
         assert isinstance(ary.dtype, types.Number)
         assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        is_complex_op = isinstance(ary.dtype, types.Complex) or isinstance(args[0].dtype, types.Complex)
+        ret_typ = types.complex128 if is_complex_op else types.float64
+        return signature(ret_typ, *args)
+
+    @bound_function("series.cov")
+    def resolve_cov(self, ary, args, kws):
+        return self._resolve_cov_func(ary, args, kws)
 
     @bound_function("series.corr")
     def resolve_corr(self, ary, args, kws):
-        # array is valid since hiframes_typed calls this after type replacement
-        assert len(args) == 1 and isinstance(args[0], (SeriesType, types.Array))
-        assert isinstance(ary.dtype, types.Number)
-        assert isinstance(args[0].dtype, types.Number)
-        # TODO: complex numbers return complex
-        return signature(types.float64, *args)
+        return self._resolve_cov_func(ary, args, kws)
 
     @bound_function("series.append")
     def resolve_append(self, ary, args, kws):
@@ -472,6 +531,16 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(ary, *args)
 
+    @bound_function("series.nsmallest")
+    def resolve_nsmallest(self, ary, args, kws):
+        assert not kws
+        return signature(ary, *args)
+
+    @bound_function("series.head")
+    def resolve_head(self, ary, args, kws):
+        assert not kws
+        return signature(ary, *args)
+
     @bound_function("series.median")
     def resolve_median(self, ary, args, kws):
         assert not kws
@@ -479,6 +548,31 @@ class SeriesAttribute(AttributeTemplate):
         # median converts integer output to float
         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
         return signature(dtype, *args)
+
+    @bound_function("series.idxmin")
+    def resolve_idxmin(self, ary, args, kws):
+        assert not kws
+        return signature(types.intp, *args)
+
+    @bound_function("series.idxmax")
+    def resolve_idxmax(self, ary, args, kws):
+        assert not kws
+        return signature(types.intp, *args)
+
+    @bound_function("series.max")
+    def resolve_max(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
+
+    @bound_function("series.min")
+    def resolve_min(self, ary, args, kws):
+        assert not kws
+        dtype = ary.dtype
+        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        return signature(dtype, *args)
+
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type
@@ -526,13 +620,16 @@ class SeriesRollingAttribute(AttributeTemplate):
 
     @bound_function("rolling.apply", True)
     def resolve_apply(self, ary, args, kws):
-        code = args[0].value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (types.Array(ary.dtype, 1, 'C'),), None)
+        # result is always float64 (see Pandas window.pyx:roll_generic)
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
 
-        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+    @bound_function("rolling.cov", True)
+    def resolve_cov(self, ary, args, kws):
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
 
+    @bound_function("rolling.corr", True)
+    def resolve_corr(self, ary, args, kws):
+        return signature(SeriesType(types.float64, 1, 'C'), *args)
 
 # similar to install_array_method in arraydecl.py
 def install_rolling_method(name, generic, support_literals=False):
@@ -546,18 +643,10 @@ def install_rolling_method(name, generic, support_literals=False):
     setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
 
 def rolling_generic(self, args, kws):
-    assert not args
-    assert not kws
-    # type function using Array typer
-    resolver = "resolve_" + self.key[len("rolling."):]
-    bound_func = getattr(ArrayAttribute, resolver)(None, self.this)
-    out_dtype = bound_func.get_call_type(None, args, kws).return_type
-    # output type is float64 due to NaNs
-    if isinstance(out_dtype, types.Integer):
-        out_dtype = types.float64
-    return signature(SeriesType(out_dtype, 1, 'C'), *args)
+    # output is always float64
+    return signature(SeriesType(types.float64, 1, 'C'), *args)
 
-for fname in ['sum', 'mean', 'min', 'max', 'std', 'var']:
+for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
 
 
@@ -780,3 +869,11 @@ class LenSeriesType(AbstractTemplate):
 #         return wrapper
 
 #@infer_global(np.full_like)
+
+@type_callable('-')
+def type_sub(context):
+    def typer(val1, val2):
+        if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
+            return timedelta_index_series_type
+    return typer
+

@@ -11,6 +11,28 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 
+_cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
+    (
+        [np.nan, -2., 3., 9.1],
+        [np.nan, -2., 3., 5.0],
+    ),
+    # TODO(quasilyte): more intricate data for complex-typed series.
+    # Some arguments make assert_almost_equal fail.
+    # Functions that yield mismaching results: _column_corr_impl and _column_cov_impl.
+    (
+        [complex(-2., 1.0), complex(3.0, 1.0)],
+        [complex(-3., 1.0), complex(2.0, 1.0)],
+    ),
+    (
+        [complex(-2.0, 1.0), complex(3.0, 1.0)],
+        [1.0, -2.0],
+    ),
+    (
+        [1.0, -4.5],
+        [complex(-4.5, 1.0), complex(3.0, 1.0)],
+    ),
+]]
+
 class TestSeries(unittest.TestCase):
     def test_create1(self):
         def test_impl():
@@ -127,7 +149,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
-    @unittest.skip("needs argsort fix in canonicalize_array_math")
     def test_series_attr5(self):
         def test_impl(A):
             return A.argsort().values
@@ -445,6 +466,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_prod1(self):
+        def test_impl(S):
+            return S.prod()
+
+        hpat_func = hpat.jit(test_impl)
+        # column with NA
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        # all NA case should produce 1
+        S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_count1(self):
         def test_impl(S):
             return S.count()
@@ -533,18 +566,20 @@ class TestSeries(unittest.TestCase):
             return S1.cov(S2)
 
         hpat_func = hpat.jit(test_impl)
-        S1 = pd.Series([np.nan, -2., 3., 9.1])
-        S2 = pd.Series([np.nan, -2., 3., 5.0])
-        np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        for pair in _cov_corr_series:
+            S1, S2 = pair
+            np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
+                                           err_msg='S1={}\nS2={}'.format(S1, S2))
 
     def test_series_corr1(self):
         def test_impl(S1, S2):
             return S1.corr(S2)
 
         hpat_func = hpat.jit(test_impl)
-        S1 = pd.Series([np.nan, -2., 3., 9.1])
-        S2 = pd.Series([np.nan, -2., 3., 5.0])
-        np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        for pair in _cov_corr_series:
+            S1, S2 = pair
+            np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
+                                           err_msg='S1={}\nS2={}'.format(S1, S2))
 
     def test_series_str_len1(self):
         def test_impl(S):
@@ -620,6 +655,16 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
+    def test_series_nlargest_default1(self):
+        def test_impl(S):
+            return S.nlargest()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
     def test_series_nlargest_nan1(self):
         def test_impl(S):
             return S.nlargest(4)
@@ -636,6 +681,63 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+
+    def test_series_nsmallest1(self):
+        def test_impl(S):
+            return S.nsmallest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nsmallest_default1(self):
+        def test_impl(S):
+            return S.nsmallest()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nsmallest_nan1(self):
+        def test_impl(S):
+            return S.nsmallest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_nsmallest_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.nsmallest(4)
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+
+    def test_series_head1(self):
+        def test_impl(S):
+            return S.head(4)
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_head_default1(self):
+        def test_impl(S):
+            return S.head()
+
+        hpat_func = hpat.jit(test_impl)
+        m = 100
+        np.random.seed(0)
+        S = pd.Series(np.random.randint(-30, 30, m))
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
     def test_series_median1(self):
         def test_impl(S):
@@ -663,6 +765,62 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
+
+    def test_series_argsort_parallel(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.argsort().values
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_idxmin1(self):
+        def test_impl(A):
+            return A.idxmin()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_idxmax1(self):
+        def test_impl(A):
+            return A.idxmax()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values1(self):
+        def test_impl(A):
+            return A.sort_values()
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.random.ranf(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values_parallel1(self):
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            S = df.points
+            return S.sort_values()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_shift_default1(self):
+        def test_impl(S):
+            return S.shift()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
 if __name__ == "__main__":
     unittest.main()

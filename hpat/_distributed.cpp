@@ -35,6 +35,8 @@ double hpat_dist_exscan_f8(double value);
 int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int type_enum);
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
 MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
+void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag);
+void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag);
 int hpat_dist_wait(MPI_Request req, bool cond);
 void hpat_dist_waitall(int size, MPI_Request *req);
 
@@ -115,6 +117,10 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_dist_irecv)));
     PyObject_SetAttrString(m, "hpat_dist_isend",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_isend)));
+    PyObject_SetAttrString(m, "hpat_dist_recv",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_recv)));
+    PyObject_SetAttrString(m, "hpat_dist_send",
+                            PyLong_FromVoidPtr((void*)(&hpat_dist_send)));
     PyObject_SetAttrString(m, "hpat_dist_wait",
                             PyLong_FromVoidPtr((void*)(&hpat_dist_wait)));
     PyObject_SetAttrString(m, "hpat_dist_get_item_pointer",
@@ -331,6 +337,19 @@ double hpat_dist_exscan_f8(double value)
     return out;
 }
 
+void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+    MPI_Recv(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+ }
+
+void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag)
+{
+    MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
+    MPI_Send(out, size, mpi_typ, pe, tag, MPI_COMM_WORLD);
+}
+
+
 MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
 {
     MPI_Request mpi_req_recv(MPI_REQUEST_NULL);
@@ -444,13 +463,13 @@ MPI_Datatype get_val_rank_MPI_typ(int typ_enum)
 MPI_Op get_MPI_op(int op_enum)
 {
     // printf("op type enum:%d\n", op_enum);
-    if (op_enum < 0 || op_enum > 5)
+    if (op_enum < 0 || op_enum > 6)
     {
         std::cerr << "Invalid MPI_Op" << "\n";
         return MPI_SUM;
     }
     MPI_Op ops_list[] = {MPI_SUM, MPI_PROD, MPI_MIN, MPI_MAX, MPI_MINLOC,
-            MPI_MAXLOC};
+            MPI_MAXLOC, MPI_BOR};
 
     return ops_list[op_enum];
 }

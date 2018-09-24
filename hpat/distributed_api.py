@@ -17,6 +17,8 @@ ll.add_symbol('c_alltoall', hdist.c_alltoall)
 ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
 ll.add_symbol('c_gatherv', hdist.c_gatherv)
 ll.add_symbol('c_bcast', hdist.c_bcast)
+ll.add_symbol('c_recv', hdist.hpat_dist_recv)
+ll.add_symbol('c_send', hdist.hpat_dist_send)
 
 from enum import Enum
 
@@ -33,6 +35,7 @@ class Reduce_Type(Enum):
     Max = 3
     Argmin = 4
     Argmax = 5
+    Or = 6
 
 
 def get_type_enum(arr):
@@ -44,6 +47,28 @@ def get_type_enum_overload(arr_typ):
     return lambda a: np.int32(typ_val)
 
 INT_MAX = np.iinfo(np.int32).max
+
+_send = types.ExternalFunction("c_send", types.void(types.voidptr, types.int32, types.int32, types.int32, types.int32))
+
+@numba.njit
+def send(val, rank, tag):
+    # dummy array for val
+    send_arr = np.full(1, val)
+    type_enum = get_type_enum(send_arr)
+    _send(send_arr.ctypes, 1, type_enum, rank, tag)
+
+
+_recv = types.ExternalFunction("c_recv", types.void(types.voidptr, types.int32, types.int32, types.int32, types.int32))
+
+@numba.njit
+def recv(dtype, rank, tag):
+    # dummy array for val
+    recv_arr = np.empty(1, dtype)
+    type_enum = get_type_enum(recv_arr)
+    _recv(recv_arr.ctypes, 1, type_enum, rank, tag)
+    return recv_arr[0]
+
+
 _alltoall = types.ExternalFunction("c_alltoall", types.void(types.voidptr, types.voidptr, types.int32, types.int32))
 
 @numba.njit

@@ -34,14 +34,103 @@ from hpat.hiframes_sort import (
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
     )
 from hpat.hiframes_join import write_send_buff
+
 AggFuncStruct = namedtuple('AggFuncStruct',
     ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
      'eval_all_func'])
 
+supported_agg_funcs = ['sum', 'count', 'mean',
+                       'min', 'max', 'prod', 'var', 'std', 'agg', 'aggregate']
+
+
+def get_agg_func(func_ir, func_name, rhs):
+    from hpat.hiframes_typed import series_replace_funcs
+    if func_name == 'var':
+        return _column_var_impl_linear
+    if func_name == 'std':
+        return _column_std_impl_linear
+    if func_name in supported_agg_funcs[:-2]:
+        func = series_replace_funcs[func_name]
+        # returning generic function
+        # TODO: support type-specific funcs e.g. for dt64
+        if isinstance(func, dict):
+            func = func[types.float64]
+        return func
+
+    assert func_name in ['agg', 'aggregate']
+    # agg case
+    # error checking: make sure there is function input only
+    if len(rhs.args) != 1:
+        raise ValueError("agg expects 1 argument")
+    agg_func = guard(get_definition, func_ir, rhs.args[0])
+    if agg_func is None or not (isinstance(agg_func, ir.Expr)
+                            and agg_func.op == 'make_function'):
+        raise ValueError("lambda for map not found")
+
+    def agg_func_wrapper(A):
+        return A
+    agg_func_wrapper.__code__ = agg_func.code
+    agg_func = agg_func_wrapper
+    return agg_func
+
+# combine function takes the reduce vars in reverse order of their user
+@numba.njit
+def _var_combine(ssqdm_a, mean_a, nobs_a, ssqdm_b, mean_b, nobs_b):  # pragma: no cover
+    nobs = (nobs_a + nobs_b)
+    mean_x = (nobs_a * mean_a + nobs_b * mean_b) / nobs
+    delta = mean_b - mean_a
+    M2 = ssqdm_a + ssqdm_b + delta * delta * nobs_a * nobs_b / nobs
+    return M2, mean_x, nobs
+
+@numba.njit
+def __special_combine(*args):
+    return
+
+# https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+def _column_var_impl_linear(A):  # pragma: no cover
+    nobs = 0
+    mean_x = 0.0
+    ssqdm_x = 0.0
+    N = len(A)
+    for i in numba.parfor.internal_prange(N):
+        hpat.hiframes_aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
+        val = A[i]
+        if not np.isnan(val):
+            nobs += 1
+            delta = val - mean_x
+            mean_x += delta / nobs
+            # TODO: Pandas formula is better or Welford?
+            # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+            delta2 = val - mean_x
+            ssqdm_x += delta * delta2
+    return hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+
+# TODO: avoid code duplication
+def _column_std_impl_linear(A):  # pragma: no cover
+    nobs = 0
+    mean_x = 0.0
+    ssqdm_x = 0.0
+    N = len(A)
+    for i in numba.parfor.internal_prange(N):
+        hpat.hiframes_aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
+        val = A[i]
+        if not np.isnan(val):
+            nobs += 1
+            delta = val - mean_x
+            mean_x += delta / nobs
+            # TODO: Pandas formula is better or Welford?
+            # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
+            delta2 = val - mean_x
+            ssqdm_x += delta * delta2
+    v = hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+    return v**0.5
+
 
 class Aggregate(ir.Stmt):
     def __init__(self, df_out, df_in, key_name, out_key_var, df_out_vars,
-                                 df_in_vars, key_arr, agg_func, out_typs, loc,
+                                 df_in_vars, key_arr, agg_func, tp_vars, loc,
                                  pivot_arr=None, pivot_values=None,
                                  is_crosstab=False):
         # name of output dataframe (just for printing purposes)
@@ -57,7 +146,8 @@ class Aggregate(ir.Stmt):
         self.key_arr = key_arr
 
         self.agg_func = agg_func
-        self.out_typs = out_typs
+        # XXX update tp_vars in copy propagate etc.?
+        self.out_typer_vars = tp_vars
 
         self.loc = loc
         # pivot_table handling
@@ -83,20 +173,13 @@ class Aggregate(ir.Stmt):
 def aggregate_typeinfer(aggregate_node, typeinferer):
     for out_name, out_var in aggregate_node.df_out_vars.items():
         if aggregate_node.pivot_arr is not None:
-            typ = list(aggregate_node.out_typs.values())[0]
+            tp_var = list(aggregate_node.out_typer_vars.values())[0]
         else:
-            typ = aggregate_node.out_typs[out_name]
+            tp_var = aggregate_node.out_typer_vars[out_name]
 
-        # TODO: are there other non-numpy array types?
-        # if typ == string_type:
-        #     arr_type = string_array_type
-        # else:
-        #     arr_type = types.Array(typ, 1, 'C')
-
-        # output is Series in type inference
-        arr_type = SeriesType(typ, 1, 'C')
-
-        typeinferer.lock_type(out_var.name, arr_type, loc=aggregate_node.loc)
+        typeinferer.constraints.append(
+            typeinfer.Propagate(
+                dst=out_var.name, src=tp_var.name, loc=aggregate_node.loc))
 
     # return key case
     if aggregate_node.out_key_var is not None:
@@ -116,6 +199,10 @@ def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
     if def_set is None:
         def_set = set()
 
+    if aggregate_node.out_typer_vars is not None:
+        # typer vars are used before typing (hiframes_typed should set None)
+        for v in aggregate_node.out_typer_vars.values():
+            use_set.add(v.name)
     # key array and input columns are used
     use_set.add(aggregate_node.key_arr.name)
     use_set.update({v.name for v in aggregate_node.df_in_vars.values()})
@@ -138,6 +225,9 @@ numba.analysis.ir_extension_usedefs[Aggregate] = aggregate_usedefs
 
 def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir, typemap):
     #
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return aggregate_node
+
     dead_cols = []
 
     for col_name, col_var in aggregate_node.df_out_vars.items():
@@ -148,7 +238,7 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
         aggregate_node.df_out_vars.pop(cname)
         if aggregate_node.pivot_arr is None:
             aggregate_node.df_in_vars.pop(cname)
-            aggregate_node.out_typs.pop(cname)
+            aggregate_node.out_typer_vars.pop(cname)
         else:
             aggregate_node.pivot_values.remove(cname)
 
@@ -426,9 +516,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         pivot_typ, agg_node.pivot_values, agg_node.is_crosstab)
 
     return_key = agg_node.out_key_var is not None
-    out_typs = list(agg_node.out_typs.values())
-    if agg_node.pivot_arr is not None:
-        out_typs = out_typs * len(agg_node.pivot_values)
+    out_typs = [t.dtype for t in out_col_typs]
 
     top_level_func = gen_top_level_agg_func(
         key_typ, return_key, agg_func_struct.var_typs, out_typs,
@@ -1191,12 +1279,44 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
 
     func_text = "def agg_combine({}):\n".format(", ".join(redvar_in_names + in_names))
 
-    for bl in parfor.loop_body.values():
+    blocks = wrap_parfor_blocks(parfor)
+    topo_order = find_topo_order(blocks)
+    topo_order = topo_order[1:]  # ignore init block
+    unwrap_parfor_blocks(parfor)
+
+    special_combines = {}
+    ignore_redvar_inds = []
+
+    for label in topo_order:
+        bl = parfor.loop_body[label]
         for stmt in bl.body:
+            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+                    == ('__special_combine', 'hpat.hiframes_aggregate')):
+                args = stmt.value.args
+                l_argnames = []
+                r_argnames = []
+                for v in args[:-1]:
+                    ind = redvars.index(v.name)
+                    ignore_redvar_inds.append(ind)
+                    l_argnames.append("v{}".format(ind))
+                    r_argnames.append("in{}".format(ind))
+                comb_name = "__special_combine__{}".format(len(special_combines))
+                func_text += "    ({},) = {}({})\n".format(
+                    ", ".join(l_argnames), comb_name, ", ".join(l_argnames + r_argnames))
+                dummy_call = ir.Expr.call(args[-1], [], (), bl.loc)
+                sp_func = guard(find_callname, f_ir, dummy_call)
+                # XXX: only var supported for now
+                # TODO: support general functions
+                assert sp_func == ('_var_combine', 'hpat.hiframes_aggregate')
+                sp_func = hpat.hiframes_aggregate._var_combine
+                special_combines[comb_name] = sp_func
+
             # reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 red_var = stmt.target.name
                 ind = redvars.index(red_var)
+                if ind in ignore_redvar_inds:
+                    continue
                 if len(f_ir._definitions[red_var]) == 2:
                     # 0 is the actual func since init_block is traversed later
                     # in parfor.py:3039, TODO: make this detection more robust
@@ -1224,7 +1344,9 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     # reduction variable types for new input and existing values
     arg_typs = tuple(2 * var_types)
 
-    f_ir = compile_to_numba_ir(agg_combine, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+    glbs = {'numba': numba, 'hpat':hpat, 'np': np}
+    glbs.update(special_combines)
+    f_ir = compile_to_numba_ir(agg_combine, glbs,  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 

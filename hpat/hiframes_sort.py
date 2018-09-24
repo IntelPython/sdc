@@ -106,6 +106,8 @@ ir_utils.visit_vars_extensions[Sort] = visit_vars_sort
 
 def remove_dead_sort(sort_node, lives, arg_aliases, alias_map, func_ir, typemap):
     #
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return sort_node
     dead_cols = []
 
     for col_name, col_var in sort_node.df_vars.items():

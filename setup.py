@@ -93,10 +93,13 @@ if use_impi:
 
 if is_win:
     # use Intel MPI on Windows
-    MPI_LIBS = ['libimalloc', 'impi', 'impicxx']
+    MPI_LIBS = ['impi', 'impicxx']
     # hdf5-parallel Windows build uses CMake which needs this flag
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
+hdf5_libs = MPI_LIBS + ['hdf5']
+if not is_win:
+    hdf5_libs += ['boost_filesystem']
 
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
@@ -148,9 +151,14 @@ ext_set = Extension(name="hset_ext",
                      library_dirs = lid,
 )
 
+str_libs = np_compile_args['libraries']
+
+if not is_win:
+    str_libs += ['boost_regex']
+
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
-                    libraries=['boost_regex'] + np_compile_args['libraries'],
+                    libraries=str_libs,
                     define_macros = np_compile_args['define_macros'], # + [('USE_BOOST_REGEX', None)],
                     extra_compile_args = eca,
                     extra_link_args = ela,
@@ -186,7 +194,12 @@ ext_quantile = Extension(name="quantile_alg",
 
 
 # pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
-pq_libs = MPI_LIBS + ['boost_filesystem']
+pq_libs = MPI_LIBS
+
+# Windows MSVC can't have boost library names on command line
+# auto-link magic of boost should be used
+if not is_win:
+    pq_libs += ['boost_filesystem']
 
 # if is_win:
 #     pq_libs += ['arrow', 'parquet']
@@ -261,7 +274,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.23.3',
+      version='0.24.0',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[

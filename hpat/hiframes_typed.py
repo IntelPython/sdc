@@ -14,15 +14,17 @@ from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
-from hpat.utils import debug_prints, inline_new_blocks
+from hpat import hiframes_sort
+from hpat.utils import debug_prints, inline_new_blocks, ReplaceFunc
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType)
-
-ReplaceFunc = namedtuple("ReplaceFunc", ["func", "arg_types", "args", "glbls"])
+from hpat.pio_api import h5dataset_type
+from hpat.hiframes_rolling import get_rolling_setup_args
+from hpat.hiframes_aggregate import Aggregate
 
 LARGE_WIN_SIZE = 10
 
@@ -47,12 +49,17 @@ class HiFramesTyped(object):
             new_body = []
             replaced = False
             for i, inst in enumerate(block.body):
+                if isinstance(inst, Aggregate):
+                    #import pdb; pdb.set_trace()
+                    inst.out_typer_vars = None
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst)
                     if isinstance(out_nodes, list):
                         new_body.extend(out_nodes)
                     if isinstance(out_nodes, ReplaceFunc):
                         rp_func = out_nodes
+                        if rp_func.pre_nodes is not None:
+                            new_body.extend(rp_func.pre_nodes)
                         # replace inst.value to a call with target args
                         # as expected by inline_closure_call
                         inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
@@ -68,6 +75,10 @@ class HiFramesTyped(object):
                         inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
                         replaced = True
                         break
+                elif (isinstance(inst, ir.StaticSetItem)
+                        and self.typemap[inst.target.name] == h5dataset_type):
+                    out_nodes = self._handle_h5_write(inst.target, inst.index, inst.value)
+                    new_body.extend(out_nodes)
                 else:
                     new_body.append(inst)
             if not replaced:
@@ -156,11 +167,21 @@ class HiFramesTyped(object):
 
         if isinstance(rhs, ir.Expr):
             # arr = S.values
-            if (rhs.op == 'getattr' and isinstance(self.typemap[rhs.value.name], SeriesType)
-                    and rhs.attr == 'values'):
-                # simply return the column
-                assign.value = rhs.value
-                return [assign]
+            if (rhs.op == 'getattr'):
+                rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
+
+                if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
+                    # simply return the column
+                    assign.value = rhs.value
+                    return [assign]
+
+                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
+                    if rhs.attr in hpat.pd_timestamp_ext.date_fields:
+                        return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+
+                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
+                    if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
+                        return self._run_Timedelta_field(assign, assign.target, rhs)
 
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
@@ -207,11 +228,34 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
+                if fdef == ('h5_read_dummy', 'hpat.pio_api'):
+                    ndim = guard(find_const, self.func_ir, rhs.args[1])
+                    dtype_str = guard(find_const, self.func_ir, rhs.args[2])
+
+                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str):\n"
+                    for i in range(ndim):
+                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
+                    func_text += "  arr_shape = ({},)\n".format(
+                        ", ".join(["size_{}".format(i) for i in range(ndim)]))
+                    func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+                    func_text += "  A = np.empty(arr_shape, np.{})\n".format(
+                        dtype_str)
+                    func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+                    func_text += "  return A\n"
+
+                    loc_vars = {}
+                    exec(func_text, {}, loc_vars)
+                    _h5_read_impl = loc_vars['_h5_read_impl']
+                    return self._replace_func(_h5_read_impl, rhs.args)
+
                 if fdef == ('DatetimeIndex', 'pandas'):
                     return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
                 if func_mod == 'hpat.hiframes_api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
+
+                if func_mod == 'hpat.hiframes_rolling':
+                    return self._run_call_rolling(assign, assign.target, rhs, func_name)
 
                 if fdef == ('empty_like', 'numpy'):
                     return self._handle_empty_like(assign, lhs, rhs)
@@ -242,7 +286,7 @@ class HiFramesTyped(object):
         # arr = fix_df_array(col) -> arr=col if col is array
         if (func_name == 'fix_df_array'
                 and isinstance(self.typemap[rhs.args[0].name],
-                               (types.Array, StringArrayType))):
+                               (types.Array, StringArrayType, SeriesType))):
             assign.value = rhs.args[0]
             return [assign]
 
@@ -289,13 +333,63 @@ class HiFramesTyped(object):
                     self.typingctx , argtyps, rhs.kws)
                 self.calltypes[rhs] = new_sig
 
+        # replace isna early to enable more optimization in PA
+        # TODO: handle more types
+        if func_name == 'isna':
+            arr = rhs.args[0]
+            ind = rhs.args[1]
+            arr_typ = self.typemap[arr.name]
+            if isinstance(arr_typ, (types.Array, SeriesType)):
+                if isinstance(arr_typ.dtype, types.Float):
+                    func = lambda arr,i: np.isnan(arr[i])
+                    return self._replace_func(func, [arr, ind])
+                elif arr_typ.dtype != string_type:
+                    return self._replace_func(lambda arr,i: False, [arr, ind])
+
+        if func_name == 'df_isin':
+            # XXX df isin is different than Series.isin, df.isin considers
+            #  index but Series.isin ignores it (everything is set)
+            # TODO: support strings and other types
+            def _isin_series(A, B):
+                numba.parfor.init_prange()
+                n = len(A)
+                m = len(B)
+                S = np.empty(n, np.bool_)
+                for i in numba.parfor.internal_prange(n):
+                    S[i] = (A[i] == B[i] if i < m else False)
+                return S
+
+            return self._replace_func(_isin_series, rhs.args)
+
+        if func_name == 'df_isin_vals':
+            def _isin_series(A, vals):
+                numba.parfor.init_prange()
+                n = len(A)
+                S = np.empty(n, np.bool_)
+                for i in numba.parfor.internal_prange(n):
+                    S[i] = A[i] in vals
+                return S
+
+            return self._replace_func(_isin_series, rhs.args)
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'std', 'min', 'max',
-                         'nunique', 'describe', 'abs', 'str.len', 'isna',
-                         'isnull', 'median']:
+        if func_name in ['sum', 'count', 'mean', 'var', 'min', 'max', 'prod']:
+            if rhs.args or rhs.kws:
+                raise ValueError("unsupported Series.{}() arguments".format(
+                    func_name))
+            # TODO: handle skipna, min_count arguments
+            series_typ = self.typemap[series_var.name]
+            series_dtype = series_typ.dtype
+            func = series_replace_funcs[func_name]
+            if isinstance(func, dict):
+                func = func[series_dtype]
+            return self._replace_func(func, [series_var])
+
+        if func_name in ['std', 'nunique', 'describe', 'abs', 'str.len', 'isna',
+                         'isnull', 'median', 'idxmin', 'idxmax', 'unique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -317,12 +411,32 @@ class HiFramesTyped(object):
 
         if func_name in ('shift', 'pct_change'):
             # TODO: support default period argument
-            shift_const = rhs.args[0]
-            func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, shift_const])
+            if len(rhs.args) == 0:
+                args = [series_var]
+                func = series_replace_funcs[func_name + "_default"]
+            else:
+                assert len(rhs.args) == 1, "invalid args for " + func_name
+                shift_const = rhs.args[0]
+                args = [series_var, shift_const]
+                func = series_replace_funcs[func_name]
+            return self._replace_func(func, args)
 
-        if func_name == 'nlargest':
-            # TODO: support default n=5 argument
+        if func_name in ('nlargest', 'nsmallest'):
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs[func_name + '_default'], [series_var],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
+            n_arg = rhs.args[0]
+            func = series_replace_funcs[func_name]
+            return self._replace_func(func, [series_var, n_arg],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
+
+        if func_name == 'head':
+            # TODO: kws
+            if len(rhs.args) == 0 and not rhs.kws:
+                return self._replace_func(
+                    series_replace_funcs['head_default'], [series_var])
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, n_arg])
@@ -334,6 +448,10 @@ class HiFramesTyped(object):
 
         if func_name == 'str.contains':
             return self._handle_series_str_contains(rhs, series_var)
+
+        if func_name in ('argsort', 'sort_values'):
+            return self._handle_series_sort(
+                lhs, rhs, series_var, func_name == 'argsort')
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
@@ -372,6 +490,28 @@ class HiFramesTyped(object):
                 func_name))
 
         return [assign]
+
+    def _handle_series_sort(self, lhs, rhs, series_var, is_argsort):
+        """creates an index list and passes it to a Sort node as data
+        """
+        if is_argsort:
+            def _get_data(S):  # pragma: no cover
+                n = len(S)
+                A = np.arange(n)
+        else:  # sort_values
+            def _get_data(S):  # pragma: no cover
+                A = S.copy()
+
+        f_block = compile_to_numba_ir(_get_data,
+                                            {'np': np}, self.typingctx,
+                                            (if_series_to_array_type(self.typemap[series_var.name]),),
+                                            self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes = f_block.body[:-3]
+        nodes[-1].target = lhs
+        nodes.append(
+            hiframes_sort.Sort(series_var.name, series_var, {'inds': lhs}, lhs.loc))
+        return nodes
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype
@@ -523,6 +663,67 @@ class HiFramesTyped(object):
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [series_var])
         return f_ir.blocks
 
+    def _run_call_rolling(self, assign, lhs, rhs, func_name):
+        if func_name == 'rolling_corr':
+            def rolling_corr_impl(arr, other, win, center):
+                cov = hpat.hiframes_rolling.rolling_cov(arr, other, win, center)
+                a_std = hpat.hiframes_rolling.rolling_fixed(arr, win, center, False, 'std')
+                b_std = hpat.hiframes_rolling.rolling_fixed(other, win, center, False, 'std')
+                return cov / (a_std * b_std)
+            return self._replace_func(rolling_corr_impl, rhs.args)
+        if func_name == 'rolling_cov':
+            def rolling_cov_impl(arr, other, w, center):  # pragma: no cover
+                ddof = 1
+                X = arr.astype(np.float64)
+                Y = other.astype(np.float64)
+                XpY = X + Y
+                XtY = X * Y
+                count = hpat.hiframes_rolling.rolling_fixed(XpY, w, center, False, 'count')
+                mean_XtY = hpat.hiframes_rolling.rolling_fixed(XtY, w, center, False, 'mean')
+                mean_X = hpat.hiframes_rolling.rolling_fixed(X, w, center, False, 'mean')
+                mean_Y = hpat.hiframes_rolling.rolling_fixed(Y, w, center, False, 'mean')
+                bias_adj = count / (count - ddof)
+                return (mean_XtY - mean_X * mean_Y) * bias_adj
+            return self._replace_func(rolling_cov_impl, rhs.args)
+        # replace apply function with dispatcher obj, now the type is known
+        if (func_name == 'rolling_fixed'
+                and self.typemap[rhs.args[4].name] == types.pyfunc_type):
+            # for apply case, create a dispatcher for the kernel and pass it
+            # TODO: automatically handle lambdas in Numba
+            dtype = self.typemap[rhs.args[0].name].dtype
+            func_node = guard(get_definition, self.func_ir, rhs.args[4])
+            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
+            def f(arr, w, center):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_fixed(
+                                                arr, w, center, False, _func)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
+                        self.typingctx,
+                        tuple(self.typemap[v.name] for v in rhs.args[:-2]),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args[:-2])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = lhs
+            return nodes
+        elif (func_name == 'rolling_variable'
+                and self.typemap[rhs.args[5].name] == types.pyfunc_type):
+            # for apply case, create a dispatcher for the kernel and pass it
+            # TODO: automatically handle lambdas in Numba
+            dtype = self.typemap[rhs.args[0].name].dtype
+            func_node = guard(get_definition, self.func_ir, rhs.args[5])
+            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
+            def f(arr, on_arr, w, center):  # pragma: no cover
+                df_arr = hpat.hiframes_rolling.rolling_variable(
+                                                arr, on_arr, w, center, False, _func)
+            f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
+                        self.typingctx,
+                        tuple(self.typemap[v.name] for v in rhs.args[:-2]),
+                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, rhs.args[:-2])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = lhs
+            return nodes
+        return [assign]
+
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
         """
         Handle Series rolling calls like:
@@ -533,258 +734,108 @@ class HiFramesTyped(object):
         call_def = guard(get_definition, self.func_ir, rolling_call.func)
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
-        window, center = self._get_rolling_setup_args(rolling_call)
-
-        nodes = self._gen_rolling_call(
-            rhs.args, series_var, window, center, func_name, lhs)
-        return nodes
-
-    def _get_rolling_setup_args(self, rhs):
-        """
-        Handle Series rolling calls like:
-          r = df.column.rolling(3)
-        """
-        center = False
-        kws = dict(rhs.kws)
-        if rhs.args:
-            window = rhs.args[0]
-        elif 'window' in kws:
-            window = kws['window']
-        else:  # pragma: no cover
-            raise ValueError("window argument to rolling() required")
-        window_const = guard(find_const, self.func_ir, window)
-        window = window_const if window_const is not None else window
-        if 'center' in kws:
-            center_const = guard(find_const, self.func_ir, kws['center'])
-            center = center_const if center_const is not None else center
-        return window, center
-
-    def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
-        loc = col_var.loc
-        scope = col_var.scope
-        if func == 'apply':
-            if len(args) != 1:  # pragma: no cover
-                raise ValueError("One argument expected for rolling apply")
-            kernel_func = guard(get_definition, self.func_ir, args[0])
-        elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-            if len(args) != 0:  # pragma: no cover
-                raise ValueError("No argument expected for rolling {}".format(
-                    func))
-            g_pack = "np"
-            if func in ['std', 'var', 'mean']:
-                g_pack = "hpat.hiframes_api"
-            if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
-                # unroll if size is less than 5
-                kernel_args = ','.join(['a[{}]'.format(-i)
-                                        for i in range(win_size)])
-                kernel_expr = '{}.{}(np.array([{}]))'.format(
-                    g_pack, func, kernel_args)
-                if func == 'sum':  # simplify sum
-                    kernel_expr = '+'.join(['a[{}]'.format(-i)
-                                            for i in range(win_size)])
-            else:
-                kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
-            func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            kernel_func = loc_vars['g']
-
-        init_nodes = []
-
-        if isinstance(win_size, int):
-            win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
-            self.typemap[win_size_var.name] = types.intp
-            init_nodes.append(
-                ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
-            win_size = win_size_var
-
-        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(
-            win_size, func, center)
-
-        init_nodes += option_nodes
-        other_args = [win_size]
-        if func == 'apply':
-            other_args = None
-        options = {'neighborhood': win_tuple}
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = self._gen_stencil_call(init_nodes, col_var, out_var, kernel_func,
-                                         index_offsets, fir_globals, other_args,
-                                         options)
-
-        def f(A, w):  # pragma: no cover
-            A[0:w - 1] = np.nan
-        fargs = [out_var, win_size]
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, fargs)
-        setitem_nodes = f_block.body[:-3]  # remove none return
-
-        if center:
-            def f1(A, w):  # pragma: no cover
-                A[0:w // 2] = np.nan
-
-            def f2(A, w):  # pragma: no cover
-                n = len(A)
-                A[n - (w // 2):n] = np.nan
-            f_block = compile_to_numba_ir(f1, {'np': np}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes1 = f_block.body[:-3]  # remove none return
-            f_block = compile_to_numba_ir(f2, {'np': np}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes2 = f_block.body[:-3]  # remove none return
-            setitem_nodes = setitem_nodes1 + setitem_nodes2
-
-        return stencil_nodes + setitem_nodes
-
-    def _gen_rolling_init(self, win_size, func, center):
         nodes = []
-        right_length = 0
-        scope = win_size.scope
-        loc = win_size.loc
-        right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
-        self.typemap[right_length.name] = types.intp
-        nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
+        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        if not isinstance(center, ir.Var):
+            center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
+            self.typemap[center_var.name] = types.bool_
+            nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
+            center = center_var
 
-        def f(w):  # pragma: no cover
-            return -w + 1
+        if func_name in ('cov', 'corr'):
+            # TODO: variable window
+            if len(rhs.args) == 1:
+                other = rhs.args[0]
+            else:
+                other = series_var
+            if func_name == 'cov':
+                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_cov(a,b,w,c)
+            if func_name == 'corr':
+                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_corr(a,b,w,c)
+            return self._replace_func(f, [series_var, other, window, center],
+                                      pre_nodes=nodes)
+        elif func_name == 'apply':
+            func_node = guard(get_definition, self.func_ir, rhs.args[0])
+            dtype = self.typemap[series_var.name].dtype
+            func_global = self._handle_rolling_apply_func(func_node, dtype)
+        else:
+            func_global = func_name
+        def f(arr, w, center):  # pragma: no cover
+            return hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func)
+        args = [series_var, window, center]
+        return self._replace_func(
+            f, args, pre_nodes=nodes, extra_globals={'_func': func_global})
 
-        fargs = [win_size]
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, fargs)
-        nodes.extend(f_block.body[:-2])  # remove none return
-        left_length = nodes[-1].target
+    def _handle_rolling_apply_func(self, func_node, dtype):
+        if func_node is None:
+                raise ValueError(
+                    "cannot find kernel function for rolling.apply() call")
+        # TODO: more error checking on the kernel to make sure it doesn't
+        # use global/closure variables
+        f_ir = numba.ir_utils.get_ir_of_code({}, func_node.code)
+        kernel_func = numba.compiler.compile_ir(
+            self.typingctx,
+            numba.targets.registry.cpu_target.target_context,
+            f_ir,
+            (types.Array(dtype, 1, 'C'),),
+            types.float64,
+            numba.compiler.DEFAULT_FLAGS,
+            {}
+        )
+        imp_dis = numba.targets.registry.dispatcher_registry['cpu'](
+                                                            lambda a: None)
+        imp_dis.add_overload(kernel_func)
+        return imp_dis
 
-        if center:
-            def f(w):  # pragma: no cover
-                return -(w // 2)
-            f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            left_length = nodes[-1].target
+    def _run_DatetimeIndex_field(self, assign, lhs, rhs):
+        """transform DatetimeIndex.<field>
+        """
+        arr = rhs.value
+        field = rhs.attr
 
-            def f(w):  # pragma: no cover
-                return (w // 2)
-            f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            right_length = nodes[-1].target
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        S[i] = ts.' + field + '\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
 
-        def f(a, b):  # pragma: no cover
-            return ((a, b),)
-        fargs = [left_length, right_length]
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, fargs)
-        nodes.extend(f_block.body[:-2])  # remove none return
-        win_tuple = nodes[-1].target
+        return self._replace_func(f, [arr])
 
-        index_offsets = [right_length]
+    def _run_Timedelta_field(self, assign, lhs, rhs):
+        """transform Timedelta.<field>
+        """
+        arr = rhs.value
+        field = rhs.attr
 
-        if func == 'apply':
-            index_offsets = [left_length]
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.timedelta64_to_integer(dti[i])\n'
+        if field == 'nanoseconds':
+            func_text += '        S[i] = dt64 % 1000\n'
+        elif field == 'microseconds':
+            func_text += '        S[i] = dt64 // 1000 % 100000\n'
+        elif field == 'seconds':
+            func_text += '        S[i] = dt64 // (1000 * 1000000) % (60 * 60 * 24)\n'
+        elif field == 'days':
+            func_text += '        S[i] = dt64 // (1000 * 1000000 * 60 * 60 * 24)\n'
+        else:
+            assert(0)
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
 
-        def f(a):  # pragma: no cover
-            return (a,)
-
-        fargs = index_offsets
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_block = compile_to_numba_ir(f, {}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, index_offsets)
-        nodes.extend(f_block.body[:-2])  # remove none return
-        index_offsets = nodes[-1].target
-
-        return index_offsets, win_tuple, nodes
-
-    def _gen_stencil_call(self, init_nodes, in_arr, out_arr, kernel_func, index_offsets, fir_globals,
-                        other_args=None, options=None):
-        if other_args is None:
-            other_args = []
-        if options is None:
-            options = {}
-        if index_offsets != [0]:
-            options['index_offsets'] = index_offsets
-        scope = in_arr.scope
-        loc = in_arr.loc
-        stencil_nodes = []
-
-        # alloc output
-        stencil_nodes += self._gen_empty_like(in_arr, out_arr)
-
-        # make kernel_var mk_function expr
-        kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
-        self.typemap[kernel_var.name] = types.pyfunc_type
-        if not isinstance(kernel_func, ir.Expr):
-            kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
-                                                kernel_func.__closure__,
-                                                kernel_func.__defaults__, loc)
-        stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
-
-        # compile vanilla function without types
-        def f(A, B, f):  # pragma: no cover
-            numba.stencil(f)(A, out=B)
-
-        f_ir = compile_to_numba_ir(f, {'numba': numba,
-            'hpat': hpat, 'np': np},)
-        f_block = f_ir.blocks[min(f_ir.blocks.keys())]
-        fargs = [in_arr, out_arr, kernel_var]
-        replace_arg_nodes(f_block, fargs)
-
-        # create arguments with array + other args for type inference
-        other_arg_vars = [ir.Var(scope, mk_unique_var("w"), loc) for i in range(len(other_args))]
-        arg_nodes = ([ir.Assign(ir.Arg('A', 0, loc), stencil_nodes[0].value, loc)]
-            + [ir.Assign(ir.Arg('w'+str(i), i+1, loc), other_arg_vars[i], loc) for i in range(len(other_args))])
-        f_block.body = arg_nodes + init_nodes + stencil_nodes + f_block.body
-
-        # fix stencil call args
-        setup_call = f_block.body[-5].value
-        stencil_call = f_block.body[-4].value
-        setup_call.kws = list(options.items())
-        stencil_call.args += other_args
-
-        # run inlining and type inference
-        f_ir.arg_names = ['A'] + ["w"+str(i) for i in range(len(other_args))]
-        f_ir.arg_count = 1 + len(other_args)
-        f_ir._definitions = build_definitions(f_ir.blocks)
-        inline_pass = numba.inline_closurecall.InlineClosureCallPass(
-        f_ir, numba.targets.cpu.ParallelOptions(False))
-        inline_pass.run()
-
-        fargs = [in_arr] + other_args
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.typingctx, f_ir, arg_typs, None)
-        # remove argument entries like arg.a from typemap
-        arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
-        for a in arg_names:
-            f_typemap.pop(a)
-        self.typemap.update(f_typemap)
-        self.calltypes.update(f_calltypes)
-        replace_arg_nodes(f_block, fargs)
-
-        return f_block.body[:-3]
-
-    def _gen_empty_like(self, in_arr, out_arr):
-        def f(A):  # pragma: no cover
-            dtype = hpat.hiframes_api.shift_dtype(A.dtype)
-            B = np.empty(A.shape, dtype)
-
-        fargs = [in_arr]
-        arg_typs = tuple(if_series_to_array_type(self.typemap[v.name]) for v in fargs)
-        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np}, self.typingctx, arg_typs,
-                                        self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, fargs)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_arr
-        return nodes
+        return self._replace_func(f, [arr])
 
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
@@ -801,6 +852,13 @@ class HiFramesTyped(object):
                     "data argument in pd.DatetimeIndex() expected")
             data = rhs.args[0]
 
+        in_typ = self.typemap[data.name]
+        if not (in_typ == string_array_type or in_typ == string_series_type):
+            # already dt_index or int64
+            # TODO: check for other types
+            f = lambda A: hpat.hiframes_api.ts_series_to_arr_typ(A)
+            return self._replace_func(f, [data])
+
         def f(str_arr):
             numba.parfor.init_prange()
             n = len(str_arr)
@@ -812,7 +870,10 @@ class HiFramesTyped(object):
         return self._replace_func(f, [data])
 
     def _is_dt_index_binop(self, rhs):
-        if rhs.op != 'binop' or rhs.fn not in ('==', '!=', '>=', '>', '<=', '<'):
+        if rhs.op != 'binop':
+            return False
+
+        if rhs.fn not in ('==', '!=', '>=', '>', '<=', '<', '-'):
             return False
 
         arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
@@ -826,6 +887,12 @@ class HiFramesTyped(object):
     def _handle_dt_index_binop(self, lhs, rhs, assign):
         arg1, arg2 = rhs.lhs, rhs.rhs
         allowed_types = (dt_index_series_type, string_type)
+
+        # TODO: this has to be more generic to support all combinations.
+        if (self.typemap[arg1.name] == dt_index_series_type and
+            self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
+            rhs.fn == '-'):
+            return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
         if (self.typemap[arg1.name] not in allowed_types
                 or self.typemap[arg2.name] not in allowed_types):
@@ -998,6 +1065,30 @@ class HiFramesTyped(object):
 
         return [assign]
 
+    def _handle_h5_write(self, dset, index, arr):
+        if index != slice(None):
+            raise ValueError("Only HDF5 write of full array supported")
+        assert isinstance(self.typemap[arr.name], types.Array)
+        ndim = self.typemap[arr.name].ndim
+
+        func_text = "def _h5_write_impl(dset_id, arr):\n"
+        func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+        # TODO: remove after support arr.shape in parallel
+        func_text += "  arr_shape = ({},)\n".format(
+            ", ".join(["arr.shape[{}]".format(i) for i in range(ndim)]))
+        func_text += "  err = hpat.pio_api.h5write(dset_id, np.int32({}), zero_tup, arr_shape, 0, arr)\n".format(ndim)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _h5_write_impl = loc_vars['_h5_write_impl']
+        f_block = compile_to_numba_ir(_h5_write_impl, {'np': np,
+                                        'hpat': hpat}, self.typingctx,
+                                    (self.typemap[dset.name], self.typemap[arr.name]),
+                                    self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [dset, arr])
+        nodes = f_block.body[:-3]  # remove none return
+        return nodes
+
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
         if isinstance(tup_def, ir.Expr):
@@ -1008,8 +1099,11 @@ class HiFramesTyped(object):
                 return tup_def.items
         raise ValueError("constant tuple expected")
 
-    def _replace_func(self, func, args, const=False, array_typ_convert=True):
+    def _replace_func(self, func, args, const=False, array_typ_convert=True,
+                      pre_nodes=None, extra_globals=None):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        if extra_globals is not None:
+            glbls.update(extra_globals)
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
             arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
@@ -1022,7 +1116,7 @@ class HiFramesTyped(object):
                 else:
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
-        return ReplaceFunc(func, arg_typs, args, glbls)
+        return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
@@ -1122,6 +1216,7 @@ def _sum_handle_nan(s, count):  # pragma: no cover
 
 def _column_sum_impl_basic(A):  # pragma: no cover
     numba.parfor.init_prange()
+    # TODO: fix output type
     s = 0
     for i in numba.parfor.internal_prange(len(A)):
         val = A[i]
@@ -1145,6 +1240,17 @@ def _column_sum_impl_count(A):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_prod_impl_basic(A):  # pragma: no cover
+    numba.parfor.init_prange()
+    # TODO: fix output type
+    s = 1
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s *= val
+
+    res = s
+    return res
 
 @numba.njit
 def _mean_handle_nan(s, count):  # pragma: no cover
@@ -1215,6 +1321,14 @@ def _column_min_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
+    numba.parfor.init_prange()
+    s = numba.targets.builtins.get_type_max_value(numba.types.int64)
+    for i in numba.parfor.internal_prange(len(in_arr)):
+        val = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i])
+        s = min(s, val)
+    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+
 def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
@@ -1227,6 +1341,22 @@ def _column_max_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
     return res
 
+def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
+    numba.parfor.init_prange()
+    s = numba.targets.builtins.get_type_min_value(numba.types.int64)
+    for i in numba.parfor.internal_prange(len(in_arr)):
+        val = in_arr[i]
+        s = max(s, hpat.pd_timestamp_ext.dt64_to_integer(val))
+    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+
+def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
+    numba.parfor.init_prange()
+    n = len(in_arr)
+    S = numba.unsafe.ndarray.empty_inferred((n,))
+    tsint = hpat.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
+    for i in numba.parfor.internal_prange(n):
+        S[i] = hpat.pd_timestamp_ext.integer_to_timedelta64(hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+    return S
 
 def _column_describe_impl(A):  # pragma: no cover
     S = hpat.hiframes_api.to_series_type(A)
@@ -1255,25 +1385,6 @@ def _column_fillna_alloc_impl(S, val):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
     hpat.hiframes_api.fillna(B, S, val)
-    return B
-
-def _column_shift_impl(A, shift):  # pragma: no cover
-    # TODO: alloc_shift
-    #B = hpat.hiframes_api.alloc_shift(A)
-    B = np.empty_like(A)
-    #numba.stencil(lambda a, b: a[-b], out=B, neighborhood=((-shift, 1-shift), ))(A, shift)
-    numba.stencil(lambda a, b: a[-b], out=B)(A, shift)
-    B[0:shift] = np.nan
-    return B
-
-
-def _column_pct_change_impl(A, shift):  # pragma: no cover
-    # TODO: alloc_shift
-    #B = hpat.hiframes_api.alloc_shift(A)
-    B = np.empty_like(A)
-    #numba.stencil(lambda a, b: a[-b], out=B, neighborhood=((-shift, 1-shift), ))(A, shift)
-    numba.stencil(lambda a, b: (a[0]-a[-b])/a[-b], out=B)(A, shift)
-    B[0:shift] = np.nan
     return B
 
 
@@ -1354,23 +1465,35 @@ def _series_astype_str_impl(arr):
         A[i] = str(s)  # TODO: check NA
     return A
 
+from collections import defaultdict
+@numba.njit
+def lt_f(a, b):
+    return a < b
+
+@numba.njit
+def gt_f(a, b):
+    return a > b
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,
+    'prod': _column_prod_impl_basic,
     'count': _column_count_impl,
     'mean': _column_mean_impl,
-    'max': _column_max_impl,
-    'min': _column_min_impl,
+    'max': defaultdict(lambda: _column_max_impl, [(numba.types.scalars.NPDatetime('ns'), _column_max_impl_no_isnan)]),
+    'min': defaultdict(lambda: _column_min_impl, [(numba.types.scalars.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes_api.nunique(A),
+    'unique': lambda A: hpat.hiframes_api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
     'dropna_float': _series_dropna_float_impl,
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
-    'shift': _column_shift_impl,
-    'pct_change': _column_pct_change_impl,
+    'shift': lambda A, shift: hpat.hiframes_rolling.shift(A, shift, False),
+    'shift_default': lambda A: hpat.hiframes_rolling.shift(A, 1, False),
+    'pct_change': lambda A, shift: hpat.hiframes_rolling.pct_change(A, shift, False),
+    'pct_change_default': lambda A: hpat.hiframes_rolling.pct_change(A, 1, False),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
@@ -1383,6 +1506,14 @@ series_replace_funcs = {
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
-    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k),
+    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k, True, gt_f),
+    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, True, gt_f),
+    'nsmallest': lambda A, k: hpat.hiframes_api.nlargest(A, k, False, lt_f),
+    'nsmallest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, False, lt_f),
+    'head': lambda A, k: A[:k],
+    'head_default': lambda A: A[:5],
     'median': lambda A: hpat.hiframes_api.median(A),
+    # TODO: handle NAs in argmin/argmax
+    'idxmin': lambda A: A.argmin(),
+    'idxmax': lambda A: A.argmax(),
 }

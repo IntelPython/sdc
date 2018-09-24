@@ -7,7 +7,8 @@ import numba
 from numba import ir, ir_utils, types
 from numba.ir_utils import (find_topo_order, guard, get_definition, require,
                             find_callname, mk_unique_var, compile_to_numba_ir,
-                            replace_arg_nodes, build_definitions)
+                            replace_arg_nodes, build_definitions,
+                            find_build_sequence, find_const)
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
@@ -37,7 +38,7 @@ _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
 
 distributed_analysis_extensions = {}
-
+auto_rebalance = False
 
 class DistributedAnalysis(object):
     """analyze program for to distributed transfromation"""
@@ -67,7 +68,7 @@ class DistributedAnalysis(object):
         self._run_analysis(self.func_ir.blocks, topo_order,
                            array_dists, parfor_dists)
         # rebalance arrays if necessary
-        if Distribution.OneD_Var in array_dists.values():
+        if auto_rebalance and Distribution.OneD_Var in array_dists.values():
             changed = self._rebalance_arrs(array_dists, parfor_dists)
             if changed:
                 return self.run()
@@ -158,9 +159,9 @@ class DistributedAnalysis(object):
         parfor_arrs = set()  # arrays this parfor accesses in parallel
         array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
         par_index_var = parfor.loop_nests[0].index_variable.name
-        stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
+        #stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
         for (arr, index) in array_accesses:
-            if index == par_index_var or index in stencil_accesses:
+            if index == par_index_var: #or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr, index))
 
@@ -251,6 +252,35 @@ class DistributedAnalysis(object):
             # nunique doesn't affect input's distribution
             return
 
+        if fdef == ('unique', 'hpat.hiframes_api'):
+            # doesn't affect distribution of input since input can stay 1D
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+
+            new_dist = Distribution(min(array_dists[lhs].value,
+                                        array_dists[rhs.args[0].name].value))
+            array_dists[lhs] = new_dist
+            return
+
+        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
+        if fdef == ('rolling_variable', 'hpat.hiframes_rolling'):
+            # lhs, in_arr, on_arr should have the same distribution
+            new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
+            array_dists[rhs.args[0].name] = new_dist
+            return
+
+        if fdef == ('shift', 'hpat.hiframes_rolling'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
+        if fdef == ('pct_change', 'hpat.hiframes_rolling'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
         if fdef == ('nlargest', 'hpat.hiframes_api'):
             # output of nlargest is REP
             array_dists[lhs] = Distribution.REP
@@ -265,6 +295,13 @@ class DistributedAnalysis(object):
             return
 
         if fdef == ('isna', 'hpat.hiframes_api'):
+            return
+
+        # dummy hiframes functions
+        if func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+                'to_arr_from_series', 'ts_series_to_arr_typ',
+                'to_date_series_type'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
         # np.fromfile()
@@ -314,6 +351,11 @@ class DistributedAnalysis(object):
                 return
 
         if isinstance(func_mod, ir.Var) and self._analyze_call_d4p(lhs, func_name, self.typemap[func_mod.name], args, array_dists):
+            return
+
+        # TODO: make sure assert_equiv is not generated unnecessarily
+        # TODO: fix assert_equiv for np.stack from df.value
+        if fdef == ('assert_equiv', 'numba.array_analysis'):
             return
 
         # set REP if not found
@@ -386,6 +428,26 @@ class DistributedAnalysis(object):
             self._analyze_call_np_dot(lhs, args, array_dists)
             return
 
+        # used in df.values
+        if func_name == 'stack':
+            seq_info = guard(find_build_sequence, self.func_ir, args[0])
+            if seq_info is None:
+                self._analyze_call_set_REP(lhs, args, array_dists)
+                return
+            in_arrs, _ = seq_info
+
+            axis = 0
+            # TODO: support kws
+            # if 'axis' in kws:
+            #     axis = find_const(self.func_ir, kws['axis'])
+            if len(args) > 1:
+                axis = find_const(self.func_ir, args[1])
+
+            # parallel if args are 1D and output is 2D and axis == 1
+            if axis is not None and axis == 1 and self.typemap[lhs].ndim == 2:
+                for v in in_arrs:
+                    self._meet_array_dists(lhs, v.name, array_dists)
+                return
 
         if (func_name in ['cumsum', 'cumprod', 'empty_like',
                           'zeros_like', 'ones_like', 'full_like', 'copy']):
@@ -686,6 +748,7 @@ class DistributedAnalysis(object):
 
         for label, block in self.func_ir.blocks.items():
             for inst in block.body:
+                # TODO: handle hiframes filter etc.
                 if (isinstance(inst, Parfor)
                         and parfor_dists[inst.id] == Distribution.OneD_Var):
                     array_accesses = ir_utils.get_array_accesses(inst.loop_body)
@@ -706,6 +769,7 @@ class DistributedAnalysis(object):
         for block in blocks.values():
             new_body = []
             for inst in block.body:
+                # TODO: handle hiframes filter etc.
                 if isinstance(inst, Parfor):
                     self._gen_rebalances(rebalance_arrs, {0: inst.init_block})
                     self._gen_rebalances(rebalance_arrs, inst.loop_body)
@@ -749,51 +813,51 @@ def _arrays_written(arrs, blocks):
                 return True
     return False
 
-def get_stencil_accesses(parfor, typemap):
-    # if a parfor has stencil pattern, see which accesses depend on loop index
-    # XXX: assuming loop index is not used for non-stencil arrays
-    # TODO support recursive parfor, multi-D, mutiple body blocks
+# def get_stencil_accesses(parfor, typemap):
+#     # if a parfor has stencil pattern, see which accesses depend on loop index
+#     # XXX: assuming loop index is not used for non-stencil arrays
+#     # TODO support recursive parfor, multi-D, mutiple body blocks
 
-    # no access if not stencil
-    is_stencil = False
-    for pattern in parfor.patterns:
-        if pattern[0] == 'stencil':
-            is_stencil = True
-            neighborhood = pattern[1]
-    if not is_stencil:
-        return {}, None
+#     # no access if not stencil
+#     is_stencil = False
+#     for pattern in parfor.patterns:
+#         if pattern[0] == 'stencil':
+#             is_stencil = True
+#             neighborhood = pattern[1]
+#     if not is_stencil:
+#         return {}, None
 
-    par_index_var = parfor.loop_nests[0].index_variable
-    body = parfor.loop_body
-    body_defs = build_definitions(body)
+#     par_index_var = parfor.loop_nests[0].index_variable
+#     body = parfor.loop_body
+#     body_defs = build_definitions(body)
 
-    stencil_accesses = {}
+#     stencil_accesses = {}
 
-    for block in body.values():
-        for stmt in block.body:
-            if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
-                lhs = stmt.target.name
-                rhs = stmt.value
-                if (rhs.op == 'getitem' and is_array(typemap, rhs.value.name)
-                        and vars_dependent(body_defs, rhs.index, par_index_var)):
-                    stencil_accesses[rhs.index.name] = rhs.value.name
+#     for block in body.values():
+#         for stmt in block.body:
+#             if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr):
+#                 lhs = stmt.target.name
+#                 rhs = stmt.value
+#                 if (rhs.op == 'getitem' and is_array(typemap, rhs.value.name)
+#                         and vars_dependent(body_defs, rhs.index, par_index_var)):
+#                     stencil_accesses[rhs.index.name] = rhs.value.name
 
-    return stencil_accesses, neighborhood
+#     return stencil_accesses, neighborhood
 
 
-def vars_dependent(defs, var1, var2):
-    # see if var1 depends on var2 based on definitions in defs
-    if len(defs[var1.name]) != 1:
-        return False
+# def vars_dependent(defs, var1, var2):
+#     # see if var1 depends on var2 based on definitions in defs
+#     if len(defs[var1.name]) != 1:
+#         return False
 
-    vardef = defs[var1.name][0]
-    if isinstance(vardef, ir.Var) and vardef.name == var2.name:
-        return True
-    if isinstance(vardef, ir.Expr):
-        for invar in vardef.list_vars():
-            if invar.name == var2.name or vars_dependent(defs, invar, var2):
-                return True
-    return False
+#     vardef = defs[var1.name][0]
+#     if isinstance(vardef, ir.Var) and vardef.name == var2.name:
+#         return True
+#     if isinstance(vardef, ir.Expr):
+#         for invar in vardef.list_vars():
+#             if invar.name == var2.name or vars_dependent(defs, invar, var2):
+#                 return True
+#     return False
 
 
 def dprint(*s):

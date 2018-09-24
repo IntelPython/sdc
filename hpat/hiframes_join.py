@@ -18,8 +18,9 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str, num_total_chars,
-                              getitem_str_offset, copy_str_arr_slice, setitem_string_array)
-from hpat.hiframes_api import str_copy_ptr
+                              getitem_str_offset, copy_str_arr_slice,
+                              setitem_string_array, str_copy_ptr)
+
 from hpat.timsort import copyElement_tup, getitem_arr_tup
 import numpy as np
 
@@ -31,9 +32,9 @@ class Join(ir.Stmt):
         self.right_df = right_df
         self.left_key = left_key
         self.right_key = right_key
-        self.df_out_vars = df_vars[self.df_out]
-        self.left_vars = df_vars[left_df]
-        self.right_vars = df_vars[right_df]
+        self.df_out_vars = df_vars[self.df_out].copy()
+        self.left_vars = df_vars[left_df].copy()
+        self.right_vars = df_vars[right_df].copy()
         # needs df columns for type inference stage
         self.df_vars = df_vars
         self.loc = loc
@@ -101,34 +102,44 @@ numba.array_analysis.array_analysis_extensions[Join] = join_array_analysis
 
 def join_distributed_analysis(join_node, array_dists):
 
+    # TODO: can columns of the same input table have diffrent dists?
+    # left and right inputs can have 1D or 1D_Var seperately (q26 case)
     # input columns have same distribution
-    in_dist = Distribution.OneD
-    for _, col_var in (list(join_node.left_vars.items())
-                       + list(join_node.right_vars.items())):
-        in_dist = Distribution(
-            min(in_dist.value, array_dists[col_var.name].value))
+    left_dist = Distribution.OneD
+    right_dist = Distribution.OneD
+    for col_var in join_node.left_vars.values():
+        left_dist = Distribution(
+            min(left_dist.value, array_dists[col_var.name].value))
+
+    for col_var in join_node.right_vars.values():
+        right_dist = Distribution(
+            min(right_dist.value, array_dists[col_var.name].value))
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
-    for _, col_var in join_node.df_out_vars.items():
+    for col_var in join_node.df_out_vars.values():
         # output dist might not be assigned yet
         if col_var.name in array_dists:
             out_dist = Distribution(
                 min(out_dist.value, array_dists[col_var.name].value))
 
     # out dist should meet input dist (e.g. REP in causes REP out)
-    out_dist = Distribution(min(out_dist.value, in_dist.value))
-    for _, col_var in join_node.df_out_vars.items():
+    out_dist = Distribution(min(out_dist.value, left_dist.value))
+    out_dist = Distribution(min(out_dist.value, right_dist.value))
+    for col_var in join_node.df_out_vars.values():
         array_dists[col_var.name] = out_dist
 
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
-        in_dist = out_dist
+        left_dist = out_dist
+        right_dist = out_dist
 
     # assign input distributions
-    for _, col_var in (list(join_node.left_vars.items())
-                       + list(join_node.right_vars.items())):
-        array_dists[col_var.name] = in_dist
+    for col_var in join_node.left_vars.values():
+        array_dists[col_var.name] = left_dist
+
+    for col_var in join_node.right_vars.values():
+        array_dists[col_var.name] = right_dist
 
     return
 
@@ -173,6 +184,8 @@ ir_utils.visit_vars_extensions[Join] = visit_vars_join
 
 
 def remove_dead_join(join_node, lives, arg_aliases, alias_map, func_ir, typemap):
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return join_node
     # if an output column is dead, the related input column is not needed
     # anymore in the join
     dead_cols = []

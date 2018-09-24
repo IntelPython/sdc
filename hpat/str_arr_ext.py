@@ -272,6 +272,29 @@ def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
 
     return types.void(string_array_type, string_array_type), codegen
 
+@intrinsic
+def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        buff_arr, ind, str, len_str = args
+        buff_arr = context.make_array(sig.args[0])(context, builder, buff_arr)
+        ptr = builder.gep(buff_arr.data, [ind])
+        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
+
+
+@intrinsic
+def str_copy_ptr(typingctx, ptr_typ, ind_typ, str_typ, len_typ=None):
+    def codegen(context, builder, sig, args):
+        ptr, ind, _str, len_str = args
+        ptr = builder.gep(ptr, [ind])
+        cgutils.raw_memcpy(builder, ptr, _str, len_str, 1)
+        return context.get_dummy_value()
+
+    return types.void(types.voidptr, types.intp, types.voidptr, types.intp), codegen
+
+
 # convert array to list of strings if it is StringArray
 # just return it otherwise
 def to_string_list(arr):
@@ -420,9 +443,8 @@ class CmpOpLEStringArray(CmpOpEqStringArray):
 class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
 
-from hpat.pd_series_ext import string_series_type
-
 def is_str_arr_typ(typ):
+    from hpat.pd_series_ext import string_series_type
     return typ == string_array_type or typ == string_series_type
 
 # @infer_global(len)
@@ -736,7 +758,8 @@ def box_str_arr(typ, val, c):
     fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
     arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets, string_array.data, string_array.null_bitmap])
 
-    c.context.nrt.decref(c.builder, typ, val)
+    # TODO: double check refcounting here
+    # c.context.nrt.decref(c.builder, typ, val)
     return arr #c.builder.load(arr)
 
 @intrinsic
