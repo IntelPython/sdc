@@ -636,6 +636,18 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skip("pending concat() bugfix")
+    def test_append1(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2.A[n//2:] = n
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
     def test_rolling1(self):
         # size 3 without unroll
         def test_impl(n):

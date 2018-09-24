@@ -356,6 +356,10 @@ class HiFrames(object):
         if func_name == 'isin':
             return self._handle_df_isin(lhs, rhs, df_var, label)
 
+        # df.append()
+        if func_name == 'append':
+            return self._handle_df_append(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -439,6 +443,21 @@ class HiFrames(object):
 
         self._create_df(lhs.name, out_df_map, label)
         return nodes
+
+    def _handle_df_append(self, lhs, rhs, df_var, label):
+        other = self._get_arg('append', rhs.args, dict(rhs.kws), 0, 'other')
+        # only handles df or list of df input
+        # TODO: check for series/dict/list input
+        # TODO: enforce ignore_index=True?
+        # single df case
+        if self._is_df_var(other):
+            return self._handle_concat_df(lhs, [df_var, other], label)
+        # list of dfs
+        df_list = guard(get_definition, self.func_ir, other)
+        if len(df_list.items) > 0 and self._is_df_var(df_list.items[0]):
+            return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
+        raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
 
     def _is_iloc_loc(self, var):
         val_def = guard(get_definition, self.func_ir, var)
@@ -651,7 +670,7 @@ class HiFrames(object):
         first_varname = df_list.items[0].name
 
         if first_varname in self.df_vars:
-            return self._handle_concat_df(lhs, df_list, label)
+            return self._handle_concat_df(lhs, df_list.items, label)
 
         # XXX convert build_list to build_tuple since Numba doesn't handle list of
         # arrays
@@ -664,7 +683,7 @@ class HiFrames(object):
         nodes = []
         done_cols = {}
         i = 0
-        for df in df_list.items:
+        for df in df_list:
             df_col_map = self._get_df_cols(df)
             for (c, v) in df_col_map.items():
                 if c in done_cols:
@@ -677,7 +696,7 @@ class HiFrames(object):
                 conc_arg_names = ['_hpat_c' + str(i)]
                 allocs = ""
                 i += 1
-                for other_df in df_list.items:
+                for other_df in df_list:
                     if other_df.name == df.name:
                         continue
                     if self._is_df_colname(other_df, c):
