@@ -299,6 +299,14 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_iat(self, ary):
         return SeriesIatType(ary)
 
+    def resolve_iloc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
+
+    def resolve_loc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
+
     def resolve_year(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return types.Array(types.int64, 1, 'C')

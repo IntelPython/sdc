@@ -291,6 +291,25 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_iloc1(self):
+        def test_impl(A):
+            return A.iloc[3]
+
+        n = 11
+        S = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_iloc2(self):
+        def test_impl(A):
+            return A.iloc[3:8]
+
+        n = 11
+        S = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(S), test_impl(S).reset_index(drop=True))
+
     def test_series_op1(self):
         def test_impl(A, i):
             return A+A

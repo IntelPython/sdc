@@ -82,7 +82,7 @@ class HiFramesTyped(object):
                 elif (isinstance(inst, (ir.SetItem, ir.StaticSetItem))
                         and isinstance(self.typemap[inst.target.name], SeriesIatType)):
                     val_def = guard(get_definition, self.func_ir, inst.target)
-                    assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr == 'iat'
+                    assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
                     series_var = val_def.value
                     inst.target = series_var
                     new_body.append(inst)
@@ -198,7 +198,7 @@ class HiFramesTyped(object):
             if (rhs.op in ['getitem', 'static_getitem']
                     and isinstance(self.typemap[rhs.value.name], SeriesIatType)):
                 val_def = guard(get_definition, self.func_ir, rhs.value)
-                assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr == 'iat'
+                assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
                 series_var = val_def.value
                 rhs.value = series_var
 
