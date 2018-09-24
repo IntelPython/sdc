@@ -664,7 +664,8 @@ class GetItemSeriesIat(AbstractTemplate):
 
     def generic(self, args, kws):
         # iat[] is the same as regular getitem
-        return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
+        if isinstance(args[0], SeriesIatType):
+            return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 @infer
 class SeriesCompEqual(AbstractTemplate):
@@ -822,7 +823,8 @@ class SetItemSeriesIat(SetItemSeries):
 
     def generic(self, args, kws):
         # iat[] is the same as regular setitem
-        return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+        if isinstance(args[0], SeriesIatType):
+            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
 
 def series_op_generic(cls, self, args, kws):
