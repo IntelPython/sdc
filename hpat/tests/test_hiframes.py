@@ -273,6 +273,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
+    def test_df_dropna1(self):
+        def test_impl(df):
+            return df.dropna()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df)
+        pd.testing.assert_frame_equal(out, h_out)
+
     def test_column_mean(self):
         def test_impl():
             A = np.array([1., 2., 3.])

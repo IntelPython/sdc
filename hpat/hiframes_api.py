@@ -373,7 +373,7 @@ class FillNaStrType(AbstractTemplate):
 class DropNAType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 1
+        assert len(args) in (1, 2)
         # args: in_arr
         return signature(args[0], *args)
 

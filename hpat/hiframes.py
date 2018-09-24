@@ -364,6 +364,10 @@ class HiFrames(object):
         if func_name == 'fillna':
             return self._handle_df_fillna(lhs, rhs, df_var, label)
 
+        # df.dropna()
+        if func_name == 'dropna':
+            return self._handle_df_dropna(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -482,6 +486,45 @@ class HiFrames(object):
         if (inplace_var.name == inplace_default.name
                 or guard(find_const, self.func_ir, inplace_var) == False):
             self._create_df(lhs.name, out_col_map, label)
+        return nodes
+
+    def _handle_df_dropna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("dropna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        inplace_var = self._get_arg('dropna', rhs.args, dict(rhs.kws), 4, 'inplace', default=inplace_default)
+
+        col_names = self._get_df_col_names(df_var)
+        col_vars = self._get_df_col_vars(df_var)
+        arg_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+        out_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+
+        func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
+        func_text += "  ({},) = hpat.hiframes_api.dropna(({},), inplace)\n".format(
+            out_names, arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _dropna_imp = loc_vars['_dropna_imp']
+
+        f_block = compile_to_numba_ir(_dropna_imp, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, col_vars + [inplace_var])
+        nodes += f_block.body[:-3]
+
+        # extract column vars from output
+        out_col_map = {}
+        for i, cname in enumerate(col_names):
+            out_col_map[cname] = nodes[-len(col_names) + i].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        else:
+            # assign back to column vars for inplace case
+            for i in range(len(col_vars)):
+                c_var = col_vars[i]
+                dropped_var = list(out_col_map.values())[i]
+                nodes.append(ir.Assign(dropped_var, c_var, lhs.loc))
         return nodes
 
     def _is_iloc_loc(self, var):

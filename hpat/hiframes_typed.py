@@ -9,7 +9,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem, mk_unique_var, dprint_func_ir,
-                            build_definitions)
+                            build_definitions, find_build_sequence)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
@@ -1044,6 +1044,9 @@ class HiFramesTyped(object):
             return self._replace_func(_series_fillna_str_alloc_impl, rhs.args)
 
         if func_name == 'dropna':
+            # df.dropna case
+            if isinstance(self.typemap[rhs.args[0].name], types.Tuple):
+                return self._handle_df_dropna(assign, lhs, rhs)
             dtype = self.typemap[rhs.args[0].name].dtype
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
@@ -1064,6 +1067,38 @@ class HiFramesTyped(object):
             return self._replace_func(_column_var_impl, rhs.args)
 
         return [assign]
+
+    def _handle_df_dropna(self, assign, lhs, rhs):
+        in_typ = self.typemap[rhs.args[0].name]
+
+        in_vars, _ = guard(find_build_sequence, self.func_ir, rhs.args[0])
+        in_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
+                     for i in range(len(in_vars))]
+        out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
+                     for i in range(len(in_vars))]
+        isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
+
+        func_text = "def _dropna_impl(arr_tup, inplace):\n"
+        func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
+        func_text += "  old_len = len({})\n".format(in_names[0])
+        func_text += "  new_len = 0\n"
+        func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
+        func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
+        func_text += "      new_len += 1\n"
+        for v, out in zip(in_names, out_names):
+            func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
+        func_text += "  curr_ind = 0\n"
+        func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
+        func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
+        for v, out in zip(in_names, out_names):
+            func_text += "      {}[curr_ind] = {}[i]\n".format(out, v)
+        func_text += "      curr_ind += 1\n"
+        func_text += "  return ({},)\n".format(", ".join(out_names))
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _dropna_impl = loc_vars['_dropna_impl']
+        return self._replace_func(_dropna_impl, rhs.args)
 
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):
