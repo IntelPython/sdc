@@ -32,9 +32,6 @@ void file_write(std::string* file_name, void* buff, int64_t size);
 void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count);
 void file_write_parallel(std::string* file_name, char* buff, int64_t start, int64_t count, int64_t elem_size);
 
-void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int * dtypes, size_t n_cols_to_read,
-                      size_t * first_row, size_t * n_rows,
-                      std::string * delimiters, std::string * quotes);
 #define ROOT 0
 #define LARGE_DTYPE_SIZE 1024
 
