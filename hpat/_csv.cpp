@@ -11,495 +11,185 @@
 #include <vector>
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem/operations.hpp>
-#include "_hpat_common.h"
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include <numpy/arrayobject.h>
 
-// #include "_distributed.h"
+#include "_datetime_ext.h"
+#include "_distributed.h"
 
-// FIXME: USE HPAT/Pandas from lib, not copy&paste
+#include <Python.h>
+#include "structmember.h"
+
+#if PY_MAJOR_VERSION < 3
+#define BUFF_TYPE Py_UNICODE
+#define BUFF2UC(_o, _s) PyUnicode_FromUnicode(_o, _s)
+#else
+#define BUFF_TYPE Py_UCS4
+#define BUFF2UC(_o, _s) PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND, _o, _s)
+#endif
 
 typedef struct {
-    npy_int64 year;
-    npy_int32 month, day, hour, min, sec, us, ps, as;
-} pandas_datetimestruct;
+    PyObject_HEAD
+    /* Your internal buffer, size and pos */
+    Py_ssize_t string_size;
+    Py_ssize_t pos;
+    char *buf;
+} hpatio;
 
-static int is_leapyear(npy_int64 year) {
-    return (year & 0x3) == 0 && /* year % 4 == 0 */
-        ((year % 100) != 0 || (year % 400) == 0);
+static void
+hpatio_dealloc(hpatio* self)
+{
+    Py_TYPE(self)->tp_free(self);
+    /* we do not own the buffer, we only ref to it; nothing else to be done */
 }
 
-static const int days_per_month_table[2][12] = {
-    {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
-    {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}};
+static PyObject *
+hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    std::cout << "new..." << std::endl;
+    hpatio *self;
 
-static int parse_iso_8601_datetime(char *str, int len,
-                                   pandas_datetimestruct *out,
-                                   int *out_local, int *out_tzoffset) {
-    int year_leap = 0;
-    int i, numdigits;
-    char *substr, sublen;
+    self = (hpatio *)type->tp_alloc(type, 0);
+    self->string_size = 0;
+    self->pos = 0;
+    self->buf = NULL;
 
-    /* If year-month-day are separated by a valid separator,
-     * months/days without leading zeroes will be parsed
-     * (though not iso8601). If the components aren't separated,
-     * 4 (YYYY) or 8 (YYYYMMDD) digits are expected. 6 digits are
-     * forbidden here (but parsed as YYMMDD elsewhere).
-    */
-    int has_ymd_sep = 0;
-    char ymd_sep = '\0';
-    char valid_ymd_sep[] = {'-', '.', '/', '\\', ' '};
-    int valid_ymd_sep_len = sizeof(valid_ymd_sep);
+    return (PyObject *)self;
+}
 
-    /* hour-minute-second may or may not separated by ':'. If not, then
-     * each component must be 2 digits. */
-    int has_hms_sep = 0;
-    int hour_was_2_digits = 0;
+static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    std::cout << "init..." << args << std::endl;
 
-    /* Initialize the output to all zeros */
-    memset(out, 0, sizeof(pandas_datetimestruct));
-    out->month = 1;
-    out->day = 1;
+    char* str = NULL;
+    Py_ssize_t count = 0;
+    PyObject *arg = Py_None;
 
-    substr = str;
-    sublen = len;
-
-    /* Skip leading whitespace */
-    while (sublen > 0 && isspace(*substr)) {
-        ++substr;
-        --sublen;
+    if(!PyArg_ParseTuple(args, "|z#", &str, &count)) {
+        return -1;
     }
 
-    /* Leading '-' sign for negative year */
-    if (*substr == '-') {
-        ++substr;
-        --sublen;
-    }
+    ((hpatio*)self)->buf = str;
+    ((hpatio*)self)->string_size = count;
 
-    if (sublen == 0) {
-        goto parse_error;
-    }
-
-    /* PARSE THE YEAR (4 digits) */
-    out->year = 0;
-    if (sublen >= 4 && isdigit(substr[0]) && isdigit(substr[1]) &&
-        isdigit(substr[2]) && isdigit(substr[3])) {
-        out->year = 1000 * (substr[0] - '0') + 100 * (substr[1] - '0') +
-                    10 * (substr[2] - '0') + (substr[3] - '0');
-
-        substr += 4;
-        sublen -= 4;
-    }
-
-    /* Negate the year if necessary */
-    if (str[0] == '-') {
-        out->year = -out->year;
-    }
-    /* Check whether it's a leap-year */
-    year_leap = is_leapyear(out->year);
-
-    /* Next character must be a separator, start of month, or end of string */
-    if (sublen == 0) {
-        if (out_local != NULL) {
-            *out_local = 0;
-        }
-        goto finish;
-    }
-
-    if (!isdigit(*substr)) {
-        for (i = 0; i < valid_ymd_sep_len; ++i) {
-            if (*substr == valid_ymd_sep[i]) {
-                break;
-            }
-        }
-        if (i == valid_ymd_sep_len) {
-            goto parse_error;
-        }
-        has_ymd_sep = 1;
-        ymd_sep = valid_ymd_sep[i];
-        ++substr;
-        --sublen;
-        /* Cannot have trailing separator */
-        if (sublen == 0 || !isdigit(*substr)) {
-            goto parse_error;
-        }
-    }
-
-    /* PARSE THE MONTH */
-    /* First digit required */
-    out->month = (*substr - '0');
-    ++substr;
-    --sublen;
-    /* Second digit optional if there was a separator */
-    if (isdigit(*substr)) {
-        out->month = 10 * out->month + (*substr - '0');
-        ++substr;
-        --sublen;
-    } else if (!has_ymd_sep) {
-        goto parse_error;
-    }
-    if (out->month < 1 || out->month > 12) {
-        printf("Month out of range in datetime string \"%s\"", str);
-        goto error;
-    }
-
-    /* Next character must be the separator, start of day, or end of string */
-    if (sublen == 0) {
-        /* Forbid YYYYMM. Parsed instead as YYMMDD by someone else. */
-        if (!has_ymd_sep) {
-            goto parse_error;
-        }
-        if (out_local != NULL) {
-            *out_local = 0;
-        }
-        goto finish;
-    }
-
-    if (has_ymd_sep) {
-        /* Must have separator, but cannot be trailing */
-        if (*substr != ymd_sep || sublen == 1) {
-            goto parse_error;
-        }
-        ++substr;
-        --sublen;
-    }
-
-    /* PARSE THE DAY */
-    /* First digit required */
-    if (!isdigit(*substr)) {
-        goto parse_error;
-    }
-    out->day = (*substr - '0');
-    ++substr;
-    --sublen;
-    /* Second digit optional if there was a separator */
-    if (isdigit(*substr)) {
-        out->day = 10 * out->day + (*substr - '0');
-        ++substr;
-        --sublen;
-    } else if (!has_ymd_sep) {
-        goto parse_error;
-    }
-    if (out->day < 1 ||
-        out->day > days_per_month_table[year_leap][out->month - 1]) {
-        printf("Day out of range in datetime string \"%s\"", str);
-        goto error;
-    }
-
-    /* Next character must be a 'T', ' ', or end of string */
-    if (sublen == 0) {
-        if (out_local != NULL) {
-            *out_local = 0;
-        }
-        goto finish;
-    }
-
-    if ((*substr != 'T' && *substr != ' ') || sublen == 1) {
-        goto parse_error;
-    }
-    ++substr;
-    --sublen;
-
-    /* PARSE THE HOURS */
-    /* First digit required */
-    if (!isdigit(*substr)) {
-        goto parse_error;
-    }
-    out->hour = (*substr - '0');
-    ++substr;
-    --sublen;
-    /* Second digit optional */
-    if (isdigit(*substr)) {
-        hour_was_2_digits = 1;
-        out->hour = 10 * out->hour + (*substr - '0');
-        ++substr;
-        --sublen;
-        if (out->hour >= 24) {
-            printf("Hours out of range in datetime string \"%s\"", str);
-            goto error;
-        }
-    }
-
-    /* Next character must be a ':' or the end of the string */
-    if (sublen == 0) {
-        if (!hour_was_2_digits) {
-            goto parse_error;
-        }
-        goto finish;
-    }
-
-    if (*substr == ':') {
-        has_hms_sep = 1;
-        ++substr;
-        --sublen;
-        /* Cannot have a trailing separator */
-        if (sublen == 0 || !isdigit(*substr)) {
-            goto parse_error;
-        }
-    } else if (!isdigit(*substr)) {
-        if (!hour_was_2_digits) {
-            goto parse_error;
-        }
-        goto parse_timezone;
-    }
-
-    /* PARSE THE MINUTES */
-    /* First digit required */
-    out->min = (*substr - '0');
-    ++substr;
-    --sublen;
-    /* Second digit optional if there was a separator */
-    if (isdigit(*substr)) {
-        out->min = 10 * out->min + (*substr - '0');
-        ++substr;
-        --sublen;
-        if (out->min >= 60) {
-            printf("Minutes out of range in datetime string \"%s\"", str);
-            goto error;
-        }
-    } else if (!has_hms_sep) {
-        goto parse_error;
-    }
-
-    if (sublen == 0) {
-        goto finish;
-    }
-
-    /* If we make it through this condition block, then the next
-     * character is a digit. */
-    if (has_hms_sep && *substr == ':') {
-        ++substr;
-        --sublen;
-        /* Cannot have a trailing ':' */
-        if (sublen == 0 || !isdigit(*substr)) {
-            goto parse_error;
-        }
-    } else if (!has_hms_sep && isdigit(*substr)) {
-    } else {
-        goto parse_timezone;
-    }
-
-    /* PARSE THE SECONDS */
-    /* First digit required */
-    out->sec = (*substr - '0');
-    ++substr;
-    --sublen;
-    /* Second digit optional if there was a separator */
-    if (isdigit(*substr)) {
-        out->sec = 10 * out->sec + (*substr - '0');
-        ++substr;
-        --sublen;
-        if (out->sec >= 60) {
-            printf("Seconds out of range in datetime string \"%s\"", str);
-            goto error;
-        }
-    } else if (!has_hms_sep) {
-        goto parse_error;
-    }
-
-    /* Next character may be a '.' indicating fractional seconds */
-    if (sublen > 0 && *substr == '.') {
-        ++substr;
-        --sublen;
-    } else {
-        goto parse_timezone;
-    }
-
-    /* PARSE THE MICROSECONDS (0 to 6 digits) */
-    numdigits = 0;
-    for (i = 0; i < 6; ++i) {
-        out->us *= 10;
-        if (sublen > 0 && isdigit(*substr)) {
-            out->us += (*substr - '0');
-            ++substr;
-            --sublen;
-            ++numdigits;
-        }
-    }
-
-    if (sublen == 0 || !isdigit(*substr)) {
-        goto parse_timezone;
-    }
-
-    /* PARSE THE PICOSECONDS (0 to 6 digits) */
-    numdigits = 0;
-    for (i = 0; i < 6; ++i) {
-        out->ps *= 10;
-        if (sublen > 0 && isdigit(*substr)) {
-            out->ps += (*substr - '0');
-            ++substr;
-            --sublen;
-            ++numdigits;
-        }
-    }
-
-    if (sublen == 0 || !isdigit(*substr)) {
-        goto parse_timezone;
-    }
-
-    /* PARSE THE ATTOSECONDS (0 to 6 digits) */
-    numdigits = 0;
-    for (i = 0; i < 6; ++i) {
-        out->as *= 10;
-        if (sublen > 0 && isdigit(*substr)) {
-            out->as += (*substr - '0');
-            ++substr;
-            --sublen;
-            ++numdigits;
-        }
-    }
-
-parse_timezone:
-    /* trim any whitepsace between time/timeezone */
-    while (sublen > 0 && isspace(*substr)) {
-        ++substr;
-        --sublen;
-    }
-
-    if (sublen == 0) {
-        // Unlike NumPy, treating no time zone as naive
-        goto finish;
-    }
-
-    /* UTC specifier */
-    if (*substr == 'Z') {
-        /* "Z" should be equivalent to tz offset "+00:00" */
-        if (out_local != NULL) {
-            *out_local = 1;
-        }
-
-        if (out_tzoffset != NULL) {
-            *out_tzoffset = 0;
-        }
-
-        if (sublen == 1) {
-            goto finish;
-        } else {
-            ++substr;
-            --sublen;
-        }
-    } else if (*substr == '-' || *substr == '+') {
-        /* Time zone offset */
-        int offset_neg = 0, offset_hour = 0, offset_minute = 0;
-
-        /*
-         * Since "local" means local with respect to the current
-         * machine, we say this is non-local.
-         */
-
-        if (*substr == '-') {
-            offset_neg = 1;
-        }
-        ++substr;
-        --sublen;
-
-        /* The hours offset */
-        if (sublen >= 2 && isdigit(substr[0]) && isdigit(substr[1])) {
-            offset_hour = 10 * (substr[0] - '0') + (substr[1] - '0');
-            substr += 2;
-            sublen -= 2;
-            if (offset_hour >= 24) {
-                printf("Timezone hours offset out of range "
-                             "in datetime string \"%s\"",
-                             str);
-                goto error;
-            }
-        } else if (sublen >= 1 && isdigit(substr[0])) {
-            offset_hour = substr[0] - '0';
-            ++substr;
-            --sublen;
-        } else {
-            goto parse_error;
-        }
-
-        /* The minutes offset is optional */
-        if (sublen > 0) {
-            /* Optional ':' */
-            if (*substr == ':') {
-                ++substr;
-                --sublen;
-            }
-
-            /* The minutes offset (at the end of the string) */
-            if (sublen >= 2 && isdigit(substr[0]) && isdigit(substr[1])) {
-                offset_minute = 10 * (substr[0] - '0') + (substr[1] - '0');
-                substr += 2;
-                sublen -= 2;
-                if (offset_minute >= 60) {
-                    printf("Timezone minutes offset out of range "
-                                 "in datetime string \"%s\"",
-                                 str);
-                    goto error;
-                }
-            } else if (sublen >= 1 && isdigit(substr[0])) {
-                offset_minute = substr[0] - '0';
-                ++substr;
-                --sublen;
-            } else {
-                goto parse_error;
-            }
-        }
-
-        /* Apply the time zone offset */
-        if (offset_neg) {
-            offset_hour = -offset_hour;
-            offset_minute = -offset_minute;
-        }
-        if (out_local != NULL) {
-            *out_local = 1;
-            // Unlike NumPy, do not change internal value to local time
-            *out_tzoffset = 60 * offset_hour + offset_minute;
-        }
-    }
-
-    /* Skip trailing whitespace */
-    while (sublen > 0 && isspace(*substr)) {
-        ++substr;
-        --sublen;
-    }
-
-    if (sublen != 0) {
-        goto parse_error;
-    }
-
-finish:
     return 0;
-
-parse_error:
-    printf("Error parsing datetime string \"%s\" at position %d", str,
-                 (int)(substr - str));
-    return -1;
-
-error:
-    return -1;
 }
 
-// FIXME use HPAT dist libs
-static int hpat_dist_get_rank()
+static void
+hpatio_init(hpatio *self, char * buf, size_t sz)
 {
-    int is_initialized;
-    MPI_Initialized(&is_initialized);
-    if (!is_initialized)
-        MPI_Init(NULL, NULL);
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // printf("my_rank:%d\n", rank);
-    return rank;
+    self->string_size = sz;
+    self->pos = 0;
+    self->buf = buf;
 }
 
-static int hpat_dist_get_size()
-{
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    return size;
+static PyObject *
+hpatio_read(hpatio* self, PyObject *args)
+{ /* taken from CPython stringio.c */
+    std::cout << "reading..." << std::endl;
+
+    Py_ssize_t size, n;
+    char * output;
+
+    if(self->buf == NULL) {
+        PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized HPATIO object");
+        return NULL;
+    }
+
+    PyObject *arg = Py_None;
+    if (!PyArg_ParseTuple(args, "|O:read", &arg)) {
+        return NULL;
+    }
+    if (PyNumber_Check(arg)) {
+        size = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
+        if (size == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+    }
+    else if (arg == Py_None) {
+        /* Read until EOF is reached, by default. */
+        size = -1;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got '%s'",
+                     Py_TYPE(arg)->tp_name);
+        return NULL;
+    }
+
+    /* adjust invalid sizes */
+    n = self->string_size - self->pos;
+    if (size < 0 || size > n) {
+        size = n;
+        if (size < 0)
+            size = 0;
+    }
+
+    output = self->buf + self->pos;
+    self->pos += size;
+
+    std::cout << "read " << size << " bytes" << std::endl;
+
+    return PyUnicode_FromStringAndSize(output, size);
 }
 
-static int64_t hpat_dist_exscan_i8(int64_t value)
+static PyObject *
+hpatio_iternext(PyObject *self)
 {
-    // printf("sum value: %lld\n", value);
-    int64_t out=0;
-    MPI_Exscan(&value, &out, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
-    return out;
+    std::cerr << "iternext not implemented";
+    return NULL;
+};
+
+static PyMethodDef hpatio_methods[] = {
+    {"read", (PyCFunction)hpatio_read, METH_VARARGS,
+     "Read at most n characters, returned as a string.",
+    },
+    {NULL}  /* Sentinel */
+};
+
+static PyTypeObject hpatio_type = {
+    PyObject_HEAD_INIT(NULL)
+    "hpat.hio.HPATIO",         /*tp_name*/
+    sizeof(hpatio),            /*tp_basicsize*/
+    0,                         /*tp_itemsize*/
+    (destructor)hpatio_dealloc,/*tp_dealloc*/
+    0,                         /*tp_print*/
+    0,                         /*tp_getattr*/
+    0,                         /*tp_setattr*/
+    0,                         /*tp_compare*/
+    0,                         /*tp_repr*/
+    0,                         /*tp_as_number*/
+    0,                         /*tp_as_sequence*/
+    0,                         /*tp_as_mapping*/
+    0,                         /*tp_hash */
+    0,                         /*tp_call*/
+    0,                         /*tp_str*/
+    0,                         /*tp_getattro*/
+    0,                         /*tp_setattro*/
+    0,                         /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,/*tp_flags*/
+    "hpatio objects",          /* tp_doc */
+    0,                         /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    hpatio_iternext,           /* tp_iter */
+    hpatio_iternext,           /* tp_iternext */
+    hpatio_methods,            /* tp_methods */
+    0,                         /* tp_members */
+    0,                         /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    hpatio_pyinit,             /* tp_init */
+    0,                         /* tp_alloc */
+    hpatio_new,                /* tp_new */
+};
+
+void PyInit_csv(PyObject * m)
+{
+    if(PyType_Ready(&hpatio_type) < 0) return;
+    Py_INCREF(&hpatio_type);
+    PyModule_AddObject(m, "HPATIO", (PyObject *)&hpatio_type);
 }
 
 #include "_meminfo.h"
@@ -651,6 +341,12 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
 #define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
 
 /*
+  This is a wrapper around pandas.read_csv.
+  Doesn't do much except calling pandas.
+  Always return NULL for now.
+
+  Comments below are outdated.
+
   We divide the file into chunks, one for each process.
   Lines generally have different lengths, so we might start int he middle of the line.
   Hence, we determine the number cols in the file and check if our first line is a full line.
@@ -667,6 +363,56 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     CHECK(dtypes, "Input parameter dtypes must not be NULL.");
     CHECK(first_row && n_rows, "Output parameters first_row and n_rows must not be NULL.");
 
+    // For now we just do single process, so our chunksize is fsz
+    size_t chunksize = fsz;
+    char * buff = new char[chunksize+1];
+    if(! f.read(buff, chunksize)) {
+        PyErr_Print();
+        std::cerr << "Reading " << chunksize << " bytes failed.";
+        return NULL;
+    }
+    buff[chunksize] = 0;
+
+    // we have our chunk read into buff, now create our 'file-like' input to pandas.read_csv
+    auto gilstate = PyGILState_Ensure();
+    PyObject * hio = PyObject_CallFunctionObjArgs((PyObject *) &hpatio_type, NULL);
+    if (hio == NULL || PyErr_Occurred()) {
+        PyErr_Print();
+        std::cerr << "Could not create IO buffer object" << std::endl;
+        PyGILState_Release(gilstate);
+        return NULL;
+    }
+    hpatio_init(reinterpret_cast<hpatio*>(hio), buff, chunksize);
+
+    // Now call pandas.read_csv.
+    PyObject * pd_read_csv = import_sym("pandas", "read_csv");
+    if (pd_read_csv == NULL || PyErr_Occurred()) {
+        PyErr_Print();
+        std::cerr << "Could not get pandas.read_csv " << std::endl;
+        PyGILState_Release(gilstate);
+        return NULL;
+    }
+    PyObject * df = PyObject_CallFunctionObjArgs(pd_read_csv, hio, NULL);
+
+    Py_XDECREF(pd_read_csv);
+    PyGILState_Release(gilstate);
+
+    delete [] buff;
+
+    if (df == NULL || PyErr_Occurred()) {
+        PyErr_Print();
+        std::cerr << "pandas.read_csv failed." << std::endl;
+        return NULL;
+    }
+
+    std::cout << "Done!" << std::endl;
+    // return df;
+    return NULL;
+}
+
+
+
+# if 0
     MemInfo ** result = new MemInfo*[n_cols_to_read]();
     if(n_cols_to_read == 0 || fsz == 0) return result;
 
@@ -764,7 +510,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     *first_row = hpat_dist_exscan_i8(*n_rows);
     return result;
 }
-
+#endif
 
 extern "C" MemInfo ** csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                                     size_t * first_row, size_t * n_rows,

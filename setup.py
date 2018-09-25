@@ -103,7 +103,7 @@ if not is_win:
 
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
-                   depends=["hpat/_hpat_common.h"],
+                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h", "hpat/_import_py.h", "hpat/_csv.h", "hpat/_datetime_ext.h"],
                    libraries = MPI_LIBS + ['hdf5', 'boost_filesystem', 'boost_system'],
                    include_dirs = ([HDF5_DIR+'/include',] + ind
                      + np_compile_args['include_dirs']
@@ -112,6 +112,7 @@ ext_io = Extension(name="hio",
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
                    extra_link_args = ela,
+                   language="c++"
 )
 
 ext_hdist = Extension(name="hdist",

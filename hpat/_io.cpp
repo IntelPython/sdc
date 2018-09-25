@@ -1,5 +1,6 @@
 #include "mpi.h"
 #include "hdf5.h"
+#include "_csv.h"
 #include <Python.h>
 #include <string>
 #include <iostream>
@@ -84,6 +85,9 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&file_read_parallel)));
     PyObject_SetAttrString(m, "file_write_parallel",
                             PyLong_FromVoidPtr((void*)(&file_write_parallel)));
+
+    PyInit_csv(m);
+
     return m;
 }
 
