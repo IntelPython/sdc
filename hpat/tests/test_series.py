@@ -356,6 +356,16 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    def test_series_op6(self):
+        def test_impl(A):
+            return A.eq(A)
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(A, B), test_impl(A, B))
+
     def test_series_len(self):
         def test_impl(A, i):
             return len(A)

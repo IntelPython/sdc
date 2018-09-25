@@ -871,7 +871,13 @@ explicit_binop_funcs = {
     '/': 'truediv',
     '//': 'floordiv',
     '%': 'mod',
-    '**': 'pow'
+    '**': 'pow',
+    '<': 'lt',
+    '>': 'gt',
+    '<=': 'le',
+    '>=': 'ge',
+    '!=': 'ne',
+    '==': 'eq',
     }
 
 def ex_binop_generic(self, args, kws):
