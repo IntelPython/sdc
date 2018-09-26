@@ -611,6 +611,42 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_combine(self):
+        def test_impl(S1, S2):
+            return S1.combine(S2, lambda a, b: 2*a + b)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([1.0, 2., 3., 4., 5.])
+        S2 = pd.Series([6.0, 21., 3.6, 5.])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    def test_series_combine_samelen(self):
+        def test_impl(S1, S2):
+            return S1.combine(S2, lambda a, b: 2*a + b)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([1.0, 2., 3., 4., 5.])
+        S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    def test_series_combine_value(self):
+        def test_impl(S1, S2):
+            return S1.combine(S2, lambda a, b: 2*a + b, 1237.56)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([1.0, 2., 3., 4., 5.])
+        S2 = pd.Series([6.0, 21., 3.6, 5.])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    def test_series_combine_value_samelen(self):
+        def test_impl(S1, S2):
+            return S1.combine(S2, lambda a, b: 2*a + b, 1237.56)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([1.0, 2., 3., 4., 5.])
+        S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
     def test_series_apply1(self):
         def test_impl(S):
             return S.apply(lambda a: 2*a)

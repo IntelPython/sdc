@@ -469,6 +469,21 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: handle apply differences: extra args, np ufuncs etc.
         return self._resolve_map_func(ary, args, kws)
 
+    def _resolve_combine_func(self, ary, args, kws):
+        dtype = ary.dtype
+        # getitem returns Timestamp for dt_index and series(dt64)
+        if dtype == types.NPDatetime('ns'):
+            dtype = pandas_timestamp_type
+        code = args[1].value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.context, f_ir, (dtype,dtype,), None)
+        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+
+    @bound_function("series.combine", True)
+    def resolve_combine(self, ary, args, kws):
+        return self._resolve_combine_func(ary, args, kws)
+
     @bound_function("series.abs")
     def resolve_abs(self, ary, args, kws):
         # call np.abs(A) to get return type

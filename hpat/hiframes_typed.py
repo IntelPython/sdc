@@ -474,6 +474,9 @@ class HiFramesTyped(object):
             # XXX: remove rolling setup call, assuming still available in definitions
             return []
 
+        if func_name == 'combine':
+            return self._handle_series_combine(assign, lhs, rhs, series_var)
+
         if func_name in ('map', 'apply'):
             return self._handle_series_map(assign, lhs, rhs, series_var)
 
@@ -750,6 +753,96 @@ class HiFramesTyped(object):
             nodes[-1].target = lhs
             return nodes
         return [assign]
+
+    def _handle_series_combine(self, assign, lhs, rhs, series_var):
+        """translate s1.combine(s2,lambda x1,x2 :...) to prange()
+        """
+        func = guard(get_definition, self.func_ir, rhs.args[1])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for combine not found")
+
+        out_typ = self.typemap[lhs.name].dtype
+
+        # If we are called with 3 arguments, we must use 3rd arg as a fill value,
+        # instead of Nan.
+        use_nan = len(rhs.args) == 2
+
+        # prange func to inline
+        if use_nan:
+            func_text = "def f(A, B):\n"
+        else:
+            func_text = "def f(A, B, C):\n"
+        func_text += "  numba.parfor.init_prange()\n"
+        func_text += "  n1 = len(A)\n"
+        func_text += "  n2 = len(B)\n"
+        func_text += "  n = n1\n"
+        func_text += "  if n2 > n:\n"
+        func_text += "      n = n2\n"
+        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
+        func_text += "  for i in numba.parfor.internal_prange(n):\n"
+        if use_nan:
+            func_text += "    t1 = np.nan\n"
+        else:
+            func_text += "    t1 = C\n"
+        func_text += "    if i < n1:\n"
+        func_text += "      t1 = A[i]\n"
+        if use_nan:
+            func_text += "    t2 = np.nan\n"
+        else:
+            func_text += "    t2 = C\n"
+        func_text += "    if i < n2:\n"
+        func_text += "      t2 = B[i]\n"
+        func_text += "    S[i] = map_func(t1, t2)\n"
+        if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
+            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
+        else:
+            func_text += "  ret = S\n"
+        func_text += "  return ret\n"
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        _globals = self.func_ir.func_id.func.__globals__
+        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
+
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        topo_order = find_topo_order(f_ir.blocks)
+
+        # find sentinel function and replace with user func
+        for l in topo_order:
+            block = f_ir.blocks[l]
+            for i, stmt in enumerate(block.body):
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'):
+                    fdef = guard(get_definition, f_ir, stmt.value.func)
+                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        inline_closure_call(f_ir, _globals, block, i, func)
+                        break
+
+        # remove sentinel global to avoid type inference issues
+        ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        if use_nan:
+            arg_typs = (self.typemap[series_var.name], self.typemap[series_var.name],)
+        else:
+            arg_typs = (self.typemap[series_var.name], self.typemap[series_var.name], self.typemap[series_var.name].dtype,)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                self.typingctx, f_ir, arg_typs, None)
+        # remove argument entries like arg.a from typemap
+        arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
+        for a in arg_names:
+            f_typemap.pop(a)
+        self.typemap.update(f_typemap)
+        self.calltypes.update(f_calltypes)
+        func_args = [series_var, rhs.args[0]]
+        if not use_nan:
+            func_args.append(rhs.args[2])
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], func_args)
+        return f_ir.blocks
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
         """
