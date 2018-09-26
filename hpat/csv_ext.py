@@ -217,6 +217,8 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, cols_to_read_names_typ, dt
         fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
         call_args = [args[0], cols_ptr, dtypes_ptr, args[4], first_row_ptr, n_rows_ptr, args[5], args[6]]
         df = builder.call(fn, call_args)
+        # pyapi = context.get_python_api(builder)
+        # pyapi.print_object(df)
 
         # pyapi = context.get_python_api(builder)
         # ub_ctxt = numba.pythonapi._UnboxContext(context, builder, pyapi)
@@ -228,11 +230,14 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, cols_to_read_names_typ, dt
         num_rows = builder.load(n_rows_ptr)
 
         for i, arr_typ in enumerate(sig.return_type.types):
+            unbox_sig = signature(
+                0, PandasDataFrameType(colnames, sig.return_type.types),
+                types.Const(i), arr_typ)
             arr = lower_unbox_df_column(context,
                                         builder,
-                                        signature(??, ??, ??), # FIXME
+                                        unbox_sig,
                                         [df, context.get_constant(types.intp, i), 0])
-            builder.store(arr._getvalue(),
+            builder.store(arr,
                           cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
 
         return builder.load(out_arr_tup)
