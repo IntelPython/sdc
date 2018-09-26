@@ -29,8 +29,8 @@ extern void PyInit_csv(PyObject *);
                      array of NULL pointers if no data was read
                      NULL if an error ocurred.
  **/
-extern "C" void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                                 size_t * first_row, size_t * n_rows,
-                                 std::string * delimiters, std::string * quotes);
+extern "C" void * csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+                                size_t * first_row, size_t * n_rows,
+                                std::string * delimiters, std::string * quotes);
 
 #endif // _CSV_H_INCLUDED

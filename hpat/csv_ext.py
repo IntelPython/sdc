@@ -2,6 +2,7 @@
 from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, cgutils
+from numba.typing.templates import signature
 from numba.extending import overload, intrinsic
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
@@ -14,6 +15,7 @@ from hpat.hiframes_sort import (
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta,
     )
+from hpat.hiframes_api import PandasDataFrameType, lower_unbox_df_column
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
@@ -26,9 +28,10 @@ import numpy as np
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, file_name, df_out, out_vars, out_types, loc):
+    def __init__(self, file_name, df_out, df_colnames, out_vars, out_types, loc):
         self.file_name = file_name
         self.df_out = df_out
+        self.df_colnames = df_colnames
         self.out_vars = out_vars
         self.out_types = out_types
         self.loc = loc
@@ -170,13 +173,14 @@ import llvmlite.binding as ll
 ll.add_symbol('csv_read_file', hio.csv_read_file)
 
 @intrinsic(support_literals=True)
-def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
-    '''
+def _csv_read(typingctx, fname_typ, cols_to_read_typ, cols_to_read_names_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
+    '''_csv_read(        fname,     (0, 1, 2, 3,),    'A,B,C,D',              (4, 6, 6, 4,), 4, ',', '"')
     This is creating the llvm wrapper calling the C function.
     '''
     # FIXME how to check types of const inputs?
     assert fname_typ == string_type
     assert isinstance(cols_to_read_typ, types.Const)
+    assert isinstance(cols_to_read_names_typ, types.Const)
     assert isinstance(dtypes_typ, types.Const)
     # assert cols_to_read_typ.count == dtypes_typ.count
     assert isinstance(n_cols_to_read_typ, types.Const)
@@ -186,6 +190,7 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
     return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
         for t in dtypes_typ.value])
     ncols = len(cols_to_read_typ.value)
+    colnames = cols_to_read_names_typ.value.split(',')
 
     def codegen(context, builder, sig, args):
         # we simply cast the input tuples to a c-pointers
@@ -198,8 +203,8 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         # we need extra pointers for output parameters
         first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64))
         n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64))
-        # define function type, it returns an array of MemInfo **
-        fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
+        # define function type, it returns an pandas dataframe (PyObject*)
+        fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                                 [lir.IntType(8).as_pointer(),  # const std::string * fname,
                                  lir.IntType(64).as_pointer(), # size_t * cols_to_read
                                  lir.IntType(64).as_pointer(), # int64_t * dtypes
@@ -210,9 +215,12 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
                                  lir.IntType(8).as_pointer(),  # std::string * quotes
                                 ])
         fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
-        call_args = [args[0], cols_ptr, dtypes_ptr, args[3], first_row_ptr,
-                     n_rows_ptr, args[4], args[5]]
-        mi_ptrs = builder.call(fn, call_args)
+        call_args = [args[0], cols_ptr, dtypes_ptr, args[4], first_row_ptr, n_rows_ptr, args[5], args[6]]
+        df = builder.call(fn, call_args)
+
+        # pyapi = context.get_python_api(builder)
+        # ub_ctxt = numba.pythonapi._UnboxContext(context, builder, pyapi)
+        # df = ub_ctxt.pyapi.to_native_value(PandasDataFrameType, pydf)
 
         # create a tuple of arrays from returned meminfo pointers
         ll_ret_typ = context.get_data_type(sig.return_type)
@@ -220,29 +228,18 @@ def _csv_read(typingctx, fname_typ, cols_to_read_typ, dtypes_typ, n_cols_to_read
         num_rows = builder.load(n_rows_ptr)
 
         for i, arr_typ in enumerate(sig.return_type.types):
-            meminfo = builder.load(cgutils.gep_inbounds(builder, mi_ptrs, i))
-            data = context.nrt.meminfo_data(builder, meminfo)
-            arr = context.make_array(arr_typ)(context, builder)
-            nb_dtype = arr_typ.dtype
-            ll_dtype = context.get_data_type(nb_dtype)
-            itemsize = context.get_constant(types.intp,
-                context.get_abi_sizeof(ll_dtype))
-            context.populate_array(arr,
-                        data=builder.bitcast(data, ll_dtype.as_pointer()),
-                        shape=[num_rows],
-                        strides=[itemsize],
-                        itemsize=itemsize,
-                        meminfo=meminfo)
-            builder.store(
-                arr._getvalue(),
-                cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
+            arr = lower_unbox_df_column(context,
+                                        builder,
+                                        signature(??, ??, ??), # FIXME
+                                        [df, context.get_constant(types.intp, i), 0])
+            builder.store(arr._getvalue(),
+                          cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
 
         return builder.load(out_arr_tup)
 
     #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
     cols_int_tup_typ = types.UniTuple(types.intp, ncols)
-    arg_typs = (string_type, cols_int_tup_typ, cols_int_tup_typ, types.intp,
-                string_type, string_type)
+    arg_typs = (string_type, cols_int_tup_typ, string_type, cols_int_tup_typ, types.intp, string_type, string_type)
     return return_typ(*arg_typs), codegen
 
 
@@ -258,11 +255,12 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     # get column variables
     arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
     col_inds = ", ".join(str(i) for i in range(n_cols))
-    col_typs = ", ".join(
-        str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
-    func_text = "def csv_impl(fname):\n"
-    func_text += "    ({},) = _csv_read(fname, ({},), ({},), {}, ',', '\"')\n".format(
-        arg_names, col_inds, col_typs, n_cols)
+    col_names = ",".join(nm for nm in csv_node.df_colnames)
+    col_typs = ", ".join(str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
+    func_text  = "def csv_impl(fname):\n"
+    func_text += "    ({},) = _csv_read(fname, ({},), '{}', ({},), {}, ',', '\"')\n".format(
+        arg_names, col_inds, col_names, col_typs, n_cols)
+    print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)

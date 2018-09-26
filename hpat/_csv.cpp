@@ -200,7 +200,7 @@ extern "C" {
 /**
    Like csv_read_file, but reading from a string.
  **/
-MemInfo ** csv_read_string(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+PyObject * csv_read_string(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                            size_t * first_row, size_t * n_rows,
                            std::string * delimiters = NULL, std::string * quotes = NULL);
 
@@ -331,7 +331,7 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
   We always read full lines until we read at least our chunk-size.
   This makes sure there are no gaps and no data duplication.
  */
-static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+static PyObject* csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                           size_t * first_row, size_t * n_rows,
                           std::string * delimiters = NULL, std::string * quotes = NULL)
 {
@@ -381,8 +381,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
     }
 
     std::cout << "Done!" << std::endl;
-    // return df;
-    return NULL;
+    return df;
 }
 
 
@@ -487,7 +486,7 @@ static MemInfo** csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
 }
 #endif
 
-extern "C" void ** csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+extern "C" void * csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                                  size_t * first_row, size_t * n_rows,
                                  std::string * delimiters, std::string * quotes)
 {
@@ -496,11 +495,11 @@ extern "C" void ** csv_read_file(const std::string * fname, size_t * cols_to_rea
     auto fsz = boost::filesystem::file_size(*fname);
     std::ifstream f(*fname);
     CHECK(f.good() && !f.eof() && f.is_open(), "could not open file.");
-    return reinterpret_cast<void**>(csv_read(f, fsz, cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes));
+    return reinterpret_cast<void*>(csv_read(f, fsz, cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes));
 }
 
 
-extern "C" MemInfo ** csv_read_string(const std::string * str, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+extern "C" PyObject * csv_read_string(const std::string * str, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                                       size_t * first_row, size_t * n_rows,
                                       std::string * delimiters, std::string * quotes)
 {

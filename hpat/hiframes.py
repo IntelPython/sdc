@@ -627,7 +627,7 @@ class HiFrames(object):
 
         self._create_df(lhs.name, col_map, label)
         return [csv_ext.CsvReader(
-            fname, lhs.name, list(col_map.values()), out_types, lhs.loc)]
+            fname, lhs.name, list(col_map.keys()), list(col_map.values()), out_types, lhs.loc)]
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
