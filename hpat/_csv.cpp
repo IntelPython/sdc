@@ -265,6 +265,7 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  *
  * @param[in]  f   the input stream
  * @param[in]  fsz total number of bytes in stream
+ * @return     HPATIO file-like object to read the owned chunk through pandas.read_csv
  **/
 static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
 {
@@ -346,13 +347,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
 }
 
 
-/**
- * Split file into chunks and return a file-like object per rank. The returned object
- * represents the data to be read on each process.
- *
- * @param[in]  f   the input stream
- * @param[in]  fsz total number of bytes in stream
- **/
+// taking a file to create a istream and calling csv_chunk_reader
 extern "C" PyObject* csv_file_chunk_reader(const std::string * fname)
 {
     CHECK(fname != NULL, "NULL filename provided.");
@@ -364,13 +359,7 @@ extern "C" PyObject* csv_file_chunk_reader(const std::string * fname)
 }
 
 
-/**
- * Split file into chunks and return a file-like object per rank. The returned object
- * represents the data to be read on each process.
- *
- * @param[in]  f   the input stream
- * @param[in]  fsz total number of bytes in stream
- **/
+// taking a string to create a istream and calling csv_chunk_reader
 extern "C" PyObject* csv_string_chunk_reader(const std::string * str)
 {
     CHECK(str != NULL, "NULL string provided.");
