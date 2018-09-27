@@ -6,6 +6,8 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 
+#include "_hpat_common.h"
+
 extern "C" {
 
 // #include "np_datetime.h"
@@ -33,7 +35,7 @@ typedef struct {
 
 static int parse_iso_8601_datetime(char *str, int len,
                             pandas_datetimestruct *out,
-                            int *out_local, int *out_tzoffset);
+                            int *out_local, int *out_tzoffset) __UNUSED__;
 
 typedef enum {
         PANDAS_FR_Y = 0,  // Years
@@ -56,10 +58,10 @@ typedef enum {
 
 static int convert_datetimestruct_to_datetime(PANDAS_DATETIMEUNIT base,
                                        const pandas_datetimestruct *dts,
-                                       npy_datetime *out);
+                                       npy_datetime *out) __UNUSED__;
 
 static void* np_datetime_date_array_from_packed_ints(uint64_t *dt_data,
-                                    int64_t n_elems, PyObject* dt_date_class);
+                                    int64_t n_elems, PyObject* dt_date_class) __UNUSED__;
 
 // void dt_to_timestamp(int64_t val, pd_timestamp *ts) {
 //     pandas_datetimestruct out;

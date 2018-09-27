@@ -14,7 +14,6 @@
 
 #include "_datetime_ext.h"
 #include "_distributed.h"
-#include "_import_py.h"
 #include "_csv.h"
 
 #include <Python.h>

@@ -16,67 +16,69 @@
 
 #define ROOT_PE 0
 
-static int hpat_dist_get_rank();
-static int hpat_dist_get_size();
-static int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id);
-static int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id);
-static int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id);
-static double hpat_dist_get_time();
-static double hpat_get_time();
-static int hpat_barrier();
-static MPI_Datatype get_MPI_typ(int typ_enum);
-static MPI_Datatype get_val_rank_MPI_typ(int typ_enum);
-static MPI_Op get_MPI_op(int op_enum);
-static int get_elem_size(int type_enum);
-static void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op, int type_enum);
+static int hpat_dist_get_rank() __UNUSED__;
+static int hpat_dist_get_size() __UNUSED__;
+static int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id) __UNUSED__;
+static int64_t hpat_dist_get_end(int64_t total, int num_pes, int node_id) __UNUSED__;
+static int64_t hpat_dist_get_node_portion(int64_t total, int num_pes, int node_id) __UNUSED__;
+static double hpat_dist_get_time() __UNUSED__;
+static double hpat_get_time() __UNUSED__;
+static int hpat_barrier() __UNUSED__;
+static MPI_Datatype get_MPI_typ(int typ_enum) __UNUSED__;
+static MPI_Datatype get_val_rank_MPI_typ(int typ_enum) __UNUSED__;
+static MPI_Op get_MPI_op(int op_enum) __UNUSED__;
+static int get_elem_size(int type_enum) __UNUSED__;
+static void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op, int type_enum) __UNUSED__;
 
-static int hpat_dist_exscan_i4(int value);
-static int64_t hpat_dist_exscan_i8(int64_t value);
-static float hpat_dist_exscan_f4(float value);
-static double hpat_dist_exscan_f8(double value);
+static int hpat_dist_exscan_i4(int value) __UNUSED__;
+static int64_t hpat_dist_exscan_i8(int64_t value) __UNUSED__;
+static float hpat_dist_exscan_f4(float value) __UNUSED__;
+static double hpat_dist_exscan_f8(double value) __UNUSED__;
 
-static int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int type_enum);
-static MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond);
-static MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond);
-static void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag);
-static void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag);
-static int hpat_dist_wait(MPI_Request req, bool cond);
-static void hpat_dist_waitall(int size, MPI_Request *req);
+static int hpat_dist_arr_reduce(void* out, int64_t* shapes, int ndims, int op_enum, int type_enum) __UNUSED__;
+static MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond) __UNUSED__;
+static MPI_Request hpat_dist_isend(void* out, int size, int type_enum, int pe, int tag, bool cond) __UNUSED__;
+static void hpat_dist_recv(void* out, int size, int type_enum, int pe, int tag) __UNUSED__;
+static void hpat_dist_send(void* out, int size, int type_enum, int pe, int tag) __UNUSED__;
+static int hpat_dist_wait(MPI_Request req, bool cond) __UNUSED__;
+static void hpat_dist_waitall(int size, MPI_Request *req) __UNUSED__;
 
-static void c_gather_scalar(void* send_data, void* recv_data, int typ_enum);
-static void c_gatherv(void* send_data, int sendcount, void* recv_data, int* recv_counts, int* displs, int typ_enum);
-static void c_bcast(void* send_data, int sendcount, int typ_enum);
+static void c_gather_scalar(void* send_data, void* recv_data, int typ_enum) __UNUSED__;
+static void c_gatherv(void* send_data, int sendcount, void* recv_data, int* recv_counts, int* displs, int typ_enum) __UNUSED__;
+static void c_bcast(void* send_data, int sendcount, int typ_enum) __UNUSED__;
 
 static void c_alltoallv(void* send_data, void* recv_data, int* send_counts,
-                int* recv_counts, int* send_disp, int* recv_disp, int typ_enum);
-static void c_alltoall(void* send_data, void* recv_data, int count, int typ_enum);
-static int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count);
-static void allgather(void* out_data, int size, void* in_data, int type_enum);
-static MPI_Request *comm_req_alloc(int size);
-static void comm_req_dealloc(MPI_Request *req_arr);
-static void req_array_setitem(MPI_Request * req_arr, int64_t ind, MPI_Request req);
+                int* recv_counts, int* send_disp, int* recv_disp, int typ_enum) __UNUSED__;
+static void c_alltoall(void* send_data, void* recv_data, int count, int typ_enum) __UNUSED__;
+static int64_t hpat_dist_get_item_pointer(int64_t ind, int64_t start, int64_t count) __UNUSED__;
+static void allgather(void* out_data, int size, void* in_data, int type_enum) __UNUSED__;
+static MPI_Request *comm_req_alloc(int size) __UNUSED__;
+static void comm_req_dealloc(MPI_Request *req_arr) __UNUSED__;
+static void req_array_setitem(MPI_Request * req_arr, int64_t ind, MPI_Request req) __UNUSED__;
 
 static void oneD_reshape_shuffle(char* output,
                           char* input,
                           int64_t new_0dim_global_len,
                           int64_t old_0dim_global_len,
                           int64_t out_lower_dims_size,
-                          int64_t in_lower_dims_size);
+                          int64_t in_lower_dims_size) __UNUSED__;
 
-static void permutation_int(int64_t* output, int n);
+static void permutation_int(int64_t* output, int n) __UNUSED__;
 static void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
-                             unsigned char *rhs, int64_t *p, int64_t p_len);
-static int hpat_finalize();
-static void fix_i_malloc();
-static int hpat_dummy_ptr[64];
+                                    unsigned char *rhs, int64_t *p, int64_t p_len) __UNUSED__;
+static int hpat_finalize() __UNUSED__;
+static void fix_i_malloc() __UNUSED__;
+static int hpat_dummy_ptr[64] __UNUSED__;
 
 /* *********************************************************************
 ************************************************************************/
 
+static void* hpat_get_dummy_ptr() __UNUSED__;
 static void* hpat_get_dummy_ptr() {
     return hpat_dummy_ptr;
 }
 
+static size_t get_mpi_req_num_bytes() __UNUSED__;
 static size_t get_mpi_req_num_bytes() {
     return sizeof(MPI_Request);
 }
