@@ -20,39 +20,38 @@
 #include <Python.h>
 #include "structmember.h"
 
-#if PY_MAJOR_VERSION < 3
-#define BUFF_TYPE Py_UNICODE
-#define BUFF2UC(_o, _s) PyUnicode_FromUnicode(_o, _s)
-#else
-#define BUFF_TYPE Py_UCS4
-#define BUFF2UC(_o, _s) PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND, _o, _s)
-#endif
+
+// ***********************************************************************************
+// Our file-like object for reading chunks in a std::istream
+// ***********************************************************************************
 
 typedef struct {
     PyObject_HEAD
     /* Your internal buffer, size and pos */
-    std::istream * ifs;
-    size_t chunk_start;
-    size_t chunk_size;
-    size_t chunk_pos;
-    std::vector<char> buf;
+    std::istream * ifs;    // input stream
+    size_t chunk_start;    // start of our chunk
+    size_t chunk_size;     // size of our chunk
+    size_t chunk_pos;      // current position in our chunk
+    std::vector<char> buf; // internal buffer for converting stream input to Unicode object
 } hpatio;
 
-static void
-hpatio_dealloc(hpatio* self)
+
+static void hpatio_dealloc(hpatio* self)
 {
+    // we own the stream!
     if(self->ifs) delete self->ifs;
     Py_TYPE(self)->tp_free(self);
-    /* we do not own the buffer, we only ref to it; nothing else to be done */
 }
 
-static PyObject *
-hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    std::cout << "new..." << std::endl;
-    hpatio *self;
 
-    self = (hpatio *)type->tp_alloc(type, 0);
+// alloc a HPTAIO object
+static PyObject * hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    hpatio *self = (hpatio *)type->tp_alloc(type, 0);
+    if(PyErr_Occurred()) {
+        PyErr_Print();
+        return NULL;
+    }
     self->ifs = NULL;
     self->chunk_start = 0;
     self->chunk_size = 0;
@@ -61,10 +60,11 @@ hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
+
+// we provide this mostly for testing purposes
+// users are not supposed to use this
 static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    std::cout << "init..." << args << std::endl;
-
     char* str = NULL;
     Py_ssize_t count = 0;
 
@@ -86,8 +86,10 @@ static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
-static void
-hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
+
+// We use this (and not the above) from C to init our HPATIO object
+// Will seek to chunk beginning
+static void hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
 {
     if(!ifs) {
         std::cerr << "Can't handle NULL pointer as input stream.\n";
@@ -98,6 +100,7 @@ hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
         std::cerr << "Got bad istream in initializing HPATIO object." << std::endl;
         return;
     }
+    // seek to our chunk beginning
     self->ifs->seekg(start, std::ios_base::beg);
     if(!self->ifs->good() || self->ifs->eof()) {
         std::cerr << "Could not seek to start position " << start << std::endl;
@@ -108,11 +111,13 @@ hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
     self->chunk_pos = 0;
 }
 
-static PyObject *
-hpatio_read(hpatio* self, PyObject *args)
+
+// read given number of bytes from our chunk and return a Unicode Object
+// returns NULL if an error occured.
+// does not read beyond end of our chunk (even if file continues)
+static PyObject * hpatio_read(hpatio* self, PyObject *args)
 {
-    /* taken from CPython stringio.c */
-    std::cout << "reading..." << std::endl;
+    // partially copied from from CPython's stringio.c
 
     if(self->ifs == NULL) {
         PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized HPATIO object");
@@ -156,25 +161,28 @@ hpatio_read(hpatio* self, PyObject *args)
         return NULL;
     }
 
-    std::cout << "read " << size << " bytes" << std::endl;
-
     return PyUnicode_FromStringAndSize(self->buf.data(), size);
 }
 
-static PyObject *
-hpatio_iternext(PyObject *self)
+
+// Needed to make Pandas accept it, never used
+static PyObject * hpatio_iternext(PyObject *self)
 {
     std::cerr << "iternext not implemented";
     return NULL;
 };
 
+
+// our class has only one method
 static PyMethodDef hpatio_methods[] = {
     {"read", (PyCFunction)hpatio_read, METH_VARARGS,
-     "Read at most n characters, returned as a string.",
+     "Read at most n characters, returned as a unicode.",
     },
     {NULL}  /* Sentinel */
 };
 
+
+// the actual Python type class
 static PyTypeObject hpatio_type = {
     PyObject_HEAD_INIT(NULL)
     "hpat.hio.HPATIO",         /*tp_name*/
@@ -216,14 +224,18 @@ static PyTypeObject hpatio_type = {
     hpatio_new,                /* tp_new */
 };
 
-void PyInit_csv(PyObject * m)
+
+// at module load time we need to make our type known ot Python
+extern "C" void PyInit_csv(PyObject * m)
 {
     if(PyType_Ready(&hpatio_type) < 0) return;
     Py_INCREF(&hpatio_type);
     PyModule_AddObject(m, "HPATIO", (PyObject *)&hpatio_type);
 }
 
+
 // ***********************************************************************************
+// C interface for getting the file-like chunk reader
 // ***********************************************************************************
 
 #define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
@@ -242,7 +254,8 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
     return pos;
 }
 
-/** 
+
+/**
  * Split stream into chunks and return a file-like object per rank. The returned object
  * represents the data to be read on each process.
  *
@@ -253,47 +266,43 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  *
  * @param[in]  f   the input stream
  * @param[in]  fsz total number of bytes in stream
- * @param[out] first_row if not NULL will be set to global number of first row in this chunk
- * @param[out] n_rows    if not NULL will be set to number of rows in this chunk
  **/
-static PyObject* csv_get_chunk(std::istream * f, size_t fsz, size_t * first_row, size_t * n_rows)
+static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
 {
-    size_t rank = hpat_dist_get_rank();
     size_t nranks = hpat_dist_get_size();
 
-    // We evenly distribute the 'data' byte-wise
-    auto chunksize = fsz/nranks;
-    // seek to our chunk
-    f->seekg(chunksize*rank, std::ios_base::beg);
-    if(!f->good() || f->eof()) {
-        std::cerr << "Could not seek to start position " << chunksize*rank << std::endl;
-        return NULL;
-    }
-    // count number of lines in chunk
-    std::vector<size_t> line_offset = count_lines(f, chunksize);
-    size_t no_lines = line_offset.size();
     size_t my_off_start = 0;
     size_t my_off_end = fsz;
-    size_t exp_no_lines = no_lines;
-    size_t extra_no_lines = 0;
 
     if(nranks > 1) {
+        size_t rank = hpat_dist_get_rank();
+        // We evenly distribute the 'data' byte-wise
+        auto chunksize = fsz/nranks;
+        // seek to our chunk
+        f->seekg(chunksize*rank, std::ios_base::beg);
+        if(!f->good() || f->eof()) {
+            std::cerr << "Could not seek to start position " << chunksize*rank << std::endl;
+            return NULL;
+        }
+        // count number of lines in chunk
+        std::vector<size_t> line_offset = count_lines(f, chunksize);
+        size_t no_lines = line_offset.size();
         // get total number of lines using allreduce
-        size_t tot_no_lines = no_lines;
-        
+        size_t tot_no_lines(0);
+
         hpat_dist_reduce(reinterpret_cast<char *>(no_lines), reinterpret_cast<char *>(tot_no_lines), MPI_SUM, HPAT_CTypes::UINT64);
         // evenly divide
-        exp_no_lines = tot_no_lines/nranks;
+        size_t exp_no_lines = tot_no_lines/nranks;
         // surplus lines added to first ranks
-        extra_no_lines = tot_no_lines-(exp_no_lines*nranks);
-        
+        size_t extra_no_lines = tot_no_lines-(exp_no_lines*nranks);
+
         // Now we need to communicate the distribution as we really want it
         // First determine which is our first line (which is the sum of previous lines)
         size_t byte_first_line = hpat_dist_exscan_i8(no_lines);
         size_t byte_last_line = byte_first_line + no_lines;
-        
+
         // We now determine the chunks of lines that begin and end in our byte-chunk
-        
+
         // issue IRecv calls, eventually receiving start and end offsets of our line-chunk
         const int START_OFFSET = 47011;
         const int END_OFFSET = 47012;
@@ -333,89 +342,44 @@ static PyObject* csv_get_chunk(std::istream * f, size_t fsz, size_t * first_row,
         reader = NULL;
     } else {
         hpatio_init(reinterpret_cast<hpatio*>(reader), f, my_off_start, my_off_end-my_off_start);
-        if(first_row) *first_row = rank*exp_no_lines + (rank < extra_no_lines ? 1 : 0);
-        if(n_rows) *n_rows = (rank+1)*exp_no_lines + (rank < extra_no_lines ? 1 : 0);
     }
 
     return reader;
 }
 
-/*
-  This is a wrapper around pandas.read_csv.
-  Doesn't do much except calling pandas.
-  Always return NULL for now.
 
-  Comments below are outdated.
-
-  We divide the file into chunks, one for each process.
-  Lines generally have different lengths, so we might start int he middle of the line.
-  Hence, we determine the number cols in the file and check if our first line is a full line.
-  If not, we just throw it away.
-  Similary, our chunk might not end at a line boundary.
-  Note that we assume all lines have the same numer of tokens/columns.
-  We always read full lines until we read at least our chunk-size.
-  This makes sure there are no gaps and no data duplication.
- */
-static PyObject* csv_read(std::istream * f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                          size_t * first_row, size_t * n_rows,
-                          std::string * delimiters = NULL, std::string * quotes = NULL)
-{
-    CHECK(dtypes, "Input parameter dtypes must not be NULL.");
-    CHECK(first_row && n_rows, "Output parameters first_row and n_rows must not be NULL.");
-
-    PyObject * reader = csv_get_chunk(f, fsz, first_row, n_rows);
-    if(reader == 0) return NULL;
-
-    // Now call pandas.read_csv.
-    PyObject * df = NULL;
-    auto gilstate = PyGILState_Ensure();
-    PyObject * pd_read_csv = import_sym("pandas", "read_csv");
-    if (pd_read_csv == NULL || PyErr_Occurred()) {
-        PyErr_Print();
-        std::cerr << "Could not get pandas.read_csv " << std::endl;
-        pd_read_csv = NULL;
-    } else {
-        df = PyObject_CallFunctionObjArgs(pd_read_csv, reader, NULL);
-        Py_XDECREF(pd_read_csv);
-    }
-    PyGILState_Release(gilstate);
-
-    if (df == NULL || PyErr_Occurred()) {
-        PyErr_Print();
-        std::cerr << "pandas.read_csv failed." << std::endl;
-        return NULL;
-    }
-
-    std::cout << "Done!" << std::endl;
-    return df;
-}
-
-
-extern "C" void * csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                                size_t * first_row, size_t * n_rows,
-                                std::string * delimiters, std::string * quotes)
+/**
+ * Split file into chunks and return a file-like object per rank. The returned object
+ * represents the data to be read on each process.
+ *
+ * @param[in]  f   the input stream
+ * @param[in]  fsz total number of bytes in stream
+ **/
+extern "C" PyObject* csv_file_chunk_reader(const std::string * fname)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
     auto fsz = boost::filesystem::file_size(*fname);
-    std::ifstream * f = new  std::ifstream(*fname);
+    std::ifstream * f = new std::ifstream(*fname);
     CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
-    return reinterpret_cast<void*>(csv_read(f, fsz, cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes));
+    return csv_chunk_reader(f, fsz);
 }
 
 
-extern "C" PyObject * csv_read_string(const std::string * str, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                                      size_t * first_row, size_t * n_rows,
-                                      std::string * delimiters, std::string * quotes)
+/**
+ * Split file into chunks and return a file-like object per rank. The returned object
+ * represents the data to be read on each process.
+ *
+ * @param[in]  f   the input stream
+ * @param[in]  fsz total number of bytes in stream
+ **/
+extern "C" PyObject* csv_string_chunk_reader(const std::string * str)
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
     std::istringstream * f = new std::istringstream(*str);
     CHECK(f->good(), "could not create istrstream from string.");
-    return csv_read(f, str->size(), cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes);
+    return csv_chunk_reader(f, str->size());
 }
 
 #undef CHECK
-
-// ***********************************************************************************
-// ***********************************************************************************
