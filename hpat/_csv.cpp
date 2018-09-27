@@ -301,21 +301,21 @@ static PyObject* csv_get_chunk(std::istream * f, size_t fsz, size_t * first_row,
         mpi_reqs.push_back(hpat_dist_irecv(&my_off_start, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, START_OFFSET, rank>0));
         mpi_reqs.push_back(hpat_dist_irecv(&my_off_end, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, END_OFFSET, rank<(nranks-1)));
 
-        size_t i_start = 0;
-        for(size_t i=0; i<nranks; ++i) {
-            // if start is on our byte-chunk, send stream-offset to rank i
+        // We iterate through chunk boundaries (defined by line-numbers)
+        // we start with boundary 1 as 0 is the beginning of file
+        size_t i_bndry = 0 < extra_no_lines ? 1 : 0;
+        for(size_t i=1; i<nranks; ++i) {
+            i_bndry += exp_no_lines + (i < extra_no_lines ? 1 : 0);
             // Note our line_offsets mark the end of each line!
-            if(i_start > byte_first_line && i_start <= byte_last_line) {
-                size_t i_off = line_offset[i_start-byte_first_line-1]+1; // +1 to skip leading newline
+            // we check if boundary is on our byte-chunk
+            if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {
+                // if so, send stream-offset to ranks which start/end here
+                size_t i_off = line_offset[i_bndry-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
+                // send to rank that starts at this boundary: i
                 mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, START_OFFSET, true));
+                // send to rank that ends at this boundary: i-1
+                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i-1, END_OFFSET, true));
             }
-            // if end is on our byte-chunk, send stream-offset to rank i
-            size_t i_end = i_start + exp_no_lines + (i < extra_no_lines ? 1 : 0);
-            if(i_end > byte_first_line && i_end <= byte_last_line && i < (nranks-1)) {
-                size_t i_off = line_offset[i_end-byte_first_line-1]+1; // +1 to include trailing newline
-                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, END_OFFSET, true));
-            }
-            i_start = i_end;
         }
         // before reading, make sure we received our start/end offsets
         hpat_dist_waitall(mpi_reqs.size(), mpi_reqs.data());
