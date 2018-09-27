@@ -311,9 +311,8 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
 
         // We iterate through chunk boundaries (defined by line-numbers)
         // we start with boundary 1 as 0 is the beginning of file
-        size_t i_bndry = 0 < extra_no_lines ? 1 : 0;
         for(size_t i=1; i<nranks; ++i) {
-            i_bndry += exp_no_lines + (i < extra_no_lines ? 1 : 0);
+            size_t i_bndry = hpat_dist_get_start(tot_no_lines, (int)nranks, (int)rank);
             // Note our line_offsets mark the end of each line!
             // we check if boundary is on our byte-chunk
             if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {
