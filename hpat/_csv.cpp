@@ -14,6 +14,7 @@
 
 #include "_datetime_ext.h"
 #include "_distributed.h"
+#include "_import_py.h"
 #include "_csv.h"
 
 #include <Python.h>
@@ -30,14 +31,17 @@
 typedef struct {
     PyObject_HEAD
     /* Your internal buffer, size and pos */
-    Py_ssize_t string_size;
-    Py_ssize_t pos;
-    char *buf;
+    std::istream * ifs;
+    size_t chunk_start;
+    size_t chunk_size;
+    size_t chunk_pos;
+    std::vector<char> buf;
 } hpatio;
 
 static void
 hpatio_dealloc(hpatio* self)
 {
+    if(self->ifs) delete self->ifs;
     Py_TYPE(self)->tp_free(self);
     /* we do not own the buffer, we only ref to it; nothing else to be done */
 }
@@ -49,9 +53,10 @@ hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     hpatio *self;
 
     self = (hpatio *)type->tp_alloc(type, 0);
-    self->string_size = 0;
-    self->pos = 0;
-    self->buf = NULL;
+    self->ifs = NULL;
+    self->chunk_start = 0;
+    self->chunk_size = 0;
+    self->chunk_pos = 0;
 
     return (PyObject *)self;
 }
@@ -62,38 +67,59 @@ static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
 
     char* str = NULL;
     Py_ssize_t count = 0;
-    PyObject *arg = Py_None;
 
-    if(!PyArg_ParseTuple(args, "|z#", &str, &count)) {
-        return -1;
+    if(!PyArg_ParseTuple(args, "|z#", &str, &count) || str == NULL) {
+        if(PyErr_Occurred()) PyErr_Print();
+        return 0;
     }
 
-    ((hpatio*)self)->buf = str;
-    ((hpatio*)self)->string_size = count;
+    ((hpatio*)self)->chunk_start = 0;
+    ((hpatio*)self)->chunk_pos = 0;
+    ((hpatio*)self)->ifs = new std::istringstream(str);
+    if(!((hpatio*)self)->ifs->good()) {
+        std::cerr << "Could not create istrstream from string.\n";
+        ((hpatio*)self)->chunk_size = 0;
+        return -1;
+    }
+    ((hpatio*)self)->chunk_size = count;
 
     return 0;
 }
 
 static void
-hpatio_init(hpatio *self, char * buf, size_t sz)
+hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
 {
-    self->string_size = sz;
-    self->pos = 0;
-    self->buf = buf;
+    if(!ifs) {
+        std::cerr << "Can't handle NULL pointer as input stream.\n";
+        return;
+    }
+    self->ifs = ifs;
+    if(!self->ifs->good() || self->ifs->eof()) {
+        std::cerr << "Got bad istream in initializing HPATIO object." << std::endl;
+        return;
+    }
+    self->ifs->seekg(start, std::ios_base::beg);
+    if(!self->ifs->good() || self->ifs->eof()) {
+        std::cerr << "Could not seek to start position " << start << std::endl;
+        return;
+    }
+    self->chunk_start = start;
+    self->chunk_size = sz;
+    self->chunk_pos = 0;
 }
 
 static PyObject *
 hpatio_read(hpatio* self, PyObject *args)
-{ /* taken from CPython stringio.c */
+{
+    /* taken from CPython stringio.c */
     std::cout << "reading..." << std::endl;
 
-    Py_ssize_t size, n;
-    char * output;
-
-    if(self->buf == NULL) {
+    if(self->ifs == NULL) {
         PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized HPATIO object");
         return NULL;
     }
+
+    Py_ssize_t size, n;
 
     PyObject *arg = Py_None;
     if (!PyArg_ParseTuple(args, "|O:read", &arg)) {
@@ -116,19 +142,23 @@ hpatio_read(hpatio* self, PyObject *args)
     }
 
     /* adjust invalid sizes */
-    n = self->string_size - self->pos;
-    if (size < 0 || size > n) {
+    n = self->chunk_size - self->chunk_pos;
+    if(size < 0 || size > n) {
         size = n;
-        if (size < 0)
-            size = 0;
+        if (size < 0) size = 0;
     }
 
-    output = self->buf + self->pos;
-    self->pos += size;
+    self->buf.resize(size);
+    self->ifs->read(self->buf.data(), size);
+    self->chunk_pos += size;
+    if(!*self->ifs) {
+        std::cerr << "Failed reading " << size << " bytes";
+        return NULL;
+    }
 
     std::cout << "read " << size << " bytes" << std::endl;
 
-    return PyUnicode_FromStringAndSize(output, size);
+    return PyUnicode_FromStringAndSize(self->buf.data(), size);
 }
 
 static PyObject *
@@ -193,127 +223,122 @@ void PyInit_csv(PyObject * m)
     PyModule_AddObject(m, "HPATIO", (PyObject *)&hpatio_type);
 }
 
-#include "_meminfo.h"
-#define ALIGN 32
-
-extern "C" {
-/**
-   Like csv_read_file, but reading from a string.
- **/
-PyObject * csv_read_string(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                           size_t * first_row, size_t * n_rows,
-                           std::string * delimiters = NULL, std::string * quotes = NULL);
-
-/**
-   Delete memory returned by csv_read.
-   @param[in] cols    pointer returned by csv_read
-   @param[in] release If > 0, release given number of MemInfo pointers
-**/
-void csv_delete(MemInfo ** cols, size_t release);
-
-}
-
 // ***********************************************************************************
 // ***********************************************************************************
-
-static MemInfo_alloc_aligned_type mi_alloc = (MemInfo_alloc_aligned_type) import_meminfo_func("MemInfo_alloc_safe_aligned");
-static MemInfo_release_type mi_release = (MemInfo_release_type) import_meminfo_func("MemInfo_release");
-#if 1
-static MemInfo_data_type mi_data = (MemInfo_data_type)import_meminfo_func("MemInfo_data");
-#else
-static void * mi_data(MemInfo* mi)
-{
-    return reinterpret_cast<void*>(((char*)mi)+24);
-}
-#endif
-
-// Allocating an array of given typesize, optionally copy from org buffer
-static MemInfo* alloc_meminfo(int dtype_sz, size_t n, MemInfo * org=NULL, size_t on=0)
-{
-    auto mi = mi_alloc(n*dtype_sz, ALIGN);
-    if(org) memcpy(mi_data(mi), mi_data(org), std::min(n, on) * dtype_sz);
-    return mi;
-}
-
-
-// Allocating an array of given type and size, optionally copy from org buffer
-static MemInfo* dtype_alloc(int dtype, size_t n, MemInfo * org=NULL, size_t on=0)
-{
-    int sz = -1;
-    switch(dtype) {
-    case HPAT_CTypes::INT32:
-    case HPAT_CTypes::UINT32:
-    case HPAT_CTypes::FLOAT32:
-        sz = 4;
-        break;
-    case HPAT_CTypes::INT64:
-    case HPAT_CTypes::UINT64:
-    case HPAT_CTypes::FLOAT64:
-        sz = 8;
-        break;
-    case HPAT_CTypes::DATETIME:
-        sz = sizeof(pandas_datetimestruct);
-        break;
-    default:
-        std::cerr << "unsupported dtype requested.";
-        return NULL;
-    }
-    return alloc_meminfo(sz, n, org, on);
-}
-
-
-static void dtype_dealloc(MemInfo * mi)
-{
-    mi_release(mi);
-}
-
-
-// convert string to a dtype
-static void dtype_convert(int dtype, const std::string & from, void * to, size_t ln)
-{
-    switch(dtype) {
-    case HPAT_CTypes::INT32:
-        (reinterpret_cast<int32_t*>(to))[ln] = std::stoi(from.c_str());
-        break;
-    case HPAT_CTypes::UINT32:
-        (reinterpret_cast<uint32_t*>(to))[ln] = (unsigned int)std::stoul(from.c_str());
-        break;
-    case HPAT_CTypes::INT64:
-        (reinterpret_cast<int64_t*>(to))[ln] = std::stoll(from.c_str());
-        break;
-    case HPAT_CTypes::UINT64:
-        (reinterpret_cast<uint64_t*>(to))[ln] = std::stoull(from.c_str());
-        break;
-    case HPAT_CTypes::FLOAT32:
-        (reinterpret_cast<float*>(to))[ln] = std::stof(from.c_str());
-        break;
-    case HPAT_CTypes::FLOAT64:
-        (reinterpret_cast<double*>(to))[ln] = std::stof(from.c_str());
-        break;
-    case HPAT_CTypes::DATETIME:
-        parse_iso_8601_datetime(const_cast<char*>(from.c_str()), from.size(),
-                                reinterpret_cast<pandas_datetimestruct*>(to) + ln,
-                                NULL, NULL);
-        break;
-    default:
-        ;
-    }
-}
-
-
-// we can use and then delete the extra dtype column
-extern "C" void csv_delete(MemInfo ** mi, size_t release)
-{
-    for(size_t i=0; i<release; ++i) {
-        if(mi[i]) {
-            dtype_dealloc(mi[i]);
-        }
-    }
-    delete [] mi;
-}
-
 
 #define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
+
+/// return vector of offsets of newlines in first n bytes of given stream
+static std::vector<size_t> count_lines(std::istream * f, size_t n)
+{
+    std::vector<size_t> pos;
+    char c;
+    size_t i=0;
+    while(i<n && f->get(c)) {
+        if(c == '\n') pos.push_back(i);
+        ++i;
+    }
+    if(i<n) std::cerr << "Warning, read only " << i << " bytes out of " << n << "requested\n";
+    return pos;
+}
+
+/** 
+ * Split stream into chunks and return a file-like object per rank. The returned object
+ * represents the data to be read on each process.
+ *
+ * We evenly distribute by number of lines by working on byte-chunks in parallel
+ *   * counting new-lines and allreducing and exscaning numbers
+ *   * computing start/end points of desired chunks-of-lines and sending them to corresponding ranks.
+ * If total number is not a multiple of number of ranks the first ranks get an extra line.
+ *
+ * @param[in]  f   the input stream
+ * @param[in]  fsz total number of bytes in stream
+ * @param[out] first_row if not NULL will be set to global number of first row in this chunk
+ * @param[out] n_rows    if not NULL will be set to number of rows in this chunk
+ **/
+static PyObject* csv_get_chunk(std::istream * f, size_t fsz, size_t * first_row, size_t * n_rows)
+{
+    size_t rank = hpat_dist_get_rank();
+    size_t nranks = hpat_dist_get_size();
+
+    // We evenly distribute the 'data' byte-wise
+    auto chunksize = fsz/nranks;
+    // seek to our chunk
+    f->seekg(chunksize*rank, std::ios_base::beg);
+    if(!f->good() || f->eof()) {
+        std::cerr << "Could not seek to start position " << chunksize*rank << std::endl;
+        return NULL;
+    }
+    // count number of lines in chunk
+    std::vector<size_t> line_offset = count_lines(f, chunksize);
+    size_t no_lines = line_offset.size();
+    size_t my_off_start = 0;
+    size_t my_off_end = fsz;
+    size_t exp_no_lines = no_lines;
+    size_t extra_no_lines = 0;
+
+    if(nranks > 1) {
+        // get total number of lines using allreduce
+        size_t tot_no_lines = no_lines;
+        
+        hpat_dist_reduce(reinterpret_cast<char *>(no_lines), reinterpret_cast<char *>(tot_no_lines), MPI_SUM, HPAT_CTypes::UINT64);
+        // evenly divide
+        exp_no_lines = tot_no_lines/nranks;
+        // surplus lines added to first ranks
+        extra_no_lines = tot_no_lines-(exp_no_lines*nranks);
+        
+        // Now we need to communicate the distribution as we really want it
+        // First determine which is our first line (which is the sum of previous lines)
+        size_t byte_first_line = hpat_dist_exscan_i8(no_lines);
+        size_t byte_last_line = byte_first_line + no_lines;
+        
+        // We now determine the chunks of lines that begin and end in our byte-chunk
+        
+        // issue IRecv calls, eventually receiving start and end offsets of our line-chunk
+        const int START_OFFSET = 47011;
+        const int END_OFFSET = 47012;
+        std::vector<MPI_Request> mpi_reqs;
+        mpi_reqs.push_back(hpat_dist_irecv(&my_off_start, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, START_OFFSET, rank>0));
+        mpi_reqs.push_back(hpat_dist_irecv(&my_off_end, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, END_OFFSET, rank<(nranks-1)));
+
+        size_t i_start = 0;
+        for(size_t i=0; i<nranks; ++i) {
+            // if start is on our byte-chunk, send stream-offset to rank i
+            // Note our line_offsets mark the end of each line!
+            if(i_start > byte_first_line && i_start <= byte_last_line) {
+                size_t i_off = line_offset[i_start-byte_first_line-1]+1; // +1 to skip leading newline
+                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, START_OFFSET, true));
+            }
+            // if end is on our byte-chunk, send stream-offset to rank i
+            size_t i_end = i_start + exp_no_lines + (i < extra_no_lines ? 1 : 0);
+            if(i_end > byte_first_line && i_end <= byte_last_line && i < (nranks-1)) {
+                size_t i_off = line_offset[i_end-byte_first_line-1]+1; // +1 to include trailing newline
+                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, END_OFFSET, true));
+            }
+            i_start = i_end;
+        }
+        // before reading, make sure we received our start/end offsets
+        hpat_dist_waitall(mpi_reqs.size(), mpi_reqs.data());
+    } // ranks>1
+
+    // Here we now know exactly what chunk to read: [my_off_start,my_off_end[
+    // let's create our file-like reader
+    auto gilstate = PyGILState_Ensure();
+    PyObject * reader = PyObject_CallFunctionObjArgs((PyObject *) &hpatio_type, NULL);
+    PyGILState_Release(gilstate);
+    if(reader == NULL || PyErr_Occurred()) {
+        PyErr_Print();
+        std::cerr << "Could not create chunk reader object" << std::endl;
+        if(reader) delete reader;
+        reader = NULL;
+    } else {
+        hpatio_init(reinterpret_cast<hpatio*>(reader), f, my_off_start, my_off_end-my_off_start);
+        if(first_row) *first_row = rank*exp_no_lines + (rank < extra_no_lines ? 1 : 0);
+        if(n_rows) *n_rows = (rank+1)*exp_no_lines + (rank < extra_no_lines ? 1 : 0);
+    }
+
+    return reader;
+}
 
 /*
   This is a wrapper around pandas.read_csv.
@@ -331,48 +356,29 @@ extern "C" void csv_delete(MemInfo ** mi, size_t release)
   We always read full lines until we read at least our chunk-size.
   This makes sure there are no gaps and no data duplication.
  */
-static PyObject* csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+static PyObject* csv_read(std::istream * f, size_t fsz, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
                           size_t * first_row, size_t * n_rows,
                           std::string * delimiters = NULL, std::string * quotes = NULL)
 {
     CHECK(dtypes, "Input parameter dtypes must not be NULL.");
     CHECK(first_row && n_rows, "Output parameters first_row and n_rows must not be NULL.");
 
-    // For now we just do single process, so our chunksize is fsz
-    size_t chunksize = fsz;
-    char * buff = new char[chunksize+1];
-    if(! f.read(buff, chunksize)) {
-        PyErr_Print();
-        std::cerr << "Reading " << chunksize << " bytes failed.";
-        return NULL;
-    }
-    buff[chunksize] = 0;
-
-    // we have our chunk read into buff, now create our 'file-like' input to pandas.read_csv
-    auto gilstate = PyGILState_Ensure();
-    PyObject * hio = PyObject_CallFunctionObjArgs((PyObject *) &hpatio_type, NULL);
-    if (hio == NULL || PyErr_Occurred()) {
-        PyErr_Print();
-        std::cerr << "Could not create IO buffer object" << std::endl;
-        PyGILState_Release(gilstate);
-        return NULL;
-    }
-    hpatio_init(reinterpret_cast<hpatio*>(hio), buff, chunksize);
+    PyObject * reader = csv_get_chunk(f, fsz, first_row, n_rows);
+    if(reader == 0) return NULL;
 
     // Now call pandas.read_csv.
+    PyObject * df = NULL;
+    auto gilstate = PyGILState_Ensure();
     PyObject * pd_read_csv = import_sym("pandas", "read_csv");
     if (pd_read_csv == NULL || PyErr_Occurred()) {
         PyErr_Print();
         std::cerr << "Could not get pandas.read_csv " << std::endl;
-        PyGILState_Release(gilstate);
-        return NULL;
+        pd_read_csv = NULL;
+    } else {
+        df = PyObject_CallFunctionObjArgs(pd_read_csv, reader, NULL);
+        Py_XDECREF(pd_read_csv);
     }
-    PyObject * df = PyObject_CallFunctionObjArgs(pd_read_csv, hio, NULL);
-
-    Py_XDECREF(pd_read_csv);
     PyGILState_Release(gilstate);
-
-    delete [] buff;
 
     if (df == NULL || PyErr_Occurred()) {
         PyErr_Print();
@@ -385,116 +391,15 @@ static PyObject* csv_read(std::istream & f, size_t fsz, size_t * cols_to_read, i
 }
 
 
-
-# if 0
-    MemInfo ** result = new MemInfo*[n_cols_to_read]();
-    if(n_cols_to_read == 0 || fsz == 0) return result;
-
-    int rank = hpat_dist_get_rank();
-    int nranks = hpat_dist_get_size();
-
-    // read the first line to determine number cols in file and estimate #lines
-    std::string line;
-    CHECK(std::getline(f,line), "could not read first line");
-    auto linesize = line.size();
-
-    size_t curr_row = 0;
-    size_t ncols = 0;
-    boost::escaped_list_separator<char> tokfunc("\\", delimiters ? *delimiters : ",", quotes ? *quotes : "\"\'");
-    try{
-        boost::tokenizer<boost::escaped_list_separator<char> > tk(line, tokfunc);
-        for(auto i(tk.begin()); i!=tk.end(); ++ncols, ++i) {}
-    } catch (...) {
-        // The first line must be correct
-        std::cerr << "Error parsing first line; giving up.\n";
-        return NULL;
-    }
-    CHECK(n_cols_to_read <= ncols, "More columns requested than available.");
-    if(cols_to_read) for(size_t i=0; i<n_cols_to_read; ++i) CHECK(ncols > cols_to_read[i], "Invalid column index provided.");
-
-    // We evenly distribute the 'data' byte-wise
-    auto chunksize = fsz/nranks;
-    // and conservatively estimate #lines per chunk
-    size_t linesperchunk = (size_t) std::max((1.1 * chunksize) / linesize, 1.0);
-
-    *n_rows = 0;
-    // we can skip reading alltogether if our chunk is past eof
-    if(chunksize*rank < fsz) {
-        // seems there is data for us to read, let's allocate the arrays
-        for(size_t i=0; i<n_cols_to_read; ++i) result[i] = dtype_alloc(static_cast<int>(dtypes[i]), linesperchunk);
-
-        // let's prepare an mask fast checking if a column is requested
-        std::vector<ssize_t> req(ncols, -1);
-        for(size_t i=0; i<n_cols_to_read; ++i) {
-            auto idx = cols_to_read ? cols_to_read[i] : i;
-            req[idx] = i;
-        }
-
-        // seek to our chunk and read it
-        f.seekg(chunksize*rank, std::ios_base::beg);
-        size_t chunkend = chunksize*(rank+1);
-        size_t curr_pos = f.tellg();
-        // we stop reading when at least reached boundary of our chunk
-        // we always stop on a line-boundary!
-        // 2 cases: exact boundary: next rank will have full line
-        //          behind boundary: next rank will skip incomplete line
-        //          note that the next rank might be after its boundary after skipping the first line!
-        while(curr_pos < chunkend && std::getline(f, line)) {
-            // if the boundary of the chunk contains enough whitespace the actual data will be entirely in the next line
-            // in this case we must not read the line, we are done!
-            size_t my_pos = f.tellg();
-            if(my_pos > chunkend) {
-                int num_whitespaces(0);
-                for(char c : line) {
-                    if(!std::isspace(c)) break;
-                    ++num_whitespaces ;
-                }
-                // there is no more meaningfull data in our chunk -> we are done
-                if(curr_pos + num_whitespaces >= chunkend) break;
-            }
-            // miss estimated number of lines?
-            if(*n_rows >= linesperchunk) {
-                size_t new_lpc = std::max(linesperchunk * 1.1, linesperchunk+2.0);
-                for(size_t i=0; i<n_cols_to_read; ++i) {
-                    MemInfo * tmp = result[i];
-                    result[i] = dtype_alloc(static_cast<int>(dtypes[i]), new_lpc, tmp, linesperchunk);
-                    dtype_dealloc(reinterpret_cast<MemInfo*>(tmp));
-                }
-                linesperchunk = new_lpc;
-            }
-            try{
-                size_t c = 0;
-                boost::tokenizer<boost::escaped_list_separator<char> > tk(line, tokfunc);
-                for(auto i(tk.begin()); i!=tk.end(); ++c, ++i) {
-                    if(req[c] >= 0) { // we only care about requested columns
-                        dtype_convert(static_cast<int>(dtypes[c]), *i, mi_data(result[req[c]]), *n_rows);
-                    }
-                }
-                // we count/keep only complete lines
-                if(c == ncols) ++(*n_rows);
-                else throw std::invalid_argument("Too few columns");
-            } catch (...) {
-                // The first line can easily be incorrect
-                if(curr_row > 0 || rank == 0) std::cerr << "Error parsing line " << curr_row << "; skipping.\n";
-            }
-            curr_pos = my_pos;
-            ++curr_row;
-        }
-    }
-    *first_row = hpat_dist_exscan_i8(*n_rows);
-    return result;
-}
-#endif
-
 extern "C" void * csv_read_file(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
-                                 size_t * first_row, size_t * n_rows,
-                                 std::string * delimiters, std::string * quotes)
+                                size_t * first_row, size_t * n_rows,
+                                std::string * delimiters, std::string * quotes)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
     auto fsz = boost::filesystem::file_size(*fname);
-    std::ifstream f(*fname);
-    CHECK(f.good() && !f.eof() && f.is_open(), "could not open file.");
+    std::ifstream * f = new  std::ifstream(*fname);
+    CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
     return reinterpret_cast<void*>(csv_read(f, fsz, cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes));
 }
 
@@ -505,8 +410,8 @@ extern "C" PyObject * csv_read_string(const std::string * str, size_t * cols_to_
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
-    std::istringstream f(*str);
-    CHECK(f.good(), "could not create istrstream from string.");
+    std::istringstream * f = new std::istringstream(*str);
+    CHECK(f->good(), "could not create istrstream from string.");
     return csv_read(f, str->size(), cols_to_read, dtypes, n_cols_to_read, first_row, n_rows, delimiters, quotes);
 }
 
@@ -514,125 +419,3 @@ extern "C" PyObject * csv_read_string(const std::string * str, size_t * cols_to_
 
 // ***********************************************************************************
 // ***********************************************************************************
-
-#if 0
-
-static void printit(MemInfo ** r, int64_t * dtypes, size_t nr, size_t nc, size_t fr)
-{
-    for(size_t i=0; i<nr; ++i) {
-        std::stringstream f;
-        f << "row" << (fr+i) << " ";
-        for(size_t j=0; j<nc; ++j) {
-            void * data = mi_data(r[j]);
-            switch(dtypes[j]) {
-            case HPAT_CTypes::INT32:
-                f << "i32:" << (reinterpret_cast<int32_t*>(data))[i];
-                break;
-            case HPAT_CTypes::UINT32:
-                f << "ui32:" << (reinterpret_cast<uint32_t*>(data))[i];
-                break;
-            case HPAT_CTypes::INT64:
-                f << "i64:" << (reinterpret_cast<int64_t*>(data))[i];
-                break;
-            case HPAT_CTypes::UINT64:
-                f << "ui64:" << (reinterpret_cast<uint64_t*>(data))[i];
-                break;
-            case HPAT_CTypes::FLOAT32:
-                f << "f32:" << (reinterpret_cast<float*>(data))[i];
-                break;
-            case HPAT_CTypes::FLOAT64:
-                f << "f64:" << (reinterpret_cast<double*>(data))[i];
-                break;
-            default:
-                f << "?";
-                ;
-            }
-            f << ", ";
-        }
-        f << std::endl;
-        std::cout << f.str();
-    }
-}
-
-int main()
-{
-    int rank = hpat_dist_get_rank();
-    int ncols = 4;
-
-    size_t cols[ncols] = {0,1,2,3};
-    int dtypes[ncols] = {HPAT_CTypes::INT, HPAT_CTypes::FLOAT32, HPAT_CTypes::FLOAT64, HPAT_CTypes::UINT64};
-    size_t first_row, n_rows;
-    std::string delimiters = ",";
-    std::string quotes = "\"";
-
-    if(!rank) std::cout << "\na regular case\n";
-    std::string csv =
-        "0,2.3,4.6,47736\n"
-        "1,2.3,4.6,47736\n"
-        "2,2.3,4.6,47736\n"
-        "4,2.3,4.6,47736\n";
-    auto r = csv_read_string(&csv, cols, dtypes, ncols,
-                             &first_row, &n_rows,
-                             &delimiters, &quotes);
-    printit(r, dtypes, n_rows, ncols, first_row);
-    csv_delete(r, ncols);
-
-    if(!rank) std::cout << "\nwhite-spaces, mis-predicted line-count, imbalance in the beginning\n";
-    MPI_Barrier(MPI_COMM_WORLD);
-    csv =
-        "0,                       2.3                 ,     4.6                    ,       47736\n"
-        "1,\"1.3\",4.6,47736\n"
-        "2,2.3,4.6,\"47736\"\n"
-        "3,2.3,4.6,47736\n";
-    r = csv_read_string(&csv, NULL, dtypes, ncols,
-                        &first_row, &n_rows,
-                        &delimiters, &quotes);
-    printit(r, dtypes, n_rows, ncols, first_row);
-    csv_delete(r, ncols);
-
-    if(!rank) std::cout << "\nwhite-spaces, imbalance in the end\n";
-    MPI_Barrier(MPI_COMM_WORLD);
-    csv =
-        "0,2.3,4.6,47736\n"
-        "1,\"1.3\",4.6,47736\n"
-        "2,2.3,4.6,\"47736\"\n"
-        "3,         2.3                 ,     4.6                    ,       47736\n";
-    r = csv_read_string(&csv, NULL, dtypes, ncols,
-                        &first_row, &n_rows,
-                        &delimiters, &quotes);
-    printit(r, dtypes, n_rows, ncols, first_row);
-    csv_delete(r, ncols);
-
-
-    if(!rank) std::cout << "\nwhite-spaces, quotes, imbalance in the middle\n";
-    MPI_Barrier(MPI_COMM_WORLD);
-    csv =
-        "0,2.3,4.6,47736\n"
-        "1,         2.3                          ,     4.6                    ,       47736\n"
-        "2,\"1.3\",4.6,47736\n"
-        "3,2.3,4.6,\"47736\"\n";
-    r = csv_read_string(&csv, NULL, dtypes, ncols,
-                        &first_row, &n_rows,
-                        &delimiters, &quotes);
-    printit(r, dtypes, n_rows, ncols, first_row);
-    csv_delete(r, ncols);
-
-    if(!rank) std::cout << "\nsyntax errors, no explicit quotes/delimiters\n";
-    MPI_Barrier(MPI_COMM_WORLD);
-    csv =
-        "0,2.3,4.6,47736\n"
-        "1,2.3,4.6,error\n"
-        "2,\"2.3\",4.6,47736\n"
-        "3,2.3,4.6,\"47736\"\n";
-    r = csv_read_string(&csv, NULL, dtypes, ncols,
-                        &first_row, &n_rows);
-    printit(r, dtypes, n_rows, ncols, first_row);
-    csv_delete(r, ncols);
-
-    csv_read_string(NULL, NULL, NULL, 4, NULL, NULL, NULL, NULL);
-    csv_read_string(&csv, NULL, NULL, 4, NULL, NULL, NULL, NULL);
-
-
-    MPI_Finalize();
-}
-#endif

@@ -33,4 +33,11 @@ extern "C" void * csv_read_file(const std::string * fname, size_t * cols_to_read
                                 size_t * first_row, size_t * n_rows,
                                 std::string * delimiters, std::string * quotes);
 
+/**
+   Like csv_read_file, but reading from a string.
+ **/
+extern "C" PyObject * csv_read_string(const std::string * fname, size_t * cols_to_read, int64_t * dtypes, size_t n_cols_to_read,
+                                      size_t * first_row, size_t * n_rows,
+                                      std::string * delimiters = NULL, std::string * quotes = NULL);
+
 #endif // _CSV_H_INCLUDED
