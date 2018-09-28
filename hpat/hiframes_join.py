@@ -965,7 +965,7 @@ def local_merge_asof(left_key, right_key, data_left, data_right):
         # TODO: copy_tup
         setitem_arr_tup(out_data_left, left_ind, getitem_arr_tup(data_left, left_ind))
 
-        if right_ind > 0:
+        if right_ind >= 0:
             out_right_key[left_ind] = right_key[right_ind]
             setitem_arr_tup(out_data_right, left_ind, getitem_arr_tup(data_right, right_ind))
         else:
