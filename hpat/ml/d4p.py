@@ -19,7 +19,10 @@
 import numpy as np
 from numpy import nan
 from numba import types, cgutils
-from numba.extending import intrinsic, typeof_impl, overload, overload_method, overload_attribute, box, unbox, make_attribute_wrapper, type_callable, models, register_model, lower_builtin, NativeValue, lower_cast
+from numba.extending import (intrinsic, typeof_impl, overload, overload_method,
+                             overload_attribute, box, unbox, make_attribute_wrapper,
+                             type_callable, models, register_model, lower_builtin,
+                             NativeValue, lower_cast, get_cython_function_address)
 from numba.targets.imputils import impl_ret_new_ref
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
@@ -29,6 +32,8 @@ from hpat.str_ext import string_type
 from hpat.distributed_analysis import Distribution as DType
 from llvmlite import ir as lir
 from numba.targets.arrayobj import _empty_nd_impl
+import ctypes
+
 
 ##############################################################################
 ##############################################################################
@@ -109,6 +114,7 @@ def nt2nd(context, builder, ptr, ary_type):
     cgutils.raw_memcpy(builder, ary.data, builder.load(data), ary.nitems, ary.itemsize, align=1)
     # we are done!
     return impl_ret_new_ref(context, builder, ary_type, ary._getvalue())
+
 
 ##############################################################################
 ##############################################################################
@@ -199,6 +205,7 @@ class algo_factory(object):
         self.mk_ctor()
         self.mk_compute()
         self.mk_attrs()
+        self.mk_boxing()
 
 
     def mk_type(self, spec):
@@ -212,7 +219,7 @@ class algo_factory(object):
                     super(NbType, self).__init__(name=name)
             return NbType
 
-        # make type and type instance for algo, its result and possibly model
+        # make type and type instance for algo, its result or possibly model
         # also register their opaque data model
         self.NbType = mk_simple(self.name + '_nbtype')
         self.all_nbtypes[self.name] = self.NbType()
@@ -371,6 +378,39 @@ def _cmm_{0}(typingctx, {2}):
 
         for a in self.spec.attrs:
             self.add_attr(self.NbType, a[0], a[1], '_'.join(['get', self.spec.c_name, a[0]]))
+
+
+    def cy_unbox(self):
+        addr = get_cython_function_address("_daal4py", 'unbox_'+self.spec.c_name)
+        functype = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.py_object)
+        return functype(addr)
+
+    def mk_boxing(self):
+        '''provide boxing and unboxing'''
+
+        if not self.spec or self.spec.input_types:
+            # we only support models/results at this point
+            return
+
+        self.unbox = self.cy_unbox()
+
+        @box(self.NbType)
+        def box_me(typ, val, c):
+            ll_intp = c.context.get_value_type(types.uintp)
+            addr = c.builder.ptrtoint(val, ll_intp)
+            v = c.box(types.uintp, addr)
+            py_obj = c.pyapi.unserialize(c.pyapi.serialize_object(self.spec.pyclass))
+            res = c.pyapi.call_function_objargs(py_obj, (v,))
+            return res
+
+        #@unbox(self.NbType)
+        #def unbox_me(typ, obj, c):
+        #    print('unbox_'+self.spec.c_name, self.NbType())
+        #    val = cgutils.alloca_once(c.builder, lir.IntType(8).as_pointer())
+        #    longobj = self.unbox(self.spec.c_name, val)
+        #    c.builder.store(longobj, val)
+        #    return NativeValue(c.builder.load(val), is_error=c.pyapi.c_api_error())
+
 
 ##############################################################################
 ##############################################################################
