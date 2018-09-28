@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 import numba
 from numba import types
@@ -939,10 +940,11 @@ class LenSeriesType(AbstractTemplate):
 
 #@infer_global(np.full_like)
 
-@type_callable('-')
 def type_sub(context):
     def typer(val1, val2):
         if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
             return timedelta_index_series_type
     return typer
 
+type_callable('-')(type_sub)
+type_callable(operator.sub)(type_sub)

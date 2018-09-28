@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import operator
 import numpy as np
 from collections import namedtuple
 import warnings
@@ -28,6 +29,14 @@ from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
 
 LARGE_WIN_SIZE = 10
+
+_dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
+                operator.eq, operator.ne, operator.ge, operator.gt,
+                operator.le, operator.lt, operator.sub)
+
+_string_array_comp_ops = ('==', '!=', '>=', '>', '<=', '<',
+                operator.eq, operator.ne, operator.ge, operator.gt,
+                operator.le, operator.lt)
 
 
 class HiFramesTyped(object):
@@ -900,7 +909,7 @@ class HiFramesTyped(object):
         if rhs.op != 'binop':
             return False
 
-        if rhs.fn not in ('==', '!=', '>=', '>', '<=', '<', '-'):
+        if rhs.fn not in _dt_index_binops:
             return False
 
         arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
@@ -918,7 +927,7 @@ class HiFramesTyped(object):
         # TODO: this has to be more generic to support all combinations.
         if (self.typemap[arg1.name] == dt_index_series_type and
             self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
-            rhs.fn == '-'):
+            rhs.fn in ('-', operator.sub)):
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
         if (self.typemap[arg1.name] not in allowed_types
@@ -947,7 +956,7 @@ class HiFramesTyped(object):
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
-                and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
+                and rhs.fn in _string_array_comp_ops
                 and (is_str_arr_typ(self.typemap[rhs.lhs.name])
                      or is_str_arr_typ(self.typemap[rhs.rhs.name]))):
             arg1 = rhs.lhs
