@@ -1,3 +1,4 @@
+import operator
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
@@ -108,6 +109,12 @@ class StringAdd(ConcreteTemplate):
 
 
 @infer
+@infer_global(operator.eq)
+@infer_global(operator.ne)
+@infer_global(operator.ge)
+@infer_global(operator.gt)
+@infer_global(operator.le)
+@infer_global(operator.lt)
 class StringOpEq(AbstractTemplate):
     key = '=='
 
@@ -348,6 +355,7 @@ def impl_string_concat(context, builder, sig, args):
     return builder.call(fn, args)
 
 
+@lower_builtin(operator.eq, string_type, string_type)
 @lower_builtin('==', string_type, string_type)
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
@@ -355,6 +363,7 @@ def string_eq_impl(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.call(fn, args)
 
+@lower_builtin(operator.eq, char_type, char_type)
 @lower_builtin('==', char_type, char_type)
 def char_eq_impl(context, builder, sig, args):
     def char_eq_impl(c1, c2):
@@ -364,6 +373,7 @@ def char_eq_impl(context, builder, sig, args):
     return res
 
 
+@lower_builtin(operator.ne, string_type, string_type)
 @lower_builtin('!=', string_type, string_type)
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
@@ -371,6 +381,7 @@ def string_neq_impl(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
 
+@lower_builtin(operator.ge, string_type, string_type)
 @lower_builtin('>=', string_type, string_type)
 def string_ge_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -381,6 +392,7 @@ def string_ge_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
     return res
 
+@lower_builtin(operator.gt, string_type, string_type)
 @lower_builtin('>', string_type, string_type)
 def string_gt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -391,6 +403,7 @@ def string_gt_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
     return res
 
+@lower_builtin(operator.le, string_type, string_type)
 @lower_builtin('<=', string_type, string_type)
 def string_le_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -401,6 +414,7 @@ def string_le_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
     return res
 
+@lower_builtin(operator.lt, string_type, string_type)
 @lower_builtin('<', string_type, string_type)
 def string_lt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -475,7 +489,7 @@ def lower_compile_regex(context, builder, sig, args):
 
 
 @lower_builtin(contains_regex, string_type, regex_type)
-def impl_string_concat(context, builder, sig, args):
+def impl_string_contains_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
@@ -483,7 +497,7 @@ def impl_string_concat(context, builder, sig, args):
 
 
 @lower_builtin(contains_noregex, string_type, string_type)
-def impl_string_concat(context, builder, sig, args):
+def impl_string_contains_noregex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(
