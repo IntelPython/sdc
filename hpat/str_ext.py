@@ -103,6 +103,7 @@ def hash_overload(str_typ):
         return lambda s: _hash_str(s)
 
 @infer
+@infer_global(operator.add)
 class StringAdd(ConcreteTemplate):
     key = "+"
     cases = [signature(string_type, string_type, string_type)]
@@ -347,6 +348,7 @@ def string_from_impl(context, builder, sig, args):
     return builder.call(fn, args)
 
 
+@lower_builtin(operator.add, string_type, string_type)
 @lower_builtin("+", string_type, string_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
