@@ -38,6 +38,25 @@ _string_array_comp_ops = ('==', '!=', '>=', '>', '<=', '<',
                 operator.eq, operator.ne, operator.ge, operator.gt,
                 operator.le, operator.lt)
 
+_binop_to_str = {
+    operator.eq: '==',
+    operator.ne: '!=',
+    operator.ge: '>=',
+    operator.gt: '>',
+    operator.le: '<=',
+    operator.lt: '<',
+    operator.sub: '-',
+    operator.add: '+',
+    '==': '==',
+    '!=': '!=',
+    '>=': '>=',
+    '>': '>',
+    '<=': '<=',
+    '<': '<',
+    '-': '-',
+    '+': '+',
+}
+
 
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
@@ -934,13 +953,15 @@ class HiFramesTyped(object):
                 or self.typemap[arg2.name] not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
 
+        op_str = _binop_to_str[rhs.fn]
+
         func_text = 'def f(arg1, arg2):\n'
         if self.typemap[arg1.name] == dt_index_series_type:
             func_text += '  dt_index, _str = arg1, arg2\n'
-            comp = 'dt_index[i] {} other'.format(rhs.fn)
+            comp = 'dt_index[i] {} other'.format(op_str)
         else:
             func_text += '  dt_index, _str = arg2, arg1\n'
-            comp = 'other {} dt_index[i]'.format(rhs.fn)
+            comp = 'other {} dt_index[i]'.format(op_str)
         func_text += '  l = len(dt_index)\n'
         func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(_str)\n'
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
@@ -976,11 +997,13 @@ class HiFramesTyped(object):
                 self.typemap.pop(arg2.name)
                 self.typemap[arg2.name] = string_array_type
 
+            op_str = _binop_to_str[rhs.fn]
+
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
-            func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
+            func_text += '    S[i] = {} {} {}\n'.format(arg1_access, op_str,
                                                         arg2_access)
             func_text += '  return S\n'
 
@@ -1171,7 +1194,7 @@ class HiFramesTyped(object):
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
         if isinstance(tup_def, ir.Expr):
-            if tup_def.op == 'binop' and tup_def.fn == '+':
+            if tup_def.op == 'binop' and tup_def.fn in ('+', operator.add):
                 return (self._get_const_tup(tup_def.lhs)
                         + self._get_const_tup(tup_def.rhs))
             if tup_def.op in ('build_tuple', 'build_list'):
