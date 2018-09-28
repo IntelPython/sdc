@@ -4,7 +4,8 @@ import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
-                            compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes,
+                            mk_unique_var)
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
@@ -21,12 +22,12 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               getitem_str_offset, copy_str_arr_slice,
                               setitem_string_array, str_copy_ptr)
 
-from hpat.timsort import copyElement_tup, getitem_arr_tup
+from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
 import numpy as np
 
 
 class Join(ir.Stmt):
-    def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, loc):
+    def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, how, loc):
         self.df_out = df_out
         self.left_df = left_df
         self.right_df = right_df
@@ -35,6 +36,7 @@ class Join(ir.Stmt):
         self.df_out_vars = df_vars[self.df_out].copy()
         self.left_vars = df_vars[left_df].copy()
         self.right_vars = df_vars[right_df].copy()
+        self.how = how
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -334,21 +336,36 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         local_right_data = ",".join(right_arg_names)
 
 
-    # local sort
-    func_text += "    local_sort_f1(t1_key, data_left)\n"
-    func_text += "    local_sort_f2(t2_key, data_right)\n"
+    if join_node.how != 'asof':
+        # asof key is already sorted, TODO: add error checking
+        # local sort
+        func_text += "    local_sort_f1(t1_key, data_left)\n"
+        func_text += "    local_sort_f2(t2_key, data_right)\n"
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
-    merge_out = [join_node.df_out_vars[join_node.left_key]]
-    merge_out.append(join_node.df_out_vars[join_node.right_key])
+    out_l_key_var = join_node.df_out_vars[join_node.left_key]
+    out_r_key_var = join_node.df_out_vars[join_node.right_key]
+    # create dummy variable if right key is not actually returned
+    # using the same output left key causes errors for asof case
+    if join_node.left_key == join_node.right_key:
+        out_r_key_var = ir.Var(
+            out_l_key_var.scope, mk_unique_var('dummy_k'), loc)
+        typemap[out_r_key_var.name] = typemap[out_l_key_var.name]
+
+    merge_out = [out_l_key_var, out_r_key_var]
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
                   if n != join_node.left_key]
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
                   if n != join_node.right_key]
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
-    func_text += "    out_t1_key, out_t2_key, out_data_left, out_data_right = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n"
+    if join_node.how == 'asof':
+        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
+    else:
+        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n")
 
     for i in range(len(left_other_names)):
         func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
@@ -372,6 +389,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     join_impl = loc_vars['f']
+
+    # print(func_text)
 
     left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
     _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(typemap[left_key_var.name], left_data_tup_typ)
@@ -915,6 +934,46 @@ def local_merge_new(left_key, right_key, data_left, data_right):
     out_data_right = trim_arr_tup(out_data_right, out_ind)
 
     return out_left_key, out_right_key, out_data_left, out_data_right
+
+
+@numba.njit
+def local_merge_asof(left_key, right_key, data_left, data_right):
+    # adapted from pandas/_libs/join_func_helper.pxi
+    l_size = len(left_key)
+    r_size = len(right_key)
+
+    out_left_key = empty_like_type(l_size, left_key)
+    out_right_key = empty_like_type(l_size, right_key)
+    out_data_left = alloc_arr_tup(l_size, data_left)
+    out_data_right = alloc_arr_tup(l_size, data_right)
+
+    left_ind = 0
+    right_ind = 0
+
+    for left_ind in range(l_size):
+        # restart right_ind if it went negative in a previous iteration
+        if right_ind < 0:
+            right_ind = 0
+
+        # find last position in right whose value is less than left's
+        while right_ind < r_size and right_key[right_ind] <= left_key[left_ind]:
+            right_ind += 1
+
+        right_ind -= 1
+
+        out_left_key[left_ind] = left_key[left_ind]
+        # TODO: copy_tup
+        setitem_arr_tup(out_data_left, left_ind, getitem_arr_tup(data_left, left_ind))
+
+        if right_ind > 0:
+            out_right_key[left_ind] = right_key[right_ind]
+            setitem_arr_tup(out_data_right, left_ind, getitem_arr_tup(data_right, right_ind))
+        else:
+            pass  # TODO: set NaN
+
+    return out_left_key, out_right_key, out_data_left, out_data_right
+
+
 
 @lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
 def lower_local_merge(context, builder, sig, args):

@@ -286,7 +286,10 @@ class HiFrames(object):
             return self._handle_pd_read_parquet(assign, lhs, rhs, label)
 
         if fdef == ('merge', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs, label)
+            return self._handle_merge(assign, lhs, rhs, False, label)
+
+        if fdef == ('merge_asof', 'pandas'):
+            return self._handle_merge(assign, lhs, rhs, True, label)
 
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
@@ -688,7 +691,7 @@ class HiFrames(object):
         fname = rhs.args[0]
         return self._gen_parquet_read(fname, lhs, label)
 
-    def _handle_merge(self, assign, lhs, rhs, label):
+    def _handle_merge(self, assign, lhs, rhs, is_asof, label):
         """transform pd.merge() into a Join node
         """
         if len(rhs.args) < 2:
@@ -718,9 +721,11 @@ class HiFrames(object):
         df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in right_colnames})
         self._create_df(lhs.name, df_col_map, label)
+        how = 'asof' if is_asof else 'inner'
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
-                                   left_on, right_on, self.df_vars, lhs.loc)]
+                                   left_on, right_on, self.df_vars, how,
+                                   lhs.loc)]
 
     def _handle_concat(self, assign, lhs, rhs, label):
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
