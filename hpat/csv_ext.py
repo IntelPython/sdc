@@ -3,7 +3,7 @@ from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, cgutils
 from numba.typing.templates import signature
-from numba.extending import overload, intrinsic
+from numba.extending import overload, intrinsic, register_model, models, box
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import hpat
@@ -24,6 +24,8 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               getitem_str_offset, copy_str_arr_slice, setitem_string_array)
 from hpat.timsort import copyElement_tup, getitem_arr_tup
 from hpat.utils import _numba_to_c_type_map
+from hpat import objmode
+import pandas as pd
 import numpy as np
 
 
@@ -170,7 +172,7 @@ ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 import hio
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-ll.add_symbol('csv_read_file', hio.csv_read_file)
+ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
 
 @intrinsic(support_literals=True)
 def _csv_read(typingctx, fname_typ, cols_to_read_typ, cols_to_read_names_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
@@ -260,19 +262,24 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     # get column variables
     arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
     col_inds = ", ".join(str(i) for i in range(n_cols))
-    col_names = ",".join(nm for nm in csv_node.df_colnames)
+    col_names = ",".join("'{}'".format(nm) for nm in csv_node.df_colnames)
     col_typs = ", ".join(str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
+    #col_typs = [str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types]
     func_text  = "def csv_impl(fname):\n"
-    func_text += "    ({},) = _csv_read(fname, ({},), '{}', ({},), {}, ',', '\"')\n".format(
-        arg_names, col_inds, col_names, col_typs, n_cols)
+    # func_text += "    ({},) = _csv_reader_py(fname, ({},), [{},], ({},))\n".format(
+    #     arg_names, col_inds, col_names, col_typs)
+    func_text += "    ({},) = _csv_reader_py(fname)\n".format(
+    arg_names)
     print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     csv_impl = loc_vars['csv_impl']
 
+    csv_reader_py = _gen_csv_reader_py(col_inds, csv_node.df_colnames, csv_node.out_types, typingctx, targetctx)
+
     f_block = compile_to_numba_ir(csv_impl,
-                                  {'_csv_read': _csv_read},
+                                  {'_csv_reader_py': csv_reader_py},
                                   typingctx, (string_type,),
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [csv_node.file_name])
@@ -284,3 +291,59 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
 
 
 distributed.distributed_run_extensions[CsvReader] = csv_distributed_run
+
+
+class HPATIOType(types.Opaque):
+    def __init__(self):
+        super(HPATIOType, self).__init__(name='HPATIOType')
+
+hpatio_type = HPATIOType()
+register_model(HPATIOType)(models.OpaqueModel)
+
+@box(HPATIOType)
+def box_hpatio(typ, val, c):
+    return val
+
+csv_file_chunk_reader = types.ExternalFunction("csv_file_chunk_reader", hpatio_type(string_type))
+
+
+def _gen_csv_reader_py(col_inds, col_names, col_typs, typingctx, targetctx):
+
+    func_text = "def csv_reader_py(fname):\n"
+    func_text += "  f_reader = csv_file_chunk_reader(fname)\n"
+    func_text += "  with objmode(A='float64[::1]'):\n"
+    func_text += "    df = pd.read_csv(f_reader, names=['A'])\n"
+    func_text += "    A = df.A.values\n"
+    func_text += "  return (A,)\n"
+
+    glbls = {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader, 'pd': pd, 'np': np}
+    loc_vars = {}
+    exec(func_text, glbls, loc_vars)
+    csv_reader_py = loc_vars['csv_reader_py']
+
+    # return numba.njit(csv_reader_py)
+    from numba import compiler
+    from numba.ir_utils import compile_to_numba_ir, get_ir_of_code
+
+    f_ir = get_ir_of_code(glbls, csv_reader_py.__code__)
+    main_ir, withs = numba.transforms.with_lifting(
+        func_ir=f_ir,
+        typingctx=typingctx,
+        targetctx=targetctx,
+        flags=compiler.DEFAULT_FLAGS,
+        locals={},
+    )
+    out_tp = types.Tuple([types.Array(types.float64, 1, 'C')])
+    csv_reader_py_func = compiler.compile_ir(
+            typingctx,
+            targetctx,
+            main_ir,
+            (string_type,),
+            out_tp,
+            compiler.DEFAULT_FLAGS,
+            {},
+            lifted=tuple(withs), lifted_from=None
+    )
+    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](csv_reader_py)
+    imp_dis.add_overload(csv_reader_py_func)
+    return imp_dis
