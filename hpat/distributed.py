@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import operator
 import types as pytypes  # avoid confusion with numba.types
 import copy
 import warnings
@@ -1646,11 +1647,11 @@ class DistributedPass(object):
         rhs = reduce_nodes[0].value
 
         if rhs.op == 'inplace_binop':
-            if rhs.fn == '+=':
+            if rhs.fn in ('+=', operator.iadd):
                 return Reduce_Type.Sum
-            if rhs.fn == '|=':
+            if rhs.fn in ('|=', operator.ior):
                 return Reduce_Type.Or
-            if rhs.fn == '*=':
+            if rhs.fn in ('*=', operator.imul):
                 return Reduce_Type.Prod
 
         if rhs.op == 'call':
