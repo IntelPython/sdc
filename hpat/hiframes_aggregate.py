@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import operator
 from collections import namedtuple, defaultdict
 from functools import reduce
 import copy
@@ -1323,9 +1324,10 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
                     var_def = f_ir._definitions[red_var][0]
                     while isinstance(var_def, ir.Var):
                         var_def = guard(get_definition, f_ir, var_def)
+                    # TODO: support other reductions
                     if (isinstance(var_def, ir.Expr)
                             and var_def.op == 'inplace_binop'
-                            and var_def.fn == '+='):
+                            and var_def.fn in ('+=', operator.iadd)):
                         func_text += "    v{} += in{}\n".format(ind, ind)
                     if (isinstance(var_def, ir.Expr) and var_def.op == 'call'):
                         fdef = guard(find_callname, f_ir, var_def)
