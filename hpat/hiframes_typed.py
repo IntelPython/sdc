@@ -47,6 +47,11 @@ _binop_to_str = {
     operator.lt: '<',
     operator.sub: '-',
     operator.add: '+',
+    operator.mul: '*',
+    operator.truediv: '/',
+    operator.floordiv: '//',
+    operator.mod: '%',
+    operator.pow: '**',
     '==': '==',
     '!=': '!=',
     '>=': '>=',
@@ -55,6 +60,11 @@ _binop_to_str = {
     '<': '<',
     '-': '-',
     '+': '+',
+    '*': '*',
+    '/': '/',
+    '//': '//',
+    '%': '%',
+    '**': '**',
 }
 
 
@@ -133,11 +143,12 @@ class HiFramesTyped(object):
             # replace array.call() variable types
             if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
                 # TODO: handle string arrays, etc.
-                assert (typ.typing_key.startswith('array.')
-                    or typ.typing_key.startswith('series.')
-                    or typ.typing_key in explicit_binop_funcs.keys())
+                assert (typ.typing_key in explicit_binop_funcs.keys()
+                    or typ.typing_key.startswith('array.')
+                    or typ.typing_key.startswith('series.'))
                 # skip if series.func since it is replaced here
-                if not typ.typing_key.startswith('array.'):
+                if (not isinstance(typ.typing_key, str)
+                        or not typ.typing_key.startswith('array.')):
                     continue
                 this = series_to_array_type(typ.this)
                 attr = typ.typing_key[len('array.'):]
@@ -528,7 +539,7 @@ class HiFramesTyped(object):
             return self._replace_func(func, [series_var])
 
         if func_name in explicit_binop_funcs.values():
-            binop_map = {v: k for k, v in explicit_binop_funcs.items()}
+            binop_map = {v: _binop_to_str[k] for k, v in explicit_binop_funcs.items()}
             func_text = "def _binop_impl(A, B):\n"
             func_text += "  return A {} B\n".format(binop_map[func_name])
 

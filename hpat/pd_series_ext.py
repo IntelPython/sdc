@@ -871,20 +871,20 @@ def install_series_method(op, name, generic, support_literals=False):
     setattr(SeriesAttribute, "resolve_" + name, array_attribute_attachment)
 
 explicit_binop_funcs = {
-    '+': 'add',
-    '-': 'sub',
-    '*': 'mul',
-    '/': 'div',
-    '/': 'truediv',
-    '//': 'floordiv',
-    '%': 'mod',
-    '**': 'pow',
-    '<': 'lt',
-    '>': 'gt',
-    '<=': 'le',
-    '>=': 'ge',
-    '!=': 'ne',
-    '==': 'eq',
+    operator.add: 'add',
+    operator.sub: 'sub',
+    operator.mul: 'mul',
+    operator.truediv: 'div',
+    operator.truediv: 'truediv',
+    operator.floordiv: 'floordiv',
+    operator.mod: 'mod',
+    operator.pow: 'pow',
+    operator.lt: 'lt',
+    operator.gt: 'gt',
+    operator.le: 'le',
+    operator.ge: 'ge',
+    operator.ne: 'ne',
+    operator.eq: 'eq',
     }
 
 def ex_binop_generic(self, args, kws):
