@@ -104,6 +104,7 @@ def hash_overload(str_typ):
 
 @infer
 @infer_global(operator.add)
+@infer_global(operator.iadd)
 class StringAdd(ConcreteTemplate):
     key = "+"
     cases = [signature(string_type, string_type, string_type)]
