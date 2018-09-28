@@ -1507,12 +1507,13 @@ class DistributedPass(object):
                 or isinstance(self.typemap[ind_var.name],
                               types.misc.SliceType)):
             return self._get_ind_sub_slice(ind_var, start_var)
-        sub_var = ir.Var(ind_var.scope, mk_unique_var("$sub_var"), ind_var.loc)
-        self.typemap[sub_var.name] = types.int64
-        sub_expr = ir.Expr.binop('-', ind_var, start_var, ind_var.loc)
-        self.calltypes[sub_expr] = find_op_typ('-', [types.int64, types.int64])
-        sub_assign = ir.Assign(sub_expr, sub_var, ind_var.loc)
-        return [sub_assign]
+        # gen sub
+        f_ir = compile_to_numba_ir(lambda ind, start: ind - start, {},
+                                   self.typingctx, (types.intp, types.intp),
+                                   self.typemap, self.calltypes)
+        block = f_ir.blocks.popitem()[1]
+        replace_arg_nodes(block, [ind_var, start_var])
+        return block.body[:-2]
 
     def _get_ind_sub_slice(self, slice_var, offset_var):
         if isinstance(slice_var, slice):
