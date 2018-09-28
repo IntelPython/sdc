@@ -1556,8 +1556,8 @@ class DistributedPass(object):
                 rank_comp_var = ir.Var(scope, mk_unique_var("$rank_comp"), loc)
                 self.typemap[rank_comp_var.name] = types.boolean
                 comp_expr = ir.Expr.binop(
-                    '==', self._rank_var, self._set0_var, loc)
-                expr_typ = find_op_typ('==', [types.int32, types.int64])
+                    operator.eq, self._rank_var, self._set0_var, loc)
+                expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
                 prev_block.body.append(comp_assign)
