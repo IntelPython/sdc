@@ -35,8 +35,6 @@ class Join(ir.Stmt):
         self.df_out_vars = df_vars[self.df_out].copy()
         self.left_vars = df_vars[left_df].copy()
         self.right_vars = df_vars[right_df].copy()
-        # needs df columns for type inference stage
-        self.df_vars = df_vars
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -54,8 +52,9 @@ class Join(ir.Stmt):
         for (c, v) in self.right_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_right_str = "{}{{{}}}".format(self.right_df, in_cols)
-        return "join [{}={}]: {} , {}, {}".format(self.left_key,
-                                                  self.right_key, df_out_str, df_left_str, df_right_str)
+        return "join [{}={}]: {} , {}, {}".format(
+            self.left_key, self.right_key, df_out_str, df_left_str,
+            df_right_str)
 
 
 def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
