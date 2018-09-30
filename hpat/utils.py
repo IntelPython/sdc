@@ -38,6 +38,7 @@ _numba_to_c_type_map = {
     types.uint64: CTypeEnum.UInt64.value,
     types.float32: CTypeEnum.Float32.value,
     types.float64: CTypeEnum.Float64.value,
+    types.NPDatetime('ns'): CTypeEnum.UInt64.value,
 }
 
 

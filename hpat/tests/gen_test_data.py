@@ -73,3 +73,13 @@ sdf = spark.createDataFrame(df, schema)
 sdf.write.parquet('sdf_dt.pq', 'overwrite')
 
 spark.stop()
+
+# generated data for parallel merge_asof testing
+df1 = pd.DataFrame({'time': pd.DatetimeIndex(
+    ['2017-01-03', '2017-01-06', '2017-02-15', '2017-02-21']),
+    'B': [4, 5, 9, 6]})
+df2 = pd.DataFrame({'time': pd.DatetimeIndex(
+    ['2017-01-01', '2017-01-14', '2017-01-16', '2017-02-23', '2017-02-23',
+    '2017-02-25']), 'A': [2,3,7,8,9,10]})
+df1.to_parquet("asof1.pq")
+df2.to_parquet("asof2.pq")

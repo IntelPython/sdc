@@ -861,6 +861,16 @@ class TestHiFrames(unittest.TestCase):
                 '2017-02-25']), 'A': [2,3,7,8,9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
+    def test_merge_asof_parallel1(self):
+        def test_impl():
+            df1 = pd.read_parquet('asof1.pq')
+            df2 = pd.read_parquet('asof2.pq')
+            df3 = pd.merge_asof(df1, df2, on='time')
+            return (df3.A.sum(), df3.time.max(), df3.B.sum())
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_concat(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})

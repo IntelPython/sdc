@@ -310,9 +310,6 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                         for i in range(len(left_other_col_vars))]
     right_other_names = ["t2_c" + str(i)
                          for i in range(len(right_other_col_vars))]
-    # all arg names
-    left_arg_names = ['t1_key'] + left_other_names
-    right_arg_names = ['t2_key'] + right_other_names
 
     func_text = "def f(t1_key, t2_key,{}{}{}):\n".format(
                 ",".join(left_other_names),
@@ -325,16 +322,13 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                                 "," if len(right_other_names) != 0 else "")
 
     if parallel:
-        func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
-        #func_text += "    print(t2_key, data_right)\n"
-        func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
-        #func_text += "    print(t2_key, data_right)\n"
-        local_left_data = "t1_key" + (", " if len(left_other_names) != 0 else "") + ",".join(["data_left[{}]".format(i) for i in range(len(left_other_names))])
-        local_right_data = "t2_key" + (", " if len(right_other_names) != 0 else "") + ",".join(["data_right[{}]".format(i) for i in range(len(right_other_names))])
-    else:
-        local_left_data = ",".join(left_arg_names)
-        local_right_data = ",".join(right_arg_names)
-
+        if join_node.how == 'asof':
+            # only the right key needs to be aligned
+            func_text += "    t2_key, data_right = parallel_asof_comm(t1_key, t2_key, data_right)\n"
+        else:
+            func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
+            func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
+            #func_text += "    print(t2_key, data_right)\n"
 
     if join_node.how != 'asof':
         # asof key is already sorted, TODO: add error checking
@@ -403,7 +397,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                   'cp_str_list_to_array': cp_str_list_to_array,
                                   'local_sort_f1': _local_sort_f1,
                                   'local_sort_f2': _local_sort_f2,
-                                  'parallel_join': parallel_join},
+                                  'parallel_join': parallel_join,
+                                  'parallel_asof_comm': parallel_asof_comm},
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
@@ -450,6 +445,71 @@ def parallel_join(key_arr, data):
     out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
 
     return shuffle_meta.out_arr, out_data
+
+@numba.njit
+def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
+    # align the left and right intervals
+    # allgather the boundaries of all left intervals and calculate overlap
+    # rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    bnd_starts = np.empty(n_pes, left_key_arr.dtype)
+    bnd_ends = np.empty(n_pes, left_key_arr.dtype)
+    hpat.distributed_api.allgather(bnd_starts, left_key_arr[0])
+    hpat.distributed_api.allgather(bnd_ends, left_key_arr[-1])
+
+    send_counts = np.zeros(n_pes, np.int32)
+    send_disp = np.zeros(n_pes, np.int32)
+    recv_counts = np.zeros(n_pes, np.int32)
+    my_start = right_key_arr[0]
+    my_end = right_key_arr[-1]
+
+    offset = -1
+    i = 0
+    # ignore no overlap processors (end of their interval is before current)
+    while i < n_pes-1 and bnd_ends[i] < my_start:
+        i += 1
+    while i < n_pes and bnd_starts[i] <= my_end:
+        offset, count = _count_overlap(right_key_arr, bnd_starts[i], bnd_ends[i])
+        # one extra element in case first value is needed for start of boundary
+        if offset != 0:
+            offset -= 1
+            count += 1
+        send_counts[i] = count
+        send_disp[i] = offset
+        i += 1
+    # one extra element in case last value is need for start of boundary
+    # TODO: see if next processor provides the value
+    while i < n_pes:
+        send_counts[i] = 1
+        send_disp[i] = len(right_key_arr) - 1
+        i += 1
+
+    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
+    n_total_recv = recv_counts.sum()
+    out_r_keys = np.empty(n_total_recv, right_key_arr.dtype)
+    # TODO: support string
+    out_r_data = alloc_arr_tup(n_total_recv, right_data)
+    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
+    hpat.distributed_api.alltoallv(right_key_arr, out_r_keys, send_counts,
+                                   recv_counts, send_disp, recv_disp)
+    hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts,
+                                   recv_counts, send_disp, recv_disp)
+
+    return out_r_keys, out_r_data
+
+@numba.njit
+def _count_overlap(r_key_arr, start, end):
+    # TODO: use binary search
+    count = 0
+    offset = 0
+    j = 0
+    while j < len(r_key_arr) and r_key_arr[j] < start:
+        offset += 1
+        j += 1
+    while j < len(r_key_arr) and start <= r_key_arr[j] <= end:
+        j += 1
+        count += 1
+    return offset, count
 
 def write_send_buff(shuffle_meta, node_id, val):
     return 0
