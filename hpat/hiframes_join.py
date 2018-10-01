@@ -1029,7 +1029,8 @@ def local_merge_asof(left_key, right_key, data_left, data_right):
             out_right_key[left_ind] = right_key[right_ind]
             setitem_arr_tup(out_data_right, left_ind, getitem_arr_tup(data_right, right_ind))
         else:
-            pass  # TODO: set NaN
+            setitem_arr_nan(out_right_key, left_ind)
+            setitem_arr_tup_nan(out_data_right, left_ind)
 
     return out_left_key, out_right_key, out_data_left, out_data_right
 
@@ -1148,3 +1149,32 @@ class GetItemCBuf(AbstractTemplate):
 def c_buffer_type_getitem(context, builder, sig, args):
     base_ptr = builder.bitcast(args[0], lir.IntType(32).as_pointer())
     return builder.load(builder.gep(base_ptr, [args[1]], inbounds=True))
+
+
+def setitem_arr_nan(arr, ind):
+    arr[ind] = np.nan
+
+@overload(setitem_arr_nan)
+def setitem_arr_nan_overload(arr_t, ind_t):
+    if isinstance(arr_t.dtype, types.Float):
+        return setitem_arr_nan
+    # TODO: support strings, bools, etc.
+    return lambda a, i: None
+
+def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
+    for arr in arr_tup:
+        arr[ind] = np.nan
+
+@overload(setitem_arr_tup_nan)
+def setitem_arr_tup_nan_overload(arr_tup_t, ind_t):
+    count = arr_tup_t.count
+
+    func_text = "def f(arr_tup, ind):\n"
+    for i in range(count):
+        func_text += "  setitem_arr_nan(arr_tup[{}], ind)\n".format(i)
+    func_text += "  return\n"
+
+    loc_vars = {}
+    exec(func_text, {'setitem_arr_nan': setitem_arr_nan}, loc_vars)
+    impl = loc_vars['f']
+    return impl
