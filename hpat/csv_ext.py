@@ -28,6 +28,8 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
+dt64_arr_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+
 
 class CsvReader(ir.Stmt):
     def __init__(self, file_name, df_out, df_colnames, out_vars, out_types, loc):
@@ -308,18 +310,27 @@ def box_hpatio(typ, val, c):
 
 csv_file_chunk_reader = types.ExternalFunction("csv_file_chunk_reader", hpatio_type(string_type))
 
+def _get_dtype_str(t):
+    dtype = t.dtype
+    if t == dt64_arr_typ:
+        dtype = 'NPDatetime("ns")'
+    return '{}[::1]'.format(dtype)
 
 def _gen_csv_reader_py(col_inds, col_names, col_typs, typingctx, targetctx):
     # TODO: support non-numpy types like strings
-    typ_strs = ", ".join(["{}='{}[::1]'".format(cname, t.dtype)
+    date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
+                           if t == dt64_arr_typ)
+    typ_strs = ", ".join(["{}='{}'".format(cname, _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
     func_text += "  f_reader = csv_file_chunk_reader(fname)\n"
     func_text += "  with objmode({}):\n".format(typ_strs)
-    func_text += "    df = pd.read_csv(f_reader, names={})\n".format(col_names)
+    func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
+    func_text += "       parse_dates=[{}])\n".format(date_inds)
     for cname in col_names:
         func_text += "    {} = df.{}.values\n".format(cname, cname)
+        # func_text += "    print({})\n".format(cname)
     func_text += "  return ({},)\n".format(", ".join(col_names))
 
     # print(func_text)
