@@ -10,7 +10,7 @@
 #
 # FIXME:
 #   - sub-classing: parameters of '__interface__' types must accept derived types
-#   - boxing/unboxing
+#   - boxing/unboxing of algorithms
 #   - GC: result/model objects returned by daal4py wrappers are newly allocated shared pointers, need to get gc'ed
 #   - float32 tables, input type selection etc.
 #   - key-word/optional input arguments
@@ -21,8 +21,8 @@ from numpy import nan
 from numba import types, cgutils
 from numba.extending import (intrinsic, typeof_impl, overload, overload_method,
                              overload_attribute, box, unbox, make_attribute_wrapper,
-                             type_callable, models, register_model, lower_builtin,
-                             NativeValue, lower_cast, get_cython_function_address)
+                             type_callable, models, register_model, lower_builtin, lower_getattr,
+                             NativeValue, lower_cast, get_cython_function_address, typeof_impl)
 from numba.targets.imputils import impl_ret_new_ref
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
@@ -155,6 +155,7 @@ class algo_factory(object):
         'itable_type' : itable_type,
         'size_t'      : types.uint64,
         'double'      : types.float64,
+        'float'       : types.float32,
         'bool'        : types.boolean,
         'std::string&': string_type,
     }
@@ -169,7 +170,7 @@ class algo_factory(object):
             return D4PSpec(spec['pyclass'],
                            spec['c_name'],
                            params = spec['params'],
-                           input_types = [(x[0], self.all_nbtypes[x[1].rstrip('*')], d4p_dtypes[x[2]]) for x in spec['input_types']],
+                           input_types = [(x[0], x[1].rstrip('*'), d4p_dtypes[x[2]]) for x in spec['input_types']],
                            result_dist =  d4p_dtypes[spec['result_dist']])
         elif 'attrs' in spec:
             # filter out (do not support) properties for which we do not know the numba type
@@ -177,7 +178,7 @@ class algo_factory(object):
             for x in spec['attrs']:
                 typ = x[1].rstrip('*')
                 if typ in self.all_nbtypes:
-                    attrs.append((x[0], self.all_nbtypes[typ]))
+                    attrs.append((x[0], typ))
                 else:
                     warnings.warn("Warning: couldn't find numba type for '" + x[1] +"'. Ignored.")
             return D4PSpec(spec['pyclass'],
@@ -203,7 +204,6 @@ class algo_factory(object):
             return
         self.spec = self.from_d4p(self.spec)
         self.mk_ctor()
-        self.mk_compute()
         self.mk_attrs()
         self.mk_boxing()
 
@@ -223,6 +223,7 @@ class algo_factory(object):
         # also register their opaque data model
         self.NbType = mk_simple(self.name + '_nbtype')
         self.all_nbtypes[self.name] = self.NbType()
+
         register_model(self.NbType)(models.OpaqueModel)
 
         # some of the classes can be parameters to others and have a default NULL/None
@@ -241,7 +242,13 @@ class algo_factory(object):
         '''
 
         if not self.spec or not self.spec.params:
-            # this must be a result or model, not an algo class
+            if self.spec:
+                # this must be a result or model, not an algo class
+                # we don't want a constructor but Numba must know ts model for boxing/unboxing
+                @typeof_impl.register(self.spec.pyclass)
+                def typeof_index(val, c):
+                    return self.all_nbtypes[self.name]
+
             return
 
         # FIXME: check args
@@ -282,108 +289,121 @@ def _cmm_{0}(typingctx, {2}):
             impl = loc_vars['_ovld_impl']
             return impl
 
-
-    def mk_compute(self):
-        '''provide the typing and lowering for calling compute on an algo object'''
-
-        if not self.spec or not self.spec.input_types:
-            # this must be a result or model, not an algo class
-            return
-
-        algo_type = self.NbType
-        result_type = self.all_nbtypes[self.name+'_result']
-        compute_name = '.'.join([self.spec.pyclass.__module__.strip('_'), self.spec.pyclass.__name__, 'compute'])
-
-        @infer_getattr
-        class AlgoAttributes(AttributeTemplate):
-            '''declares numba signatures of attributes/methods of algo objects'''
-            key = algo_type
-
-            @bound_function(compute_name)
-            def resolve_compute(self, dict, args, kws):
-                # FIXME: keyword args
-                # FIXME: check args
-                return signature(result_type, *args)
-
-
-        @lower_builtin(compute_name, self.all_nbtypes[self.name], *[self.all_nbtypes[x[1]] if isinstance(x[1], str) else x[1] for x in self.spec.input_types])
-        def lower_compute(context, builder, sig, args):
-            '''lowers compute method algo objects'''
-            # First prepare list of argument types
-            lir_types = [lir.IntType(8).as_pointer()]  # the first arg is always our algo object (shrd_ptr)
-            c_args = [args[0]]                         # the first arg is always our algo object (shrd_ptr)
-            for i in range(1, len(args)):
-                lirt = get_lir_type(context, sig.args[i])
-                if isinstance(lirt, list):  # Array!
-                    # generate lir code to extract actual arguments
-                    # collect args/types in list
-                    lir_types += lirt
-                    in_arrtype = sig.args[i]
-                    in_array = context.make_array(in_arrtype)(context, builder, args[i])
-                    in_shape = cgutils.unpack_tuple(builder, in_array.shape)
-                    c_args += [in_array.data, in_shape[0], in_shape[1]]
-                else:
-                    lir_types.append(lirt)
-                    c_args.append(args[i])
-            # Now we can define the signature and call the C-function
-            fnty = lir.FunctionType(lir.IntType(8).as_pointer(), lir_types)
-            fn = builder.module.get_or_insert_function(fnty, name='compute_' + self.spec.c_name)
-            # finally we call the function
-            return builder.call(fn, c_args)
-
-
-    def add_attr(self, NbType, attr, attr_type, c_func):
+    def gen_call(context, builder, sig, args, c_func):
         '''
-        Generate getter for attribute 'attr' on objects of numba result/model type.
-        Calls c_func to retrieve the attribute from the given result/model object.
-        Converts to ndarray if attr_type is Array
+        This is generating the llvm code for calling a d4p C function.
+        May also convert to ndarray.
+        Used by our dynamically generated/exec'ed @lower_builtin/@lower_getattr functions below.
         '''
-
-        if isinstance(attr_type, str):
-            attr_type = self.all_nbtypes[attr_type]
-        is_array = isinstance(attr_type, types.Array)
-
-        @intrinsic
-        def get_attr_impl(typingctx, obj):
-            '''
-            This is creating the llvm wrapper calling the C function.
-            May also convert to ndarray.
-            '''
-            def codegen(context, builder, sig, args):
-                assert(len(args) == 1)
-                c_func_ret_type = lir.IntType(8).as_pointer() if is_array else context.get_data_type(attr_type)
-                # First call the getter
-                fnty = lir.FunctionType(c_func_ret_type, [lir.IntType(8).as_pointer()])
-                fn = builder.module.get_or_insert_function(fnty, name=c_func)
-                ptr = builder.call(fn, args)
-                return nt2nd(context, builder, ptr, sig.return_type) if is_array else ptr
-
-            return attr_type(obj), codegen
-
-        @overload_attribute(NbType, attr)
-        def get_attr(obj):
-            '''declaring getter for attribute 'attr' of objects of type "NbType"'''
-            def getter(obj):
-                return get_attr_impl(obj)
-            return getter
+        lir_types = [lir.IntType(8).as_pointer()]  # the first arg is always our algo object (shrd_ptr)
+        c_args = [args[0]]                         # the first arg is always our algo object (shrd_ptr)
+        # prepare our args (usually none for most get_* attribuutes/properties)
+        for i in range(1, len(args)):
+            lirt = get_lir_type(context, sig.args[i])
+            if isinstance(lirt, list):  # Array!
+                # generate lir code to extract actual arguments
+                # collect args/types in list
+                lir_types += lirt
+                in_arrtype = sig.args[i]
+                in_array = context.make_array(in_arrtype)(context, builder, args[i])
+                in_shape = cgutils.unpack_tuple(builder, in_array.shape)
+                c_args += [in_array.data, in_shape[0], in_shape[1]]
+            else:
+                lir_types.append(lirt)
+                c_args.append(args[i])
+        #ret_typ = sig if c_func.startswith('get_') else sig.return_type
+        # Our getter might return an array, which needs special handling
+        ret_is_array = isinstance(sig.return_type, types.Array)
+        # define our llvm return type
+        c_func_ret_type = lir.IntType(8).as_pointer() if ret_is_array else context.get_data_type(sig.return_type)
+        # Now we can define the signature
+        fnty = lir.FunctionType(c_func_ret_type, lir_types)
+        # Get function
+        fn = builder.module.get_or_insert_function(fnty, name=c_func)
+        # and finally generate the call
+        ptr = builder.call(fn, c_args)
+        return nt2nd(context, builder, ptr, sig.return_type) if ret_is_array else ptr
 
 
     def mk_attrs(self):
-        '''Make attributes of result and model known to numba and how to get their values.'''
+        '''
+        Provide the typing and lowering for getters and calling compute
+        Again, we can't use static code for our infer_getarr class, so we need
+        to generate code that we exec.
+        Apparently the @infer_getattr/@bound_function and @lower_builtin need to
+        be in the same context, so we need to include the @lower_builtin stuff
+        there, too.
+        '''
 
-        if not self.spec or not self.spec.attrs:
-            # this must be algo class, which does not have attributes
-            # or it is an alias only
+        if not self.spec:
             return
 
-        for a in self.spec.attrs:
-            self.add_attr(self.NbType, a[0], a[1], '_'.join(['get', self.spec.c_name, a[0]]))
+        # Initing the code we want to exec
+        lower_code = ''
+        infer_code = '''# This is our class providing the resolve_* methods
+@infer_getattr
+class AlgoAttributes_{0}(AttributeTemplate):
+    "declares numba signatures of attributes/methods of {0} objects"
+    key = algo_factory.all_nbtypes['{0}'].__class__
+'''.format(self.spec.c_name)
+
+        # The python name stub (module + class)
+        name_stub = '_'+'.'.join([self.spec.pyclass.__module__.strip('_'), self.spec.pyclass.__name__])
+        result_type = None
+
+        # First handle properties (result/model classes)
+        if self.spec.attrs:
+            for a in self.spec.attrs:
+                c_func = '_'.join(['get', self.spec.c_name, a[0]])
+                full_name = '.'.join([name_stub, a[0]])
+                # for typing we simply provide resolve_* method for each attribute
+                infer_code += '''
+    def resolve_{0}(self, obj):
+        return algo_factory.all_nbtypes['{1}']
+'''.format(a[0], a[1])
+
+                # lowering code for properties through @lower_getattr
+                lower_code += '''
+@lower_getattr(algo_factory.all_nbtypes['{0}'], '{1}') # getters have no args (other than self)
+def lower_{2}(context, builder, typ, val):
+    return algo_factory.gen_call(context, builder, signature(algo_factory.all_nbtypes['{3}']), [val], '{2}')
+'''.format(self.name, a[0], c_func, a[1])
+
+        # Now we handle compute method algorithms classes
+        if self.spec.input_types:
+            compute_name = '.'.join([name_stub, 'compute'])
+
+            # using bound_function for typing
+            infer_code += '''
+    @bound_function("{0}")
+    def resolve_compute(self, dict, args, kws):
+        # FIXME: keyword args
+        # FIXME: check args
+        return signature(algo_factory.all_nbtypes['{1}_result'], *args)
+'''.format(compute_name, self.name)
+
+            # lowering methods provided with lower_builtin
+            lower_code += '''
+@lower_builtin('{0}', algo_factory.all_nbtypes['{1}'], *[{2}])
+def lower_compute(context, builder, sig, args):
+    return algo_factory.gen_call(context, builder, sig, args, 'compute_{3}')
+'''.format(compute_name,
+           self.name,
+           ', '.join(["algo_factory.all_nbtypes['{}']".format(x[1]) for x in self.spec.input_types]), #if isinstance(x[1], str) else "'{}'")
+            self.spec.c_name)
+
+        loc_vars = {}
+        exec(infer_code+lower_code, globals(), loc_vars)
 
 
-    def cy_unbox(self):
+    def cy_unboxer(self):
+        '''
+        Return the address of the cython generated C(++) function which
+        provides the actual DAAL C++ pointer for our result/model Python object.
+        '''
         addr = get_cython_function_address("_daal4py", 'unbox_'+self.spec.c_name)
-        functype = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.py_object)
-        return functype(addr)
+        return addr
+
 
     def mk_boxing(self):
         '''provide boxing and unboxing'''
@@ -392,10 +412,11 @@ def _cmm_{0}(typingctx, {2}):
             # we only support models/results at this point
             return
 
-        self.unbox = self.cy_unbox()
+        ll.add_symbol('unbox_'+self.spec.c_name, self.cy_unboxer())
 
         @box(self.NbType)
         def box_me(typ, val, c):
+            'Call Cythons contructor with the C++ pointer and return Python object.'
             ll_intp = c.context.get_value_type(types.uintp)
             addr = c.builder.ptrtoint(val, ll_intp)
             v = c.box(types.uintp, addr)
@@ -403,13 +424,17 @@ def _cmm_{0}(typingctx, {2}):
             res = c.pyapi.call_function_objargs(py_obj, (v,))
             return res
 
-        #@unbox(self.NbType)
-        #def unbox_me(typ, obj, c):
-        #    print('unbox_'+self.spec.c_name, self.NbType())
-        #    val = cgutils.alloca_once(c.builder, lir.IntType(8).as_pointer())
-        #    longobj = self.unbox(self.spec.c_name, val)
-        #    c.builder.store(longobj, val)
-        #    return NativeValue(c.builder.load(val), is_error=c.pyapi.c_api_error())
+        @unbox(self.NbType)
+        def unbox_me(typ, obj, c):
+            'Call C++ unboxing function and return as NativeValue'
+            # Define the signature
+            fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(8).as_pointer(),])
+            # Get function
+            fn = c.builder.module.get_or_insert_function(fnty, name='unbox_'+self.spec.c_name)
+            # finally generate the call
+            ptr = c.builder.call(fn, [obj])
+            return NativeValue(ptr, is_error=c.pyapi.c_api_error())
+
 
 
 ##############################################################################
