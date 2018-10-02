@@ -39,6 +39,10 @@ _numba_to_c_type_map = {
     types.float32: CTypeEnum.Float32.value,
     types.float64: CTypeEnum.Float64.value,
     types.NPDatetime('ns'): CTypeEnum.UInt64.value,
+    # XXX: Numpy's bool array uses a byte for each value but regular booleans
+    # are not bytes
+    # TODO: handle boolean scalars properly
+    types.bool_: CTypeEnum.UInt8.value,
 }
 
 
