@@ -1159,6 +1159,12 @@ def setitem_arr_nan_overload(arr_t, ind_t):
     if isinstance(arr_t.dtype, types.Float):
         return setitem_arr_nan
     # TODO: support strings, bools, etc.
+    # XXX: set NA values in bool arrays to False
+    # FIXME: replace with proper NaN
+    if arr_t.dtype == types.bool_:
+        def b_set(a, i):
+            a[i] = False
+        return b_set
     return lambda a, i: None
 
 def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
