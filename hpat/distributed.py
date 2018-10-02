@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import operator
 import types as pytypes  # avoid confusion with numba.types
 import copy
 import warnings
@@ -771,7 +772,7 @@ class DistributedPass(object):
     def _run_call_array(self, lhs, arr, func_name, assign, args):
         #
         out = [assign]
-        if func_name in ('astype', 'copy') and not self._is_REP(arr.name):
+        if func_name in ('astype', 'copy') and self._is_1D_arr(lhs):
             self._array_starts[lhs] = self._array_starts[arr.name]
             self._array_counts[lhs] = self._array_counts[arr.name]
             self._array_sizes[lhs] = self._array_sizes[arr.name]
@@ -780,7 +781,7 @@ class DistributedPass(object):
             return self._run_reshape(assign, arr, args)
 
 
-        if func_name == 'transpose' and not self._is_REP(arr.name):
+        if func_name == 'transpose' and self._is_1D_arr(lhs):
             # Currently only 1D arrays are supported
             assert self._is_1D_arr(arr.name)
             ndim = self.typemap[arr.name].ndim
@@ -1506,12 +1507,13 @@ class DistributedPass(object):
                 or isinstance(self.typemap[ind_var.name],
                               types.misc.SliceType)):
             return self._get_ind_sub_slice(ind_var, start_var)
-        sub_var = ir.Var(ind_var.scope, mk_unique_var("$sub_var"), ind_var.loc)
-        self.typemap[sub_var.name] = types.int64
-        sub_expr = ir.Expr.binop('-', ind_var, start_var, ind_var.loc)
-        self.calltypes[sub_expr] = find_op_typ('-', [types.int64, types.int64])
-        sub_assign = ir.Assign(sub_expr, sub_var, ind_var.loc)
-        return [sub_assign]
+        # gen sub
+        f_ir = compile_to_numba_ir(lambda ind, start: ind - start, {},
+                                   self.typingctx, (types.intp, types.intp),
+                                   self.typemap, self.calltypes)
+        block = f_ir.blocks.popitem()[1]
+        replace_arg_nodes(block, [ind_var, start_var])
+        return block.body[:-2]
 
     def _get_ind_sub_slice(self, slice_var, offset_var):
         if isinstance(slice_var, slice):
@@ -1554,8 +1556,8 @@ class DistributedPass(object):
                 rank_comp_var = ir.Var(scope, mk_unique_var("$rank_comp"), loc)
                 self.typemap[rank_comp_var.name] = types.boolean
                 comp_expr = ir.Expr.binop(
-                    '==', self._rank_var, self._set0_var, loc)
-                expr_typ = find_op_typ('==', [types.int32, types.int64])
+                    operator.eq, self._rank_var, self._set0_var, loc)
+                expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
                 prev_block.body.append(comp_assign)
@@ -1646,11 +1648,11 @@ class DistributedPass(object):
         rhs = reduce_nodes[0].value
 
         if rhs.op == 'inplace_binop':
-            if rhs.fn == '+=':
+            if rhs.fn in ('+=', operator.iadd):
                 return Reduce_Type.Sum
-            if rhs.fn == '|=':
+            if rhs.fn in ('|=', operator.ior):
                 return Reduce_Type.Or
-            if rhs.fn == '*=':
+            if rhs.fn in ('*=', operator.imul):
                 return Reduce_Type.Prod
 
         if rhs.op == 'call':

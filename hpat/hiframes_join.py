@@ -4,7 +4,8 @@ import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
-                            compile_to_numba_ir, replace_arg_nodes)
+                            compile_to_numba_ir, replace_arg_nodes,
+                            mk_unique_var)
 import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
@@ -21,12 +22,12 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               getitem_str_offset, copy_str_arr_slice,
                               setitem_string_array, str_copy_ptr)
 
-from hpat.timsort import copyElement_tup, getitem_arr_tup
+from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
 import numpy as np
 
 
 class Join(ir.Stmt):
-    def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, loc):
+    def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, how, loc):
         self.df_out = df_out
         self.left_df = left_df
         self.right_df = right_df
@@ -35,8 +36,7 @@ class Join(ir.Stmt):
         self.df_out_vars = df_vars[self.df_out].copy()
         self.left_vars = df_vars[left_df].copy()
         self.right_vars = df_vars[right_df].copy()
-        # needs df columns for type inference stage
-        self.df_vars = df_vars
+        self.how = how
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -54,8 +54,9 @@ class Join(ir.Stmt):
         for (c, v) in self.right_vars.items():
             in_cols += "'{}':{}, ".format(c, v.name)
         df_right_str = "{}{{{}}}".format(self.right_df, in_cols)
-        return "join [{}={}]: {} , {}, {}".format(self.left_key,
-                                                  self.right_key, df_out_str, df_left_str, df_right_str)
+        return "join [{}={}]: {} , {}, {}".format(
+            self.left_key, self.right_key, df_out_str, df_left_str,
+            df_right_str)
 
 
 def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
@@ -309,9 +310,6 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                         for i in range(len(left_other_col_vars))]
     right_other_names = ["t2_c" + str(i)
                          for i in range(len(right_other_col_vars))]
-    # all arg names
-    left_arg_names = ['t1_key'] + left_other_names
-    right_arg_names = ['t2_key'] + right_other_names
 
     func_text = "def f(t1_key, t2_key,{}{}{}):\n".format(
                 ",".join(left_other_names),
@@ -324,32 +322,44 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                                 "," if len(right_other_names) != 0 else "")
 
     if parallel:
-        func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
-        #func_text += "    print(t2_key, data_right)\n"
-        func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
-        #func_text += "    print(t2_key, data_right)\n"
-        local_left_data = "t1_key" + (", " if len(left_other_names) != 0 else "") + ",".join(["data_left[{}]".format(i) for i in range(len(left_other_names))])
-        local_right_data = "t2_key" + (", " if len(right_other_names) != 0 else "") + ",".join(["data_right[{}]".format(i) for i in range(len(right_other_names))])
-    else:
-        local_left_data = ",".join(left_arg_names)
-        local_right_data = ",".join(right_arg_names)
+        if join_node.how == 'asof':
+            # only the right key needs to be aligned
+            func_text += "    t2_key, data_right = parallel_asof_comm(t1_key, t2_key, data_right)\n"
+        else:
+            func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
+            func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
+            #func_text += "    print(t2_key, data_right)\n"
 
-
-    # local sort
-    func_text += "    local_sort_f1(t1_key, data_left)\n"
-    func_text += "    local_sort_f2(t2_key, data_right)\n"
+    if join_node.how != 'asof':
+        # asof key is already sorted, TODO: add error checking
+        # local sort
+        func_text += "    local_sort_f1(t1_key, data_left)\n"
+        func_text += "    local_sort_f2(t2_key, data_right)\n"
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
-    merge_out = [join_node.df_out_vars[join_node.left_key]]
-    merge_out.append(join_node.df_out_vars[join_node.right_key])
+    out_l_key_var = join_node.df_out_vars[join_node.left_key]
+    out_r_key_var = join_node.df_out_vars[join_node.right_key]
+    # create dummy variable if right key is not actually returned
+    # using the same output left key causes errors for asof case
+    if join_node.left_key == join_node.right_key:
+        out_r_key_var = ir.Var(
+            out_l_key_var.scope, mk_unique_var('dummy_k'), loc)
+        typemap[out_r_key_var.name] = typemap[out_l_key_var.name]
+
+    merge_out = [out_l_key_var, out_r_key_var]
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
                   if n != join_node.left_key]
     merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
                   if n != join_node.right_key]
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
-    func_text += "    out_t1_key, out_t2_key, out_data_left, out_data_right = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n"
+    if join_node.how == 'asof':
+        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
+    else:
+        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n")
 
     for i in range(len(left_other_names)):
         func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
@@ -374,6 +384,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     exec(func_text, {}, loc_vars)
     join_impl = loc_vars['f']
 
+    # print(func_text)
+
     left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
     _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(typemap[left_key_var.name], left_data_tup_typ)
     right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
@@ -385,7 +397,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                   'cp_str_list_to_array': cp_str_list_to_array,
                                   'local_sort_f1': _local_sort_f1,
                                   'local_sort_f2': _local_sort_f2,
-                                  'parallel_join': parallel_join},
+                                  'parallel_join': parallel_join,
+                                  'parallel_asof_comm': parallel_asof_comm},
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [left_key_var, right_key_var]
@@ -432,6 +445,71 @@ def parallel_join(key_arr, data):
     out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
 
     return shuffle_meta.out_arr, out_data
+
+@numba.njit
+def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
+    # align the left and right intervals
+    # allgather the boundaries of all left intervals and calculate overlap
+    # rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    bnd_starts = np.empty(n_pes, left_key_arr.dtype)
+    bnd_ends = np.empty(n_pes, left_key_arr.dtype)
+    hpat.distributed_api.allgather(bnd_starts, left_key_arr[0])
+    hpat.distributed_api.allgather(bnd_ends, left_key_arr[-1])
+
+    send_counts = np.zeros(n_pes, np.int32)
+    send_disp = np.zeros(n_pes, np.int32)
+    recv_counts = np.zeros(n_pes, np.int32)
+    my_start = right_key_arr[0]
+    my_end = right_key_arr[-1]
+
+    offset = -1
+    i = 0
+    # ignore no overlap processors (end of their interval is before current)
+    while i < n_pes-1 and bnd_ends[i] < my_start:
+        i += 1
+    while i < n_pes and bnd_starts[i] <= my_end:
+        offset, count = _count_overlap(right_key_arr, bnd_starts[i], bnd_ends[i])
+        # one extra element in case first value is needed for start of boundary
+        if offset != 0:
+            offset -= 1
+            count += 1
+        send_counts[i] = count
+        send_disp[i] = offset
+        i += 1
+    # one extra element in case last value is need for start of boundary
+    # TODO: see if next processor provides the value
+    while i < n_pes:
+        send_counts[i] = 1
+        send_disp[i] = len(right_key_arr) - 1
+        i += 1
+
+    hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
+    n_total_recv = recv_counts.sum()
+    out_r_keys = np.empty(n_total_recv, right_key_arr.dtype)
+    # TODO: support string
+    out_r_data = alloc_arr_tup(n_total_recv, right_data)
+    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
+    hpat.distributed_api.alltoallv(right_key_arr, out_r_keys, send_counts,
+                                   recv_counts, send_disp, recv_disp)
+    hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts,
+                                   recv_counts, send_disp, recv_disp)
+
+    return out_r_keys, out_r_data
+
+@numba.njit
+def _count_overlap(r_key_arr, start, end):
+    # TODO: use binary search
+    count = 0
+    offset = 0
+    j = 0
+    while j < len(r_key_arr) and r_key_arr[j] < start:
+        offset += 1
+        j += 1
+    while j < len(r_key_arr) and start <= r_key_arr[j] <= end:
+        j += 1
+        count += 1
+    return offset, count
 
 def write_send_buff(shuffle_meta, node_id, val):
     return 0
@@ -917,6 +995,47 @@ def local_merge_new(left_key, right_key, data_left, data_right):
 
     return out_left_key, out_right_key, out_data_left, out_data_right
 
+
+@numba.njit
+def local_merge_asof(left_key, right_key, data_left, data_right):
+    # adapted from pandas/_libs/join_func_helper.pxi
+    l_size = len(left_key)
+    r_size = len(right_key)
+
+    out_left_key = empty_like_type(l_size, left_key)
+    out_right_key = empty_like_type(l_size, right_key)
+    out_data_left = alloc_arr_tup(l_size, data_left)
+    out_data_right = alloc_arr_tup(l_size, data_right)
+
+    left_ind = 0
+    right_ind = 0
+
+    for left_ind in range(l_size):
+        # restart right_ind if it went negative in a previous iteration
+        if right_ind < 0:
+            right_ind = 0
+
+        # find last position in right whose value is less than left's
+        while right_ind < r_size and right_key[right_ind] <= left_key[left_ind]:
+            right_ind += 1
+
+        right_ind -= 1
+
+        out_left_key[left_ind] = left_key[left_ind]
+        # TODO: copy_tup
+        setitem_arr_tup(out_data_left, left_ind, getitem_arr_tup(data_left, left_ind))
+
+        if right_ind >= 0:
+            out_right_key[left_ind] = right_key[right_ind]
+            setitem_arr_tup(out_data_right, left_ind, getitem_arr_tup(data_right, right_ind))
+        else:
+            setitem_arr_nan(out_right_key, left_ind)
+            setitem_arr_tup_nan(out_data_right, left_ind)
+
+    return out_left_key, out_right_key, out_data_left, out_data_right
+
+
+
 @lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
 def lower_local_merge(context, builder, sig, args):
     #
@@ -1030,3 +1149,38 @@ class GetItemCBuf(AbstractTemplate):
 def c_buffer_type_getitem(context, builder, sig, args):
     base_ptr = builder.bitcast(args[0], lir.IntType(32).as_pointer())
     return builder.load(builder.gep(base_ptr, [args[1]], inbounds=True))
+
+
+def setitem_arr_nan(arr, ind):
+    arr[ind] = np.nan
+
+@overload(setitem_arr_nan)
+def setitem_arr_nan_overload(arr_t, ind_t):
+    if isinstance(arr_t.dtype, types.Float):
+        return setitem_arr_nan
+    # TODO: support strings, bools, etc.
+    # XXX: set NA values in bool arrays to False
+    # FIXME: replace with proper NaN
+    if arr_t.dtype == types.bool_:
+        def b_set(a, i):
+            a[i] = False
+        return b_set
+    return lambda a, i: None
+
+def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
+    for arr in arr_tup:
+        arr[ind] = np.nan
+
+@overload(setitem_arr_tup_nan)
+def setitem_arr_tup_nan_overload(arr_tup_t, ind_t):
+    count = arr_tup_t.count
+
+    func_text = "def f(arr_tup, ind):\n"
+    for i in range(count):
+        func_text += "  setitem_arr_nan(arr_tup[{}], ind)\n".format(i)
+    func_text += "  return\n"
+
+    loc_vars = {}
+    exec(func_text, {'setitem_arr_nan': setitem_arr_nan}, loc_vars)
+    impl = loc_vars['f']
+    return impl

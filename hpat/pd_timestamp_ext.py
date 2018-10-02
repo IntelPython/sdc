@@ -1,3 +1,4 @@
+import operator
 import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
@@ -6,7 +7,9 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
 from numba import cgutils
 from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
 from numba.targets.boxing import unbox_array, box_array
-from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
+from numba.typing.templates import (infer_getattr, AttributeTemplate,
+    bound_function, signature, infer_global, AbstractTemplate,
+    ConcreteTemplate)
 
 import numpy as np
 import ctypes
@@ -89,6 +92,55 @@ def impl_ctor_pandas_dts(context, builder, sig, args):
     typ = sig.return_type
     ts = cgutils.create_struct_proxy(typ)(context, builder)
     return ts._getvalue()
+
+
+#-- builtin operators for dt64 ----------------------------------------------
+# TODO: move to Numba
+
+class CompDT64(ConcreteTemplate):
+    cases = signature(
+        types.boolean, types.NPDatetime('ns'), types.NPDatetime('ns'))
+
+@infer_global(operator.lt)
+class CmpOpLt(CompDT64):
+    key = operator.lt
+
+@infer_global(operator.le)
+class CmpOpLe(CompDT64):
+    key = operator.le
+
+@infer_global(operator.gt)
+class CmpOpGt(CompDT64):
+    key = operator.gt
+
+@infer_global(operator.ge)
+class CmpOpGe(CompDT64):
+    key = operator.ge
+
+@infer_global(operator.eq)
+class CmpOpEq(CompDT64):
+    key = operator.eq
+
+@infer_global(operator.ne)
+class CmpOpNe(CompDT64):
+    key = operator.ne
+
+class MinMaxBaseDT64(numba.typing.builtins.MinMaxBase):
+
+    def _unify_minmax(self, tys):
+        for ty in tys:
+            if not ty == types.NPDatetime('ns'):
+                return
+        return self.context.unify_types(*tys)
+
+@infer_global(max)
+class Max(MinMaxBaseDT64):
+    pass
+
+
+@infer_global(min)
+class Min(MinMaxBaseDT64):
+    pass
 
 #---------------------------------------------------------------
 

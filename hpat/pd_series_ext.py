@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 import numba
 from numba import types
@@ -300,8 +301,17 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_date(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return date_series_type
-            #return types.Array(datetime_date_type, 1, 'C')
-            #return types.Array(types.int64, 1, 'C')
+
+    def resolve_iat(self, ary):
+        return SeriesIatType(ary)
+
+    def resolve_iloc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
+
+    def resolve_loc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
 
     def resolve_year(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
@@ -656,8 +666,28 @@ def rolling_generic(self, args, kws):
 for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
 
+class SeriesIatType(types.Type):
+    def __init__(self, stype):
+        self.stype = stype
+        name = "SeriesIatType({})".format(stype)
+        super(SeriesIatType, self).__init__(name)
 
 @infer
+class GetItemSeriesIat(AbstractTemplate):
+    key = "getitem"
+
+    def generic(self, args, kws):
+        # iat[] is the same as regular getitem
+        if isinstance(args[0], SeriesIatType):
+            return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
+
+@infer
+@infer_global(operator.eq)
+@infer_global(operator.ne)
+@infer_global(operator.ge)
+@infer_global(operator.gt)
+@infer_global(operator.le)
+@infer_global(operator.lt)
 class SeriesCompEqual(AbstractTemplate):
     key = '=='
     def generic(self, args, kws):
@@ -807,6 +837,16 @@ class SetItemSeries(SetItemBuffer):
             res.args = (new_series, res.args[1], res.args[2])
             return res
 
+@infer
+class SetItemSeriesIat(SetItemSeries):
+    key = "setitem"
+
+    def generic(self, args, kws):
+        # iat[] is the same as regular setitem
+        if isinstance(args[0], SeriesIatType):
+            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+
+
 def series_op_generic(cls, self, args, kws):
     # return if no Series
     if not any(isinstance(arg, SeriesType) for arg in args):
@@ -823,6 +863,40 @@ def series_op_generic(cls, self, args, kws):
 class SeriesOpUfuncs(NumpyRulesArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesOpUfuncs, self, args, kws)
+
+def install_series_method(op, name, generic, support_literals=False):
+    # taken from arraydecl.py, Series instead of Array
+    my_attr = {"key": op, "generic": generic}
+    temp_class = type("Series_" + name, (SeriesOpUfuncs,), my_attr)
+    if support_literals:
+        temp_class.support_literals = support_literals
+    def array_attribute_attachment(self, ary):
+        return types.BoundFunction(temp_class, ary)
+
+    setattr(SeriesAttribute, "resolve_" + name, array_attribute_attachment)
+
+explicit_binop_funcs = {
+    operator.add: 'add',
+    operator.sub: 'sub',
+    operator.mul: 'mul',
+    operator.truediv: 'div',
+    operator.truediv: 'truediv',
+    operator.floordiv: 'floordiv',
+    operator.mod: 'mod',
+    operator.pow: 'pow',
+    operator.lt: 'lt',
+    operator.gt: 'gt',
+    operator.le: 'le',
+    operator.ge: 'ge',
+    operator.ne: 'ne',
+    operator.eq: 'eq',
+    }
+
+def ex_binop_generic(self, args, kws):
+    return SeriesOpUfuncs.generic(self, (self.this,) + args, kws)
+
+for op, fname in explicit_binop_funcs.items():
+    install_series_method(op, fname, ex_binop_generic)
 
 class SeriesInplaceOpUfuncs(NumpyRulesInplaceArrayOperator):
     def generic(self, args, kws):
@@ -877,10 +951,11 @@ class LenSeriesType(AbstractTemplate):
 
 #@infer_global(np.full_like)
 
-@type_callable('-')
 def type_sub(context):
     def typer(val1, val2):
         if(val1 == dt_index_series_type and val2 == pandas_timestamp_type):
             return timedelta_index_series_type
     return typer
 
+type_callable('-')(type_sub)
+type_callable(operator.sub)(type_sub)

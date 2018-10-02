@@ -373,7 +373,7 @@ class FillNaStrType(AbstractTemplate):
 class DropNAType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 1
+        assert len(args) in (1, 2)
         # args: in_arr
         return signature(args[0], *args)
 
@@ -682,6 +682,21 @@ class SortTyping(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         return signature(types.none, *args)
+
+def df_isin(A, B):  # pragma: no cover
+    return A
+
+def df_isin_vals(A, B):  # pragma: no cover
+    return A
+
+@infer_global(df_isin)
+@infer_global(df_isin_vals)
+class DfIsinCol(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(SeriesType(types.bool_, 1, 'C'), *args)
+
 
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):

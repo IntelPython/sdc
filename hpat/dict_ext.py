@@ -1,3 +1,4 @@
+import operator
 import numba
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer,
@@ -98,6 +99,15 @@ class InDict(AbstractTemplate):
         _, cont = args
         if isinstance(cont, DictType):
             return signature(types.boolean, cont.key_typ, cont)
+
+@infer_global(operator.contains)
+class InDictOp(AbstractTemplate):
+    def generic(self, args, kws):
+        # contains operator reverses the args
+        cont, _ = args
+        if isinstance(cont, DictType):
+            return signature(types.boolean, cont, cont.key_typ)
+
 
 dict_int_int_type = DictType(types.intp, types.intp)
 dict_int32_int32_type = DictType(types.int32, types.int32)
@@ -339,6 +349,14 @@ def lower_dict_in(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name=fname)
     return builder.call(fn, args)
 
+@lower_builtin(operator.contains, DictType, types.Any)
+def lower_dict_in_op(context, builder, sig, args):
+    dict_typ, key_typ = sig.args
+    fname = "dict_in_{}_{}".format(key_typ, dict_typ.val_typ)
+    fnty = lir.FunctionType(lir.IntType(1), [context.get_value_type(key_typ),
+                                                lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name=fname)
+    return builder.call(fn, [args[1], args[0]])
 
 @lower_cast(dict_int_int_type, types.boolean)
 def dict_empty(context, builder, fromty, toty, val):

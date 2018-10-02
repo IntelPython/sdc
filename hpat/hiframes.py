@@ -192,27 +192,31 @@ class HiFrames(object):
             if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
                     and isinstance(rhs.index, str)):
                 assign.value = self._get_df_cols(rhs.value)[rhs.index]
+                return [assign]
 
-            # df1 = df[df.A > .5]
-            if rhs.op == 'getitem' and self._is_df_var(rhs.value):
+            # df1 = df[df.A > .5], df.iloc[1:n], df.iloc[[1,2,3]], ...
+            if rhs.op in ('getitem', 'static_getitem') and (
+                    self._is_df_var(rhs.value)
+                    or self._is_iloc_loc(rhs.value)):
+                # XXX handling getitem, iloc, and loc the same way
+                # TODO: support their differences
+                # XXX: integer index not supported
+                # TODO: check index for non-integer
+                # TODO: support constant integer (return namedtuple)
+                df = (rhs.value if self._is_df_var(rhs.value)
+                    else guard(get_definition, self.func_ir, rhs.value).value)
+                index_var = (rhs.index_var if rhs.op == 'static_getitem'
+                             else rhs.index)
                 # output df1 has same columns as df, create new vars
                 scope = assign.target.scope
                 loc = assign.target.loc
-                in_df_col_names = self._get_df_col_names(rhs.value)
+                in_df_col_names = self._get_df_col_names(df)
                 df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in in_df_col_names}
                 self._create_df(lhs, df_col_map, label)
-                in_df = self._get_renamed_df(rhs.value)
-                return [hiframes_filter.Filter(lhs, in_df.name, rhs.index,
+                in_df = self._get_renamed_df(df)
+                return [hiframes_filter.Filter(lhs, in_df.name, index_var,
                                                self.df_vars, rhs.loc)]
-
-            # df.loc or df.iloc
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and rhs.attr in ['loc', 'iloc']):
-                # FIXME: treat iloc and loc as regular df variables so getitem
-                # turns them into filter. Only boolean array is supported
-                self.df_vars[lhs] = self._get_df_cols(rhs.value)
-                return []
 
             # d = df.column
             if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
@@ -282,7 +286,10 @@ class HiFrames(object):
             return self._handle_pd_read_parquet(assign, lhs, rhs, label)
 
         if fdef == ('merge', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs, label)
+            return self._handle_merge(assign, lhs, rhs, False, label)
+
+        if fdef == ('merge_asof', 'pandas'):
+            return self._handle_merge(assign, lhs, rhs, True, label)
 
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
@@ -348,6 +355,22 @@ class HiFrames(object):
         if func_name == 'head':
             return self._handle_df_head(lhs, rhs, df_var, label)
 
+        # df.isin()
+        if func_name == 'isin':
+            return self._handle_df_isin(lhs, rhs, df_var, label)
+
+        # df.append()
+        if func_name == 'append':
+            return self._handle_df_append(lhs, rhs, df_var, label)
+
+        # df.fillna()
+        if func_name == 'fillna':
+            return self._handle_df_fillna(lhs, rhs, df_var, label)
+
+        # df.dropna()
+        if func_name == 'dropna':
+            return self._handle_df_dropna(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -375,6 +398,144 @@ class HiFrames(object):
 
         self._create_df(lhs.name, out_df_map, label)
         return nodes
+
+
+    def _handle_df_isin(self, lhs, rhs, df_var, label):
+        other = self._get_arg('isin', rhs.args, dict(rhs.kws), 0, 'values')
+        other_colmap = {}
+        df_col_map = self._get_df_cols(df_var)
+        nodes = []
+        df_case = False
+
+        # dataframe case
+        if self._is_df_var(other):
+            df_case = True
+            arg_df_map = self._get_df_cols(other)
+            for cname in df_col_map:
+                if cname in arg_df_map:
+                    other_colmap[cname] = arg_df_map[cname]
+        else:
+            other_def = guard(get_definition, self.func_ir, other)
+            # dict case
+            if isinstance(other_def, ir.Expr) and other_def.op == 'build_map':
+                for c, v in other_def.items:
+                    cname = guard(find_const, self.func_ir, c)
+                    if not isinstance(cname, str):
+                        raise ValueError("dictionary argument to isin() should have constant keys")
+                    other_colmap[cname] = v
+            else:
+                # general iterable (e.g. list, set) case
+                # TODO: handle passed in dict case (pass colname to func?)
+                other_colmap = {c: other for c in df_col_map.keys()}
+
+        out_df_map = {}
+        isin_func = lambda A, B: hpat.hiframes_api.df_isin(A, B)
+        isin_vals_func = lambda A, B: hpat.hiframes_api.df_isin_vals(A, B)
+        # create array of False values used when other col not available
+        bool_arr_func = lambda A: hpat.hiframes_api.to_series_type(np.zeros(len(A), np.bool_))
+        # use the first array of df to get len. TODO: check for empty df
+        false_arr_args = [list(df_col_map.values())[0]]
+
+        for cname, in_var in self.df_vars[df_var.name].items():
+            if cname in other_colmap:
+                if df_case:
+                    func = isin_func
+                else:
+                    func = isin_vals_func
+                other_col_var = other_colmap[cname]
+                args = [in_var, other_col_var]
+            else:
+                func = bool_arr_func
+                args = false_arr_args
+            f_block = compile_to_numba_ir(func, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            out_df_map[cname] = nodes[-1].target
+
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
+
+    def _handle_df_append(self, lhs, rhs, df_var, label):
+        other = self._get_arg('append', rhs.args, dict(rhs.kws), 0, 'other')
+        # only handles df or list of df input
+        # TODO: check for series/dict/list input
+        # TODO: enforce ignore_index=True?
+        # single df case
+        if self._is_df_var(other):
+            return self._handle_concat_df(lhs, [df_var, other], label)
+        # list of dfs
+        df_list = guard(get_definition, self.func_ir, other)
+        if len(df_list.items) > 0 and self._is_df_var(df_list.items[0]):
+            return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
+        raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
+
+    def _handle_df_fillna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("fillna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        val_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 0, 'value')
+        inplace_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
+
+        _fillna_func = lambda A, val, inplace: A.fillna(val, inplace=inplace)
+        out_col_map = {}
+        for cname, in_var in self._get_df_cols(df_var).items():
+            f_block = compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, val_var, inplace_var])
+            nodes += f_block.body[:-2]
+            out_col_map[cname] = nodes[-1].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        return nodes
+
+    def _handle_df_dropna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("dropna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        inplace_var = self._get_arg('dropna', rhs.args, dict(rhs.kws), 4, 'inplace', default=inplace_default)
+
+        col_names = self._get_df_col_names(df_var)
+        col_vars = self._get_df_col_vars(df_var)
+        arg_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+        out_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+
+        func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
+        func_text += "  ({},) = hpat.hiframes_api.dropna(({},), inplace)\n".format(
+            out_names, arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _dropna_imp = loc_vars['_dropna_imp']
+
+        f_block = compile_to_numba_ir(_dropna_imp, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, col_vars + [inplace_var])
+        nodes += f_block.body[:-3]
+
+        # extract column vars from output
+        out_col_map = {}
+        for i, cname in enumerate(col_names):
+            out_col_map[cname] = nodes[-len(col_names) + i].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        else:
+            # assign back to column vars for inplace case
+            for i in range(len(col_vars)):
+                c_var = col_vars[i]
+                dropped_var = list(out_col_map.values())[i]
+                nodes.append(ir.Assign(dropped_var, c_var, lhs.loc))
+        return nodes
+
+    def _is_iloc_loc(self, var):
+        val_def = guard(get_definition, self.func_ir, var)
+        # check for df.at[] pattern
+        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr in ('iloc', 'loc')
+                and self._is_df_var(val_def.value))
 
     def _is_iat(self, var):
         val_def = guard(get_definition, self.func_ir, var)
@@ -530,7 +691,7 @@ class HiFrames(object):
         fname = rhs.args[0]
         return self._gen_parquet_read(fname, lhs, label)
 
-    def _handle_merge(self, assign, lhs, rhs, label):
+    def _handle_merge(self, assign, lhs, rhs, is_asof, label):
         """transform pd.merge() into a Join node
         """
         if len(rhs.args) < 2:
@@ -560,9 +721,11 @@ class HiFrames(object):
         df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in right_colnames})
         self._create_df(lhs.name, df_col_map, label)
+        how = 'asof' if is_asof else 'inner'
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
-                                   left_on, right_on, self.df_vars, lhs.loc)]
+                                   left_on, right_on, self.df_vars, how,
+                                   lhs.loc)]
 
     def _handle_concat(self, assign, lhs, rhs, label):
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
@@ -580,7 +743,7 @@ class HiFrames(object):
         first_varname = df_list.items[0].name
 
         if first_varname in self.df_vars:
-            return self._handle_concat_df(lhs, df_list, label)
+            return self._handle_concat_df(lhs, df_list.items, label)
 
         # XXX convert build_list to build_tuple since Numba doesn't handle list of
         # arrays
@@ -591,58 +754,50 @@ class HiFrames(object):
     def _handle_concat_df(self, lhs, df_list, label):
         # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
+
+        # get output column names
+        all_colnames = []
+        for df in df_list:
+            all_colnames.extend(self._get_df_col_names(df))
+        # TODO: verify how Pandas sorts column names
+        all_colnames = sorted(set(all_colnames))
+
+        # generate a concat call for each output column
+        # TODO: support non-numericals like string
+        gen_nan_func = lambda A: np.full(len(A), np.nan)
+        # gen concat function
+        arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
+        func_text = "def _concat_imp({}):\n".format(arg_names)
+        func_text += "    return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
+            arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _concat_imp = loc_vars['_concat_imp']
+
         done_cols = {}
-        i = 0
-        for df in df_list.items:
-            df_col_map = self._get_df_cols(df)
-            for (c, v) in df_col_map.items():
-                if c in done_cols:
-                    continue
-                # arguments to the generated function
-                args = [v]
-                # names of arguments to the generated function
-                arg_names = ['_hpat_c' + str(i)]
-                # arguments to the concatenate function
-                conc_arg_names = ['_hpat_c' + str(i)]
-                allocs = ""
-                i += 1
-                for other_df in df_list.items:
-                    if other_df.name == df.name:
-                        continue
-                    if self._is_df_colname(other_df, c):
-                        other_var = self._get_df_colvar(other_df, c)
-                        args.append(other_var)
-                        arg_names.append('_hpat_c' + str(i))
-                        conc_arg_names.append('_hpat_c' + str(i))
-                        i += 1
-                    else:
-                        # use a df column variable just for computing length
-                        len_arg = self._get_df_col_vars(other_df)[0]
-                        len_name = '_hpat_len' + str(i)
-                        args.append(len_arg)
-                        arg_names.append(len_name)
-                        i += 1
-                        out_name = '_hpat_out' + str(i)
-                        conc_arg_names.append(out_name)
-                        i += 1
-                        # TODO: fix type
-                        # TODO: allocate string array of NAs
-                        allocs += "    {} = np.full(len({}), np.nan)\n".format(
-                            out_name, len_name)
-
-                func_text = "def f({}):\n".format(",".join(arg_names))
-                func_text += allocs
-                func_text += "    s = hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
-                    ",".join(conc_arg_names))
-                loc_vars = {}
-                exec(func_text, {}, loc_vars)
-                f = loc_vars['f']
-
-                f_block = compile_to_numba_ir(f,
+        for cname in all_colnames:
+            # arguments to the generated function
+            args = []
+            # get input columns
+            for df in df_list:
+                df_col_map = self._get_df_cols(df)
+                # generate full NaN column
+                if cname not in df_col_map:
+                    # use a df column just for len()
+                    len_arr = list(df_col_map.values())[0]
+                    f_block = compile_to_numba_ir(gen_nan_func,
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, args)
-                nodes += f_block.body[:-3]
-                done_cols[c] = nodes[-1].target
+                    replace_arg_nodes(f_block, [len_arr])
+                    nodes += f_block.body[:-2]
+                    args.append(nodes[-1].target)
+                else:
+                    args.append(df_col_map[cname])
+
+            f_block = compile_to_numba_ir(_concat_imp,
+                        {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            done_cols[cname] = nodes[-1].target
 
         self._create_df(lhs.name, done_cols, label)
         return nodes
