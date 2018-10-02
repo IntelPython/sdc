@@ -263,15 +263,8 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     # get column variables
     arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
-    col_inds = ", ".join(str(i) for i in range(n_cols))
-    col_names = ",".join("'{}'".format(nm) for nm in csv_node.df_colnames)
-    col_typs = ", ".join(str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types)
-    #col_typs = [str(_numba_to_c_type_map[arr_typ.dtype]) for arr_typ in csv_node.out_types]
     func_text  = "def csv_impl(fname):\n"
-    # func_text += "    ({},) = _csv_reader_py(fname, ({},), [{},], ({},))\n".format(
-    #     arg_names, col_inds, col_names, col_typs)
-    func_text += "    ({},) = _csv_reader_py(fname)\n".format(
-    arg_names)
+    func_text += "    ({},) = _csv_reader_py(fname)\n".format(arg_names)
     # print(func_text)
 
     loc_vars = {}
@@ -279,8 +272,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     csv_impl = loc_vars['csv_impl']
 
     csv_reader_py = _gen_csv_reader_py(
-        col_inds, csv_node.df_colnames, csv_node.out_types, typingctx,
-        targetctx)
+        csv_node.df_colnames, csv_node.out_types, typingctx, targetctx)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -314,9 +306,14 @@ def _get_dtype_str(t):
     dtype = t.dtype
     if t == dt64_arr_typ:
         dtype = 'NPDatetime("ns")'
+    if t == string_array_type:
+        # HACK: add string_array_type to numba.types
+        # FIXME: fix after Numba #3372 is resolved
+        types.string_array_type = string_array_type
+        return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
-def _gen_csv_reader_py(col_inds, col_names, col_typs, typingctx, targetctx):
+def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt64_arr_typ)
