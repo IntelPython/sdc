@@ -5,7 +5,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
 from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
-from numba.targets.boxing import unbox_array
+from numba.targets.boxing import unbox_array, box_array
 from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
 
 import numpy as np
@@ -130,6 +130,10 @@ def datetime_get_day(context, builder, typ, val):
 def convert_datetime_date_array_to_native(x):
     return np.array([(val.day + (val.month << 16) + (val.year << 32)) for val in x], dtype=np.int64)
 
+@numba.njit
+def datetime_date_ctor(y, m, d):
+    return datetime.date(y, m, d)
+
 @unbox(DatetimeDateType)
 def unbox_datetime_date(typ, val, c):
     year_obj = c.pyapi.object_getattr_string(val, "year")
@@ -168,6 +172,21 @@ def unbox_datetime_date_array(typ, val, c):
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(out_arr._getvalue(), is_error=is_error)
+
+def int_to_datetime_date_python(ia):
+    return datetime.date(ia >> 32, (ia >> 16) & 0xffff, ia & 0xffff)
+
+def int_array_to_datetime_date(ia):
+    return np.vectorize(int_to_datetime_date_python)(ia)
+
+def box_datetime_date_array(typ, val, c):
+    ary = box_array(types.Array(types.int64, 1, 'C'), val, c)
+    hpat_name = c.context.insert_const_string(c.builder.module, 'hpat')
+    hpat_mod = c.pyapi.import_module_noblock(hpat_name)
+    pte_mod = c.pyapi.object_getattr_string(hpat_mod, 'pd_timestamp_ext')
+    iatdd = c.pyapi.object_getattr_string(pte_mod, 'int_array_to_datetime_date')
+    res = c.pyapi.call_function_objargs(iatdd, [ary])
+    return res
 
 # TODO: move to utils or Numba
 

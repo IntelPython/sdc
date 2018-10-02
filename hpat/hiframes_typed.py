@@ -25,6 +25,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
+import datetime
 
 LARGE_WIN_SIZE = 10
 
@@ -178,6 +179,8 @@ class HiFramesTyped(object):
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
                     if rhs.attr in hpat.pd_timestamp_ext.date_fields:
                         return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+                    if rhs.attr == 'date':
+                        return self._run_DatetimeIndex_date(assign, assign.target, rhs)
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
                     if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
@@ -775,6 +778,29 @@ class HiFramesTyped(object):
         func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
         func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
         func_text += '        S[i] = ts.' + field + '\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, [arr])
+
+    def _run_DatetimeIndex_date(self, assign, lhs, rhs):
+        """transform DatetimeIndex.date
+        """
+        arr = rhs.value
+        field = rhs.attr
+
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        S[i] = hpat.pd_timestamp_ext.datetime_date_ctor(ts.year, ts.month, ts.day)\n'
+        #func_text += '        S[i] = datetime.date(ts.year, ts.month, ts.day)\n'
+        #func_text += '        S[i] = ts.day + (ts.month << 16) + (ts.year << 32)\n'
         func_text += '    return S\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
