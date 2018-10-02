@@ -270,13 +270,15 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     #     arg_names, col_inds, col_names, col_typs)
     func_text += "    ({},) = _csv_reader_py(fname)\n".format(
     arg_names)
-    print(func_text)
+    # print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     csv_impl = loc_vars['csv_impl']
 
-    csv_reader_py = _gen_csv_reader_py(col_inds, csv_node.df_colnames, csv_node.out_types, typingctx, targetctx)
+    csv_reader_py = _gen_csv_reader_py(
+        col_inds, csv_node.df_colnames, csv_node.out_types, typingctx,
+        targetctx)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -308,42 +310,24 @@ csv_file_chunk_reader = types.ExternalFunction("csv_file_chunk_reader", hpatio_t
 
 
 def _gen_csv_reader_py(col_inds, col_names, col_typs, typingctx, targetctx):
+    # TODO: support non-numpy types like strings
+    typ_strs = ", ".join(["{}='{}[::1]'".format(cname, t.dtype)
+                          for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
     func_text += "  f_reader = csv_file_chunk_reader(fname)\n"
-    func_text += "  with objmode(A='float64[::1]'):\n"
-    func_text += "    df = pd.read_csv(f_reader, names=['A'])\n"
-    func_text += "    A = df.A.values\n"
-    func_text += "  return (A,)\n"
+    func_text += "  with objmode({}):\n".format(typ_strs)
+    func_text += "    df = pd.read_csv(f_reader, names={})\n".format(col_names)
+    for cname in col_names:
+        func_text += "    {} = df.{}.values\n".format(cname, cname)
+    func_text += "  return ({},)\n".format(", ".join(col_names))
 
-    glbls = {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader, 'pd': pd, 'np': np}
+    # print(func_text)
+    glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
+    # {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader,
+    # 'pd': pd, 'np': np}
     loc_vars = {}
     exec(func_text, glbls, loc_vars)
     csv_reader_py = loc_vars['csv_reader_py']
 
-    # return numba.njit(csv_reader_py)
-    from numba import compiler
-    from numba.ir_utils import compile_to_numba_ir, get_ir_of_code
-
-    f_ir = get_ir_of_code(glbls, csv_reader_py.__code__)
-    main_ir, withs = numba.transforms.with_lifting(
-        func_ir=f_ir,
-        typingctx=typingctx,
-        targetctx=targetctx,
-        flags=compiler.DEFAULT_FLAGS,
-        locals={},
-    )
-    out_tp = types.Tuple([types.Array(types.float64, 1, 'C')])
-    csv_reader_py_func = compiler.compile_ir(
-            typingctx,
-            targetctx,
-            main_ir,
-            (string_type,),
-            out_tp,
-            compiler.DEFAULT_FLAGS,
-            {},
-            lifted=tuple(withs), lifted_from=None
-    )
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](csv_reader_py)
-    imp_dis.add_overload(csv_reader_py_func)
-    return imp_dis
+    return numba.njit(csv_reader_py)
