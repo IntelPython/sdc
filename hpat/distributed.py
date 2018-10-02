@@ -772,7 +772,7 @@ class DistributedPass(object):
     def _run_call_array(self, lhs, arr, func_name, assign, args):
         #
         out = [assign]
-        if func_name in ('astype', 'copy') and not self._is_REP(arr.name):
+        if func_name in ('astype', 'copy') and self._is_1D_arr(lhs):
             self._array_starts[lhs] = self._array_starts[arr.name]
             self._array_counts[lhs] = self._array_counts[arr.name]
             self._array_sizes[lhs] = self._array_sizes[arr.name]
@@ -781,7 +781,7 @@ class DistributedPass(object):
             return self._run_reshape(assign, arr, args)
 
 
-        if func_name == 'transpose' and not self._is_REP(arr.name):
+        if func_name == 'transpose' and self._is_1D_arr(lhs):
             # Currently only 1D arrays are supported
             assert self._is_1D_arr(arr.name)
             ndim = self.typemap[arr.name].ndim
