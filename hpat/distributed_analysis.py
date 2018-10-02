@@ -382,9 +382,11 @@ class DistributedAnalysis(object):
                         if aname not in array_dists:
                             array_dists[aname] = adist
                         else:
+                            min_adist = Distribution.OneD_Var if adist == Distribution.OneD else adist
+                            assert array_dists[aname].value <= Distribution.OneD.value, "Cannot handle unknown distribution type"
                             # bail out if there is a distribution conflict with some other use of the argument
                             # FIXME: handle Distribution.Thread and Disribution.REP as equivalent
-                            assert array_dists[aname] == adist,\
+                            assert array_dists[aname].value >= min_adist.value,\
                                    'Distribution of argument {} ({}) to "daal4py.{}.compute" must be "{}". '\
                                    'Some other use of it demands "{}", though.'\
                                    .format(i+1, algo.spec.input_types[i][0], algo.name, adist, array_dists[aname])
@@ -393,6 +395,11 @@ class DistributedAnalysis(object):
                         array_dists[lhs] = algo.spec.result_dist
                     else:
                         array_dists[lhs] = Distribution(min(array_dists[lhs].value, algo.spec.result_dist.value))
+                        min_rdist = Distribution.OneD_Var if algo.spec.result_dist == Distribution.OneD else algo.spec.result_dist
+                        assert array_dists[lhs].value >= min_rdist.value,\
+                            'Distribution ({}) to "daal4py.{}.compute" must be at least "{}". '\
+                            'Some other use of it demands "{}", though.'\
+                            .format(algo.name, min_rdist, array_dists[lhs])
                     return True
             return False
 
