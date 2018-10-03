@@ -18,8 +18,6 @@ class Filter(ir.Stmt):
         self.df_out_vars = df_vars[self.df_out].copy()
         self.df_in_vars = df_vars[self.df_in].copy()
         self.bool_arr = bool_arr
-        # needs df columns for type inference stage
-        self.df_vars = df_vars
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover

@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import operator
 import numpy as np
 from collections import namedtuple
 import warnings
@@ -9,7 +10,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem, mk_unique_var, dprint_func_ir,
-                            build_definitions)
+                            build_definitions, find_build_sequence)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
@@ -21,12 +22,51 @@ from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
-    series_str_methods_type, SeriesRollingType)
+    series_str_methods_type, SeriesRollingType, SeriesIatType,
+    explicit_binop_funcs)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
+import datetime
 
 LARGE_WIN_SIZE = 10
+
+_dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
+                operator.eq, operator.ne, operator.ge, operator.gt,
+                operator.le, operator.lt, operator.sub)
+
+_string_array_comp_ops = ('==', '!=', '>=', '>', '<=', '<',
+                operator.eq, operator.ne, operator.ge, operator.gt,
+                operator.le, operator.lt)
+
+_binop_to_str = {
+    operator.eq: '==',
+    operator.ne: '!=',
+    operator.ge: '>=',
+    operator.gt: '>',
+    operator.le: '<=',
+    operator.lt: '<',
+    operator.sub: '-',
+    operator.add: '+',
+    operator.mul: '*',
+    operator.truediv: '/',
+    operator.floordiv: '//',
+    operator.mod: '%',
+    operator.pow: '**',
+    '==': '==',
+    '!=': '!=',
+    '>=': '>=',
+    '>': '>',
+    '<=': '<=',
+    '<': '<',
+    '-': '-',
+    '+': '+',
+    '*': '*',
+    '/': '/',
+    '//': '//',
+    '%': '%',
+    '**': '**',
+}
 
 
 class HiFramesTyped(object):
@@ -79,6 +119,13 @@ class HiFramesTyped(object):
                         and self.typemap[inst.target.name] == h5dataset_type):
                     out_nodes = self._handle_h5_write(inst.target, inst.index, inst.value)
                     new_body.extend(out_nodes)
+                elif (isinstance(inst, (ir.SetItem, ir.StaticSetItem))
+                        and isinstance(self.typemap[inst.target.name], SeriesIatType)):
+                    val_def = guard(get_definition, self.func_ir, inst.target)
+                    assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
+                    series_var = val_def.value
+                    inst.target = series_var
+                    new_body.append(inst)
                 else:
                     new_body.append(inst)
             if not replaced:
@@ -97,10 +144,12 @@ class HiFramesTyped(object):
             # replace array.call() variable types
             if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
                 # TODO: handle string arrays, etc.
-                assert (typ.typing_key.startswith('array.')
+                assert (typ.typing_key in explicit_binop_funcs.keys()
+                    or typ.typing_key.startswith('array.')
                     or typ.typing_key.startswith('series.'))
                 # skip if series.func since it is replaced here
-                if typ.typing_key.startswith('series.'):
+                if (not isinstance(typ.typing_key, str)
+                        or not typ.typing_key.startswith('array.')):
                     continue
                 this = series_to_array_type(typ.this)
                 attr = typ.typing_key[len('array.'):]
@@ -178,6 +227,8 @@ class HiFramesTyped(object):
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
                     if rhs.attr in hpat.pd_timestamp_ext.date_fields:
                         return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+                    if rhs.attr == 'date':
+                        return self._run_DatetimeIndex_date(assign, assign.target, rhs)
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
                     if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
@@ -186,6 +237,14 @@ class HiFramesTyped(object):
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
                 return res
+
+            # replace getitems on Series.iat
+            if (rhs.op in ['getitem', 'static_getitem']
+                    and isinstance(self.typemap[rhs.value.name], SeriesIatType)):
+                val_def = guard(get_definition, self.func_ir, rhs.value)
+                assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
+                series_var = val_def.value
+                rhs.value = series_var
 
             # replace getitems on dt_index/dt64 series with Timestamp function
             if (rhs.op in ['getitem', 'static_getitem']
@@ -481,6 +540,16 @@ class HiFramesTyped(object):
                 return self._replace_func(lambda a: a, [series_var])
             func = series_replace_funcs['astype_str']
             return self._replace_func(func, [series_var])
+
+        if func_name in explicit_binop_funcs.values():
+            binop_map = {v: _binop_to_str[k] for k, v in explicit_binop_funcs.items()}
+            func_text = "def _binop_impl(A, B):\n"
+            func_text += "  return A {} B\n".format(binop_map[func_name])
+
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            _binop_impl = loc_vars['_binop_impl']
+            return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
@@ -808,6 +877,29 @@ class HiFramesTyped(object):
 
         return self._replace_func(f, [arr])
 
+    def _run_DatetimeIndex_date(self, assign, lhs, rhs):
+        """transform DatetimeIndex.date
+        """
+        arr = rhs.value
+        field = rhs.attr
+
+        func_text = 'def f(dti):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(dti)\n'
+        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        S[i] = hpat.pd_timestamp_ext.datetime_date_ctor(ts.year, ts.month, ts.day)\n'
+        #func_text += '        S[i] = datetime.date(ts.year, ts.month, ts.day)\n'
+        #func_text += '        S[i] = ts.day + (ts.month << 16) + (ts.year << 32)\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, [arr])
+
     def _run_Timedelta_field(self, assign, lhs, rhs):
         """transform Timedelta.<field>
         """
@@ -873,7 +965,7 @@ class HiFramesTyped(object):
         if rhs.op != 'binop':
             return False
 
-        if rhs.fn not in ('==', '!=', '>=', '>', '<=', '<', '-'):
+        if rhs.fn not in _dt_index_binops:
             return False
 
         arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
@@ -891,20 +983,22 @@ class HiFramesTyped(object):
         # TODO: this has to be more generic to support all combinations.
         if (self.typemap[arg1.name] == dt_index_series_type and
             self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
-            rhs.fn == '-'):
+            rhs.fn in ('-', operator.sub)):
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
         if (self.typemap[arg1.name] not in allowed_types
                 or self.typemap[arg2.name] not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
 
+        op_str = _binop_to_str[rhs.fn]
+
         func_text = 'def f(arg1, arg2):\n'
         if self.typemap[arg1.name] == dt_index_series_type:
             func_text += '  dt_index, _str = arg1, arg2\n'
-            comp = 'dt_index[i] {} other'.format(rhs.fn)
+            comp = 'dt_index[i] {} other'.format(op_str)
         else:
             func_text += '  dt_index, _str = arg2, arg1\n'
-            comp = 'other {} dt_index[i]'.format(rhs.fn)
+            comp = 'other {} dt_index[i]'.format(op_str)
         func_text += '  l = len(dt_index)\n'
         func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(_str)\n'
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
@@ -920,7 +1014,7 @@ class HiFramesTyped(object):
     def _handle_string_array_expr(self, lhs, rhs, assign):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
-                and rhs.fn in ['==', '!=', '>=', '>', '<=', '<']
+                and rhs.fn in _string_array_comp_ops
                 and (is_str_arr_typ(self.typemap[rhs.lhs.name])
                      or is_str_arr_typ(self.typemap[rhs.rhs.name]))):
             arg1 = rhs.lhs
@@ -940,11 +1034,13 @@ class HiFramesTyped(object):
                 self.typemap.pop(arg2.name)
                 self.typemap[arg2.name] = string_array_type
 
+            op_str = _binop_to_str[rhs.fn]
+
             func_text = 'def f(A, B):\n'
             func_text += '  l = {}\n'.format(len_call)
             func_text += '  S = np.empty(l, dtype=np.bool_)\n'
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
-            func_text += '    S[i] = {} {} {}\n'.format(arg1_access, rhs.fn,
+            func_text += '    S[i] = {} {} {}\n'.format(arg1_access, op_str,
                                                         arg2_access)
             func_text += '  return S\n'
 
@@ -1044,6 +1140,9 @@ class HiFramesTyped(object):
             return self._replace_func(_series_fillna_str_alloc_impl, rhs.args)
 
         if func_name == 'dropna':
+            # df.dropna case
+            if isinstance(self.typemap[rhs.args[0].name], types.BaseTuple):
+                return self._handle_df_dropna(assign, lhs, rhs)
             dtype = self.typemap[rhs.args[0].name].dtype
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
@@ -1064,6 +1163,46 @@ class HiFramesTyped(object):
             return self._replace_func(_column_var_impl, rhs.args)
 
         return [assign]
+
+    def _handle_df_dropna(self, assign, lhs, rhs):
+        in_typ = self.typemap[rhs.args[0].name]
+
+        in_vars, _ = guard(find_build_sequence, self.func_ir, rhs.args[0])
+        in_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
+                     for i in range(len(in_vars))]
+        out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
+                     for i in range(len(in_vars))]
+        str_colnames = [in_names[i] for i, t in enumerate(in_typ.types) if t == string_series_type]
+        isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
+
+        func_text = "def _dropna_impl(arr_tup, inplace):\n"
+        func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
+        func_text += "  old_len = len({})\n".format(in_names[0])
+        func_text += "  new_len = 0\n"
+        for c in str_colnames:
+            func_text += "  num_chars_{} = 0\n".format(c)
+        func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
+        func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
+        func_text += "      new_len += 1\n"
+        for c in str_colnames:
+            func_text += "      num_chars_{} += len({}[i])\n".format(c, c)
+        for v, out in zip(in_names, out_names):
+            if v in str_colnames:
+                func_text += "  {} = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars_{})\n".format(out, v)
+            else:
+                func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
+        func_text += "  curr_ind = 0\n"
+        func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
+        func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
+        for v, out in zip(in_names, out_names):
+            func_text += "      {}[curr_ind] = {}[i]\n".format(out, v)
+        func_text += "      curr_ind += 1\n"
+        func_text += "  return ({},)\n".format(", ".join(out_names))
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _dropna_impl = loc_vars['_dropna_impl']
+        return self._replace_func(_dropna_impl, rhs.args)
 
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):
@@ -1092,7 +1231,7 @@ class HiFramesTyped(object):
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
         if isinstance(tup_def, ir.Expr):
-            if tup_def.op == 'binop' and tup_def.fn == '+':
+            if tup_def.op == 'binop' and tup_def.fn in ('+', operator.add):
                 return (self._get_const_tup(tup_def.lhs)
                         + self._get_const_tup(tup_def.rhs))
             if tup_def.op in ('build_tuple', 'build_list'):

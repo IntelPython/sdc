@@ -90,3 +90,13 @@ data = ("0,2.3,2015-01-03,47736\n"
 
 with open("csv_data_date1.csv", "w") as f:
     f.write(data)
+
+# generated data for parallel merge_asof testing
+df1 = pd.DataFrame({'time': pd.DatetimeIndex(
+    ['2017-01-03', '2017-01-06', '2017-02-15', '2017-02-21']),
+    'B': [4, 5, 9, 6]})
+df2 = pd.DataFrame({'time': pd.DatetimeIndex(
+    ['2017-01-01', '2017-01-14', '2017-01-16', '2017-02-23', '2017-02-23',
+    '2017-02-25']), 'A': [2,3,7,8,9,10]})
+df1.to_parquet("asof1.pq")
+df2.to_parquet("asof2.pq")

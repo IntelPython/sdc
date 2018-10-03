@@ -1,3 +1,4 @@
+import operator
 import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
@@ -5,8 +6,10 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
 from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
-from numba.targets.boxing import unbox_array
-from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
+from numba.targets.boxing import unbox_array, box_array
+from numba.typing.templates import (infer_getattr, AttributeTemplate,
+    bound_function, signature, infer_global, AbstractTemplate,
+    ConcreteTemplate)
 
 import numpy as np
 import ctypes
@@ -90,6 +93,55 @@ def impl_ctor_pandas_dts(context, builder, sig, args):
     ts = cgutils.create_struct_proxy(typ)(context, builder)
     return ts._getvalue()
 
+
+#-- builtin operators for dt64 ----------------------------------------------
+# TODO: move to Numba
+
+class CompDT64(ConcreteTemplate):
+    cases = signature(
+        types.boolean, types.NPDatetime('ns'), types.NPDatetime('ns'))
+
+@infer_global(operator.lt)
+class CmpOpLt(CompDT64):
+    key = operator.lt
+
+@infer_global(operator.le)
+class CmpOpLe(CompDT64):
+    key = operator.le
+
+@infer_global(operator.gt)
+class CmpOpGt(CompDT64):
+    key = operator.gt
+
+@infer_global(operator.ge)
+class CmpOpGe(CompDT64):
+    key = operator.ge
+
+@infer_global(operator.eq)
+class CmpOpEq(CompDT64):
+    key = operator.eq
+
+@infer_global(operator.ne)
+class CmpOpNe(CompDT64):
+    key = operator.ne
+
+class MinMaxBaseDT64(numba.typing.builtins.MinMaxBase):
+
+    def _unify_minmax(self, tys):
+        for ty in tys:
+            if not ty == types.NPDatetime('ns'):
+                return
+        return self.context.unify_types(*tys)
+
+@infer_global(max)
+class Max(MinMaxBaseDT64):
+    pass
+
+
+@infer_global(min)
+class Min(MinMaxBaseDT64):
+    pass
+
 #---------------------------------------------------------------
 
 # datetime.date implementation that uses a single int to store year/month/day
@@ -130,6 +182,10 @@ def datetime_get_day(context, builder, typ, val):
 def convert_datetime_date_array_to_native(x):
     return np.array([(val.day + (val.month << 16) + (val.year << 32)) for val in x], dtype=np.int64)
 
+@numba.njit
+def datetime_date_ctor(y, m, d):
+    return datetime.date(y, m, d)
+
 @unbox(DatetimeDateType)
 def unbox_datetime_date(typ, val, c):
     year_obj = c.pyapi.object_getattr_string(val, "year")
@@ -168,6 +224,21 @@ def unbox_datetime_date_array(typ, val, c):
 
     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
     return NativeValue(out_arr._getvalue(), is_error=is_error)
+
+def int_to_datetime_date_python(ia):
+    return datetime.date(ia >> 32, (ia >> 16) & 0xffff, ia & 0xffff)
+
+def int_array_to_datetime_date(ia):
+    return np.vectorize(int_to_datetime_date_python)(ia)
+
+def box_datetime_date_array(typ, val, c):
+    ary = box_array(types.Array(types.int64, 1, 'C'), val, c)
+    hpat_name = c.context.insert_const_string(c.builder.module, 'hpat')
+    hpat_mod = c.pyapi.import_module_noblock(hpat_name)
+    pte_mod = c.pyapi.object_getattr_string(hpat_mod, 'pd_timestamp_ext')
+    iatdd = c.pyapi.object_getattr_string(pte_mod, 'int_array_to_datetime_date')
+    res = c.pyapi.call_function_objargs(iatdd, [ary])
+    return res
 
 # TODO: move to utils or Numba
 

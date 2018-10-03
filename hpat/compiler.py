@@ -136,6 +136,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         name = 'hpat'
         pm.create_pipeline(name)
         self.add_preprocessing_stage(pm)
+        self.add_with_handling_stage(pm)
         self.add_pre_typing_stage(pm)
         pm.add_stage(self.stage_inline_pass, "inline funcs")
         pm.add_stage(self.stage_df_pass, "convert DataFrames")
@@ -158,6 +159,8 @@ class HPATPipeline(numba.compiler.BasePipeline):
         if self.flags.auto_parallel.enabled:
             pm.add_stage(self.stage_parfor_pass, "convert to parfors")
         pm.add_stage(self.stage_distributed_pass, "convert to distributed")
+        pm.add_stage(self.stage_ir_legalization,
+                "ensure IR is legal prior to lowering")
         self.add_lowering_stage(pm)
         self.add_cleanup_stage(pm)
 
