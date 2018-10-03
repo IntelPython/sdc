@@ -290,7 +290,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
         // get total number of lines using allreduce
         size_t tot_no_lines(0);
 
-        hpat_dist_reduce(reinterpret_cast<char *>(no_lines), reinterpret_cast<char *>(tot_no_lines), HPAT_ReduceOps::SUM, HPAT_CTypes::UINT64);
+        hpat_dist_reduce(reinterpret_cast<char *>(&no_lines), reinterpret_cast<char *>(&tot_no_lines), HPAT_ReduceOps::SUM, HPAT_CTypes::UINT64);
         // evenly divide
         size_t exp_no_lines = tot_no_lines/nranks;
         // surplus lines added to first ranks
