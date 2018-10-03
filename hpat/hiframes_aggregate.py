@@ -1020,6 +1020,23 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
 
 def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
 
+    # parallelaccelerator adds functions that check the size of input array
+    # these calls need to be removed
+    _checker_calls = (numba.parfor.max_checker, numba.parfor.min_checker,
+        numba.parfor.argmax_checker, numba.parfor.argmin_checker)
+    checker_vars = set()
+    cleaned_init_nodes = []
+    for stmt in init_nodes:
+        if (is_assign(stmt) and isinstance(stmt.value, ir.Global)
+                and stmt.value.value in _checker_calls):
+            checker_vars.add(stmt.target.name)
+        elif is_call(stmt) and stmt.value.func.name in checker_vars:
+            pass  # remove call
+        else:
+            cleaned_init_nodes.append(stmt)
+
+    init_nodes = cleaned_init_nodes
+
     return_typ = types.Tuple(var_types)
 
     dummy_f = lambda: None
