@@ -160,7 +160,7 @@ if not is_win:
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=str_libs,
-                    define_macros = np_compile_args['define_macros'], # + [('USE_BOOST_REGEX', None)],
+                    define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
                     extra_compile_args = eca,
                     extra_link_args = ela,
                     include_dirs = np_compile_args['include_dirs'] + ind,
