@@ -26,7 +26,7 @@ from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
 from hpat.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
-    set_df_datetime_date_lower, unbox_datetime_date_array)
+    set_df_datetime_date_lower, unbox_datetime_date_array, box_datetime_date_array)
 import hpat
 from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
@@ -916,6 +916,8 @@ def box_series(typ, val, c):
     """
     if typ.dtype == string_type:
         arr = box_str_arr(typ, val, c)
+    elif typ.dtype == datetime_date_type:
+        arr = box_datetime_date_array(typ, val, c)
     else:
         arr = box_array(types.Array(typ.dtype, 1, 'C'), val, c)
     mod_name = c.context.insert_const_string(c.builder.module, "pandas")

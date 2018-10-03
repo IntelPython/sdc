@@ -17,6 +17,7 @@ from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 from hpat.hiframes_rolling import supported_rolling_funcs
+import datetime
 
 # TODO: implement type inference instead of subtyping array since Pandas as of
 # 0.23 is deprecating things like itemsize etc.
@@ -297,6 +298,10 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    def resolve_date(self, ary):
+        if isinstance(ary.dtype, types.scalars.NPDatetime):
+            return date_series_type
+
     def resolve_iat(self, ary):
         return SeriesIatType(ary)
 
@@ -575,14 +580,14 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_max(self, ary, args, kws):
         assert not kws
         dtype = ary.dtype
-        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        dtype = pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
         return signature(dtype, *args)
 
     @bound_function("series.min")
     def resolve_min(self, ary, args, kws):
         assert not kws
         dtype = ary.dtype
-        dtype = hpat.pd_timestamp_ext.pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
+        dtype = pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
         return signature(dtype, *args)
 
 
@@ -948,7 +953,7 @@ class LenSeriesType(AbstractTemplate):
 
 def type_sub(context):
     def typer(val1, val2):
-        if(val1 == dt_index_series_type and val2 == hpat.pd_timestamp_ext.pandas_timestamp_type):
+        if(val1 == dt_index_series_type and val2 == pandas_timestamp_type):
             return timedelta_index_series_type
     return typer
 
