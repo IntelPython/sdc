@@ -272,7 +272,8 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     csv_impl = loc_vars['csv_impl']
 
     csv_reader_py = _gen_csv_reader_py(
-        csv_node.df_colnames, csv_node.out_types, typingctx, targetctx)
+        csv_node.df_colnames, csv_node.out_types, typingctx, targetctx,
+        parallel)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -300,7 +301,8 @@ register_model(HPATIOType)(models.OpaqueModel)
 def box_hpatio(typ, val, c):
     return val
 
-csv_file_chunk_reader = types.ExternalFunction("csv_file_chunk_reader", hpatio_type(string_type))
+csv_file_chunk_reader = types.ExternalFunction(
+    "csv_file_chunk_reader", hpatio_type(string_type, types.bool_))
 
 def _get_dtype_str(t):
     dtype = t.dtype
@@ -313,7 +315,7 @@ def _get_dtype_str(t):
         return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
-def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx):
+def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt64_arr_typ)
@@ -321,7 +323,8 @@ def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx):
                           for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
-    func_text += "  f_reader = csv_file_chunk_reader(fname)\n"
+    func_text += "  f_reader = csv_file_chunk_reader(fname, {})\n".format(
+                                                                      parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}])\n".format(date_inds)

@@ -267,14 +267,14 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  * @param[in]  fsz total number of bytes in stream
  * @return     HPATIO file-like object to read the owned chunk through pandas.read_csv
  **/
-static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
+static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel)
 {
     size_t nranks = hpat_dist_get_size();
 
     size_t my_off_start = 0;
     size_t my_off_end = fsz;
 
-    if(nranks > 1) {
+    if(is_parallel) {
         size_t rank = hpat_dist_get_rank();
         // We evenly distribute the 'data' byte-wise
         auto chunksize = fsz/nranks;
@@ -327,7 +327,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
         }
         // before reading, make sure we received our start/end offsets
         hpat_dist_waitall(mpi_reqs.size(), mpi_reqs.data());
-    } // ranks>1
+    } // if is_parallel
 
     // Here we now know exactly what chunk to read: [my_off_start,my_off_end[
     // let's create our file-like reader
@@ -348,25 +348,25 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz)
 
 
 // taking a file to create a istream and calling csv_chunk_reader
-extern "C" PyObject* csv_file_chunk_reader(const std::string * fname)
+extern "C" PyObject* csv_file_chunk_reader(const std::string * fname, bool is_parallel)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
     auto fsz = boost::filesystem::file_size(*fname);
     std::ifstream * f = new std::ifstream(*fname);
     CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
-    return csv_chunk_reader(f, fsz);
+    return csv_chunk_reader(f, fsz, is_parallel);
 }
 
 
 // taking a string to create a istream and calling csv_chunk_reader
-extern "C" PyObject* csv_string_chunk_reader(const std::string * str)
+extern "C" PyObject* csv_string_chunk_reader(const std::string * str, bool is_parallel)
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
     std::istringstream * f = new std::istringstream(*str);
     CHECK(f->good(), "could not create istrstream from string.");
-    return csv_chunk_reader(f, str->size());
+    return csv_chunk_reader(f, str->size(), is_parallel);
 }
 
 #undef CHECK
