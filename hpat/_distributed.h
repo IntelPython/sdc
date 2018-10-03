@@ -16,6 +16,20 @@
 
 #define ROOT_PE 0
 
+// XXX same as distributed_api.py:Reduce_Type
+struct HPAT_ReduceOps {
+    enum ReduceOpsEnum {
+        SUM = 0,
+        PROD = 1,
+        MIN = 2,
+        MAX = 3,
+        ARGMIN = 4,
+        ARGMAX = 5,
+        OR = 6
+    };
+};
+
+
 static int hpat_dist_get_rank() __UNUSED__;
 static int hpat_dist_get_size() __UNUSED__;
 static int64_t hpat_dist_get_start(int64_t total, int num_pes, int node_id) __UNUSED__;
