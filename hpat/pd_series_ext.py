@@ -470,14 +470,17 @@ class SeriesAttribute(AttributeTemplate):
         return self._resolve_map_func(ary, args, kws)
 
     def _resolve_combine_func(self, ary, args, kws):
-        dtype = ary.dtype
+        dtype1 = ary.dtype
         # getitem returns Timestamp for dt_index and series(dt64)
-        if dtype == types.NPDatetime('ns'):
-            dtype = pandas_timestamp_type
+        if dtype1 == types.NPDatetime('ns'):
+            dtype1 = pandas_timestamp_type
+        dtype2 = args[0].dtype
+        if dtype2 == types.NPDatetime('ns'):
+            dtype2 = pandas_timestamp_type
         code = args[1].value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (dtype,dtype,), None)
+                self.context, f_ir, (dtype1,dtype2,), None)
         return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
     @bound_function("series.combine", True)

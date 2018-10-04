@@ -757,6 +757,11 @@ class HiFramesTyped(object):
     def _handle_series_combine(self, assign, lhs, rhs, series_var):
         """translate s1.combine(s2,lambda x1,x2 :...) to prange()
         """
+        # error checking: make sure there is function input only
+        if len(rhs.args) < 2:
+            raise ValueError("not enough arguments in call to combine")
+        if len(rhs.args) > 3:
+            raise ValueError("too many arguments in call to combine")
         func = guard(get_definition, self.func_ir, rhs.args[1])
         if func is None or not (isinstance(func, ir.Expr)
                                 and func.op == 'make_function'):
@@ -773,26 +778,38 @@ class HiFramesTyped(object):
             func_text = "def f(A, B):\n"
         else:
             func_text = "def f(A, B, C):\n"
-        func_text += "  numba.parfor.init_prange()\n"
         func_text += "  n1 = len(A)\n"
         func_text += "  n2 = len(B)\n"
-        func_text += "  n = n1\n"
-        func_text += "  if n2 > n:\n"
-        func_text += "      n = n2\n"
+        func_text += "  n = max(n1, n2)\n"
+        if not isinstance(self.typemap[series_var.name].dtype, types.Float) and use_nan:
+            func_text += "  assert n1 == n, 'can not use NAN for non-float series, with different length'\n"
+        if not isinstance(self.typemap[rhs.args[0].name].dtype, types.Float) and use_nan:
+            func_text += "  assert n2 == n, 'can not use NAN for non-float series, with different length'\n"
+        func_text += "  numba.parfor.init_prange()\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        if use_nan:
+        if use_nan and isinstance(self.typemap[series_var.name].dtype, types.Float):
             func_text += "    t1 = np.nan\n"
+            func_text += "    if i < n1:\n"
+            func_text += "      t1 = A[i]\n"
+        # length is equal, due to assertion above
+        elif use_nan:
+            func_text += "    t1 = A[i]\n"
         else:
             func_text += "    t1 = C\n"
-        func_text += "    if i < n1:\n"
-        func_text += "      t1 = A[i]\n"
-        if use_nan:
+            func_text += "    if i < n1:\n"
+            func_text += "      t1 = A[i]\n"
+        # same, but for 2nd argument
+        if use_nan and isinstance(self.typemap[rhs.args[0].name].dtype, types.Float):
             func_text += "    t2 = np.nan\n"
+            func_text += "    if i < n2:\n"
+            func_text += "      t2 = B[i]\n"
+        elif use_nan:
+            func_text += "    t2 = B[i]\n"
         else:
             func_text += "    t2 = C\n"
-        func_text += "    if i < n2:\n"
-        func_text += "      t2 = B[i]\n"
+            func_text += "    if i < n2:\n"
+            func_text += "      t2 = B[i]\n"
         func_text += "    S[i] = map_func(t1, t2)\n"
         if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
             func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
@@ -827,9 +844,9 @@ class HiFramesTyped(object):
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
         f_ir._definitions = build_definitions(f_ir.blocks)
         if use_nan:
-            arg_typs = (self.typemap[series_var.name], self.typemap[series_var.name],)
+            arg_typs = (self.typemap[series_var.name], self.typemap[rhs.args[0].name],)
         else:
-            arg_typs = (self.typemap[series_var.name], self.typemap[series_var.name], self.typemap[series_var.name].dtype,)
+            arg_typs = (self.typemap[series_var.name], self.typemap[rhs.args[0].name], self.typemap[rhs.args[2].name],)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.typingctx, f_ir, arg_typs, None)
         # remove argument entries like arg.a from typemap
