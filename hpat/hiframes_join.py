@@ -281,7 +281,7 @@ def build_join_definitions(join_node, definitions=None):
 ir_utils.build_defs_extensions[Join] = build_join_definitions
 
 
-def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, targetctx):
+def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
     for v in (list(join_node.left_vars.values())
               + list(join_node.right_vars.values())

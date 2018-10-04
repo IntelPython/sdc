@@ -164,7 +164,7 @@ def apply_copies_sort(sort_node, var_dict, name_var_table,
 ir_utils.apply_copy_propagate_extensions[Sort] = apply_copies_sort
 
 
-def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx):
+def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
     data_vars = list(sort_node.df_vars.values())
     for v in [sort_node.key_arr] + data_vars:

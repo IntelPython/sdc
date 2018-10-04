@@ -133,7 +133,7 @@ def build_filter_definitions(filter_node, definitions=None):
 ir_utils.build_defs_extensions[Filter] = build_filter_definitions
 
 
-def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx):
+def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = filter_node.loc
     bool_arr = filter_node.bool_arr
