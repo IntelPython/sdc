@@ -108,6 +108,7 @@ static void hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t s
     self->chunk_start = start;
     self->chunk_size = sz;
     self->chunk_pos = 0;
+    std::cerr << "My chunk is " << ((hpatio*)self)->chunk_start << " + " << ((hpatio*)self)->chunk_size << std::endl;
 }
 
 
@@ -118,6 +119,7 @@ static PyObject * hpatio_read(hpatio* self, PyObject *args)
 {
     // partially copied from from CPython's stringio.c
 
+    std::cerr << "reading..." << std::endl;
     if(self->ifs == NULL) {
         PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized HPATIO object");
         return NULL;
@@ -160,6 +162,7 @@ static PyObject * hpatio_read(hpatio* self, PyObject *args)
         return NULL;
     }
 
+    std::cerr << "read " << size << " bytes\n";
     return PyUnicode_FromStringAndSize(self->buf.data(), size);
 }
 
@@ -274,27 +277,23 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
     size_t my_off_start = 0;
     size_t my_off_end = fsz;
 
-    if(is_parallel) {
+    if(is_parallel && nranks > 1) {
         size_t rank = hpat_dist_get_rank();
-        // We evenly distribute the 'data' byte-wise
-        auto chunksize = fsz/nranks;
+
         // seek to our chunk
-        f->seekg(chunksize*rank, std::ios_base::beg);
+        f->seekg(hpat_dist_get_start(fsz, nranks, rank), std::ios_base::beg);
         if(!f->good() || f->eof()) {
-            std::cerr << "Could not seek to start position " << chunksize*rank << std::endl;
+            std::cerr << "Could not seek to start position " << hpat_dist_get_start(fsz, nranks, rank) << std::endl;
             return NULL;
         }
+        // We evenly distribute the 'data' byte-wise
         // count number of lines in chunk
-        std::vector<size_t> line_offset = count_lines(f, chunksize);
+        std::vector<size_t> line_offset = count_lines(f, hpat_dist_get_node_portion(fsz, nranks, rank));
         size_t no_lines = line_offset.size();
         // get total number of lines using allreduce
         size_t tot_no_lines(0);
 
         hpat_dist_reduce(reinterpret_cast<char *>(&no_lines), reinterpret_cast<char *>(&tot_no_lines), HPAT_ReduceOps::SUM, HPAT_CTypes::UINT64);
-        // evenly divide
-        size_t exp_no_lines = tot_no_lines/nranks;
-        // surplus lines added to first ranks
-        size_t extra_no_lines = tot_no_lines-(exp_no_lines*nranks);
 
         // Now we need to communicate the distribution as we really want it
         // First determine which is our first line (which is the sum of previous lines)
@@ -312,8 +311,8 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
 
         // We iterate through chunk boundaries (defined by line-numbers)
         // we start with boundary 1 as 0 is the beginning of file
-        for(size_t i=1; i<nranks; ++i) {
-            size_t i_bndry = hpat_dist_get_start(tot_no_lines, (int)nranks, (int)rank);
+        for(int i=1; i<nranks; ++i) {
+            size_t i_bndry = hpat_dist_get_start(tot_no_lines, (int)nranks, i);
             // Note our line_offsets mark the end of each line!
             // we check if boundary is on our byte-chunk
             if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {
@@ -323,7 +322,10 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
                 mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, START_OFFSET, true));
                 // send to rank that ends at this boundary: i-1
                 mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i-1, END_OFFSET, true));
-            }
+            } else {
+                // if not and we past our chunk -> we stop
+                if(i_bndry > byte_last_line) break;
+            } // else we are before our chunk -> continue iteration
         }
         // before reading, make sure we received our start/end offsets
         hpat_dist_waitall(mpi_reqs.size(), mpi_reqs.data());
@@ -343,6 +345,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
         hpatio_init(reinterpret_cast<hpatio*>(reader), f, my_off_start, my_off_end-my_off_start);
     }
 
+    std::cerr << "returning reader " << reader << std::endl;
     return reader;
 }
 
