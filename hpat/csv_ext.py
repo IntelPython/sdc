@@ -75,7 +75,10 @@ numba.array_analysis.array_analysis_extensions[CsvReader] = csv_array_analysis
 
 
 def csv_distributed_analysis(csv_node, array_dists):
-    # TODO
+    for v in csv_node.out_vars:
+        if v.name not in array_dists:
+            array_dists[v.name] = Distribution.OneD
+
     return
 
 
