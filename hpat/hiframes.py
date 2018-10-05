@@ -88,39 +88,43 @@ def remove_hiframes(rhs, lives, call_list):
 
 # TODO(quasilyte): remove duplication from this dict and
 # methods handling specific attributes and methods.
-df_spec = {}
-unimplemented_attrs = [
-    'ndim',
-]
-unimplemented_methods = []
-implemented_attrs = [
-    'values',
-    'iat',
-    'loc',
-    'iloc',
-]
-implemented_methods = [
-    'apply',
-    'describe',
-    'sort_values',
-    'itertuples',
-    'pivot_table',
-    'head',
-    'isin',
-    'append',
-    'fillna',
-    'dropna',
-    'groupby',
-    'rolling',
-]
-for name in unimplemented_attrs:
-    df_spec[name] = DataFrameAttr.UNIMPLEMENTED_ATTR
-for name in unimplemented_methods:
-    df_spec[name] = DataFrameAttr.UNIMPLEMENTED_METHOD
-for name in implemented_attrs:
-    df_spec[name] = DataFrameAttr.IMPLEMENTED_ATTR
-for name in implemented_methods:
-    df_spec[name] = DataFrameAttr.IMPLEMENTED_METHOD
+df_spec = {
+    DataFrameAttr.UNIMPLEMENTED_ATTR: [
+        'ndim',
+    ],
+    DataFrameAttr.UNIMPLEMENTED_METHOD: [
+    ],
+    DataFrameAttr.IMPLEMENTED_ATTR: [
+        'values',
+        'iat',
+        'loc',
+        'iloc',
+    ],
+    DataFrameAttr.IMPLEMENTED_METHOD: [
+        'apply',
+        'describe',
+        'sort_values',
+        'itertuples',
+        'pivot_table',
+        'head',
+        'isin',
+        'append',
+        'fillna',
+        'dropna',
+        'groupby',
+        'rolling',
+    ],
+}
+
+# To avoid excessive globals and keep convenient inversed dict literal,
+# convert to final form using comprehensions.
+# First comprehension turns dict into a list of dicts.
+# Second comprehension merges all dicts together.
+# {0: ['a', 'b'], 1: ['c']}
+# => [{'a': 0, 'b': 0}, {'c': 1}]
+# => {'a': 0, 'b': 0, 'c': 1}
+df_spec = [{v:k for v in values} for k, values in df_spec.items()]
+df_spec = {k:v for d in df_spec for k, v in d.items()}
 
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
