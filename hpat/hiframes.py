@@ -35,8 +35,20 @@ from hpat.pd_series_ext import SeriesType, BoxedSeriesType
 from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
 
+import enum
+
 LARGE_WIN_SIZE = 10
 
+# Enumeration for annotating known data frame attributes.
+# Used to give better error messages to the user.
+#
+# Non-method attributes do not require immediate call tracking.
+# Methods are required to be called right after getattr assignment.
+class DataFrameAttr(enum.Enum):
+    UNIMPLEMENTED_ATTR = 0
+    UNIMPLEMENTED_METHOD = 1
+    IMPLEMENTED_ATTR = 2
+    IMPLEMENTED_METHOD = 3
 
 def remove_hiframes(rhs, lives, call_list):
     # used in stencil generation of rolling
@@ -74,6 +86,42 @@ def remove_hiframes(rhs, lives, call_list):
     return False
 
 
+# TODO(quasilyte): remove duplication from this dict and
+# methods handling specific attributes and methods.
+df_spec = {}
+unimplemented_attrs = [
+    'ndim',
+]
+unimplemented_methods = []
+implemented_attrs = [
+    'values',
+    'iat',
+    'loc',
+    'iloc',
+]
+implemented_methods = [
+    'apply',
+    'describe',
+    'sort_values',
+    'itertuples',
+    'pivot_table',
+    'head',
+    'isin',
+    'append',
+    'fillna',
+    'dropna',
+    'groupby',
+    'rolling',
+]
+for name in unimplemented_attrs:
+    df_spec[name] = DataFrameAttr.UNIMPLEMENTED_ATTR
+for name in unimplemented_methods:
+    df_spec[name] = DataFrameAttr.UNIMPLEMENTED_METHOD
+for name in implemented_attrs:
+    df_spec[name] = DataFrameAttr.IMPLEMENTED_ATTR
+for name in implemented_methods:
+    df_spec[name] = DataFrameAttr.IMPLEMENTED_METHOD
+
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
 class HiFrames(object):
@@ -100,6 +148,11 @@ class HiFrames(object):
             func_ir, typingctx, args, _locals, self.reverse_copies)
         self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
 
+        # Track bound instancemethod values.
+        # HPAT currently requires them to be immediately called.
+        # This is a more strict limitation than in numba and
+        # can be a subject to change in future.
+        self.method_values = {}
 
     def run(self):
         # FIXME: see why this breaks test_kmeans
@@ -169,6 +222,13 @@ class HiFrames(object):
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
+        # For every bound instancemethod report ones that were not immediately called.
+        # All immediately called entries are removed to this point.
+        for k in self.method_values:
+            assign = self.method_values[k]
+            selector = "{}.{}".format(assign.value.value, assign.value.attr)
+            warnings.warn("bound data frame instancemethod {} referenced at {} not immediately called".format(
+                selector, assign.loc))
         return
 
     def _run_assign(self, assign, label):
@@ -177,6 +237,10 @@ class HiFrames(object):
 
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
+                # If this is a call for recently referenced method value,
+                # remove it from the dictionary.
+                if rhs.func.name in self.method_values:
+                    del self.method_values[rhs.func.name]
                 return self._run_call(assign, label)
 
             # fix type for f['A'][:] dset reads
@@ -218,21 +282,42 @@ class HiFrames(object):
                 return [hiframes_filter.Filter(lhs, in_df.name, index_var,
                                                self.df_vars, rhs.loc)]
 
-            # d = df.column
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and self._is_df_colname(rhs.value, rhs.attr)):
-                df = rhs.value.name
-                col_var = self._get_df_colvar(rhs.value, rhs.attr)
-                assign.value = col_var
-                # need to remove the lhs definition so that find_callname can
-                # match column function calls (i.e. A.f instead of df.A.f)
-                assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
-                self.func_ir._definitions[lhs] = [None]
-
-            # A = df.values
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and rhs.attr == 'values'):
-                return self._handle_df_values(assign.target, rhs.value)
+            if rhs.op == 'getattr' and self._is_df_var(rhs.value):
+                if self._is_df_colname(rhs.value, rhs.attr):
+                    # Handle `d = df.column`
+                    df = rhs.value.name
+                    col_var = self._get_df_colvar(rhs.value, rhs.attr)
+                    assign.value = col_var
+                    # need to remove the lhs definition so that find_callname can
+                    # match column function calls (i.e. A.f instead of df.A.f)
+                    assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
+                    self.func_ir._definitions[lhs] = [None]
+                elif rhs.attr not in df_spec:
+                    # Not a column name, not a statically known attribute.
+                    # Should probably raise an AttributeError, but since
+                    # some entries may be missing from fields table,
+                    # print a warning for now.
+                    selector = "{}.{}".format(assign.value.value, assign.value.attr)
+                    warnings.warn("unknown attribute {} accessed at {}".format(
+                        selector, assign.loc))
+                else:
+                    kind = df_spec[rhs.attr]
+                    if kind == DataFrameAttr.UNIMPLEMENTED_ATTR:
+                        raise NotImplementedError(
+                            "data frame attribute {} not implemented yet".format(rhs.attr))
+                    elif kind == DataFrameAttr.UNIMPLEMENTED_METHOD:
+                        raise NotImplementedError(
+                            "data frame function {} not implemented yet".format(rhs.attr))
+                    elif kind == DataFrameAttr.IMPLEMENTED_METHOD:
+                        # Track method until it's called.
+                        # The handling is done inside _run_call_df.
+                        self.method_values[lhs] = assign
+                    elif kind == DataFrameAttr.IMPLEMENTED_ATTR:
+                        # Handle `A = df.values`
+                        if rhs.attr == 'values':
+                            return self._handle_df_values(assign.target, rhs.value)
+                    else:
+                        raise ValueError("unreachable: unexpected DataFrameAttr kind")
 
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
