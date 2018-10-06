@@ -241,7 +241,13 @@ class DistributedAnalysis(object):
             return
 
         if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
-                and func_name in ['h5read', 'h5write']):
+                and func_name in ('h5read', 'h5write', 'h5read_filter')):
+            return
+
+        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+                and func_name == 'get_filter_read_indices'):
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
             return
 
         if fdef == ('quantile', 'hpat.hiframes_api'):
@@ -630,6 +636,9 @@ class DistributedAnalysis(object):
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
+        # selecting an array from a tuple shouldn't make it REP
+        if isinstance(self.typemap[rhs.value.name], types.BaseTuple):
+            return
         if rhs.op == 'static_getitem':
             if rhs.index_var is None:
                 # TODO: things like A[0] need broadcast

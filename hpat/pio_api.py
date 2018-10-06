@@ -1,13 +1,16 @@
 import numpy as np
 import numba
-from numba import types
+from numba import types, cgutils
 from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
+from llvmlite import ir as lir
 import h5py
-from numba.extending import register_model, models, infer_getattr, infer
+from numba.extending import register_model, models, infer_getattr, infer, intrinsic
 from hpat.str_ext import string_type
 import hpat
-
+import hio
+import llvmlite.binding as ll
+ll.add_symbol('hpat_h5_read_filter', hio.hpat_h5_read_filter)
 
 ################## Types #######################
 
@@ -281,3 +284,23 @@ def get_filter_read_indices(bool_arr):
     start = hpat.distributed_api.get_start(n, n_pes, rank)
     end = hpat.distributed_api.get_end(n, n_pes, rank)
     return all_indices[start:end]
+
+@intrinsic
+def tuple_to_ptr(typingctx, tuple_tp=None):
+    def codegen(context, builder, sig, args):
+        ptr = cgutils.alloca_once(builder, args[0].type)
+        builder.store(args[0], ptr)
+        return builder.bitcast(ptr, lir.IntType(8).as_pointer())
+    return signature(types.voidptr, tuple_tp), codegen
+
+_h5read_filter = types.ExternalFunction("hpat_h5_read_filter",
+    types.int32(h5dataset_or_group_type, types.int32, types.voidptr,
+    types.voidptr, types.intp, types.voidptr, types.int32, types.voidptr, types.int32))
+
+@numba.njit
+def h5read_filter(dset_id, ndim, starts, counts, is_parallel, out_arr, read_indices):
+    starts_ptr = tuple_to_ptr(starts)
+    counts_ptr = tuple_to_ptr(counts)
+    type_enum = hpat.distributed_api.get_type_enum(out_arr)
+    return _h5read_filter(dset_id, ndim, starts_ptr, counts_ptr, is_parallel,
+                   out_arr.ctypes, type_enum, read_indices.ctypes, len(read_indices))
