@@ -43,13 +43,14 @@ class PIO(object):
             dtype_str = str(tp.dtype)
             func_text = "def _h5_read_impl(dset, index):\n"
             # TODO: index arg?
-            func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, {}, '{}')\n".format(tp.ndim, dtype_str)
+            func_text += "  arr = hpat.pio_api.h5_read_dummy(dset, {}, '{}', index)\n".format(tp.ndim, dtype_str)
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             _h5_read_impl = loc_vars['_h5_read_impl']
             f_block = compile_to_numba_ir(
                     _h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [rhs.value, rhs.index_var])
+            index_var = rhs.index if rhs.op == 'getitem' else rhs.index_var
+            replace_arg_nodes(f_block, [rhs.value, index_var])
             nodes = f_block.body[:-3]  # remove none return
             nodes[-1].target = assign.target
             return nodes
@@ -62,15 +63,19 @@ class PIO(object):
         return guard(self._infer_h5_typ, rhs)
 
     def _infer_h5_typ(self, rhs):
-        # infer the type if it is of the from f['A']['B'][:] 
+        # infer the type if it is of the from f['A']['B'][:] or f['A'][b,:]
         # with constant filename
         # TODO: static_getitem has index_var for sure?
         # make sure it's slice, TODO: support non-slice like integer
         require(rhs.op in ('getitem', 'static_getitem'))
+        # XXX can't know the type of index here especially if it is bool arr
+        # make sure it is not string (we're not in the middle a select chain)
         index_var = rhs.index if rhs.op == 'getitem' else rhs.index_var
-        index_def = get_definition(self.func_ir, index_var)
-        require(isinstance(index_def, ir.Expr) and index_def.op == 'call')
-        require(find_callname(self.func_ir, index_def) == ('slice', 'builtins'))
+        index_val = guard(find_const, self.func_ir, index_var)
+        require(not isinstance(index_val, str))
+        # index_def = get_definition(self.func_ir, index_var)
+        # require(isinstance(index_def, ir.Expr) and index_def.op == 'call')
+        # require(find_callname(self.func_ir, index_def) == ('slice', 'builtins'))
         # collect object names until the call
         val_def = rhs
         obj_name_list = []
@@ -100,6 +105,7 @@ class PIO(object):
         obj = f
         for obj_name in obj_name_list:
             obj = obj[obj_name]
+        require(isinstance(obj, h5py.Dataset))
         ndims = len(obj.shape)
         numba_dtype = numba.numpy_support.from_dtype(obj.dtype)
         f.close()
