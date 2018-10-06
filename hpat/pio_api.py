@@ -1,3 +1,4 @@
+import numpy as np
 import numba
 from numba import types
 from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
@@ -5,6 +6,7 @@ from numba.typing import signature
 import h5py
 from numba.extending import register_model, models, infer_getattr, infer
 from hpat.str_ext import string_type
+import hpat
 
 
 ################## Types #######################
@@ -253,3 +255,29 @@ class H5GgetObjNameByIdx(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         return signature(string_type, *args)
+
+sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
+@numba.njit
+def get_filter_read_indices(bool_arr):
+    indices = bool_arr.nonzero()[0]
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+    n_arr = hpat.distributed_api.dist_reduce(len(bool_arr), np.int32(sum_op))
+    ind_start = hpat.distributed_api.get_start(n_arr, n_pes, rank)
+    indices += ind_start
+
+    # TODO: use prefix-sum and all-to-all
+    # all_indices = np.empty(n, indices.dtype)
+    # allgatherv(all_indices, indices)
+    n = hpat.distributed_api.dist_reduce(len(indices), np.int32(sum_op))
+    inds = hpat.distributed_api.gatherv(indices)
+    if rank == 0:
+        all_indices = inds
+    else:
+        all_indices = np.empty(n, indices.dtype)
+    hpat.distributed_api.bcast(all_indices)
+
+    start = hpat.distributed_api.get_start(n, n_pes, rank)
+    end = hpat.distributed_api.get_end(n, n_pes, rank)
+    return all_indices[start:end]
