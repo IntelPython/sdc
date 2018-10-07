@@ -266,8 +266,15 @@ def get_filter_read_indices(bool_arr):
     indices = bool_arr.nonzero()[0]
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
-    n_arr = hpat.distributed_api.dist_reduce(len(bool_arr), np.int32(sum_op))
-    ind_start = hpat.distributed_api.get_start(n_arr, n_pes, rank)
+
+    # get number of elements before this processor to align the indices
+    # assuming bool_arr can be 1D_Var
+    all_starts = np.empty(n_pes, np.int64)
+    n_bool = len(bool_arr)
+    hpat.distributed_api.allgather(all_starts, n_bool)
+    ind_start = all_starts.cumsum()[rank] - n_bool
+    #n_arr = hpat.distributed_api.dist_reduce(len(bool_arr), np.int32(sum_op))
+    #ind_start = hpat.distributed_api.get_start(n_arr, n_pes, rank)
     indices += ind_start
 
     # TODO: use prefix-sum and all-to-all
