@@ -16,7 +16,8 @@ from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 import hpat
 from hpat import hiframes_sort
-from hpat.utils import debug_prints, inline_new_blocks, ReplaceFunc
+from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
+    is_whole_slice)
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
 from hpat.pd_series_ext import (SeriesType, string_series_type,
@@ -200,6 +201,10 @@ class HiFramesTyped(object):
             print("--- types after Series replacement:", self.typemap)
             print("calltypes: ", self.calltypes)
 
+        # XXX remove slice() of h5 read due to Numba's #3380 bug
+        while ir_utils.remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir, self.typemap):
+            pass
+
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes_typed")
         return if_series_to_unbox(self.return_type)
@@ -290,16 +295,29 @@ class HiFramesTyped(object):
                 if fdef == ('h5_read_dummy', 'hpat.pio_api'):
                     ndim = guard(find_const, self.func_ir, rhs.args[1])
                     dtype_str = guard(find_const, self.func_ir, rhs.args[2])
+                    index_var = rhs.args[3]
+                    filter_read = False
 
-                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str):\n"
-                    for i in range(ndim):
+                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
+                    if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+                        func_text += "  size_0 = hpat.pio_api.h5size(dset_id, np.int32(0))\n"
+                    else:
+                        # TODO: check index format for this case
+                        filter_read = True
+                        assert isinstance(self.typemap[index_var.name], types.BaseTuple)
+                        func_text += "  read_indices = hpat.pio_api.get_filter_read_indices(index[0])\n"
+                        func_text += "  size_0 = len(read_indices)\n"
+                    for i in range(1, ndim):
                         func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
                     func_text += "  arr_shape = ({},)\n".format(
                         ", ".join(["size_{}".format(i) for i in range(ndim)]))
                     func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
                     func_text += "  A = np.empty(arr_shape, np.{})\n".format(
                         dtype_str)
-                    func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+                    if filter_read:
+                        func_text += "  err = hpat.pio_api.h5read_filter(dset_id, np.int32({}), zero_tup, arr_shape, 0, A, read_indices)\n".format(ndim)
+                    else:
+                        func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
                     func_text += "  return A\n"
 
                     loc_vars = {}

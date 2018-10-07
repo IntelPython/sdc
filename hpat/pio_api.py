@@ -1,11 +1,16 @@
+import numpy as np
 import numba
-from numba import types
+from numba import types, cgutils
 from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
+from llvmlite import ir as lir
 import h5py
-from numba.extending import register_model, models, infer_getattr, infer
+from numba.extending import register_model, models, infer_getattr, infer, intrinsic
 from hpat.str_ext import string_type
-
+import hpat
+import hio
+import llvmlite.binding as ll
+ll.add_symbol('hpat_h5_read_filter', hio.hpat_h5_read_filter)
 
 ################## Types #######################
 
@@ -253,3 +258,56 @@ class H5GgetObjNameByIdx(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         return signature(string_type, *args)
+
+sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
+@numba.njit
+def get_filter_read_indices(bool_arr):
+    indices = bool_arr.nonzero()[0]
+    rank = hpat.distributed_api.get_rank()
+    n_pes = hpat.distributed_api.get_size()
+
+    # get number of elements before this processor to align the indices
+    # assuming bool_arr can be 1D_Var
+    all_starts = np.empty(n_pes, np.int64)
+    n_bool = len(bool_arr)
+    hpat.distributed_api.allgather(all_starts, n_bool)
+    ind_start = all_starts.cumsum()[rank] - n_bool
+    #n_arr = hpat.distributed_api.dist_reduce(len(bool_arr), np.int32(sum_op))
+    #ind_start = hpat.distributed_api.get_start(n_arr, n_pes, rank)
+    indices += ind_start
+
+    # TODO: use prefix-sum and all-to-all
+    # all_indices = np.empty(n, indices.dtype)
+    # allgatherv(all_indices, indices)
+    n = hpat.distributed_api.dist_reduce(len(indices), np.int32(sum_op))
+    inds = hpat.distributed_api.gatherv(indices)
+    if rank == 0:
+        all_indices = inds
+    else:
+        all_indices = np.empty(n, indices.dtype)
+    hpat.distributed_api.bcast(all_indices)
+
+    start = hpat.distributed_api.get_start(n, n_pes, rank)
+    end = hpat.distributed_api.get_end(n, n_pes, rank)
+    return all_indices[start:end]
+
+@intrinsic
+def tuple_to_ptr(typingctx, tuple_tp=None):
+    def codegen(context, builder, sig, args):
+        ptr = cgutils.alloca_once(builder, args[0].type)
+        builder.store(args[0], ptr)
+        return builder.bitcast(ptr, lir.IntType(8).as_pointer())
+    return signature(types.voidptr, tuple_tp), codegen
+
+_h5read_filter = types.ExternalFunction("hpat_h5_read_filter",
+    types.int32(h5dataset_or_group_type, types.int32, types.voidptr,
+    types.voidptr, types.intp, types.voidptr, types.int32, types.voidptr, types.int32))
+
+@numba.njit
+def h5read_filter(dset_id, ndim, starts, counts, is_parallel, out_arr, read_indices):
+    starts_ptr = tuple_to_ptr(starts)
+    counts_ptr = tuple_to_ptr(counts)
+    type_enum = hpat.distributed_api.get_type_enum(out_arr)
+    return _h5read_filter(dset_id, ndim, starts_ptr, counts_ptr, is_parallel,
+                   out_arr.ctypes, type_enum, read_indices.ctypes, len(read_indices))

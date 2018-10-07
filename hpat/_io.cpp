@@ -14,6 +14,8 @@ hid_t hpat_h5_open_dset_or_group_obj(hid_t file_id, char* obj_name);
 int64_t hpat_h5_size(hid_t dataset_id, int dim);
 int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
+int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
+    int64_t* counts, int64_t is_parallel, void* out, int typ_enum, int64_t *indices, int n_indices);
 int hpat_h5_close(hid_t file_id);
 hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
     int64_t* counts, int typ_enum);
@@ -50,6 +52,8 @@ PyMODINIT_FUNC PyInit_hio(void) {
                             PyLong_FromVoidPtr((void*)(&hpat_h5_size)));
     PyObject_SetAttrString(m, "hpat_h5_read",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_read)));
+    PyObject_SetAttrString(m, "hpat_h5_read_filter",
+                            PyLong_FromVoidPtr((void*)(&hpat_h5_read_filter)));
     PyObject_SetAttrString(m, "hpat_h5_close",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_close)));
     PyObject_SetAttrString(m, "hpat_h5_create_dset",
@@ -164,6 +168,20 @@ int64_t hpat_h5_size(hid_t dataset_id, int dim)
     return ret;
 }
 
+hid_t get_dset_space_from_range(hid_t dataset_id, int64_t* starts, int64_t* counts)
+{
+    hid_t space_id = H5Dget_space(dataset_id);
+    CHECK(space_id != -1, "h5 read get_space error");
+
+    hsize_t* HDF5_start = (hsize_t*)starts;
+    hsize_t* HDF5_count = (hsize_t*)counts;
+    herr_t ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
+    CHECK(ret != -1, "h5 read select_hyperslab error");
+    return space_id;
+}
+
+
+
 int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum)
 {
@@ -172,11 +190,8 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     // printf("start %lld end %lld\n", start_ind, end_ind);
     herr_t ret;
     CHECK(dataset_id != -1, "h5 read invalid dataset_id");
-    hid_t space_id = H5Dget_space(dataset_id);
-    CHECK(space_id != -1, "h5 read get_space error");
 
-    hsize_t* HDF5_start = (hsize_t*)starts;
-    hsize_t* HDF5_count = (hsize_t*)counts;
+    hid_t space_id = get_dset_space_from_range(dataset_id, starts, counts);
 
     hid_t xfer_plist_id = H5P_DEFAULT;
     if(is_parallel)
@@ -185,9 +200,7 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
     }
 
-    ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
-    CHECK(ret != -1, "h5 read select_hyperslab error");
-    hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, HDF5_count, NULL);
+    hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, (hsize_t*)counts, NULL);
     CHECK (mem_dataspace != -1, "h5 read create_simple error");
     hid_t h5_typ = get_h5_typ(typ_enum);
     ret = H5Dread(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
@@ -198,6 +211,78 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     return ret;
 }
 
+hid_t get_dset_space_from_indices(hid_t dataset_id, int ndims, int64_t* starts,
+                                  int64_t* counts, int64_t *indices, int n_indices)
+{
+    // printf("num ind: %d\n", n_indices);
+    hid_t space_id = H5Dget_space(dataset_id);
+    CHECK(space_id != -1, "h5 read get_space error");
+
+    hsize_t* HDF5_start = new hsize_t[ndims];
+    hsize_t* HDF5_count = new hsize_t[ndims];
+    hsize_t* HDF5_block = new hsize_t[ndims];
+    for(int i=1; i<ndims; i++)
+    {
+        HDF5_start[i] = 0;
+        HDF5_count[i] = 1;
+        HDF5_block[i] = counts[i];
+    }
+    // check for empty index list
+    if (n_indices<=0)
+    {
+        HDF5_start[0] = 0;
+        HDF5_count[0] = 0;
+        HDF5_block[0] = 0;
+        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, HDF5_block);
+        return space_id;
+    }
+    // printf("ind %d\n", indices[0]);
+    HDF5_start[0] = indices[0];
+    HDF5_count[0] = 1;
+    HDF5_block[0] = 1;
+    H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, HDF5_block);
+    for(int i=1; i<n_indices; i++)
+    {
+        HDF5_start[0] = indices[i];
+        // printf("ind %d\n", indices[i]);
+        herr_t ret = H5Sselect_hyperslab(space_id, H5S_SELECT_OR, HDF5_start, NULL, HDF5_count, HDF5_block);
+        CHECK(ret != -1, "h5 read select_hyperslab error");
+    }
+
+    delete[] HDF5_start;
+    delete[] HDF5_count;
+    delete[] HDF5_block;
+    return space_id;
+}
+
+int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
+    int64_t* counts, int64_t is_parallel, void* out, int typ_enum, int64_t *indices, int n_indices)
+{
+    //
+    // printf("ndim %d starts %d %d %d %d\n", ndims, starts[0], starts[1], starts[2], starts[3]);
+    // printf("counts %d %d %d %d\n", counts[0], counts[1], counts[2], counts[3]);
+    herr_t ret;
+    CHECK(dataset_id != -1, "h5 read invalid dataset_id");
+
+    hid_t space_id = get_dset_space_from_indices(dataset_id, ndims, starts, counts, indices, n_indices);
+
+    hid_t xfer_plist_id = H5P_DEFAULT;
+    if(is_parallel)
+    {
+        xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
+        H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
+    }
+
+    hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, (hsize_t*)counts, NULL);
+    CHECK (mem_dataspace != -1, "h5 read create_simple error");
+    hid_t h5_typ = get_h5_typ(typ_enum);
+    ret = H5Dread(dataset_id, h5_typ, mem_dataspace, space_id, xfer_plist_id, out);
+    CHECK(ret != -1, "h5 read call error");
+    // printf("out: %lf %lf ...\n", ((double*)out)[0], ((double*)out)[1]);
+    // TODO: close here?
+    H5Dclose(dataset_id);
+    return ret;
+}
 
 // _numba_to_c_type_map = {
 //     int8:0,
