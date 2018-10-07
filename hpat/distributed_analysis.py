@@ -636,9 +636,17 @@ class DistributedAnalysis(object):
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
-        # selecting an array from a tuple shouldn't make it REP
-        if isinstance(self.typemap[rhs.value.name], types.BaseTuple):
-            return
+        # selecting an array from a tuple
+        if (rhs.op == 'static_getitem'
+                and isinstance(self.typemap[rhs.value.name], types.BaseTuple)
+                and isinstance(rhs.index, int)):
+            seq_info = guard(find_build_sequence, self.func_ir, rhs.value)
+            if seq_info is not None:
+                in_arrs, _ = seq_info
+                arr = in_arrs[rhs.index]
+                self._meet_array_dists(lhs, arr.name, array_dists)
+                return
+
         if rhs.op == 'static_getitem':
             if rhs.index_var is None:
                 # TODO: things like A[0] need broadcast
