@@ -145,7 +145,7 @@ class TestIO(unittest.TestCase):
             return X
 
         hpat_func = hpat.jit(locals={'X:return': 'distributed'})(test_impl)
-        n = len(test_impl())
+        n = 4  # len(test_impl())
         start, end = self._get_start_end(n)
         np.testing.assert_allclose(hpat_func(), test_impl()[start:end])
 
