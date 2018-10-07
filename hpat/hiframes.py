@@ -1008,11 +1008,8 @@ class HiFrames(object):
     def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)
         # find key array for sort ('by' arg)
-        key_name = None
-        if len(rhs.args) > 0:
-            key_name = guard(find_const, self.func_ir, rhs.args[0])
-        else:
-            key_name = kws['by'] if 'by' in kws else None
+        by_arg = self._get_arg('sort_values', rhs.args, kws, 0, 'by')
+        key_name = guard(find_const, self.func_ir, by_arg)
         if key_name is None:
             raise ValueError("'by' argument is required for sort_values() "
                              "which should be a constant string")
