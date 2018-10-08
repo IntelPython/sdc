@@ -93,6 +93,7 @@ df_spec = {
         'ndim',
     ],
     DataFrameAttr.UNIMPLEMENTED_METHOD: [
+        'filter',
     ],
     DataFrameAttr.IMPLEMENTED_ATTR: [
         'values',
