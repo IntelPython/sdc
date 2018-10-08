@@ -209,6 +209,12 @@ class DistributedAnalysis(object):
         func_mod = ""
         fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
         if fdef is None:
+            # check ObjModeLiftedWith, we assume distribution doesn't change
+            # blocks of data are passed in, TODO: document
+            func_def = guard(get_definition, self.func_ir, rhs.func)
+            if isinstance(func_def, ir.Const) and isinstance(func_def.value,
+                                           numba.dispatcher.ObjModeLiftedWith):
+                return
             warnings.warn(
                 "function call couldn't be found for distributed analysis")
             self._analyze_call_set_REP(lhs, args, array_dists)
