@@ -152,12 +152,6 @@ class HiFrames(object):
             func_ir, typingctx, args, _locals, self.reverse_copies)
         self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
 
-        # Track bound instancemethod values.
-        # HPAT currently requires them to be immediately called.
-        # This is a more strict limitation than in numba and
-        # can be a subject to change in future.
-        self.method_values = {}
-
     def run(self):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
@@ -226,13 +220,6 @@ class HiFrames(object):
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
-        # For every bound instancemethod report ones that were not immediately called.
-        # All immediately called entries are removed to this point.
-        for k in self.method_values:
-            assign = self.method_values[k]
-            selector = "{}.{}".format(assign.value.value, assign.value.attr)
-            warnings.warn("bound data frame instancemethod {} referenced at {} not immediately called".format(
-                selector, assign.loc))
         return
 
     def _run_assign(self, assign, label):
@@ -241,10 +228,6 @@ class HiFrames(object):
 
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
-                # If this is a call for recently referenced method value,
-                # remove it from the dictionary.
-                if rhs.func.name in self.method_values:
-                    del self.method_values[rhs.func.name]
                 return self._run_call(assign, label)
 
             # fix type for f['A'][:] dset reads
@@ -313,9 +296,7 @@ class HiFrames(object):
                         raise NotImplementedError(
                             "data frame function {} not implemented yet".format(rhs.attr))
                     elif kind == DataFrameAttr.IMPLEMENTED_METHOD:
-                        # Track method until it's called.
-                        # The handling is done inside _run_call_df.
-                        self.method_values[lhs] = assign
+                        pass # Handling is done inside _run_call_df.
                     elif kind == DataFrameAttr.IMPLEMENTED_ATTR:
                         # Handle `A = df.values`
                         if rhs.attr == 'values':
