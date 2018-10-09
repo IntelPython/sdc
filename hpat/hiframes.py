@@ -691,7 +691,7 @@ class HiFrames(object):
                 raise ValueError("dtype column names should be constant")
             typ = self._get_const_dtype(dtype_var)
             if i in date_cols:
-                typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+                typ = SeriesType(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
             col_map[col_name] = ir.Var(
                 lhs.scope, mk_unique_var(col_name), lhs.loc)
@@ -715,7 +715,7 @@ class HiFrames(object):
         typ_name = 'int64' if typ_name == 'int' else typ_name
         typ_name = 'float64' if typ_name == 'float' else typ_name
         typ = getattr(types, typ_name)
-        typ = types.Array(typ, 1, 'C')
+        typ = SeriesType(typ, 1, 'C')
         return typ
 
     def _handle_pd_Series(self, assign, lhs, rhs):
