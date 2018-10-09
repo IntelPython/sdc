@@ -38,6 +38,7 @@ class CsvReader(ir.Stmt):
         self.df_colnames = df_colnames
         self.out_vars = out_vars
         self.out_types = out_types
+        self.usecols = list(range(len(df_colnames)))
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -115,6 +116,23 @@ ir_utils.visit_vars_extensions[CsvReader] = visit_vars_csv
 
 def remove_dead_csv(csv_node, lives, arg_aliases, alias_map, func_ir, typemap):
     # TODO
+    new_df_colnames = []
+    new_out_vars = []
+    new_out_types = []
+    new_usecols = []
+
+    for i, col_var in enumerate(csv_node.out_vars):
+        if col_var.name in lives:
+            new_df_colnames.append(csv_node.df_colnames[i])
+            new_out_vars.append(csv_node.out_vars[i])
+            new_out_types.append(csv_node.out_types[i])
+            new_usecols.append(csv_node.usecols[i])
+
+    csv_node.df_colnames = new_df_colnames
+    csv_node.out_vars = new_out_vars
+    csv_node.out_types = new_out_types
+    csv_node.usecols = new_usecols
+
     return csv_node
 
 
@@ -275,8 +293,8 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     csv_impl = loc_vars['csv_impl']
 
     csv_reader_py = _gen_csv_reader_py(
-        csv_node.df_colnames, csv_node.out_types, typingctx, targetctx,
-        parallel)
+        csv_node.df_colnames, csv_node.out_types, csv_node.usecols, typingctx,
+        targetctx, parallel)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -337,7 +355,7 @@ def _get_dtype_str(t):
         return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
-def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx, parallel):
+def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt64_arr_typ)
@@ -349,7 +367,8 @@ def _gen_csv_reader_py(col_names, col_typs, typingctx, targetctx, parallel):
                                                                       parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
-    func_text += "       parse_dates=[{}])\n".format(date_inds)
+    func_text += "       parse_dates=[{}],\n".format(date_inds)
+    func_text += "       usecols={},)\n".format(usecols)
     for cname in col_names:
         func_text += "    {} = df.{}.values\n".format(cname, cname)
         # func_text += "    print({})\n".format(cname)

@@ -232,6 +232,15 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_csv_rm_dead1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data1.csv",
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int},)
+            return df.B.values
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
     def test_csv_date1(self):
         def test_impl():
             return pd.read_csv("csv_data_date1.csv",
