@@ -355,6 +355,12 @@ def _get_dtype_str(t):
         return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
+# XXX: temporary fix pending Numba's #3378
+# keep the compiled functions around to make sure GC doesn't delete them and
+# the reference to the dynamic function inside them
+# (numba/lowering.py:self.context.add_dynamic_addr ...)
+compiled_funcs = []
+
 def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
@@ -382,4 +388,6 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, paral
     exec(func_text, glbls, loc_vars)
     csv_reader_py = loc_vars['csv_reader_py']
 
-    return numba.njit(csv_reader_py)
+    jit_func = numba.njit(csv_reader_py)
+    compiled_funcs.append(jit_func)
+    return jit_func
