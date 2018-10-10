@@ -2,6 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import operator
 import numpy as np
+import pandas as pd
 from collections import namedtuple
 import warnings
 import numba
@@ -969,20 +970,21 @@ class HiFramesTyped(object):
                     "cannot find kernel function for rolling.apply() call")
         # TODO: more error checking on the kernel to make sure it doesn't
         # use global/closure variables
-        f_ir = numba.ir_utils.get_ir_of_code({}, func_node.code)
-        kernel_func = numba.compiler.compile_ir(
-            self.typingctx,
-            numba.targets.registry.cpu_target.target_context,
-            f_ir,
-            (types.Array(dtype, 1, 'C'),),
-            types.float64,
-            numba.compiler.DEFAULT_FLAGS,
-            {}
-        )
-        imp_dis = numba.targets.registry.dispatcher_registry['cpu'](
-                                                            lambda a: None)
-        imp_dis.add_overload(kernel_func)
-        return imp_dis
+        if func_node.closure is not None:
+            raise ValueError(
+                "rolling apply kernel functions cannot have closure variables")
+        if func_node.defaults is not None:
+            raise ValueError(
+                "rolling apply kernel functions cannot have default arguments")
+        # create a function from the code object
+        glbs = self.func_ir.func_id.func.__globals__
+        lcs = {}
+        exec("def f(A): return A", glbs, lcs)
+        kernel_func = lcs['f']
+        kernel_func.__code__ = func_node.code
+        kernel_func.__name__ = func_node.code.co_name
+        # use hpat.jit to enable pandas operations
+        return hpat.jit(kernel_func)
 
     def _run_DatetimeIndex_field(self, assign, lhs, rhs):
         """transform DatetimeIndex.<field>
