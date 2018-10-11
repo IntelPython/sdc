@@ -1,5 +1,12 @@
 /*
-  SPMD CSV reader.
+  SPMD Stream and CSV reader.
+
+  We provide a Python object that is file-like in the Pandas sense
+  and can so be used as the input argument to CSV read.
+  When called in a parallel/distributed setup, each process owns a
+  chunk of the csv file only. The chunks are balanced by number of
+  lines (not neessarily number of bytes). The actual file read is
+  done lazily in the objects read method.
 */
 #include <mpi.h>
 #include <cstdint>
@@ -32,10 +39,10 @@ typedef struct {
     size_t chunk_size;     // size of our chunk
     size_t chunk_pos;      // current position in our chunk
     std::vector<char> buf; // internal buffer for converting stream input to Unicode object
-} hpatio;
+} stream_reader;
 
 
-static void hpatio_dealloc(hpatio* self)
+static void stream_reader_dealloc(stream_reader* self)
 {
     // we own the stream!
     if(self->ifs) delete self->ifs;
@@ -44,9 +51,9 @@ static void hpatio_dealloc(hpatio* self)
 
 
 // alloc a HPTAIO object
-static PyObject * hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+static PyObject * stream_reader_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    hpatio *self = (hpatio *)type->tp_alloc(type, 0);
+    stream_reader *self = (stream_reader *)type->tp_alloc(type, 0);
     if(PyErr_Occurred()) {
         PyErr_Print();
         return NULL;
@@ -62,7 +69,7 @@ static PyObject * hpatio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 // we provide this mostly for testing purposes
 // users are not supposed to use this
-static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
+static int stream_reader_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
 {
     char* str = NULL;
     Py_ssize_t count = 0;
@@ -72,23 +79,23 @@ static int hpatio_pyinit(PyObject *self, PyObject *args, PyObject *kwds)
         return 0;
     }
 
-    ((hpatio*)self)->chunk_start = 0;
-    ((hpatio*)self)->chunk_pos = 0;
-    ((hpatio*)self)->ifs = new std::istringstream(str);
-    if(!((hpatio*)self)->ifs->good()) {
+    ((stream_reader*)self)->chunk_start = 0;
+    ((stream_reader*)self)->chunk_pos = 0;
+    ((stream_reader*)self)->ifs = new std::istringstream(str);
+    if(!((stream_reader*)self)->ifs->good()) {
         std::cerr << "Could not create istrstream from string.\n";
-        ((hpatio*)self)->chunk_size = 0;
+        ((stream_reader*)self)->chunk_size = 0;
         return -1;
     }
-    ((hpatio*)self)->chunk_size = count;
+    ((stream_reader*)self)->chunk_size = count;
 
     return 0;
 }
 
 
-// We use this (and not the above) from C to init our HPATIO object
+// We use this (and not the above) from C to init our StreamReader object
 // Will seek to chunk beginning
-static void hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t sz)
+static void stream_reader_init(stream_reader *self, std::istream * ifs, size_t start, size_t sz)
 {
     if(!ifs) {
         std::cerr << "Can't handle NULL pointer as input stream.\n";
@@ -96,7 +103,7 @@ static void hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t s
     }
     self->ifs = ifs;
     if(!self->ifs->good() || self->ifs->eof()) {
-        std::cerr << "Got bad istream in initializing HPATIO object." << std::endl;
+        std::cerr << "Got bad istream in initializing StreamReader object." << std::endl;
         return;
     }
     // seek to our chunk beginning
@@ -108,20 +115,18 @@ static void hpatio_init(hpatio *self, std::istream * ifs, size_t start, size_t s
     self->chunk_start = start;
     self->chunk_size = sz;
     self->chunk_pos = 0;
-    std::cerr << "My chunk is " << ((hpatio*)self)->chunk_start << " + " << ((hpatio*)self)->chunk_size << std::endl;
 }
 
 
 // read given number of bytes from our chunk and return a Unicode Object
 // returns NULL if an error occured.
 // does not read beyond end of our chunk (even if file continues)
-static PyObject * hpatio_read(hpatio* self, PyObject *args)
+static PyObject * stream_reader_read(stream_reader* self, PyObject *args)
 {
     // partially copied from from CPython's stringio.c
 
-    std::cerr << "reading..." << std::endl;
     if(self->ifs == NULL) {
-        PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized HPATIO object");
+        PyErr_SetString(PyExc_ValueError, "I/O operation on uninitialized StreamReader object");
         return NULL;
     }
 
@@ -162,13 +167,12 @@ static PyObject * hpatio_read(hpatio* self, PyObject *args)
         return NULL;
     }
 
-    std::cerr << "read " << size << " bytes\n";
     return PyUnicode_FromStringAndSize(self->buf.data(), size);
 }
 
 
 // Needed to make Pandas accept it, never used
-static PyObject * hpatio_iternext(PyObject *self)
+static PyObject * stream_reader_iternext(PyObject *self)
 {
     std::cerr << "iternext not implemented";
     return NULL;
@@ -176,8 +180,8 @@ static PyObject * hpatio_iternext(PyObject *self)
 
 
 // our class has only one method
-static PyMethodDef hpatio_methods[] = {
-    {"read", (PyCFunction)hpatio_read, METH_VARARGS,
+static PyMethodDef stream_reader_methods[] = {
+    {"read", (PyCFunction)stream_reader_read, METH_VARARGS,
      "Read at most n characters, returned as a unicode.",
     },
     {NULL}  /* Sentinel */
@@ -185,12 +189,12 @@ static PyMethodDef hpatio_methods[] = {
 
 
 // the actual Python type class
-static PyTypeObject hpatio_type = {
+static PyTypeObject stream_reader_type = {
     PyObject_HEAD_INIT(NULL)
-    "hpat.hio.HPATIO",         /*tp_name*/
-    sizeof(hpatio),            /*tp_basicsize*/
+    "hpat.hio.StreamReader",   /*tp_name*/
+    sizeof(stream_reader),     /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    (destructor)hpatio_dealloc,/*tp_dealloc*/
+    (destructor)stream_reader_dealloc,/*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
@@ -206,14 +210,14 @@ static PyTypeObject hpatio_type = {
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,/*tp_flags*/
-    "hpatio objects",          /* tp_doc */
+    "stream_reader objects",   /* tp_doc */
     0,                         /* tp_traverse */
     0,                         /* tp_clear */
     0,                         /* tp_richcompare */
     0,                         /* tp_weaklistoffset */
-    hpatio_iternext,           /* tp_iter */
-    hpatio_iternext,           /* tp_iternext */
-    hpatio_methods,            /* tp_methods */
+    stream_reader_iternext,    /* tp_iter */
+    stream_reader_iternext,    /* tp_iternext */
+    stream_reader_methods,     /* tp_methods */
     0,                         /* tp_members */
     0,                         /* tp_getset */
     0,                         /* tp_base */
@@ -221,18 +225,18 @@ static PyTypeObject hpatio_type = {
     0,                         /* tp_descr_get */
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
-    hpatio_pyinit,             /* tp_init */
+    stream_reader_pyinit,      /* tp_init */
     0,                         /* tp_alloc */
-    hpatio_new,                /* tp_new */
+    stream_reader_new,                /* tp_new */
 };
 
 
 // at module load time we need to make our type known ot Python
 extern "C" void PyInit_csv(PyObject * m)
 {
-    if(PyType_Ready(&hpatio_type) < 0) return;
-    Py_INCREF(&hpatio_type);
-    PyModule_AddObject(m, "HPATIO", (PyObject *)&hpatio_type);
+    if(PyType_Ready(&stream_reader_type) < 0) return;
+    Py_INCREF(&stream_reader_type);
+    PyModule_AddObject(m, "StreamReader", (PyObject *)&stream_reader_type);
 }
 
 
@@ -264,11 +268,12 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  * We evenly distribute by number of lines by working on byte-chunks in parallel
  *   * counting new-lines and allreducing and exscaning numbers
  *   * computing start/end points of desired chunks-of-lines and sending them to corresponding ranks.
- * If total number is not a multiple of number of ranks the first ranks get an extra line.
+ * Using hpat_dist_get_size and hpat_dist_get_start to compute chunk start/end/size as well as 
+ * the final chunking of lines.
  *
  * @param[in]  f   the input stream
  * @param[in]  fsz total number of bytes in stream
- * @return     HPATIO file-like object to read the owned chunk through pandas.read_csv
+ * @return     StreamReader file-like object to read the owned chunk through pandas.read_csv
  **/
 static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel)
 {
@@ -281,7 +286,8 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
         size_t rank = hpat_dist_get_rank();
 
         // seek to our chunk
-        f->seekg(hpat_dist_get_start(fsz, nranks, rank), std::ios_base::beg);
+        size_t byte_offset = hpat_dist_get_start(fsz, nranks, rank);
+        f->seekg(byte_offset, std::ios_base::beg);
         if(!f->good() || f->eof()) {
             std::cerr << "Could not seek to start position " << hpat_dist_get_start(fsz, nranks, rank) << std::endl;
             return NULL;
@@ -317,7 +323,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
             // we check if boundary is on our byte-chunk
             if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {
                 // if so, send stream-offset to ranks which start/end here
-                size_t i_off = line_offset[i_bndry-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
+                size_t i_off = byte_offset + line_offset[i_bndry-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
                 // send to rank that starts at this boundary: i
                 mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, START_OFFSET, true));
                 // send to rank that ends at this boundary: i-1
@@ -334,7 +340,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
     // Here we now know exactly what chunk to read: [my_off_start,my_off_end[
     // let's create our file-like reader
     auto gilstate = PyGILState_Ensure();
-    PyObject * reader = PyObject_CallFunctionObjArgs((PyObject *) &hpatio_type, NULL);
+    PyObject * reader = PyObject_CallFunctionObjArgs((PyObject *) &stream_reader_type, NULL);
     PyGILState_Release(gilstate);
     if(reader == NULL || PyErr_Occurred()) {
         PyErr_Print();
@@ -342,10 +348,9 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
         if(reader) delete reader;
         reader = NULL;
     } else {
-        hpatio_init(reinterpret_cast<hpatio*>(reader), f, my_off_start, my_off_end-my_off_start);
+        stream_reader_init(reinterpret_cast<stream_reader*>(reader), f, my_off_start, my_off_end-my_off_start);
     }
 
-    std::cerr << "returning reader " << reader << std::endl;
     return reader;
 }
 

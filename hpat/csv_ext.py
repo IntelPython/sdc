@@ -1,4 +1,3 @@
-
 from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, cgutils
@@ -197,87 +196,12 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
 
-@intrinsic(support_literals=True)
-def _csv_read(typingctx, fname_typ, cols_to_read_typ, cols_to_read_names_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ):
-    '''_csv_read(        fname,     (0, 1, 2, 3,),    'A,B,C,D',              (4, 6, 6, 4,), 4, ',', '"')
-    This is creating the llvm wrapper calling the C function.
-    '''
-    # FIXME how to check types of const inputs?
-    assert fname_typ == string_type
-    assert isinstance(cols_to_read_typ, types.Const)
-    assert isinstance(cols_to_read_names_typ, types.Const)
-    assert isinstance(dtypes_typ, types.Const)
-    # assert cols_to_read_typ.count == dtypes_typ.count
-    assert isinstance(n_cols_to_read_typ, types.Const)
-    assert delims_typ == string_type or isinstance(delims_typ, types.Const)
-    assert quotes_typ == string_type or isinstance(quotes_typ, types.Const)
-    ctype_enum_to_nb_typ = {v: k for k, v in _numba_to_c_type_map.items()}
-    return_typ = types.Tuple([types.Array(ctype_enum_to_nb_typ[t], 1, 'C')
-        for t in dtypes_typ.value])
-    ncols = len(cols_to_read_typ.value)
-    colnames = cols_to_read_names_typ.value.split(',')
-
-    def codegen(context, builder, sig, args):
-        # we simply cast the input tuples to a c-pointers
-        cols_ptr = cgutils.alloca_once(builder, args[1].type)
-        builder.store(args[1], cols_ptr)
-        cols_ptr = builder.bitcast(cols_ptr, lir.IntType(64).as_pointer())
-        dtypes_ptr = cgutils.alloca_once(builder, args[2].type)
-        builder.store(args[2], dtypes_ptr)
-        dtypes_ptr = builder.bitcast(dtypes_ptr, lir.IntType(64).as_pointer())
-        # we need extra pointers for output parameters
-        first_row_ptr = cgutils.alloca_once(builder, lir.IntType(64))
-        n_rows_ptr = cgutils.alloca_once(builder, lir.IntType(64))
-        # define function type, it returns an pandas dataframe (PyObject*)
-        fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                                [lir.IntType(8).as_pointer(),  # const std::string * fname,
-                                 lir.IntType(64).as_pointer(), # size_t * cols_to_read
-                                 lir.IntType(64).as_pointer(), # int64_t * dtypes
-                                 lir.IntType(64),              # size_t n_cols_to_read
-                                 lir.IntType(64).as_pointer(), # size_t * first_row,
-                                 lir.IntType(64).as_pointer(), # size_t * n_rows,
-                                 lir.IntType(8).as_pointer(),  # std::string * delimiters
-                                 lir.IntType(8).as_pointer(),  # std::string * quotes
-                                ])
-        fn = builder.module.get_or_insert_function(fnty, name='csv_read_file')
-        call_args = [args[0], cols_ptr, dtypes_ptr, args[4], first_row_ptr, n_rows_ptr, args[5], args[6]]
-        df = builder.call(fn, call_args)
-        # pyapi = context.get_python_api(builder)
-        # pyapi.print_object(df)
-
-        # pyapi = context.get_python_api(builder)
-        # ub_ctxt = numba.pythonapi._UnboxContext(context, builder, pyapi)
-        # df = ub_ctxt.pyapi.to_native_value(PandasDataFrameType, pydf)
-
-        # create a tuple of arrays from returned meminfo pointers
-        ll_ret_typ = context.get_data_type(sig.return_type)
-        out_arr_tup = cgutils.alloca_once(builder, ll_ret_typ)
-        num_rows = builder.load(n_rows_ptr)
-
-        for i, arr_typ in enumerate(sig.return_type.types):
-            unbox_sig = signature(
-                0, PandasDataFrameType(colnames, sig.return_type.types),
-                types.Const(i), arr_typ)
-            arr = lower_unbox_df_column(context,
-                                        builder,
-                                        unbox_sig,
-                                        [df, context.get_constant(types.intp, i), 0])
-            builder.store(arr,
-                          cgutils.gep_inbounds(builder, out_arr_tup, 0, i))
-
-        return builder.load(out_arr_tup)
-
-    #    return types.CPointer(types.MemInfoPointer(types.byte))(cols_to_read_typ, dtypes_typ, n_cols_to_read_typ, delims_typ, quotes_typ)
-    cols_int_tup_typ = types.UniTuple(types.intp, ncols)
-    arg_typs = (string_type, cols_int_tup_typ, string_type, cols_int_tup_typ, types.intp, string_type, string_type)
-    return return_typ(*arg_typs), codegen
-
-
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
     for v in csv_node.out_vars:
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
+            print(v.name, array_dists[v.name])
             parallel = False
 
     n_cols = len(csv_node.out_vars)
@@ -330,19 +254,19 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
 distributed.distributed_run_extensions[CsvReader] = csv_distributed_run
 
 
-class HPATIOType(types.Opaque):
+class StreamReaderType(types.Opaque):
     def __init__(self):
-        super(HPATIOType, self).__init__(name='HPATIOType')
+        super(StreamReaderType, self).__init__(name='StreamReaderType')
 
-hpatio_type = HPATIOType()
-register_model(HPATIOType)(models.OpaqueModel)
+stream_reader_type = StreamReaderType()
+register_model(StreamReaderType)(models.OpaqueModel)
 
-@box(HPATIOType)
-def box_hpatio(typ, val, c):
+@box(StreamReaderType)
+def box_stream_reader(typ, val, c):
     return val
 
 csv_file_chunk_reader = types.ExternalFunction(
-    "csv_file_chunk_reader", hpatio_type(string_type, types.bool_))
+    "csv_file_chunk_reader", stream_reader_type(string_type, types.bool_))
 
 def _get_dtype_str(t):
     dtype = t.dtype
@@ -362,6 +286,7 @@ def _get_dtype_str(t):
 compiled_funcs = []
 
 def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
+    print(parallel)
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt64_arr_typ)
