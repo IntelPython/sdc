@@ -230,3 +230,33 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # to handle boxing
         if ret_typ is not None:
             self.return_type = ret_typ
+
+class HPATPipelineSeq(HPATPipeline):
+    """HPAT pipeline without the distributed pass (used in rolling kernels)
+    """
+    def define_pipelines(self, pm):
+        name = 'hpat_seq'
+        pm.create_pipeline(name)
+        self.add_preprocessing_stage(pm)
+        self.add_with_handling_stage(pm)
+        self.add_pre_typing_stage(pm)
+        pm.add_stage(self.stage_inline_pass, "inline funcs")
+        pm.add_stage(self.stage_df_pass, "convert DataFrames")
+        pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
+        self.add_typing_stage(pm)
+        pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
+        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
+        if not self.flags.no_rewrites:
+            pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
+        if self.flags.auto_parallel.enabled:
+            pm.add_stage(self.stage_parfor_pass, "convert to parfors")
+        # pm.add_stage(self.stage_distributed_pass, "convert to distributed")
+        pm.add_stage(self.stage_lower_parfor_seq, "parfor seq lower")
+        pm.add_stage(self.stage_ir_legalization,
+                "ensure IR is legal prior to lowering")
+        self.add_lowering_stage(pm)
+        self.add_cleanup_stage(pm)
+
+    def stage_lower_parfor_seq(self):
+        numba.parfor.lower_parfor_sequential(
+                self.typingctx, self.func_ir, self.typemap, self.calltypes)

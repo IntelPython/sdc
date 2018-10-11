@@ -994,8 +994,10 @@ class HiFramesTyped(object):
         kernel_func = lcs['f']
         kernel_func.__code__ = func_node.code
         kernel_func.__name__ = func_node.code.co_name
-        # use hpat.jit to enable pandas operations
-        impl_disp = hpat.jit(kernel_func)
+        # use hpat's sequential pipeline to enable pandas operations
+        # XXX seq pipeline used since dist pass causes a hang
+        impl_disp = numba.njit(
+            kernel_func, pipeline_class=hpat.compiler.HPATPipelineSeq)
         # precompile to avoid REP counting conflict in testing
         sig = out_dtype(types.Array(dtype, 1, 'C'))
         impl_disp.compile(sig)
