@@ -310,7 +310,8 @@ def getpointer_from_string(context, builder, sig, args):
 
 @lower_cast(StringType, types.Const)
 def string_type_to_const(context, builder, fromty, toty, val):
-    cstr = context.insert_const_string(builder.module, toty.value)
+    # calling str() since the const value can be non-str like tuple const (CSV)
+    cstr = context.insert_const_string(builder.module, str(toty.value))
     # check to make sure Const value matches stored string
     # call str == cstr
     fnty = lir.FunctionType(lir.IntType(1),

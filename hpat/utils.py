@@ -12,7 +12,7 @@ import collections
 import numpy as np
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
-
+from hpat.pd_timestamp_ext import pandas_dts_type
 from enum import Enum
 
 

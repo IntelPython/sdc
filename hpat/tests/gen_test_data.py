@@ -74,6 +74,23 @@ sdf.write.parquet('sdf_dt.pq', 'overwrite')
 
 spark.stop()
 
+# CSV reader test
+data = ("0,2.3,4.6,47736\n"
+        "1,2.3,4.6,47736\n"
+        "2,2.3,4.6,47736\n"
+        "4,2.3,4.6,47736\n")
+
+with open("csv_data1.csv", "w") as f:
+    f.write(data)
+
+data = ("0,2.3,2015-01-03,47736\n"
+        "1,2.3,1966-11-13,47736\n"
+        "2,2.3,1998-05-21,47736\n"
+        "4,2.3,2018-07-11,47736\n")
+
+with open("csv_data_date1.csv", "w") as f:
+    f.write(data)
+
 # generated data for parallel merge_asof testing
 df1 = pd.DataFrame({'time': pd.DatetimeIndex(
     ['2017-01-03', '2017-01-06', '2017-02-15', '2017-02-21']),

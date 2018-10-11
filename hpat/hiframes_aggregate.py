@@ -482,7 +482,7 @@ class EvalDummyTyper(AbstractTemplate):
         # takes the output array as first argument to know the output dtype
         return signature(args[0].dtype, *args)
 
-def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx):
+def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
     for v in (list(agg_node.df_in_vars.values())
               + list(agg_node.df_out_vars.values()) + [agg_node.key_arr]):

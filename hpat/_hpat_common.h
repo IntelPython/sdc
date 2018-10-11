@@ -1,6 +1,11 @@
 #ifndef HPAT_COMMON_H_
 #define HPAT_COMMON_H_
 
+#if defined(__GNUC__)
+#define __UNUSED__ __attribute__((unused))
+#else
+#define __UNUSED__
+#endif
 
 // class CTypeEnum(Enum):
 //     Int8 = 0

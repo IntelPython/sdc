@@ -238,7 +238,7 @@ T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, i
         }
         return get_nth_parallel(new_my_array, new_k, myrank, n_pes, type_enum);
     }
-    return -1.0;
+    return (T)-1.0;
 }
 
 template <class T>

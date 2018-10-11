@@ -347,7 +347,7 @@ void set_string_array_range(uint32_t *out_offsets, char *out_data,
         curr_offset = out_offsets[start_str_ind];
 
     // set offsets
-    for (size_t i=0; i<num_strs; i++)
+    for (size_t i=0; i<(size_t)num_strs; i++)
     {
         out_offsets[start_str_ind+i] = curr_offset;
         int32_t len = in_offsets[i+1]-in_offsets[i];
