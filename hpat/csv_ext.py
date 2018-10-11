@@ -27,7 +27,7 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
-dt64_arr_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+from hpat.pd_series_ext import dt_index_series_type
 
 
 class CsvReader(ir.Stmt):
@@ -269,7 +269,7 @@ csv_file_chunk_reader = types.ExternalFunction(
 
 def _get_dtype_str(t):
     dtype = t.dtype
-    if t == dt64_arr_typ:
+    if t == dt_index_series_type:
         dtype = 'NPDatetime("ns")'
     if t == string_array_type:
         # HACK: add string_array_type to numba.types
@@ -287,7 +287,7 @@ compiled_funcs = []
 def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
-                           if t == dt64_arr_typ)
+                           if t == dt_index_series_type)
     typ_strs = ", ".join(["{}='{}'".format(cname, _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
 
