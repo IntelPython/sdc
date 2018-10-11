@@ -195,7 +195,7 @@ ext_quantile = Extension(name="quantile_alg",
 
 
 # pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
-pq_libs = MPI_LIBS
+pq_libs = MPI_LIBS.copy()
 
 # Windows MSVC can't have boost library names on command line
 # auto-link magic of boost should be used

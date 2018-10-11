@@ -401,7 +401,7 @@ class DistributedPass(object):
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
         if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
-                and func_name in ['h5read', 'h5write'])
+                and func_name in ('h5read', 'h5write', 'h5read_filter'))
                 and self._is_1D_arr(rhs.args[5].name)):
             arr = rhs.args[5].name
             ndims = len(self._array_starts[arr])
@@ -424,6 +424,19 @@ class DistributedPass(object):
             # set parallel arg in file open
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)
+
+        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+                and func_name == 'get_filter_read_indices'):
+            #
+            out += self._gen_1D_Var_len(assign.target)
+            size_var = out[-1].target
+            self._array_sizes[lhs] = [size_var]
+            g_out, start_var, count_var = self._gen_1D_div(
+                size_var, scope, loc, "$alloc", "get_node_portion",
+                distributed_api.get_node_portion)
+            self._array_starts[lhs] = [start_var]
+            self._array_counts[lhs] = [count_var]
+            out += g_out
 
         if (hpat.config._has_pyarrow
                 and fdef == ('read_parquet', 'hpat.parquet_pio')

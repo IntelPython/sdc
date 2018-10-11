@@ -209,6 +209,12 @@ class DistributedAnalysis(object):
         func_mod = ""
         fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
         if fdef is None:
+            # check ObjModeLiftedWith, we assume distribution doesn't change
+            # blocks of data are passed in, TODO: document
+            func_def = guard(get_definition, self.func_ir, rhs.func)
+            if isinstance(func_def, ir.Const) and isinstance(func_def.value,
+                                           numba.dispatcher.ObjModeLiftedWith):
+                return
             warnings.warn(
                 "function call couldn't be found for distributed analysis")
             self._analyze_call_set_REP(lhs, args, array_dists)
@@ -241,7 +247,13 @@ class DistributedAnalysis(object):
             return
 
         if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
-                and func_name in ['h5read', 'h5write']):
+                and func_name in ('h5read', 'h5write', 'h5read_filter')):
+            return
+
+        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+                and func_name == 'get_filter_read_indices'):
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
             return
 
         if fdef == ('quantile', 'hpat.hiframes_api'):
@@ -630,6 +642,17 @@ class DistributedAnalysis(object):
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
+        # selecting an array from a tuple
+        if (rhs.op == 'static_getitem'
+                and isinstance(self.typemap[rhs.value.name], types.BaseTuple)
+                and isinstance(rhs.index, int)):
+            seq_info = guard(find_build_sequence, self.func_ir, rhs.value)
+            if seq_info is not None:
+                in_arrs, _ = seq_info
+                arr = in_arrs[rhs.index]
+                self._meet_array_dists(lhs, arr.name, array_dists)
+                return
+
         if rhs.op == 'static_getitem':
             if rhs.index_var is None:
                 # TODO: things like A[0] need broadcast
