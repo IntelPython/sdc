@@ -374,6 +374,18 @@ class SeriesAttribute(AttributeTemplate):
             sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
+    @bound_function("array.copy")
+    def resolve_copy(self, ary, args, kws):
+        dtype = ary.dtype
+        if dtype == string_type:
+            ret_type = string_series_type
+            sig = signature(ret_type, *args)
+        else:
+            resolver = ArrayAttribute.resolve_copy.__wrapped__
+            sig = resolver(self, ary, args, kws)
+            sig.return_type = if_arr_to_series_type(sig.return_type)
+        return sig
+
     @bound_function("series.rolling")
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
@@ -607,7 +619,6 @@ class SeriesAttribute(AttributeTemplate):
         dtype = ary.dtype
         dtype = pandas_timestamp_type if isinstance(dtype, numba.types.scalars.NPDatetime) else dtype
         return signature(dtype, *args)
-
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type

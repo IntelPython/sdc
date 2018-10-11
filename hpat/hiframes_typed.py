@@ -155,6 +155,11 @@ class HiFramesTyped(object):
                     continue
                 this = series_to_array_type(typ.this)
                 attr = typ.typing_key[len('array.'):]
+                # string array copy() shouldn't go to np array resolver
+                if this == string_array_type and attr == 'copy':
+                    replace_series[vname] = hpat.str_arr_ext.StrArrayAttribute(
+                        self.typingctx).resolve_copy(this)
+                    continue
                 resolver = getattr(ArrayAttribute, 'resolve_'+attr)
                 # methods are either installed with install_array_method or
                 # using @bound_function in arraydecl.py

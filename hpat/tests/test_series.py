@@ -176,6 +176,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_copy_str1(self):
+        def test_impl(A):
+            return A.copy()
+
+        n = 11
+        S = pd.Series(['aa', 'bb', 'cc'])
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_series_astype_str1(self):
         def test_impl(A):
             return A.astype(str)
