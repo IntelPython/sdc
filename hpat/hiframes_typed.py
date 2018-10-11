@@ -787,8 +787,10 @@ class HiFramesTyped(object):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
+            out_dtype = self.typemap[lhs.name].dtype
             func_node = guard(get_definition, self.func_ir, rhs.args[4])
-            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
+            imp_dis = self._handle_rolling_apply_func(
+                func_node, dtype, out_dtype)
             def f(arr, w, center):  # pragma: no cover
                 df_arr = hpat.hiframes_rolling.rolling_fixed(
                                                 arr, w, center, False, _func)
@@ -805,8 +807,10 @@ class HiFramesTyped(object):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
+            out_dtype = self.typemap[lhs.name].dtype
             func_node = guard(get_definition, self.func_ir, rhs.args[5])
-            imp_dis = self._handle_rolling_apply_func(func_node, dtype)
+            imp_dis = self._handle_rolling_apply_func(
+                func_node, dtype, out_dtype)
             def f(arr, on_arr, w, center):  # pragma: no cover
                 df_arr = hpat.hiframes_rolling.rolling_variable(
                                                 arr, on_arr, w, center, False, _func)
@@ -960,7 +964,9 @@ class HiFramesTyped(object):
         elif func_name == 'apply':
             func_node = guard(get_definition, self.func_ir, rhs.args[0])
             dtype = self.typemap[series_var.name].dtype
-            func_global = self._handle_rolling_apply_func(func_node, dtype)
+            out_dtype = self.typemap[lhs.name].dtype
+            func_global = self._handle_rolling_apply_func(
+                func_node, dtype, out_dtype)
         else:
             func_global = func_name
         def f(arr, w, center):  # pragma: no cover
@@ -969,7 +975,7 @@ class HiFramesTyped(object):
         return self._replace_func(
             f, args, pre_nodes=nodes, extra_globals={'_func': func_global})
 
-    def _handle_rolling_apply_func(self, func_node, dtype):
+    def _handle_rolling_apply_func(self, func_node, dtype, out_dtype):
         if func_node is None:
                 raise ValueError(
                     "cannot find kernel function for rolling.apply() call")
@@ -989,7 +995,11 @@ class HiFramesTyped(object):
         kernel_func.__code__ = func_node.code
         kernel_func.__name__ = func_node.code.co_name
         # use hpat.jit to enable pandas operations
-        return hpat.jit(kernel_func)
+        impl_disp = hpat.jit(kernel_func)
+        # precompile to avoid REP counting conflict in testing
+        sig = out_dtype(types.Array(dtype, 1, 'C'))
+        impl_disp.compile(sig)
+        return impl_disp
 
     def _run_DatetimeIndex_field(self, assign, lhs, rhs):
         """transform DatetimeIndex.<field>
