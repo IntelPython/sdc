@@ -237,6 +237,10 @@ extern "C" void PyInit_csv(PyObject * m)
     if(PyType_Ready(&stream_reader_type) < 0) return;
     Py_INCREF(&stream_reader_type);
     PyModule_AddObject(m, "StreamReader", (PyObject *)&stream_reader_type);
+    PyObject_SetAttrString(m, "csv_file_chunk_reader",
+                           PyLong_FromVoidPtr((void*)(&csv_file_chunk_reader)));
+    PyObject_SetAttrString(m, "csv_string_chunk_reader",
+                           PyLong_FromVoidPtr((void*)(&csv_string_chunk_reader)));
 }
 
 

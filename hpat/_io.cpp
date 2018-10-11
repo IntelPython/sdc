@@ -45,11 +45,6 @@ PyMODINIT_FUNC PyInit_hio(void) {
     if (m == NULL)
         return NULL;
 
-    PyObject_SetAttrString(m, "csv_file_chunk_reader",
-                           PyLong_FromVoidPtr((void*)(&csv_file_chunk_reader)));
-    PyObject_SetAttrString(m, "csv_string_chunk_reader",
-                           PyLong_FromVoidPtr((void*)(&csv_string_chunk_reader)));
-
     PyObject_SetAttrString(m, "hpat_h5_open",
                             PyLong_FromVoidPtr((void*)(&hpat_h5_open)));
     PyObject_SetAttrString(m, "hpat_h5_open_dset_or_group_obj",
