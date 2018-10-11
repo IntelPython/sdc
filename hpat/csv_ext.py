@@ -201,7 +201,6 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     for v in csv_node.out_vars:
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
-            print(v.name, array_dists[v.name])
             parallel = False
 
     n_cols = len(csv_node.out_vars)
@@ -286,7 +285,6 @@ def _get_dtype_str(t):
 compiled_funcs = []
 
 def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
-    print(parallel)
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt64_arr_typ)
