@@ -694,7 +694,7 @@ def finalize_data_shuffle_meta_overload(data_t, shuffle_meta_t, key_meta_t, is_c
     for i, typ in enumerate(data_t.types):
         func_text += "  arr = data[{}]\n".format(i)
         if isinstance(typ, types.Array):
-            func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, np.{})\n".format(i, typ.dtype)
+            func_text += "  meta_tup[{}].out_arr = np.empty(key_meta.n_out, arr.dtype)\n".format(i)
             func_text += "  if not is_contig:\n"
             if init_vals_t is not None:
                 func_text += "    meta_tup[{}].send_buff = np.full(key_meta.n_send, init_vals[{}], arr.dtype)\n".format(i, i)
