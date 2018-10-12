@@ -555,9 +555,10 @@ class DistributedPass(object):
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            if self._is_1D_arr(in_arr):
+                self._array_starts[lhs] = self._array_starts[in_arr]
+                self._array_counts[lhs] = self._array_counts[in_arr]
+                self._array_sizes[lhs] = self._array_sizes[in_arr]
             # set parallel flag to true
             true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
             self.typemap[true_var.name] = types.boolean
@@ -568,9 +569,10 @@ class DistributedPass(object):
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            if self._is_1D_arr(in_arr):
+                self._array_starts[lhs] = self._array_starts[in_arr]
+                self._array_counts[lhs] = self._array_counts[in_arr]
+                self._array_sizes[lhs] = self._array_sizes[in_arr]
             # set parallel flag to true
             true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
             self.typemap[true_var.name] = types.boolean
@@ -582,9 +584,10 @@ class DistributedPass(object):
                     and (self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name))):
             in_arr = rhs.args[0].name
-            self._array_starts[lhs] = self._array_starts[in_arr]
-            self._array_counts[lhs] = self._array_counts[in_arr]
-            self._array_sizes[lhs] = self._array_sizes[in_arr]
+            if self._is_1D_arr(in_arr):
+                self._array_starts[lhs] = self._array_starts[in_arr]
+                self._array_counts[lhs] = self._array_counts[in_arr]
+                self._array_sizes[lhs] = self._array_sizes[in_arr]
             # set parallel flag to true
             true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
             self.typemap[true_var.name] = types.boolean
