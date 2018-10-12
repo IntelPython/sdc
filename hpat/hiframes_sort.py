@@ -67,7 +67,10 @@ numba.array_analysis.array_analysis_extensions[Sort] = sort_array_analysis
 def sort_distributed_analysis(sort_node, array_dists):
 
     # input columns have same distribution
-    in_dist = array_dists[sort_node.key_arr.name]
+    # output is 1D_Var due to shuffle
+    # XXX output vars are assigned to input to handle inplace case more easily
+    in_dist = Distribution(min(array_dists[sort_node.key_arr.name].value,
+                                                  Distribution.OneD_Var.value))
     for col_var in sort_node.df_vars.values():
         in_dist = Distribution(
             min(in_dist.value, array_dists[col_var.name].value))

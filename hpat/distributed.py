@@ -1086,7 +1086,10 @@ class DistributedPass(object):
 
         # size is single int var
         if isinstance(size_var, ir.Var) and isinstance(self.typemap[size_var.name], types.Integer):
-            assert size_var.name in self.oneDVar_len_vars, "invalid 1DVar alloc"
+            # array could be allocated inside 1D_Var nodes like sort
+            if size_var.name not in self.oneDVar_len_vars:
+                return [], size_var
+            # assert size_var.name in self.oneDVar_len_vars, "invalid 1DVar alloc"
             arr_var = self.oneDVar_len_vars[size_var.name]
 
             def f(oneD_var_arr):  # pragma: no cover
