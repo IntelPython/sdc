@@ -996,11 +996,13 @@ class HiFramesTyped(object):
         kernel_func.__name__ = func_node.code.co_name
         # use hpat's sequential pipeline to enable pandas operations
         # XXX seq pipeline used since dist pass causes a hang
+        m = numba.ir_utils._max_label
         impl_disp = numba.njit(
             kernel_func, pipeline_class=hpat.compiler.HPATPipelineSeq)
         # precompile to avoid REP counting conflict in testing
         sig = out_dtype(types.Array(dtype, 1, 'C'))
         impl_disp.compile(sig)
+        numba.ir_utils._max_label += m
         return impl_disp
 
     def _run_DatetimeIndex_field(self, assign, lhs, rhs):
