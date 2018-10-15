@@ -13,7 +13,7 @@ import numpy as np
 
 import hpat
 from hpat import pio_api, pio_lower, utils
-from hpat.utils import get_constant, NOT_CONSTANT, debug_prints
+from hpat.utils import find_str_const, debug_prints
 import h5py
 
 
@@ -88,16 +88,14 @@ class PIO(object):
             # object_name should be constant str
             require(val_def.op in ('getitem', 'static_getitem'))
             val_index_var = val_def.index if val_def.op == 'getitem' else val_def.index_var
-            obj_name = find_const(self.func_ir, val_index_var)
-            require(isinstance(obj_name, str))
+            obj_name = find_str_const(self.func_ir, val_index_var)
             obj_name_list.append(obj_name)
 
     def _get_h5_type_file(self, val_def, obj_name_list):
         require(len(obj_name_list) > 0)
         require(find_callname(self.func_ir, val_def) == ('File', 'h5py'))
         require(len(val_def.args) > 0)
-        f_name = find_const(self.func_ir, val_def.args[0])
-        require(isinstance(f_name, str))
+        f_name = find_str_const(self.func_ir, val_def.args[0])
         obj_name_list.reverse()
 
         import h5py

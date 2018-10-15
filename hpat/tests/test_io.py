@@ -43,6 +43,18 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_allclose(hpat_func(), test_impl())
 
+    def test_h5_read_const_infer_seq(self):
+        def test_impl():
+            p = 'lr'
+            f = h5py.File(p + ".hdf5", "r")
+            s = 'po'
+            X = f[s + 'ints'][:]
+            f.close()
+            return X
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_allclose(hpat_func(), test_impl())
+
     def test_h5_read_parallel(self):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")

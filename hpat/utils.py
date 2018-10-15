@@ -1,4 +1,5 @@
 from collections import namedtuple
+import operator
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
@@ -379,6 +380,25 @@ def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=Tr
             numba.inline_closurecall._add_definitions(func_ir, block)
             work_list.append((_label, block))
     return label
+
+
+def find_str_const(func_ir, var):
+    """Check if a variable can be inferred as a string constant, and return
+    the constant value, or raise GuardException otherwise.
+    """
+    require(isinstance(var, ir.Var))
+    var_def = get_definition(func_ir, var)
+    if isinstance(var_def, ir.Const):
+        val = var_def.value
+        require(isinstance(val, str))
+        return val
+
+    # only add supported (s1+s2), TODO: extend to other expressions
+    require(isinstance(var_def, ir.Expr) and var_def.op == 'binop'
+        and var_def.fn == operator.add)
+    arg1 = find_str_const(func_ir, var_def.lhs)
+    arg2 = find_str_const(func_ir, var_def.rhs)
+    return arg1 + arg2
 
 
 def is_call(stmt):
