@@ -90,7 +90,7 @@ PyMODINIT_FUNC PyInit_hio(void) {
 }
 
 // TODO: raise Python error
-#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl;}
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; H5Eprint(H5E_DEFAULT, NULL);}
 
 hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
 {
@@ -101,7 +101,9 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     hid_t file_id = -1;
     unsigned flag = H5F_ACC_RDWR;
 
-    if(is_parallel)
+    int num_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
+    if(is_parallel && num_pes>1)
     {
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
         CHECK(ret != -1, "h5 open MPI driver set error");
@@ -197,8 +199,10 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
 
     hid_t space_id = get_dset_space_from_range(dataset_id, starts, counts);
 
+    int num_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel)
+    if(is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
@@ -270,8 +274,10 @@ int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
 
     hid_t space_id = get_dset_space_from_indices(dataset_id, ndims, starts, counts, indices, n_indices);
 
+    int num_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel)
+    if(is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
@@ -424,8 +430,10 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
 
+    int num_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel)
+    if(is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
