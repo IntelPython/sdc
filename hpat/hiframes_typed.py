@@ -590,23 +590,31 @@ class HiFramesTyped(object):
     def _handle_series_sort(self, lhs, rhs, series_var, is_argsort):
         """creates an index list and passes it to a Sort node as data
         """
+        in_df = {}
+        out_df = {}
+        out_key_arr = lhs
+        nodes = []
         if is_argsort:
             def _get_data(S):  # pragma: no cover
                 n = len(S)
-                A = np.arange(n)
-        else:  # sort_values
-            def _get_data(S):  # pragma: no cover
-                A = S.copy()
+                return np.arange(n)
 
-        f_block = compile_to_numba_ir(_get_data,
-                                            {'np': np}, self.typingctx,
-                                            (if_series_to_array_type(self.typemap[series_var.name]),),
-                                            self.typemap, self.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [series_var])
-        nodes = f_block.body[:-3]
-        nodes[-1].target = lhs
-        nodes.append(
-            hiframes_sort.Sort(series_var.name, series_var, {'inds': lhs}, lhs.loc))
+            f_block = compile_to_numba_ir(
+                _get_data, {'np': np}, self.typingctx,
+                (if_series_to_array_type(self.typemap[series_var.name]),),
+                self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [series_var])
+            nodes = f_block.body[:-2]
+            in_df = {'inds': nodes[-1].target}
+            out_df = {'inds': lhs}
+            # dummy output key, TODO: remove
+            out_key_arr = ir.Var(lhs.scope, mk_unique_var('dummy'), lhs.loc)
+            self.typemap[out_key_arr.name] = if_series_to_array_type(
+                self.typemap[series_var.name])
+
+
+        nodes.append(hiframes_sort.Sort(series_var.name, lhs.name, series_var,
+            out_key_arr, in_df, out_df, False, lhs.loc))
         return nodes
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):

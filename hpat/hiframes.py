@@ -1102,24 +1102,22 @@ class HiFrames(object):
         # TODO: support ascending=False
 
         out = []
-        df_cols = self._get_df_cols(df).copy()  # copy since it'll be modified
+        in_df = self._get_df_cols(df).copy()  # copy since it'll be modified
+        out_df = in_df.copy()
         if not inplace:
-            new_df_cols = {}
-            def cp_func(arr):
-                arr_cp = arr.copy()
-            for cname, cvar in df_cols.items():
-                f_block = compile_to_numba_ir(cp_func, {}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [cvar])
-                out += f_block.body[:-3]
-                new_df_cols[cname] = out[-1].target
-            df_cols = new_df_cols
-            self._create_df(lhs.name, df_cols.copy(), label)
+            out_df = {cname: ir.Var(lhs.scope, mk_unique_var(v.name), lhs.loc)
+                                                for cname, v in in_df.items()}
+            self._create_df(lhs.name, out_df.copy(), label)
 
-        if key_name not in df_cols:
+        if key_name not in in_df:
             raise ValueError("invalid sort key {}".format(key_name))
-        key_var = df_cols.pop(key_name)
 
-        out.append(hiframes_sort.Sort(df.name, key_var, df_cols, lhs.loc))
+        # remove key from dfs (only data is kept)
+        key_var = in_df.pop(key_name)
+        out_key_var = out_df.pop(key_name)
+
+        out.append(hiframes_sort.Sort(df.name, lhs.name, key_var, out_key_var,
+                                      in_df, out_df, inplace, lhs.loc))
         return out
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
