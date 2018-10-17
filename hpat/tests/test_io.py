@@ -5,16 +5,14 @@ import h5py
 import pyarrow.parquet as pq
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                        count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
+    get_start_end)
 
 
 class TestIO(unittest.TestCase):
 
-    def _get_rank(self):
-        return hpat.jit(lambda: hpat.distributed_api.get_rank())()
-
     def setUp(self):
-        if self._get_rank() == 0:
+        if get_rank() == 0:
             # h5 filter test
             n = 11
             size = (n, 13, 21, 3)
@@ -22,16 +20,6 @@ class TestIO(unittest.TestCase):
             f = h5py.File('h5_test_filter.h5', "w")
             f.create_dataset('test', data=A)
             f.close()
-
-    def _get_start_end(self, n):
-        @hpat.jit
-        def get_start_end(n):
-            rank = hpat.distributed_api.get_rank()
-            n_pes = hpat.distributed_api.get_size()
-            start = hpat.distributed_api.get_start(n, n_pes, rank)
-            end = hpat.distributed_api.get_end(n, n_pes, rank)
-            return start, end
-        return get_start_end(n)
 
     def test_h5_read_seq(self):
         def test_impl():
@@ -158,7 +146,7 @@ class TestIO(unittest.TestCase):
 
         hpat_func = hpat.jit(locals={'X:return': 'distributed'})(test_impl)
         n = 4  # len(test_impl())
-        start, end = self._get_start_end(n)
+        start, end = get_start_end(n)
         np.testing.assert_allclose(hpat_func(), test_impl()[start:end])
 
     def test_pq_read(self):
