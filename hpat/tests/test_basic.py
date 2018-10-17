@@ -190,7 +190,7 @@ class TestBasic(BaseTest):
                                             and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(n):
-                A = np.ones(n, dtype=np.{})
+                A = np.arange(0, n, 1, np.{})
                 return A.{}()
             """.format(dtype, func)
             loc_vars = {}
@@ -198,7 +198,7 @@ class TestBasic(BaseTest):
             test_impl = loc_vars['f']
 
             hpat_func = hpat.jit(test_impl)
-            n = 128
+            n = 21  # XXX arange() on float32 has overflow issues on large n
             np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
