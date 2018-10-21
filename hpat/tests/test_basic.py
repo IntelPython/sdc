@@ -6,8 +6,8 @@ import numba
 import hpat
 import random
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs,
-                                   count_array_OneD_Vars, dist_IR_contains)
+    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
+    dist_IR_contains, get_rank, get_start_end)
 
 def get_np_state_ptr():
     return numba._helperlib.rnd_get_np_state_ptr()
@@ -201,6 +201,32 @@ class TestBasic(BaseTest):
             n = 21  # XXX arange() on float32 has overflow issues on large n
             np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_REPs(), 0)
+            self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_reduce2(self):
+        import sys
+        dtypes = ['float32', 'float64', 'int32', 'int64']
+        funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
+        for (dtype, func) in itertools.product(dtypes, funcs):
+            # loc allreduce doesn't support int64 on windows
+            if (sys.platform.startswith('win') and dtype=='int64'
+                                            and func in ['argmin', 'argmax']):
+                continue
+            func_text = """def f(A):
+                return A.{}()
+            """.format(func)
+            loc_vars = {}
+            exec(func_text, {'np': np}, loc_vars)
+            test_impl = loc_vars['f']
+
+            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            n = 21
+            start, end = get_start_end(n)
+            np.random.seed(0)
+            A = np.random.randint(0, 10, n).astype(dtype)
+            np.testing.assert_almost_equal(
+                hpat_func(A[start:end]), test_impl(A), decimal=3)
+            self.assertEqual(count_array_REPs(), 1)
             self.assertEqual(count_parfor_REPs(), 0)
 
     def test_array_reduce(self):
