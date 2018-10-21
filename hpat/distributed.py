@@ -1362,33 +1362,13 @@ class DistributedPass(object):
                 != Distribution.REP):
             parfor.no_sequential_lowering = True
 
-        if self._dist_analysis.parfor_dists[parfor.id] != Distribution.OneD:
-            out = [parfor]
-            # TODO: make sure loop index is not used for calculations in
-            # OneD_Var parfors
-            if self._dist_analysis.parfor_dists[parfor.id] == Distribution.OneD_Var:
-                # recover range of 1DVar parfors coming from converted 1DVar array len()
-                prepend = []
-                for l in parfor.loop_nests:
-                    if l.stop.name in self.oneDVar_len_vars:
-                        arr_var = self.oneDVar_len_vars[l.stop.name]
+        if self._dist_analysis.parfor_dists[parfor.id] == Distribution.OneD_Var:
+            return self._run_parfor_1D_Var(parfor, namevar_table)
 
-                        def f(A):  # pragma: no cover
-                            arr_len = len(A)
-                        f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                                      (self.typemap[arr_var.name],),
-                                                      self.typemap, self.calltypes).blocks.popitem()[1]
-                        replace_arg_nodes(f_block, [arr_var])
-                        nodes = f_block.body[:-3]  # remove none return
-                        l.stop = nodes[-1].target
-                        prepend += nodes
-                init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(
-                    parfor, namevar_table)
-                parfor.init_block.body += init_reduce_nodes
-                out = prepend + out + reduce_nodes
+        if self._dist_analysis.parfor_dists[parfor.id] != Distribution.OneD:
             if debug_prints():  # pragma: no cover
                 print("parfor " + str(parfor.id) + " not parallelized.")
-            return out
+            return [parfor]
 
         scope = parfor.init_block.scope
         loc = parfor.init_block.loc
@@ -1439,6 +1419,30 @@ class DistributedPass(object):
             parfor, namevar_table)
         parfor.init_block.body += init_reduce_nodes
         out += reduce_nodes
+        return out
+
+    def _run_parfor_1D_Var(self, parfor, namevar_table):
+        # TODO: make sure loop index is not used for calculations in
+        # OneD_Var parfors
+        # recover range of 1DVar parfors coming from converted 1DVar array len()
+        prepend = []
+        for l in parfor.loop_nests:
+            if l.stop.name in self.oneDVar_len_vars:
+                arr_var = self.oneDVar_len_vars[l.stop.name]
+
+                def f(A):  # pragma: no cover
+                    arr_len = len(A)
+                f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
+                                                (self.typemap[arr_var.name],),
+                                                self.typemap, self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [arr_var])
+                nodes = f_block.body[:-3]  # remove none return
+                l.stop = nodes[-1].target
+                prepend += nodes
+        init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(
+            parfor, namevar_table)
+        parfor.init_block.body += init_reduce_nodes
+        out = prepend + [parfor] + reduce_nodes
         return out
 
     def _gen_parfor_reductions(self, parfor, namevar_table):
