@@ -229,6 +229,34 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 1)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_reduce_filter1(self):
+        import sys
+        dtypes = ['float32', 'float64', 'int32', 'int64']
+        funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
+        for (dtype, func) in itertools.product(dtypes, funcs):
+            # loc allreduce doesn't support int64 on windows
+            if (sys.platform.startswith('win') and dtype=='int64'
+                                            and func in ['argmin', 'argmax']):
+                continue
+            func_text = """def f(A):
+                A = A[A>5]
+                return A.{}()
+            """.format(func)
+            loc_vars = {}
+            exec(func_text, {'np': np}, loc_vars)
+            test_impl = loc_vars['f']
+
+            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            n = 21
+            start, end = get_start_end(n)
+            np.random.seed(0)
+            A = np.random.randint(0, 10, n).astype(dtype)
+            np.testing.assert_almost_equal(
+                hpat_func(A[start:end]), test_impl(A), decimal=3,
+                err_msg="{} on {}".format(func, dtype))
+            self.assertEqual(count_array_REPs(), 1)
+            self.assertEqual(count_parfor_REPs(), 0)
+
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']

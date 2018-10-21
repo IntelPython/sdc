@@ -400,6 +400,11 @@ def find_str_const(func_ir, var):
     arg2 = find_str_const(func_ir, var_def.rhs)
     return arg1 + arg2
 
+def gen_getitem(out_var, in_var, ind, calltypes, nodes):
+    loc = out_var.loc
+    getitem = ir.Expr.static_getitem(in_var, ind, None, loc)
+    calltypes[getitem] = None
+    nodes.append(ir.Assign(getitem, out_var, loc))
 
 def is_call(stmt):
     """true if stmt is a getitem or static_getitem assignment"""

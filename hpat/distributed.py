@@ -14,7 +14,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
                             find_callname, build_definitions,
-                            find_build_sequence, find_const)
+                            find_build_sequence, find_const, is_get_setitem)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing import signature
 from numba.parfor import (get_parfor_reductions, get_parfor_params,
@@ -34,7 +34,7 @@ from hpat.distributed_analysis import (Distribution,
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints, ReplaceFunc)
+                        debug_prints, ReplaceFunc, gen_getitem)
 from hpat.distributed_api import Reduce_Type
 
 distributed_run_extensions = {}
@@ -1207,7 +1207,10 @@ class DistributedPass(object):
 
     def _run_getsetitem(self, arr, index_var, node, full_node):
         out = [full_node]
-        if self._is_1D_arr(arr.name) and (arr.name, index_var.name) in self._parallel_accesses:
+        # 1D_Var arrays need adjustment for 1D_Var parfors as well
+        if ((self._is_1D_arr(arr.name) or
+                (self._is_1D_Var_arr(arr.name) and arr.name in self._array_starts))
+                and (arr.name, index_var.name) in self._parallel_accesses):
             scope = index_var.scope
             loc = index_var.loc
             #ndims = self._get_arr_ndim(arr.name)
@@ -1422,8 +1425,6 @@ class DistributedPass(object):
         return out
 
     def _run_parfor_1D_Var(self, parfor, namevar_table):
-        # TODO: make sure loop index is not used for calculations in
-        # OneD_Var parfors
         # recover range of 1DVar parfors coming from converted 1DVar array len()
         prepend = []
         for l in parfor.loop_nests:
@@ -1439,11 +1440,68 @@ class DistributedPass(object):
                 nodes = f_block.body[:-3]  # remove none return
                 l.stop = nodes[-1].target
                 prepend += nodes
+
+        # see if parfor index is used in compute other than array access
+        # (e.g. argmin)
+        l_nest = parfor.loop_nests[0]
+        ind_varname = l_nest.index_variable.name
+        ind_used = False
+        for block in parfor.loop_body.values():
+            for stmt in block.body:
+                if not is_get_setitem(stmt) and ind_varname in (v.name for v in stmt.list_vars()):
+                    ind_used = True
+                    dprint("index of 1D_Var pafor {} used in {}".format(
+                        parfor.id, stmt))
+                break
+
+        # fix parfor start and stop bounds using ex_scan on ranges
+        if ind_used:
+            scope = l_nest.index_variable.scope
+            loc = l_nest.index_variable.loc
+            if isinstance(l_nest.start, int):
+                start_var = ir.Var(scope, mk_unique_var("loop_start"), loc)
+                self.typemap[start_var.name] = types.intp
+                prepend.append(ir.Assign(
+                    ir.Const(l_nest.start, loc), start_var, loc))
+                l_nest.start = start_var
+
+            def _fix_ind_bounds(start, stop):
+                prefix = hpat.distributed_api.dist_exscan(stop - start)
+                # rank = hpat.distributed_api.get_rank()
+                # print(rank, prefix, start, stop)
+                return start + prefix, stop + prefix
+
+            f_block = compile_to_numba_ir(_fix_ind_bounds, {'hpat': hpat},
+                self.typingctx, (types.intp,types.intp), self.typemap,
+                self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [l_nest.start, l_nest.stop])
+            nodes = f_block.body[:-2]
+            ret_var = nodes[-1].target
+            gen_getitem(l_nest.start, ret_var, 0, self.calltypes, nodes)
+            gen_getitem(l_nest.stop, ret_var, 1, self.calltypes, nodes)
+            prepend += nodes
+
+            array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
+            for (arr, index) in array_accesses:
+                if self._index_has_par_index(index, ind_varname):
+                    self._array_starts[arr] = [l_nest.start]
+
         init_reduce_nodes, reduce_nodes = self._gen_parfor_reductions(
             parfor, namevar_table)
         parfor.init_block.body += init_reduce_nodes
         out = prepend + [parfor] + reduce_nodes
         return out
+
+    def _index_has_par_index(self, index, other_index):
+        if index == other_index:
+            return True
+        # multi-dim case
+        tup_list = guard(find_build_tuple, self.func_ir, index)
+        if tup_list is not None:
+            index_tuple = [var.name for var in tup_list]
+            if index_tuple[0] == index:
+                return True
+        return False
 
     def _gen_parfor_reductions(self, parfor, namevar_table):
         scope = parfor.init_block.scope

@@ -14,7 +14,8 @@ from hpat.utils import _numba_to_c_type_map
 from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
-from hpat.utils import debug_prints, empty_like_type, get_ctypes_ptr
+from hpat.utils import (debug_prints, empty_like_type, get_ctypes_ptr,
+    gen_getitem)
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
@@ -303,16 +304,16 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     # get key
     key_arr = ir.Var(scope, mk_unique_var(key_arr.name), loc)
     typemap[key_arr.name] = key_typ
-    _gen_getitem(key_arr, ret_var, 0, calltypes, nodes)
+    gen_getitem(key_arr, ret_var, 0, calltypes, nodes)
     # get data tup
     data_tup_var = ir.Var(scope, mk_unique_var('sort_data'), loc)
     typemap[data_tup_var.name] = data_tup_typ
-    _gen_getitem(data_tup_var, ret_var, 1, calltypes, nodes)
+    gen_getitem(data_tup_var, ret_var, 1, calltypes, nodes)
 
     if not parallel:
         nodes.append(ir.Assign(key_arr, sort_node.out_key_arr, loc))
         for i, var in enumerate(out_vars):
-            _gen_getitem(var, data_tup_var, i, calltypes, nodes)
+            gen_getitem(var, data_tup_var, i, calltypes, nodes)
         return nodes
 
     # parallel case
@@ -336,14 +337,14 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
     # get output key
-    _gen_getitem(sort_node.out_key_arr, ret_var, 0, calltypes, nodes)
+    gen_getitem(sort_node.out_key_arr, ret_var, 0, calltypes, nodes)
     # get data tup
     data_tup = ir.Var(scope, mk_unique_var('sort_data'), loc)
     typemap[data_tup.name] = data_tup_typ
-    _gen_getitem(data_tup, ret_var, 1, calltypes, nodes)
+    gen_getitem(data_tup, ret_var, 1, calltypes, nodes)
 
     for i, var in enumerate(out_vars):
-        _gen_getitem(var, data_tup, i, calltypes, nodes)
+        gen_getitem(var, data_tup, i, calltypes, nodes)
 
     # TODO: handle 1D balance for inplace case
 
@@ -351,14 +352,6 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
 
 
 distributed.distributed_run_extensions[Sort] = sort_distributed_run
-
-
-def _gen_getitem(out_var, in_var, ind, calltypes, nodes):
-    loc = out_var.loc
-    getitem = ir.Expr.static_getitem(in_var, ind, None, loc)
-    calltypes[getitem] = None
-    nodes.append(ir.Assign(getitem, out_var, loc))
-
 
 def _copy_array_nodes(var, nodes, typingctx, typemap, calltypes):
     def _impl(arr):
