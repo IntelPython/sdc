@@ -359,7 +359,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
     else:
         func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right)\n")
+        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right, {})\n".format(
+            join_node.how == 'left'))
 
     for i in range(len(left_other_names)):
         func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
@@ -939,8 +940,47 @@ def trim_arr_overload(arr_t, size_t):
 
     return trim_arr_str
 
+def setnan_elem_buff(arr, ind):  # pragma: no cover
+    new_arr = ensure_capacity(arr, ind+1)
+    setitem_arr_nan(new_arr, ind)
+    return new_arr
+
+@overload(setnan_elem_buff)
+def setnan_elem_buff_overload(arr_t, ind_t):
+    if isinstance(arr_t, types.Array):
+        return setnan_elem_buff
+
+    assert arr_t == string_array_type
+    def setnan_elem_buff_str(arr, ind):
+        new_arr = ensure_capacity_str(arr, ind+1, 0)
+        setitem_arr_nan(new_arr, ind)
+        return new_arr
+
+    return setnan_elem_buff_str
+
+def setnan_elem_buff_tup(arr, ind):  # pragma: no cover
+    return arr
+
+@overload(setnan_elem_buff_tup)
+def setnan_elem_buff_tup_overload(data_t, ind_t):
+    assert isinstance(data_t, (types.Tuple, types.UniTuple))
+    count = data_t.count
+
+    func_text = "def f(data, ind):\n"
+    for i in range(count):
+        func_text += "  arr_{} = setnan_elem_buff(data[{}], ind)\n".format(i, i)
+    func_text += "  return ({}{})\n".format(
+        ','.join(["arr_{}".format(i) for i in range(count)]),
+        "," if count == 1 else "")
+
+    loc_vars = {}
+    exec(func_text, {'setnan_elem_buff': setnan_elem_buff}, loc_vars)
+    cp_impl = loc_vars['f']
+    return cp_impl
+
+
 @numba.njit
-def local_merge_new(left_key, right_key, data_left, data_right):
+def local_merge_new(left_key, right_key, data_left, data_right, is_left=False):
     curr_size = 101 + min(len(left_key), len(right_key)) // 10
     out_left_key = empty_like_type(curr_size, left_key)
     out_data_left = alloc_arr_tup(curr_size, data_left)
@@ -982,6 +1022,12 @@ def local_merge_new(left_key, right_key, data_left, data_right):
             left_ind += 1
             right_ind += 1
         elif left_key[left_ind] < right_key[right_ind]:
+            if is_left:
+                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+                l_data_val = getitem_arr_tup(data_left, left_ind)
+                out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+                out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
+                out_ind += 1
             left_ind += 1
         else:
             right_ind += 1
