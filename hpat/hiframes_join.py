@@ -1032,6 +1032,15 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False):
         else:
             right_ind += 1
 
+    if is_left and left_ind < len(left_key):
+        while left_ind < len(left_key):
+            out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+            l_data_val = getitem_arr_tup(data_left, left_ind)
+            out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+            out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
+            out_ind += 1
+            left_ind += 1
+
     #out_left_key = out_left_key[:out_ind]
     out_left_key = trim_arr(out_left_key, out_ind)
 
