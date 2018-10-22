@@ -359,8 +359,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
     else:
         func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right, {})\n".format(
-            join_node.how == 'left'))
+        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right, {}, {})\n".format(
+            join_node.how in ('left', 'outer'), join_node.how == 'outer'))
 
     for i in range(len(left_other_names)):
         func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
@@ -980,7 +980,8 @@ def setnan_elem_buff_tup_overload(data_t, ind_t):
 
 
 @numba.njit
-def local_merge_new(left_key, right_key, data_left, data_right, is_left=False):
+def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
+                                                               is_outer=False):
     curr_size = 101 + min(len(left_key), len(right_key)) // 10
     out_left_key = empty_like_type(curr_size, left_key)
     out_data_left = alloc_arr_tup(curr_size, data_left)
@@ -1030,6 +1031,13 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False):
                 out_ind += 1
             left_ind += 1
         else:
+            if is_outer:
+                # TODO: support separate keys?
+                out_left_key = copy_elem_buff(out_left_key, out_ind, right_key[right_ind])
+                out_data_left = setnan_elem_buff_tup(out_data_left, out_ind)
+                r_data_val = getitem_arr_tup(data_right, right_ind)
+                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
+                out_ind += 1
             right_ind += 1
 
     if is_left and left_ind < len(left_key):
@@ -1040,6 +1048,15 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False):
             out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
             out_ind += 1
             left_ind += 1
+
+    if is_outer and right_ind < len(right_key):
+        while right_ind < len(right_key):
+            out_left_key = copy_elem_buff(out_left_key, out_ind, right_key[right_ind])
+            out_data_left = setnan_elem_buff_tup(out_data_left, out_ind)
+            r_data_val = getitem_arr_tup(data_right, right_ind)
+            out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
+            out_ind += 1
+            right_ind += 1
 
     #out_left_key = out_left_key[:out_ind]
     out_left_key = trim_arr(out_left_key, out_ind)

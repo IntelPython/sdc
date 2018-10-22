@@ -905,6 +905,24 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(
             set(h_res.A.dropna().values), set(res.A.dropna().values))
 
+    def test_join_outer_seq1(self):
+        def test_impl(df1, df2):
+            return pd.merge(df1, df2, how='outer', on='key')
+
+        hpat_func = hpat.jit(test_impl)
+        df1 = pd.DataFrame(
+            {'key': [2,3,5,1,2,8], 'A': np.array([4,6,3,9,9,-1], np.float)})
+        df2 = pd.DataFrame(
+            {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
+        h_res = hpat_func(df1, df2)
+        res = test_impl(df1, df2)
+        np.testing.assert_array_equal(h_res.key.values, res.key.values)
+        # converting arrays to sets since order of values can be different
+        self.assertEqual(
+            set(h_res.B.dropna().values), set(res.B.dropna().values))
+        self.assertEqual(
+            set(h_res.A.dropna().values), set(res.A.dropna().values))
+
     def test_concat(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})
