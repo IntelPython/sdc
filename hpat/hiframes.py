@@ -806,6 +806,12 @@ class HiFrames(object):
             right_on = self._get_str_arg('merge', rhs.args, kws, on_argno+2,
                                                    'right_on', err_msg=err_msg)
 
+        # convert right join to left join
+        if how == 'right':
+            how = 'left'
+            left_df, right_df = right_df, left_df
+            left_on, right_on = right_on, left_on
+
         scope = lhs.scope
         loc = lhs.loc
         # add columns from left to output
