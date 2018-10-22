@@ -773,23 +773,39 @@ class HiFrames(object):
 
     def _handle_merge(self, assign, lhs, rhs, is_asof, label):
         """transform pd.merge() into a Join node
+
+        signature: pd.merge(left, right, how='inner', on=None, left_on=None,
+            right_on=None, left_index=False, right_index=False, sort=False,
+            suffixes=('_x', '_y'), copy=True, indicator=False, validate=None)
+        pd.merge_asof(left, right, on=None, left_on=None, right_on=None,
+        left_index=False, right_index=False, by=None, left_by=None,
+        right_by=None, suffixes=('_x', '_y'), tolerance=None,
+        allow_exact_matches=True, direction='backward')
         """
-        if len(rhs.args) < 2:
-            raise ValueError("left and right arguments required for merge")
-        left_df = rhs.args[0]
-        right_df = rhs.args[1]
         kws = dict(rhs.kws)
-        if 'on' in kws:
-            left_on = get_constant(self.func_ir, kws['on'], None)
+        left_df = self._get_arg('merge', rhs.args, kws, 0, 'left')
+        right_df = self._get_arg('merge', rhs.args, kws, 1, 'right')
+        on_argno = 3  # merge() has 'how' arg but merge_asof doesn't
+        if is_asof:
+            how = 'asof'
+            on_argno = 2
+        else:
+            how =  self._get_str_arg('merge', rhs.args, kws, 2, 'how', 'inner')
+
+        # find key columns
+        left_on = right_on = None
+        on = self._get_str_arg('merge', rhs.args, kws, on_argno, 'on', '')
+
+        if on != '':
+            left_on = on
             right_on = left_on
         else:  # pragma: no cover
-            if 'left_on' not in kws or 'right_on' not in kws:
-                raise ValueError("merge 'on' or 'left_on'/'right_on'"
-                                 "arguments required")
-            left_on = get_constant(self.func_ir, kws['left_on'], None)
-            right_on = get_constant(self.func_ir, kws['right_on'], None)
-        if left_on is None or right_on is None:
-            raise ValueError("merge key values should be constant strings")
+            err_msg = "merge 'on' or 'left_on'/'right_on' arguments required"
+            left_on = self._get_str_arg('merge', rhs.args, kws, on_argno+1,
+                                                    'left_on', err_msg=err_msg)
+            right_on = self._get_str_arg('merge', rhs.args, kws, on_argno+2,
+                                                   'right_on', err_msg=err_msg)
+
         scope = lhs.scope
         loc = lhs.loc
         # add columns from left to output
@@ -801,7 +817,6 @@ class HiFrames(object):
         df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in right_colnames})
         self._create_df(lhs.name, df_col_map, label)
-        how = 'asof' if is_asof else 'inner'
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
                                    left_on, right_on, self.df_vars, how,
@@ -1263,7 +1278,8 @@ class HiFrames(object):
         values = self.locals.pop(new_name + ":pivot")
         return values
 
-    def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
+    def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
         arg = None
         if len(args) > arg_no:
             arg = guard(find_const, self.func_ir, args[arg_no])
@@ -1273,8 +1289,10 @@ class HiFrames(object):
         if arg is None:
             if default is not None:
                 return default
-            raise ValueError(("{} requires '{}' argument as a"
-                             "constant string").format(f_name, arg_name))
+            if err_msg is None:
+                err_msg = ("{} requires '{}' argument as a "
+                             "constant string").format(f_name, arg_name)
+            raise ValueError(err_msg)
         return arg
 
     def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
