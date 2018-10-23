@@ -34,6 +34,16 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_column_list_select1(self):
+        def test_impl(df):
+            return df[['A', 'C']]
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     def test_pd_DataFrame_from_series_par(self):
         def test_impl(n):
             S1 = pd.Series(np.ones(n))

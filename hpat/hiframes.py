@@ -190,11 +190,22 @@ class HiFrames(object):
                 if h5_nodes is not None:
                     return h5_nodes
 
-            # d = df['column']
-            if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
-                    and isinstance(rhs.index, str)):
-                assign.value = self._get_df_cols(rhs.value)[rhs.index]
-                return [assign]
+            # d = df['column'] or df[['C1', 'C2']]
+            if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
+                # d = df['column']
+                if isinstance(rhs.index, str):
+                    assign.value = self._get_df_cols(rhs.value)[rhs.index]
+                    return [assign]
+                # df[['C1', 'C2']]
+                if isinstance(rhs.index, list) and all(
+                        isinstance(rhs.index[i], str)
+                        for i in range(len(rhs.index))):
+                    in_df_map = self._get_df_cols(rhs.value)
+                    out_df_map = {c:in_df_map[c] for c in rhs.index}
+                    self._create_df(lhs, out_df_map, label)
+                    return []
+                # raise ValueError("unsupported dataframe access {}[{}]".format(
+                #                  rhs.value.name, rhs.index))
 
             # df1 = df[df.A > .5], df.iloc[1:n], df.iloc[[1,2,3]], ...
             if rhs.op in ('getitem', 'static_getitem') and (
