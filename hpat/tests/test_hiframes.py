@@ -44,6 +44,19 @@ class TestHiFrames(unittest.TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_column_list_select2(self):
+        # make sure HPAT copies the columns like Pandas does
+        def test_impl(df):
+            df2 = df[['A']]
+            df2['A'] += 10
+            return df2.A, df.A
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        np.testing.assert_array_equal(hpat_func(df.copy())[1], test_impl(df)[1])
+
     def test_pd_DataFrame_from_series_par(self):
         def test_impl(n):
             S1 = pd.Series(np.ones(n))

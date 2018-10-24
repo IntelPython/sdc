@@ -201,9 +201,11 @@ class HiFrames(object):
                         isinstance(rhs.index[i], str)
                         for i in range(len(rhs.index))):
                     in_df_map = self._get_df_cols(rhs.value)
-                    out_df_map = {c:in_df_map[c] for c in rhs.index}
+                    nodes = []
+                    out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
+                                                            for c in rhs.index}
                     self._create_df(lhs, out_df_map, label)
-                    return []
+                    return nodes
                 # raise ValueError("unsupported dataframe access {}[{}]".format(
                 #                  rhs.value.name, rhs.index))
 
@@ -1941,6 +1943,14 @@ class HiFrames(object):
         # XXX placeholder for df variable renaming
         assert isinstance(df_var, ir.Var)
         return df_var
+
+
+def _gen_arr_copy(in_arr, nodes):
+    f_block = compile_to_numba_ir(
+        lambda A: A.copy(), {}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [in_arr])
+    nodes += f_block.body[:-2]
+    return nodes[-1].target
 
 
 def simple_block_copy_propagate(block):
