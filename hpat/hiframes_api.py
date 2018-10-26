@@ -1134,7 +1134,7 @@ def lower_ts_series_to_arr_typ(context, builder, sig, args):
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
     # TODO: handle NA as 1st value
-    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
+    if len(val) > 0 and isinstance(val.values[0], str):  # and isinstance(val[-1], str):
         arr_typ = string_array_type
     elif len(val) > 0 and isinstance(val.values[0], datetime.date):
         # XXX: using .values to check date type since DatetimeIndex returns
