@@ -283,7 +283,7 @@ class HiFramesTyped(object):
 
             if rhs.op == 'call':
 
-                fdef = guard(find_callname, self.func_ir, rhs)
+                fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
                 if fdef is None:
                     from numba.stencil import StencilFunc
                     # could be make_function from list comprehension which is ok
