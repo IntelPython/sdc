@@ -56,7 +56,7 @@ def intraday_mean_revert():
         n_days = len(df['Rets'])
         res = np.zeros(max_num_days)
         if n_days:
-            res[-n_days:] = df['Rets'].fillna(0)
+            res[-n_days:] = df['Rets'].fillna(0).values
         all_res += res
 
     f.close()
