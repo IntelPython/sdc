@@ -110,10 +110,12 @@ class PIO(object):
         return types.Array(numba_dtype, ndims, 'C')
 
     def _get_h5_type_locals(self, varname):
-        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':h5_types') not in self.locals:
-            return None
-        new_name = self.reverse_copies[varname]
-        typ = self.locals.pop(new_name + ":h5_types")
+        # TODO: can we do this without reverse_copies?
+        # TODO: if copy propagation is done, varname itself should be checked
+        new_name = self.reverse_copies.get(varname, None)
+        typ = self.locals.pop(new_name, None)
+        if typ is None and new_name is not None:
+            typ = self.locals.pop(new_name + ":h5_types", None)
         return typ
 
     def _handle_h5_File_call(self, assign, lhs, rhs):
