@@ -103,7 +103,8 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
 
     int num_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
-    if(is_parallel && num_pes>1)
+    // TODO: enable MPIO after fixing address overflow issues
+    if(false && is_parallel && num_pes>1)
     {
         ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
         CHECK(ret != -1, "h5 open MPI driver set error");
@@ -202,7 +203,8 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     int num_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel && num_pes>1)
+    // TODO: enable MPIO after fixing address overflow issues
+    if(false && is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
@@ -277,7 +279,8 @@ int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
     int num_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel && num_pes>1)
+    // TODO: enable MPIO after fixing address overflow issues
+    if(false && is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
@@ -433,7 +436,8 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int num_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
-    if(is_parallel && num_pes>1)
+    // TODO: enable MPIO after fixing address overflow issues
+    if(false && is_parallel && num_pes>1)
     {
         xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
         H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
