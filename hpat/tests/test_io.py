@@ -121,6 +121,9 @@ class TestIO(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl, h5_types={'X': hpat.int64[:]})
         self.assertEqual(hpat_func(), test_impl())
+        # test using locals for typing
+        hpat_func = hpat.jit(test_impl, locals={'X': hpat.int64[:]})
+        self.assertEqual(hpat_func(), test_impl())
 
     def test_h5_group_keys(self):
         def test_impl():
