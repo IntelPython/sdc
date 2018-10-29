@@ -312,7 +312,7 @@ class DistributedAnalysis(object):
         # dummy hiframes functions
         if func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
-                'to_date_series_type'):
+                'to_date_series_type', 'dummy_unbox_series'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 

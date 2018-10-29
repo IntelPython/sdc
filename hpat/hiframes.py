@@ -1647,6 +1647,7 @@ class HiFrames(object):
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
             self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
             self._add_node_defs(nodes)
 
         # TODO: handle datetime.date() series
@@ -1693,6 +1694,7 @@ class HiFrames(object):
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
             self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
             self._add_node_defs(nodes)
 
         # TODO: handle list(series), set(series), etc.
@@ -1716,6 +1718,7 @@ class HiFrames(object):
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
             self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
             self._add_node_defs(nodes)
 
 
