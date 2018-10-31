@@ -13,7 +13,8 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             add_offset_to_labels, get_ir_of_code, find_const,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition,
-                            build_definitions, replace_vars_stmt, replace_vars_inner)
+                            build_definitions, replace_vars_stmt,
+                            replace_vars_inner, find_build_sequence)
 
 from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
@@ -1377,12 +1378,13 @@ class HiFrames(object):
 
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
-        key_colname, as_index = self._get_agg_obj_args(obj_var)
+        key_colnames, as_index = self._get_agg_obj_args(obj_var)
         if out_colnames is None:
             out_colnames = list(self.df_vars[df_var.name].keys())
             # key arr is not output by default
             # as_index should be handled separately since it just returns keys
-            out_colnames.remove(key_colname)
+            for k in key_colnames:
+                out_colnames.remove(k)
 
         # find input vars and output types
         out_types = {}
@@ -1402,7 +1404,7 @@ class HiFrames(object):
             out_types[out_cname] = nodes[-1].target
 
         # output column map, create dataframe if multiple outputs
-        out_key_var = None
+        out_key_vars = None
         if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
         else:
@@ -1410,14 +1412,19 @@ class HiFrames(object):
                                 for col in out_colnames})
             out_df = df_col_map.copy()
             if as_index is False:
-                out_key_var = ir.Var(lhs.scope, mk_unique_var(key_colname), lhs.loc)
-                out_df[key_colname] = out_key_var
+                out_key_vars = []
+                for k in key_colnames:
+                    out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
+                    out_df[k] = out_key_var
+                    out_key_vars.append(out_key_var)
 
             self._create_df(lhs.name, out_df, label)
 
+        in_key_vars = [self.df_vars[df_var.name][k] for k in key_colnames]
+
         agg_node = hiframes_aggregate.Aggregate(
-            lhs.name, df_var.name, key_colname, out_key_var, df_col_map,
-            in_vars, self.df_vars[df_var.name][key_colname],
+            lhs.name, df_var.name, key_colnames, out_key_vars, df_col_map,
+            in_vars, in_key_vars,
             agg_func, out_types, lhs.loc)
         nodes.append(agg_node)
         return nodes
@@ -1439,9 +1446,24 @@ class HiFrames(object):
             by_arg = kws['by']
         else:  # pragma: no cover
             raise ValueError("by argument for groupby() required")
-        key_colname = guard(find_const, self.func_ir, by_arg)
 
-        return key_colname, as_index
+        err_msg = ("groupby() by argument should be "
+                   "list of column names or a column name")
+        by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+        if by_arg_def is None:
+            # try single key column
+            by_arg_def = guard(find_const, self.func_ir, by_arg)
+            if by_arg_def is None:
+                raise ValueError(err_msg)
+            key_colnames = [by_arg_def]
+        else:
+            if by_arg_def[1] != 'build_list':
+                raise ValueError(err_msg)
+            key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
+            if any(not isinstance(v, str) for v in key_colnames):
+                raise ValueError(err_msg)
+
+        return key_colnames, as_index
 
     def _get_df_obj_select(self, obj_var, obj_name):
         """analyze selection of columns in after groupby() or rolling()
