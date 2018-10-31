@@ -260,6 +260,13 @@ def is_np_array(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], types.Array))
 
+def is_array_container(typemap, varname):
+    return (varname in typemap
+            and isinstance(typemap[varname], (types.List, types.Set))
+                and (isinstance(typemap[varname].dtype, types.Array)
+                or typemap[varname].dtype == string_array_type))
+
+
 # converts an iterable to array, similar to np.array, but can support
 # other things like StringArray
 # TODO: other types like datetime?
