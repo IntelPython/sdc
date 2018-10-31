@@ -1254,6 +1254,7 @@ class HiFrames(object):
         return False
 
     def _handle_df_pivot_table(self, lhs, rhs, df_var, label):
+        # TODO: multiple keys (index columns)
         kws = dict(rhs.kws)
         values_arg = self._get_str_arg('pivot_table', rhs.args, kws, 0, 'values')
         index_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'index')
@@ -1284,8 +1285,8 @@ class HiFrames(object):
         self._create_df(lhs.name, out_df, label)
         pivot_arr = self.df_vars[df_var.name][columns_arg]
         agg_node = hiframes_aggregate.Aggregate(
-            lhs.name, df_var.name, index_arg, None, df_col_map,
-            in_vars, self.df_vars[df_var.name][index_arg],
+            lhs.name, df_var.name, [index_arg], None, df_col_map,
+            in_vars, [self.df_vars[df_var.name][index_arg]],
             agg_func, out_types, lhs.loc, pivot_arr, pivot_values)
         nodes.append(agg_node)
         return nodes
@@ -1331,6 +1332,7 @@ class HiFrames(object):
 
     def _handle_crosstab(self, lhs, rhs, label):
         kws = dict(rhs.kws)
+        # TODO: hanlde multiple keys (index args)
         index_arg = self._get_arg('crosstab', rhs.args, kws, 0, 'index')
         columns_arg = self._get_arg('crosstab', rhs.args, kws, 1, 'columns')
         # TODO: handle values and aggfunc options
@@ -1361,8 +1363,8 @@ class HiFrames(object):
         # TODO: make out_key_var an index column
 
         agg_node = hiframes_aggregate.Aggregate(
-            lhs.name, 'crosstab', index_arg.name, None, df_col_map,
-            in_vars, index_arg,
+            lhs.name, 'crosstab', [index_arg.name], None, df_col_map,
+            in_vars, [index_arg],
             _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)
         nodes.append(agg_node)
         return nodes
