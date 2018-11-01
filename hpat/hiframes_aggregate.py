@@ -513,15 +513,15 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     # TODO: handle key column being part of output
 
-    key_typ = typemap[agg_node.key_arrs[0].name]
+    key_typs = tuple(typemap[v.name] for v in agg_node.key_arrs)
     # get column variables
     in_col_vars = [v for (n, v) in sorted(agg_node.df_in_vars.items())]
     out_col_vars = [v for (n, v) in sorted(agg_node.df_out_vars.items())]
     # get column types
-    in_col_typs = [typemap[v.name] for v in in_col_vars]
-    out_col_typs = [typemap[v.name] for v in out_col_vars]
+    in_col_typs = tuple(typemap[v.name] for v in in_col_vars)
+    out_col_typs = tuple(typemap[v.name] for v in out_col_vars)
     pivot_typ = types.none if agg_node.pivot_arr is None else typemap[agg_node.pivot_arr.name]
-    arg_typs = tuple([key_typ] + in_col_typs + [pivot_typ])
+    arg_typs = tuple(key_typs + in_col_typs + (pivot_typ,))
 
     agg_func_struct = get_agg_func_struct(
         agg_node.agg_func, in_col_typs, out_col_typs, typingctx, targetctx,
@@ -531,7 +531,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     out_typs = [t.dtype for t in out_col_typs]
 
     top_level_func = gen_top_level_agg_func(
-        key_typ, return_key, agg_func_struct.var_typs, out_typs,
+        agg_node.key_names, return_key, agg_func_struct.var_typs, out_typs,
         agg_node.df_in_vars.keys(), agg_node.df_out_vars.keys(), parallel)
 
     f_block = compile_to_numba_ir(top_level_func,
@@ -557,7 +557,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
     else:
         in_col_vars.append(agg_node.pivot_arr)
 
-    replace_arg_nodes(f_block, [agg_node.key_arrs[0]] + in_col_vars)
+    replace_arg_nodes(f_block, agg_node.key_arrs + in_col_vars)
 
     tuple_assign = f_block.body[-3]
     assert (is_assign(tuple_assign) and isinstance(tuple_assign.value, ir.Expr)
@@ -579,28 +579,28 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 distributed.distributed_run_extensions[Aggregate] = agg_distributed_run
 
 @numba.njit
-def parallel_agg(key_arr, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
+def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
         __update_redvars, __combine_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
-    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
+    shuffle_meta = alloc_shuffle_metadata(key_arrs[0], n_pes, False)
     data_shuffle_meta = data_alloc_shuffle_metadata(data_redvar_dummy, n_pes, False)
 
     # calc send/recv counts
-    key_set = get_key_set(key_arr)
-    for i in range(len(key_arr)):
-        val = key_arr[i]
+    key_set = get_key_set(key_arrs[0])
+    for i in range(len(key_arrs[0])):
+        val = key_arrs[0][i]
         if val not in key_set:
             key_set.add(val)
             node_id = hash(val) % n_pes
             update_shuffle_meta(shuffle_meta, node_id, i, val, False)
         #update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
 
-    finalize_shuffle_meta(key_arr, shuffle_meta, False)
+    finalize_shuffle_meta(key_arrs[0], shuffle_meta, False)
     finalize_data_shuffle_meta(data_redvar_dummy, data_shuffle_meta, shuffle_meta, False, init_vals)
 
-    agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta, __update_redvars, pivot_arr)
-    alltoallv(key_arr, shuffle_meta)
+    agg_parallel_local_iter(key_arrs[0], data_in, shuffle_meta, data_shuffle_meta, __update_redvars, pivot_arr)
+    alltoallv(key_arrs[0], shuffle_meta)
     reduce_recvs = alltoallv_tup(data_redvar_dummy, data_shuffle_meta, shuffle_meta)
     #print(data_shuffle_meta[0].out_arr)
     key_arr = shuffle_meta.out_arr
@@ -671,19 +671,19 @@ def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
     return out_arrs
 
 @numba.njit
-def agg_seq_iter(key_arr, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
+def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
                  __update_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
-    key_set = set(key_arr)
+    key_set = set(key_arrs[0])
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
     # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
     local_redvars = alloc_arr_tup(n_uniq_keys, redvar_dummy_tup, init_vals)
 
-    key_write_map = get_key_dict(key_arr)
+    key_write_map = get_key_dict(key_arrs[0])
     curr_write_ind = 0
-    for i in range(len(key_arr)):
-        k = key_arr[i]
+    for i in range(len(key_arrs[0])):
+        k = key_arrs[0][i]
         if k not in key_write_map:
             w_ind = curr_write_ind
             curr_write_ind += 1
@@ -829,14 +829,15 @@ def setitem_array_with_str_overload(arr_t, ind_t, val_t):
     return setitem_impl
 
 
-def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
+def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
     """create the top level aggregation function by generating text
     """
 
     # arg names
-    in_names = ["in_c{}".format(i) for i in range(len(in_col_names))]
-    out_names = ["out_c{}".format(i) for i in range(len(out_col_names))]
+    in_names = tuple("in_{}".format(c) for c in in_col_names)
+    out_names = tuple("out_{}".format(c) for c in out_col_names)
+    key_args = ", ".join("key_{}".format(c) for c in key_names)
 
     in_args = ", ".join(in_names)
     if in_args != '':
@@ -845,29 +846,33 @@ def gen_top_level_agg_func(key_typ, return_key, red_var_typs, out_typs,
     # pass None instead of False to enable static specialization in
     # alloc_agg_output()
     return_key_p = "True" if return_key else "None"
+    # TODO: fix multi-key return key output
 
-    func_text = "def agg_top(key_arr{}, pivot_arr):\n".format(in_args)
+    func_text = "def agg_top({}{}, pivot_arr):\n".format(key_args, in_args)
     func_text += "    data_redvar_dummy = ({}{})\n".format(
         ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
         "," if len(red_var_typs) == 1 else "")
     func_text += "    out_dummy_tup = ({}{}{})\n".format(
         ",".join(["np.empty(1, np.{})".format(t) for t in out_typs]),
         "," if len(out_typs) != 0 else "",
-        "key_arr," if return_key else "")
+        "{},".format(key_args) if return_key else "")
     func_text += "    data_in = ({}{})\n".format(",".join(in_names),
         "," if len(in_names) == 1 else "")
     func_text += "    init_vals = __init_func()\n"
-    out_tup = ", ".join(out_names + ['out_key'] if return_key else out_names)
+    # TODO: multikey output
+    out_keys = tuple("out_key_{}".format(c) for c in key_names)
+    out_tup = ", ".join(out_names + out_keys if return_key else out_names)
 
     if parallel:
-        func_text += ("    ({},) = parallel_agg(key_arr, data_redvar_dummy, "
+        func_text += ("    ({},) = parallel_agg(({},), data_redvar_dummy, "
             "out_dummy_tup, data_in, init_vals, __update_redvars, "
             "__combine_redvars, __eval_res, {}, pivot_arr)\n").format(
-                out_tup, return_key_p)
+                out_tup, key_args, return_key_p)
     else:
-        func_text += ("    ({},) = agg_seq_iter(key_arr, data_redvar_dummy, "
+        func_text += ("    ({},) = agg_seq_iter(({},), data_redvar_dummy, "
             "out_dummy_tup, data_in, init_vals, __update_redvars, "
-            "__eval_res, {}, pivot_arr)\n").format(out_tup, return_key_p)
+            "__eval_res, {}, pivot_arr)\n").format(
+                out_tup, key_args, return_key_p)
 
     func_text += "    return ({},)\n".format(out_tup)
 
