@@ -299,7 +299,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         double *double_data = (double*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
         {
-            if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
+            if (!::arrow::BitUtil::GetBit(null_bitmap_buff, i+rows_to_skip))
             {
                 // std::cout << "NULL found" << std::endl;
                 // TODO: use NPY_NAN
@@ -313,7 +313,7 @@ inline void copy_data(uint8_t* out_data, const uint8_t* buff,
         float *float_data = (float*)out_data;
         for(int64_t i=0; i<rows_to_read; i++)
         {
-            if (::arrow::BitUtil::BitNotSet(null_bitmap_buff, i+rows_to_skip))
+            if (!::arrow::BitUtil::GetBit(null_bitmap_buff, i+rows_to_skip))
             {
                 // std::cout << "NULL found" << std::endl;
                 // TODO: use NPY_NAN
