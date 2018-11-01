@@ -1,4 +1,5 @@
 from __future__ import print_function, division, absolute_import
+import operator
 from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
@@ -1206,9 +1207,9 @@ def _set_merge_output(indent, left_other_names, right_other_names, left_ind, rig
     return func_text
 
 
-@infer
+@infer_global(operator.getitem)
 class GetItemCBuf(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         c_buff, idx = args
@@ -1217,7 +1218,7 @@ class GetItemCBuf(AbstractTemplate):
                 return signature(types.int32, c_buff, idx)
 
 
-@lower_builtin('getitem', c_buffer_type, types.intp)
+@lower_builtin(operator.getitem, c_buffer_type, types.intp)
 def c_buffer_type_getitem(context, builder, sig, args):
     base_ptr = builder.bitcast(args[0], lir.IntType(32).as_pointer())
     return builder.load(builder.gep(base_ptr, [args[1]], inbounds=True))

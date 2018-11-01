@@ -41,7 +41,7 @@ class CharType(types.Type):
 char_type = CharType()
 register_model(CharType)(models.IntegerModel)
 
-@overload('getitem')
+@overload(operator.getitem)
 def char_getitem_overload(_str, ind):
     if _str == string_type and isinstance(ind, types.Integer):
         sig = char_type(
@@ -55,7 +55,7 @@ def char_getitem_overload(_str, ind):
         return impl
 
 # XXX: fix overload for getitem and use it
-@lower_builtin('getitem', StringType, types.Integer)
+@lower_builtin(operator.getitem, StringType, types.Integer)
 def getitem_string(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -161,9 +161,9 @@ class StringAttribute(AttributeTemplate):
         return signature(types.List(string_type), *args)
 
 
-# @infer
+# @infer_global(operator.getitem)
 # class GetItemString(AbstractTemplate):
-#     key = "getitem"
+#     key = operator.getitem
 #
 #     def generic(self, args, kws):
 #         assert not kws
@@ -452,7 +452,7 @@ def string_split_impl(context, builder, sig, args):
     return impl_ret_new_ref(context, builder, sig.return_type, _list.value)
 
 
-# @lower_builtin('getitem', StringType, types.Integer)
+# @lower_builtin(operator.getitem, StringType, types.Integer)
 # def getitem_string(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
 #                             [lir.IntType(8).as_pointer(), lir.IntType(64)])

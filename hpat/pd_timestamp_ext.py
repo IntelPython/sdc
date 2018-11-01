@@ -856,9 +856,9 @@ def parse_datetime_str(str):
 
 # XXX: code for timestamp series getitem in regular Numba
 
-# @infer
+# @infer_global(operator.getitem)
 # class GetItemTimestampSeries(AbstractTemplate):
-#     key = "getitem"
+#     key = operator.getitem
 #
 #     def generic(self, args, kws):
 #         assert not kws
@@ -875,7 +875,7 @@ def parse_datetime_str(str):
 # #import hdatetime_ext
 # #ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
 #
-# @lower_builtin('getitem', TimestampSeriesType, types.Integer)
+# @lower_builtin(operator.getitem, TimestampSeriesType, types.Integer)
 # def lower_timestamp_series_getitem(context, builder, sig, args):
 #     #print("lower_timestamp_series_getitem", sig, type(sig), args, type(args), sig.return_type)
 #     old_ret = sig.return_type

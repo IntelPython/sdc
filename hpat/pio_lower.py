@@ -1,3 +1,4 @@
+import operator
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
@@ -33,8 +34,8 @@ else:
 
 h5g_close = types.ExternalFunction("h5g_close", types.none(h5group_type))
 
-@lower_builtin("getitem", h5file_type, StringType)
-@lower_builtin("getitem", h5dataset_or_group_type, StringType)
+@lower_builtin(operator.getitem, h5file_type, StringType)
+@lower_builtin(operator.getitem, h5dataset_or_group_type, StringType)
 def h5_open_dset_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
