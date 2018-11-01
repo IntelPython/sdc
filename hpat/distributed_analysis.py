@@ -15,6 +15,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
+from hpat.pd_series_ext import BoxedSeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
                         is_np_array, find_build_tuple, debug_prints)
@@ -767,8 +768,11 @@ class DistributedAnalysis(object):
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
+            # Handle BoxedSeriesType since it comes from Arg node and it could
+            # have user-defined distribution
             if (is_array(self.typemap, varname)
-                    or is_array_container(self.typemap, varname)):
+                    or is_array_container(self.typemap, varname)
+                    or isinstance(self.typemap[varname], BoxedSeriesType)):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays

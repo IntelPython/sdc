@@ -140,7 +140,8 @@ class DistributedPass(object):
                     rhs = inst.value
                     if isinstance(rhs, ir.Expr):
                         out_nodes = self._run_expr(inst, namevar_table)
-                    elif isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
+                    elif isinstance(rhs, ir.Var) and (self._is_1D_arr(rhs.name)
+                           and not is_array_container(self.typemap, rhs.name)):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
