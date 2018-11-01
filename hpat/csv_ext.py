@@ -9,11 +9,7 @@ import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
 from hpat.distributed_analysis import Distribution
-from hpat.hiframes_sort import (
-    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
-    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
-    update_shuffle_meta, update_data_shuffle_meta,
-    )
+
 from hpat.hiframes_api import PandasDataFrameType, lower_unbox_df_column
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, to_string_list,
