@@ -22,7 +22,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               pre_alloc_string_array, del_str, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice,
                               setitem_string_array, str_copy_ptr)
-
+from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
 import numpy as np
 
@@ -513,34 +513,73 @@ def _count_overlap(r_key_arr, start, end):
         count += 1
     return offset, count
 
-def write_send_buff(shuffle_meta, node_id, val):
-    return 0
+
+
+
+def write_send_buff(shuffle_meta, node_id, i, val, data):
+    return i
 
 @overload(write_send_buff)
-def write_send_buff_overload(meta_t, node_id_t, val_t):
-    arr_t = meta_t.struct['out_arr']
-    if isinstance(arr_t, types.Array):
-        def write_impl(shuffle_meta, node_id, val):
-            # TODO: refactor to use only tmp_offset
-            ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
-            shuffle_meta.send_buff[ind] = val
-            return ind
+def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
+    func_text = "def f(meta, node_id, i, val, data):\n"
+    func_text += "  w_ind = meta.send_disp[node_id] + meta.tmp_offset[node_id]\n"
+    n_keys = len(val_t.types)
+    n_str = 0
+    for i, typ in enumerate(val_t.types + data_t.types):
+        val = ("val[{}]".format(i) if i < n_keys
+               else "data[{}][i]".format(i - n_keys))
+        func_text += "  val_{} = {}\n".format(i, val)
+        if not typ in (string_type, string_array_type):
+            func_text += "  meta.send_buff_tup[{}][w_ind] = val_{}\n".format(i, i)
+        else:
+            func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
+            func_text += "  meta.send_arr_lens_tup[{}][w_ind] = n_chars_{}\n".format(n_str, i)
+            func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id] + meta.tmp_offset_char_tup[{}][node_id]\n".format(i, n_str, n_str)
+            func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}.c_str(), n_chars_{})\n".format(n_str, i, i, i)
+            func_text += "  meta.tmp_offset_char_tup[{}][node_id] += n_chars_{}\n".format(n_str, i)
+            # func_text += "  del_str(val_{})\n".format(i)
+            n_str += 1
 
-        return write_impl
-    assert arr_t == string_array_type
-    def write_str_impl(shuffle_meta, node_id, val):
-        n_chars = len(val)
-        # offset buff
-        ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
-        shuffle_meta.send_arr_lens[ind] = n_chars
-        # data buff
-        indc = shuffle_meta.send_disp_char[node_id] + shuffle_meta.tmp_offset_char[node_id]
-        str_copy_ptr(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
-        shuffle_meta.tmp_offset_char[node_id] += n_chars
-        #del_str(val)
-        return ind
+    func_text += "  return w_ind\n"
 
-    return write_str_impl
+    # print(func_text)
+
+    loc_vars = {}
+    exec(func_text, {'del_str': del_str, 'str_copy_ptr': str_copy_ptr}, loc_vars)
+    write_impl = loc_vars['f']
+    return write_impl
+
+
+
+
+# def write_send_buff(shuffle_meta, node_id, val):
+#     return 0
+
+# @overload(write_send_buff)
+# def write_send_buff_overload(meta_t, node_id_t, val_t):
+#     arr_t = meta_t.struct['out_arr']
+#     if isinstance(arr_t, types.Array):
+#         def write_impl(shuffle_meta, node_id, val):
+#             # TODO: refactor to use only tmp_offset
+#             ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+#             shuffle_meta.send_buff[ind] = val
+#             return ind
+
+#         return write_impl
+#     assert arr_t == string_array_type
+#     def write_str_impl(shuffle_meta, node_id, val):
+#         n_chars = len(val)
+#         # offset buff
+#         ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
+#         shuffle_meta.send_arr_lens[ind] = n_chars
+#         # data buff
+#         indc = shuffle_meta.send_disp_char[node_id] + shuffle_meta.tmp_offset_char[node_id]
+#         str_copy_ptr(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
+#         shuffle_meta.tmp_offset_char[node_id] += n_chars
+#         #del_str(val)
+#         return ind
+
+#     return write_str_impl
 
 
 def write_data_send_buff(data_shuffle_meta, node_id, i, data, key_meta):
@@ -569,6 +608,7 @@ def write_data_send_buff_overload(meta_t, node_id_t, ind_t, data_t, key_meta_t):
     exec(func_text, {'del_str': del_str, 'str_copy_ptr': str_copy_ptr}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
+
 
 from numba.typing.templates import (
     signature, AbstractTemplate, infer_global, infer)

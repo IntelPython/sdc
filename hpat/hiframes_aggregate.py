@@ -33,6 +33,7 @@ from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+    alloc_pre_shuffle_metadata,
     )
 from hpat.hiframes_join import write_send_buff
 
@@ -583,8 +584,7 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
         __update_redvars, __combine_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
-    shuffle_meta = alloc_shuffle_metadata(key_arrs[0], n_pes, False)
-    data_shuffle_meta = data_alloc_shuffle_metadata(data_redvar_dummy, n_pes, False)
+    pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data_redvar_dummy, n_pes, False)
 
     # calc send/recv counts
     key_set = get_key_set(key_arrs[0])
@@ -593,18 +593,18 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
         if val not in key_set:
             key_set.add(val)
             node_id = hash(val) % n_pes
-            update_shuffle_meta(shuffle_meta, node_id, i, val, False)
-        #update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
+            # data isn't computed here yet so pass empty tuple
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,), (), False)
 
-    finalize_shuffle_meta(key_arrs[0], shuffle_meta, False)
-    finalize_data_shuffle_meta(data_redvar_dummy, data_shuffle_meta, shuffle_meta, False, init_vals)
+    shuffle_meta = finalize_shuffle_meta(key_arrs, data_redvar_dummy, pre_shuffle_meta, n_pes, False, init_vals)
 
-    agg_parallel_local_iter(key_arrs[0], data_in, shuffle_meta, data_shuffle_meta, __update_redvars, pivot_arr)
-    alltoallv(key_arrs[0], shuffle_meta)
-    reduce_recvs = alltoallv_tup(data_redvar_dummy, data_shuffle_meta, shuffle_meta)
+    agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy, __update_redvars, pivot_arr)
+
+    recvs = alltoallv_tup(key_arrs + data_redvar_dummy, shuffle_meta)
     #print(data_shuffle_meta[0].out_arr)
-    key_arr = shuffle_meta.out_arr
-    out_arrs = agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup,
+    key_arrs = _get_keys_tup(recvs, key_arrs)
+    reduce_recvs = _get_data_tup(recvs, key_arrs)
+    out_arrs = agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup,
         init_vals, __combine_redvars, __eval_res, return_key, data_in, pivot_arr)
     return out_arrs
 
@@ -615,7 +615,7 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
 
 
 @numba.njit
-def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
+def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
                                         __update_redvars, pivot_arr):  # pragma: no cover
     # _init_val_0 = np.int64(0)
     # redvar_0_arr = np.full(n_uniq_keys, _init_val_0, np.int64)
@@ -623,16 +623,15 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
     # redvar_1_arr = np.full(n_uniq_keys, _init_val_1, np.int64)
     # out_key = np.empty(n_uniq_keys, np.float64)
     n_pes = hpat.distributed_api.get_size()
-    key_write_map = get_key_dict(key_arr)#hpat.dict_ext.dict_float64_int64_init()
-    redvar_arrs = get_shuffle_send_buffs(data_shuffle_meta)
+    key_write_map = get_key_dict(key_arrs[0]) # hpat.dict_ext.init_dict_float64_int64()
 
-    for i in range(len(key_arr)):
-        k = key_arr[i]
+    redvar_arrs = get_shuffle_data_send_buffs(shuffle_meta, key_arrs, data_redvar_dummy)
+
+    for i in range(len(key_arrs[0])):
+        k = key_arrs[0][i]
         if k not in key_write_map:
             node_id = hash(k) % n_pes
-            # w_ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
-            # shuffle_meta.send_buff[w_ind] = k
-            w_ind = write_send_buff(shuffle_meta, node_id, k)
+            w_ind = write_send_buff(shuffle_meta, node_id, i, (k,), ())
             shuffle_meta.tmp_offset[node_id] += 1
             key_write_map[k] = w_ind
         else:
@@ -643,19 +642,19 @@ def agg_parallel_local_iter(key_arr, data_in, shuffle_meta, data_shuffle_meta,
 
 
 @numba.njit
-def agg_parallel_combine_iter(key_arr, reduce_recvs, out_dummy_tup, init_vals,
+def agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup, init_vals,
                 __combine_redvars, __eval_res, return_key, data_in, pivot_arr):  # pragma: no cover
-    key_set = set(key_arr)
+    key_set = set(key_arrs[0])
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
     # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
     local_redvars = alloc_arr_tup(n_uniq_keys, reduce_recvs, init_vals)
 
-    key_write_map = get_key_dict(key_arr)
+    key_write_map = get_key_dict(key_arrs[0])
     curr_write_ind = 0
-    for i in range(len(key_arr)):
-        k = key_arr[i]
+    for i in range(len(key_arrs[0])):
+        k = key_arrs[0][i]
         if k not in key_write_map:
             w_ind = curr_write_ind
             curr_write_ind += 1
@@ -698,18 +697,52 @@ def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
         __eval_res(local_redvars, out_arrs, j)
     return out_arrs
 
-def get_shuffle_send_buffs(sh):  # pragma: no cover
+
+def _get_keys_tup(recvs, key_arrs):
+    return recvs[:len(key_arrs)]
+
+@overload(_get_keys_tup)
+def _get_keys_tup_overload(recvs_t, key_arrs_t):
+    n_keys = len(key_arrs_t.types)
+    func_text = "def f(recvs, key_arrs):\n"
+    res = ",".join("recvs[{}]".format(i) for i in range(n_keys))
+    func_text += "  return ({}{})\n".format(res, "," if n_keys==1 else "")
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+
+def _get_data_tup(recvs, key_arrs):
+    return recvs[len(key_arrs):]
+
+@overload(_get_data_tup)
+def _get_data_tup_overload(recvs_t, key_arrs_t):
+    n_keys = len(key_arrs_t.types)
+    n_all = len(recvs_t.types)
+    n_data = n_all - n_keys
+    func_text = "def f(recvs, key_arrs):\n"
+    res = ",".join("recvs[{}]".format(i) for i in range(n_keys, n_all))
+    func_text += "  return ({}{})\n".format(res, "," if n_data==1 else "")
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+def get_shuffle_data_send_buffs(sh, karrs, data):  # pragma: no cover
     return ()
 
-@overload(get_shuffle_send_buffs)
-def get_shuffle_send_buffs_overload(data_shuff_t):
-    assert isinstance(data_shuff_t, (types.Tuple, types.UniTuple))
-    count = data_shuff_t.count
+@overload(get_shuffle_data_send_buffs)
+def get_shuffle_data_send_buffs_overload(shuffle_meta_t, key_arrs_t, data_t):
+    n_keys = len(key_arrs_t.types)
+    count = len(data_t.types)
 
-    func_text = "def send_buff_impl(data):\n"
-    func_text += "  return ({}{})\n".format(','.join(["data[{}].send_buff".format(
-        i) for i in range(count)]),
+    func_text = "def send_buff_impl(meta, key_arrs, data):\n"
+    func_text += "  return ({}{})\n".format(','.join(["meta.send_buff_tup[{}]".format(
+        i) for i in range(n_keys, count + n_keys)]),
         "," if count == 1 else "")  # single value needs comma to become tuple
+
+    # print(func_text)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
