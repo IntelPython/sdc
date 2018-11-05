@@ -54,27 +54,37 @@ def typ_str_to_obj(typ_str):
         return "string_type"
     return "types.{}".format(typ_str)
 
-for key_typ in elem_types:
-    for val_typ in elem_types:
-        k_obj = typ_str_to_obj(key_typ)
-        v_obj = typ_str_to_obj(val_typ)
+for key_typ_ in elem_types:
+    for val_typ_ in elem_types:
+        k_obj = typ_str_to_obj(key_typ_)
+        v_obj = typ_str_to_obj(val_typ_)
+        key_typ = str(key_typ_).rstrip('c')
+        val_typ = str(val_typ_).rstrip('c')
         # create types
-        exec("dict_{}_{}_type = DictType({}, {})".format(key_typ, val_typ,
-                                                                k_obj, v_obj))
+        exec("dict_{}_{}_type = DictType({}, {})".format(key_typ, val_typ, k_obj, v_obj))
         # init dict object
-        exec("ll.add_symbol('init_dict_{}_{}', hdict_ext.init_dict_{}_{})".format(
-            key_typ, val_typ, key_typ, val_typ))
-        exec("init_dict_{}_{} = types.ExternalFunction('init_dict_{}_{}', dict_{}_{}_type())".format(
-            key_typ, val_typ, key_typ, val_typ, key_typ, val_typ))
+        exec("print('{0}_{1}');ll.add_symbol('dict_{0}_{1}_init', hdict_ext.dict_{0}_{1}_init)".format(key_typ, val_typ))
+        exec("dict_{0}_{1}_init = types.ExternalFunction('dict_{0}_{1}_init', dict_{0}_{1}_type())".format(key_typ, val_typ))
         # setitem
-        exec("ll.add_symbol('dict_setitem_{}_{}', hdict_ext.dict_setitem_{}_{})".format(
-            key_typ, val_typ, key_typ, val_typ))
+        exec("ll.add_symbol('dict_{0}_{1}_setitem', hdict_ext.dict_{0}_{1}_setitem)".format(key_typ, val_typ))
+        # getitem
+        exec("ll.add_symbol('dict_{0}_{1}_getitem', hdict_ext.dict_{0}_{1}_getitem)".format(key_typ, val_typ))
         # in
-        exec("ll.add_symbol('dict_in_{}_{}', hdict_ext.dict_in_{}_{})".format(
-            key_typ, val_typ, key_typ, val_typ))
-        exec("ll.add_symbol('dict_getitem_{}_{}', hdict_ext.dict_getitem_{}_{})".format(
-            key_typ, val_typ, key_typ, val_typ))
-
+        exec("ll.add_symbol('dict_{0}_{1}_in', hdict_ext.dict_{0}_{1}_in)".format(key_typ, val_typ))
+        # print
+        exec("ll.add_symbol('dict_{0}_{1}_print', hdict_ext.dict_{0}_{1}_print)".format(key_typ, val_typ))
+        # get
+        exec("ll.add_symbol('dict_{0}_{1}_get', hdict_ext.dict_{0}_{1}_get)".format(key_typ, val_typ))
+        # pop
+        exec("ll.add_symbol('dict_{0}_{1}_pop', hdict_ext.dict_{0}_{1}_pop)".format(key_typ, val_typ))
+        # keys
+        exec("ll.add_symbol('dict_{0}_{1}_keys', hdict_ext.dict_{0}_{1}_keys)".format(key_typ, val_typ))
+        # min
+        exec("ll.add_symbol('dict_{0}_{1}_min', hdict_ext.dict_{0}_{1}_min)".format(key_typ, val_typ))
+        # max
+        exec("ll.add_symbol('dict_{0}_{1}_max', hdict_ext.dict_{0}_{1}_max)".format(key_typ, val_typ))
+        # not_empty
+        exec("ll.add_symbol('dict_{0}_{1}_not_empty', hdict_ext.dict_{0}_{1}_not_empty)".format(key_typ, val_typ))
 
 
 # XXX: needs Numba #3014 resolved
@@ -109,7 +119,7 @@ class InDictOp(AbstractTemplate):
             return signature(types.boolean, cont, cont.key_typ)
 
 
-dict_int_int_type = DictType(types.intp, types.intp)
+dict_int_int_type = DictType(types.intc, types.intc)
 dict_int32_int32_type = DictType(types.int32, types.int32)
 
 
@@ -236,30 +246,30 @@ class MinMaxDict(AbstractTemplate):
             return signature(args[0].key_typ, *args)
 
 
-ll.add_symbol('init_dict_int_int', hdict_ext.init_dict_int_int)
-ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
-ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
-ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
-ll.add_symbol('dict_int_int_getitem', hdict_ext.dict_int_int_getitem)
-ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
-ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
-ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
-ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
-ll.add_symbol('dict_int_int_in', hdict_ext.dict_int_int_in)
-ll.add_symbol('dict_int_int_not_empty', hdict_ext.dict_int_int_not_empty)
-
-# int32 versions
-ll.add_symbol('init_dict_int32_int32', hdict_ext.init_dict_int32_int32)
-ll.add_symbol('dict_int32_int32_setitem', hdict_ext.dict_int32_int32_setitem)
-ll.add_symbol('dict_int32_int32_print', hdict_ext.dict_int32_int32_print)
-ll.add_symbol('dict_int32_int32_get', hdict_ext.dict_int32_int32_get)
-ll.add_symbol('dict_int32_int32_getitem', hdict_ext.dict_int32_int32_getitem)
-ll.add_symbol('dict_int32_int32_pop', hdict_ext.dict_int32_int32_pop)
-ll.add_symbol('dict_int32_int32_keys', hdict_ext.dict_int32_int32_keys)
-ll.add_symbol('dict_int32_int32_min', hdict_ext.dict_int32_int32_min)
-ll.add_symbol('dict_int32_int32_max', hdict_ext.dict_int32_int32_max)
-ll.add_symbol('dict_int32_int32_not_empty',
-              hdict_ext.dict_int32_int32_not_empty)
+if False:
+    ll.add_symbol('dict_int_int_init', hdict_ext.dict_int_int_init)
+    ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
+    ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
+    ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
+    ll.add_symbol('dict_int_int_getitem', hdict_ext.dict_int_int_getitem)
+    ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
+    ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
+    ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
+    ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
+    ll.add_symbol('dict_int_int_in', hdict_ext.dict_int_int_in)
+    ll.add_symbol('dict_int_int_not_empty', hdict_ext.dict_int_int_not_empty)
+    
+    # int32 versions
+    ll.add_symbol('dict_int32_int32_init', hdict_ext.dict_int32_int32_init)
+    ll.add_symbol('dict_int32_int32_setitem', hdict_ext.dict_int32_int32_setitem)
+    ll.add_symbol('dict_int32_int32_print', hdict_ext.dict_int32_int32_print)
+    ll.add_symbol('dict_int32_int32_get', hdict_ext.dict_int32_int32_get)
+    ll.add_symbol('dict_int32_int32_getitem', hdict_ext.dict_int32_int32_getitem)
+    ll.add_symbol('dict_int32_int32_pop', hdict_ext.dict_int32_int32_pop)
+    ll.add_symbol('dict_int32_int32_keys', hdict_ext.dict_int32_int32_keys)
+    ll.add_symbol('dict_int32_int32_min', hdict_ext.dict_int32_int32_min)
+    ll.add_symbol('dict_int32_int32_max', hdict_ext.dict_int32_int32_max)
+    ll.add_symbol('dict_int32_int32_not_empty', hdict_ext.dict_int32_int32_not_empty)
 
 
 # dict_int_int_in = types.ExternalFunction("dict_int_int_in", types.boolean(dict_int_int_type, types.intp))
@@ -267,14 +277,14 @@ ll.add_symbol('dict_int32_int32_not_empty',
 @lower_builtin(DictIntInt)
 def impl_dict_int_int(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [])
-    fn = builder.module.get_or_insert_function(fnty, name="init_dict_int_int")
+    fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_init")
     return builder.call(fn, [])
 
 
 @lower_builtin('setitem', DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
     _, key_typ, val_typ = sig.args
-    fname = "dict_setitem_{}_{}".format(key_typ, val_typ)
+    fname = "dict_{}_{}_setitem".format(key_typ, val_typ)
     fnty = lir.FunctionType(lir.VoidType(),
         [lir.IntType(8).as_pointer(),
         context.get_value_type(key_typ),
@@ -307,7 +317,7 @@ def lower_dict_getitem(context, builder, sig, args):
     dict_typ, key_typ = sig.args
     fnty = lir.FunctionType(context.get_value_type(dict_typ.val_typ),
         [lir.IntType(8).as_pointer(), context.get_value_type(key_typ)])
-    fname = "dict_getitem_{}_{}".format(key_typ, dict_typ.val_typ)
+    fname = "dict_{}_{}_getitem".format(key_typ, dict_typ.val_typ)
     fn = builder.module.get_or_insert_function(fnty, name=fname)
     return builder.call(fn, args)
 
@@ -343,20 +353,20 @@ def lower_dict_max(context, builder, sig, args):
 @lower_builtin("in", types.Any, DictType)
 def lower_dict_in(context, builder, sig, args):
     key_typ, dict_typ = sig.args
-    fname = "dict_in_{}_{}".format(key_typ, dict_typ.val_typ)
-    fnty = lir.FunctionType(lir.IntType(1), [context.get_value_type(key_typ),
-                                                lir.IntType(8).as_pointer()])
+    fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
+                                             context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    return builder.call(fn, [args[1], args[0]])
 
 @lower_builtin(operator.contains, DictType, types.Any)
 def lower_dict_in_op(context, builder, sig, args):
     dict_typ, key_typ = sig.args
-    fname = "dict_in_{}_{}".format(key_typ, dict_typ.val_typ)
-    fnty = lir.FunctionType(lir.IntType(1), [context.get_value_type(key_typ),
-                                                lir.IntType(8).as_pointer()])
+    fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
+                                             context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, [args[1], args[0]])
+    return builder.call(fn, args)
 
 @lower_cast(dict_int_int_type, types.boolean)
 def dict_empty(context, builder, fromty, toty, val):
@@ -371,7 +381,7 @@ def dict_empty(context, builder, fromty, toty, val):
 def impl_dict_int32_int32(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [])
     fn = builder.module.get_or_insert_function(
-        fnty, name="init_dict_int32_int32")
+        fnty, name="dict_int32_int32_init")
     return builder.call(fn, [])
 
 

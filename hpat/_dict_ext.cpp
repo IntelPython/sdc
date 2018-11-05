@@ -1,114 +1,366 @@
+/*
+ * Implementation of dictionaries using std::unordered_map.
+ *
+ * Provides most common maps of simple data types:
+ *   {int*, double, float, string} -> {int*, double, float, string}
+ * C-Functions are exported as Python module, types are part of their names
+ *   dict_<key-type>_<value-type_{init, setitem, getitem, in}.
+ * Also provides a dict which maps a byte-array to a int64.
+ *
+ * We define our own dictionary template class.
+ * To get external C-functions per key/value-type we use a macro-factory
+ * which generates C-Functions calling our C++ dictionary.
+ */
+
 #include <Python.h>
+#include <random>
+#include <algorithm>
+#include <iterator>
+#include <vector>
 #include <unordered_map>
+#include <cstddef>
 #include <iostream>
-#include <limits>
-#include <string>
-#include <boost/preprocessor/cat.hpp>
-#include <boost/preprocessor/stringize.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/functional/hash/hash.hpp>
 #include <boost/preprocessor/list/for_each_product.hpp>
-#include <boost/preprocessor/tuple/to_list.hpp>
-#include <cmath>
+#include <boost/preprocessor/stringize.hpp>
+#include <cassert>
 
-void* init_dict_int_int();
-void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value);
-void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m);
-int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t default_val);
-int64_t dict_int_int_getitem(std::unordered_map<int64_t, int64_t>* m, int64_t index);
-int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index);
-void* dict_int_int_keys(std::unordered_map<int64_t, int64_t>* m);
-int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m);
-int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m);
-bool dict_int_int_in(std::unordered_map<int64_t, int64_t>* m, int64_t val);
-bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m);
+// we need a few typedefs to make our macro factory work
+// It requires types to end with '_t'
+typedef std::string StringType_t;
+typedef bool bool_t;
+typedef int int_t;
+typedef float float32_t;
+typedef double float64_t;
+typedef std::vector<unsigned char> byte_vec_t;
 
-// -- int32 versions --
-// void* init_dict_int32_int32();
-void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value);
-void dict_int32_int32_print(std::unordered_map<int, int>* m);
-int dict_int32_int32_get(std::unordered_map<int, int>* m, int index, int default_val);
-int dict_int32_int32_getitem(std::unordered_map<int, int>* m, int index);
-int dict_int32_int32_pop(std::unordered_map<int, int>* m, int index);
-void* dict_int32_int32_keys(std::unordered_map<int, int>* m);
-int dict_int32_int32_min(std::unordered_map<int, int>* m);
-int dict_int32_int32_max(std::unordered_map<int, int>* m);
-bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m);
+namespace std
+{
+    // hash function for byte arrays
+    template<>
+    struct hash<byte_vec_t>
+    {
+        typedef byte_vec_t argument_type;
+        typedef std::size_t result_type;
 
-#define StringType_t std::string
-#define bool_t bool
-#define float32_t float
-#define float64_t double
+        // interpret byte-array as array of given integer type (T) and produce hash
+        // we use boost::hash_combine for generating an aggregated hash value
+        template< typename T >
+        result_type hashit(const T * ptr, size_t n) const
+        {
+            // we do this only for aligned pointers (at both ends!)
+            if(n >= sizeof(T) && reinterpret_cast<uintptr_t>(ptr) % sizeof(T) == 0 && n % sizeof(T) == 0) {
+                auto _ptr = reinterpret_cast<const T *>(ptr);
+                n /= sizeof(T);
+                std::size_t seed = 0;
+                for(size_t i=0; i<n; ++i) boost::hash_combine(seed, _ptr[i]);
+                //std::cout << "[" << sizeof(T) << "] " << seed << std::endl;
+                return seed;
+            } else return 0;
+        }
 
-#define C_TYPE(a) BOOST_PP_CAT(a,_t)
+        // returns the hash-value for given vector of bytes
+        // Note: this will return different hash-values for the same key depending on
+        //       the pointer alignment. E.g. if the data of a given vector is aligned
+        //       at 8-byte boundary and its size is a multiple of 8 we use a different
+        //       hashing algorithm than when the same bytes are unaligned.
+        //       We might need to revise this depending on how we use it
+        // We might want to produce specializations for specific sizes
+        result_type operator()(argument_type const& x) const
+        {
+            
+            std::size_t n = x.size();
+            if(n == 0) return 0;
+            const argument_type::value_type * ptr = x.data();
+            size_t h;
+            // we now try to reinterpret bytes as integers of different size, starting with long integers
+            if(sizeof(uintmax_t) > sizeof(uint64_t)
+               && (h = hashit(reinterpret_cast<const uintmax_t *>(ptr), n)) != 0) return h;
+            if((h = hashit(reinterpret_cast<const uint64_t *>(ptr), n)) != 0) return h;
+            if((h = hashit(reinterpret_cast<const uint32_t *>(ptr), n)) != 0) return h;
+            if((h = hashit(reinterpret_cast<const uint16_t *>(ptr), n)) != 0) return h;
+            // This is our fall-back, probably pretty slow
+            if((h = hashit(reinterpret_cast<const uint8_t *>(ptr), n)) != 0) return h;
 
-#define SECOND(a, b, ...) b
-#define IS_PROBE(...) SECOND(__VA_ARGS__, 0)
-#define PROBE() ~, 1
-#define IS_STR(x) IS_PROBE(_IS_STR_ ## x)
-#define _IS_STR_StringType PROBE()
+            // everything must align with 1 byte, so we should not ever get here
+            std::cerr << "Unexpected code path taken in hash operation";
+            return static_cast<result_type>(-1);
+        }
+    };
+}
 
-#define IN_TYP(x) BOOST_PP_IIF(IS_STR(x), C_TYPE(x)*, C_TYPE(x))
+template <typename T>
+std::ostream& operator<< (std::ostream& out, const std::vector<T>& v) {
+  if ( !v.empty() ) {
+    out << '[';
+    std::copy (v.begin(), v.end(), std::ostream_iterator<T>(out, ", "));
+    out << "\b\b]";
+  }
+  return out;
+}
 
-#define DE_PTR(x) BOOST_PP_IIF(IS_STR(x), *, )
-#define GET_PTR(x) BOOST_PP_IIF(IS_STR(x), &, )
+// Type trait to allow by pointer/reference/value distinction for different types.
+// Some keys/values are passed by value, others by reference(pointer!)
+// This template struct defines how the dict keys/values appear on the dict interface
+// Generic struct defines the defaults as by-value
+template<typename T>
+struct IFTYPE
+{
+    typedef T in_t;
+    typedef T out_t;
+    static out_t out(T& o) { return o; }
+};
 
-// definition of dict functions
-#define DEF_DICT(key_typ, val_typ) \
-/* create dictionary */ \
-void* BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)() { \
-    return new std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>(); \
-} \
-/* setitem */ \
-void BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ) \
-(std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m, IN_TYP(key_typ) index, IN_TYP(val_typ) value) \
-{ \
-    (*m)[DE_PTR(key_typ)index] = DE_PTR(val_typ)value; \
-} \
-/* in */ \
-bool BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)\
-(IN_TYP(key_typ) val, std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m)\
-{ \
-    return (m->find(DE_PTR(key_typ)val) != m->end()); \
-} \
-/* getitem */ \
-IN_TYP(val_typ) BOOST_PP_CAT(dict_getitem_##key_typ, _##val_typ) \
-(std::unordered_map<C_TYPE(key_typ), C_TYPE(val_typ)>* m, IN_TYP(key_typ) index) \
-{ \
-    return GET_PTR(val_typ)m->at(DE_PTR(key_typ)index); \
-} \
-/**/
+// strings appear by reference/pointer on the interface
+template<>
+struct IFTYPE< std::string >
+{
+    typedef std::string& in_t;
+    typedef std::string* out_t;
+    static out_t out(std::string& o) { return &o; }
+};
 
-// declaration of dict functions in python module
-#define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)));
+// byte-vectors appear by reference on the interface
+template<>
+struct IFTYPE< byte_vec_t >
+{
+    typedef byte_vec_t& in_t;
+    // hopefully we never need the out types
+    typedef byte_vec_t out_t;
+    static out_t out(byte_vec_t& o) { return o; }
+};
 
-#define DEC_DICT_MOD(key_typ, val_typ) \
-DEC_MOD_METHOD(BOOST_PP_CAT(init_dict_##key_typ, _##val_typ)) \
-DEC_MOD_METHOD(BOOST_PP_CAT(dict_setitem_##key_typ, _##val_typ)) \
-DEC_MOD_METHOD(BOOST_PP_CAT(dict_in_##key_typ, _##val_typ)) \
-DEC_MOD_METHOD(BOOST_PP_CAT(dict_getitem_##key_typ, _##val_typ)) \
-/**/
+// Generic template dict class
+template<typename IDX, typename VAL>
+class dict
+{
+private:
+    std::unordered_map<IDX, VAL> m_dict;
+public:
+    typedef typename IFTYPE<IDX>::in_t idx_in_t;
+    typedef typename IFTYPE<IDX>::out_t idx_out_t;
+    typedef typename IFTYPE<VAL>::in_t val_in_t;
+    typedef typename IFTYPE<VAL>::out_t val_out_t;
+    
+    dict() : m_dict() {}
 
-#define TYPES \
-   BOOST_PP_TUPLE_TO_LIST(12, (\
-int8, \
-int16, \
-int32, \
-int64, \
-uint8, \
-uint16, \
-uint32, \
-uint64, \
-bool, \
-float32, \
-float64, \
-StringType \
-)) \
-/**/
+    // sets given value for given index
+    void setitem(idx_in_t index, val_in_t value)
+    {
+        m_dict[index] = value;
+        return;
+    }
 
+    // @return value for given index, entry must exist
+    val_out_t getitem(const idx_in_t index)
+    {
+        return IFTYPE<VAL>::out(m_dict.at(index));
+    }
+
+    // @return true if given index is found in dict, false otherwise
+    bool in(const idx_in_t index)
+    {
+        return (m_dict.find(index) != m_dict.end());
+    }
+
+    // print the entire dict
+    void print()
+    {
+        // TODO: return python string and print in native mode
+        for (auto& x: m_dict) {
+            std::cout << x.first << ": " << x.second << std::endl;
+        }
+        return;
+    }
+
+    // @return value for given index or default_val if not in dict
+    val_out_t get(const idx_in_t index, val_in_t default_val)
+    {
+        auto val = m_dict.find(index);
+        if (val==m_dict.end())
+            return IFTYPE<VAL>::out(default_val);
+        return IFTYPE<VAL>::out((*val).second);
+    }
+
+    // deletes entry from dict
+    // @return value for given index
+    val_out_t pop(const idx_in_t index)
+    {
+        auto val = IFTYPE<VAL>::out(m_dict.at(index));
+        m_dict.erase(index);
+        return val;
+    }
+
+    void* keys()
+    {
+        // TODO: return actual iterator
+        return this;
+    }
+
+    // @return maximum value (not key!) in dict
+    val_out_t min()
+    {
+        // TODO: use actual iterator
+        auto res = std::numeric_limits<VAL>::max();
+        typename std::unordered_map<IDX, VAL>::iterator it = m_dict.end();
+        for (typename std::unordered_map<IDX, VAL>::iterator x=m_dict.begin(); x!=m_dict.end(); ++x) {
+            if (x->second<res) {
+                res = x->second;
+                it = x;
+            }
+        }
+        return IFTYPE<VAL>::out(it->second);
+    }
+
+    // @return maximum value (not key!) in dict
+    val_out_t max()
+    {
+        // TODO: use actual iterator
+        auto res = std::numeric_limits<VAL>::min();
+        typename std::unordered_map<IDX, VAL>::iterator it = m_dict.end();
+        for (typename std::unordered_map<IDX, VAL>::iterator x=m_dict.begin(); x!=m_dict.end(); ++x) {
+            if (x->second>res) {
+                res = x->second;
+                it = x;
+            }
+        }
+        return IFTYPE<VAL>::out(it->second);
+    }
+
+    // @return true if dict is not empty, false otherwise
+    bool not_empty()
+    {
+        return !m_dict.empty();
+    }
+};
+
+// macro expanding to C-functions
+#define DEF_DICT(_IDX_, _VAL_)                                          \
+    dict<_IDX_##_t, _VAL_##_t> * dict_##_IDX_##_##_VAL_##_init()        \
+    {                                                                   \
+        return new dict<_IDX_##_t, _VAL_##_t>();                        \
+    }                                                                   \
+    void dict_##_IDX_##_##_VAL_##_setitem(dict<_IDX_##_t, _VAL_##_t>* m, IFTYPE<_IDX_##_t>::in_t index, IFTYPE<_VAL_##_t>::in_t value) \
+    {                                                                   \
+        m->setitem(index, value);                                       \
+    }                                                                   \
+    IFTYPE<_VAL_##_t>::out_t dict_##_IDX_##_##_VAL_##_getitem(dict<_IDX_##_t, _VAL_##_t>* m, const IFTYPE<_IDX_##_t>::in_t index) \
+    {                                                                   \
+        return m->getitem(index);                                       \
+    }                                                                   \
+    bool dict_##_IDX_##_##_VAL_##_in(dict<_IDX_##_t, _VAL_##_t>* m, const IFTYPE<_IDX_##_t>::in_t index) \
+    {                                                                   \
+        return m->in(index);                                            \
+    }                                                                   \
+    void dict_##_IDX_##_##_VAL_##_print(dict<_IDX_##_t, _VAL_##_t>* m)  \
+    {                                                                   \
+        m->print();                                                     \
+    }                                                                   \
+    IFTYPE<_VAL_##_t>::out_t dict_##_IDX_##_##_VAL_##_get(dict<_IDX_##_t, _VAL_##_t>* m, const IFTYPE<_IDX_##_t>::in_t index, IFTYPE<_VAL_##_t>::in_t default_val) \
+    {                                                                   \
+        return m->get(index, default_val);                              \
+    }                                                                   \
+    IFTYPE<_VAL_##_t>::out_t dict_##_IDX_##_##_VAL_##_pop(dict<_IDX_##_t, _VAL_##_t>* m, const IFTYPE<_IDX_##_t>::in_t index) \
+    {                                                                   \
+        return m->pop(index);                                           \
+    }                                                                   \
+    IFTYPE<_VAL_##_t>::out_t dict_##_IDX_##_##_VAL_##_min(dict<_IDX_##_t, _VAL_##_t>* m) \
+    {                                                                   \
+        return m->min();                                                \
+    }                                                                   \
+    IFTYPE<_VAL_##_t>::out_t dict_##_IDX_##_##_VAL_##_max(dict<_IDX_##_t, _VAL_##_t>* m) \
+    {                                                                   \
+        return m->max();                                                \
+    }                                                                   \
+    bool dict_##_IDX_##_##_VAL_##_not_empty(dict<_IDX_##_t, _VAL_##_t>* m) \
+    {                                                                   \
+        return m->not_empty();                                          \
+    }                                                                   \
+    void * dict_##_IDX_##_##_VAL_##_keys(dict<_IDX_##_t, _VAL_##_t>* m) \
+    {                                                                   \
+        return m->keys();                                               \
+    }
+
+/*
+ * Byte vectors are special, we need to somehow create them without copying stuff several times.
+ * To create such a vector
+ *     - first get a handle with byte_vec_init
+ *     - use the handle to set it's value with byte_vec_set or byte_vec_append
+ * Free memory by calling byte_vec_init when done with it.
+ */
+
+// forward decl
+void byte_vec_set(byte_vec_t * vec, size_t pos, const unsigned char * val, size_t n);
+
+/**
+ * Init byte vector with given size and optional content
+ * @param n make vector n bytes long (to be used with byte_vec_set) [default: 0]
+ * @param val if != NULL copy n-bytes from here to new vector
+ * @return new byte vector of size n
+ **/
+byte_vec_t * byte_vec_init(size_t n, const unsigned char * val)
+{
+    auto v = new byte_vec_t(n);
+    if(val) byte_vec_set(v, 0, val, n);
+    return v;
+}
+// in vec, set n bytes starting at position pos to content of val
+// vec must have been initialized with size at least pos+n
+void byte_vec_set(byte_vec_t * vec, size_t pos, const unsigned char * val, size_t n)
+{
+    for(size_t i=0; i<n; ++i) (*vec)[pos+i] = val[i];
+}
+// resize vector to given length
+void byte_vec_resize(byte_vec_t * vec, size_t n)
+{
+    vec->resize(n);
+}
+// free vector
+void byte_vec_free(byte_vec_t * vec)
+{
+    delete vec;
+}
+
+// all the types that we support for keys and values
+#define TYPES BOOST_PP_TUPLE_TO_LIST(12, (int,                \
+                                          int8,               \
+                                          int16,              \
+                                          int32,              \
+                                          int64,              \
+                                          uint8,              \
+                                          uint16,             \
+                                          uint32,             \
+                                          uint64,             \
+                                          bool,               \
+                                          float32,            \
+                                          float64,            \
+                                          StringType))
+
+// Bring our generic dict to life
+DEF_DICT(byte_vec, int64);
+
+// Now use some macro-magic from boost to support dicts for above types
 #define APPLY_DEF_DICT(r, product) DEF_DICT product
 BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEF_DICT, 2, (TYPES, TYPES))
 
+// declaration of dict functions in python module
+#define DEC_MOD_METHOD(func) PyObject_SetAttrString(m, BOOST_PP_STRINGIZE(func), PyLong_FromVoidPtr((void*)(&func)))
+#define DEC_DICT_MOD(_IDX_, _VAL_)                                      \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_init);                      \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_setitem);                   \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_getitem);                   \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_in);                        \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_print);                     \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_get);                       \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_pop);                       \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_keys);                      \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_min);                       \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_max);                       \
+    DEC_MOD_METHOD(dict_##_IDX_##_##_VAL_##_not_empty);    
 
+
+// module initiliziation
+// make our C-functions available
 PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject *m;
     static struct PyModuleDef moduledef = {
@@ -117,207 +369,16 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     if (m == NULL)
         return NULL;
 
-    #define APPLY_DEC_DICT_MOD(r, product) DEC_DICT_MOD product
-    BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEC_DICT_MOD, 2, (TYPES, TYPES))
+    // Add our generic dict
+    DEC_DICT_MOD(byte_vec, int64);
+    // And all the other speicialized dicts
+#define APPLY_DEC_DICT_MOD(r, product) DEC_DICT_MOD product
+    BOOST_PP_LIST_FOR_EACH_PRODUCT(APPLY_DEC_DICT_MOD, 2, (TYPES, TYPES));
 
+    PyObject_SetAttrString(m, "byte_vec_init", PyLong_FromVoidPtr((void*)(&byte_vec_init)));
+    PyObject_SetAttrString(m, "byte_vec_set", PyLong_FromVoidPtr((void*)(&byte_vec_set)));
+    PyObject_SetAttrString(m, "byte_vec_free", PyLong_FromVoidPtr((void*)(&byte_vec_free)));
+    PyObject_SetAttrString(m, "byte_vec_resize", PyLong_FromVoidPtr((void*)(&byte_vec_resize)));
 
-    DEC_MOD_METHOD(init_dict_int_int)
-
-    // PyObject_SetAttrString(m, "init_dict_int_int",
-    //                         PyLong_FromVoidPtr((void*)(&init_dict_int_int)));
-    PyObject_SetAttrString(m, "dict_int_int_setitem",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_setitem)));
-    PyObject_SetAttrString(m, "dict_int_int_print",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_print)));
-    PyObject_SetAttrString(m, "dict_int_int_get",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_get)));
-    PyObject_SetAttrString(m, "dict_int_int_getitem",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_getitem)));
-    PyObject_SetAttrString(m, "dict_int_int_pop",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_pop)));
-    PyObject_SetAttrString(m, "dict_int_int_keys",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_keys)));
-    PyObject_SetAttrString(m, "dict_int_int_min",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_min)));
-    PyObject_SetAttrString(m, "dict_int_int_max",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_max)));
-    PyObject_SetAttrString(m, "dict_int_int_in",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_in)));
-    PyObject_SetAttrString(m, "dict_int_int_not_empty",
-                            PyLong_FromVoidPtr((void*)(&dict_int_int_not_empty)));
-    // ---- int32 versions ----
-    // PyObject_SetAttrString(m, "init_dict_int32_int32",
-    //                         PyLong_FromVoidPtr((void*)(&init_dict_int32_int32)));
-    PyObject_SetAttrString(m, "dict_int32_int32_setitem",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_setitem)));
-    PyObject_SetAttrString(m, "dict_int32_int32_print",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_print)));
-    PyObject_SetAttrString(m, "dict_int32_int32_get",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_get)));
-    PyObject_SetAttrString(m, "dict_int32_int32_getitem",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_getitem)));
-    PyObject_SetAttrString(m, "dict_int32_int32_pop",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_pop)));
-    PyObject_SetAttrString(m, "dict_int32_int32_keys",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_keys)));
-    PyObject_SetAttrString(m, "dict_int32_int32_min",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_min)));
-    PyObject_SetAttrString(m, "dict_int32_int32_max",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_max)));
-    PyObject_SetAttrString(m, "dict_int32_int32_not_empty",
-                            PyLong_FromVoidPtr((void*)(&dict_int32_int32_not_empty)));
     return m;
-}
-
-void* init_dict_int_int()
-{
-    return new std::unordered_map<int64_t, int64_t>();
-}
-
-void dict_int_int_setitem(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t value)
-{
-    (*m)[index] = value;
-    return;
-}
-
-void dict_int_int_print(std::unordered_map<int64_t, int64_t>* m)
-{
-    // TODO: return python string and print in native mode
-    for (auto& x: *m) {
-        std::cout << x.first << ": " << x.second << std::endl;
-    }
-    return;
-}
-
-int64_t dict_int_int_get(std::unordered_map<int64_t, int64_t>* m, int64_t index, int64_t default_val)
-{
-    auto val = m->find(index);
-    if (val==m->end())
-        return default_val;
-    return (*val).second;
-}
-
-int64_t dict_int_int_getitem(std::unordered_map<int64_t, int64_t>* m, int64_t index)
-{
-    return m->at(index);
-}
-
-int64_t dict_int_int_pop(std::unordered_map<int64_t, int64_t>* m, int64_t index)
-{
-    int64_t val = m->at(index);
-    m->erase(index);
-    return val;
-}
-
-void* dict_int_int_keys(std::unordered_map<int64_t, int64_t>* m)
-{
-    // TODO: return actual iterator
-    return m;
-}
-
-int64_t dict_int_int_min(std::unordered_map<int64_t, int64_t>* m)
-{
-    // TODO: use actual iterator
-    int64_t res = std::numeric_limits<int64_t>::max();
-    for (auto& x: *m) {
-        if (x.first<res)
-            res = x.first;
-    }
-    return res;
-}
-
-int64_t dict_int_int_max(std::unordered_map<int64_t, int64_t>* m)
-{
-    // TODO: use actual iterator
-    int64_t res = std::numeric_limits<int64_t>::min();
-    for (auto& x: *m) {
-        if (x.first>res)
-            res = x.first;
-    }
-    return res;
-}
-
-bool dict_int_int_in(std::unordered_map<int64_t, int64_t>* m, int64_t val)
-{
-    return (m->find(val) != m->end());
-}
-
-bool dict_int_int_not_empty(std::unordered_map<int64_t, int64_t>* m)
-{
-    return !m->empty();
-}
-
-
-// --------- int32 versions ------
-// void* init_dict_int32_int32()
-// {
-//     return new std::unordered_map<int, int>();
-// }
-
-void dict_int32_int32_setitem(std::unordered_map<int, int>* m, int index, int value)
-{
-    (*m)[index] = value;
-    return;
-}
-
-void dict_int32_int32_print(std::unordered_map<int, int>* m)
-{
-    // TODO: return python string and print in native mode
-    for (auto& x: *m) {
-        std::cout << x.first << ": " << x.second << std::endl;
-    }
-    return;
-}
-
-int dict_int32_int32_get(std::unordered_map<int, int>* m, int index, int default_val)
-{
-    auto val = m->find(index);
-    if (val==m->end())
-        return default_val;
-    return (*val).second;
-}
-
-int dict_int32_int32_getitem(std::unordered_map<int, int>* m, int index)
-{
-    return m->at(index);
-}
-
-int dict_int32_int32_pop(std::unordered_map<int, int>* m, int index)
-{
-    int val = m->at(index);
-    m->erase(index);
-    return val;
-}
-
-void* dict_int32_int32_keys(std::unordered_map<int, int>* m)
-{
-    // TODO: return actual iterator
-    return m;
-}
-
-int dict_int32_int32_min(std::unordered_map<int, int>* m)
-{
-    // TODO: use actual iterator
-    int res = std::numeric_limits<int>::max();
-    for (auto& x: *m) {
-        if (x.first<res)
-            res = x.first;
-    }
-    return res;
-}
-
-int dict_int32_int32_max(std::unordered_map<int, int>* m)
-{
-    // TODO: use actual iterator
-    int res = std::numeric_limits<int>::min();
-    for (auto& x: *m) {
-        if (x.first>res)
-            res = x.first;
-    }
-    return res;
-}
-
-bool dict_int32_int32_not_empty(std::unordered_map<int, int>* m)
-{
-    return !m->empty();
 }
