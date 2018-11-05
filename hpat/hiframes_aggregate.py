@@ -623,7 +623,7 @@ def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
     # redvar_1_arr = np.full(n_uniq_keys, _init_val_1, np.int64)
     # out_key = np.empty(n_uniq_keys, np.float64)
     n_pes = hpat.distributed_api.get_size()
-    key_write_map = get_key_dict(key_arrs[0]) # hpat.dict_ext.init_dict_float64_int64()
+    key_write_map = get_key_dict(key_arrs[0]) # hpat.dict_ext.dict_float64_int64_init()
 
     redvar_arrs = get_shuffle_data_send_buffs(shuffle_meta, key_arrs, data_redvar_dummy)
 
@@ -755,7 +755,7 @@ def get_key_dict(arr):  # pragma: no cover
 @overload(get_key_dict)
 def get_key_dict_overload(arr_t):
     func_text = "def k_dict_impl(arr):\n"
-    func_text += "  return hpat.dict_ext.init_dict_{}_int64()\n".format(arr_t.dtype)
+    func_text += "  return hpat.dict_ext.dict_{}_int64_init()\n".format(arr_t.dtype)
     loc_vars = {}
     exec(func_text, {'hpat': hpat}, loc_vars)
     k_dict_impl = loc_vars['k_dict_impl']
