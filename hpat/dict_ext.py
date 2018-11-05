@@ -246,32 +246,6 @@ class MinMaxDict(AbstractTemplate):
             return signature(args[0].key_typ, *args)
 
 
-if False:
-    ll.add_symbol('dict_int_int_init', hdict_ext.dict_int_int_init)
-    ll.add_symbol('dict_int_int_setitem', hdict_ext.dict_int_int_setitem)
-    ll.add_symbol('dict_int_int_print', hdict_ext.dict_int_int_print)
-    ll.add_symbol('dict_int_int_get', hdict_ext.dict_int_int_get)
-    ll.add_symbol('dict_int_int_getitem', hdict_ext.dict_int_int_getitem)
-    ll.add_symbol('dict_int_int_pop', hdict_ext.dict_int_int_pop)
-    ll.add_symbol('dict_int_int_keys', hdict_ext.dict_int_int_keys)
-    ll.add_symbol('dict_int_int_min', hdict_ext.dict_int_int_min)
-    ll.add_symbol('dict_int_int_max', hdict_ext.dict_int_int_max)
-    ll.add_symbol('dict_int_int_in', hdict_ext.dict_int_int_in)
-    ll.add_symbol('dict_int_int_not_empty', hdict_ext.dict_int_int_not_empty)
-    
-    # int32 versions
-    ll.add_symbol('dict_int32_int32_init', hdict_ext.dict_int32_int32_init)
-    ll.add_symbol('dict_int32_int32_setitem', hdict_ext.dict_int32_int32_setitem)
-    ll.add_symbol('dict_int32_int32_print', hdict_ext.dict_int32_int32_print)
-    ll.add_symbol('dict_int32_int32_get', hdict_ext.dict_int32_int32_get)
-    ll.add_symbol('dict_int32_int32_getitem', hdict_ext.dict_int32_int32_getitem)
-    ll.add_symbol('dict_int32_int32_pop', hdict_ext.dict_int32_int32_pop)
-    ll.add_symbol('dict_int32_int32_keys', hdict_ext.dict_int32_int32_keys)
-    ll.add_symbol('dict_int32_int32_min', hdict_ext.dict_int32_int32_min)
-    ll.add_symbol('dict_int32_int32_max', hdict_ext.dict_int32_int32_max)
-    ll.add_symbol('dict_int32_int32_not_empty', hdict_ext.dict_int32_int32_not_empty)
-
-
 # dict_int_int_in = types.ExternalFunction("dict_int_int_in", types.boolean(dict_int_int_type, types.intp))
 
 @lower_builtin(DictIntInt)
