@@ -32,7 +32,7 @@ from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis)
 # from mpi4py import MPI
 import hpat.utils
-from hpat.utils import (is_alloc_callname, is_whole_slice,
+from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
                         debug_prints, ReplaceFunc, gen_getitem)
 from hpat.distributed_api import Reduce_Type
@@ -140,7 +140,8 @@ class DistributedPass(object):
                     rhs = inst.value
                     if isinstance(rhs, ir.Expr):
                         out_nodes = self._run_expr(inst, namevar_table)
-                    elif isinstance(rhs, ir.Var) and self._is_1D_arr(rhs.name):
+                    elif isinstance(rhs, ir.Var) and (self._is_1D_arr(rhs.name)
+                           and not is_array_container(self.typemap, rhs.name)):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
@@ -644,6 +645,8 @@ class DistributedPass(object):
         if fdef == ('dist_input', 'hpat.distributed_api'):
             out = [assign]
             arr = rhs.args[0]
+            if is_array_container(self.typemap, arr.name):
+                return out
             # remove sentinel call
             assign.value = arr
 

@@ -701,9 +701,9 @@ class SeriesIatType(types.Type):
         name = "SeriesIatType({})".format(stype)
         super(SeriesIatType, self).__init__(name)
 
-@infer
+@infer_global(operator.getitem)
 class GetItemSeriesIat(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         # iat[] is the same as regular getitem
@@ -754,9 +754,9 @@ class CmpOpLESeries(SeriesCompEqual):
 class CmpOpLTSeries(SeriesCompEqual):
     key = '<'
 
-# @infer
+# @infer_global(operator.getitem)
 # class GetItemBuffer(AbstractTemplate):
-#     key = "getitem"
+#     key = operator.getitem
 
 #     def generic(self, args, kws):
 #         assert not kws
@@ -804,9 +804,9 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
 
-@infer
+@infer_global(operator.getitem)
 class GetItemSeries(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         assert not kws

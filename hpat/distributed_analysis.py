@@ -15,8 +15,9 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
+from hpat.pd_series_ext import BoxedSeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
-                        is_whole_slice, is_array,
+                        is_whole_slice, is_array, is_array_container,
                         is_np_array, find_build_tuple, debug_prints)
 
 from enum import Enum
@@ -107,7 +108,8 @@ class DistributedAnalysis(object):
         if isinstance(rhs, ir.Expr) and rhs.op == 'cast':
             rhs = rhs.value
 
-        if isinstance(rhs, ir.Var) and is_array(self.typemap, lhs):
+        if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
+                                     or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
         elif (is_array(self.typemap, lhs)
@@ -142,6 +144,17 @@ class DistributedAnalysis(object):
             pass  # X.shape doesn't affect X distribution
         elif isinstance(rhs, ir.Expr) and rhs.op == 'call':
             self._analyze_call(lhs, rhs, rhs.func.name, rhs.args, array_dists)
+        # handle for A in arr_container: ...
+        # A = pair_first(iternext(getiter(arr_container)))
+        # TODO: support getitem of container
+        elif isinstance(rhs, ir.Expr) and rhs.op == 'pair_first' and is_array(self.typemap, lhs):
+            arr_container = guard(_get_pair_first_container, self.func_ir, rhs)
+            if arr_container is not None:
+                self._meet_array_dists(lhs, arr_container.name, array_dists)
+                return
+        elif isinstance(rhs, ir.Expr) and rhs.op in ('getiter', 'iternext'):
+            # analyze array container access in pair_first
+            return
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
@@ -634,10 +647,12 @@ class DistributedAnalysis(object):
 
     def _analyze_call_set_REP(self, lhs, args, array_dists):
         for v in args:
-            if is_array(self.typemap, v.name):
+            if (is_array(self.typemap, v.name)
+                    or is_array_container(self.typemap, v.name)):
                 dprint("dist setting call arg REP {}".format(v.name))
                 array_dists[v.name] = Distribution.REP
-        if is_array(self.typemap, lhs):
+        if (is_array(self.typemap, lhs)
+                or is_array_container(self.typemap, lhs)):
             dprint("dist setting call out REP {}".format(lhs))
             array_dists[lhs] = Distribution.REP
 
@@ -753,7 +768,11 @@ class DistributedAnalysis(object):
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
-            if is_array(self.typemap, varname):
+            # Handle BoxedSeriesType since it comes from Arg node and it could
+            # have user-defined distribution
+            if (is_array(self.typemap, varname)
+                    or is_array_container(self.typemap, varname)
+                    or isinstance(self.typemap[varname], BoxedSeriesType)):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
@@ -831,6 +850,15 @@ class DistributedAnalysis(object):
                     new_body.append(inst)
 
             block.body = new_body
+
+
+def _get_pair_first_container(func_ir, rhs):
+    assert isinstance(rhs, ir.Expr) and rhs.op == 'pair_first'
+    iternext = get_definition(func_ir, rhs.value)
+    require(isinstance(iternext, ir.Expr) and iternext.op == 'iternext')
+    getiter = get_definition(func_ir, iternext.value)
+    require(isinstance(iternext, ir.Expr) and getiter.op == 'getiter')
+    return getiter.value
 
 
 def _arrays_written(arrs, blocks):

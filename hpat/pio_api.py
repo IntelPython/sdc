@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 import numba
 from numba import types, cgutils
@@ -116,9 +117,9 @@ class GroupAttribute(AttributeTemplate):
     def resolve_create_dataset(self, f_id, args, kws):
         return _create_dataset_typer(args, kws)
 
-@infer
+@infer_global(operator.getitem)
 class GetItemH5File(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         assert not kws

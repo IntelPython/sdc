@@ -167,9 +167,9 @@ class SetItemDict(AbstractTemplate):
             return signature(types.none, dict_t, dict_t.key_typ, dict_t.val_typ)
 
 
-@infer
+@infer_global(operator.getitem)
 class GetItemDict(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         dict_t, _ = args
@@ -286,7 +286,7 @@ def lower_dict_get(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="dict_int_int_get")
     return builder.call(fn, args)
 
-@lower_builtin("getitem", DictType, types.Any)
+@lower_builtin(operator.getitem, DictType, types.Any)
 def lower_dict_getitem(context, builder, sig, args):
     dict_typ, key_typ = sig.args
     fnty = lir.FunctionType(context.get_value_type(dict_typ.val_typ),
@@ -390,7 +390,7 @@ def lower_dict_get_int32(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-# @lower_builtin("getitem", DictType, types.int32)
+# @lower_builtin(operator.getitem, DictType, types.int32)
 # def lower_dict_getitem_int32(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.IntType(
 #         32), [lir.IntType(8).as_pointer(), lir.IntType(32)])

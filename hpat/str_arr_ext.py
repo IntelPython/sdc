@@ -101,7 +101,7 @@ class StringArrayModel(models.StructModel):
         models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
 
 # TODO: fix overload for things like 'getitem'
-# @overload('getitem')
+# @overload(operator.getitem)
 # def str_arr_getitem_bool_overload(str_arr_tp, bool_arr_tp):
 #     import pdb; pdb.set_trace()
 #     if str_arr_tp == string_array_type and bool_arr_tp == types.Array(types.bool_, 1, 'C'):
@@ -381,9 +381,9 @@ def str_list_to_array_overload(list_typ):
 
     return lambda a: a
 
-@infer
+@infer_global(operator.getitem)
 class GetItemStringArray(AbstractTemplate):
-    key = "getitem"
+    key = operator.getitem
 
     def generic(self, args, kws):
         assert not kws
@@ -826,7 +826,7 @@ def lower_is_na(context, builder, bull_bitmap, ind):
     return builder.call(fn_getitem, [bull_bitmap,
                                      ind])
 
-@lower_builtin('getitem', StringArrayType, types.Integer)
+@lower_builtin(operator.getitem, StringArrayType, types.Integer)
 def lower_string_arr_getitem(context, builder, sig, args):
     typ = sig.args[0]
     ind = args[1]
@@ -853,7 +853,7 @@ def lower_string_arr_getitem(context, builder, sig, args):
                                      string_array.data, args[1]])
 
 
-@lower_builtin('getitem', StringArrayType, types.Array(types.bool_, 1, 'C'))
+@lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
 def lower_string_arr_getitem_bool(context, builder, sig, args):
     def str_arr_bool_impl(str_arr, bool_arr):
         n = len(str_arr)
@@ -881,7 +881,7 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
     return res
 
 
-@lower_builtin('getitem', StringArrayType, types.Array(types.intp, 1, 'C'))
+@lower_builtin(operator.getitem, StringArrayType, types.Array(types.intp, 1, 'C'))
 def lower_string_arr_getitem_arr(context, builder, sig, args):
     def str_arr_arr_impl(str_arr, ind_arr):
         n = len(ind_arr)
