@@ -53,16 +53,16 @@ installed.</p>
 <div class="section" id="building-hpat-from-source">
 <h2>Building HPAT from Source<a class="headerlink" href="#building-hpat-from-source" title="Permalink to this headline">¶</a></h2>
 <p>We use <a class="reference external" href="https://www.anaconda.com/download/">Anaconda</a> distribution of
-Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
+Python for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba on Ubuntu Linux:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span>wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 chmod +x miniconda.sh
 ./miniconda.sh -b
 export PATH=$HOME/miniconda3/bin:$PATH
-conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
+conda create -n HPAT -q -y numpy scipy pandas boost cmake
 source activate HPAT
 conda install -c numba numba
-conda install mpich -c conda-forge
+conda install mpich mpi -c conda-forge
 conda install pyarrow
 conda install h5py -c ehsantn
 conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
