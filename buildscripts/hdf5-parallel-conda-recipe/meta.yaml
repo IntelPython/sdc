@@ -1,4 +1,4 @@
-{% set version = "1.10.1" %}
+{% set version = "1.10.4" %}
 {% set maj_min_ver = ".".join(version.split(".")[:2]) %}
 
 package:
@@ -8,19 +8,24 @@ package:
 source:
   fn: hdf5-{{ version }}.tar.gz
   url: https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-{{ maj_min_ver }}/hdf5-{{ version }}/src/hdf5-{{ version }}.tar.gz
-  sha256: 048a9d149fb99aaa1680a712963f5a78e9c43b588d0e79d55e06760ec377c172
+  sha256: 8f60dc4dd6ab5fcd23c750d1dc5bca3d0453bdce5c8cdaf0a4a61a9d1122adb2
 
 build:
-  number: 2
+  number: 1002
 
 requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
-    - cmake >=3.1   # [win]
-    - python 3.6.*
-    - mpich # [not win]
+    - cmake >=3.2.2              # [win]
+    - python >=3.6
+    - mpich                      # [not win]
+    - libtool                    # [unix]
+    - ninja                      # [win]
+  host:
+    - zlib
   run:
+    - zlib
     - mpich # [not win]
 
 
