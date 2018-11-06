@@ -21,7 +21,6 @@ requirements:
     - pandas >=0.23
     - pyarrow >=0.9
     - arrow-cpp
-    - parquet-cpp
     - boost
     - hdf5
     - h5py
@@ -33,7 +32,6 @@ requirements:
     - pandas >=0.23
     - pyarrow >=0.9
     - arrow-cpp
-    - parquet-cpp
     - boost
     - numba 0.41.*
     - hdf5
