@@ -14,8 +14,8 @@ from hpat.distributed_analysis import Distribution
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
-    update_shuffle_meta, update_data_shuffle_meta,
-    )
+    update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
+    _get_keys_tup, _get_data_tup)
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
@@ -420,33 +420,34 @@ distributed.distributed_run_extensions[Join] = join_distributed_run
 def parallel_join(key_arr, data):
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
-    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, False)
-    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes, False)
+    pre_shuffle_meta = alloc_pre_shuffle_metadata((key_arr,), data, n_pes, False)
+
 
     # calc send/recv counts
     for i in range(len(key_arr)):
         val = key_arr[i]
         node_id = hash(val) % n_pes
-        update_shuffle_meta(shuffle_meta, node_id, i, val, False)
-        update_data_shuffle_meta(data_shuffle_meta, node_id, i, data, False)
+        update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
+            getitem_arr_tup(data, i), False)
 
-    finalize_shuffle_meta(key_arr, shuffle_meta, False)
-    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta, False)
+    shuffle_meta = finalize_shuffle_meta((key_arr,), data, pre_shuffle_meta,
+                                          n_pes, False)
 
     # write send buffers
     for i in range(len(key_arr)):
         val = key_arr[i]
         node_id = hash(val) % n_pes
-        write_send_buff(shuffle_meta, node_id, val)
-        write_data_send_buff(data_shuffle_meta, node_id, i, data, shuffle_meta)
+        write_send_buff(shuffle_meta, node_id, i, (val,), data)
         # update last since it is reused in data
         shuffle_meta.tmp_offset[node_id] += 1
 
     # shuffle
-    alltoallv(key_arr, shuffle_meta)
-    out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
+    key_arrs = (key_arr,)
+    recvs = alltoallv_tup(key_arrs + data, shuffle_meta)
+    out_key, = _get_keys_tup(recvs, key_arrs)
+    out_data = _get_data_tup(recvs, key_arrs)
 
-    return shuffle_meta.out_arr, out_data
+    return out_key, out_data
 
 @numba.njit
 def parallel_asof_comm(left_key_arr, right_key_arr, right_data):

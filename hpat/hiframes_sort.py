@@ -578,7 +578,7 @@ def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t, data_t, is_con
 
 
 
-def finalize_shuffle_meta(arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals):
+def finalize_shuffle_meta(arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals=()):
     return ShuffleMeta()
 
 @overload(finalize_shuffle_meta)
@@ -748,3 +748,35 @@ def alltoallv_tup_overload(arrs_t, shuffle_meta_t):
          'convert_len_arr_to_offset': convert_len_arr_to_offset}, loc_vars)
     a2a_impl = loc_vars['f']
     return a2a_impl
+
+
+def _get_keys_tup(recvs, key_arrs):
+    return recvs[:len(key_arrs)]
+
+@overload(_get_keys_tup)
+def _get_keys_tup_overload(recvs_t, key_arrs_t):
+    n_keys = len(key_arrs_t.types)
+    func_text = "def f(recvs, key_arrs):\n"
+    res = ",".join("recvs[{}]".format(i) for i in range(n_keys))
+    func_text += "  return ({}{})\n".format(res, "," if n_keys==1 else "")
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+
+def _get_data_tup(recvs, key_arrs):
+    return recvs[len(key_arrs):]
+
+@overload(_get_data_tup)
+def _get_data_tup_overload(recvs_t, key_arrs_t):
+    n_keys = len(key_arrs_t.types)
+    n_all = len(recvs_t.types)
+    n_data = n_all - n_keys
+    func_text = "def f(recvs, key_arrs):\n"
+    res = ",".join("recvs[{}]".format(i) for i in range(n_keys, n_all))
+    func_text += "  return ({}{})\n".format(res, "," if n_data==1 else "")
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    impl = loc_vars['f']
+    return impl

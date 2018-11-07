@@ -33,7 +33,7 @@ from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
-    alloc_pre_shuffle_metadata,
+    alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup
     )
 from hpat.hiframes_join import write_send_buff
 
@@ -697,37 +697,6 @@ def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
         __eval_res(local_redvars, out_arrs, j)
     return out_arrs
 
-
-def _get_keys_tup(recvs, key_arrs):
-    return recvs[:len(key_arrs)]
-
-@overload(_get_keys_tup)
-def _get_keys_tup_overload(recvs_t, key_arrs_t):
-    n_keys = len(key_arrs_t.types)
-    func_text = "def f(recvs, key_arrs):\n"
-    res = ",".join("recvs[{}]".format(i) for i in range(n_keys))
-    func_text += "  return ({}{})\n".format(res, "," if n_keys==1 else "")
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    impl = loc_vars['f']
-    return impl
-
-
-def _get_data_tup(recvs, key_arrs):
-    return recvs[len(key_arrs):]
-
-@overload(_get_data_tup)
-def _get_data_tup_overload(recvs_t, key_arrs_t):
-    n_keys = len(key_arrs_t.types)
-    n_all = len(recvs_t.types)
-    n_data = n_all - n_keys
-    func_text = "def f(recvs, key_arrs):\n"
-    res = ",".join("recvs[{}]".format(i) for i in range(n_keys, n_all))
-    func_text += "  return ({}{})\n".format(res, "," if n_data==1 else "")
-    loc_vars = {}
-    exec(func_text, {}, loc_vars)
-    impl = loc_vars['f']
-    return impl
 
 def get_shuffle_data_send_buffs(sh, karrs, data):  # pragma: no cover
     return ()
