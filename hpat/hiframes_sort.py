@@ -10,6 +10,7 @@ from numba.typing import signature
 from numba.extending import overload
 import hpat
 import hpat.timsort
+from hpat.timsort import getitem_arr_tup
 from hpat.utils import _numba_to_c_type_map
 from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
@@ -442,24 +443,25 @@ def parallel_sort(key_arr, data):
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts
-    shuffle_meta = alloc_shuffle_metadata(key_arr, n_pes, True)
-    data_shuffle_meta = data_alloc_shuffle_metadata(data, n_pes, True)
+    key_arrs = (key_arr,)
+    pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data, n_pes, True)
     node_id = 0
     for i in range(n_local):
         val = key_arr[i]
         if node_id < (n_pes - 1) and val >= bounds[node_id]:
             node_id += 1
-        update_shuffle_meta(shuffle_meta, node_id, i, val)
-        update_data_shuffle_meta(data_shuffle_meta, node_id, i, data)
+        update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
+            getitem_arr_tup(data, i), True)
 
-    finalize_shuffle_meta(key_arr, shuffle_meta, True)
-    finalize_data_shuffle_meta(data, data_shuffle_meta, shuffle_meta, True)
+    shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta,
+                                          n_pes, True)
 
     # shuffle
-    alltoallv(key_arr, shuffle_meta)
-    out_data = alltoallv_tup(data, data_shuffle_meta, shuffle_meta)
+    recvs = alltoallv_tup(key_arrs + data, shuffle_meta)
+    out_key, = _get_keys_tup(recvs, key_arrs)
+    out_data = _get_data_tup(recvs, key_arrs)
 
-    return shuffle_meta.out_arr, out_data
+    return out_key, out_data
 
 def alloc_shuffle_metadata():
     pass

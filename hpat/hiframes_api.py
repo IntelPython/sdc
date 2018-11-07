@@ -36,7 +36,7 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
-    update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
     )
 from hpat.hiframes_join import write_send_buff
 
@@ -299,29 +299,31 @@ def unique_overload_parallel(arr_typ):
 
     def unique_par(A):
         uniq_A = hpat.utils.to_array(set(A))
+        key_arrs = (uniq_A,)
 
         n_pes = hpat.distributed_api.get_size()
-        shuffle_meta = alloc_shuffle_metadata(uniq_A, n_pes, False)
+        pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, (), n_pes, False)
+
         # calc send/recv counts
         for i in range(len(uniq_A)):
             val = uniq_A[i]
             node_id = hash(val) % n_pes
-            update_shuffle_meta(shuffle_meta, node_id, i, val, False)
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,), (), False)
 
-        finalize_shuffle_meta(uniq_A, shuffle_meta, False)
+        shuffle_meta = finalize_shuffle_meta(key_arrs, (), pre_shuffle_meta, n_pes, False)
 
         # write send buffers
         for i in range(len(uniq_A)):
             val = uniq_A[i]
             node_id = hash(val) % n_pes
-            write_send_buff(shuffle_meta, node_id, val)
+            write_send_buff(shuffle_meta, node_id, i, (val,), ())
             # update last since it is reused in data
             shuffle_meta.tmp_offset[node_id] += 1
 
         # shuffle
-        alltoallv(uniq_A, shuffle_meta)
+        out_arr, = alltoallv_tup(key_arrs, shuffle_meta)
 
-        return hpat.utils.to_array(set(shuffle_meta.out_arr))
+        return hpat.utils.to_array(set(out_arr))
 
     return unique_par
 
