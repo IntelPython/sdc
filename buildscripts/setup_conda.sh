@@ -24,12 +24,9 @@ conda remove --all -q -y -n $CONDA_ENV
 
 conda create -n $CONDA_ENV -q -y numpy scipy pandas boost cmake
 source activate $CONDA_ENV
-$CONDA_INSTALL -c numba numba
 $CONDA_INSTALL pyarrow
-$CONDA_INSTALL h5py -c ehsantn
 #$CONDA_INSTALL daal-devel daal-include daal -c intel --no-deps
 #$CONDA_INSTALL tbb
-$CONDA_INSTALL mpich -c conda-forge
 $CONDA_INSTALL pyspark
 
 # install compilers
@@ -41,4 +38,8 @@ else
     echo "Error in compiler install"
 fi
 
-if [ "$RUN_COVERAGE" == "yes" ]; then $CONDA_INSTALL coveralls -c conda-forge; fi
+$CONDA_INSTALL mpich mpi -c conda-forge --no-deps
+$CONDA_INSTALL -c numba numba
+$CONDA_INSTALL h5py -c ehsantn --override-channels
+
+if [ "$RUN_COVERAGE" == "yes" ]; then $CONDA_INSTALL coveralls; fi
