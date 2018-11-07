@@ -839,7 +839,8 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
     # arg names
     in_names = tuple("in_{}".format(c) for c in in_col_names)
     out_names = tuple("out_{}".format(c) for c in out_col_names)
-    key_args = ", ".join("key_{}".format(c) for c in key_names)
+    key_args = ", ".join("key_{}".format(
+        _sanitize_varname(c)) for c in key_names)
 
     in_args = ", ".join(in_names)
     if in_args != '':
@@ -862,7 +863,8 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
         "," if len(in_names) == 1 else "")
     func_text += "    init_vals = __init_func()\n"
     # TODO: multikey output
-    out_keys = tuple("out_key_{}".format(c) for c in key_names)
+    out_keys = tuple("out_key_{}".format(
+        _sanitize_varname(c)) for c in key_names)
     out_tup = ", ".join(out_names + out_keys if return_key else out_names)
 
     if parallel:
@@ -1591,3 +1593,6 @@ def get_parfor_reductions(parfor, parfor_params, calltypes,
             reduce_varnames.append(param)
 
     return reduce_varnames, var_to_param
+
+def _sanitize_varname(varname):
+    return varname.replace('$', '_').replace('.', '_')
