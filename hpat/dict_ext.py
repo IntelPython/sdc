@@ -13,6 +13,13 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hdict_ext
 
+class ByteVecType(types.Opaque):
+    def __init__(self):
+        super(ByteVecType, self).__init__(
+            name='byte_vec')
+
+byte_vec_type = ByteVecType()
+register_model(ByteVecType)(models.OpaqueModel)
 
 class DictType(types.Opaque):
     def __init__(self, key_typ, val_typ):
@@ -54,37 +61,55 @@ def typ_str_to_obj(typ_str):
         return "string_type"
     return "types.{}".format(typ_str)
 
+def _add_dict_symbols(key_str, val_str):
+    # init dict object
+    exec("ll.add_symbol('dict_{0}_{1}_init', hdict_ext.dict_{0}_{1}_init)".format(key_str, val_str))
+    # setitem
+    exec("ll.add_symbol('dict_{0}_{1}_setitem', hdict_ext.dict_{0}_{1}_setitem)".format(key_str, val_str))
+    # getitem
+    exec("ll.add_symbol('dict_{0}_{1}_getitem', hdict_ext.dict_{0}_{1}_getitem)".format(key_str, val_str))
+    # in
+    exec("ll.add_symbol('dict_{0}_{1}_in', hdict_ext.dict_{0}_{1}_in)".format(key_str, val_str))
+    # print
+    exec("ll.add_symbol('dict_{0}_{1}_print', hdict_ext.dict_{0}_{1}_print)".format(key_str, val_str))
+    # get
+    exec("ll.add_symbol('dict_{0}_{1}_get', hdict_ext.dict_{0}_{1}_get)".format(key_str, val_str))
+    # pop
+    exec("ll.add_symbol('dict_{0}_{1}_pop', hdict_ext.dict_{0}_{1}_pop)".format(key_str, val_str))
+    # keys
+    exec("ll.add_symbol('dict_{0}_{1}_keys', hdict_ext.dict_{0}_{1}_keys)".format(key_str, val_str))
+    # min
+    exec("ll.add_symbol('dict_{0}_{1}_min', hdict_ext.dict_{0}_{1}_min)".format(key_str, val_str))
+    # max
+    exec("ll.add_symbol('dict_{0}_{1}_max', hdict_ext.dict_{0}_{1}_max)".format(key_str, val_str))
+    # not_empty
+    exec("ll.add_symbol('dict_{0}_{1}_not_empty', hdict_ext.dict_{0}_{1}_not_empty)".format(key_str, val_str))
+
+
 for key_typ in elem_types:
     for val_typ in elem_types:
         k_obj = typ_str_to_obj(key_typ)
         v_obj = typ_str_to_obj(val_typ)
         key_str = str(key_typ)
         val_str = str(val_typ)
+        _add_dict_symbols(key_str, val_str)
         # create types
         exec("dict_{}_{}_type = DictType({}, {})".format(key_str, val_str, k_obj, v_obj))
-        # init dict object
-        exec("ll.add_symbol('dict_{0}_{1}_init', hdict_ext.dict_{0}_{1}_init)".format(key_str, val_str))
         exec("dict_{0}_{1}_init = types.ExternalFunction('dict_{0}_{1}_init', dict_{0}_{1}_type())".format(key_str, val_str))
-        # setitem
-        exec("ll.add_symbol('dict_{0}_{1}_setitem', hdict_ext.dict_{0}_{1}_setitem)".format(key_str, val_str))
-        # getitem
-        exec("ll.add_symbol('dict_{0}_{1}_getitem', hdict_ext.dict_{0}_{1}_getitem)".format(key_str, val_str))
-        # in
-        exec("ll.add_symbol('dict_{0}_{1}_in', hdict_ext.dict_{0}_{1}_in)".format(key_str, val_str))
-        # print
-        exec("ll.add_symbol('dict_{0}_{1}_print', hdict_ext.dict_{0}_{1}_print)".format(key_str, val_str))
-        # get
-        exec("ll.add_symbol('dict_{0}_{1}_get', hdict_ext.dict_{0}_{1}_get)".format(key_str, val_str))
-        # pop
-        exec("ll.add_symbol('dict_{0}_{1}_pop', hdict_ext.dict_{0}_{1}_pop)".format(key_str, val_str))
-        # keys
-        exec("ll.add_symbol('dict_{0}_{1}_keys', hdict_ext.dict_{0}_{1}_keys)".format(key_str, val_str))
-        # min
-        exec("ll.add_symbol('dict_{0}_{1}_min', hdict_ext.dict_{0}_{1}_min)".format(key_str, val_str))
-        # max
-        exec("ll.add_symbol('dict_{0}_{1}_max', hdict_ext.dict_{0}_{1}_max)".format(key_str, val_str))
-        # not_empty
-        exec("ll.add_symbol('dict_{0}_{1}_not_empty', hdict_ext.dict_{0}_{1}_not_empty)".format(key_str, val_str))
+
+dict_byte_vec_int64_type = DictType(byte_vec_type, types.int64)
+dict_byte_vec_int64_init = types.ExternalFunction('dict_byte_vec_int64_init', dict_byte_vec_int64_type())
+_add_dict_symbols('byte_vec', 'int64')
+
+ll.add_symbol('byte_vec_init', hdict_ext.byte_vec_init)
+ll.add_symbol('byte_vec_set', hdict_ext.byte_vec_set)
+ll.add_symbol('byte_vec_free', hdict_ext.byte_vec_free)
+ll.add_symbol('byte_vec_resize', hdict_ext.byte_vec_resize)
+
+byte_vec_init = types.ExternalFunction('byte_vec_init', byte_vec_type(types.int64, types.voidptr))
+byte_vec_set = types.ExternalFunction('byte_vec_set', types.void(byte_vec_type, types.int64, types.voidptr, types.int64))
+byte_vec_resize = types.ExternalFunction('byte_vec_resize', types.void(byte_vec_type, types.int64))
+byte_vec_free = types.ExternalFunction('byte_vec_free', types.void(byte_vec_type))
 
 
 # XXX: needs Numba #3014 resolved
