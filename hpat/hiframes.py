@@ -1407,7 +1407,8 @@ class HiFrames(object):
 
         # output column map, create dataframe if multiple outputs
         out_key_vars = None
-        if len(out_colnames) == 1 and explicit_select:
+        # XXX output becomes series if single output and explicitly selected
+        if len(out_colnames) == 1 and explicit_select and as_index:
             df_col_map = {out_colnames[0]: lhs}
         else:
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
