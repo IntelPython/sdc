@@ -1411,15 +1411,17 @@ class HiFrames(object):
         if len(out_colnames) == 1 and explicit_select and as_index:
             df_col_map = {out_colnames[0]: lhs}
         else:
-            df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                                for col in out_colnames})
-            out_df = df_col_map.copy()
+            out_df = {}
+            # keys come first in column list
             if as_index is False:
                 out_key_vars = []
                 for k in key_colnames:
                     out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
                     out_df[k] = out_key_var
                     out_key_vars.append(out_key_var)
+            df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in out_colnames})
+            out_df.update(df_col_map)
 
             self._create_df(lhs.name, out_df, label)
 
