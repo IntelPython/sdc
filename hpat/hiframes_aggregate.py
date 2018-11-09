@@ -566,14 +566,13 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
         and tuple_assign.value.op == 'build_tuple')
     nodes += f_block.body[:-3]
 
-    for i, var in enumerate(agg_node.df_out_vars.values()):
+    out_vars = list(agg_node.df_out_vars.values())
+    if return_key:
+        out_vars += agg_node.out_key_vars
+
+    for i, var in enumerate(out_vars):
         out_var = tuple_assign.value.items[i]
         nodes.append(ir.Assign(out_var, var, var.loc))
-
-    if return_key:
-        nodes.append(ir.Assign(
-            tuple_assign.value.items[len(out_col_vars)], agg_node.out_key_vars[0],
-            agg_node.out_key_vars[0].loc))
 
     return nodes
 
@@ -675,7 +674,6 @@ def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
                  __update_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
     key_set = _build_set(key_arrs)
     n_uniq_keys = len(key_set)
-    # TODO: fix multi-key alloc when return_key==True
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
     # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
@@ -690,9 +688,9 @@ def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
             w_ind = curr_write_ind
             curr_write_ind += 1
             key_write_map[k] = w_ind
-            # TODO: fix return key case
-            #if return_key:
-            #    setitem_array_with_str(out_arrs[-1], w_ind, k)
+            if return_key:
+                _set_out_keys(out_arrs, w_ind, key_arrs, i, k)
+                # setitem_array_with_str(out_arrs[-1], w_ind, k)
                 # out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
@@ -776,6 +774,30 @@ def _getitem_keys_overload(arr_t, i_t, b_v_t):
     return lambda arr, i, b: arr[i]
 
 
+def _set_out_keys(out_arrs, w_ind, key_arrs, i, k):
+    setitem_array_with_str(out_arrs[-1], w_ind, k)
+
+@overload(_set_out_keys)
+def _set_out_keys_overload(out_arrs_t, w_ind_t, key_arrs_t, i_t, k_t):
+    if isinstance(key_arrs_t, types.BaseTuple):
+        n_keys = len(key_arrs_t.types)
+        n_outs = len(out_arrs_t.types)
+        key_start = n_outs - n_keys
+
+        func_text = "def set_keys_impl(out_arrs, w_ind, key_arrs, i, k):\n"
+        for i in range(n_keys):
+            func_text += "  setitem_array_with_str(out_arrs[{}], w_ind, key_arrs[{}][i])\n".format(
+                key_start + i, i)
+
+        # print(func_text)
+        loc_vars = {}
+        exec(func_text, {'setitem_array_with_str': setitem_array_with_str}, loc_vars)
+        set_keys_impl = loc_vars['set_keys_impl']
+        return set_keys_impl
+
+    return _set_out_keys
+
+
 def get_key_set(arr):  # pragma: no cover
     return set()
 
@@ -803,22 +825,28 @@ def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t,
     # return key is either True or None
     if return_key_t == types.boolean:
         # TODO: handle pivot_table/crosstab with return key
-        assert out_dummy_tup_t.count == data_in_t.count + 1
-        key_typ = key_set_t.dtype
+        dtype = key_set_t.dtype
+        key_types = list(dtype.types) if isinstance(dtype, types.BaseTuple) else [dtype]
+        n_keys = len(key_types)
+        assert out_dummy_tup_t.count == data_in_t.count + n_keys
 
         func_text = "def out_alloc_f(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key):\n"
         for i in range(data_in_t.count):
             func_text += "  c_{} = empty_like_type(n_uniq_keys, out_dummy_tup[{}])\n".format(i, i)
 
-        if key_typ == string_type:
+        # string special case
+        # TODO: handle strings in multi-key case
+        if key_types == [string_type]:
             func_text += "  num_total_chars = num_total_chars_set_string(key_set)\n"
-            func_text += "  out_key = pre_alloc_string_array(n_uniq_keys, num_total_chars)\n"
+            func_text += "  out_key_0 = pre_alloc_string_array(n_uniq_keys, num_total_chars)\n"
         else:
-            func_text += "  out_key = np.empty(n_uniq_keys, np.{})\n".format(key_typ)
+            for i, key_typ in enumerate(key_types):
+                func_text += "  out_key_{} = np.empty(n_uniq_keys, np.{})\n".format(i, key_typ)
 
-        func_text += "  return ({}{}out_key,)\n".format(
+        func_text += "  return ({}{}{},)\n".format(
             ", ".join(["c_{}".format(i) for i in range(data_in_t.count)]),
-            "," if data_in_t.count != 0 else "")
+            "," if data_in_t.count != 0 else "",
+            ", ".join(["out_key_{}".format(i) for i in range(n_keys)]))
 
         loc_vars = {}
         # print(func_text)
@@ -894,7 +922,6 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
     # pass None instead of False to enable static specialization in
     # alloc_agg_output()
     return_key_p = "True" if return_key else "None"
-    # TODO: fix multi-key return key output
 
     func_text = "def agg_top({}{}, pivot_arr):\n".format(key_args, in_args)
     func_text += "    data_redvar_dummy = ({}{})\n".format(
@@ -907,7 +934,7 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
     func_text += "    data_in = ({}{})\n".format(",".join(in_names),
         "," if len(in_names) == 1 else "")
     func_text += "    init_vals = __init_func()\n"
-    # TODO: multikey output
+
     out_keys = tuple("out_key_{}".format(
         _sanitize_varname(c)) for c in key_names)
     out_tup = ", ".join(out_names + out_keys if return_key else out_names)
