@@ -36,6 +36,7 @@ from hpat.hiframes_sort import (
     alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup
     )
 from hpat.hiframes_join import write_send_buff
+from hpat.timsort import getitem_arr_tup
 
 AggFuncStruct = namedtuple('AggFuncStruct',
     ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
@@ -672,29 +673,34 @@ def agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup, init_vals,
 @numba.njit
 def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
                  __update_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
-    key_set = set(key_arrs[0])
+    key_set = _build_set(key_arrs)
     n_uniq_keys = len(key_set)
+    # TODO: fix multi-key alloc when return_key==True
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
     # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
     local_redvars = alloc_arr_tup(n_uniq_keys, redvar_dummy_tup, init_vals)
 
-    key_write_map = get_key_dict(key_arrs[0])
+    key_write_map, byte_v = get_key_dict(key_arrs)
     curr_write_ind = 0
     for i in range(len(key_arrs[0])):
-        k = key_arrs[0][i]
+        #k = key_arrs[0][i]
+        k = _getitem_keys(key_arrs, i, byte_v)
         if k not in key_write_map:
             w_ind = curr_write_ind
             curr_write_ind += 1
             key_write_map[k] = w_ind
-            if return_key:
-                setitem_array_with_str(out_arrs[-1], w_ind, k)
+            # TODO: fix return key case
+            #if return_key:
+            #    setitem_array_with_str(out_arrs[-1], w_ind, k)
                 # out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
         __update_redvars(local_redvars, data_in, w_ind, i, pivot_arr)
     for j in range(n_uniq_keys):
         __eval_res(local_redvars, out_arrs, j)
+
+    hpat.dict_ext.byte_vec_free(byte_v)
     return out_arrs
 
 
@@ -723,12 +729,51 @@ def get_key_dict(arr):  # pragma: no cover
 
 @overload(get_key_dict)
 def get_key_dict_overload(arr_t):
+    """returns dictionary and possibly a byte_vec for multi-key case
+    """
+    # get byte_vec dict for multi-key case
+    if isinstance(arr_t, types.BaseTuple):
+        n_bytes = 0
+        context = numba.targets.registry.cpu_target.target_context
+        for t in arr_t.types:
+            n_bytes += context.get_abi_sizeof(context.get_data_type(t.dtype))
+        def _impl(arrs):
+            b_v = hpat.dict_ext.byte_vec_init(n_bytes, 0)
+            b_dict = hpat.dict_ext.dict_byte_vec_int64_init()
+            return b_dict, b_v
+        return _impl
+
+    # regular scalar keys
     func_text = "def k_dict_impl(arr):\n"
-    func_text += "  return hpat.dict_ext.dict_{}_int64_init()\n".format(arr_t.dtype)
+    func_text += "  b_v = hpat.dict_ext.byte_vec_init(1, 0)\n"
+    func_text += "  return hpat.dict_ext.dict_{}_int64_init(), b_v\n".format(arr_t.dtype)
     loc_vars = {}
     exec(func_text, {'hpat': hpat}, loc_vars)
     k_dict_impl = loc_vars['k_dict_impl']
     return k_dict_impl
+
+def _getitem_keys(key_arrs, i, b_v):
+    return key_arrs[i]
+
+@overload(_getitem_keys)
+def _getitem_keys_overload(arr_t, i_t, b_v_t):
+    if isinstance(arr_t, types.BaseTuple):
+        func_text = "def getitem_impl(arrs, ind, b_v):\n"
+        offset = 0
+        context = numba.targets.registry.cpu_target.target_context
+        for i, t in enumerate(arr_t.types):
+            n_bytes = context.get_abi_sizeof(context.get_data_type(t.dtype))
+            func_text += "  arr_ptr = arrs[{}].ctypes.data + ind * {}\n".format(i, n_bytes)
+            func_text += "  hpat.dict_ext.byte_vec_set(b_v, {}, arr_ptr, {})\n".format(offset, n_bytes)
+            offset += n_bytes
+
+        func_text += "  return b_v\n"
+        loc_vars = {}
+        exec(func_text, {'hpat': hpat}, loc_vars)
+        getitem_impl = loc_vars['getitem_impl']
+        return getitem_impl
+
+    return lambda arr, i, b: arr[i]
 
 
 def get_key_set(arr):  # pragma: no cover
@@ -1593,6 +1638,22 @@ def get_parfor_reductions(parfor, parfor_params, calltypes,
             reduce_varnames.append(param)
 
     return reduce_varnames, var_to_param
+
+def _build_set(arr):
+    return set(arr)
+
+@overload(_build_set)
+def _build_set_overload(arr_tup_t):
+    # TODO: support string in tuple set
+    if isinstance(arr_tup_t, types.BaseTuple):
+        def _impl(arr_tup):
+            n = len(arr_tup[0])
+            s = set()
+            for i in range(n):
+                s.add(getitem_arr_tup(arr_tup, i))
+            return s
+        return _impl
+    return _build_set
 
 def _sanitize_varname(varname):
     return varname.replace('$', '_').replace('.', '_')
