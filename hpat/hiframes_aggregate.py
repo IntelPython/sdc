@@ -498,7 +498,7 @@ class EvalDummyTyper(AbstractTemplate):
 def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
     for v in (list(agg_node.df_in_vars.values())
-              + list(agg_node.df_out_vars.values()) + [agg_node.key_arrs[0]]):
+              + list(agg_node.df_out_vars.values()) + agg_node.key_arrs):
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
@@ -587,14 +587,15 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
     pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data_redvar_dummy, n_pes, False)
 
     # calc send/recv counts
-    key_set = get_key_set(key_arrs[0])
+    # TODO: is tuple set as fast as single key set? specialize?
+    key_set = get_key_set(key_arrs)
     for i in range(len(key_arrs[0])):
-        val = key_arrs[0][i]
+        val = getitem_arr_tup(key_arrs, i)
         if val not in key_set:
             key_set.add(val)
             node_id = hash(val) % n_pes
             # data isn't computed here yet so pass empty tuple
-            update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,), (), False)
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, val, (), False)
 
     shuffle_meta = finalize_shuffle_meta(key_arrs, data_redvar_dummy, pre_shuffle_meta, n_pes, False, init_vals)
 
@@ -623,50 +624,61 @@ def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
     # redvar_1_arr = np.full(n_uniq_keys, _init_val_1, np.int64)
     # out_key = np.empty(n_uniq_keys, np.float64)
     n_pes = hpat.distributed_api.get_size()
-    key_write_map = get_key_dict(key_arrs[0]) # hpat.dict_ext.init_dict_float64_int64()
+    # hpat.dict_ext.init_dict_float64_int64()
+    # key_write_map = get_key_dict(key_arrs[0])
+    key_write_map, byte_v = get_key_dict(key_arrs)
 
     redvar_arrs = get_shuffle_data_send_buffs(shuffle_meta, key_arrs, data_redvar_dummy)
 
     for i in range(len(key_arrs[0])):
-        k = key_arrs[0][i]
+        # k = key_arrs[0][i]
+        k = _getitem_keys(key_arrs, i, byte_v)
         if k not in key_write_map:
-            node_id = hash(k) % n_pes
-            w_ind = write_send_buff(shuffle_meta, node_id, i, (k,), ())
+            # k is byte_vec but we need tuple value for hashing
+            tup_val = getitem_arr_tup(key_arrs, i)
+            node_id = hash(tup_val) % n_pes
+            w_ind = write_send_buff(shuffle_meta, node_id, i, tup_val, ())
             shuffle_meta.tmp_offset[node_id] += 1
             key_write_map[k] = w_ind
         else:
             w_ind = key_write_map[k]
         __update_redvars(redvar_arrs, data_in, w_ind, i, pivot_arr)
         #redvar_arrs[0][w_ind], redvar_arrs[1][w_ind] = __update_redvars(redvar_arrs[0][w_ind], redvar_arrs[1][w_ind], data_in[0][i])
+    hpat.dict_ext.byte_vec_free(byte_v)
     return
 
 
 @numba.njit
 def agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup, init_vals,
                 __combine_redvars, __eval_res, return_key, data_in, pivot_arr):  # pragma: no cover
-    key_set = set(key_arrs[0])
+    key_set = _build_set(key_arrs)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
     # out_arrs = alloc_arr_tup(n_uniq_keys, out_dummy_tup)
     local_redvars = alloc_arr_tup(n_uniq_keys, reduce_recvs, init_vals)
 
-    key_write_map = get_key_dict(key_arrs[0])
+    # key_write_map = get_key_dict(key_arrs[0])
+    key_write_map, byte_v = get_key_dict(key_arrs)
     curr_write_ind = 0
     for i in range(len(key_arrs[0])):
-        k = key_arrs[0][i]
+        # k = key_arrs[0][i]
+        k = _getitem_keys(key_arrs, i, byte_v)
         if k not in key_write_map:
             w_ind = curr_write_ind
             curr_write_ind += 1
             key_write_map[k] = w_ind
             if return_key:
-                setitem_array_with_str(out_arrs[-1], w_ind, k)
+                _set_out_keys(out_arrs, w_ind, key_arrs, i, k)
+                # setitem_array_with_str(out_arrs[-1], w_ind, k)
                 # out_arrs[-1][w_ind] = k
         else:
             w_ind = key_write_map[k]
         __combine_redvars(local_redvars, reduce_recvs, w_ind, i, pivot_arr)
     for j in range(n_uniq_keys):
         __eval_res(local_redvars, out_arrs, j)
+
+    hpat.dict_ext.byte_vec_free(byte_v)
     return out_arrs
 
 @numba.njit
@@ -805,6 +817,15 @@ def get_key_set(arr):  # pragma: no cover
 def get_key_set_overload(arr_t):
     if arr_t == string_array_type:
         return lambda a: hpat.set_ext.init_set_string()
+
+    if isinstance(arr_t, types.BaseTuple):
+        def get_set(arrs):
+            s = set()
+            v = getitem_arr_tup(arrs, 0)
+            s.add(v)
+            s.remove(v)
+            return s
+        return get_set
 
     # hack to return set with specified type
     def get_set(arr):
