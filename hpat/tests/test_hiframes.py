@@ -9,7 +9,8 @@ import hpat
 from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                            get_start_end)
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
                     "bar", "bar", "bar", "bar"],
@@ -1099,6 +1100,38 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_multikey_seq(self):
+        def test_impl(df):
+            A = df.groupby(['A', 'C'])['B'].sum()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
+                           'C': [3,5,6,5,4,4,3]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+    
+    def test_agg_multikey_parallel(self):
+        def test_impl(in_A, in_B, in_C):
+            df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
+            A = df.groupby(['A', 'C'])['B'].sum()
+            return A.sum()
+
+        hpat_func = hpat.jit(locals={'in_A:input': 'distributed',
+            'in_B:input': 'distributed',
+            'in_C:input': 'distributed'})(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
+                           'C': [3,5,6,5,4,4,3]})
+        start, end = get_start_end(len(df))
+        h_A = df.A.values[start:end]
+        h_B = df.B.values[start:end]
+        h_C = df.C.values[start:end]
+        p_A = df.A.values
+        p_B = df.B.values
+        p_C = df.C.values
+        h_res = hpat_func(h_A, h_B, h_C)
+        p_res = test_impl(p_A, p_B, p_C)
+        self.assertEqual(h_res, p_res)
 
     def test_agg_parallel(self):
         def test_impl(n):
