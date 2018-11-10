@@ -587,15 +587,14 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
     pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data_redvar_dummy, n_pes, False)
 
     # calc send/recv counts
-    # TODO: is tuple set as fast as single key set? specialize?
     key_set = get_key_set(key_arrs)
     for i in range(len(key_arrs[0])):
-        val = getitem_arr_tup(key_arrs, i)
+        val = getitem_arr_tup_single(key_arrs, i)
         if val not in key_set:
             key_set.add(val)
             node_id = hash(val) % n_pes
             # data isn't computed here yet so pass empty tuple
-            update_shuffle_meta(pre_shuffle_meta, node_id, i, val, (), False)
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, _val_to_tup(val), (), False)
 
     shuffle_meta = finalize_shuffle_meta(key_arrs, data_redvar_dummy, pre_shuffle_meta, n_pes, False, init_vals)
 
@@ -635,9 +634,9 @@ def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
         k = _getitem_keys(key_arrs, i, byte_v)
         if k not in key_write_map:
             # k is byte_vec but we need tuple value for hashing
-            tup_val = getitem_arr_tup(key_arrs, i)
-            node_id = hash(tup_val) % n_pes
-            w_ind = write_send_buff(shuffle_meta, node_id, i, tup_val, ())
+            val = getitem_arr_tup_single(key_arrs, i)
+            node_id = hash(val) % n_pes
+            w_ind = write_send_buff(shuffle_meta, node_id, i, _val_to_tup(val), ())
             shuffle_meta.tmp_offset[node_id] += 1
             key_write_map[k] = w_ind
         else:
@@ -742,7 +741,7 @@ def get_key_dict_overload(arr_t):
     """returns dictionary and possibly a byte_vec for multi-key case
     """
     # get byte_vec dict for multi-key case
-    if isinstance(arr_t, types.BaseTuple):
+    if isinstance(arr_t, types.BaseTuple) and len(arr_t.types) != 1:
         n_bytes = 0
         context = numba.targets.registry.cpu_target.target_context
         for t in arr_t.types:
@@ -754,9 +753,10 @@ def get_key_dict_overload(arr_t):
         return _impl
 
     # regular scalar keys
+    dtype = arr_t.types[0].dtype
     func_text = "def k_dict_impl(arr):\n"
     func_text += "  b_v = hpat.dict_ext.byte_vec_init(1, 0)\n"
-    func_text += "  return hpat.dict_ext.dict_{}_int64_init(), b_v\n".format(arr_t.dtype)
+    func_text += "  return hpat.dict_ext.dict_{}_int64_init(), b_v\n".format(dtype)
     loc_vars = {}
     exec(func_text, {'hpat': hpat}, loc_vars)
     k_dict_impl = loc_vars['k_dict_impl']
@@ -767,7 +767,7 @@ def _getitem_keys(key_arrs, i, b_v):
 
 @overload(_getitem_keys)
 def _getitem_keys_overload(arr_t, i_t, b_v_t):
-    if isinstance(arr_t, types.BaseTuple):
+    if isinstance(arr_t, types.BaseTuple) and len(arr_t.types) != 1:
         func_text = "def getitem_impl(arrs, ind, b_v):\n"
         offset = 0
         context = numba.targets.registry.cpu_target.target_context
@@ -783,7 +783,7 @@ def _getitem_keys_overload(arr_t, i_t, b_v_t):
         getitem_impl = loc_vars['getitem_impl']
         return getitem_impl
 
-    return lambda arr, i, b: arr[i]
+    return lambda arrs, i, b: arrs[0][i]
 
 
 def _set_out_keys(out_arrs, w_ind, key_arrs, i, k):
@@ -815,17 +815,18 @@ def get_key_set(arr):  # pragma: no cover
 
 @overload(get_key_set)
 def get_key_set_overload(arr_t):
-    if arr_t == string_array_type:
+    if arr_t == string_array_type or (isinstance(arr_t, types.BaseTuple)
+            and len(arr_t.types) == 1 and arr_t.types[0] == string_array_type):
         return lambda a: hpat.set_ext.init_set_string()
 
     if isinstance(arr_t, types.BaseTuple):
-        def get_set(arrs):
+        def get_set_tup(arrs):
             s = set()
-            v = getitem_arr_tup(arrs, 0)
+            v = getitem_arr_tup_single(arrs, 0)
             s.add(v)
             s.remove(v)
             return s
-        return get_set
+        return get_set_tup
 
     # hack to return set with specified type
     def get_set(arr):
@@ -835,6 +836,25 @@ def get_key_set_overload(arr_t):
         return s
 
     return get_set
+
+# returns scalar instead of tuple if only one array
+def getitem_arr_tup_single(arrs, i):
+    return arrs[0][i]
+
+@overload(getitem_arr_tup_single)
+def getitem_arr_tup_single_overload(arrs_t, i_t):
+    if len(arrs_t.types) == 1:
+        return lambda arrs, i: arrs[0][i]
+    return lambda arrs, i: getitem_arr_tup(arrs, i)
+
+def _val_to_tup(val):
+    return (val,)
+
+@overload(_val_to_tup)
+def _val_to_tup_overload(val_t):
+    if isinstance(val_t, types.BaseTuple):
+        return lambda a: a
+    return lambda a: (a,)
 
 def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key):  # pragma: no cover
     return out_dummy_tup
@@ -1687,13 +1707,13 @@ def get_parfor_reductions(parfor, parfor_params, calltypes,
 
     return reduce_varnames, var_to_param
 
-def _build_set(arr):
-    return set(arr)
+def _build_set(arrs):
+    return set(arrs[0])
 
 @overload(_build_set)
 def _build_set_overload(arr_tup_t):
     # TODO: support string in tuple set
-    if isinstance(arr_tup_t, types.BaseTuple):
+    if isinstance(arr_tup_t, types.BaseTuple) and len(arr_tup_t.types) != 1:
         def _impl(arr_tup):
             n = len(arr_tup[0])
             s = set()
