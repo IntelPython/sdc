@@ -390,6 +390,11 @@ class HiFrames(object):
         if func_name == 'dropna':
             return self._handle_df_dropna(lhs, rhs, df_var, label)
 
+        # df.merge()
+        if func_name == 'merge':
+            rhs.args.insert(0, df_var)
+            return self._handle_merge(assign, lhs, rhs, False, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))

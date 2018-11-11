@@ -850,7 +850,7 @@ class TestHiFrames(unittest.TestCase):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
             df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
-            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
+            df3 = df1.merge(df2, left_on='key1', right_on='key2')
             return df3.B
 
         hpat_func = hpat.jit(test_impl)
