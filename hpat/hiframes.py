@@ -813,17 +813,20 @@ class HiFrames(object):
 
         # find key columns
         left_on = right_on = None
-        on = self._get_str_arg('merge', rhs.args, kws, on_argno, 'on', '')
+        on_arg = self._get_arg('merge', rhs.args, kws, on_argno, 'on', '')
+        on = self._get_str_or_list(on_arg, default=[''])[0]
 
         if on != '':
             left_on = on
             right_on = left_on
         else:  # pragma: no cover
             err_msg = "merge 'on' or 'left_on'/'right_on' arguments required"
-            left_on = self._get_str_arg('merge', rhs.args, kws, on_argno+1,
+            left_on_var = self._get_arg('merge', rhs.args, kws, on_argno+1,
                                                     'left_on', err_msg=err_msg)
-            right_on = self._get_str_arg('merge', rhs.args, kws, on_argno+2,
+            left_on = self._get_str_or_list(left_on_var, err_msg=err_msg)[0]
+            right_on_var = self._get_arg('merge', rhs.args, kws, on_argno+2,
                                                    'right_on', err_msg=err_msg)
+            right_on = self._get_str_or_list(right_on_var, err_msg=err_msg)[0]
 
         # convert right join to left join
         if how == 'right':
@@ -1321,7 +1324,8 @@ class HiFrames(object):
             raise ValueError(err_msg)
         return arg
 
-    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None):
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
         arg = None
         if len(args) > arg_no:
             arg = args[arg_no]
@@ -1331,8 +1335,9 @@ class HiFrames(object):
         if arg is None:
             if default is not None:
                 return default
-            raise ValueError("{} requires '{}' argument".format(
-                f_name, arg_name))
+            if err_msg is None:
+                err_msg = "{} requires '{}' argument".format(f_name, arg_name)
+            raise ValueError(err_msg)
         return arg
 
     def _handle_crosstab(self, lhs, rhs, label):
@@ -1459,21 +1464,32 @@ class HiFrames(object):
 
         err_msg = ("groupby() by argument should be "
                    "list of column names or a column name")
+        key_colnames = self._get_str_or_list(by_arg, True, err_msg=err_msg)
+
+        return key_colnames, as_index
+
+    def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None):
         by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
         if by_arg_def is None:
             # try single key column
             by_arg_def = guard(find_const, self.func_ir, by_arg)
             if by_arg_def is None:
+                if default is not None:
+                    return default
                 raise ValueError(err_msg)
             key_colnames = [by_arg_def]
         else:
-            if by_arg_def[1] != 'build_list':
+            if list_only and by_arg_def[1] != 'build_list':
+                if default is not None:
+                    return default
                 raise ValueError(err_msg)
             key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
             if any(not isinstance(v, str) for v in key_colnames):
+                if default is not None:
+                    return default
                 raise ValueError(err_msg)
+        return key_colnames
 
-        return key_colnames, as_index
 
     def _get_df_obj_select(self, obj_var, obj_name):
         """analyze selection of columns in after groupby() or rolling()
