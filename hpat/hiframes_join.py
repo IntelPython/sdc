@@ -28,12 +28,12 @@ import numpy as np
 
 
 class Join(ir.Stmt):
-    def __init__(self, df_out, left_df, right_df, left_key, right_key, df_vars, how, loc):
+    def __init__(self, df_out, left_df, right_df, left_keys, right_keys, df_vars, how, loc):
         self.df_out = df_out
         self.left_df = left_df
         self.right_df = right_df
-        self.left_key = left_key
-        self.right_key = right_key
+        self.left_keys = left_keys
+        self.right_keys = right_keys
         self.df_out_vars = df_vars[self.df_out].copy()
         self.left_vars = df_vars[left_df].copy()
         self.right_vars = df_vars[right_df].copy()
@@ -56,7 +56,7 @@ class Join(ir.Stmt):
             in_cols += "'{}':{}, ".format(c, v.name)
         df_right_str = "{}{{{}}}".format(self.right_df, in_cols)
         return "join [{}={}]: {} , {}, {}".format(
-            self.left_key, self.right_key, df_out_str, df_left_str,
+            self.left_keys, self.right_keys, df_out_str, df_left_str,
             df_right_str)
 
 
@@ -197,9 +197,9 @@ def remove_dead_join(join_node, lives, arg_aliases, alias_map, func_ir, typemap)
 
     for col_name, col_var in join_node.df_out_vars.items():
         if col_var.name not in lives:
-            if col_name == join_node.left_key:
+            if col_name in join_node.left_keys:
                 left_key_dead = True
-            elif col_name == join_node.right_key:
+            elif col_name in join_node.right_keys:
                 right_key_dead = True
             else:
                 dead_cols.append(col_name)
@@ -294,18 +294,19 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     # get column variables
-    left_key_var = join_node.left_vars[join_node.left_key]
-    right_key_var = join_node.right_vars[join_node.right_key]
+    left_key_vars = tuple(join_node.left_vars[c] for c in join_node.left_keys)
+    right_key_vars = tuple(join_node.right_vars[c] for c in join_node.right_keys)
 
-    left_other_col_vars = [v for (n, v) in sorted(join_node.left_vars.items())
-                           if n != join_node.left_key]
-    right_other_col_vars = [v for (n, v) in sorted(join_node.right_vars.items())
-                            if n != join_node.right_key]
+    left_other_col_vars = tuple(v for (n, v) in sorted(join_node.left_vars.items())
+                           if n not in join_node.left_keys)
+    right_other_col_vars = tuple(v for (n, v) in sorted(join_node.right_vars.items())
+                            if n not in join_node.right_keys)
     # get column types
-    left_other_col_typ = [typemap[v.name] for v in left_other_col_vars]
-    right_other_col_typ = [typemap[v.name] for v in right_other_col_vars]
-    arg_typs = tuple([typemap[left_key_var.name], typemap[right_key_var.name]]
-                     + left_other_col_typ + right_other_col_typ)
+    arg_vars = (left_key_vars + right_key_vars
+                + left_other_col_vars + right_other_col_vars)
+    arg_typs = tuple(typemap[v.name] for v in arg_vars)
+    scope = arg_vars[0].scope
+
     # arg names of non-key columns
     left_other_names = ["t1_c" + str(i)
                         for i in range(len(left_other_col_vars))]
@@ -339,20 +340,22 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
-    out_l_key_var = join_node.df_out_vars[join_node.left_key]
-    out_r_key_var = join_node.df_out_vars[join_node.right_key]
+    out_l_key_vars = tuple(join_node.df_out_vars[c] for c in join_node.left_keys)
+    out_r_key_vars = tuple(join_node.df_out_vars[c] for c in join_node.right_keys)
     # create dummy variable if right key is not actually returned
     # using the same output left key causes errors for asof case
-    if join_node.left_key == join_node.right_key:
-        out_r_key_var = ir.Var(
-            out_l_key_var.scope, mk_unique_var('dummy_k'), loc)
-        typemap[out_r_key_var.name] = typemap[out_l_key_var.name]
+    n_keys = len(join_node.right_keys)
+    if join_node.left_keys == join_node.right_keys:
+        out_r_key_vars = tuple(ir.Var(scope, mk_unique_var('dummy_k'), loc)
+                                                        for _ in range(n_keys))
+        for v, w in zip(out_r_key_vars, out_l_key_vars):
+            typemap[v.name] = typemap[w.name]
 
-    merge_out = [out_l_key_var, out_r_key_var]
-    merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
-                  if n != join_node.left_key]
-    merge_out += [join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
-                  if n != join_node.right_key]
+    merge_out = out_l_key_vars + out_r_key_vars
+    merge_out += tuple(join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
+                  if n not in join_node.left_keys)
+    merge_out += tuple(join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
+                  if n not in join_node.right_keys)
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
     if join_node.how == 'asof':
@@ -389,9 +392,9 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     # print(func_text)
 
     left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
-    _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(typemap[left_key_var.name], left_data_tup_typ)
+    _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(typemap[left_key_vars[0].name], left_data_tup_typ)
     right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
-    _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(typemap[right_key_var.name], right_data_tup_typ)
+    _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(typemap[right_key_vars[0].name], right_data_tup_typ)
 
     f_block = compile_to_numba_ir(join_impl,
                                   {'hpat': hpat, 'np': np,
@@ -403,8 +406,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                   'parallel_asof_comm': parallel_asof_comm},
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [left_key_var, right_key_var]
-                      + left_other_col_vars + right_other_col_vars)
+    replace_arg_nodes(f_block, arg_vars)
 
     nodes = f_block.body[:-3]
     for i in range(len(merge_out)):
@@ -921,7 +923,7 @@ def trim_arr_tup_overload(data_t, new_size_t):
 #     out_data_left = ensure_capacity(out_data_left, out_ind+1)
 #     out_data_right = ensure_capacity(out_data_right, out_ind+1)
 
-#     out_left_key[out_ind] = left_key[left_ind]
+#     out_left_key[out_ind] = left_keys[left_ind]
 #     copyElement_tup(data_left, left_ind, out_data_left, out_ind)
 #     copyElement_tup(data_right, right_ind, out_data_right, out_ind)
 #     return out_left_key, out_data_left, out_data_right

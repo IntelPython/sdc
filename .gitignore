@@ -20,3 +20,4 @@ docs/gh-pages/
 *.csv
 *.parquet
 *.hdf5
+tmp_tests/

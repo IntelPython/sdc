@@ -814,19 +814,19 @@ class HiFrames(object):
         # find key columns
         left_on = right_on = None
         on_arg = self._get_arg('merge', rhs.args, kws, on_argno, 'on', '')
-        on = self._get_str_or_list(on_arg, default=[''])[0]
+        on = self._get_str_or_list(on_arg, default=[''])
 
-        if on != '':
+        if on != ['']:
             left_on = on
             right_on = left_on
         else:  # pragma: no cover
             err_msg = "merge 'on' or 'left_on'/'right_on' arguments required"
             left_on_var = self._get_arg('merge', rhs.args, kws, on_argno+1,
                                                     'left_on', err_msg=err_msg)
-            left_on = self._get_str_or_list(left_on_var, err_msg=err_msg)[0]
+            left_on = self._get_str_or_list(left_on_var, err_msg=err_msg)
             right_on_var = self._get_arg('merge', rhs.args, kws, on_argno+2,
                                                    'right_on', err_msg=err_msg)
-            right_on = self._get_str_or_list(right_on_var, err_msg=err_msg)[0]
+            right_on = self._get_str_or_list(right_on_var, err_msg=err_msg)
 
         # convert right join to left join
         if how == 'right':
