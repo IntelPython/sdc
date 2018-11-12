@@ -335,7 +335,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     if parallel:
         if join_node.how == 'asof':
             # only the right key needs to be aligned
-            func_text += "    t2_key, data_right = parallel_asof_comm(t1_key, t2_key, data_right)\n"
+            func_text += "    t2_keys, data_right = parallel_asof_comm(t1_keys, t2_keys, data_right)\n"
         else:
             func_text += "    t1_keys, data_left = parallel_join(t1_keys, data_left)\n"
             func_text += "    t2_keys, data_right = parallel_join(t2_keys, data_right)\n"
@@ -367,8 +367,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
     if join_node.how == 'asof':
-        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
+        func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
     else:
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
         " = hpat.hiframes_join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
@@ -457,7 +457,7 @@ def parallel_join(key_arrs, data):
     for i in range(len(key_arrs[0])):
         val = getitem_arr_tup(key_arrs, i)
         node_id = hash(val) % n_pes
-        write_send_buff(shuffle_meta, node_id, i, (val,), data)
+        write_send_buff(shuffle_meta, node_id, i, val, data)
         # update last since it is reused in data
         shuffle_meta.tmp_offset[node_id] += 1
 
@@ -469,21 +469,22 @@ def parallel_join(key_arrs, data):
     return out_keys, out_data
 
 @numba.njit
-def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
+def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
     # align the left and right intervals
     # allgather the boundaries of all left intervals and calculate overlap
     # rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
-    bnd_starts = np.empty(n_pes, left_key_arr.dtype)
-    bnd_ends = np.empty(n_pes, left_key_arr.dtype)
-    hpat.distributed_api.allgather(bnd_starts, left_key_arr[0])
-    hpat.distributed_api.allgather(bnd_ends, left_key_arr[-1])
+    # TODO: multiple keys
+    bnd_starts = np.empty(n_pes, left_key_arrs[0].dtype)
+    bnd_ends = np.empty(n_pes, left_key_arrs[0].dtype)
+    hpat.distributed_api.allgather(bnd_starts, left_key_arrs[0][0])
+    hpat.distributed_api.allgather(bnd_ends, left_key_arrs[0][-1])
 
     send_counts = np.zeros(n_pes, np.int32)
     send_disp = np.zeros(n_pes, np.int32)
     recv_counts = np.zeros(n_pes, np.int32)
-    my_start = right_key_arr[0]
-    my_end = right_key_arr[-1]
+    my_start = right_key_arrs[0][0]
+    my_end = right_key_arrs[0][-1]
 
     offset = -1
     i = 0
@@ -491,7 +492,7 @@ def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
     while i < n_pes-1 and bnd_ends[i] < my_start:
         i += 1
     while i < n_pes and bnd_starts[i] <= my_end:
-        offset, count = _count_overlap(right_key_arr, bnd_starts[i], bnd_ends[i])
+        offset, count = _count_overlap(right_key_arrs[0], bnd_starts[i], bnd_ends[i])
         # one extra element in case first value is needed for start of boundary
         if offset != 0:
             offset -= 1
@@ -503,21 +504,21 @@ def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
     # TODO: see if next processor provides the value
     while i < n_pes:
         send_counts[i] = 1
-        send_disp[i] = len(right_key_arr) - 1
+        send_disp[i] = len(right_key_arrs[0]) - 1
         i += 1
 
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     n_total_recv = recv_counts.sum()
-    out_r_keys = np.empty(n_total_recv, right_key_arr.dtype)
+    out_r_keys = np.empty(n_total_recv, right_key_arrs[0].dtype)
     # TODO: support string
     out_r_data = alloc_arr_tup(n_total_recv, right_data)
     recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-    hpat.distributed_api.alltoallv(right_key_arr, out_r_keys, send_counts,
+    hpat.distributed_api.alltoallv(right_key_arrs[0], out_r_keys, send_counts,
                                    recv_counts, send_disp, recv_disp)
     hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts,
                                    recv_counts, send_disp, recv_disp)
 
-    return out_r_keys, out_r_data
+    return (out_r_keys,), out_r_data
 
 @numba.njit
 def _count_overlap(r_key_arr, start, end):
@@ -1130,13 +1131,13 @@ def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
 
 
 @numba.njit
-def local_merge_asof(left_key, right_key, data_left, data_right):
+def local_merge_asof(left_keys, right_keys, data_left, data_right):
     # adapted from pandas/_libs/join_func_helper.pxi
-    l_size = len(left_key)
-    r_size = len(right_key)
+    l_size = len(left_keys[0])
+    r_size = len(right_keys[0])
 
-    out_left_key = empty_like_type(l_size, left_key)
-    out_right_key = empty_like_type(l_size, right_key)
+    out_left_keys = alloc_arr_tup(l_size, left_keys)
+    out_right_keys = alloc_arr_tup(l_size, right_keys)
     out_data_left = alloc_arr_tup(l_size, data_left)
     out_data_right = alloc_arr_tup(l_size, data_right)
 
@@ -1149,23 +1150,23 @@ def local_merge_asof(left_key, right_key, data_left, data_right):
             right_ind = 0
 
         # find last position in right whose value is less than left's
-        while right_ind < r_size and right_key[right_ind] <= left_key[left_ind]:
+        while right_ind < r_size and getitem_arr_tup(right_keys, right_ind) <= getitem_arr_tup(left_keys, left_ind):
             right_ind += 1
 
         right_ind -= 1
 
-        out_left_key[left_ind] = left_key[left_ind]
+        setitem_arr_tup(out_left_keys, left_ind, getitem_arr_tup(left_keys, left_ind))
         # TODO: copy_tup
         setitem_arr_tup(out_data_left, left_ind, getitem_arr_tup(data_left, left_ind))
 
         if right_ind >= 0:
-            out_right_key[left_ind] = right_key[right_ind]
+            setitem_arr_tup(out_right_keys, left_ind, getitem_arr_tup(right_keys, right_ind))
             setitem_arr_tup(out_data_right, left_ind, getitem_arr_tup(data_right, right_ind))
         else:
-            setitem_arr_nan(out_right_key, left_ind)
+            setitem_arr_tup_nan(out_right_keys, left_ind)
             setitem_arr_tup_nan(out_data_right, left_ind)
 
-    return out_left_key, out_right_key, out_data_left, out_data_right
+    return out_left_keys, out_right_keys, out_data_left, out_data_right
 
 
 
