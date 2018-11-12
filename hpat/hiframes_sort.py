@@ -29,13 +29,13 @@ MPI_ROOT = 0
 
 
 class Sort(ir.Stmt):
-    def __init__(self, df_in, df_out, key_arr, out_key_arr, df_in_vars,
+    def __init__(self, df_in, df_out, key_arrs, out_key_arrs, df_in_vars,
                                                     df_out_vars, inplace, loc):
         # for printing only
         self.df_in = df_in
         self.df_out = df_out
-        self.key_arr = key_arr
-        self.out_key_arr = out_key_arr
+        self.key_arrs = key_arrs
+        self.out_key_arrs = out_key_arrs
         self.df_in_vars = df_in_vars
         self.df_out_vars = df_out_vars
         self.inplace = inplace
@@ -51,18 +51,16 @@ class Sort(ir.Stmt):
             out_cols += "'{}':{}, ".format(c, v.name)
         df_out_str = "{}{{{}}}".format(self.df_out, out_cols)
         return "sort: [key: {}] {} [key: {}] {}".format(
-            self.key_arr.name, df_in_str, self.out_key_arr.name, df_out_str)
+            (v.name for v in self.key_arrs), df_in_str,
+            (v.name for v in self.out_key_arrs), df_out_str)
 
 
 def sort_array_analysis(sort_node, equiv_set, typemap, array_analysis):
 
-    # arrays of input df have same size in first dimension as key array
-    col_shape = equiv_set.get_shape(sort_node.key_arr)
+    # arrays of input df have same size in first dimension
     all_shapes = []
-    if (typemap[sort_node.key_arr.name] != string_array_type
-            and col_shape is not None):
-        all_shapes = [col_shape[0]]
-    for col_var in sort_node.df_in_vars.values():
+    in_arrs = sort_node.key_arrs + list(sort_node.df_in_vars.values())
+    for col_var in in_arrs:
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
@@ -75,12 +73,8 @@ def sort_array_analysis(sort_node, equiv_set, typemap, array_analysis):
 
     # arrays of output have the same shape (not necessarily the same as input
     # arrays in the parallel case, TODO: fix)
-    col_shape = equiv_set.get_shape(sort_node.out_key_arr)
-    all_shapes = []
-    if (typemap[sort_node.out_key_arr.name] != string_array_type
-            and col_shape is not None):
-        all_shapes = [col_shape[0]]
-    for col_var in sort_node.df_out_vars.values():
+    out_arrs = sort_node.out_key_arrs + list(sort_node.df_out_vars.values())
+    for col_var in out_arrs:
         typ = typemap[col_var.name]
         if typ == string_array_type:
             continue
@@ -99,19 +93,18 @@ numba.array_analysis.array_analysis_extensions[Sort] = sort_array_analysis
 
 def sort_distributed_analysis(sort_node, array_dists):
 
+    in_arrs = sort_node.key_arrs + list(sort_node.df_in_vars.values())
+    out_arrs = sort_node.out_key_arrs + list(sort_node.df_out_vars.values())
     # input columns have same distribution
-    in_dist = array_dists[sort_node.key_arr.name]
-    for col_var in sort_node.df_in_vars.values():
+    in_dist = Distribution.OneD
+    for col_var in in_arrs:
         in_dist = Distribution(
             min(in_dist.value, array_dists[col_var.name].value))
 
     # output is 1D_Var due to shuffle, has to meet input dist
     # TODO: set to input dist in inplace case
     out_dist = Distribution(min(in_dist.value, Distribution.OneD_Var.value))
-    if sort_node.out_key_arr.name in array_dists:
-        out_dist = Distribution(min(out_dist.value,
-                                array_dists[sort_node.out_key_arr.name].value))
-    for col_var in sort_node.df_out_vars.values():
+    for col_var in out_arrs:
         if col_var.name in array_dists:
             out_dist = Distribution(
                 min(out_dist.value, array_dists[col_var.name].value))
@@ -121,13 +114,11 @@ def sort_distributed_analysis(sort_node, array_dists):
         in_dist = out_dist
 
     # set dists
-    for col_var in sort_node.df_in_vars.values():
+    for col_var in in_arrs:
         array_dists[col_var.name] = in_dist
-    array_dists[sort_node.key_arr.name] = in_dist
 
-    for col_var in sort_node.df_out_vars.values():
+    for col_var in out_arrs:
         array_dists[col_var.name] = out_dist
-    array_dists[sort_node.out_key_arr.name] = out_dist
 
     # TODO: handle rebalance
     # assert not (in_dist == Distribution.OneD and out_dist == Distribution.OneD_Var)
@@ -138,9 +129,10 @@ distributed_analysis.distributed_analysis_extensions[Sort] = sort_distributed_an
 
 def sort_typeinfer(sort_node, typeinferer):
     # input and output arrays have the same type
-    typeinferer.constraints.append(typeinfer.Propagate(
-        dst=sort_node.out_key_arr.name, src=sort_node.key_arr.name,
-        loc=sort_node.loc))
+    for in_key, out_key in zip(sort_node.key_arrs, sort_node.out_key_arrs):
+        typeinferer.constraints.append(typeinfer.Propagate(
+            dst=out_key.name, src=in_key.name,
+            loc=sort_node.loc))
     for col_name, col_var in sort_node.df_in_vars.items():
         out_col_var = sort_node.df_out_vars[col_name]
         typeinferer.constraints.append(typeinfer.Propagate(
@@ -155,10 +147,11 @@ def visit_vars_sort(sort_node, callback, cbdata):
         print("visiting sort vars for:", sort_node)
         print("cbdata: ", sorted(cbdata.items()))
 
-    sort_node.key_arr = visit_vars_inner(
-        sort_node.key_arr, callback, cbdata)
-    sort_node.out_key_arr = visit_vars_inner(
-        sort_node.out_key_arr, callback, cbdata)
+    for i in range(len(sort_node.key_arrs)):
+        sort_node.key_arrs[i] = visit_vars_inner(
+            sort_node.key_arrs[i], callback, cbdata)
+        sort_node.out_key_arrs[i] = visit_vars_inner(
+            sort_node.out_key_arrs[i], callback, cbdata)
 
     for col_name in list(sort_node.df_in_vars.keys()):
         sort_node.df_in_vars[col_name] = visit_vars_inner(
@@ -190,7 +183,7 @@ def remove_dead_sort(sort_node, lives, arg_aliases, alias_map, func_ir, typemap)
 
     # remove empty sort node
     if (len(sort_node.df_out_vars) == 0
-            and sort_node.out_key_arr.name not in lives):
+            and all(v.name not in lives for v in sort_node.out_key_arrs)):
         return None
 
     return sort_node
@@ -206,12 +199,12 @@ def sort_usedefs(sort_node, use_set=None, def_set=None):
         def_set = set()
 
     # key array and input columns are used
-    use_set.add(sort_node.key_arr.name)
+    use_set.update({v.name for v in sort_node.key_arrs})
     use_set.update({v.name for v in sort_node.df_in_vars.values()})
 
     # output arrays are defined
     if not sort_node.inplace:
-        def_set.add(sort_node.out_key_arr.name)
+        def_set.update({v.name for v in sort_node.out_key_arrs})
         def_set.update({v.name for v in sort_node.df_out_vars.values()})
 
     return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
@@ -225,7 +218,7 @@ def get_copies_sort(sort_node, typemap):
     kill_set = set()
     if not sort_node.inplace:
         kill_set = set(v.name for v in sort_node.df_out_vars.values())
-        kill_set.add(sort_node.out_key_arr.name)
+        kill_set.update({v.name for v in sort_node.out_key_arrs})
     return set(), kill_set
 
 ir_utils.copy_propagate_extensions[Sort] = get_copies_sort
@@ -234,8 +227,9 @@ ir_utils.copy_propagate_extensions[Sort] = get_copies_sort
 def apply_copies_sort(sort_node, var_dict, name_var_table,
                         typemap, calltypes, save_copies):
     """apply copy propagate in sort node"""
-    sort_node.key_arr = replace_vars_inner(sort_node.key_arr, var_dict)
-    sort_node.out_key_arr = replace_vars_inner(sort_node.out_key_arr, var_dict)
+    for i in range(len(sort_node.key_arrs)):
+        sort_node.key_arrs[i] = replace_vars_inner(sort_node.key_arrs[i], var_dict)
+        sort_node.out_key_arrs[i] = replace_vars_inner(sort_node.out_key_arrs[i], var_dict)
 
     for col_name in list(sort_node.df_in_vars.keys()):
         sort_node.df_in_vars[col_name] = replace_vars_inner(
@@ -255,39 +249,43 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     parallel = True
     in_vars = list(sort_node.df_in_vars.values())
     out_vars = list(sort_node.df_out_vars.values())
-    for v in [sort_node.key_arr, sort_node.out_key_arr] + in_vars + out_vars:
+    for v in sort_node.key_arrs + sort_node.out_key_arrs + in_vars + out_vars:
         if (array_dists[v.name] != distributed.Distribution.OneD
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
 
     loc = sort_node.loc
-    scope = sort_node.key_arr.scope
+    scope = sort_node.key_arrs[0].scope
     # copy arrays when not inplace
     nodes = []
-    key_arr = sort_node.key_arr
+    key_arrs = sort_node.key_arrs
     if not sort_node.inplace:
-        key_arr = _copy_array_nodes(key_arr, nodes, typingctx, typemap,
-                                                                     calltypes)
+        new_keys = []
+        for v in key_arrs:
+            new_key = _copy_array_nodes(v, nodes, typingctx, typemap, calltypes)
+            new_keys.append(new_key)
+        key_arrs = new_keys
         new_in_vars = []
         for v in in_vars:
             v_cp = _copy_array_nodes(v, nodes, typingctx, typemap, calltypes)
             new_in_vars.append(v_cp)
         in_vars = new_in_vars
 
-
+    key_name_args = ', '.join("key"+str(i) for i in range(len(key_arrs)))
     col_name_args = ', '.join(["c"+str(i) for i in range(len(in_vars))])
     # TODO: use *args
-    func_text = "def f(key_arr, {}):\n".format(col_name_args)
+    func_text = "def f({}, {}):\n".format(key_name_args, col_name_args)
+    func_text += "  key_arrs = ({},)\n".format(key_name_args)
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(in_vars) == 1 else "")  # single value needs comma to become tuple
-    func_text += "  local_sort_f(key_arr, data)\n"
-    func_text += "  return key_arr, data\n"
+    func_text += "  local_sort_f(key_arrs, data)\n"
+    func_text += "  return key_arrs, data\n"
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     sort_impl = loc_vars['f']
 
-    key_typ = typemap[key_arr.name]
+    key_typ = types.Tuple([typemap[v.name] for v in key_arrs])
     data_tup_typ = types.Tuple([typemap[v.name] for v in in_vars])
     _local_sort_f = get_local_sort_func(key_typ, data_tup_typ)
 
@@ -297,29 +295,30 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
                                     'to_string_list': to_string_list,
                                     'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
-                                    tuple([key_typ] + list(data_tup_typ.types)),
+                                    tuple(list(key_typ.types) + list(data_tup_typ.types)),
                                     typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [key_arr] + in_vars)
+    replace_arg_nodes(f_block, key_arrs + in_vars)
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
-    # get key
-    key_arr = ir.Var(scope, mk_unique_var(key_arr.name), loc)
-    typemap[key_arr.name] = key_typ
-    gen_getitem(key_arr, ret_var, 0, calltypes, nodes)
+    # get key tup
+    key_arrs_tup_var = ir.Var(scope, mk_unique_var('key_data'), loc)
+    typemap[key_arrs_tup_var.name] = key_typ
+    gen_getitem(key_arrs_tup_var, ret_var, 0, calltypes, nodes)
     # get data tup
     data_tup_var = ir.Var(scope, mk_unique_var('sort_data'), loc)
     typemap[data_tup_var.name] = data_tup_typ
     gen_getitem(data_tup_var, ret_var, 1, calltypes, nodes)
 
     if not parallel:
-        nodes.append(ir.Assign(key_arr, sort_node.out_key_arr, loc))
+        for i, var in enumerate(sort_node.out_key_arrs):
+            gen_getitem(var, key_arrs_tup_var, i, calltypes, nodes)
         for i, var in enumerate(out_vars):
             gen_getitem(var, data_tup_var, i, calltypes, nodes)
         return nodes
 
     # parallel case
-    def par_sort_impl(key_arr, data):
-        out_key, out_data = parallel_sort(key_arr, data)
+    def par_sort_impl(key_arrs, data):
+        out_key, out_data = parallel_sort(key_arrs, data)
         # TODO: use k-way merge instead of sort
         # sort output
         local_sort_f(out_key, out_data)
@@ -334,15 +333,20 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
                                     typingctx,
                                     (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [key_arr, data_tup_var])
+    replace_arg_nodes(f_block, [key_arrs_tup_var, data_tup_var])
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
     # get output key
-    gen_getitem(sort_node.out_key_arr, ret_var, 0, calltypes, nodes)
+    key_tup = ir.Var(scope, mk_unique_var('sort_keys'), loc)
+    typemap[key_tup.name] = key_typ
+    gen_getitem(key_tup, ret_var, 0, calltypes, nodes)
     # get data tup
     data_tup = ir.Var(scope, mk_unique_var('sort_data'), loc)
     typemap[data_tup.name] = data_tup_typ
     gen_getitem(data_tup, ret_var, 1, calltypes, nodes)
+
+    for i, var in enumerate(sort_node.out_key_arrs):
+        gen_getitem(var, key_tup, i, calltypes, nodes)
 
     for i, var in enumerate(out_vars):
         gen_getitem(var, data_tup, i, calltypes, nodes)
@@ -410,8 +414,8 @@ def local_sort(key_arrs, data):
 
 
 @numba.njit
-def parallel_sort(key_arr, data):
-    n_local = len(key_arr)
+def parallel_sort(key_arrs, data):
+    n_local = len(key_arrs)
     n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))
 
     n_pes = hpat.distributed_api.get_size()
@@ -423,7 +427,7 @@ def parallel_sort(key_arr, data):
     fraction = min(sampleSize / max(n_total, 1), 1.0)
     n_loc_samples = min(math.ceil(fraction * n_local), n_local)
     inds = np.random.randint(0, n_local, n_loc_samples)
-    samples = key_arr[inds]
+    samples = key_arrs[0][inds]
     # print(sampleSize, fraction, n_local, n_loc_samples, len(samples))
 
     all_samples = hpat.distributed_api.gatherv(samples)
@@ -443,11 +447,10 @@ def parallel_sort(key_arr, data):
     hpat.distributed_api.bcast(bounds)
 
     # calc send/recv counts
-    key_arrs = (key_arr,)
     pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data, n_pes, True)
     node_id = 0
     for i in range(n_local):
-        val = key_arr[i]
+        val = key_arrs[0][i]
         if node_id < (n_pes - 1) and val >= bounds[node_id]:
             node_id += 1
         update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
@@ -458,7 +461,7 @@ def parallel_sort(key_arr, data):
 
     # shuffle
     recvs = alltoallv_tup(key_arrs + data, shuffle_meta)
-    out_key, = _get_keys_tup(recvs, key_arrs)
+    out_key = _get_keys_tup(recvs, key_arrs)
     out_data = _get_data_tup(recvs, key_arrs)
 
     return out_key, out_data
