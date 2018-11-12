@@ -293,6 +293,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
+    n_keys = len(join_node.left_keys)
     # get column variables
     left_key_vars = tuple(join_node.left_vars[c] for c in join_node.left_keys)
     right_key_vars = tuple(join_node.right_vars[c] for c in join_node.right_keys)
@@ -308,15 +309,23 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     scope = arg_vars[0].scope
 
     # arg names of non-key columns
-    left_other_names = ["t1_c" + str(i)
-                        for i in range(len(left_other_col_vars))]
-    right_other_names = ["t2_c" + str(i)
-                         for i in range(len(right_other_col_vars))]
+    left_other_names = tuple("t1_c" + str(i)
+                        for i in range(len(left_other_col_vars)))
+    right_other_names = tuple("t2_c" + str(i)
+                         for i in range(len(right_other_col_vars)))
 
-    func_text = "def f(t1_key, t2_key,{}{}{}):\n".format(
+    left_key_names = tuple("t1_key" + str(i) for i in range(n_keys))
+    right_key_names = tuple("t2_key" + str(i) for i in range(n_keys))
+
+    func_text = "def f({}, {},{}{}{}):\n".format(
+                ",".join(left_key_names),
+                ",".join(right_key_names),
                 ",".join(left_other_names),
                 ("," if len(left_other_names) != 0 else ""),
                 ",".join(right_other_names))
+
+    func_text += "    t1_keys = ({},)\n".format(",".join(left_key_names))
+    func_text += "    t2_keys = ({},)\n".format(",".join(right_key_names))
 
     func_text += "    data_left = ({}{})\n".format(",".join(left_other_names),
                                                 "," if len(left_other_names) != 0 else "")
@@ -328,15 +337,15 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
             # only the right key needs to be aligned
             func_text += "    t2_key, data_right = parallel_asof_comm(t1_key, t2_key, data_right)\n"
         else:
-            func_text += "    t1_key, data_left = parallel_join(t1_key, data_left)\n"
-            func_text += "    t2_key, data_right = parallel_join(t2_key, data_right)\n"
+            func_text += "    t1_keys, data_left = parallel_join(t1_keys, data_left)\n"
+            func_text += "    t2_keys, data_right = parallel_join(t2_keys, data_right)\n"
             #func_text += "    print(t2_key, data_right)\n"
 
     if join_node.how != 'asof':
         # asof key is already sorted, TODO: add error checking
         # local sort
-        func_text += "    local_sort_f1(t1_key, data_left)\n"
-        func_text += "    local_sort_f2(t2_key, data_right)\n"
+        func_text += "    local_sort_f1(t1_keys, data_left)\n"
+        func_text += "    local_sort_f2(t2_keys, data_right)\n"
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
@@ -344,7 +353,6 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     out_r_key_vars = tuple(join_node.df_out_vars[c] for c in join_node.right_keys)
     # create dummy variable if right key is not actually returned
     # using the same output left key causes errors for asof case
-    n_keys = len(join_node.right_keys)
     if join_node.left_keys == join_node.right_keys:
         out_r_key_vars = tuple(ir.Var(scope, mk_unique_var('dummy_k'), loc)
                                                         for _ in range(n_keys))
@@ -362,8 +370,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
         " = hpat.hiframes_join.local_merge_asof(t1_key, t2_key, data_left, data_right)\n")
     else:
-        func_text += ("    out_t1_key, out_t2_key, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_new(t1_key, t2_key, data_left, data_right, {}, {})\n".format(
+        func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
             join_node.how in ('left', 'outer'), join_node.how == 'outer'))
 
     for i in range(len(left_other_names)):
@@ -372,14 +380,22 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     for i in range(len(right_other_names)):
         func_text += "    right_{} = out_data_right[{}]\n".format(i, i)
 
-    func_text += "    {} = out_t1_key\n".format(out_names[0])
-    func_text += "    {} = out_t2_key\n".format(out_names[1])
+    for i in range(n_keys):
+        func_text += "    t1_keys_{} = out_t1_keys[{}]\n".format(i, i)
+
+    for i in range(n_keys):
+        func_text += "    t2_keys_{} = out_t2_keys[{}]\n".format(i, i)
+
+    for i in range(n_keys):
+        func_text += "    {} = t1_keys_{}\n".format(out_names[i], i)
+    for i in range(n_keys):
+        func_text += "    {} = t2_keys_{}\n".format(out_names[n_keys + i], i)
 
     for i in range(len(left_other_names)):
-        func_text += "    {} = left_{}\n".format(out_names[i+2], i)
+        func_text += "    {} = left_{}\n".format(out_names[i+2*n_keys], i)
 
     for i in range(len(right_other_names)):
-        func_text += "    {} = right_{}\n".format(out_names[i+2+len(left_other_names)], i)
+        func_text += "    {} = right_{}\n".format(out_names[i+2*n_keys+len(left_other_names)], i)
 
     # func_text += "    {} = hpat.hiframes_join.local_merge({}, {}, {})\n".format(
     #     ",".join(out_names), len(left_arg_names),
@@ -391,10 +407,12 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     # print(func_text)
 
+    left_keys_tup_typ = types.Tuple([typemap[v.name] for v in left_key_vars])
     left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
-    _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(typemap[left_key_vars[0].name], left_data_tup_typ)
+    _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
+    right_keys_tup_typ = types.Tuple([typemap[v.name] for v in right_key_vars])
     right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
-    _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(typemap[right_key_vars[0].name], right_data_tup_typ)
+    _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
 
     f_block = compile_to_numba_ir(join_impl,
                                   {'hpat': hpat, 'np': np,
@@ -419,37 +437,36 @@ distributed.distributed_run_extensions[Join] = join_distributed_run
 
 
 @numba.njit
-def parallel_join(key_arr, data):
+def parallel_join(key_arrs, data):
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
-    pre_shuffle_meta = alloc_pre_shuffle_metadata((key_arr,), data, n_pes, False)
+    pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data, n_pes, False)
 
 
     # calc send/recv counts
-    for i in range(len(key_arr)):
-        val = key_arr[i]
+    for i in range(len(key_arrs[0])):
+        val = getitem_arr_tup(key_arrs, i)
         node_id = hash(val) % n_pes
-        update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
+        update_shuffle_meta(pre_shuffle_meta, node_id, i, val,
             getitem_arr_tup(data, i), False)
 
-    shuffle_meta = finalize_shuffle_meta((key_arr,), data, pre_shuffle_meta,
+    shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta,
                                           n_pes, False)
 
     # write send buffers
-    for i in range(len(key_arr)):
-        val = key_arr[i]
+    for i in range(len(key_arrs[0])):
+        val = getitem_arr_tup(key_arrs, i)
         node_id = hash(val) % n_pes
         write_send_buff(shuffle_meta, node_id, i, (val,), data)
         # update last since it is reused in data
         shuffle_meta.tmp_offset[node_id] += 1
 
     # shuffle
-    key_arrs = (key_arr,)
     recvs = alltoallv_tup(key_arrs + data, shuffle_meta)
-    out_key, = _get_keys_tup(recvs, key_arrs)
+    out_keys = _get_keys_tup(recvs, key_arrs)
     out_data = _get_data_tup(recvs, key_arrs)
 
-    return out_key, out_data
+    return out_keys, out_data
 
 @numba.njit
 def parallel_asof_comm(left_key_arr, right_key_arr, right_data):
@@ -1024,10 +1041,10 @@ def setnan_elem_buff_tup_overload(data_t, ind_t):
 
 
 @numba.njit
-def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
+def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
                                                                is_outer=False):
-    curr_size = 101 + min(len(left_key), len(right_key)) // 10
-    out_left_key = empty_like_type(curr_size, left_key)
+    curr_size = 101 + min(len(left_keys[0]), len(right_keys[0])) // 10
+    out_left_key = alloc_arr_tup(curr_size, left_keys)
     out_data_left = alloc_arr_tup(curr_size, data_left)
     out_data_right = alloc_arr_tup(curr_size, data_right)
 
@@ -1035,9 +1052,9 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
     left_ind = 0
     right_ind = 0
 
-    while left_ind < len(left_key) and right_ind < len(right_key):
-        if left_key[left_ind] == right_key[right_ind]:
-            out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+    while left_ind < len(left_keys[0]) and right_ind < len(right_keys[0]):
+        if getitem_arr_tup(left_keys, left_ind) == getitem_arr_tup(right_keys, right_ind):
+            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
             l_data_val = getitem_arr_tup(data_left, left_ind)
             out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
             r_data_val = getitem_arr_tup(data_right, right_ind)
@@ -1045,8 +1062,8 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
 
             out_ind += 1
             left_run = left_ind + 1
-            while left_run < len(left_key) and left_key[left_run] == right_key[right_ind]:
-                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_run])
+            while left_run < len(left_keys[0]) and getitem_arr_tup(left_keys, left_run) == getitem_arr_tup(right_keys, right_ind):
+                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_run))
                 l_data_val = getitem_arr_tup(data_left, left_run)
                 out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
                 r_data_val = getitem_arr_tup(data_right, right_ind)
@@ -1055,8 +1072,8 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
                 out_ind += 1
                 left_run += 1
             right_run = right_ind + 1
-            while right_run < len(right_key) and right_key[right_run] == left_key[left_ind]:
-                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+            while right_run < len(right_keys[0]) and getitem_arr_tup(right_keys, right_run) == getitem_arr_tup(left_keys, left_ind):
+                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
                 l_data_val = getitem_arr_tup(data_left, left_ind)
                 out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
                 r_data_val = getitem_arr_tup(data_right, right_run)
@@ -1066,9 +1083,9 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
                 right_run += 1
             left_ind += 1
             right_ind += 1
-        elif left_key[left_ind] < right_key[right_ind]:
+        elif getitem_arr_tup(left_keys, left_ind) < getitem_arr_tup(right_keys, right_ind):
             if is_left:
-                out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
                 l_data_val = getitem_arr_tup(data_left, left_ind)
                 out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
                 out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
@@ -1077,25 +1094,25 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
         else:
             if is_outer:
                 # TODO: support separate keys?
-                out_left_key = copy_elem_buff(out_left_key, out_ind, right_key[right_ind])
+                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(right_keys, right_ind))
                 out_data_left = setnan_elem_buff_tup(out_data_left, out_ind)
                 r_data_val = getitem_arr_tup(data_right, right_ind)
                 out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
                 out_ind += 1
             right_ind += 1
 
-    if is_left and left_ind < len(left_key):
-        while left_ind < len(left_key):
-            out_left_key = copy_elem_buff(out_left_key, out_ind, left_key[left_ind])
+    if is_left and left_ind < len(left_keys[0]):
+        while left_ind < len(left_keys[0]):
+            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
             l_data_val = getitem_arr_tup(data_left, left_ind)
             out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
             out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
             out_ind += 1
             left_ind += 1
 
-    if is_outer and right_ind < len(right_key):
-        while right_ind < len(right_key):
-            out_left_key = copy_elem_buff(out_left_key, out_ind, right_key[right_ind])
+    if is_outer and right_ind < len(right_keys[0]):
+        while right_ind < len(right_keys[0]):
+            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(right_keys, right_ind))
             out_data_left = setnan_elem_buff_tup(out_data_left, out_ind)
             r_data_val = getitem_arr_tup(data_right, right_ind)
             out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
@@ -1103,9 +1120,9 @@ def local_merge_new(left_key, right_key, data_left, data_right, is_left=False,
             right_ind += 1
 
     #out_left_key = out_left_key[:out_ind]
-    out_left_key = trim_arr(out_left_key, out_ind)
+    out_left_key = trim_arr_tup(out_left_key, out_ind)
 
-    out_right_key = out_left_key.copy()
+    out_right_key = copy_arr_tup(out_left_key)
     out_data_left = trim_arr_tup(out_data_left, out_ind)
     out_data_right = trim_arr_tup(out_data_right, out_ind)
 
@@ -1298,5 +1315,19 @@ def setitem_arr_tup_nan_overload(arr_tup_t, ind_t):
 
     loc_vars = {}
     exec(func_text, {'setitem_arr_nan': setitem_arr_nan}, loc_vars)
+    impl = loc_vars['f']
+    return impl
+
+def copy_arr_tup(arrs):
+    return tuple(a.copy() for a in arrs)
+
+@overload(copy_arr_tup)
+def copy_arr_tup_overload(arrs_t):
+    count = arrs_t.count
+    func_text = "def f(arrs):\n"
+    func_text += "  return ({},)\n".format(",".join("arrs[{}].copy()".format(i) for i in range(count)))
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
     impl = loc_vars['f']
     return impl
