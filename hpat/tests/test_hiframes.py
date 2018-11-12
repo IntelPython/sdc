@@ -871,6 +871,60 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(list(hpat_func()), list(test_impl()))
 
+    def test_join_mutil_seq1(self):
+        def test_impl(df1, df2):
+            return df1.merge(df2, on=['A', 'B'])
+
+        hpat_func = hpat.jit(test_impl)
+        df1 = pd.DataFrame({'A': [3,1,1,3,4],
+                            'B': [1,2,3,2,3],
+                            'C': [7,8,9,4,5]})
+
+        df2 = pd.DataFrame({'A': [2,1,4,4,3],
+                            'B': [1,3,2,3,2],
+                            'D': [1,2,3,4,8]})
+
+        pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
+
+    def test_join_mutil_parallel1(self):
+        def test_impl(A1, B1, C1, A2, B2, D2):
+            df1 = pd.DataFrame({'A': A1, 'B': B1, 'C': C1})
+            df2 = pd.DataFrame({'A': A2, 'B': B2, 'D': D2})
+            df3 = df1.merge(df2, on=['A', 'B'])
+            return df3.C.sum() + df3.D.sum()
+
+        hpat_func = hpat.jit(locals={
+            'A1:input': 'distributed',
+            'B1:input': 'distributed',
+            'C1:input': 'distributed',
+            'A2:input': 'distributed',
+            'B2:input': 'distributed',
+            'D2:input': 'distributed',})(test_impl)
+        df1 = pd.DataFrame({'A': [3,1,1,3,4],
+                            'B': [1,2,3,2,3],
+                            'C': [7,8,9,4,5]})
+
+        df2 = pd.DataFrame({'A': [2,1,4,4,3],
+                            'B': [1,3,2,3,2],
+                            'D': [1,2,3,4,8]})
+
+        start, end = get_start_end(len(df1))
+        h_A1 = df1.A.values[start:end]
+        h_B1 = df1.B.values[start:end]
+        h_C1 = df1.C.values[start:end]
+        h_A2 = df2.A.values[start:end]
+        h_B2 = df2.B.values[start:end]
+        h_D2 = df2.D.values[start:end]
+        p_A1 = df1.A.values
+        p_B1 = df1.B.values
+        p_C1 = df1.C.values
+        p_A2 = df2.A.values
+        p_B2 = df2.B.values
+        p_D2 = df2.D.values
+        h_res = hpat_func(h_A1, h_B1, h_C1, h_A2, h_B2, h_D2)
+        p_res = test_impl(p_A1, p_B1, p_C1, p_A2, p_B2, p_D2)
+        self.assertEqual(h_res, p_res)
+
     def test_merge_asof_seq1(self):
         def test_impl(df1, df2):
             return pd.merge_asof(df1, df2, on='time')
