@@ -1132,16 +1132,14 @@ class HiFrames(object):
         kws = dict(rhs.kws)
         # find key array for sort ('by' arg)
         by_arg = self._get_arg('sort_values', rhs.args, kws, 0, 'by')
-        key_name = guard(find_const, self.func_ir, by_arg)
-        if key_name is None:
-            raise ValueError("'by' argument is required for sort_values() "
+        err_msg = ("'by' argument is required for sort_values() "
                              "which should be a constant string")
+        key_names = self._get_str_or_list(by_arg, err_msg=err_msg)
 
         inplace = False
         if 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True:
             inplace = True
 
-        # TODO: support multiple columns as key
         # TODO: support ascending=False
 
         out = []
@@ -1152,14 +1150,14 @@ class HiFrames(object):
                                                 for cname, v in in_df.items()}
             self._create_df(lhs.name, out_df.copy(), label)
 
-        if key_name not in in_df:
-            raise ValueError("invalid sort key {}".format(key_name))
+        if any(k not in in_df for k in key_names):
+            raise ValueError("invalid sort keys {}".format(key_names))
 
         # remove key from dfs (only data is kept)
-        key_var = in_df.pop(key_name)
-        out_key_var = out_df.pop(key_name)
+        key_vars = [in_df.pop(k) for k in key_names]
+        out_key_vars = [out_df.pop(k) for k in key_names]
 
-        out.append(hiframes_sort.Sort(df.name, lhs.name, key_var, out_key_var,
+        out.append(hiframes_sort.Sort(df.name, lhs.name, key_vars, out_key_vars,
                                       in_df, out_df, inplace, lhs.loc))
         return out
 
