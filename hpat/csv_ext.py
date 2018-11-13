@@ -129,6 +129,9 @@ def remove_dead_csv(csv_node, lives, arg_aliases, alias_map, func_ir, typemap):
     csv_node.out_types = new_out_types
     csv_node.usecols = new_usecols
 
+    if len(csv_node.out_vars) == 0:
+        return None
+
     return csv_node
 
 
