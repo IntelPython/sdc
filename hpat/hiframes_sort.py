@@ -641,6 +641,7 @@ def finalize_shuffle_meta_overload(key_arrs_t, data_t, pre_shuffle_meta_t, n_pes
             func_text += "  send_arr_chars_arr_{} = np.empty(1, np.uint8)\n".format(i)
             func_text += "  send_arr_chars_{} = get_ctypes_ptr(get_data_ptr(arr))\n".format(i)
             func_text += "  if not is_contig:\n"
+            func_text += "    send_arr_lens_{} = np.empty(n_send, np.uint32)\n".format(n_str)
             func_text += "    s_n_all_chars = send_counts_char_{}.sum()\n".format(n_str)
             func_text += "    send_arr_chars_arr_{} = np.empty(s_n_all_chars, np.uint8)\n".format(n_str)
             func_text += "    send_arr_chars_{} = get_ctypes_ptr(send_arr_chars_arr_{}.ctypes)\n".format(n_str, n_str)
