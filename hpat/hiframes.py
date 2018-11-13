@@ -577,6 +577,23 @@ class HiFrames(object):
                        "or labels and axis required")
             columns = self._get_str_or_list(columns_var, err_msg=err_msg)
 
+        inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
+        inplace = guard(find_const, self.func_ir, inplace_var)
+
+        if inplace is not None and inplace == True:
+            df_label = self.df_labels[df_var.name]
+            cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+            # dropping columns inplace possible only when it dominates the df
+            # creation to keep schema consistent
+            if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
+                raise ValueError("dropping dataframe columns inplace inside "
+                             "conditionals and loops not supported yet")
+            # TODO: rename df name
+            # TODO: support dropping columns of input dfs (reflection)
+            for cname in columns:
+                self.df_vars[df_var.name].pop(cname)
+            return []
+
         in_df_map = self._get_df_cols(df_var)
         nodes = []
         out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
