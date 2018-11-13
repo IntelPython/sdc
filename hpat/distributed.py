@@ -384,6 +384,14 @@ class DistributedPass(object):
         if isinstance(func_mod, ir.Var) and is_np_array(self.typemap, func_mod.name):
             return self._run_call_array(lhs, func_mod, func_name, assign, rhs.args)
 
+        # string_array.func_calls
+        if (isinstance(func_mod, ir.Var)
+                and self.typemap[func_mod.name] == string_array_type):
+            if func_name == 'copy':
+                self._array_starts[lhs] = self._array_starts[func_mod.name]
+                self._array_counts[lhs] = self._array_counts[func_mod.name]
+                self._array_sizes[lhs] = self._array_sizes[func_mod.name]
+
         if fdef == ('permutation', 'numpy.random'):
             if self.typemap[rhs.args[0].name] == types.int64:
                 self._array_sizes[lhs] = [rhs.args[0]]
