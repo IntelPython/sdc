@@ -390,6 +390,10 @@ class HiFrames(object):
         if func_name == 'dropna':
             return self._handle_df_dropna(lhs, rhs, df_var, label)
 
+        # df.drop()
+        if func_name == 'drop':
+            return self._handle_df_drop(lhs, rhs, df_var, label)
+
         # df.merge()
         if func_name == 'merge':
             rhs.args.insert(0, df_var)
@@ -552,6 +556,32 @@ class HiFrames(object):
                 c_var = col_vars[i]
                 dropped_var = list(out_col_map.values())[i]
                 nodes.append(ir.Assign(dropped_var, c_var, lhs.loc))
+        return nodes
+
+    def _handle_df_drop(self, lhs, rhs, df_var, label):
+        # df.drop(labels=None, axis=0, index=None, columns=None, level=None,
+        #         inplace=False, errors='raise')
+        kws = dict(rhs.kws)
+        labels_var = self._get_arg('drop', rhs.args, kws, 0, 'labels', '')
+        axis_var = self._get_arg('drop', rhs.args, kws, 1, 'axis', '')
+        labels = self._get_str_or_list(labels_var, default='')
+        axis = guard(find_const, self.func_ir, axis_var)
+
+        if labels != '' and axis is not None:
+            if axis != 1:
+                raise ValueError("only dropping columns (axis=1) supported")
+            columns = labels
+        else:
+            columns_var = self._get_arg('drop', rhs.args, kws, 3, 'columns', '')
+            err_msg = ("columns argument (constant string list) "
+                       "or labels and axis required")
+            columns = self._get_str_or_list(columns_var, err_msg=err_msg)
+
+        in_df_map = self._get_df_cols(df_var)
+        nodes = []
+        out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
+                      for c in in_df_map.keys() if c not in columns}
+        self._create_df(lhs.name, out_df_map, label)
         return nodes
 
     def _is_iloc_loc(self, var):

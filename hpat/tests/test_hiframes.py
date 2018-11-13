@@ -340,6 +340,14 @@ class TestHiFrames(unittest.TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    def test_df_drop1(self):
+        def test_impl(df):
+            return df.drop(columns=['A'])
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     def test_column_mean(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -1164,7 +1172,7 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
                            'C': [3,5,6,5,4,4,3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
-    
+
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
             df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
