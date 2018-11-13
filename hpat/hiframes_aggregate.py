@@ -37,6 +37,7 @@ from hpat.hiframes_sort import (
     )
 from hpat.hiframes_join import write_send_buff
 from hpat.timsort import getitem_arr_tup
+from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
 
 AggFuncStruct = namedtuple('AggFuncStruct',
     ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
@@ -594,7 +595,7 @@ def parallel_agg(key_arrs, data_redvar_dummy, out_dummy_tup, data_in, init_vals,
             key_set.add(val)
             node_id = hash(val) % n_pes
             # data isn't computed here yet so pass empty tuple
-            update_shuffle_meta(pre_shuffle_meta, node_id, i, _val_to_tup(val), (), False)
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, val_to_tup(val), (), False)
 
     shuffle_meta = finalize_shuffle_meta(key_arrs, data_redvar_dummy, pre_shuffle_meta, n_pes, False, init_vals)
 
@@ -636,7 +637,7 @@ def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
             # k is byte_vec but we need tuple value for hashing
             val = getitem_arr_tup_single(key_arrs, i)
             node_id = hash(val) % n_pes
-            w_ind = write_send_buff(shuffle_meta, node_id, i, _val_to_tup(val), ())
+            w_ind = write_send_buff(shuffle_meta, node_id, i, val_to_tup(val), ())
             shuffle_meta.tmp_offset[node_id] += 1
             key_write_map[k] = w_ind
         else:
@@ -837,24 +838,6 @@ def get_key_set_overload(arr_t):
 
     return get_set
 
-# returns scalar instead of tuple if only one array
-def getitem_arr_tup_single(arrs, i):
-    return arrs[0][i]
-
-@overload(getitem_arr_tup_single)
-def getitem_arr_tup_single_overload(arrs_t, i_t):
-    if len(arrs_t.types) == 1:
-        return lambda arrs, i: arrs[0][i]
-    return lambda arrs, i: getitem_arr_tup(arrs, i)
-
-def _val_to_tup(val):
-    return (val,)
-
-@overload(_val_to_tup)
-def _val_to_tup_overload(val_t):
-    if isinstance(val_t, types.BaseTuple):
-        return lambda a: a
-    return lambda a: (a,)
 
 def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key):  # pragma: no cover
     return out_dummy_tup

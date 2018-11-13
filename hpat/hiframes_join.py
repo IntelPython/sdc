@@ -24,6 +24,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               setitem_string_array, str_copy_ptr)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
+from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
 import numpy as np
 
 
@@ -445,9 +446,9 @@ def parallel_join(key_arrs, data):
 
     # calc send/recv counts
     for i in range(len(key_arrs[0])):
-        val = getitem_arr_tup(key_arrs, i)
+        val = getitem_arr_tup_single(key_arrs, i)
         node_id = hash(val) % n_pes
-        update_shuffle_meta(pre_shuffle_meta, node_id, i, val,
+        update_shuffle_meta(pre_shuffle_meta, node_id, i, val_to_tup(val),
             getitem_arr_tup(data, i), False)
 
     shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta,
@@ -455,9 +456,9 @@ def parallel_join(key_arrs, data):
 
     # write send buffers
     for i in range(len(key_arrs[0])):
-        val = getitem_arr_tup(key_arrs, i)
+        val = getitem_arr_tup_single(key_arrs, i)
         node_id = hash(val) % n_pes
-        write_send_buff(shuffle_meta, node_id, i, val, data)
+        write_send_buff(shuffle_meta, node_id, i, val_to_tup(val), data)
         # update last since it is reused in data
         shuffle_meta.tmp_offset[node_id] += 1
 
