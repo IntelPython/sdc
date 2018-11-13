@@ -530,7 +530,7 @@ def alloc_pre_shuffle_metadata_overload(key_arrs_t, data_t, n_pes_t, is_contig_t
     for i, typ in enumerate(key_arrs_t.types + data_t.types):
         if typ == string_array_type:
             func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys
-                else "  arr = data[{}]".format(i - n_keys))
+                else "  arr = data[{}]\n".format(i - n_keys))
             func_text += "  send_counts_char_{} = np.zeros(n_pes, np.int32)\n".format(n_str)
             func_text += "  send_arr_lens_{} = np.empty(1, np.uint32)\n".format(n_str)
             # needs allocation since written in update before finalize
