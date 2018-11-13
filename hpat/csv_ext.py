@@ -27,9 +27,10 @@ from hpat.pd_series_ext import dt_index_series_type
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, file_name, df_out, df_colnames, out_vars, out_types, loc):
+    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, loc):
         self.file_name = file_name
         self.df_out = df_out
+        self.sep = sep
         self.df_colnames = df_colnames
         self.out_vars = out_vars
         self.out_types = out_types
@@ -212,8 +213,8 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     csv_impl = loc_vars['csv_impl']
 
     csv_reader_py = _gen_csv_reader_py(
-        csv_node.df_colnames, csv_node.out_types, csv_node.usecols, typingctx,
-        targetctx, parallel)
+        csv_node.df_colnames, csv_node.out_types, csv_node.usecols,
+        csv_node.sep, typingctx, targetctx, parallel)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -280,7 +281,7 @@ def _get_dtype_str(t):
 # (numba/lowering.py:self.context.add_dynamic_addr ...)
 compiled_funcs = []
 
-def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, parallel):
+def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t == dt_index_series_type)
@@ -293,7 +294,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, typingctx, targetctx, paral
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
-    func_text += "       usecols={},)\n".format(usecols)
+    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
     for cname in col_names:
         func_text += "    {} = df.{}.values\n".format(cname, cname)
         # func_text += "    print({})\n".format(cname)

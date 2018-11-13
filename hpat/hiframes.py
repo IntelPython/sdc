@@ -665,28 +665,34 @@ class HiFrames(object):
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
-        # TODO: check file name arg
-        fname = rhs.args[0]
+        # schema: pd.read_csv(filepath_or_buffer, sep=',', delimiter=None,
+        # header='infer', names=None, index_col=None, usecols=None,
+        # squeeze=False, prefix=None, mangle_dupe_cols=True, dtype=None,
+        # engine=None, converters=None, true_values=None, false_values=None,
+        # skipinitialspace=False, skiprows=None, nrows=None, na_values=None,
+        # keep_default_na=True, na_filter=True, verbose=False,
+        # skip_blank_lines=True, parse_dates=False,
+        # infer_datetime_format=False, keep_date_col=False, date_parser=None,
+        # dayfirst=False, iterator=False, chunksize=None, compression='infer',
+        # thousands=None, decimal=b'.', lineterminator=None, quotechar='"',
+        # quoting=0, escapechar=None, comment=None, encoding=None,
+        # dialect=None, tupleize_cols=None, error_bad_lines=True,
+        # warn_bad_lines=True, skipfooter=0, doublequote=True,
+        # delim_whitespace=False, low_memory=True, memory_map=False,
+        # float_precision=None)
+
         kws = dict(rhs.kws)
-        if 'names' not in kws:
-            raise ValueError("pd.read_csv() names argument expected")
+        fname = self._get_arg('read_csv', rhs.args, kws, 0, 'filepath_or_buffer')
+        sep = self._get_str_arg('read_csv', rhs.args, kws, 1, 'sep', ',')
+        sep = self._get_str_arg('read_csv', rhs.args, kws, 2, 'delimiter', sep)
+        # TODO: header arg
+        names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names')
+        err_msg = "pd.read_csv() names should be constant list"
+        col_names = self._get_str_or_list(names_var, err_msg=err_msg)
+        # TODO: support other args like usecols
+        dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype')
 
-        names_list = guard(get_definition, self.func_ir, kws['names'])
-
-        if not isinstance(names_list, ir.Expr) or names_list.op != 'build_list':
-            raise ValueError("pd.read_csv() names should be constant list")
-
-        col_names = []
-        for v in names_list.items:
-            col_name = guard(find_const, self.func_ir, v)
-            if col_name is None:
-                raise ValueError("pd.read_csv() names should be constant list")
-            col_names.append(col_name)
-
-        if 'dtype' not in kws:
-            raise ValueError("pd.read_csv() dtype argument expected")
-
-        dtype_map = guard(get_definition, self.func_ir, kws['dtype'])
+        dtype_map = guard(get_definition, self.func_ir, dtype_var)
         if (not isinstance(dtype_map, ir.Expr)
                  or dtype_map.op != 'build_map'):  # pragma: no cover
             raise ValueError("pd.read_csv() dtype should be constant dictionary")
@@ -717,7 +723,7 @@ class HiFrames(object):
 
         self._create_df(lhs.name, col_map, label)
         return [csv_ext.CsvReader(
-            fname, lhs.name, list(col_map.keys()), list(col_map.values()), out_types, lhs.loc)]
+            fname, lhs.name, sep, list(col_map.keys()), list(col_map.values()), out_types, lhs.loc)]
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
