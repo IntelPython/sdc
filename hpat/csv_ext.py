@@ -278,6 +278,14 @@ def _get_dtype_str(t):
         return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
+def _get_pd_dtype_str(t):
+    dtype = t.dtype
+    if t == dt_index_series_type:
+        dtype = 'str'
+    if t == string_array_type:
+        return 'str'
+    return 'np.{}'.format(dtype)
+
 # XXX: temporary fix pending Numba's #3378
 # keep the compiled functions around to make sure GC doesn't delete them and
 # the reference to the dynamic function inside them
@@ -290,6 +298,8 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
                            if t == dt_index_series_type)
     typ_strs = ", ".join(["{}='{}'".format(cname, _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
+    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t))
+                          for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
     func_text += "  f_reader = csv_file_chunk_reader(fname, {})\n".format(
@@ -297,6 +307,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
+    func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
     func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
     for cname in col_names:
         func_text += "    {} = df.{}.values\n".format(cname, cname)
