@@ -15,6 +15,8 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
+from numba.extending import overload
+from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat import hiframes_sort
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
@@ -297,6 +299,19 @@ class HiFramesTyped(object):
                     return [assign]
                 else:
                     func_name, func_mod = fdef
+
+                # replace _get_type_max_value(arr.dtype) since parfors
+                # arr.dtype transformation produces invalid code for dt64
+                # TODO: min
+                if fdef == ('_get_type_max_value', 'hpat.hiframes_typed'):
+                    if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
+                        return self._replace_func(
+                            lambda: hpat.pd_timestamp_ext.integer_to_dt64(
+                                numba.targets.builtins.get_type_max_value(
+                                    numba.types.int64)), [])
+                    return self._replace_func(
+                        lambda d: numba.targets.builtins.get_type_max_value(
+                                    d), rhs.args)
 
                 if fdef == ('h5_read_dummy', 'hpat.pio_api'):
                     ndim = guard(find_const, self.func_ir, rhs.args[1])
@@ -1503,11 +1518,42 @@ def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     hpat.str_arr_ext.copy_data(A, B)
     return A
 
+# return the nan value for the type (handle dt64)
+def _get_nan(val):
+    return np.nan
+
+@overload(_get_nan)
+def _get_nan_overload(val_t):
+    if isinstance(val_t, (types.NPDatetime, types.NPTimedelta)):
+        nat = val_t('NaT')
+        return lambda v: nat
+    # TODO: other types
+    return lambda v: np.nan
+
+def _get_type_max_value(dtype):
+    return 0
+
+@overload(_get_type_max_value)
+def _get_type_max_value_overload(dtype_t):
+    if isinstance(dtype_t.dtype, (types.NPDatetime, types.NPTimedelta)):
+        return lambda d: hpat.pd_timestamp_ext.integer_to_dt64(
+            numba.targets.builtins.get_type_max_value(numba.types.int64))
+    return lambda d: numba.targets.builtins.get_type_max_value(d)
+
+# type(dtype) is called by np.full (used in agg_typer)
+@infer_global(type)
+class TypeDt64(AbstractTemplate):
+
+    def generic(self, args, kws):
+        assert not kws
+        if len(args) == 1 and isinstance(args[0], (types.NPDatetime, types.NPTimedelta)):
+            classty = types.DType(args[0])
+            return signature(classty, *args)
 
 @numba.njit
 def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
-        s = np.nan
+        s = hpat.hiframes_typed._get_nan(s)
     return s
 
 def _column_sum_impl_basic(A):  # pragma: no cover
@@ -1608,10 +1654,10 @@ def _column_std_impl(A):  # pragma: no cover
 def _column_min_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
-    s = numba.targets.builtins.get_type_max_value(in_arr.dtype)
+    s = hpat.hiframes_typed._get_type_max_value(in_arr.dtype)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
-        if not np.isnan(val):
+        if not hpat.hiframes_api.isna(in_arr, i):
             s = min(s, val)
             count += 1
     res = hpat.hiframes_typed._sum_handle_nan(s, count)
@@ -1625,6 +1671,7 @@ def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
         s = min(s, val)
     return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
+# TODO: fix for dt64
 def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0

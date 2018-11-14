@@ -545,6 +545,7 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
                                   '__init_func': agg_func_struct.init_func,
                                   '__combine_redvars': agg_func_struct.combine_all_func,
                                   '__eval_res': agg_func_struct.eval_all_func,
+                                  'dt64_dtype': np.dtype('datetime64[ns]'),
                                   },
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
@@ -927,6 +928,10 @@ def setitem_array_with_str_overload(arr_t, ind_t, val_t):
 
     return setitem_impl
 
+def _get_np_dtype(t):
+    if t == types.NPDatetime('ns'):
+        return "dt64_dtype"
+    return "np.{}".format(t)
 
 def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
                                         in_col_names, out_col_names, parallel):
@@ -949,10 +954,10 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
 
     func_text = "def agg_top({}{}, pivot_arr):\n".format(key_args, in_args)
     func_text += "    data_redvar_dummy = ({}{})\n".format(
-        ",".join(["np.empty(1, np.{})".format(t) for t in red_var_typs]),
+        ",".join(["np.empty(1, {})".format(_get_np_dtype(t)) for t in red_var_typs]),
         "," if len(red_var_typs) == 1 else "")
     func_text += "    out_dummy_tup = ({}{}{})\n".format(
-        ",".join(["np.empty(1, np.{})".format(t) for t in out_typs]),
+        ",".join(["np.empty(1, {})".format(_get_np_dtype(t)) for t in out_typs]),
         "," if len(out_typs) != 0 else "",
         "{},".format(key_args) if return_key else "")
     func_text += "    data_in = ({}{})\n".format(",".join(in_names),
@@ -1368,15 +1373,16 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
     return_typ = pm.typemap[eval_nodes[-1].value.name]
 
     # TODO: non-numeric return
-    func_text = "def agg_eval({}):\n return np.{}(0)\n".format(", ".join(in_names), return_typ)
+    zero = return_typ(0)
+    func_text = "def agg_eval({}):\n return _zero\n".format(", ".join(in_names))
 
     # print(func_text)
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'_zero': zero}, loc_vars)
     agg_eval = loc_vars['agg_eval']
 
     arg_typs = tuple(var_types)
-    f_ir = compile_to_numba_ir(agg_eval, {'numba': numba, 'hpat':hpat, 'np': np},  # TODO: add outside globals
+    f_ir = compile_to_numba_ir(agg_eval, {'numba': numba, 'hpat':hpat, 'np': np, '_zero': zero},  # TODO: add outside globals
                                   typingctx, arg_typs,
                                   pm.typemap, pm.calltypes)
 
