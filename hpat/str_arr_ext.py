@@ -201,7 +201,7 @@ def get_data_ptr(typingctx, str_arr_typ=None):
     return data_ctypes_type(string_array_type), codegen
 
 @intrinsic
-def getitem_str_offset(typingctx, str_arr_typ, ind_t):
+def getitem_str_offset(typingctx, str_arr_typ, ind_t=None):
     def codegen(context, builder, sig, args):
         in_str_arr, ind = args
 
@@ -210,6 +210,19 @@ def getitem_str_offset(typingctx, str_arr_typ, ind_t):
         return builder.load(builder.gep(offsets, [ind]))
 
     return types.uint32(string_array_type, ind_t), codegen
+
+# TODO: fix this for join
+@intrinsic
+def setitem_str_offset(typingctx, str_arr_typ, ind_t, val_t=None):
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind, val = args
+
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+        offsets = builder.bitcast(string_array.offsets, lir.IntType(32).as_pointer())
+        builder.store(val, builder.gep(offsets, [ind]))
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, ind_t, types.uint32), codegen
 
 @intrinsic
 def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t=None):

@@ -21,7 +21,8 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, del_str, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice,
-                              setitem_string_array, str_copy_ptr)
+                              setitem_string_array, str_copy_ptr,
+                              setitem_str_offset)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
 from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
@@ -909,7 +910,7 @@ def ensure_capacity_str(arr, new_size, n_chars):
     #print("new alloc", new_size, curr_len, getitem_str_offset(arr, new_size-1), n_chars, curr_num_chars)
     if curr_len < new_size or getitem_str_offset(arr, new_size-1) + n_chars > curr_num_chars:
         new_len = 2 * curr_len
-        new_num_chars = 2 * curr_num_chars
+        new_num_chars = 2 * curr_num_chars + n_chars
         new_arr = pre_alloc_string_array(new_len, new_num_chars)
         copy_str_arr_slice(new_arr, arr, new_size-1)
 
@@ -1016,7 +1017,12 @@ def setnan_elem_buff_overload(arr_t, ind_t):
     assert arr_t == string_array_type
     def setnan_elem_buff_str(arr, ind):
         new_arr = ensure_capacity_str(arr, ind+1, 0)
-        setitem_arr_nan(new_arr, ind)
+        # TODO: set actual nan for str
+        # TODO: why doesn't setitem_str_offset work
+        #setitem_arr_nan(new_arr, ind)
+        #setitem_str_offset(arr, ind+1, getitem_str_offset(arr, ind))
+        setitem_string_array(get_offset_ptr(new_arr), get_data_ptr(new_arr), '', ind)
+        #print(getitem_str_offset(arr, ind), getitem_str_offset(arr, ind+1))
         return new_arr
 
     return setnan_elem_buff_str
