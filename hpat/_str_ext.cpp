@@ -512,7 +512,8 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         offsets[i] = len;
         PyObject * s = PySequence_GetItem(obj, i);
         CHECK(s, "getting element failed");
-        if (s == Py_None)
+        // Pandas stores NA as either None or nan
+        if (s == Py_None || (PyFloat_Check(s) && std::isnan(PyFloat_AsDouble(s))))
         {
             // leave null bit as 0
             tmp_store[i] = "";
