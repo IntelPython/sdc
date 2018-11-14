@@ -1299,6 +1299,11 @@ def setitem_arr_nan(arr, ind):
 def setitem_arr_nan_overload(arr_t, ind_t):
     if isinstance(arr_t.dtype, types.Float):
         return setitem_arr_nan
+    if isinstance(arr_t.dtype, (types.NPDatetime, types.NPTimedelta)):
+        nat = arr_t.dtype('NaT')
+        def _setnan_impl(arr, ind):
+            arr[ind] = nat
+        return _setnan_impl
     # TODO: support strings, bools, etc.
     # XXX: set NA values in bool arrays to False
     # FIXME: replace with proper NaN
