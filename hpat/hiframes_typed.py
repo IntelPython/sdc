@@ -27,7 +27,7 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
-    explicit_binop_funcs)
+    explicit_binop_funcs, series_dt_methods_type)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes_rolling import get_rolling_setup_args
 from hpat.hiframes_aggregate import Aggregate
@@ -251,6 +251,13 @@ class HiFramesTyped(object):
                         return self._run_DatetimeIndex_field(assign, assign.target, rhs)
                     if rhs.attr == 'date':
                         return self._run_DatetimeIndex_date(assign, assign.target, rhs)
+
+                if rhs_type == series_dt_methods_type:
+                    dt_def = guard(get_definition, self.func_ir, rhs.value)
+                    if dt_def is None:  # TODO: check for errors
+                        raise ValueError("invalid series.dt")
+                    rhs.value = dt_def.value
+                    return self._run_DatetimeIndex_field(assign, assign.target, rhs)
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
                     if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
@@ -1052,7 +1059,9 @@ class HiFramesTyped(object):
         func_text = 'def f(dti):\n'
         func_text += '    numba.parfor.init_prange()\n'
         func_text += '    n = len(dti)\n'
-        func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        #func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        # TODO: why doesn't empty_inferred work for t4 mortgage test?
+        func_text += '    S = np.empty(n, np.int64)\n'
         func_text += '    for i in numba.parfor.internal_prange(n):\n'
         func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
         func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'

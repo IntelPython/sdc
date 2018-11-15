@@ -298,6 +298,10 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == string_type
         return series_str_methods_type
 
+    def resolve_dt(self, ary):
+        assert ary.dtype == types.NPDatetime('ns')
+        return series_dt_methods_type
+
     def resolve_date(self, ary):
         if isinstance(ary.dtype, types.scalars.NPDatetime):
             return date_series_type
@@ -652,6 +656,27 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     @bound_function("strmethod.len")
     def resolve_len(self, ary, args, kws):
         return signature(SeriesType(types.int64, 1, 'C'), *args)
+
+
+class SeriesDtMethodType(types.Type):
+    def __init__(self):
+        name = "SeriesDtMethodType"
+        super(SeriesDtMethodType, self).__init__(name)
+
+series_dt_methods_type = SeriesDtMethodType()
+
+
+@infer_getattr
+class SeriesDtMethodAttribute(AttributeTemplate):
+    key = SeriesDtMethodType
+
+    def resolve_month(self, ary):
+        return SeriesType(types.int64, 1, 'C')
+
+    def resolve_year(self, ary):
+        return SeriesType(types.int64, 1, 'C')
+    # TODO: other attrs
+
 
 class SeriesRollingType(types.Type):
     def __init__(self, dtype):
