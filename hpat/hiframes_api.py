@@ -451,6 +451,13 @@ def isna_overload(arr_typ, ind_typ):
     dtype = arr_typ.dtype
     if isinstance(dtype, types.Float):
         return lambda arr,i: np.isnan(arr[i])
+
+    # NaT for dt64
+    if isinstance(dtype, (types.NPDatetime, types.NPTimedelta)):
+        nat = dtype('NaT')
+        # TODO: replace with np.isnat
+        return lambda arr,i: arr[i] == nat
+
     # XXX integers don't have nans, extend to boolean
     return lambda arr,i: False
 

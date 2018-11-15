@@ -232,6 +232,15 @@ class HiFramesTyped(object):
             if (rhs.op == 'getattr'):
                 rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
 
+                # replace arr.dtype for dt64 since PA replaces with
+                # np.datetime64[ns] which invalid, TODO: fix PA
+                if (rhs.attr == 'dtype' and (is_series_type(rhs_type)
+                        or isinstance(rhs_type, types.Array)) and isinstance(
+                            rhs_type.dtype,
+                            (types.NPDatetime, types.NPTimedelta))):
+                    assign.value = ir.Global("numpy.datetime64", rhs_type.dtype, rhs.loc)
+                    return [assign]
+
                 if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
                     # simply return the column
                     assign.value = rhs.value
@@ -441,6 +450,12 @@ class HiFramesTyped(object):
                 if isinstance(arr_typ.dtype, types.Float):
                     func = lambda arr,i: np.isnan(arr[i])
                     return self._replace_func(func, [arr, ind])
+                elif isinstance(
+                        arr_typ.dtype, (types.NPDatetime, types.NPTimedelta)):
+                    nat = arr_typ.dtype('NaT')
+                    # TODO: replace with np.isnat
+                    return self._replace_func(
+                        lambda arr,i: arr[i] == nat, [arr, ind])
                 elif arr_typ.dtype != string_type:
                     return self._replace_func(lambda arr,i: False, [arr, ind])
 
