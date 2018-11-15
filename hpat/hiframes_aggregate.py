@@ -244,7 +244,8 @@ def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir
         aggregate_node.df_out_vars.pop(cname)
         if aggregate_node.pivot_arr is None:
             aggregate_node.df_in_vars.pop(cname)
-            aggregate_node.out_typer_vars.pop(cname)
+            if aggregate_node.out_typer_vars is not None:
+                aggregate_node.out_typer_vars.pop(cname)
         else:
             aggregate_node.pivot_values.remove(cname)
 
