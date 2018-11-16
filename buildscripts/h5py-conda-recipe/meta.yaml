@@ -17,7 +17,7 @@ requirements:
 
   host:
     - hdf5
-    - python >=3.6
+    - python 3.7
     - pip
     - numpy
     - cython
@@ -26,7 +26,7 @@ requirements:
     - mpich # [not win]
 
   run:
-    - python
+    - python 3.7
     - numpy
     - six
     - mpich # [not win]

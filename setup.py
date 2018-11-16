@@ -99,12 +99,12 @@ if is_win:
 
 hdf5_libs = MPI_LIBS + ['hdf5']
 if not is_win:
-    hdf5_libs += ['boost_filesystem']
+    hdf5_libs += ['boost_filesystem', 'boost_system']
 
 ext_io = Extension(name="hio",
                    sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
                    depends=["hpat/_hpat_common.h", "hpat/_distributed.h", "hpat/_import_py.h", "hpat/_csv.h", "hpat/_datetime_ext.h"],
-                   libraries = MPI_LIBS + ['hdf5', 'boost_filesystem', 'boost_system'],
+                   libraries = hdf5_libs,
                    include_dirs = ([HDF5_DIR+'/include',] + ind
                      + np_compile_args['include_dirs']),
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
