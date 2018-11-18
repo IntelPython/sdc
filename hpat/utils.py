@@ -63,6 +63,14 @@ ReplaceFunc = namedtuple("ReplaceFunc",
 
 np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 
+
+# TODO: move to Numba
+class BooleanLiteral(types.Literal, types.Boolean):
+    pass  # TODO: conversion needed like IntegerLiteral?
+
+types.Literal.ctor_map[bool] = BooleanLiteral
+
+
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
     if def_node is None:

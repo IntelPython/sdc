@@ -312,15 +312,15 @@ class SetDfDTInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        assert isinstance(args[1], types.Const)
+        assert isinstance(args[1], types.Literal)
         return signature(types.none, *args)
 
 SetDfDTInfer.support_literals = True
 
-@lower_builtin(set_df_datetime_date, types.Any, types.Const, types.Array)
+@lower_builtin(set_df_datetime_date, types.Any, types.Literal, types.Array)
 def set_df_datetime_date_lower(context, builder, sig, args):
     #
-    col_name = sig.args[1].value
+    col_name = sig.args[1].literal_value
     data_arr = make_array(sig.args[2])(context, builder, args[2])
     num_elems = builder.extract_value(data_arr.shape, 0)
 
@@ -760,6 +760,7 @@ def type_int_to_dt64(context):
     return typer
 
 @lower_builtin(integer_to_dt64, types.int64)
+@lower_builtin(integer_to_dt64, types.IntegerLiteral)
 def impl_int_to_dt64(context, builder, sig, args):
     return args[0]
 
@@ -796,6 +797,7 @@ def impl_dt64_to_int(context, builder, sig, args):
 
 @lower_builtin(myref, types.int32)
 @lower_builtin(myref, types.int64)
+@lower_builtin(myref, types.IntegerLiteral)
 def impl_myref_int32(context, builder, sig, args):
     typ = types.voidptr
     val = args[0]

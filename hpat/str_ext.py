@@ -308,10 +308,10 @@ def getpointer_from_string(context, builder, sig, args):
     c_str = builder.call(fn, [val])
     return c_str
 
-@lower_cast(StringType, types.Const)
+@lower_cast(StringType, types.Literal)
 def string_type_to_const(context, builder, fromty, toty, val):
     # calling str() since the const value can be non-str like tuple const (CSV)
-    cstr = context.insert_const_string(builder.module, str(toty.value))
+    cstr = context.insert_const_string(builder.module, str(toty.literal_value))
     # check to make sure Const value matches stored string
     # call str == cstr
     fnty = lir.FunctionType(lir.IntType(1),
@@ -321,7 +321,7 @@ def string_type_to_const(context, builder, fromty, toty, val):
     with cgutils.if_unlikely(builder, builder.not_(match)):
         # Raise RuntimeError about the assumption violation
         usermsg = "constant string assumption violated"
-        errmsg = "{}: expecting {}".format(usermsg, toty.value)
+        errmsg = "{}: expecting {}".format(usermsg, toty.literal_value)
         context.call_conv.return_user_exc(builder, RuntimeError, (errmsg,))
 
     return impl_ret_untracked(context, builder, toty, cstr)

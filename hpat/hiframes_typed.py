@@ -1447,7 +1447,7 @@ class HiFramesTyped(object):
             for i, arg in enumerate(args):
                 val = guard(find_const, self.func_ir, arg)
                 if val:
-                    new_args.append(types.Const(val))
+                    new_args.append(types.literal(val))
                 else:
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)

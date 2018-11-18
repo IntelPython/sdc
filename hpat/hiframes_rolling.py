@@ -77,12 +77,6 @@ class RollingType(AbstractTemplate):
         # result is always float64 in pandas
         # see _prep_values() in window.py
         f_type = args[4]
-        # Const of CPUDispatcher needs to be converted to type since lowerer
-        # cannot handle it
-        if (isinstance(f_type, types.Const)
-                and isinstance(f_type.value,
-                numba.targets.registry.CPUDispatcher)):
-            f_type = types.functions.Dispatcher(f_type.value)
         return signature(arr.copy(dtype=types.float64), arr, types.intp,
                          types.bool_, types.bool_, f_type)
 
@@ -97,12 +91,6 @@ class RollingVarType(AbstractTemplate):
         # result is always float64 in pandas
         # see _prep_values() in window.py
         f_type = args[5]
-        # Const of CPUDispatcher needs to be converted to type since lowerer
-        # cannot handle it
-        if (isinstance(f_type, types.Const)
-                and isinstance(f_type.value,
-                numba.targets.registry.CPUDispatcher)):
-            f_type = types.functions.Dispatcher(f_type.value)
         return signature(arr.copy(dtype=types.float64), arr, on_arr, types.intp,
                          types.bool_, types.bool_, f_type)
 
@@ -118,7 +106,7 @@ class RollingCovType(AbstractTemplate):
 
 
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
-               types.Boolean, types.Const)
+               types.Boolean, types.StringLiteral)
 def lower_rolling_fixed(context, builder, sig, args):
     func_name = sig.args[-1].value
     if func_name == 'sum':
@@ -158,7 +146,7 @@ def lower_rolling_fixed_apply(context, builder, sig, args):
 
 
 @lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
-               types.Boolean, types.Const)
+               types.Boolean, types.StringLiteral)
 def lower_rolling_variable(context, builder, sig, args):
     func_name = sig.args[-1].value
     if func_name == 'sum':

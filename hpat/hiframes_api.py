@@ -764,13 +764,13 @@ class UnBoxDfCol(AbstractTemplate):
         assert not kws
         assert len(args) == 3
         df_typ, col_ind_const, dtype_typ = args[0], args[1], args[2]
-        if isinstance(dtype_typ, types.Const):
-            if dtype_typ.value == 12:  # FIXME dtype for dt64
+        if isinstance(dtype_typ, types.Literal):
+            if dtype_typ.literal_value == 12:  # FIXME dtype for dt64
                 out_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
-            elif dtype_typ.value == 11:  # FIXME dtype for str
+            elif dtype_typ.literal_value == 11:  # FIXME dtype for str
                 out_typ = string_array_type
             else:
-                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.value))
+                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.literal_value))
         else:
             out_typ = types.Array(dtype_typ.dtype, 1, 'C')
         # FIXME: last arg should be types.DType?
@@ -786,15 +786,15 @@ class SetDfColInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        assert isinstance(args[1], types.Const)
+        assert isinstance(args[1], types.Literal)
         return signature(types.none, *args)
 
 SetDfColInfer.support_literals = True
 
-@lower_builtin(set_df_col, PandasDataFrameType, types.Const, types.Array)
+@lower_builtin(set_df_col, PandasDataFrameType, types.Literal, types.Array)
 def set_df_col_lower(context, builder, sig, args):
     #
-    col_name = sig.args[1].value
+    col_name = sig.args[1].literal_value
     arr_typ = sig.args[2]
     if arr_typ.dtype == datetime_date_type:
         return set_df_datetime_date_lower(context, builder, sig, args)
@@ -830,18 +830,18 @@ class BoxDfTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) % 2 == 0, "name and column pairs expected"
-        col_names = [a.value for a in args[:len(args)//2]]
+        col_names = [a.literal_value for a in args[:len(args)//2]]
         col_types =  [a.dtype for a in args[len(args)//2:]]
         df_typ = PandasDataFrameType(col_names, col_types)
         return signature(df_typ, *args)
 
 BoxDfTyper.support_literals = True
 
-@lower_builtin(box_df, types.Const, types.VarArg(types.Any))
+@lower_builtin(box_df, types.Literal, types.VarArg(types.Any))
 def lower_box_df(context, builder, sig, args):
     assert len(sig.args) % 2 == 0, "name and column pairs expected"
     n_cols = len(sig.args)//2
-    col_names = [a.value for a in sig.args[:n_cols]]
+    col_names = [a.literal_value for a in sig.args[:n_cols]]
     col_arrs = [a for a in args[n_cols:]]
     arr_typs = [a for a in sig.args[n_cols:]]
 
@@ -877,22 +877,22 @@ def box_df_dummy(typ, val, c):
     return val
 
 
-@lower_builtin(unbox_df_column, PandasDataFrameType, types.Const, types.Any)
+@lower_builtin(unbox_df_column, PandasDataFrameType, types.Literal, types.Any)
 def lower_unbox_df_column(context, builder, sig, args):
     # FIXME: last arg should be types.DType?
     pyapi = context.get_python_api(builder)
     c = numba.pythonapi._UnboxContext(context, builder, pyapi)
 
     # TODO: refcounts?
-    col_ind = sig.args[1].value
+    col_ind = sig.args[1].literal_value
     col_name = sig.args[0].col_names[col_ind]
     series_obj = c.pyapi.object_getattr_string(args[0], col_name)
     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
 
-    if isinstance(sig.args[2], types.Const) and sig.args[2].value == 11:  # FIXME: str code
+    if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 11:  # FIXME: str code
         native_val = unbox_str_series(string_array_type, arr_obj, c)
     else:
-        if isinstance(sig.args[2], types.Const) and sig.args[2].value == 12:  # FIXME: dt64 code
+        if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 12:  # FIXME: dt64 code
             dtype = types.NPDatetime('ns')
         else:
             dtype = sig.args[2].dtype
@@ -1231,7 +1231,7 @@ class TypeIterTuples(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) % 2 == 0, "name and column pairs expected"
-        col_names = [a.value for a in args[:len(args)//2]]
+        col_names = [a.literal_value for a in args[:len(args)//2]]
         arr_types =  [if_series_to_array_type(a) for a in args[len(args)//2:]]
         # XXX index handling, assuming implicit index
         assert "Index" not in col_names[0]

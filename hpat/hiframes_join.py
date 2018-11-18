@@ -1177,10 +1177,10 @@ def local_merge_asof(left_keys, right_keys, data_left, data_right):
 
 
 
-@lower_builtin(local_merge, types.Const, types.VarArg(types.Any))
+@lower_builtin(local_merge, types.Literal, types.VarArg(types.Any))
 def lower_local_merge(context, builder, sig, args):
     #
-    num_left_cols = sig.args[0].value
+    num_left_cols = sig.args[0].literal_value
     num_right_cols = len(args) - num_left_cols - 1
     left_other_names = ["t1_c" + str(i) for i in range(num_left_cols - 1)]
     right_other_names = ["t2_c" + str(i) for i in range(num_right_cols - 1)]

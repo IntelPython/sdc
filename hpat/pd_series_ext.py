@@ -440,7 +440,7 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_fillna(self, ary, args, kws):
         out = ary
         # output is None for inplace case
-        if 'inplace' in kws and kws['inplace'] == types.Const(True):
+        if 'inplace' in kws and kws['inplace'] == types.literal(True):
             out = types.none
         return signature(out, *args)
 
@@ -448,7 +448,7 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_dropna(self, ary, args, kws):
         out = ary
         # output is None for inplace case
-        if 'inplace' in kws and kws['inplace'] == types.Const(True):
+        if 'inplace' in kws and kws['inplace'] == types.literal(True):
             out = types.none
         return signature(out, *args)
 
