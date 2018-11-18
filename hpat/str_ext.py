@@ -308,7 +308,12 @@ def getpointer_from_string(context, builder, sig, args):
     c_str = builder.call(fn, [val])
     return c_str
 
-@lower_cast(StringType, types.Literal)
+@lower_builtin(getpointer, types.StringLiteral)
+def getpointer_from_string_literal(context, builder, sig, args):
+    cstr = context.insert_const_string(builder.module, sig.args[0].literal_value)
+    return cstr
+
+@lower_cast(StringType, types.StringLiteral)
 def string_type_to_const(context, builder, fromty, toty, val):
     # calling str() since the const value can be non-str like tuple const (CSV)
     cstr = context.insert_const_string(builder.module, str(toty.literal_value))
@@ -337,6 +342,15 @@ def const_string(context, builder, ty, pyval):
     ret = builder.call(fn, [cstr])
     return ret
 
+@lower_cast(types.StringLiteral, StringType)
+def const_to_string_type(context, builder, fromty, toty, val):
+    cstr = context.insert_const_string(builder.module, fromty.literal_value)
+
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    ret = builder.call(fn, [cstr])
+    return ret
 
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):

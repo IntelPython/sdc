@@ -289,7 +289,8 @@ class HiFramesTyped(object):
                     s = np.int64(dt)
                     res = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
-                assert self.typemap[ind_var.name] == types.intp
+                assert isinstance(self.typemap[ind_var.name],
+                    (types.Integer, types.IntegerLiteral))
                 f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
                                                 'hpat': hpat}, self.typingctx,
                                             (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
@@ -1182,8 +1183,8 @@ class HiFramesTyped(object):
             rhs.fn in ('-', operator.sub)):
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
-        if (self.typemap[arg1.name] not in allowed_types
-                or self.typemap[arg2.name] not in allowed_types):
+        if (types.unliteral(self.typemap[arg1.name]) not in allowed_types
+                or types.unliteral(self.typemap[arg2.name]) not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
 
         op_str = _binop_to_str[rhs.fn]

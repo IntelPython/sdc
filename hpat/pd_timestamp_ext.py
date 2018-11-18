@@ -610,6 +610,7 @@ def impl_ctor_ts_ts(context, builder, sig, args):
 
 #              , types.int64, types.int64, types.int64, types.int64, types.int64)
 @lower_builtin(datetime.datetime, types.int64, types.int64, types.int64)
+@lower_builtin(datetime.datetime, types.IntegerLiteral, types.IntegerLiteral, types.IntegerLiteral)
 def impl_ctor_datetime(context, builder, sig, args):
     typ = sig.return_type
     year, month, day = args
