@@ -499,7 +499,7 @@ class SeriesAttribute(AttributeTemplate):
         dtype2 = args[0].dtype
         if dtype2 == types.NPDatetime('ns'):
             dtype2 = pandas_timestamp_type
-        code = args[1].value.code
+        code = args[1].literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.context, f_ir, (dtype1,dtype2,), None)
