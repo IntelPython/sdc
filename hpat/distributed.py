@@ -385,7 +385,7 @@ class DistributedPass(object):
             return self._run_call_array(lhs, func_mod, func_name, assign, rhs.args)
 
         # string_array.func_calls
-        if (isinstance(func_mod, ir.Var)
+        if (self._is_1D_arr(lhs) and isinstance(func_mod, ir.Var)
                 and self.typemap[func_mod.name] == string_array_type):
             if func_name == 'copy':
                 self._array_starts[lhs] = self._array_starts[func_mod.name]
