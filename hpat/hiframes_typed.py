@@ -828,8 +828,8 @@ class HiFramesTyped(object):
                 return (mean_XtY - mean_X * mean_Y) * bias_adj
             return self._replace_func(rolling_cov_impl, rhs.args)
         # replace apply function with dispatcher obj, now the type is known
-        if (func_name == 'rolling_fixed'
-                and self.typemap[rhs.args[4].name] == types.pyfunc_type):
+        if (func_name == 'rolling_fixed' and isinstance(
+                self.typemap[rhs.args[4].name], types.MakeFunctionLiteral)):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype
@@ -848,8 +848,8 @@ class HiFramesTyped(object):
             nodes = f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
             return nodes
-        elif (func_name == 'rolling_variable'
-                and self.typemap[rhs.args[5].name] == types.pyfunc_type):
+        elif (func_name == 'rolling_variable' and isinstance(
+                self.typemap[rhs.args[5].name], types.MakeFunctionLiteral)):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
             dtype = self.typemap[rhs.args[0].name].dtype

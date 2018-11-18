@@ -109,7 +109,7 @@ class RollingCovType(AbstractTemplate):
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
                types.Boolean, types.StringLiteral)
 def lower_rolling_fixed(context, builder, sig, args):
-    func_name = sig.args[-1].value
+    func_name = sig.args[-1].literal_value
     if func_name == 'sum':
         func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
     elif func_name == 'mean':
@@ -149,7 +149,7 @@ def lower_rolling_fixed_apply(context, builder, sig, args):
 @lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
                types.Boolean, types.StringLiteral)
 def lower_rolling_variable(context, builder, sig, args):
-    func_name = sig.args[-1].value
+    func_name = sig.args[-1].literal_value
     if func_name == 'sum':
         func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
     elif func_name == 'mean':
