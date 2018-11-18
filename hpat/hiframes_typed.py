@@ -651,8 +651,8 @@ class HiFramesTyped(object):
                 self.typemap[series_var.name])
 
 
-        nodes.append(hiframes_sort.Sort(series_var.name, lhs.name, series_var,
-            out_key_arr, in_df, out_df, False, lhs.loc))
+        nodes.append(hiframes_sort.Sort(series_var.name, lhs.name, [series_var],
+            [out_key_arr], in_df, out_df, False, lhs.loc))
         return nodes
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
