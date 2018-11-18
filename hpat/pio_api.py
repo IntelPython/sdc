@@ -9,6 +9,7 @@ import h5py
 from numba.extending import register_model, models, infer_getattr, infer, intrinsic
 from hpat.str_ext import string_type
 import hpat
+from hpat.utils import unliteral_all
 import hio
 import llvmlite.binding as ll
 ll.add_symbol('hpat_h5_read_filter', hio.hpat_h5_read_filter)
@@ -68,9 +69,9 @@ string_list_type = types.List(string_type)
 
 def _create_dataset_typer(args, kws):
     kwargs = dict(kws)
-    name = args[0] if len(args) > 0 else kwargs['name']
-    shape = args[1] if len(args) > 1 else kwargs['shape']
-    dtype = args[2] if len(args) > 2 else kwargs['dtype']
+    name = args[0] if len(args) > 0 else types.unliteral(kwargs['name'])
+    shape = args[1] if len(args) > 1 else types.unliteral(kwargs['shape'])
+    dtype = args[2] if len(args) > 2 else types.unliteral(kwargs['dtype'])
     def create_dset_stub(name, shape, dtype):
         pass
     pysig = numba.utils.pysignature(create_dset_stub)
@@ -92,11 +93,11 @@ class FileAttribute(AttributeTemplate):
 
     @bound_function("h5file.create_dataset")
     def resolve_create_dataset(self, f_id, args, kws):
-        return _create_dataset_typer(args, kws)
+        return _create_dataset_typer(unliteral_all(args), kws)
 
     @bound_function("h5file.create_group")
     def resolve_create_group(self, f_id, args, kws):
-        return signature(h5group_type, *args)
+        return signature(h5group_type, *unliteral_all(args))
 
 @infer_getattr
 class GroupOrDatasetAttribute(AttributeTemplate):
@@ -115,7 +116,7 @@ class GroupAttribute(AttributeTemplate):
 
     @bound_function("h5group.create_dataset")
     def resolve_create_dataset(self, f_id, args, kws):
-        return _create_dataset_typer(args, kws)
+        return _create_dataset_typer(unliteral_all(args), kws)
 
 @infer_global(operator.getitem)
 class GetItemH5File(AbstractTemplate):
@@ -183,8 +184,8 @@ def h5_read_dummy():
 class H5ReadType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        ndim = args[1].value
-        dtype = getattr(types, args[2].value)
+        ndim = args[1].literal_value
+        dtype = getattr(types, args[2].literal_value)
         ret_typ = types.Array(dtype, ndim, 'C')
         return signature(ret_typ, *args)
 
@@ -194,7 +195,7 @@ H5ReadType.support_literals = True
 class H5File(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        return signature(h5file_type, *args)
+        return signature(h5file_type, *unliteral_all(args))
 
 
 @infer_global(h5size)
@@ -202,7 +203,7 @@ class H5Size(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(h5read)
@@ -210,7 +211,7 @@ class H5Read(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 6
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(h5close)
@@ -226,7 +227,7 @@ class H5CreateDSet(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 4
-        return signature(h5file_type, *args)
+        return signature(h5file_type, *unliteral_all(args))
 
 
 @infer_global(h5create_group)
@@ -234,7 +235,7 @@ class H5CreateGroup(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(h5file_type, *args)
+        return signature(h5file_type, *unliteral_all(args))
 
 
 @infer_global(h5write)
@@ -242,7 +243,7 @@ class H5Write(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 6
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(h5g_get_num_objs)
