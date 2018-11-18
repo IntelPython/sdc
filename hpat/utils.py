@@ -8,7 +8,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
-from numba.extending import overload, intrinsic
+from numba.extending import overload, intrinsic, lower_cast
 import collections
 import numpy as np
 from hpat.str_ext import string_type
@@ -66,10 +66,27 @@ np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 
 # TODO: move to Numba
 class BooleanLiteral(types.Literal, types.Boolean):
-    pass  # TODO: conversion needed like IntegerLiteral?
+
+    def can_convert_to(self, typingctx, other):
+        # similar to IntegerLiteral
+        conv = typingctx.can_convert(self.literal_type, other)
+        if conv is not None:
+            return max(conv, types.Conversion.promote)
+
 
 types.Literal.ctor_map[bool] = BooleanLiteral
 
+numba.datamodel.register_default(
+    BooleanLiteral)(numba.extending.models.BooleanModel)
+
+@lower_cast(BooleanLiteral, types.Boolean)
+def literal_bool_cast(context, builder, fromty, toty, val):
+    lit = context.get_constant_generic(
+        builder,
+        fromty.literal_type,
+        fromty.literal_value,
+        )
+    return context.cast(builder, lit, fromty.literal_type, toty)
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
