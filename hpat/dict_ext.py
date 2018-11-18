@@ -12,6 +12,7 @@ from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hdict_ext
+from hpat.utils import unliteral_all
 
 class ByteVecType(types.Opaque):
     def __init__(self):
@@ -217,12 +218,12 @@ class DictAttribute(AttributeTemplate):
     def resolve_get(self, dict, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(args[1], *args)
+        return signature(args[1], *unliteral_all(args))
 
     @bound_function("dict.pop")
     def resolve_pop(self, dict, args, kws):
         assert not kws
-        return signature(dict.val_typ, *args)
+        return signature(dict.val_typ, *unliteral_all(args))
 
     @bound_function("dict.keys")
     def resolve_keys(self, dict, args, kws):
@@ -268,7 +269,7 @@ register_model(DictKeyIteratorType)(models.OpaqueModel)
 class MinMaxDict(AbstractTemplate):
     def generic(self, args, kws):
         if len(args) == 1 and isinstance(args[0], DictKeyIteratorType):
-            return signature(args[0].key_typ, *args)
+            return signature(args[0].key_typ, *unliteral_all(args))
 
 
 # dict_int_int_in = types.ExternalFunction("dict_int_int_in", types.boolean(dict_int_int_type, types.intp))

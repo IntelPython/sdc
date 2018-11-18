@@ -53,7 +53,7 @@ ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
 ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
 from numba.targets.arrayobj import make_array
 from numba import cgutils
-from hpat.utils import _numba_to_c_type_map
+from hpat.utils import _numba_to_c_type_map, unliteral_all
 
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
@@ -408,7 +408,7 @@ class QuantileType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) in [2, 3]
-        return signature(types.float64, *args)
+        return signature(types.float64, *unliteral_all(args))
 
 
 @infer_global(str_contains_regex)
@@ -418,7 +418,7 @@ class ContainsType(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         # args: str_arr, pat
-        return signature(types.Array(types.boolean, 1, 'C'), *args)
+        return signature(types.Array(types.boolean, 1, 'C'), *unliteral_all(args))
 
 def alloc_shift(A):
     return np.empty_like(A)
@@ -704,7 +704,7 @@ class DfIsinCol(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(SeriesType(types.bool_, 1, 'C'), *args)
+        return signature(SeriesType(types.bool_, 1, 'C'), *unliteral_all(args))
 
 
 class PandasDataFrameType(types.Type):

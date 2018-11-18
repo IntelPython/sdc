@@ -8,7 +8,8 @@ import hpat
 from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, del_str, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
-from hpat.utils import debug_prints, empty_like_type, _numba_to_c_type_map
+from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map,
+    unliteral_all)
 import time
 from llvmlite import ir as lir
 import hdist
@@ -416,14 +417,14 @@ class DistAllgather(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2  # array and val
-        return signature(types.none, *args)
+        return signature(types.none, *unliteral_all(args))
 
 @infer_global(rebalance_array_parallel)
 class DistRebalanceParallel(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2  # array and count
-        return signature(args[0], *args)
+        return signature(args[0], *unliteral_all(args))
 
 
 @infer_global(get_rank)
@@ -431,7 +432,7 @@ class DistRank(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 0
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(get_size)
@@ -439,7 +440,7 @@ class DistSize(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 0
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(get_start)
@@ -447,7 +448,7 @@ class DistStart(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(get_end)
@@ -455,7 +456,7 @@ class DistEnd(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(get_node_portion)
@@ -463,7 +464,7 @@ class DistPortion(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(dist_reduce)
@@ -471,7 +472,7 @@ class DistReduce(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2  # value and reduce_op
-        return signature(args[0], *args)
+        return signature(args[0], *unliteral_all(args))
 
 
 @infer_global(dist_exscan)
@@ -479,7 +480,7 @@ class DistExscan(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(args[0], *args)
+        return signature(args[0], *unliteral_all(args))
 
 
 @infer_global(dist_arr_reduce)
@@ -487,7 +488,7 @@ class DistArrReduce(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2  # value and reduce_op
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(time.time)
@@ -495,7 +496,7 @@ class DistTime(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 0
-        return signature(types.float64, *args)
+        return signature(types.float64, *unliteral_all(args))
 
 
 @infer_global(dist_time)
@@ -503,7 +504,7 @@ class DistDistTime(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 0
-        return signature(types.float64, *args)
+        return signature(types.float64, *unliteral_all(args))
 
 
 @infer_global(barrier)
@@ -511,7 +512,7 @@ class DistBarrier(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 0
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(dist_cumsum)
@@ -520,7 +521,7 @@ class DistCumsumprod(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 @infer_global(irecv)
@@ -529,7 +530,7 @@ class DistIRecv(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) in [4, 5]
-        return signature(mpi_req_numba_type, *args)
+        return signature(mpi_req_numba_type, *unliteral_all(args))
 
 
 @infer_global(wait)
@@ -537,21 +538,21 @@ class DistWait(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 @infer_global(waitall)
 class DistWaitAll(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2 and args == (types.int32, req_array_type)
-        return signature(types.none, *args)
+        return signature(types.none, *unliteral_all(args))
 
 # @infer_global(dist_setitem)
 # class DistSetitem(AbstractTemplate):
 #     def generic(self, args, kws):
 #         assert not kws
 #         assert len(args)==5
-#         return signature(types.int32, *args)
+#         return signature(types.int32, *unliteral_all(args))
 
 
 class ReqArrayType(types.Type):
@@ -573,14 +574,14 @@ class DistCommReqAlloc(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1 and args[0] == types.int32
-        return signature(req_array_type, *args)
+        return signature(req_array_type, *unliteral_all(args))
 
 @infer_global(comm_req_dealloc)
 class DistCommReqDeAlloc(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1 and args[0] == req_array_type
-        return signature(types.none, *args)
+        return signature(types.none, *unliteral_all(args))
 
 @infer
 class SetItemReqArray(AbstractTemplate):
@@ -590,4 +591,4 @@ class SetItemReqArray(AbstractTemplate):
         assert not kws
         [ary, idx, val] = args
         if isinstance(ary, ReqArrayType) and idx == types.intp and val == mpi_req_numba_type:
-            return signature(types.none, *args)
+            return signature(types.none, *unliteral_all(args))

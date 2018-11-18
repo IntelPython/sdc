@@ -15,6 +15,7 @@ import hpat
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
+from hpat.utils import unliteral_all
 
 # boolean, int32, int64, int96, float, double
 # XXX arrow converts int96 timestamp to int64
@@ -242,7 +243,7 @@ class SizeParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.intp, *args)
+        return signature(types.intp, args[0], types.unliteral(args[1]))
 
 
 @infer_global(read_parquet)
@@ -251,9 +252,9 @@ class ReadParquetInfer(AbstractTemplate):
         assert not kws
         assert len(args) == 4
         if args[2] == types.intp:  # string read call, returns string array
-            return signature(string_array_type, *args)
+            return signature(string_array_type, *unliteral_all(args))
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(read_parquet_str)
@@ -261,7 +262,7 @@ class ReadParquetStrInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        return signature(string_array_type, *args)
+        return signature(string_array_type, *unliteral_all(args))
 
 
 @infer_global(read_parquet_str_parallel)
@@ -269,7 +270,7 @@ class ReadParquetStrParallelInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 4
-        return signature(string_array_type, *args)
+        return signature(string_array_type, *unliteral_all(args))
 
 
 @infer_global(read_parquet_parallel)
@@ -278,7 +279,7 @@ class ReadParallelParquetInfer(AbstractTemplate):
         assert not kws
         assert len(args) == 6
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 from numba import cgutils

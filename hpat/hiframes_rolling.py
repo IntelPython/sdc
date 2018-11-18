@@ -11,6 +11,7 @@ from numba.ir_utils import guard, find_const
 
 from hpat.distributed_api import Reduce_Type
 from hpat.pd_timestamp_ext import integer_to_dt64
+from hpat.utils import unliteral_all
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',
                            'min', 'max', 'cov', 'corr', 'apply')
@@ -102,7 +103,7 @@ RollingVarType.support_literals = True
 class RollingCovType(AbstractTemplate):
     def generic(self, args, kws):
         arr = args[0]  # array or series
-        return signature(arr.copy(dtype=types.float64), *args)
+        return signature(arr.copy(dtype=types.float64), *unliteral_all(args))
 
 
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,

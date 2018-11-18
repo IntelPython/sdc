@@ -12,6 +12,11 @@ import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hpat
+#from hpat.utils import unliteral_all
+# TODO: resolve import conflict
+def unliteral_all(args):
+    return tuple(types.unliteral(a) for a in args)
+
 import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
@@ -158,7 +163,7 @@ class StringAttribute(AttributeTemplate):
     def resolve_split(self, dict, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.List(string_type), *args)
+        return signature(types.List(string_type), types.unliteral(args[0]))
 
 
 # @infer_global(operator.getitem)
@@ -225,7 +230,7 @@ class CompileRegexInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(regex_type, *args)
+        return signature(regex_type, *unliteral_all(args))
 
 
 def contains_regex(str, pat):
@@ -242,7 +247,7 @@ class ContainsInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.boolean, *args)
+        return signature(types.boolean, *unliteral_all(args))
 
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)

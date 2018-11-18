@@ -63,6 +63,8 @@ ReplaceFunc = namedtuple("ReplaceFunc",
 
 np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 
+def unliteral_all(args):
+    return tuple(types.unliteral(a) for a in args)
 
 # TODO: move to Numba
 class BooleanLiteral(types.Literal, types.Boolean):
