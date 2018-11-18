@@ -736,7 +736,12 @@ class HiFrames(object):
         names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names')
         err_msg = "pd.read_csv() names should be constant list"
         col_names = self._get_str_or_list(names_var, err_msg=err_msg)
-        # TODO: support other args like usecols
+        usecols_var = self._get_arg('read_csv', rhs.args, kws, 6, 'usecols', '')
+        usecols = list(range(len(col_names)))
+        if usecols_var != '':
+            err_msg = "pd.read_csv() usecols should be constant list of ints"
+            usecols = self._get_str_or_list(usecols_var, err_msg=err_msg, typ=int)
+        # TODO: support other args
         dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype')
 
         dtype_map = guard(get_definition, self.func_ir, dtype_var)
@@ -770,7 +775,7 @@ class HiFrames(object):
 
         self._create_df(lhs.name, col_map, label)
         return [csv_ext.CsvReader(
-            fname, lhs.name, sep, list(col_map.keys()), list(col_map.values()), out_types, lhs.loc)]
+            fname, lhs.name, sep, list(col_map.keys()), list(col_map.values()), out_types, usecols, lhs.loc)]
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
@@ -1519,7 +1524,8 @@ class HiFrames(object):
 
         return key_colnames, as_index
 
-    def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None):
+    def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
+        typ = str if typ is None else typ
         by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
         if by_arg_def is None:
             # try single key column
@@ -1535,7 +1541,7 @@ class HiFrames(object):
                     return default
                 raise ValueError(err_msg)
             key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
-            if any(not isinstance(v, str) for v in key_colnames):
+            if any(not isinstance(v, typ) for v in key_colnames):
                 if default is not None:
                     return default
                 raise ValueError(err_msg)

@@ -27,14 +27,14 @@ from hpat.pd_series_ext import dt_index_series_type
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, loc):
+    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc):
         self.file_name = file_name
         self.df_out = df_out
         self.sep = sep
         self.df_colnames = df_colnames
         self.out_vars = out_vars
         self.out_types = out_types
-        self.usecols = list(range(len(df_colnames)))
+        self.usecols = usecols
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
