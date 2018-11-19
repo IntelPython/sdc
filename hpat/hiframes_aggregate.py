@@ -519,8 +519,8 @@ def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, ta
 
     key_typs = tuple(typemap[v.name] for v in agg_node.key_arrs)
     # get column variables
-    in_col_vars = [v for (n, v) in sorted(agg_node.df_in_vars.items())]
-    out_col_vars = [v for (n, v) in sorted(agg_node.df_out_vars.items())]
+    in_col_vars = [v for (n, v) in agg_node.df_in_vars.items()]
+    out_col_vars = [v for (n, v) in agg_node.df_out_vars.items()]
     # get column types
     in_col_typs = tuple(typemap[v.name] for v in in_col_vars)
     out_col_typs = tuple(typemap[v.name] for v in out_col_vars)
