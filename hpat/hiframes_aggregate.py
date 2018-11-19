@@ -1461,20 +1461,12 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
                 if len(f_ir._definitions[red_var]) == 2:
                     # 0 is the actual func since init_block is traversed later
                     # in parfor.py:3039, TODO: make this detection more robust
+                    # XXX trying both since init_prange doesn't work for min
                     var_def = f_ir._definitions[red_var][0]
-                    while isinstance(var_def, ir.Var):
-                        var_def = guard(get_definition, f_ir, var_def)
-                    # TODO: support other reductions
-                    if (isinstance(var_def, ir.Expr)
-                            and var_def.op == 'inplace_binop'
-                            and var_def.fn in ('+=', operator.iadd)):
-                        func_text += "    v{} += in{}\n".format(ind, ind)
-                    if (isinstance(var_def, ir.Expr) and var_def.op == 'call'):
-                        fdef = guard(find_callname, f_ir, var_def)
-                        if fdef == ('min', 'builtins'):
-                            func_text += "    v{} = min(v{}, in{})\n".format(ind, ind, ind)
-                        if fdef == ('max', 'builtins'):
-                            func_text += "    v{} = max(v{}, in{})\n".format(ind, ind, ind)
+                    func_text += _match_reduce_def(var_def, f_ir, ind)
+                    var_def = f_ir._definitions[red_var][1]
+                    func_text += _match_reduce_def(var_def, f_ir, ind)
+
 
     func_text += "    return {}".format(", ".join(["v{}".format(i)
                                                 for i in range(num_red_vars)]))
@@ -1509,6 +1501,24 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_combine)
     imp_dis.add_overload(combine_func)
     return imp_dis
+
+
+def _match_reduce_def(var_def, f_ir, ind):
+    func_text = ""
+    while isinstance(var_def, ir.Var):
+        var_def = guard(get_definition, f_ir, var_def)
+    # TODO: support other reductions
+    if (isinstance(var_def, ir.Expr)
+            and var_def.op == 'inplace_binop'
+            and var_def.fn in ('+=', operator.iadd)):
+        func_text = "    v{} += in{}\n".format(ind, ind)
+    if (isinstance(var_def, ir.Expr) and var_def.op == 'call'):
+        fdef = guard(find_callname, f_ir, var_def)
+        if fdef == ('min', 'builtins'):
+            func_text = "    v{} = min(v{}, in{})\n".format(ind, ind, ind)
+        if fdef == ('max', 'builtins'):
+            func_text = "    v{} = max(v{}, in{})\n".format(ind, ind, ind)
+    return func_text
 
 def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
                        in_col_typ, pm, typingctx, targetctx):
