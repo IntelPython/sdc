@@ -1062,35 +1062,22 @@ def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
 
     while left_ind < len(left_keys[0]) and right_ind < len(right_keys[0]):
         if getitem_arr_tup(left_keys, left_ind) == getitem_arr_tup(right_keys, right_ind):
-            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
-            l_data_val = getitem_arr_tup(data_left, left_ind)
-            out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
-            r_data_val = getitem_arr_tup(data_right, right_ind)
-            out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
-
-            out_ind += 1
-            left_run = left_ind + 1
-            while left_run < len(left_keys[0]) and getitem_arr_tup(left_keys, left_run) == getitem_arr_tup(right_keys, right_ind):
-                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_run))
-                l_data_val = getitem_arr_tup(data_left, left_run)
-                out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
-                r_data_val = getitem_arr_tup(data_right, right_ind)
-                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
-
-                out_ind += 1
+            key = getitem_arr_tup(left_keys, left_ind)
+            # catesian product in case of duplicate keys on either side
+            left_run = left_ind
+            while left_run < len(left_keys[0]) and getitem_arr_tup(left_keys, left_run) == key:
+                right_run = right_ind
+                while right_run < len(right_keys[0]) and getitem_arr_tup(right_keys, right_run) == key:
+                    out_left_key = copy_elem_buff_tup(out_left_key, out_ind, key)
+                    l_data_val = getitem_arr_tup(data_left, left_run)
+                    out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+                    r_data_val = getitem_arr_tup(data_right, right_run)
+                    out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
+                    out_ind += 1
+                    right_run += 1
                 left_run += 1
-            right_run = right_ind + 1
-            while right_run < len(right_keys[0]) and getitem_arr_tup(right_keys, right_run) == getitem_arr_tup(left_keys, left_ind):
-                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
-                l_data_val = getitem_arr_tup(data_left, left_ind)
-                out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
-                r_data_val = getitem_arr_tup(data_right, right_run)
-                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
-
-                out_ind += 1
-                right_run += 1
-            left_ind += 1
-            right_ind += 1
+            left_ind = left_run
+            right_ind = right_run
         elif getitem_arr_tup(left_keys, left_ind) < getitem_arr_tup(right_keys, right_ind):
             if is_left:
                 out_left_key = copy_elem_buff_tup(out_left_key, out_ind, getitem_arr_tup(left_keys, left_ind))
