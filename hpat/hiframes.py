@@ -1555,9 +1555,11 @@ class HiFrames(object):
         select_def = guard(get_definition, self.func_ir, obj_var)
         out_colnames = None
         explicit_select = False
-        if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
+        if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
             obj_var = select_def.value
-            out_colnames = guard(find_const, self.func_ir, select_def.index)
+            out_colnames = (select_def.index
+                if select_def.op == 'static_getitem'
+                else guard(find_const, self.func_ir, select_def.index))
             if not isinstance(out_colnames, (str, tuple)):
                 raise ValueError("{} output column names should be constant".format(obj_name))
             if isinstance(out_colnames, str):
