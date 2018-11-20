@@ -490,6 +490,10 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         // empty sequence, this is not an error, need to set size
         PyGILState_Release(gilstate);
         *no_strings = 0;
+        *null_bitmap = new uint8_t[0];
+        *offset_table = new uint32_t[1];
+        (*offset_table)[0] = 0;
+        *buffer = new char[0];
         return;
     }
 

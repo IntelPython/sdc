@@ -307,6 +307,16 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_csv_str_parallel1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_date1.csv",
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int})
+            return (df.A.sum(), df.B.sum(), (df.C == '1966-11-13').sum(),
+                    df.D.sum())
+        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_csv_usecols1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
@@ -316,6 +326,7 @@ class TestIO(unittest.TestCase):
             )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
