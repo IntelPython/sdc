@@ -33,6 +33,8 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
 
+from hpat.pd_categorical_ext import PDCategoricalDtype, box_categorical_series_dtype_fix
+
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
@@ -923,18 +925,24 @@ def unbox_series(typ, val, c):
 def box_series(typ, val, c):
     """
     """
-    if typ.dtype == string_type:
-        arr = box_str_arr(typ, val, c)
-    elif typ.dtype == datetime_date_type:
-        arr = box_datetime_date_array(typ, val, c)
-    else:
-        arr = box_array(types.Array(typ.dtype, 1, 'C'), val, c)
     mod_name = c.context.insert_const_string(c.builder.module, "pandas")
-    class_obj = c.pyapi.import_module_noblock(mod_name)
-    res = c.pyapi.call_method(class_obj, "Series", (arr,))
+    pd_class_obj = c.pyapi.import_module_noblock(mod_name)
+    dtype = typ.dtype
+
+    if dtype == string_type:
+        arr = box_str_arr(typ, val, c)
+    elif dtype == datetime_date_type:
+        arr = box_datetime_date_array(typ, val, c)
+    elif isinstance(dtype, PDCategoricalDtype):
+        arr = box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj)
+    else:
+        arr = box_array(types.Array(dtype, 1, 'C'), val, c)
+
+    res = c.pyapi.call_method(pd_class_obj, "Series", (arr,))
+    # c.pyapi.decref(arr)  # TODO needed?
     # class_obj = c.pyapi.unserialize(c.pyapi.serialize_object(pd.Series))
     # res = c.pyapi.call_function_objargs(class_obj, (arr,))
-    c.pyapi.decref(class_obj)
+    c.pyapi.decref(pd_class_obj)
     return res
 
 

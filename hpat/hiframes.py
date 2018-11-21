@@ -29,12 +29,14 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat import csv_ext
 
+import pandas as pd
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType
+from hpat.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
 
@@ -73,6 +75,8 @@ def remove_hiframes(rhs, lives, call_list):
     if call_list == ['groupby']:
         return True
     if call_list == ['rolling']:
+        return True
+    if call_list == [pd.api.types.CategoricalDtype]:
         return True
     return False
 
@@ -780,8 +784,20 @@ class HiFrames(object):
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
         # str case
-        if isinstance(dtype_def, ir.Global) or dtype_def.value == str:
+        if isinstance(dtype_def, ir.Global) and dtype_def.value == str:
             return string_array_type
+        # categorical case
+        if isinstance(dtype_def, ir.Expr) and dtype_def.op == 'call':
+            if (not guard(find_callname, self.func_ir, dtype_def)
+                    == ('category', 'pandas.core.dtypes.dtypes')):
+                raise ValueError("pd.read_csv() invalid dtype "
+                    "(built using a call but not Categorical)")
+            cats_var = self._get_arg('CategoricalDtype', dtype_def.args,
+                dict(dtype_def.kws), 0, 'categories')
+            err_msg = "categories should be constant list"
+            cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
+            typ = PDCategoricalDtype(cats)
+            return SeriesType(typ, 1, 'C')
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
         glob_def = guard(get_definition, self.func_ir, dtype_def.value)

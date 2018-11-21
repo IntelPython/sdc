@@ -23,6 +23,7 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
+from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
 from hpat.pd_series_ext import dt_index_series_type
 
 
@@ -269,6 +270,9 @@ csv_file_chunk_reader = types.ExternalFunction(
 
 def _get_dtype_str(t):
     dtype = t.dtype
+    if isinstance(dtype, PDCategoricalDtype):
+        dtype = str(get_categories_int_type(dtype))
+
     if t == dt_index_series_type:
         dtype = 'NPDatetime("ns")'
     if t == string_array_type:
@@ -280,6 +284,8 @@ def _get_dtype_str(t):
 
 def _get_pd_dtype_str(t):
     dtype = t.dtype
+    if isinstance(dtype, PDCategoricalDtype):
+        return 'pd.api.types.CategoricalDtype({})'.format(dtype.categories)
     if t == dt_index_series_type:
         dtype = 'str'
     if t == string_array_type:
@@ -309,8 +315,10 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     func_text += "       parse_dates=[{}],\n".format(date_inds)
     func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
     func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
-    for cname in col_names:
-        func_text += "    {} = df.{}.values\n".format(cname, cname)
+    for i, cname in enumerate(col_names):
+        extra = (".codes" if isinstance(col_typs[i].dtype, PDCategoricalDtype)
+                else "")
+        func_text += "    {} = df.{}.values{}\n".format(cname, cname, extra)
         # func_text += "    print({})\n".format(cname)
     func_text += "  return ({},)\n".format(", ".join(col_names))
 

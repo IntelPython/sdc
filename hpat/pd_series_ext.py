@@ -16,6 +16,7 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
 from hpat.hiframes_rolling import supported_rolling_funcs
 import datetime
 
@@ -146,17 +147,20 @@ date_series_type = SeriesType(datetime_date_type, 1, 'C')
 @register_model(SeriesType)
 class SeriesModel(models.StructModel):
     def __init__(self, dmm, fe_type):
+        dtype = fe_type.dtype
+        if isinstance(dtype, PDCategoricalDtype):
+            dtype = get_categories_int_type(dtype)
         # TODO: types other than Array and StringArray?
-        if fe_type.dtype == string_type:
+        if dtype == string_type:
             members = hpat.str_arr_ext.str_arr_model_members
         else:
             ndim = 1
             members = [
-                ('meminfo', types.MemInfoPointer(fe_type.dtype)),
+                ('meminfo', types.MemInfoPointer(dtype)),
                 ('parent', types.pyobject),
                 ('nitems', types.intp),
                 ('itemsize', types.intp),
-                ('data', types.CPointer(fe_type.dtype)),
+                ('data', types.CPointer(dtype)),
                 ('shape', types.UniTuple(types.intp, ndim)),
                 ('strides', types.UniTuple(types.intp, ndim)),
 
@@ -188,16 +192,19 @@ class UnBoxedSeriesType(types.Type):
 register_model(UnBoxedSeriesType)(SeriesModel)
 
 def series_to_array_type(typ, replace_boxed=False):
-    if typ.dtype == string_type:
+    dtype = typ.dtype
+    if isinstance(dtype, PDCategoricalDtype):
+        dtype = get_categories_int_type(dtype)
+    if dtype == string_type:
         new_typ = string_array_type
     elif isinstance(typ, BoxedSeriesType):
         new_typ = typ
         if replace_boxed:
-            new_typ = types.Array(typ.dtype, 1, 'C')
+            new_typ = types.Array(dtype, 1, 'C')
     else:
         # TODO: other types?
         new_typ = types.Array(
-        typ.dtype, typ.ndim, typ.layout, not typ.mutable,
+        dtype, typ.ndim, typ.layout, not typ.mutable,
         aligned=typ.aligned)
     return new_typ
 

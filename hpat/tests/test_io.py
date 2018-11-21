@@ -1,5 +1,6 @@
 import unittest
 import pandas as pd
+from pandas.api.types import CategoricalDtype
 import numpy as np
 import h5py
 import pyarrow.parquet as pq
@@ -20,6 +21,15 @@ class TestIO(unittest.TestCase):
             f = h5py.File('h5_test_filter.h5', "w")
             f.create_dataset('test', data=A)
             f.close()
+
+            # test_csv_cat1
+            data = ("2,B,SA\n"
+                    "3,A,SBC\n"
+                    "4,C,S123\n"
+                    "5,B,BCD\n")
+
+            with open("csv_data_cat1.csv", "w") as f:
+                f.write(data)
 
     def test_h5_read_seq(self):
         def test_impl():
@@ -326,6 +336,17 @@ class TestIO(unittest.TestCase):
             )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_csv_cat1(self):
+        def test_impl():
+            ct_dtype = CategoricalDtype(['A', 'B', 'C'])
+            df = pd.read_csv("csv_data_cat1.csv",
+                names=['C1', 'C2', 'C3'],
+                dtype={'C1':np.int, 'C2': ct_dtype, 'C3':str},
+            )
+            return df.C2
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
 
 
 if __name__ == "__main__":
