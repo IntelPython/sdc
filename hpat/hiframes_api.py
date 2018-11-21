@@ -846,6 +846,8 @@ def lower_box_df(context, builder, sig, args):
     col_names = [a.literal_value for a in sig.args[:n_cols]]
     col_arrs = [a for a in args[n_cols:]]
     arr_typs = [a for a in sig.args[n_cols:]]
+    # use dtypes from return type since it contains Categorical dtype
+    dtypes = sig.return_type.col_types
 
     pyapi = context.get_python_api(builder)
     env_manager = context.get_env_manager(builder)
@@ -855,11 +857,14 @@ def lower_box_df(context, builder, sig, args):
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
     res = pyapi.call_method(class_obj, "DataFrame", ())
-    for cname, arr, arr_typ in zip(col_names, col_arrs, arr_typs):
+    for cname, arr, arr_typ, dtype in zip(col_names, col_arrs, arr_typs, dtypes):
         # df['cname'] = boxed_arr
         # TODO: datetime.date, DatetimeIndex?
-        if arr_typ == string_array_type:
+        if dtype == string_type:
             arr_obj = box_str_arr(arr_typ, arr, c)
+        elif isinstance(dtype, PDCategoricalDtype):
+            arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
+            context.nrt.incref(builder, arr_typ, arr)
         else:
             arr_obj = box_array(arr_typ, arr, c)
             # TODO: is incref required?

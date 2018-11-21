@@ -4,7 +4,7 @@ from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
-from numba import types, typing
+from numba import types, typing, cgutils
 from numba.targets.boxing import box_array, unbox_array
 
 import numpy as np
@@ -35,7 +35,14 @@ def box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj):
 
     # categories list e.g. ['A', 'B', 'C']
     item_objs = _get_cat_obj_items(dtype.categories, c)
-    list_obj = c.pyapi.list_pack(item_objs)
+    n = len(item_objs)
+    list_obj = c.pyapi.list_new(c.context.get_constant(types.intp, n))
+    for i in range(n):
+        idx = c.context.get_constant(types.intp, i)
+        c.pyapi.incref(item_objs[i])
+        c.pyapi.list_setitem(list_obj, idx, item_objs[i])
+    # TODO: why does list_pack crash for test_csv_cat2?
+    #list_obj = c.pyapi.list_pack(item_objs)
 
     # call pd.api.types.CategoricalDtype(['A', 'B', 'C'])
     # api_obj = c.pyapi.object_getattr_string(pd_class_obj, "api")

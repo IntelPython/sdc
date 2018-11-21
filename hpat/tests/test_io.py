@@ -346,8 +346,19 @@ class TestIO(unittest.TestCase):
             )
             return df.C2
         hpat_func = hpat.jit(test_impl)
-        pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
+        pd.testing.assert_series_equal(
+            hpat_func(), test_impl(), check_names=False)
 
+    def test_csv_cat2(self):
+        def test_impl():
+            ct_dtype = CategoricalDtype(['A', 'B', 'C', 'D'])
+            df = pd.read_csv("csv_data_cat1.csv",
+                names=['C1', 'C2', 'C3'],
+                dtype={'C1':np.int, 'C2': ct_dtype, 'C3':str},
+            )
+            return df
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
 if __name__ == "__main__":
     unittest.main()
