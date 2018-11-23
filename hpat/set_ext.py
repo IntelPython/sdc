@@ -1,11 +1,13 @@
+import operator
 import numba
 from numba import types, typing
 from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+                                    iternext_impl, impl_ret_untracked)
 from numba import cgutils
-from numba.typing.templates import signature, AbstractTemplate, infer
+from numba.typing.templates import signature, AbstractTemplate, infer, infer_global
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -24,7 +26,9 @@ import hpat
 from hpat.utils import to_array
 from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
-                              pre_alloc_string_array, StringArrayPayloadType)
+                              pre_alloc_string_array, StringArrayPayloadType,
+                              is_str_arr_typ)
+from hpat.hiframes_api import dummy_unbox_series
 
 # similar to types.Container.Set
 class SetType(types.Container):
@@ -77,8 +81,9 @@ num_total_chars_set_string = types.ExternalFunction("num_total_chars_set_string"
 
 @overload(set)
 def init_set_string_array(in_typ):
-    if in_typ == string_array_type:
-        def f(str_arr):
+    if is_str_arr_typ(in_typ):
+        def f(A):
+            str_arr = dummy_unbox_series(A)
             str_set = init_set_string()
             n = len(str_arr)
             for i in range(n):
@@ -104,6 +109,17 @@ def len_set_str_overload(in_typ):
             return len_set_string(str_set)
         return len_impl
 
+# FIXME: overload fails in lowering sometimes!
+@lower_builtin(len, set_string_type)
+def lower_len_set_impl(context, builder, sig, args):
+
+    def len_impl(str_set):
+        return len_set_string(str_set)
+
+    res = context.compile_internal(builder, len_impl, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+
 @infer
 class InSet(AbstractTemplate):
     key = "in"
@@ -113,12 +129,29 @@ class InSet(AbstractTemplate):
         if cont_typ == set_string_type:
             return signature(types.boolean, cont_typ.dtype, cont_typ)
 
+
+@infer_global(operator.contains)
+class InSetOp(AbstractTemplate):
+    def generic(self, args, kws):
+        cont_typ, _ = args
+        if cont_typ == set_string_type:
+            return signature(types.boolean, cont_typ, cont_typ.dtype)
+
+
 @lower_builtin("in", string_type, set_string_type)
 def lower_dict_in(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                                 lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
     return builder.call(fn, args)
+
+@lower_builtin(operator.contains, set_string_type, string_type)
+def lower_dict_in_op(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
+                                                lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
+    return builder.call(fn, [args[1], args[0]])
+
 
 @overload(to_array)
 def to_array_overload(in_typ):
@@ -134,22 +167,17 @@ def to_array_overload(in_typ):
         return set_string_to_array
 
 @intrinsic
-def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ):
+def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ=None):
     assert in_set_typ == set_string_type
-    assert in_str_arr_typ == string_array_type
+    assert is_str_arr_typ(in_str_arr_typ)
     def codegen(context, builder, sig, args):
         in_set, in_str_arr = args
-        dtype = StringArrayPayloadType()
 
-        inst_struct = context.make_helper(builder, string_array_type, in_str_arr)
-        data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
-        data_pointer = builder.bitcast(data_pointer,
-                                       context.get_data_type(dtype).as_pointer())
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
 
-        string_array = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
         fnty = lir.FunctionType( lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
-                                 lir.IntType(8).as_pointer(),
+                                 lir.IntType(32).as_pointer(),
                                  lir.IntType(8).as_pointer(),
                                 ])
         fn_getitem = builder.module.get_or_insert_function(fnty,

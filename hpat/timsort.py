@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import numba
 from numba.extending import overload
+from hpat.utils import empty_like_type, alloc_arr_tup
 
 # ported from Spark to Numba-compilable Python
 # A port of the Android TimSort class, which utilizes a "stable, adaptive, iterative mergesort."
@@ -57,7 +58,7 @@ MIN_MERGE = 32
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
 @numba.njit
-def sort(sortState, key_arr, lo, hi, data):
+def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -65,8 +66,8 @@ def sort(sortState, key_arr, lo, hi, data):
 
     # If array is small, do a "mini-TimSort" with no merges
     if nRemaining < MIN_MERGE:
-        initRunLen = countRunAndMakeAscending(key_arr, lo, hi, data)
-        binarySort(key_arr, lo, hi, lo + initRunLen, data)
+        initRunLen = countRunAndMakeAscending(key_arrs, lo, hi, data)
+        binarySort(key_arrs, lo, hi, lo + initRunLen, data)
         return
 
     # March over the array once, left to right, finding natural runs,
@@ -76,12 +77,12 @@ def sort(sortState, key_arr, lo, hi, data):
     minRun = minRunLength(nRemaining)
     while True:  # emulating do-while
         # Identify next run
-        runLen = countRunAndMakeAscending(key_arr, lo, hi, data)
+        runLen = countRunAndMakeAscending(key_arrs, lo, hi, data)
 
         # If run is short, extend to min(minRun, nRemaining)
         if runLen < minRun:
             force = nRemaining if nRemaining <= minRun else minRun
-            binarySort(key_arr, lo, lo + force, lo + runLen, data)
+            binarySort(key_arrs, lo, lo + force, lo + runLen, data)
             runLen = force
 
         # Push run onto pending-run stack, and maybe merge
@@ -119,7 +120,7 @@ def sort(sortState, key_arr, lo, hi, data):
 # @param c comparator to used for the sort
 
 @numba.njit
-def binarySort(key_arr, lo, hi, start, data):
+def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
     assert lo <= start and start <= hi
     if start == lo:
         start += 1
@@ -127,11 +128,11 @@ def binarySort(key_arr, lo, hi, start, data):
     # Buffer pivotStore = s.allocate(1)
 
     while start < hi:
-        #pivotStore = key_arr[start]  # TODO: copy data to pivot
-        pivot = key_arr[start]
+        #pivotStore = key_arrs[start]  # TODO: copy data to pivot
+        pivot = getitem_arr_tup(key_arrs, start)
         pivot_data = getitem_arr_tup(data, start)
 
-        # Set left (and right) to the index where key_arr[start] (pivot) belongs
+        # Set left (and right) to the index where key_arrs[start] (pivot) belongs
         left = lo
         right = start
         assert left <= right
@@ -142,7 +143,7 @@ def binarySort(key_arr, lo, hi, start, data):
 
         while left < right:
             mid = (left + right) >> 1
-            if pivot < key_arr[mid]:
+            if pivot < getitem_arr_tup(key_arrs, mid):
                 right = mid
             else:
                 left = mid + 1
@@ -160,12 +161,12 @@ def binarySort(key_arr, lo, hi, start, data):
         # TODO: optimize for n==1 and n==2
         # TODO: data
         # FIXME: is slicing ok?
-        #key_arr[left+1:left+1+n] = key_arr[left:left+n]
-        copyRange(key_arr, left, key_arr, left + 1, n)
+        #key_arrs[left+1:left+1+n] = key_arrs[left:left+n]
+        copyRange_tup(key_arrs, left, key_arrs, left + 1, n)
         copyRange_tup(data, left, data, left + 1, n)
 
-        #copyElement(pivotStore, 0, key_arr, left)
-        key_arr[left] = pivot
+        #copyElement(pivotStore, 0, key_arrs, left)
+        setitem_arr_tup(key_arrs, left, pivot)
         setitem_arr_tup(data, left, pivot_data)
         start += 1
 
@@ -196,21 +197,21 @@ def binarySort(key_arr, lo, hi, start, data):
 #         the specified array
 
 @numba.njit
-def countRunAndMakeAscending(key_arr, lo, hi, data):
+def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
     assert lo < hi
     runHi = lo + 1
     if runHi == hi:
         return 1
 
     # Find end of run, and reverse range if descending
-    if key_arr[runHi] < key_arr[lo]:  # Descending
+    if getitem_arr_tup(key_arrs, runHi) < getitem_arr_tup(key_arrs, lo):  # Descending
         runHi += 1
-        while runHi < hi and key_arr[runHi] < key_arr[runHi-1]:
+        while runHi < hi and getitem_arr_tup(key_arrs, runHi) < getitem_arr_tup(key_arrs, runHi-1):
             runHi += 1
-        reverseRange(key_arr, lo, runHi, data)
+        reverseRange(key_arrs, lo, runHi, data)
     else:                     # Ascending
         runHi += 1
-        while runHi < hi and key_arr[runHi] >= key_arr[runHi-1]:
+        while runHi < hi and getitem_arr_tup(key_arrs, runHi) >= getitem_arr_tup(key_arrs, runHi-1):
             runHi += 1
 
 
@@ -223,13 +224,13 @@ def countRunAndMakeAscending(key_arr, lo, hi, data):
 # @param hi the index after the last element in the range to be reversed
 
 @numba.njit
-def reverseRange(key_arr, lo, hi, data):
+def reverseRange(key_arrs, lo, hi, data):  # pragma: no cover
     hi -= 1
     while lo < hi:
         # swap, TODO: copy data
-        tmp = key_arr[lo]
-        key_arr[lo] = key_arr[hi]
-        key_arr[hi] = tmp
+        tmp = getitem_arr_tup(key_arrs, lo)
+        setitem_arr_tup(key_arrs, lo, getitem_arr_tup(key_arrs, hi))
+        setitem_arr_tup(key_arrs, hi, tmp)
 
         # TODO: add support for map and use it
         swap_arrs(data, lo, hi)
@@ -260,7 +261,7 @@ def reverseRange(key_arr, lo, hi, data):
 
 
 @numba.njit
-def minRunLength(n):
+def minRunLength(n):  # pragma: no cover
     assert n >= 0
     r = 0      # Becomes 1 if any 1 bits are shifted off
     while n >= MIN_MERGE:
@@ -284,7 +285,7 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 
 
 # spec = [
-#     ('key_arr', numba.float64[:]),
+#     ('key_arrs', numba.float64[:]),
 #     ('aLength', numba.intp),
 #     ('minGallop', numba.intp),
 #     ('tmpLength', numba.intp),
@@ -296,9 +297,9 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 
 # Creates a TimSort instance to maintain the state of an ongoing sort.
 #@numba.jitclass(spec)
-class SortState:
-    def __init__(self, key_arr, aLength, data):
-        self.key_arr = key_arr
+class SortState:  # pragma: no cover
+    def __init__(self, key_arrs, aLength, data):
+        self.key_arrs = key_arrs
         self.data = data
         self.aLength = aLength
 
@@ -310,7 +311,7 @@ class SortState:
         arr_len = aLength
         # Allocate temp storage (which may be increased later if necessary)
         self.tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
-        self.tmp = np.empty(self.tmpLength, key_arr.dtype)
+        self.tmp = alloc_arr_tup(self.tmpLength, self.key_arrs)
         self.tmp_data = alloc_arr_tup(self.tmpLength, data)
 
 
@@ -417,7 +418,7 @@ class SortState:
         # Find where the first element of run2 goes in run1. Prior elements
         # in run1 can be ignored (because they're already in place).
 
-        k = self.gallopRight(self.key_arr[base2], self.key_arr, base1, len1, 0)
+        k = self.gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
         assert k >= 0
         base1 += k
         len1 -= k
@@ -428,7 +429,7 @@ class SortState:
         # Find where the last element of run1 goes in run2. Subsequent elements
         # in run2 can be ignored (because they're already in place).
 
-        len2 = self.gallopLeft(self.key_arr[base1+len1-1], self.key_arr, base2, len2, len2 - 1)
+        len2 = self.gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
         assert len2 >= 0
         if len2 == 0:
             return
@@ -462,10 +463,10 @@ class SortState:
         lastOfs = 0
         ofs = 1
 
-        if key > arr[base+hint]:
+        if key > getitem_arr_tup(arr, base+hint):
             # Gallop right until a[base+hint+lastOfs] < key <= a[base+hint+ofs]
             maxOfs = _len - hint
-            while ofs < maxOfs and key > arr[base+hint+ofs]:
+            while ofs < maxOfs and key > getitem_arr_tup(arr, base+hint+ofs):
                 lastOfs = ofs
                 ofs = (ofs << 1) + 1
                 if ofs <= 0:   # overflow
@@ -480,7 +481,7 @@ class SortState:
         else:  # key <= a[base + hint]
             # Gallop left until a[base+hint-ofs] < key <= a[base+hint-lastOfs]
             maxOfs = hint + 1
-            while ofs < maxOfs and key <= arr[base+hint-ofs]:
+            while ofs < maxOfs and key <= getitem_arr_tup(arr, base+hint-ofs):
                 lastOfs = ofs
                 ofs = (ofs << 1) + 1
                 if ofs <= 0:   # overflow
@@ -505,7 +506,7 @@ class SortState:
         while lastOfs < ofs:
             m = lastOfs + ((ofs - lastOfs) >> 1)
 
-            if key > arr[base+m]:
+            if key > getitem_arr_tup(arr, base+m):
                 lastOfs = m + 1  # a[base + m] < key
             else:
                 ofs = m          # key <= a[base + m]
@@ -533,10 +534,10 @@ class SortState:
         ofs = 1
         lastOfs = 0
 
-        if key < arr[base + hint]:
+        if key < getitem_arr_tup(arr, base + hint):
             # Gallop left until a[b+hint - ofs] <= key < a[b+hint - lastOfs]
             maxOfs = hint + 1
-            while ofs < maxOfs and key < arr[base + hint - ofs]:
+            while ofs < maxOfs and key < getitem_arr_tup(arr, base + hint - ofs):
                 lastOfs = ofs
                 ofs = (ofs << 1) + 1
                 if ofs <= 0:   # overflow
@@ -552,7 +553,7 @@ class SortState:
         else:  #  a[b + hint] <= key
             # Gallop right until a[b+hint + lastOfs] <= key < a[b+hint + ofs]
             maxOfs = _len - hint
-            while ofs < maxOfs and key >= arr[base+hint+ofs]:
+            while ofs < maxOfs and key >= getitem_arr_tup(arr, base+hint+ofs):
                 lastOfs = ofs
                 ofs = (ofs << 1) + 1
                 if ofs <= 0:   # overflow
@@ -576,7 +577,7 @@ class SortState:
         while lastOfs < ofs:
             m = lastOfs + ((ofs - lastOfs) >> 1)
 
-            if key < arr[base + m]:
+            if key < getitem_arr_tup(arr, base + m):
                 ofs = m          # key < a[b + m]
             else:
                 lastOfs = m + 1  # a[b + m] <= key
@@ -603,11 +604,11 @@ class SortState:
         assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
         # Copy first run into temp array
-        arr = self.key_arr
+        arr = self.key_arrs
         arr_data = self.data
         tmp = self.ensureCapacity(len1)
         tmp_data = self.tmp_data
-        copyRange(arr, base1, tmp, 0, len1)
+        copyRange_tup(arr, base1, tmp, 0, len1)
         #tmp[:len1] = arr[base1:base1+len1]
         copyRange_tup(arr_data, base1, tmp_data, 0, len1)
 
@@ -617,22 +618,22 @@ class SortState:
 
         # Move first element of second run and deal with degenerate cases
         # copyElement(arr, cursor2, arr, dest)
-        arr[dest] = arr[cursor2]
+        setitem_arr_tup(arr, dest, getitem_arr_tup(arr, cursor2))
         copyElement_tup(arr_data, cursor2, arr_data, dest)
 
         cursor2 += 1
         dest += 1
         len2 -= 1
         if len2 == 0:
-            copyRange(tmp, cursor1, arr, dest, len1)
+            copyRange_tup(tmp, cursor1, arr, dest, len1)
             copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
             #arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
             return
 
         if len1 == 1:
-            copyRange(arr, cursor2, arr, dest, len2)
+            copyRange_tup(arr, cursor2, arr, dest, len2)
             copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-            copyElement(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
+            copyElement_tup(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
             copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
             return
 
@@ -649,21 +650,21 @@ class SortState:
 
         if len1 == 1:
             assert len2 > 0
-            copyRange(arr, cursor2, arr, dest, len2)
+            copyRange_tup(arr, cursor2, arr, dest, len2)
             copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-            copyElement(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
+            copyElement_tup(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
             copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
         elif len1 == 0:
             raise ValueError("Comparison method violates its general contract!")
         else:
             assert len2 == 0
             assert len1 > 1
-            copyRange(tmp, cursor1, arr, dest, len1)
+            copyRange_tup(tmp, cursor1, arr, dest, len1)
             copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
 
 
     def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-        arr = self.key_arr
+        arr = self.key_arrs
         arr_data = self.data
         tmp_data = self.tmp_data
 
@@ -677,8 +678,8 @@ class SortState:
 
             while True:
                 assert len1 > 1 and len2 > 0
-                if arr[cursor2] < tmp[cursor1]:
-                    copyElement(arr, cursor2, arr, dest)
+                if getitem_arr_tup(arr, cursor2) < getitem_arr_tup(tmp, cursor1):
+                    copyElement_tup(arr, cursor2, arr, dest)
                     copyElement_tup(arr_data, cursor2, arr_data, dest)
                     cursor2 += 1
                     dest += 1
@@ -688,7 +689,7 @@ class SortState:
                     if len2 == 0:
                         return len1, len2, cursor1, cursor2, dest, minGallop
                 else:
-                    copyElement(tmp, cursor1, arr, dest)
+                    copyElement_tup(tmp, cursor1, arr, dest)
                     copyElement_tup(tmp_data, cursor1, arr_data, dest)
                     cursor1 += 1
                     dest += 1
@@ -708,9 +709,9 @@ class SortState:
 
             while True:
                 assert len1 > 1 and len2 > 0
-                count1 = self.gallopRight(arr[cursor2], tmp, cursor1, len1, 0)
+                count1 = self.gallopRight(getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
                 if count1 != 0:
-                    copyRange(tmp, cursor1, arr, dest, count1)
+                    copyRange_tup(tmp, cursor1, arr, dest, count1)
                     copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
                     dest += count1
                     cursor1 += count1
@@ -718,7 +719,7 @@ class SortState:
                     if len1 <= 1: # len1 == 1 or len1 == 0
                         return len1, len2, cursor1, cursor2, dest, minGallop
 
-                copyElement(arr, cursor2, arr, dest)
+                copyElement_tup(arr, cursor2, arr, dest)
                 copyElement_tup(arr_data, cursor2, arr_data, dest)
                 cursor2 += 1
                 dest += 1
@@ -726,9 +727,9 @@ class SortState:
                 if len2 == 0:
                     return len1, len2, cursor1, cursor2, dest, minGallop
 
-                count2 = self.gallopLeft(tmp[cursor1], arr, cursor2, len2, 0)
+                count2 = self.gallopLeft(getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
                 if count2 != 0:
-                    copyRange(arr, cursor2, arr, dest, count2)
+                    copyRange_tup(arr, cursor2, arr, dest, count2)
                     copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
                     dest += count2
                     cursor2 += count2
@@ -736,7 +737,7 @@ class SortState:
                     if len2 == 0:
                         return len1, len2, cursor1, cursor2, dest, minGallop
 
-                copyElement(tmp, cursor1, arr, dest)
+                copyElement_tup(tmp, cursor1, arr, dest)
                 copyElement_tup(tmp_data, cursor1, arr_data, dest)
                 cursor1 += 1
                 dest += 1
@@ -771,11 +772,11 @@ class SortState:
         assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
         # Copy second run into temp array
-        arr = self.key_arr
+        arr = self.key_arrs
         arr_data = self.data
         tmp = self.ensureCapacity(len2)
         tmp_data = self.tmp_data
-        copyRange(arr, base2, tmp, 0, len2)
+        copyRange_tup(arr, base2, tmp, 0, len2)
         copyRange_tup(arr_data, base2, tmp_data, 0, len2)
 
         cursor1 = base1 + len1 - 1  # Indexes into arr
@@ -783,22 +784,22 @@ class SortState:
         dest = base2 + len2 - 1     # Indexes into arr
 
         # Move last element of first run and deal with degenerate cases
-        copyElement(arr, cursor1, arr, dest)
+        copyElement_tup(arr, cursor1, arr, dest)
         copyElement_tup(arr_data, cursor1, arr_data, dest)
         cursor1 -= 1
         dest -= 1
         len1 -= 1
         if len1 == 0:
-            copyRange(tmp, 0, arr, dest - (len2 - 1), len2)
+            copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
             copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
             return
 
         if len2 == 1:
             dest -= len1
             cursor1 -= len1
-            copyRange(arr, cursor1 + 1, arr, dest + 1, len1)
+            copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
             copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
-            copyElement(tmp, cursor2, arr, dest)
+            copyElement_tup(tmp, cursor2, arr, dest)
             copyElement_tup(tmp_data, cursor2, arr_data, dest)
             return
 
@@ -815,22 +816,22 @@ class SortState:
             assert len1 > 0
             dest -= len1
             cursor1 -= len1
-            copyRange(arr, cursor1 + 1, arr, dest + 1, len1)
+            copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
             copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
-            copyElement(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
+            copyElement_tup(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
             copyElement_tup(tmp_data, cursor2, arr_data, dest)
         elif len2 == 0:
             raise ValueError("Comparison method violates its general contract!")
         else:
             assert len1 == 0
             assert len2 > 0
-            copyRange(tmp, 0, arr, dest - (len2 - 1), len2)
+            copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
             copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
 
 
     # XXX refactored nested loop break
     def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-        arr = self.key_arr
+        arr = self.key_arrs
         arr_data = self.data
         tmp_data = self.tmp_data
 
@@ -843,8 +844,8 @@ class SortState:
 
             while True:
                 assert len1 > 0 and len2 > 1
-                if tmp[cursor2] < arr[cursor1]:
-                    copyElement(arr, cursor1, arr, dest)
+                if getitem_arr_tup(tmp, cursor2) < getitem_arr_tup(arr, cursor1):
+                    copyElement_tup(arr, cursor1, arr, dest)
                     copyElement_tup(arr_data, cursor1, arr_data, dest)
                     cursor1 -= 1
                     dest -= 1
@@ -854,7 +855,7 @@ class SortState:
                     if len1 == 0:
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
                 else:
-                    copyElement(tmp, cursor2, arr, dest)
+                    copyElement_tup(tmp, cursor2, arr, dest)
                     copyElement_tup(tmp_data, cursor2, arr_data, dest)
                     cursor2 -=1
                     dest -= 1
@@ -874,17 +875,17 @@ class SortState:
 
             while True:
                 assert len1 > 0 and len2 > 1
-                count1 = len1 - self.gallopRight(tmp[cursor2], arr, base1, len1, len1 - 1)
+                count1 = len1 - self.gallopRight(getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
                 if count1 != 0:
                     dest -= count1
                     cursor1 -= count1
                     len1 -= count1
-                    copyRange(arr, cursor1 + 1, arr, dest + 1, count1)
+                    copyRange_tup(arr, cursor1 + 1, arr, dest + 1, count1)
                     copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, count1)
                     if len1 == 0:
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-                copyElement(tmp, cursor2, arr, dest)
+                copyElement_tup(tmp, cursor2, arr, dest)
                 copyElement_tup(tmp_data, cursor2, arr_data, dest)
                 cursor2 -= 1
                 dest -= 1
@@ -892,17 +893,17 @@ class SortState:
                 if len2 == 1:
                     return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-                count2 = len2 - self.gallopLeft(arr[cursor1], tmp, 0, len2, len2 - 1)
+                count2 = len2 - self.gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
                 if count2 != 0:
                     dest -= count2
                     cursor2 -= count2
                     len2 -= count2
-                    copyRange(tmp, cursor2 + 1, arr, dest + 1, count2)
+                    copyRange_tup(tmp, cursor2 + 1, arr, dest + 1, count2)
                     copyRange_tup(tmp_data, cursor2 + 1, arr_data, dest + 1, count2)
                     if len2 <= 1:  # len2 == 1 or len2 == 0
                         return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-                copyElement(arr, cursor1, arr, dest)
+                copyElement_tup(arr, cursor1, arr, dest)
                 copyElement_tup(arr_data, cursor1, arr_data, dest)
                 cursor1 -= 1
                 dest -= 1
@@ -943,7 +944,7 @@ class SortState:
             else:
                 newSize = min(newSize, self.aLength >> 1)
 
-            self.tmp = np.empty(newSize, self.key_arr.dtype)
+            self.tmp = alloc_arr_tup(newSize, self.key_arrs)
             self.tmp_data = alloc_arr_tup(newSize, self.data)
             self.tmpLength = newSize
 
@@ -952,7 +953,7 @@ class SortState:
 
 ################### Utils #############
 
-def swap_arrs(data, lo, hi):
+def swap_arrs(data, lo, hi):  # pragma: no cover
     for arr in data:
         tmp_v = arr[lo]
         arr[lo] = arr[hi]
@@ -976,10 +977,10 @@ def swap_arrs_overload(arr_tup_t, l_typ, h_typ):
 
 
 @numba.njit
-def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):
+def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):  # pragma: no cover
     dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
-def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
+def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
@@ -999,10 +1000,10 @@ def copyRange_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t, n
     return copy_impl
 
 @numba.njit
-def copyElement(src_arr, src_pos, dst_arr, dst_pos):
+def copyElement(src_arr, src_pos, dst_arr, dst_pos):  # pragma: no cover
     dst_arr[dst_pos] = src_arr[src_pos]
 
-def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
+def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos] = src_arr[src_pos]
 
@@ -1021,7 +1022,7 @@ def copyElement_tup_overload(src_arr_tup_t, src_pos_t, dst_arr_tup_t, dst_pos_t)
     copy_impl = loc_vars['f']
     return copy_impl
 
-def getitem_arr_tup(arr_tup, ind):
+def getitem_arr_tup(arr_tup, ind):  # pragma: no cover
     l = [arr[ind] for arr in arr_tup]
     return tuple(l)
 
@@ -1039,7 +1040,7 @@ def getitem_arr_tup_overload(arr_tup_t, ind_t):
     impl = loc_vars['f']
     return impl
 
-def setitem_arr_tup(arr_tup, ind, val_tup):
+def setitem_arr_tup(arr_tup, ind, val_tup):  # pragma: no cover
     for arr, val in zip(arr_tup, val_tup):
         arr[ind] = val
 
@@ -1057,27 +1058,8 @@ def setitem_arr_tup_overload(arr_tup_t, ind_t, val_tup_t):
     impl = loc_vars['f']
     return impl
 
-def alloc_arr_tup(n, arr_tup):
-    arrs = []
-    for in_arr in arr_tup:
-        arrs.append(np.empty(n, in_arr.dtype))
-    return tuple(arrs)
 
-@overload(alloc_arr_tup)
-def alloc_arr_tup_overload(n_t, data_t):
-    count = data_t.count
-
-    func_text = "def f(n, d):\n"
-    func_text += "  return ({}{})\n".format(','.join(["np.empty(n, np.{})".format(
-        data_t.types[i].dtype) for i in range(count)]),
-        "," if count == 1 else "")  # single value needs comma to become tuple
-
-    loc_vars = {}
-    exec(func_text, {'np': np}, loc_vars)
-    alloc_impl = loc_vars['f']
-    return alloc_impl
-
-def test():
+def test():  # pragma: no cover
     import time
     #SortStateCL = SortState #numba.jitclass(spec)(SortState)
     # warm up
@@ -1085,11 +1067,11 @@ def test():
     T = np.ones(3)
     data = (np.arange(3), np.ones(3),)
     spec = [
-    ('key_arr', numba.float64[:]),
+    ('key_arrs', numba.types.Tuple((numba.float64[::1],))),
     ('aLength', numba.intp),
     ('minGallop', numba.intp),
     ('tmpLength', numba.intp),
-    ('tmp', numba.float64[:]),
+    ('tmp', numba.types.Tuple((numba.float64[::1],))),
     ('stackSize', numba.intp),
     ('runBase', numba.int64[:]),
     ('runLen', numba.int64[:]),
@@ -1097,8 +1079,8 @@ def test():
     ('tmp_data', numba.typeof(data)),
     ]
     SortStateCL = numba.jitclass(spec)(SortState)
-    sortState = SortStateCL(T, 3, data)
-    sort(sortState, T, 0, 3, data)
+    sortState = SortStateCL((T,), 3, data)
+    sort(sortState, (T,), 0, 3, data)
     print("compile time", time.time()-t1)
     n = 210000
     np.random.seed(2)
@@ -1109,13 +1091,13 @@ def test():
     #B = np.sort(A)
     df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
-    sortState = SortStateCL(A, n, data)
-    sort(sortState, A, 0, n, data)
+    sortState = SortStateCL((A,), n, data)
+    sort(sortState, (A,), 0, n, data)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
     # print(df2.B)
     # print(data)
     np.testing.assert_almost_equal(data[0], df2.B.values)
     np.testing.assert_almost_equal(data[1], df2.C.values)
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     test()

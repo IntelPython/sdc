@@ -1,6 +1,8 @@
 from __future__ import print_function, division, absolute_import
 
 from collections import namedtuple
+import pandas as pd
+import datetime
 
 import numba
 from numba import ir, ir_utils
@@ -9,19 +11,61 @@ from numba import types
 import numba.array_analysis
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 from numba.targets.arrayobj import _getitem_array1d
+from numba.targets.boxing import box_array, unbox_array
 import llvmlite.llvmpy.core as lc
 
 from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type, unbox_str_series
+from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
+    unbox_str_series, is_str_arr_typ, box_str_arr)
 
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import timestamp_series_type, pandas_timestamp_type
+from hpat.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
+    set_df_datetime_date_lower, unbox_datetime_date_array, box_datetime_date_array)
 import hpat
+from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
+    string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
+    series_to_array_type, if_series_to_array_type, dt_index_series_type,
+    date_series_type, UnBoxedSeriesType)
+
+from hpat.pd_categorical_ext import PDCategoricalDtype, box_categorical_series_dtype_fix
+
+from hpat.hiframes_sort import (
+    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
+    update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
+    )
+from hpat.hiframes_join import write_send_buff
+
+# XXX: used in agg func output to avoid mutating filter, agg, join, etc.
+# TODO: fix type inferrer and remove this
+enable_hiframes_remove_dead = True
+
+# quantile imports?
+from llvmlite import ir as lir
+import quantile_alg
+import llvmlite.binding as ll
+ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
+ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
+ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
+from numba.targets.arrayobj import make_array
+from numba import cgutils
+from hpat.utils import _numba_to_c_type_map, unliteral_all
+
+# boxing/unboxing
+from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
+from numba import numpy_support
+
+nth_sequential = types.ExternalFunction("nth_sequential",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
+
+nth_parallel = types.ExternalFunction("nth_parallel",
+    types.void(types.voidptr, types.voidptr, types.int64, types.int64, types.int32))
 
 # from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
@@ -44,6 +88,11 @@ def count(A):  # pragma: no cover
 def fillna(A):  # pragma: no cover
     return 0
 
+def fillna_str_alloc(A, fill):  # pragma: no cover
+    return 0
+
+def dropna(A):  # pragma: no cover
+    return 0
 
 def column_sum(A):  # pragma: no cover
     return 0
@@ -79,28 +128,83 @@ def str_contains_noregex(str_arr, pat):  # pragma: no cover
 def concat(arr_list):
     return pd.concat(arr_list)
 
-@overload(concat)
+
+@numba.njit
+def nth_element(arr, k, parallel=False):
+    res = np.empty(1, arr.dtype)
+    type_enum = hpat.distributed_api.get_type_enum(arr)
+    if parallel:
+        nth_parallel(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    else:
+        nth_sequential(res.ctypes, arr.ctypes, len(arr), k, type_enum)
+    return res[0]
+
+sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
+@numba.njit
+def median(arr, parallel=False):
+    # similar to numpy/lib/function_base.py:_median
+    # TODO: check return types, e.g. float32 -> float32
+    n = len(arr)
+    if parallel:
+        n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))
+    k = n // 2
+
+    # odd length case
+    if n % 2 == 1:
+        return nth_element(arr, k, parallel)
+
+    v1 = nth_element(arr, k-1, parallel)
+    v2 = nth_element(arr, k, parallel)
+    return (v1 + v2) / 2
+
+
+@infer_global(concat)
+class ConcatType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr_list = args[0]
+        if (isinstance(arr_list, types.UniTuple)
+                and is_str_arr_typ(arr_list.dtype)):
+            ret_typ = string_array_type
+        else:
+            # use typer of np.concatenate
+            arr_list_to_arr = if_series_to_array_type(arr_list)
+            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list_to_arr)
+
+        return signature(ret_typ, arr_list)
+
+@lower_builtin(concat, types.Any)  # TODO: replace Any with types
+def lower_concat(context, builder, sig, args):
+    func = concat_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(concat)
 def concat_overload(arr_list):
     # all string input case
     # TODO: handle numerics to string casting case
     if (isinstance(arr_list, types.UniTuple)
-            and arr_list.dtype == string_array_type):
+            and is_str_arr_typ(arr_list.dtype)):
         def string_concat_impl(in_arrs):
             # preallocate the output
             num_strs = 0
             num_chars = 0
             for A in in_arrs:
-                num_strs += len(A)
-                num_chars += hpat.str_arr_ext.num_total_chars(A)
+                arr = dummy_unbox_series(A)
+                num_strs += len(arr)
+                num_chars += hpat.str_arr_ext.num_total_chars(arr)
             out_arr = hpat.str_arr_ext.pre_alloc_string_array(num_strs, num_chars)
             # copy data to output
             curr_str_ind = 0
             curr_chars_ind = 0
             for A in in_arrs:
+                arr = dummy_unbox_series(A)
                 hpat.str_arr_ext.set_string_array_range(
-                    out_arr, A, curr_str_ind, curr_chars_ind)
-                curr_str_ind += len(A)
-                curr_chars_ind += hpat.str_arr_ext.num_total_chars(A)
+                    out_arr, arr, curr_str_ind, curr_chars_ind)
+                curr_str_ind += len(arr)
+                curr_chars_ind += hpat.str_arr_ext.num_total_chars(arr)
             return out_arr
 
         return string_concat_impl
@@ -108,7 +212,7 @@ def concat_overload(arr_list):
         if not isinstance(typ, types.Array):
             raise ValueError("concat supports only numerical and string arrays")
     # numerical input
-    return lambda a: np.concatenate(a)
+    return lambda a: np.concatenate(dummy_unbox_series(a))
 
 def nunique(A):  # pragma: no cover
     return len(set(A))
@@ -116,84 +220,116 @@ def nunique(A):  # pragma: no cover
 def nunique_parallel(A):  # pragma: no cover
     return len(set(A))
 
-@overload(nunique)
+@infer_global(nunique)
+@infer_global(nunique_parallel)
+class NuniqueType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        # if arr == string_series_type:
+        #     arr = string_array_type
+        return signature(types.intp, arr)
+
+@lower_builtin(nunique, types.Any)  # TODO: replace Any with types
+def lower_nunique(context, builder, sig, args):
+    func = nunique_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(nunique)
 def nunique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def nunique_seq(A):
         return len(set(A))
     return nunique_seq
 
-@overload(nunique_parallel)
+@lower_builtin(nunique_parallel, types.Any)  # TODO: replace Any with types
+def lower_nunique_parallel(context, builder, sig, args):
+    func = nunique_overload_parallel(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(nunique_parallel)
 def nunique_overload_parallel(arr_typ):
-    # TODO: extend to other types
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
-    if arr_typ == string_array_type:
-        int32_typ_enum = np.int32(_h5_typ_table[types.int32])
-        char_typ_enum = np.int32(_h5_typ_table[types.uint8])
-        def nunique_par_str(A):
-            uniq_A = hpat.utils.to_array(set(A))
-            n_strs = len(uniq_A)
-            n_pes = hpat.distributed_api.get_size()
-            # send recv counts for the number of strings
-            send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-            send_disp = hpat.hiframes_join.calc_disp(send_counts)
-            recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-            recv_size = recv_counts.sum()
-            # send recv counts for the number of chars
-            send_chars_count, recv_chars_count = set_recv_counts_chars(uniq_A)
-            send_disp_chars = hpat.hiframes_join.calc_disp(send_chars_count)
-            recv_disp_chars = hpat.hiframes_join.calc_disp(recv_chars_count)
-            recv_num_chars = recv_chars_count.sum()
-            n_all_chars = hpat.str_arr_ext.num_total_chars(uniq_A)
 
-            # allocate send recv arrays
-            send_arr_lens = np.empty(n_strs, np.uint32)  # XXX offset type is uint32
-            send_arr_chars = np.empty(n_all_chars, np.uint8)
-            recv_arr = hpat.str_arr_ext.pre_alloc_string_array(recv_size, recv_num_chars)
-
-            # populate send array
-            tmp_offset = np.zeros(n_pes, dtype=np.int64)
-            tmp_offset_chars = np.zeros(n_pes, dtype=np.int64)
-
-            for i in range(n_strs):
-                str = uniq_A[i]
-                node_id = hash(str) % n_pes
-                # lens
-                ind = send_disp[node_id] + tmp_offset[node_id]
-                send_arr_lens[ind] = len(str)
-                tmp_offset[node_id] += 1
-                # chars
-                indc = send_disp_chars[node_id] + tmp_offset_chars[node_id]
-                str_copy(send_arr_chars, indc, str.c_str(), len(str))
-                tmp_offset_chars[node_id] += len(str)
-                hpat.str_ext.del_str(str)
-
-            # shuffle len values
-            offset_ptr = hpat.str_arr_ext.get_offset_ptr(recv_arr)
-            c_alltoallv(send_arr_lens.ctypes, offset_ptr, send_counts.ctypes, recv_counts.ctypes, send_disp.ctypes, recv_disp.ctypes, int32_typ_enum)
-            data_ptr = hpat.str_arr_ext.get_data_ptr(recv_arr)
-            # shuffle char values
-            c_alltoallv(send_arr_chars.ctypes, data_ptr, send_chars_count.ctypes, recv_chars_count.ctypes, send_disp_chars.ctypes, recv_disp_chars.ctypes, char_typ_enum)
-            convert_len_arr_to_offset(offset_ptr, recv_size)
-            loc_nuniq = len(set(recv_arr))
-            return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
-        return nunique_par_str
-
-    assert arr_typ == types.Array(types.int64, 1, 'C'), "only in64 for parallel nunique"
     def nunique_par(A):
-        uniq_A = hpat.utils.to_array(set(A))
-        send_counts, recv_counts = hpat.hiframes_join.send_recv_counts_new(uniq_A)
-        send_disp = hpat.hiframes_join.calc_disp(send_counts)
-        recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
-        recv_size = recv_counts.sum()
-        # (send_counts, recv_counts, send_disp, recv_disp,
-        #  recv_size) = hpat.hiframes_join.get_sendrecv_counts(uniq_A)
-        send_arr = np.empty_like(uniq_A)
-        recv_arr = np.empty(recv_size, uniq_A.dtype)
-        hpat.hiframes_join.shuffle_data(send_counts, recv_counts, send_disp, recv_disp, uniq_A, send_arr, recv_arr)
-        loc_nuniq = len(set(recv_arr))
+        uniq_A = hpat.hiframes_api.unique_parallel(A)
+        loc_nuniq = len(uniq_A)
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
+
     return nunique_par
+
+
+def unique(A):  # pragma: no cover
+    return np.array([a for a in set(A)]).astype(A.dtype)
+
+def unique_parallel(A):  # pragma: no cover
+    return np.array([a for a in set(A)]).astype(A.dtype)
+
+@infer_global(unique)
+@infer_global(unique_parallel)
+class uniqueType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        return signature(arr, arr)
+
+@lower_builtin(unique, types.Any)  # TODO: replace Any with types
+def lower_unique(context, builder, sig, args):
+    func = unique_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(unique)
+def unique_overload(arr_typ):
+    # TODO: extend to other types like datetime?
+    def unique_seq(A):
+        return hpat.utils.to_array(set(A))
+    return unique_seq
+
+@lower_builtin(unique_parallel, types.Any)  # TODO: replace Any with types
+def lower_unique_parallel(context, builder, sig, args):
+    func = unique_overload_parallel(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_untracked(context, builder, sig.return_type, res)
+
+# @overload(unique_parallel)
+def unique_overload_parallel(arr_typ):
+
+    def unique_par(A):
+        uniq_A = hpat.utils.to_array(set(A))
+        key_arrs = (uniq_A,)
+
+        n_pes = hpat.distributed_api.get_size()
+        pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, (), n_pes, False)
+
+        # calc send/recv counts
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,), (), False)
+
+        shuffle_meta = finalize_shuffle_meta(key_arrs, (), pre_shuffle_meta, n_pes, False)
+
+        # write send buffers
+        for i in range(len(uniq_A)):
+            val = uniq_A[i]
+            node_id = hash(val) % n_pes
+            write_send_buff(shuffle_meta, node_id, i, (val,), ())
+            # update last since it is reused in data
+            shuffle_meta.tmp_offset[node_id] += 1
+
+        # shuffle
+        out_arr, = alltoallv_tup(key_arrs, shuffle_meta)
+
+        return hpat.utils.to_array(set(out_arr))
+
+    return unique_par
+
+
 
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
@@ -212,20 +348,6 @@ def set_recv_counts_chars(key_arr):
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     return send_counts, recv_counts
 
-@intrinsic
-def str_copy(typingctx, buff_arr_typ, ind_typ, str_typ, len_typ):
-    def codegen(context, builder, sig, args):
-        buff_arr, ind, str, len_str = args
-        buff_arr = make_array(sig.args[0])(context, builder, buff_arr)
-        ptr = builder.gep(buff_arr.data, [ind])
-        cgutils.raw_memcpy(builder, ptr, str, len_str, 1)
-        return context.get_dummy_value()
-
-    return types.void(types.Array(types.uint8, 1, 'C'), types.intp, types.voidptr, types.intp), codegen
-
-
-from numba.typing.arraydecl import _expand_integer
-
 
 @infer_global(count)
 class CountTyper(AbstractTemplate):
@@ -243,6 +365,21 @@ class FillNaType(AbstractTemplate):
         # args: out_arr, in_arr, value
         return signature(types.none, *args)
 
+@infer_global(fillna_str_alloc)
+class FillNaStrType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        # args: in_arr, value
+        return signature(string_array_type, *args)
+
+@infer_global(dropna)
+class DropNAType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) in (1, 2)
+        # args: in_arr
+        return signature(args[0], *args)
 
 @infer_global(column_sum)
 class SumType(AbstractTemplate):
@@ -251,6 +388,7 @@ class SumType(AbstractTemplate):
         assert len(args) == 1
         # arg: in_arr
         return signature(_expand_integer(args[0].dtype), *args)
+
 
 
 # copied from numba/numba/typing/arraydecl.py:563
@@ -272,7 +410,7 @@ class QuantileType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) in [2, 3]
-        return signature(types.float64, *args)
+        return signature(types.float64, *unliteral_all(args))
 
 
 @infer_global(str_contains_regex)
@@ -282,7 +420,150 @@ class ContainsType(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         # args: str_arr, pat
-        return signature(types.Array(types.boolean, 1, 'C'), *args)
+        return signature(types.Array(types.boolean, 1, 'C'), *unliteral_all(args))
+
+def alloc_shift(A):
+    return np.empty_like(A)
+
+@overload(alloc_shift)
+def alloc_shift_overload(A_typ):
+    if isinstance(A_typ.dtype, types.Integer):
+        return lambda A: np.empty(len(A), np.float64)
+    return lambda A: np.empty(len(A), A.dtype)
+
+def shift_dtype(d):
+    return d
+
+@overload(shift_dtype)
+def shift_dtype_overload(d_typ):
+    if isinstance(d_typ.dtype, types.Integer):
+        return lambda a: np.float64
+    else:
+        return lambda a: a
+
+def isna(arr, i):
+    return False
+
+@overload(isna)
+def isna_overload(arr_typ, ind_typ):
+    if arr_typ == string_array_type:
+        return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+    # TODO: extend to other types
+    assert isinstance(arr_typ, types.Array)
+    dtype = arr_typ.dtype
+    if isinstance(dtype, types.Float):
+        return lambda arr,i: np.isnan(arr[i])
+
+    # NaT for dt64
+    if isinstance(dtype, (types.NPDatetime, types.NPTimedelta)):
+        nat = dtype('NaT')
+        # TODO: replace with np.isnat
+        return lambda arr,i: arr[i] == nat
+
+    # XXX integers don't have nans, extend to boolean
+    return lambda arr,i: False
+
+
+@numba.njit
+def min_heapify(arr, n, start, cmp_f):
+    min_ind = start
+    left = 2 * start + 1
+    right = 2 * start + 2
+
+    if left < n and not cmp_f(arr[left], arr[min_ind]):  # < for nlargest
+        min_ind = left
+
+    if right < n and not cmp_f(arr[right], arr[min_ind]):
+        min_ind = right
+
+    if min_ind != start:
+        arr[start], arr[min_ind] = arr[min_ind], arr[start]  # swap
+        min_heapify(arr, n, min_ind, cmp_f)
+
+
+def select_k_nonan(A, m, k):  # pragma: no cover
+    return A
+
+@overload(select_k_nonan)
+def select_k_nonan_overload(A_t, m_t, k_t):
+    dtype = A_t.dtype
+    if isinstance(dtype, types.Integer):
+        # ints don't have nans
+        return lambda A,m,k: (A[:k].copy(), k)
+
+    assert isinstance(dtype, types.Float)
+
+    def select_k_nonan_float(A, m, k):
+        # select the first k elements but ignore NANs
+        min_heap_vals = np.empty(k, A.dtype)
+        i = 0
+        ind = 0
+        while i < m and ind < k:
+            val = A[i]
+            i += 1
+            if not np.isnan(val):
+                min_heap_vals[ind] = val
+                ind += 1
+
+        # if couldn't fill with k values
+        if ind < k:
+            min_heap_vals = min_heap_vals[:ind]
+
+        return min_heap_vals, i
+
+    return select_k_nonan_float
+
+@numba.njit
+def nlargest(A, k, is_largest, cmp_f):
+    # algorithm: keep a min heap of k largest values, if a value is greater
+    # than the minimum (root) in heap, replace the minimum and rebuild the heap
+    m = len(A)
+
+    # if all of A, just sort and reverse
+    if k >= m:
+        B = np.sort(A)
+        B = B[~np.isnan(B)]
+        if is_largest:
+            B = B[::-1]
+        return np.ascontiguousarray(B)
+
+    # create min heap but
+    min_heap_vals, start = select_k_nonan(A, m, k)
+    # heapify k/2-1 to 0 instead of sort?
+    min_heap_vals.sort()
+    if not is_largest:
+        min_heap_vals = np.ascontiguousarray(min_heap_vals[::-1])
+
+    for i in range(start, m):
+        if cmp_f(A[i], min_heap_vals[0]):  # > for nlargest
+            min_heap_vals[0] = A[i]
+            min_heapify(min_heap_vals, k, 0, cmp_f)
+
+    # sort and return the heap values
+    min_heap_vals.sort()
+    if is_largest:
+        min_heap_vals = min_heap_vals[::-1]
+    return np.ascontiguousarray(min_heap_vals)
+
+MPI_ROOT = 0
+
+@numba.njit
+def nlargest_parallel(A, k, is_largest, cmp_f):
+    # parallel algorithm: assuming k << len(A), just call nlargest on chunks
+    # of A, gather the result and return the largest k
+    # TODO: support cases where k is not too small
+    my_rank = hpat.distributed_api.get_rank()
+    local_res = nlargest(A, k, is_largest, cmp_f)
+    all_largest = hpat.distributed_api.gatherv(local_res)
+
+    # TODO: handle len(res) < k case
+    if my_rank == MPI_ROOT:
+        res = nlargest(all_largest, k, is_largest, cmp_f)
+    else:
+        res = np.empty(k, A.dtype)
+    hpat.distributed_api.bcast(res)
+    return res
+
 
 # @jit
 # def describe(a_count, a_mean, a_std, a_min, q25, q50, q75, a_max):
@@ -367,21 +648,12 @@ def array_std(context, builder, sig, args):
     return impl_ret_untracked(context, builder, sig.return_type, res)
 
 
-from llvmlite import ir as lir
-import quantile_alg
-import llvmlite.binding as ll
-ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
-from numba.targets.arrayobj import make_array
-from numba import cgutils
-from hpat.distributed_lower import _h5_typ_table
-
-
 @lower_builtin(quantile, types.npytypes.Array, types.float64)
 @lower_builtin(quantile_parallel, types.npytypes.Array, types.float64, types.intp)
 def lower_dist_quantile(context, builder, sig, args):
 
     # store an int to specify data type
-    typ_enum = _h5_typ_table[sig.args[0].dtype]
+    typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
     typ_arg = cgutils.alloca_once_value(
         builder, lir.Constant(lir.IntType(32), typ_enum))
     assert sig.args[0].ndim == 1
@@ -422,10 +694,20 @@ class SortTyping(AbstractTemplate):
         assert not kws
         return signature(types.none, *args)
 
+def df_isin(A, B):  # pragma: no cover
+    return A
 
-import pandas as pd
-from numba.extending import typeof_impl, unbox, register_model, models, NativeValue
-from numba import numpy_support
+def df_isin_vals(A, B):  # pragma: no cover
+    return A
+
+@infer_global(df_isin)
+@infer_global(df_isin_vals)
+class DfIsinCol(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(SeriesType(types.bool_, 1, 'C'), *unliteral_all(args))
+
 
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):
@@ -461,7 +743,7 @@ def get_hiframes_dtypes(df):
     for cname, typ in zip(col_names, pd_typ_list):
         if typ == np.dtype('O'):
             # XXX assuming the whole column is strings if 1st val is string
-            first_val = df[cname][0]
+            first_val = df[cname].iloc[0]
             if isinstance(first_val, str):
                 hi_typs.append(string_type)
                 continue
@@ -484,13 +766,13 @@ class UnBoxDfCol(AbstractTemplate):
         assert not kws
         assert len(args) == 3
         df_typ, col_ind_const, dtype_typ = args[0], args[1], args[2]
-        if isinstance(dtype_typ, types.Const):
-            if dtype_typ.value == 12:  # FIXME dtype for dt64
+        if isinstance(dtype_typ, types.Literal):
+            if dtype_typ.literal_value == 12:  # FIXME dtype for dt64
                 out_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
-            elif dtype_typ.value == 11:  # FIXME dtype for str
+            elif dtype_typ.literal_value == 11:  # FIXME dtype for str
                 out_typ = string_array_type
             else:
-                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.value))
+                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.literal_value))
         else:
             out_typ = types.Array(dtype_typ.dtype, 1, 'C')
         # FIXME: last arg should be types.DType?
@@ -506,18 +788,18 @@ class SetDfColInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        assert isinstance(args[1], types.Const)
+        assert isinstance(args[1], types.Literal)
         return signature(types.none, *args)
 
 SetDfColInfer.support_literals = True
 
-from numba.targets.boxing import box_array
-
-@lower_builtin(set_df_col, PandasDataFrameType, types.Const, types.Array)
+@lower_builtin(set_df_col, PandasDataFrameType, types.Literal, types.Array)
 def set_df_col_lower(context, builder, sig, args):
     #
-    col_name = sig.args[1].value
+    col_name = sig.args[1].literal_value
     arr_typ = sig.args[2]
+    if arr_typ.dtype == datetime_date_type:
+        return set_df_datetime_date_lower(context, builder, sig, args)
 
     # get boxed array
     pyapi = context.get_python_api(builder)
@@ -542,25 +824,82 @@ def set_df_col_lower(context, builder, sig, args):
 
     return context.get_dummy_value()
 
+def box_df(names, arrs):
+    return pd.DataFrame()
 
-from numba.targets.boxing import unbox_array
+@infer_global(box_df)
+class BoxDfTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) % 2 == 0, "name and column pairs expected"
+        col_names = [a.literal_value for a in args[:len(args)//2]]
+        col_types =  [a.dtype for a in args[len(args)//2:]]
+        df_typ = PandasDataFrameType(col_names, col_types)
+        return signature(df_typ, *args)
 
-@lower_builtin(unbox_df_column, PandasDataFrameType, types.Const, types.Any)
+BoxDfTyper.support_literals = True
+
+@lower_builtin(box_df, types.Literal, types.VarArg(types.Any))
+def lower_box_df(context, builder, sig, args):
+    assert len(sig.args) % 2 == 0, "name and column pairs expected"
+    n_cols = len(sig.args)//2
+    col_names = [a.literal_value for a in sig.args[:n_cols]]
+    col_arrs = [a for a in args[n_cols:]]
+    arr_typs = [a for a in sig.args[n_cols:]]
+    # use dtypes from return type since it contains Categorical dtype
+    dtypes = sig.return_type.col_types
+
+    pyapi = context.get_python_api(builder)
+    env_manager = context.get_env_manager(builder)
+    c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
+    gil_state = pyapi.gil_ensure()  # acquire GIL
+
+    mod_name = context.insert_const_string(c.builder.module, "pandas")
+    class_obj = pyapi.import_module_noblock(mod_name)
+    res = pyapi.call_method(class_obj, "DataFrame", ())
+    for cname, arr, arr_typ, dtype in zip(col_names, col_arrs, arr_typs, dtypes):
+        # df['cname'] = boxed_arr
+        # TODO: datetime.date, DatetimeIndex?
+        if dtype == string_type:
+            arr_obj = box_str_arr(arr_typ, arr, c)
+        elif isinstance(dtype, PDCategoricalDtype):
+            arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
+            context.nrt.incref(builder, arr_typ, arr)
+        else:
+            arr_obj = box_array(arr_typ, arr, c)
+            # TODO: is incref required?
+            context.nrt.incref(builder, arr_typ, arr)
+        name_str = context.insert_const_string(c.builder.module, cname)
+        cname_obj = pyapi.string_from_string(name_str)
+        pyapi.object_setitem(res, cname_obj, arr_obj)
+        # pyapi.decref(arr_obj)
+        pyapi.decref(cname_obj)
+
+    pyapi.decref(class_obj)
+    pyapi.gil_release(gil_state)    # release GIL
+    return res
+
+@box(PandasDataFrameType)
+def box_df_dummy(typ, val, c):
+    return val
+
+
+@lower_builtin(unbox_df_column, PandasDataFrameType, types.Literal, types.Any)
 def lower_unbox_df_column(context, builder, sig, args):
     # FIXME: last arg should be types.DType?
     pyapi = context.get_python_api(builder)
     c = numba.pythonapi._UnboxContext(context, builder, pyapi)
 
     # TODO: refcounts?
-    col_ind = sig.args[1].value
+    col_ind = sig.args[1].literal_value
     col_name = sig.args[0].col_names[col_ind]
     series_obj = c.pyapi.object_getattr_string(args[0], col_name)
     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
 
-    if isinstance(sig.args[2], types.Const) and sig.args[2].value == 11:  # FIXME: str code
+    if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 11:  # FIXME: str code
         native_val = unbox_str_series(string_array_type, arr_obj, c)
     else:
-        if isinstance(sig.args[2], types.Const) and sig.args[2].value == 12:  # FIXME: dt64 code
+        if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 12:  # FIXME: dt64 code
             dtype = types.NPDatetime('ns')
         else:
             dtype = sig.args[2].dtype
@@ -572,21 +911,190 @@ def lower_unbox_df_column(context, builder, sig, args):
     return native_val.value
 
 
+@unbox(BoxedSeriesType)
+def unbox_series(typ, val, c):
+    arr_obj = c.pyapi.object_getattr_string(val, "values")
 
-@overload(fix_df_array)
+    if typ.dtype == string_type:
+        native_val = unbox_str_series(string_array_type, arr_obj, c)
+    elif typ.dtype == datetime_date_type:
+        native_val = unbox_datetime_date_array(typ, val, c)
+    else:
+        # TODO: error handling like Numba callwrappers.py
+        native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
+
+    c.pyapi.decref(arr_obj)
+    return native_val
+
+@box(UnBoxedSeriesType)
+def box_series(typ, val, c):
+    """
+    """
+    mod_name = c.context.insert_const_string(c.builder.module, "pandas")
+    pd_class_obj = c.pyapi.import_module_noblock(mod_name)
+    dtype = typ.dtype
+
+    if dtype == string_type:
+        arr = box_str_arr(typ, val, c)
+    elif dtype == datetime_date_type:
+        arr = box_datetime_date_array(typ, val, c)
+    elif isinstance(dtype, PDCategoricalDtype):
+        arr = box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj)
+    else:
+        arr = box_array(types.Array(dtype, 1, 'C'), val, c)
+
+    res = c.pyapi.call_method(pd_class_obj, "Series", (arr,))
+    # c.pyapi.decref(arr)  # TODO needed?
+    # class_obj = c.pyapi.unserialize(c.pyapi.serialize_object(pd.Series))
+    # res = c.pyapi.call_function_objargs(class_obj, (arr,))
+    c.pyapi.decref(pd_class_obj)
+    return res
+
+
+def to_series_type(arr):
+    return arr
+
+@infer_global(to_series_type)
+class ToSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        if isinstance(arr, BoxedSeriesType):
+            series_type = SeriesType(arr.dtype, 1, 'C')
+        else:
+            series_type = if_arr_to_series_type(arr)
+        assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
+        return signature(series_type, arr)
+
+@lower_builtin(to_series_type, types.Any)
+def to_series_dummy_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+def to_arr_from_series(arr):
+    return arr
+
+@infer_global(to_arr_from_series)
+class ToArrFromSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        return signature(if_series_to_array_type(arr), arr)
+
+@lower_builtin(to_arr_from_series, types.Any)
+def to_arr_from_series_dummy_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+# dummy func to convert input series to array type
+def dummy_unbox_series(arr):
+    return arr
+
+@infer_global(dummy_unbox_series)
+class DummyToSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = if_series_to_array_type(args[0], True)
+        return signature(arr, *args)
+
+@lower_builtin(dummy_unbox_series, types.Any)
+def dummy_unbox_series_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+def to_date_series_type(arr):
+    return arr
+
+@infer_global(to_date_series_type)
+class ToDateSeriesType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        assert (arr == types.Array(types.intp, 1, 'C')
+            or arr == types.Array(datetime_date_type, 1, 'C'))
+        return signature(date_series_type, arr)
+
+@lower_builtin(to_date_series_type, types.Any)
+def to_date_series_type_impl(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+# convert const tuple expressions or const list to tuple statically
+def to_const_tuple(arrs):  # pragma: no cover
+    return tuple(arrs)
+
+@infer_global(to_const_tuple)
+class ToConstTupleTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        ret_typ = arr
+        # XXX: returns a dummy type that should be fixed in hiframes_typed
+        if isinstance(arr, types.List):
+            ret_typ = types.Tuple((arr.dtype,))
+        return signature(ret_typ, arr)
+
+
+def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
+    assert len(args) >= 1
+    numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
+
+if hasattr(numba.ir_utils, 'alias_func_extensions'):
+    numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
+
+@numba.njit
+def agg_typer(a, _agg_f):
+    return np.full(1, _agg_f(a))
+
+
+# XXX: use infer_global instead of overload, since overload fails if the same
+# user function is compiled twice
+@infer_global(fix_df_array)
+class FixDfArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        ret_typ = column
+        if (isinstance(column, types.List)
+            and (isinstance(column.dtype, types.Number)
+                 or column.dtype == types.boolean)):
+            ret_typ = types.Array(column.dtype, 1, 'C')
+        if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+            ret_typ = string_array_type
+        # TODO: add other types
+        return signature(ret_typ, column)
+
+@lower_builtin(fix_df_array, types.Any)  # TODO: replace Any with types
+def lower_fix_df_array(context, builder, sig, args):
+    func = fix_df_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+#@overload(fix_df_array)
 def fix_df_array_overload(column):
     # convert list of numbers/bools to numpy array
     if (isinstance(column, types.List)
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
-        def fix_df_array_impl(column):  # pragma: no cover
+        def fix_df_array_list_impl(column):  # pragma: no cover
             return np.array(column)
-        return fix_df_array_impl
+        return fix_df_array_list_impl
+
     # convert list of strings to string array
     if isinstance(column, types.List) and isinstance(column.dtype, StringType):
-        def fix_df_array_impl(column):  # pragma: no cover
+        def fix_df_array_str_impl(column):  # pragma: no cover
             return StringArray(column)
-        return fix_df_array_impl
+        return fix_df_array_str_impl
+
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType))
     def fix_df_array_impl(column):  # pragma: no cover
@@ -594,8 +1102,26 @@ def fix_df_array_overload(column):
     # FIXME: np.array() for everything else?
     return fix_df_array_impl
 
+@infer_global(fix_rolling_array)
+class FixDfRollingArrayType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        column = args[0]
+        dtype = column.dtype
+        ret_typ = column
+        if dtype == types.boolean or isinstance(dtype, types.Integer):
+            ret_typ = types.Array(types.float64, 1, 'C')
+        # TODO: add other types
+        return signature(ret_typ, column)
 
-@overload(fix_rolling_array)
+@lower_builtin(fix_rolling_array, types.Any)  # TODO: replace Any with types
+def lower_fix_rolling_array(context, builder, sig, args):
+    func = fix_rolling_array_overload(sig.args[0])
+    res = context.compile_internal(builder, func, sig, args)
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+# @overload(fix_rolling_array)
 def fix_rolling_array_overload(column):
     assert isinstance(column, types.Array)
     dtype = column.dtype
@@ -617,57 +1143,58 @@ class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == timestamp_series_type or args[0] == types.Array(types.int64, 1, 'C')
+        assert args[0] == dt_index_series_type or args[0] == types.Array(types.int64, 1, 'C')
         return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
 
-@lower_builtin(ts_series_to_arr_typ, timestamp_series_type)
+@lower_builtin(ts_series_to_arr_typ, dt_index_series_type)
 @lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-def ts_series_getitem(arr, ind):
-    return arr[ind]
-
-@infer_global(ts_series_getitem)
-class TsSeriesGetItemType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        out = get_array_index_type(ary, idx)
-        # check result to be dt64 since it might be sliced array
-        # replace result with Timestamp
-        if out is not None and out.result == types.NPDatetime('ns'):
-            return signature(pandas_timestamp_type, ary, out.index)
-
-def ts_binop_wrapper(op, arr, other):  # pragma: no cover
-    return
-
-@infer_global(ts_binop_wrapper)
-class TsBinopWrapperType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [op, ts_arr, other] = args
-        assert isinstance(op, types.Const) and isinstance(op.value, str)
-        assert ts_arr == types.Array(types.NPDatetime('ns'), 1, 'C')
-        # TODO: extend to other types like string array
-        assert other == string_type
-        # TODO: examine all possible ops
-        out = types.Array(types.NPDatetime('ns'), 1, 'C')
-        if op.value in ['==', '!=', '>=', '>', '<=', '<']:
-            out = types.Array(types.boolean, 1, 'C')
-        return signature(out, *args)
-
-TsBinopWrapperType.support_literals = True
 
 
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    if len(val) > 0 and isinstance(val[0], str):  # and isinstance(val[-1], str):
-        return string_array_type
-    if len(val) > 0 and isinstance(val[0], pd.Timestamp):
-        return timestamp_series_type
+    # TODO: handle NA as 1st value
+    if len(val) > 0 and isinstance(val.values[0], str):  # and isinstance(val[-1], str):
+        arr_typ = string_array_type
+    elif len(val) > 0 and isinstance(val.values[0], datetime.date):
+        # XXX: using .values to check date type since DatetimeIndex returns
+        # Timestamp which is subtype of datetime.date
+        return BoxedSeriesType(datetime_date_type)
+    else:
+        arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
 
+    return arr_to_boxed_series_type(arr_typ)
+
+@typeof_impl.register(pd.Index)
+def typeof_pd_index(val, c):
+    if len(val) > 0 and isinstance(val[0], datetime.date):
+        return BoxedSeriesType(datetime_date_type)
+    else:
+        raise NotImplementedError("unsupported pd.Index type")
+
+
+# TODO: separate pd.DatetimeIndex type
+#@typeof_impl.register(pd.DatetimeIndex)
+
+def pd_dt_index_stub(data):  # pragma: no cover
+    return data
+
+@infer_global(pd.DatetimeIndex)
+class DatetimeIndexTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        pysig = numba.utils.pysignature(pd_dt_index_stub)
+        try:
+            bound = pysig.bind(*args, **kws)
+        except TypeError:  # pragma: no cover
+            msg = "Unsupported arguments for pd.DatetimeIndex()"
+            raise ValueError(msg)
+
+        sig = signature(
+            SeriesType(types.NPDatetime('ns'), 1, 'C'), bound.args).replace(
+                pysig=pysig)
+        return sig
 
 @overload(np.array)
 def np_array_array_overload(in_tp):
@@ -717,12 +1244,12 @@ class TypeIterTuples(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) % 2 == 0, "name and column pairs expected"
-        col_names = [a.value for a in args[:len(args)//2]]
-        arr_types = args[len(args)//2:]
+        col_names = [a.literal_value for a in args[:len(args)//2]]
+        arr_types =  [if_series_to_array_type(a) for a in args[len(args)//2:]]
         # XXX index handling, assuming implicit index
         assert "Index" not in col_names[0]
         col_names = ['Index'] + col_names
-        arr_types = [types.Array(types.int64, 1, 'C')] + list(arr_types)
+        arr_types = [types.Array(types.int64, 1, 'C')] + arr_types
         iter_typ = DataFrameTupleIterator(col_names, arr_types)
         return signature(iter_typ, *args)
 

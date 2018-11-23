@@ -14,27 +14,29 @@ requirements:
     - {{ compiler('cxx') }}
 
   host:
-    - python 3.6.*
+    - python >=3.6
     - setuptools
-    - numba 0.39.*
-    - numpy 1.14.*
-    - pandas 0.23
-    - mpich # [not win]
-    - pyarrow 0.9.*
+    - numba 0.41.*
+    - numpy >=1.14
+    - pandas >=0.23
+    - pyarrow >=0.9
+    - arrow-cpp
     - boost
     - hdf5
     - h5py
+    - mpich # [not win]
 
   run:
-    - python 3.6.*
-    - numpy 1.14.*
-    - pandas 0.23
-    - mpich # [not win]
-    - pyarrow 0.9.*
+    - python >=3.6
+    - numpy >=1.14
+    - pandas >=0.23
+    - pyarrow >=0.9
+    - arrow-cpp
     - boost
-    - numba 0.39.*
+    - numba 0.41.*
     - hdf5
     - h5py
+    - mpich # [not win]
 
 test:
   imports:

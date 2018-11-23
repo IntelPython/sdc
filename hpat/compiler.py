@@ -136,10 +136,11 @@ class HPATPipeline(numba.compiler.BasePipeline):
         name = 'hpat'
         pm.create_pipeline(name)
         self.add_preprocessing_stage(pm)
+        self.add_with_handling_stage(pm)
         self.add_pre_typing_stage(pm)
         pm.add_stage(self.stage_inline_pass, "inline funcs")
         pm.add_stage(self.stage_df_pass, "convert DataFrames")
-        pm.add_stage(self.stage_io_pass, "replace IO calls")
+        # pm.add_stage(self.stage_io_pass, "replace IO calls")
         # repeat inline closure pass to inline df stencils
         pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
         self.add_typing_stage(pm)
@@ -148,13 +149,18 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # e.g. need to handle string array exprs before nopython rewrites
         # converts them to arrayexpr.
         # self.add_optimization_stage(pm)
-        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
+        # hiframes typed pass should be before pre_parfor since variable types
+        # need updating, and A.call to np.call transformation is invalid for
+        # Series (e.g. S.var is not the same as np.var(S))
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
+        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:
             pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
         if self.flags.auto_parallel.enabled:
             pm.add_stage(self.stage_parfor_pass, "convert to parfors")
         pm.add_stage(self.stage_distributed_pass, "convert to distributed")
+        pm.add_stage(self.stage_ir_legalization,
+                "ensure IR is legal prior to lowering")
         self.add_lowering_stage(pm)
         self.add_cleanup_stage(pm)
 
@@ -216,5 +222,41 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # Ensure we have an IR and type information.
         assert self.func_ir
         df_pass = HiFramesTyped(self.func_ir, self.typingctx,
-                                self.type_annotation.typemap, self.type_annotation.calltypes)
-        df_pass.run()
+                                self.type_annotation.typemap,
+                                self.type_annotation.calltypes,
+                                self.return_type)
+        ret_typ = df_pass.run()
+        # XXX update return type since it can be replaced with UnBoxSeries
+        # to handle boxing
+        if ret_typ is not None:
+            self.return_type = ret_typ
+
+class HPATPipelineSeq(HPATPipeline):
+    """HPAT pipeline without the distributed pass (used in rolling kernels)
+    """
+    def define_pipelines(self, pm):
+        name = 'hpat_seq'
+        pm.create_pipeline(name)
+        self.add_preprocessing_stage(pm)
+        self.add_with_handling_stage(pm)
+        self.add_pre_typing_stage(pm)
+        pm.add_stage(self.stage_inline_pass, "inline funcs")
+        pm.add_stage(self.stage_df_pass, "convert DataFrames")
+        pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
+        self.add_typing_stage(pm)
+        pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
+        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
+        if not self.flags.no_rewrites:
+            pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
+        if self.flags.auto_parallel.enabled:
+            pm.add_stage(self.stage_parfor_pass, "convert to parfors")
+        # pm.add_stage(self.stage_distributed_pass, "convert to distributed")
+        pm.add_stage(self.stage_lower_parfor_seq, "parfor seq lower")
+        pm.add_stage(self.stage_ir_legalization,
+                "ensure IR is legal prior to lowering")
+        self.add_lowering_stage(pm)
+        self.add_cleanup_stage(pm)
+
+    def stage_lower_parfor_seq(self):
+        numba.parfor.lower_parfor_sequential(
+                self.typingctx, self.func_ir, self.typemap, self.calltypes)

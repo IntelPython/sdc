@@ -16,17 +16,17 @@ Building HPAT from Source
 -------------------------
 
 We use `Anaconda <https://www.anaconda.com/download/>`_ distribution of
-Python 3.6 for setting up HPAT. These commands install HPAT and its dependencies
+Python for setting up HPAT. These commands install HPAT and its dependencies
 such as Numba on Ubuntu Linux::
 
     wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
     chmod +x miniconda.sh
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
-    conda create -n HPAT -q -y python=3.6 numpy scipy pandas boost cmake
+    conda create -n HPAT -q -y numpy scipy pandas boost cmake
     source activate HPAT
     conda install -c numba numba
-    conda install mpich -c conda-forge
+    conda install mpich mpi -c conda-forge
     conda install pyarrow
     conda install h5py -c ehsantn
     conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
@@ -42,6 +42,7 @@ A command line for running the Pi example on 4 cores::
 
 Running unit tests::
 
+    conda install pyspark
     python hpat/tests/gen_test_data.py
     python -m unittest
 
@@ -56,28 +57,21 @@ Building from Source on Windows
 Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:
 
 * Install `Build Tools for Visual Studio 2017 (14.0) <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017>`_.
-* Setup the environment by running ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat amd64``.
 * Install `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_.
-* Setup the environment by following
-  `Intel MPI installation instructions <https://software.intel.com/en-us/articles/intel-mpi-library-for-windows-installation-instructions>`_.
-* Install `Anaconda 4.4 for Windows <https://repo.continuum.io/archive/Anaconda3-4.4.0-Windows-x86_64.exe>`_.
+* Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
+* Start 'Anaconda prompt'
 * Setup the Conda environment in Anaconda Prompt::
 
-    conda create -n HPAT
+    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge python=3.6 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
     activate HPAT
-    conda install numpy scipy pandas llvmlite
-    git clone https://github.com/IntelLabs/numba.git
-    cd numba
-    git checkout hpat_req
-    python setup.py install
-    cd ..
-    conda install pyarrow=0.8.* -c conda-forge
     git clone https://github.com/IntelLabs/hpat.git
     cd hpat
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
+    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
+    "%I_MPI_ROOT%"\intel64\bin\mpivars.bat
+    set HDF5_DIR=%CONDA_PREFIX%\Library
     python setup.py install
-
 
 Troubleshooting Windows Build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -13,27 +13,33 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             add_offset_to_labels, get_ir_of_code, find_const,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition,
-                            build_definitions, replace_vars_stmt, replace_vars_inner)
+                            build_definitions, replace_vars_stmt,
+                            replace_vars_inner, find_build_sequence)
 
 from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
 
 import hpat
-from hpat import (hiframes_api, utils, parquet_pio, config, hiframes_filter,
-                  hiframes_join, hiframes_aggregate, hiframes_sort)
-from hpat.utils import get_constant, NOT_CONSTANT, get_definitions, debug_prints
+from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
+                  hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
+from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
+    inline_new_blocks, ReplaceFunc)
 from hpat.hiframes_api import PandasDataFrameType
-from hpat.str_ext import StringType, string_type
-from hpat.str_arr_ext import StringArray, StringArrayType, string_array_type
+from hpat.str_ext import string_type
+from hpat.str_arr_ext import string_array_type
+from hpat import csv_ext
 
+import pandas as pd
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
-from hpat.pd_timestamp_ext import (timestamp_series_type, datetime_date_type,
+from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType
+from hpat.pd_categorical_ext import PDCategoricalDtype
+from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
+from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
 
-df_col_funcs = ['shift', 'pct_change', 'fillna', 'sum', 'mean', 'var', 'std',
-                'quantile', 'count', 'describe', 'nunique']
 LARGE_WIN_SIZE = 10
 
 
@@ -50,7 +56,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
-            'concat', 'count', 'mean', 'quantile', 'var', 'ts_series_getitem',
+            'concat', 'count', 'mean', 'quantile', 'var',
             'str_contains_regex', 'str_contains_noregex', 'column_sum',
             'nunique']):
         return True
@@ -62,9 +68,15 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
         return True
+    if call_list == ['agg_typer', 'hiframes_api', hpat]:
+        return True
     if call_list == [list]:
         return True
     if call_list == ['groupby']:
+        return True
+    if call_list == ['rolling']:
+        return True
+    if call_list == [pd.api.types.CategoricalDtype]:
         return True
     return False
 
@@ -80,70 +92,87 @@ class HiFrames(object):
         self.args = args
         self.locals = _locals
         ir_utils._max_label = max(func_ir.blocks.keys())
-
-        # rolling call name -> [column_varname, win_size]
-        self.rolling_calls = {}
+        # replace inst variables as determined previously during the pass
+        # currently use to keep lhs of Arg nodes intact
+        self.replace_var_dict = {}
 
         # df_var -> {col1:col1_var ...}
         self.df_vars = {}
         # df_var -> label where it is defined
         self.df_labels = {}
-        # arrays that are df columns actually (pd.Series)
-        self.df_cols = set()
-        # keep track of series that are timestamp to replace getitem
-        # FIXME: this is possibly fragile, maybe replace all series getitems
-        # with a function and handle this after type inference
-        self.ts_series_vars = set()
-        # remember datetime.date series due to special boxing, getitem etc.
-        self.dt_date_series_vars  = set()
 
         self.arrow_tables = {}
         self.reverse_copies = {}
         self.pq_handler = ParquetHandler(
             func_ir, typingctx, args, _locals, self.reverse_copies)
+        self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
+
 
     def run(self):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
-        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
-        topo_order = find_topo_order(self.func_ir.blocks)
-        for label in topo_order:
-            self._get_reverse_copies(self.func_ir.blocks[label].body)
+        blocks = self.func_ir.blocks
+        # topo_order necessary since df vars need to be found before use
+        topo_order = find_topo_order(blocks)
+        work_list = list((l, blocks[l]) for l in reversed(topo_order))
+        while work_list:
+            label, block = work_list.pop()
+            self._get_reverse_copies(blocks[label].body)
             new_body = []
+            replaced = False
             self._working_body = new_body
-            old_body = self.func_ir.blocks[label].body
-            for inst in old_body:
+            for i, inst in enumerate(block.body):
+                ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+                if (isinstance(inst, (ir.StaticSetItem, ir.SetItem)) and self._is_iat(inst.target)):
+                    ind = inst.index if isinstance(inst, ir.SetItem) else inst.index_var
+                    out_nodes = self._handle_iat_setitem(inst.target, ind, inst.value, inst.loc)
+                    new_body.extend(out_nodes)
                 # df['col'] = arr
-                if (isinstance(inst, ir.StaticSetItem)
+                elif (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
+                    # cfg needed for set df column
+                    cfg = compute_cfg_from_blocks(blocks)
                     new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, label)
                     if isinstance(out_nodes, list):
+                        # TODO: fix scope/loc
                         new_body.extend(out_nodes)
+                    if isinstance(out_nodes, ReplaceFunc):
+                        rp_func = out_nodes
+                        if rp_func.pre_nodes is not None:
+                            new_body.extend(rp_func.pre_nodes)
+                        # replace inst.value to a call with target args
+                        # as expected by inline_closure_call
+                        inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                        block.body = new_body + block.body[i:]
+                        inline_closure_call(self.func_ir, rp_func.glbls,
+                            block, len(new_body), rp_func.func, work_list=work_list)
+                        replaced = True
+                        break
                     if isinstance(out_nodes, dict):
-                        old_label = label
-                        label = include_new_blocks(
-                            self.func_ir.blocks, out_nodes, label, new_body)
-                        # cfg needs to be updated since label is updated
-                        # needed for set df column
-                        # new block will have the same jump as old block
-                        self.func_ir.blocks[label].body.append(old_body[-1])
-                        cfg = compute_cfg_from_blocks(self.func_ir.blocks)
-                        self.func_ir.blocks[label].body.pop()
-                        new_body = []
-                        self._working_body = new_body
+                        block.body = new_body + block.body[i:]
+                        # TODO: insert new blocks in current spot of work_list
+                        # instead of append?
+                        # TODO: rename variables, fix scope/loc
+                        inline_new_blocks(self.func_ir, block, len(new_body), out_nodes, work_list)
+                        replaced = True
+                        break
                 elif isinstance(inst, ir.Return):
                     nodes = self._run_return(inst)
                     new_body += nodes
                 else:
                     new_body.append(inst)
-            self.func_ir.blocks[label].body = new_body
+            if not replaced:
+                blocks[label].body = new_body
 
-        self.func_ir._definitions = get_definitions(self.func_ir.blocks)
-        self.func_ir.df_cols = self.df_cols
-        # remove_dead(self.func_ir.blocks, self.func_ir.arg_names)
+        self.func_ir._definitions = build_definitions(blocks)
+        # XXX: remove dead here fixes h5 slice issue
+        # iterative remove dead to make sure all extra code (e.g. df vars) is removed
+        while remove_dead(blocks, self.func_ir.arg_names, self.func_ir):
+            pass
+        self.func_ir._definitions = build_definitions(blocks)
         dprint_func_ir(self.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
@@ -157,42 +186,57 @@ class HiFrames(object):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
 
-            if rhs.op == 'binop':
-                return self._run_binop(assign)
+            # fix type for f['A'][:] dset reads
+            if rhs.op in ('getitem', 'static_getitem'):
+                if self._is_iat(rhs.value):
+                    return self._handle_iat_getitem(assign, lhs, rhs)
+                h5_nodes = self.h5_handler.handle_possible_h5_read(
+                    assign, lhs, rhs)
+                if h5_nodes is not None:
+                    return h5_nodes
 
-            # d = df['column']
-            if (rhs.op == 'static_getitem' and self._is_df_var(rhs.value)
-                    and isinstance(rhs.index, str)):
-                assign.value = self._get_df_cols(rhs.value)[rhs.index]
-                self.df_cols.add(lhs)  # save lhs as column
-                if assign.value.name in self.ts_series_vars:
-                    self.ts_series_vars.add(lhs)
-                if assign.value.name in self.dt_date_series_vars:
-                    self.dt_date_series_vars.add(lhs)
+            # d = df['column'] or df[['C1', 'C2']]
+            if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
+                # d = df['column']
+                if isinstance(rhs.index, str):
+                    assign.value = self._get_df_cols(rhs.value)[rhs.index]
+                    return [assign]
+                # df[['C1', 'C2']]
+                if isinstance(rhs.index, list) and all(
+                        isinstance(rhs.index[i], str)
+                        for i in range(len(rhs.index))):
+                    in_df_map = self._get_df_cols(rhs.value)
+                    nodes = []
+                    out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
+                                                            for c in rhs.index}
+                    self._create_df(lhs, out_df_map, label)
+                    return nodes
+                # raise ValueError("unsupported dataframe access {}[{}]".format(
+                #                  rhs.value.name, rhs.index))
 
-            # df1 = df[df.A > .5]
-            if rhs.op == 'getitem' and self._is_df_var(rhs.value):
+            # df1 = df[df.A > .5], df.iloc[1:n], df.iloc[[1,2,3]], ...
+            if rhs.op in ('getitem', 'static_getitem') and (
+                    self._is_df_var(rhs.value)
+                    or self._is_iloc_loc(rhs.value)):
+                # XXX handling getitem, iloc, and loc the same way
+                # TODO: support their differences
+                # XXX: integer index not supported
+                # TODO: check index for non-integer
+                # TODO: support constant integer (return namedtuple)
+                df = (rhs.value if self._is_df_var(rhs.value)
+                    else guard(get_definition, self.func_ir, rhs.value).value)
+                index_var = (rhs.index_var if rhs.op == 'static_getitem'
+                             else rhs.index)
                 # output df1 has same columns as df, create new vars
                 scope = assign.target.scope
                 loc = assign.target.loc
-                in_df_col_names = self._get_df_col_names(rhs.value)
+                in_df_col_names = self._get_df_col_names(df)
                 df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in in_df_col_names}
                 self._create_df(lhs, df_col_map, label)
-                in_df = self._get_renamed_df(rhs.value)
-                return [hiframes_filter.Filter(lhs, in_df.name, rhs.index,
+                in_df = self._get_renamed_df(df)
+                return [hiframes_filter.Filter(lhs, in_df.name, index_var,
                                                self.df_vars, rhs.loc)]
-
-            # df.loc or df.iloc
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and rhs.attr in ['loc', 'iloc']):
-                # FIXME: treat iloc and loc as regular df variables so getitem
-                # turns them into filter. Only boolean array is supported
-                self.df_vars[lhs] = self._get_df_cols(rhs.value)
-                return []
-
-            # if (rhs.op == 'getitem' and rhs.value.name in self.df_cols):
-            #     self.col_filters.add(assign)
 
             # d = df.column
             if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
@@ -200,63 +244,15 @@ class HiFrames(object):
                 df = rhs.value.name
                 col_var = self._get_df_colvar(rhs.value, rhs.attr)
                 assign.value = col_var
-                self.df_cols.add(lhs)  # save lhs as column
-                if col_var.name in self.ts_series_vars:
-                    self.ts_series_vars.add(lhs)
-                if col_var.name in self.dt_date_series_vars:
-                    self.dt_date_series_vars.add(lhs)
                 # need to remove the lhs definition so that find_callname can
                 # match column function calls (i.e. A.f instead of df.A.f)
                 assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
                 self.func_ir._definitions[lhs] = [None]
 
-            # c = df.column.values
-            if (rhs.op == 'getattr' and rhs.value.name in self.df_cols and
-                    rhs.attr == 'values'):
-                # simply return the column
-                # output is array so it's not added to df_cols
-                assign.value = rhs.value
-                return [assign]
-
-            # replace getitems on timestamp series with function
-            # for proper type inference
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and rhs.value.name in self.ts_series_vars):
-                if rhs.op == 'getitem':
-                    ind_var = rhs.index
-                else:
-                    ind_var = rhs.index_var
-                def f(_ts_series, _ind):  # pragma: no cover
-                    _val = hpat.hiframes_api.ts_series_getitem(_ts_series, _ind)
-
-                f_block = compile_to_numba_ir(
-                    f, {'hpat': hpat}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [rhs.value, ind_var])
-                nodes = f_block.body[:-3]  # remove none return
-                nodes[-1].target = assign.target
-                # output could be series in case of slice index
-                # FIXME: this is fragile
-                self.ts_series_vars.add(lhs)
-                return nodes
-
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and rhs.value.name in self.dt_date_series_vars):
-                if rhs.op == 'getitem':
-                    ind_var = rhs.index
-                else:
-                    ind_var = rhs.index_var
-                def f(_dt_series, _ind):  # pragma: no cover
-                    _val = hpat.pd_timestamp_ext.int_to_datetime_date(_dt_series[_ind])
-
-                f_block = compile_to_numba_ir(
-                    f, {'hpat': hpat}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [rhs.value, ind_var])
-                nodes = f_block.body[:-3]  # remove none return
-                nodes[-1].target = assign.target
-                # output could be series in case of slice index
-                # FIXME: this is fragile
-                self.dt_date_series_vars.add(lhs)
-                return nodes
+            # A = df.values
+            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
+                    and rhs.attr == 'values'):
+                return self._handle_df_values(assign.target, rhs.value)
 
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
@@ -266,14 +262,8 @@ class HiFrames(object):
             self.df_vars[lhs] = self.df_vars[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.df_labels:
             self.df_labels[lhs] = self.df_labels[rhs.name]
-        if isinstance(rhs, ir.Var) and rhs.name in self.df_cols:
-            self.df_cols.add(lhs)
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
-        if isinstance(rhs, ir.Var) and rhs.name in self.ts_series_vars:
-            self.ts_series_vars.add(lhs)
-        if isinstance(rhs, ir.Var) and rhs.name in self.dt_date_series_vars:
-            self.dt_date_series_vars.add(lhs)
         return [assign]
 
     def _run_call(self, assign, label):
@@ -299,11 +289,14 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        if fdef == ('read_csv', 'pandas'):
+            return self._handle_pd_read_csv(assign, lhs, rhs, label)
+
+        if fdef == ('Series', 'pandas'):
+            return self._handle_pd_Series(assign, lhs, rhs)
+
         if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
             return self._df_len(lhs, rhs.args[0])
-
-        if fdef == ('DatetimeIndex', 'pandas'):
-            return self._handle_pd_DatetimeIndex(assign, lhs, rhs)
 
         if fdef == ('read_table', 'pyarrow.parquet'):
             return self._handle_pq_read_table(assign, lhs, rhs)
@@ -312,96 +305,380 @@ class HiFrames(object):
                 and func_mod.name in self.arrow_tables):
             return self._handle_pq_to_pandas(assign, lhs, rhs, func_mod, label)
 
+        if fdef == ('read_parquet', 'pandas'):
+            return self._handle_pd_read_parquet(assign, lhs, rhs, label)
+
         if fdef == ('merge', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs, label)
+            return self._handle_merge(assign, lhs, rhs, False, label)
+
+        if fdef == ('merge_asof', 'pandas'):
+            return self._handle_merge(assign, lhs, rhs, True, label)
 
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
 
+        if fdef == ('crosstab', 'pandas'):
+            return self._handle_crosstab(lhs, rhs, label)
+
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
-
-        # df.column.shift(3)
-        if isinstance(func_mod, ir.Var) and func_mod.name in self.df_cols:
-            return self._handle_column_call(assign, lhs, rhs, func_mod, func_name, label)
-
-        # df.apply(lambda a:..., axis=1)
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'apply'):
-            return self._handle_df_apply(assign, lhs, rhs, func_mod)
-
-        # df.describe()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'describe'):
-            return self._handle_df_describe(assign, lhs, rhs, func_mod)
-
-        # df.sort_values()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'sort_values'):
-            return self._handle_df_sort_values(assign, lhs, rhs, func_mod)
-
-        # df.itertuples()
-        if (isinstance(func_mod, ir.Var) and self._is_df_var(func_mod)
-                and func_name == 'itertuples'):
-            return self._handle_df_itertuples(assign, lhs, rhs, func_mod)
-
-        res = self._handle_rolling_call(assign.target, rhs)
-        if res is not None:
-            return res
+        if isinstance(func_mod, ir.Var) and self._is_df_var(func_mod):
+            return self._run_call_df(
+                assign, lhs, rhs, func_mod, func_name, label)
 
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-        if isinstance(func_mod, ir.Var) and self._is_groupby(func_mod):
+        if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'groupby'):
             return self._handle_aggregate(lhs, rhs, func_mod, func_name, label)
+
+        # rolling window
+        # e.g. df.rolling(2).sum
+        if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
+            return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
+
+
+        if fdef == ('File', 'h5py'):
+            return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
         if fdef == ('fromfile', 'numpy'):
             return hpat.io._handle_np_fromfile(assign, lhs, rhs)
 
         if fdef == ('read_xenon', 'hpat.xenon_ext'):
             col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.func_ir)
-            col_map = self._process_df_build_map(col_items)
+            df_nodes, col_map = self._process_df_build_map(col_items)
             self._create_df(lhs.name, col_map, label)
+            nodes += df_nodes
             return nodes
 
         return [assign]
 
-    def _run_binop(self, assign):
-        """wrap binops with timeseries data in case type conversion is required
-        """
-        # TODO: proper Series/Timeseries type to avoid this
-        lhs = assign.target
-        rhs = assign.value
+    def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
+        # df.apply(lambda a:..., axis=1)
+        if func_name == 'apply':
+            return self._handle_df_apply(assign, lhs, rhs, df_var)
 
-        # no timeseries, not needed
-        if rhs.rhs.name not in self.ts_series_vars and rhs.lhs.name not in self.ts_series_vars:
-            return [assign]
+        # df.describe()
+        if func_name == 'describe':
+            return self._handle_df_describe(assign, lhs, rhs, df_var)
 
-        # both timeseries, not needed
-        if rhs.rhs.name in self.ts_series_vars and rhs.lhs.name in self.ts_series_vars:
-            self.ts_series_vars.add(lhs.name)
-            self.df_cols.add(lhs.name)
-            return [assign]
+        # df.sort_values()
+        if func_name == 'sort_values':
+            return self._handle_df_sort_values(assign, lhs, rhs, df_var, label)
 
-        if rhs.rhs.name in self.ts_series_vars:
-            ts_arr = rhs.rhs
-            other = rhs.lhs
+        # df.itertuples()
+        if func_name == 'itertuples':
+            return self._handle_df_itertuples(assign, lhs, rhs, df_var)
+
+        # df.pivot_table()
+        if func_name == 'pivot_table':
+            return self._handle_df_pivot_table(lhs, rhs, df_var, label)
+
+        # df.head()
+        if func_name == 'head':
+            return self._handle_df_head(lhs, rhs, df_var, label)
+
+        # df.isin()
+        if func_name == 'isin':
+            return self._handle_df_isin(lhs, rhs, df_var, label)
+
+        # df.append()
+        if func_name == 'append':
+            return self._handle_df_append(lhs, rhs, df_var, label)
+
+        # df.fillna()
+        if func_name == 'fillna':
+            return self._handle_df_fillna(lhs, rhs, df_var, label)
+
+        # df.dropna()
+        if func_name == 'dropna':
+            return self._handle_df_dropna(lhs, rhs, df_var, label)
+
+        # df.drop()
+        if func_name == 'drop':
+            return self._handle_df_drop(lhs, rhs, df_var, label)
+
+        # df.merge()
+        if func_name == 'merge':
+            rhs.args.insert(0, df_var)
+            return self._handle_merge(assign, lhs, rhs, False, label)
+
+        if func_name not in ('groupby', 'rolling'):
+            raise NotImplementedError(
+                "data frame function {} not implemented yet".format(func_name))
+
+        return [assign]
+
+    def _handle_df_head(self, lhs, rhs, df_var, label):
+        nodes = []
+        out_df_map = {}
+
+        if len(rhs.args) == 0:
+            def series_head(a):
+                res = a.head()
         else:
-            ts_arr = rhs.lhs
-            other = rhs.rhs
+            if len(rhs.args) != 1:
+                raise ValueError("invalid df.head args")
+            def series_head(a, n):
+                res = a.head(n)
 
-        func_text = "def f(ts_arr, other):\n"
-        func_text += "    s = hpat.hiframes_api.ts_binop_wrapper('{}', ts_arr, other)\n".format(rhs.fn)
+        for cname, in_var in self.df_vars[df_var.name].items():
+            f_block = compile_to_numba_ir(series_head, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var] + rhs.args)
+            nodes += f_block.body[:-3]  # remove none return
+            out_df_map[cname] = nodes[-1].target
+
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
+
+
+    def _handle_df_isin(self, lhs, rhs, df_var, label):
+        other = self._get_arg('isin', rhs.args, dict(rhs.kws), 0, 'values')
+        other_colmap = {}
+        df_col_map = self._get_df_cols(df_var)
+        nodes = []
+        df_case = False
+
+        # dataframe case
+        if self._is_df_var(other):
+            df_case = True
+            arg_df_map = self._get_df_cols(other)
+            for cname in df_col_map:
+                if cname in arg_df_map:
+                    other_colmap[cname] = arg_df_map[cname]
+        else:
+            other_def = guard(get_definition, self.func_ir, other)
+            # dict case
+            if isinstance(other_def, ir.Expr) and other_def.op == 'build_map':
+                for c, v in other_def.items:
+                    cname = guard(find_const, self.func_ir, c)
+                    if not isinstance(cname, str):
+                        raise ValueError("dictionary argument to isin() should have constant keys")
+                    other_colmap[cname] = v
+            else:
+                # general iterable (e.g. list, set) case
+                # TODO: handle passed in dict case (pass colname to func?)
+                other_colmap = {c: other for c in df_col_map.keys()}
+
+        out_df_map = {}
+        isin_func = lambda A, B: hpat.hiframes_api.df_isin(A, B)
+        isin_vals_func = lambda A, B: hpat.hiframes_api.df_isin_vals(A, B)
+        # create array of False values used when other col not available
+        bool_arr_func = lambda A: hpat.hiframes_api.to_series_type(np.zeros(len(A), np.bool_))
+        # use the first array of df to get len. TODO: check for empty df
+        false_arr_args = [list(df_col_map.values())[0]]
+
+        for cname, in_var in self.df_vars[df_var.name].items():
+            if cname in other_colmap:
+                if df_case:
+                    func = isin_func
+                else:
+                    func = isin_vals_func
+                other_col_var = other_colmap[cname]
+                args = [in_var, other_col_var]
+            else:
+                func = bool_arr_func
+                args = false_arr_args
+            f_block = compile_to_numba_ir(func, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            out_df_map[cname] = nodes[-1].target
+
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
+
+    def _handle_df_append(self, lhs, rhs, df_var, label):
+        other = self._get_arg('append', rhs.args, dict(rhs.kws), 0, 'other')
+        # only handles df or list of df input
+        # TODO: check for series/dict/list input
+        # TODO: enforce ignore_index=True?
+        # single df case
+        if self._is_df_var(other):
+            return self._handle_concat_df(lhs, [df_var, other], label)
+        # list of dfs
+        df_list = guard(get_definition, self.func_ir, other)
+        if len(df_list.items) > 0 and self._is_df_var(df_list.items[0]):
+            return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
+        raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
+
+    def _handle_df_fillna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("fillna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        val_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 0, 'value')
+        inplace_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
+
+        _fillna_func = lambda A, val, inplace: A.fillna(val, inplace=inplace)
+        out_col_map = {}
+        for cname, in_var in self._get_df_cols(df_var).items():
+            f_block = compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, val_var, inplace_var])
+            nodes += f_block.body[:-2]
+            out_col_map[cname] = nodes[-1].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        return nodes
+
+    def _handle_df_dropna(self, lhs, rhs, df_var, label):
+        nodes = []
+        inplace_default = ir.Var(lhs.scope, mk_unique_var("dropna_default"), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
+        inplace_var = self._get_arg('dropna', rhs.args, dict(rhs.kws), 4, 'inplace', default=inplace_default)
+
+        col_names = self._get_df_col_names(df_var)
+        col_vars = self._get_df_col_vars(df_var)
+        arg_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+        out_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
+
+        func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
+        func_text += "  ({},) = hpat.hiframes_api.dropna(({},), inplace)\n".format(
+            out_names, arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
-        ts_binop_f = loc_vars['f']
+        _dropna_imp = loc_vars['_dropna_imp']
 
-        f_block = compile_to_numba_ir(ts_binop_f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [ts_arr, other])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        self.df_cols.add(lhs.name)
+        f_block = compile_to_numba_ir(_dropna_imp, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, col_vars + [inplace_var])
+        nodes += f_block.body[:-3]
+
+        # extract column vars from output
+        out_col_map = {}
+        for i, cname in enumerate(col_names):
+            out_col_map[cname] = nodes[-len(col_names) + i].target
+
+        # create output df if not inplace
+        if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        else:
+            # assign back to column vars for inplace case
+            for i in range(len(col_vars)):
+                c_var = col_vars[i]
+                dropped_var = list(out_col_map.values())[i]
+                nodes.append(ir.Assign(dropped_var, c_var, lhs.loc))
         return nodes
+
+    def _handle_df_drop(self, lhs, rhs, df_var, label):
+        # df.drop(labels=None, axis=0, index=None, columns=None, level=None,
+        #         inplace=False, errors='raise')
+        kws = dict(rhs.kws)
+        labels_var = self._get_arg('drop', rhs.args, kws, 0, 'labels', '')
+        axis_var = self._get_arg('drop', rhs.args, kws, 1, 'axis', '')
+        labels = self._get_str_or_list(labels_var, default='')
+        axis = guard(find_const, self.func_ir, axis_var)
+
+        if labels != '' and axis is not None:
+            if axis != 1:
+                raise ValueError("only dropping columns (axis=1) supported")
+            columns = labels
+        else:
+            columns_var = self._get_arg('drop', rhs.args, kws, 3, 'columns', '')
+            err_msg = ("columns argument (constant string list) "
+                       "or labels and axis required")
+            columns = self._get_str_or_list(columns_var, err_msg=err_msg)
+
+        inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
+        inplace = guard(find_const, self.func_ir, inplace_var)
+
+        if inplace is not None and inplace == True:
+            df_label = self.df_labels[df_var.name]
+            cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+            # dropping columns inplace possible only when it dominates the df
+            # creation to keep schema consistent
+            if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
+                raise ValueError("dropping dataframe columns inplace inside "
+                             "conditionals and loops not supported yet")
+            # TODO: rename df name
+            # TODO: support dropping columns of input dfs (reflection)
+            for cname in columns:
+                self.df_vars[df_var.name].pop(cname)
+            return []
+
+        in_df_map = self._get_df_cols(df_var)
+        nodes = []
+        out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
+                      for c in in_df_map.keys() if c not in columns}
+        self._create_df(lhs.name, out_df_map, label)
+        return nodes
+
+    def _is_iloc_loc(self, var):
+        val_def = guard(get_definition, self.func_ir, var)
+        # check for df.at[] pattern
+        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr in ('iloc', 'loc')
+                and self._is_df_var(val_def.value))
+
+    def _is_iat(self, var):
+        val_def = guard(get_definition, self.func_ir, var)
+        # check for df.at[] pattern
+        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr == 'iat' and self._is_df_var(val_def.value))
+
+    def _handle_iat_getitem(self, assign, lhs, rhs):
+        if rhs.op == 'static_getitem':
+            index_var = rhs.index_var
+        else:
+            index_var = rhs.index
+
+        val_def = guard(get_definition, self.func_ir, rhs.value)
+        df = val_def.value  # check already done in _is_iat
+        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
+        getitem_node = ir.Expr.getitem(col_var, row_ind, rhs.loc)
+        assign.value = getitem_node
+        nodes.append(assign)
+        return nodes
+
+    def _handle_iat_setitem(self, target, index_var, val, loc):
+        val_def = guard(get_definition, self.func_ir, target)
+        df = val_def.value  # check already done in _is_iat
+        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
+        setitem_node = ir.SetItem(col_var, row_ind, val, loc)
+        nodes.append(setitem_node)
+        return nodes
+
+    def _get_iat_col_ind(self, df, index_var):
+        nodes = []
+        scope = index_var.scope
+        loc = index_var.loc
+        # find column/row indices
+        col_ind = None
+        row_ind = None
+        ind_def = guard(get_definition, self.func_ir, index_var)
+
+        # index is constant tuple
+        if isinstance(ind_def, ir.Const):
+            val = ind_def.value
+            if not isinstance(val, tuple) or not len(val) == 2:
+                raise ValueError("invalid index {} for df.iat[]".format(val))
+            row_ind, col_ind = val
+            r_var = ir.Var(scope, mk_unique_var(index_var.name), loc)
+            nodes.append(ir.Assign(ir.Const(row_ind, loc), r_var, loc))
+            row_ind = r_var
+
+        # index is variable tuple
+        elif isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple':
+            if len(ind_def.items) != 2:
+                raise ValueError("invalid index length for df.iat[], "
+                                 "[row, column] expected")
+            row_ind = ind_def.items[0]
+            col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+            if col_ind is None:
+                raise ValueError("column index in iat[] should be constant")
+        else:
+            raise ValueError("invalid index in iat[]")
+
+        # XXX assuming the order of the dictionary is the same as Pandas
+        # TODO: check dictionary order
+        col_var_list = list(self._get_df_cols(df).values())
+        if not col_ind < len(col_var_list):
+            raise ValueError("invalid column index in iat[]")
+        col_var = col_var_list[col_ind]
+
+        return col_var, row_ind, nodes
 
     def _get_reverse_copies(self, body):
         for inst in body:
@@ -429,35 +706,129 @@ class HiFrames(object):
                 or arg_def.op != 'build_map'):  # pragma: no cover
             raise ValueError(
                 "Invalid DataFrame() arguments (constant dict of columns expected)")
-        out, items = self._fix_df_arrays(arg_def.items)
-        col_map = self._process_df_build_map(items)
+        nodes, items = self._fix_df_arrays(arg_def.items)
+        df_nodes, col_map = self._process_df_build_map(items)
+        nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
         # remove DataFrame call
-        return out
+        return nodes
 
-    def _handle_pd_DatetimeIndex(self, assign, lhs, rhs):
-        """transform pd.DatetimeIndex() call with string array argument
+    def _handle_pd_read_csv(self, assign, lhs, rhs, label):
+        """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError(
-                "Invalid DatetimeIndex() arguments (one expected)")
+        # schema: pd.read_csv(filepath_or_buffer, sep=',', delimiter=None,
+        # header='infer', names=None, index_col=None, usecols=None,
+        # squeeze=False, prefix=None, mangle_dupe_cols=True, dtype=None,
+        # engine=None, converters=None, true_values=None, false_values=None,
+        # skipinitialspace=False, skiprows=None, nrows=None, na_values=None,
+        # keep_default_na=True, na_filter=True, verbose=False,
+        # skip_blank_lines=True, parse_dates=False,
+        # infer_datetime_format=False, keep_date_col=False, date_parser=None,
+        # dayfirst=False, iterator=False, chunksize=None, compression='infer',
+        # thousands=None, decimal=b'.', lineterminator=None, quotechar='"',
+        # quoting=0, escapechar=None, comment=None, encoding=None,
+        # dialect=None, tupleize_cols=None, error_bad_lines=True,
+        # warn_bad_lines=True, skipfooter=0, doublequote=True,
+        # delim_whitespace=False, low_memory=True, memory_map=False,
+        # float_precision=None)
 
-        def f(str_arr):
-            numba.parfor.init_prange()
-            n = len(str_arr)
-            S = numba.unsafe.ndarray.empty_inferred((n,))
-            for i in numba.parfor.internal_prange(n):
-                S[i] = hpat.pd_timestamp_ext.parse_datetime_str(str_arr[i])
-            ret = S
+        kws = dict(rhs.kws)
+        fname = self._get_arg('read_csv', rhs.args, kws, 0, 'filepath_or_buffer')
+        sep = self._get_str_arg('read_csv', rhs.args, kws, 1, 'sep', ',')
+        sep = self._get_str_arg('read_csv', rhs.args, kws, 2, 'delimiter', sep)
+        # TODO: header arg
+        names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names')
+        err_msg = "pd.read_csv() names should be constant list"
+        col_names = self._get_str_or_list(names_var, err_msg=err_msg)
+        usecols_var = self._get_arg('read_csv', rhs.args, kws, 6, 'usecols', '')
+        usecols = list(range(len(col_names)))
+        if usecols_var != '':
+            err_msg = "pd.read_csv() usecols should be constant list of ints"
+            usecols = self._get_str_or_list(usecols_var, err_msg=err_msg, typ=int)
+        # TODO: support other args
+        dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype')
 
-        f_ir = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba})
-        topo_order = find_topo_order(f_ir.blocks)
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [rhs.args[0]])
-        # FIXME: refactor
-        output_arr = f_ir.blocks[topo_order[-1]].body[-4].target
-        self.ts_series_vars.add(output_arr.name)
-        return f_ir.blocks
+        dtype_map = guard(get_definition, self.func_ir, dtype_var)
+        if (not isinstance(dtype_map, ir.Expr)
+                 or dtype_map.op != 'build_map'):  # pragma: no cover
+            raise ValueError("pd.read_csv() dtype should be constant dictionary")
+
+        date_cols = []
+        if 'parse_dates' in kws:
+            date_list = guard(get_definition, self.func_ir, kws['parse_dates'])
+            if not isinstance(date_list, ir.Expr) or date_list.op != 'build_list':
+                raise ValueError("pd.read_csv() parse_dates should be constant list")
+            for v in date_list.items:
+                col_val = guard(find_const, self.func_ir, v)
+                if col_val is None:
+                    raise ValueError("pd.read_csv() parse_dates expects constant column numbers")
+                date_cols.append(col_val)
+
+        col_map = {}
+        out_types = []
+        for i, (name_var, dtype_var) in enumerate(dtype_map.items):
+            col_name = guard(find_const, self.func_ir, name_var)
+            if col_name is None:  # pragma: no cover
+                raise ValueError("dtype column names should be constant")
+            typ = self._get_const_dtype(dtype_var)
+            if i in date_cols:
+                typ = SeriesType(types.NPDatetime('ns'), 1, 'C')
+            out_types.append(typ)
+            col_map[col_name] = ir.Var(
+                lhs.scope, mk_unique_var(col_name), lhs.loc)
+
+        self._create_df(lhs.name, col_map, label)
+        return [csv_ext.CsvReader(
+            fname, lhs.name, sep, list(col_map.keys()), list(col_map.values()), out_types, usecols, lhs.loc)]
+
+    def _get_const_dtype(self, dtype_var):
+        dtype_def = guard(get_definition, self.func_ir, dtype_var)
+        # str case
+        if isinstance(dtype_def, ir.Global) and dtype_def.value == str:
+            return string_array_type
+        # categorical case
+        if isinstance(dtype_def, ir.Expr) and dtype_def.op == 'call':
+            if (not guard(find_callname, self.func_ir, dtype_def)
+                    == ('category', 'pandas.core.dtypes.dtypes')):
+                raise ValueError("pd.read_csv() invalid dtype "
+                    "(built using a call but not Categorical)")
+            cats_var = self._get_arg('CategoricalDtype', dtype_def.args,
+                dict(dtype_def.kws), 0, 'categories')
+            err_msg = "categories should be constant list"
+            cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
+            typ = PDCategoricalDtype(cats)
+            return SeriesType(typ, 1, 'C')
+        if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
+            raise ValueError("pd.read_csv() invalid dtype")
+        glob_def = guard(get_definition, self.func_ir, dtype_def.value)
+        if not isinstance(glob_def, ir.Global) or glob_def.value != np:
+            raise ValueError("pd.read_csv() invalid dtype")
+        # TODO: extend to other types like string and date, check error
+        typ_name = dtype_def.attr
+        typ_name = 'int64' if typ_name == 'int' else typ_name
+        typ_name = 'float64' if typ_name == 'float' else typ_name
+        typ = getattr(types, typ_name)
+        typ = SeriesType(typ, 1, 'C')
+        return typ
+
+    def _handle_pd_Series(self, assign, lhs, rhs):
+        """transform pd.Series(A) call
+        """
+        kws = dict(rhs.kws)
+        if 'data' in kws:
+            data = kws['data']
+            if len(rhs.args) != 0:  # pragma: no cover
+                raise ValueError(
+                    "only data argument suppoted in pd.Series()")
+        else:
+            if len(rhs.args) != 1:  # pragma: no cover
+                raise ValueError(
+                    "data argument in pd.Series() expected")
+            data = rhs.args[0]
+
+        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
+                hpat.hiframes_api.fix_df_array(arr)),
+            [data])
 
     def _df_len(self, lhs, df_var):
         # run len on one of the columns
@@ -469,12 +840,8 @@ class HiFrames(object):
             return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
         arr = df_arrs[0]
         def f(df_arr):  # pragma: no cover
-            df_len = len(df_arr)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [arr])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+            return len(df_arr)
+        return self._replace_func(f, [arr])
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
@@ -483,34 +850,64 @@ class HiFrames(object):
         return []
 
     def _handle_pq_to_pandas(self, assign, lhs, rhs, t_var, label):
+        return self._gen_parquet_read(self.arrow_tables[t_var.name], lhs, label)
+
+    def _gen_parquet_read(self, fname, lhs, label):
         col_items, col_types, nodes = self.pq_handler.gen_parquet_read(
-            self.arrow_tables[t_var.name], lhs)
-        for v, t in zip(col_items, col_types):
-            if t == types.Array(types.NPDatetime('ns'), 1, 'C'):
-                self.ts_series_vars.add(v[1].name)
-        col_map = self._process_df_build_map(col_items)
+            fname, lhs)
+        df_nodes, col_map = self._process_df_build_map(col_items)
+        nodes += df_nodes
         self._create_df(lhs.name, col_map, label)
         return nodes
 
-    def _handle_merge(self, assign, lhs, rhs, label):
+    def _handle_pd_read_parquet(self, assign, lhs, rhs, label):
+        fname = rhs.args[0]
+        return self._gen_parquet_read(fname, lhs, label)
+
+    def _handle_merge(self, assign, lhs, rhs, is_asof, label):
         """transform pd.merge() into a Join node
+
+        signature: pd.merge(left, right, how='inner', on=None, left_on=None,
+            right_on=None, left_index=False, right_index=False, sort=False,
+            suffixes=('_x', '_y'), copy=True, indicator=False, validate=None)
+        pd.merge_asof(left, right, on=None, left_on=None, right_on=None,
+        left_index=False, right_index=False, by=None, left_by=None,
+        right_by=None, suffixes=('_x', '_y'), tolerance=None,
+        allow_exact_matches=True, direction='backward')
         """
-        if len(rhs.args) < 2:
-            raise ValueError("left and right arguments required for merge")
-        left_df = rhs.args[0]
-        right_df = rhs.args[1]
         kws = dict(rhs.kws)
-        if 'on' in kws:
-            left_on = get_constant(self.func_ir, kws['on'], None)
+        left_df = self._get_arg('merge', rhs.args, kws, 0, 'left')
+        right_df = self._get_arg('merge', rhs.args, kws, 1, 'right')
+        on_argno = 3  # merge() has 'how' arg but merge_asof doesn't
+        if is_asof:
+            how = 'asof'
+            on_argno = 2
+        else:
+            how =  self._get_str_arg('merge', rhs.args, kws, 2, 'how', 'inner')
+
+        # find key columns
+        left_on = right_on = None
+        on_arg = self._get_arg('merge', rhs.args, kws, on_argno, 'on', '')
+        on = self._get_str_or_list(on_arg, default=[''])
+
+        if on != ['']:
+            left_on = on
             right_on = left_on
         else:  # pragma: no cover
-            if 'left_on' not in kws or 'right_on' not in kws:
-                raise ValueError("merge 'on' or 'left_on'/'right_on'"
-                                 "arguments required")
-            left_on = get_constant(self.func_ir, kws['left_on'], None)
-            right_on = get_constant(self.func_ir, kws['right_on'], None)
-        if left_on is None or right_on is None:
-            raise ValueError("merge key values should be constant strings")
+            err_msg = "merge 'on' or 'left_on'/'right_on' arguments required"
+            left_on_var = self._get_arg('merge', rhs.args, kws, on_argno+1,
+                                                    'left_on', err_msg=err_msg)
+            left_on = self._get_str_or_list(left_on_var, err_msg=err_msg)
+            right_on_var = self._get_arg('merge', rhs.args, kws, on_argno+2,
+                                                   'right_on', err_msg=err_msg)
+            right_on = self._get_str_or_list(right_on_var, err_msg=err_msg)
+
+        # convert right join to left join
+        if how == 'right':
+            how = 'left'
+            left_df, right_df = right_df, left_df
+            left_on, right_on = right_on, left_on
+
         scope = lhs.scope
         loc = lhs.loc
         # add columns from left to output
@@ -524,7 +921,8 @@ class HiFrames(object):
         self._create_df(lhs.name, df_col_map, label)
         return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
-                                   left_on, right_on, self.df_vars, lhs.loc)]
+                                   left_on, right_on, self.df_vars, how,
+                                   lhs.loc)]
 
     def _handle_concat(self, assign, lhs, rhs, label):
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
@@ -540,14 +938,10 @@ class HiFrames(object):
             raise ValueError("No objects to concatenate")
 
         first_varname = df_list.items[0].name
-        # the inputs should be either dataframe or series
-        if not (first_varname in self.df_vars
-                or first_varname in self.df_cols):
-            raise ValueError("pd.concat input should be pd.Series or pd.DataFrame")
 
         if first_varname in self.df_vars:
-            return self._handle_concat_df(lhs, df_list, label)
-        assert first_varname in self.df_cols
+            return self._handle_concat_df(lhs, df_list.items, label)
+
         # XXX convert build_list to build_tuple since Numba doesn't handle list of
         # arrays
         if df_list.op == 'build_list':
@@ -557,58 +951,50 @@ class HiFrames(object):
     def _handle_concat_df(self, lhs, df_list, label):
         # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
+
+        # get output column names
+        all_colnames = []
+        for df in df_list:
+            all_colnames.extend(self._get_df_col_names(df))
+        # TODO: verify how Pandas sorts column names
+        all_colnames = sorted(set(all_colnames))
+
+        # generate a concat call for each output column
+        # TODO: support non-numericals like string
+        gen_nan_func = lambda A: np.full(len(A), np.nan)
+        # gen concat function
+        arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
+        func_text = "def _concat_imp({}):\n".format(arg_names)
+        func_text += "    return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
+            arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _concat_imp = loc_vars['_concat_imp']
+
         done_cols = {}
-        i = 0
-        for df in df_list.items:
-            df_col_map = self._get_df_cols(df)
-            for (c, v) in df_col_map.items():
-                if c in done_cols:
-                    continue
-                # arguments to the generated function
-                args = [v]
-                # names of arguments to the generated function
-                arg_names = ['_hpat_c' + str(i)]
-                # arguments to the concatenate function
-                conc_arg_names = ['_hpat_c' + str(i)]
-                allocs = ""
-                i += 1
-                for other_df in df_list.items:
-                    if other_df.name == df.name:
-                        continue
-                    if self._is_df_colname(other_df, c):
-                        other_var = self._get_df_colvar(other_df, c)
-                        args.append(other_var)
-                        arg_names.append('_hpat_c' + str(i))
-                        conc_arg_names.append('_hpat_c' + str(i))
-                        i += 1
-                    else:
-                        # use a df column variable just for computing length
-                        len_arg = self._get_df_col_vars(other_df)[0]
-                        len_name = '_hpat_len' + str(i)
-                        args.append(len_arg)
-                        arg_names.append(len_name)
-                        i += 1
-                        out_name = '_hpat_out' + str(i)
-                        conc_arg_names.append(out_name)
-                        i += 1
-                        # TODO: fix type
-                        # TODO: allocate string array of NAs
-                        allocs += "    {} = np.full(len({}), np.nan)\n".format(
-                            out_name, len_name)
-
-                func_text = "def f({}):\n".format(",".join(arg_names))
-                func_text += allocs
-                func_text += "    s = hpat.hiframes_api.concat(({}))\n".format(
-                    ",".join(conc_arg_names))
-                loc_vars = {}
-                exec(func_text, {}, loc_vars)
-                f = loc_vars['f']
-
-                f_block = compile_to_numba_ir(f,
+        for cname in all_colnames:
+            # arguments to the generated function
+            args = []
+            # get input columns
+            for df in df_list:
+                df_col_map = self._get_df_cols(df)
+                # generate full NaN column
+                if cname not in df_col_map:
+                    # use a df column just for len()
+                    len_arr = list(df_col_map.values())[0]
+                    f_block = compile_to_numba_ir(gen_nan_func,
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, args)
-                nodes += f_block.body[:-3]
-                done_cols[c] = nodes[-1].target
+                    replace_arg_nodes(f_block, [len_arr])
+                    nodes += f_block.body[:-2]
+                    args.append(nodes[-1].target)
+                else:
+                    args.append(df_col_map[cname])
+
+            f_block = compile_to_numba_ir(_concat_imp,
+                        {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            done_cols[cname] = nodes[-1].target
 
         self._create_df(lhs.name, done_cols, label)
         return nodes
@@ -616,13 +1002,8 @@ class HiFrames(object):
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            concat_arr = hpat.hiframes_api.concat(arr_list)
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, rhs.args)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        self.df_cols.add(lhs.name)
-        return nodes
+            return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
+        return self._replace_func(f, rhs.args)
 
     def _handle_ros(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
@@ -658,6 +1039,7 @@ class HiFrames(object):
 
     def _process_df_build_map(self, items_list):
         df_cols = {}
+        nodes = []
         for item in items_list:
             col_var = item[0]
             if isinstance(col_var, str):
@@ -667,14 +1049,16 @@ class HiFrames(object):
                 if col_name is NOT_CONSTANT:  # pragma: no cover
                     raise ValueError(
                         "data frame column names should be constant")
-            df_cols[col_name] = item[1]
-        return df_cols
-
-    def _update_df_cols(self):
-        for df_name, cols_map in self.df_vars.items():
-            for col_name, col_var in cols_map.items():
-                self.df_cols.add(col_var.name)
-        return
+            # cast to series type
+            def f(arr):  # pragma: no cover
+                df_arr = hpat.hiframes_api.to_series_type(arr)
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [item[1]])
+            nodes += f_block.body[:-3]  # remove none return
+            new_col_arr = nodes[-1].target
+            df_cols[col_name] = new_col_arr
+        return nodes, df_cols
 
     def _handle_df_apply(self, assign, lhs, rhs, func_mod):
         # check for axis=1
@@ -737,7 +1121,7 @@ class HiFrames(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "     row = Row({})\n".format(row_args)
         func_text += "     S[i] = map_func(row)\n"
-        func_text += "  ret = S\n"
+        func_text += "  return S\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -760,7 +1144,6 @@ class HiFrames(object):
                         inline_closure_call(f_ir, _globals, block, i, func)
                         break
 
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
         df_col_map = self._get_df_cols(func_mod)
         col_vars = [df_col_map[c] for c in used_cols]
         replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
@@ -794,7 +1177,7 @@ class HiFrames(object):
 
 
         col_header = "      ".join([c for c in col_names])
-        func_text += "  res = '        {}\\n' + \\\n".format(col_header)
+        func_text += "  return '        {}\\n' + \\\n".format(col_header)
         count_strs = "+ '   ' + ".join(["str({}_count)".format(c) for c in col_name_args])
         func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
         mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
@@ -816,34 +1199,41 @@ class HiFrames(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         col_vars = self._get_df_col_vars(func_mod)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
+        return self._replace_func(f, col_vars)
 
-    def _handle_df_sort_values(self, assign, lhs, rhs, df):
+    def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)
         # find key array for sort ('by' arg)
-        key_name = None
-        if len(rhs.args) > 0:
-            key_name = guard(find_const, self.func_ir, rhs.args[0])
-        else:
-            key_name = kws['by'] if 'by' in kws else None
-        if key_name is None:
-            raise ValueError("'by' argument is required for sort_values() "
+        by_arg = self._get_arg('sort_values', rhs.args, kws, 0, 'by')
+        err_msg = ("'by' argument is required for sort_values() "
                              "which should be a constant string")
-        # TODO: support inplace=False
-        assert 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True
-        # TODO: support multiple columns as key
+        key_names = self._get_str_or_list(by_arg, err_msg=err_msg)
+
+        inplace = False
+        if 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True:
+            inplace = True
+
         # TODO: support ascending=False
 
-        df_cols = self._get_df_cols(df).copy()  # copy since it'll be modified
-        assert key_name in df_cols
-        key_var = df_cols.pop(key_name)
-        return [hiframes_sort.Sort(df.name, key_var, df_cols, lhs.loc)]
+        out = []
+        in_df = self._get_df_cols(df).copy()  # copy since it'll be modified
+        out_df = in_df.copy()
+        if not inplace:
+            out_df = {cname: ir.Var(lhs.scope, mk_unique_var(v.name), lhs.loc)
+                                                for cname, v in in_df.items()}
+            self._create_df(lhs.name, out_df.copy(), label)
+
+        if any(k not in in_df for k in key_names):
+            raise ValueError("invalid sort keys {}".format(key_names))
+
+        # remove key from dfs (only data is kept)
+        key_vars = [in_df.pop(k) for k in key_names]
+        out_key_vars = [out_df.pop(k) for k in key_names]
+
+        out.append(hiframes_sort.Sort(df.name, lhs.name, key_vars, out_key_vars,
+                                      in_df, out_df, inplace, lhs.loc))
+        return out
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
         """pass df column names and variables to get_itertuples() to be able
@@ -856,119 +1246,15 @@ class HiFrames(object):
         name_consts = ', '.join(["'{}'".format(c) for c in col_names])
 
         func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  it = hpat.hiframes_api.get_itertuples({}, {})\n"\
+        func_text += "  return hpat.hiframes_api.get_itertuples({}, {})\n"\
                                             .format(name_consts, col_name_args)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-
         col_vars = self._get_df_col_vars(df_var)
-        replace_arg_nodes(f_block, col_vars)
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
-
-    def _handle_column_call(self, assign, lhs, rhs, col_var, func_name, label):
-        """
-        Handle Series calls like:
-          A = df.column.shift(3)
-        """
-        # TODO: handle map/apply differences
-        if func_name in ['map', 'apply']:
-            return self._handle_map(assign, lhs, rhs, col_var, label)
-
-        if func_name == 'rolling':
-            return self._handle_rolling_setup(assign, lhs, rhs, col_var)
-
-        if func_name == 'str.contains':
-            return self._handle_str_contains(assign, lhs, rhs, col_var)
-
-        if func_name in df_col_funcs:
-            return self._gen_column_call(lhs, rhs.args, col_var, func_name,
-                                         dict(rhs.kws))
-        return [assign]
-
-    def _handle_map(self, assign, lhs, rhs, col_var, label):
-        """translate df.A.map(lambda a:...) to prange()
-        """
-        # error checking: make sure there is function input only
-        if len(rhs.args) != 1:
-            raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.func_ir, rhs.args[0])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
-
-        out_typ = self._get_map_output_typ(col_var, func, label)
-        # remember datetime.date series due to special boxing, getitem etc.
-        if out_typ == datetime_date_type:
-            self.dt_date_series_vars.add(lhs.name)
-
-        # TODO: handle non numpy alloc types like string array
-        # prange func to inline
-        func_text = "def f(A):\n"
-        func_text += "  numba.parfor.init_prange()\n"
-        func_text += "  n = len(A)\n"
-        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
-        func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        if col_var.name in self.ts_series_vars:
-            func_text += "    t = hpat.hiframes_api.ts_series_getitem(A, i)\n"
-        elif col_var.name in self.dt_date_series_vars:
-            func_text += "    t = int_to_datetime_date(A[i])\n"
-        else:
-            func_text += "    t = A[i]\n"
-        if out_typ == datetime_date_type:
-            func_text += "    S[i] = datetime_date_to_int(map_func(t))\n"
-        else:
-            func_text += "    S[i] = map_func(t)\n"
-        func_text += "  ret = S\n"
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        _globals = self.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat,
-            'datetime_date_to_int': datetime_date_to_int,
-            'int_to_datetime_date': int_to_datetime_date})
-        # fix definitions to enable finding sentinel
-        f_ir._definitions = build_definitions(f_ir.blocks)
-        topo_order = find_topo_order(f_ir.blocks)
-
-        # find sentinel function and replace with user func
-        for l in topo_order:
-            block = f_ir.blocks[l]
-            for i, stmt in enumerate(block.body):
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op == 'call'):
-                    fdef = guard(get_definition, f_ir, stmt.value.func)
-                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
-                        inline_closure_call(f_ir, _globals, block, i, func)
-                        break
-
-        f_ir.blocks[topo_order[-1]].body[-4].target = lhs
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [col_var])
-        return f_ir.blocks
-
-    def _get_map_output_typ(self, col_var, func, label):
-        # wrapper function to get the output type
-        def f(A):
-            return map_func(A[0])
-        if col_var.name in self.ts_series_vars:
-            def f(A):
-                t = hpat.hiframes_api.ts_series_getitem(A, 0)
-                return map_func(t)
-        if col_var.name in self.dt_date_series_vars:
-            def f(A):
-                t = hpat.pd_timestamp_ext.int_to_datetime_date(A[0])
-                return map_func(t)
-
-        return self._get_func_output_typ(col_var, func, f, label)
+        return self._replace_func(f, col_vars)
 
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference
@@ -1012,7 +1298,11 @@ class HiFrames(object):
         dummy_ir.blocks.update(f_ir.blocks)
         dummy_ir.blocks[0].body.append(ir.Jump(first_label, col_var.loc))
         # dead df code can cause type inference issues
-        remove_dead(dummy_ir.blocks, dummy_ir.arg_names, dummy_ir)
+        # TODO: remove this
+        hiframes_api.enable_hiframes_remove_dead = False
+        while remove_dead(dummy_ir.blocks, dummy_ir.arg_names, dummy_ir):
+            pass
+        hiframes_api.enable_hiframes_remove_dead = True
 
         # run type inference on the dummy IR
         warnings = numba.errors.WarningsFixer(numba.errors.NumbaWarning)
@@ -1026,345 +1316,207 @@ class HiFrames(object):
         return out_tp
 
 
-    def _handle_rolling_setup(self, assign, lhs, rhs, col_var):
+    def _is_df_obj_call(self, call_var, obj_name):
+        """determines whether variable is coming from groupby() or groupby()[],
+        rolling(), rolling()[]
         """
-        Handle Series rolling calls like:
-          r = df.column.rolling(3)
-        """
-        center = False
-        kws = dict(rhs.kws)
-        if rhs.args:
-            window = rhs.args[0]
-        elif 'window' in kws:
-            window = kws['window']
-        else:  # pragma: no cover
-            raise ValueError("window argument to rolling() required")
-        window = get_constant(self.func_ir, window, window)
-        if 'center' in kws:
-            center = get_constant(self.func_ir, kws['center'], center)
-        self.rolling_calls[lhs.name] = [col_var, window, center]
-        return []  # remove
-
-    def _handle_rolling_call(self, lhs, rhs):
-        """
-        Handle Series rolling calls like:
-          A = df.column.rolling(3).sum()
-        """
-        func_def = guard(get_definition, self.func_ir, rhs.func)
-        assert func_def is not None
-        # df.column.rolling(3).sum()
-        if (isinstance(func_def, ir.Expr) and func_def.op == 'getattr'
-                and func_def.value.name in self.rolling_calls):
-            func_name = func_def.attr
-            self.df_cols.add(lhs.name)  # output is Series
-            return self._gen_rolling_call(rhs.args,
-                                    *self.rolling_calls[func_def.value.name]
-                                    + [func_name, lhs])
-        return None
-
-    def _handle_str_contains(self, assign, lhs, rhs, str_col):
-        """
-        Handle string contains like:
-          B = df.column.str.contains('oo*', regex=True)
-        """
-        kws = dict(rhs.kws)
-        pat = rhs.args[0]
-        regex = True  # default regex arg is True
-        if 'regex' in kws:
-            regex = get_constant(self.func_ir, kws['regex'], regex)
-        if regex:
-            def f(str_arr, pat):  # pragma: no cover
-                e = hpat.str_ext.compile_regex(pat)
-                hpat.hiframes_api.str_contains_regex(str_arr, e)
-        else:
-            def f(str_arr, pat):  # pragma: no cover
-                hpat.hiframes_api.str_contains_noregex(str_arr, pat)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [str_col, pat])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = lhs
-        return nodes
-
-    def _get_str_contains_col(self, func_def):
-        require(isinstance(func_def, ir.Expr) and func_def.op == 'getattr')
-        require(func_def.attr == 'contains')
-        str_def = get_definition(self.func_ir, func_def.value)
-        require(isinstance(str_def, ir.Expr) and str_def.op == 'getattr')
-        require(str_def.attr == 'str')
-        col = str_def.value
-        require(col.name in self.df_cols)
-        return col
-
-    def _gen_column_call(self, out_var, args, col_var, func, kws):
-        if func in ['fillna', 'pct_change', 'shift']:
-            self.df_cols.add(out_var.name)  # output is Series except sum
-        if func == 'count':
-            return self._gen_col_count(out_var, args, col_var)
-        if func == 'fillna':
-            return self._gen_fillna(out_var, args, col_var, kws)
-        if func == 'sum':
-            return self._gen_col_sum(out_var, args, col_var)
-        if func == 'mean':
-            return self._gen_col_mean(out_var, args, col_var)
-        if func == 'var':
-            return self._gen_col_var(out_var, args, col_var)
-        if func == 'std':
-            return self._gen_col_std(out_var, args, col_var)
-        if func == 'quantile':
-            return self._gen_col_quantile(out_var, args, col_var)
-        if func == 'nunique':
-            return self._gen_col_nunique(out_var, args, col_var)
-        if func == 'describe':
-            return self._gen_col_describe(out_var, args, col_var)
-        else:
-            assert func in ['pct_change', 'shift']
-            return self._gen_column_shift_pct(out_var, args, col_var, func)
-
-    def _gen_column_shift_pct(self, out_var, args, col_var, func):
-        loc = col_var.loc
-        if func == 'pct_change':
-            shift_const = 1
-            if args:
-                shift_const = get_constant(self.func_ir, args[0])
-                assert shift_const is not NOT_CONSTANT
-            func_text = 'def g(a):\n  return (a[0]-a[{}])/a[{}]\n'.format(
-                -shift_const, -shift_const)
-        else:
-            assert func == 'shift'
-            shift_const = get_constant(self.func_ir, args[0])
-            assert shift_const is not NOT_CONSTANT
-            func_text = 'def g(a):\n  return a[{}]\n'.format(-shift_const)
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        kernel_func = loc_vars['g']
-
-        index_offsets = [0]
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(
-            col_var, out_var, kernel_func, index_offsets, fir_globals)
-
-        border_text = 'def f(A):\n  A[0:{}] = np.nan\n'.format(shift_const)
-        loc_vars = {}
-        exec(border_text, {}, loc_vars)
-        border_func = loc_vars['f']
-
-        f_blocks = compile_to_numba_ir(border_func, {'np': np}).blocks
-        block = f_blocks[min(f_blocks.keys())]
-        replace_arg_nodes(block, [out_var])
-        setitem_nodes = block.body[:-3]  # remove none return
-
-        return stencil_nodes + setitem_nodes
-
-    def _gen_col_count(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.count(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_fillna(self, out_var, args, col_var, kws):
-        inplace = False
-        if 'inplace' in kws:
-            inplace = get_constant(self.func_ir, kws['inplace'])
-            if inplace == NOT_CONSTANT:  # pragma: no cover
-                raise ValueError("inplace arg to fillna should be constant")
-
-        if inplace:
-            out_var = col_var  # output array is same as input array
-            alloc_nodes = []
-        else:
-            alloc_nodes = gen_empty_like(col_var, out_var)
-
-        val = args[0]
-
-        def f(A, B, fill):  # pragma: no cover
-            hpat.hiframes_api.fillna(A, B, fill)
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [out_var, col_var, val])
-        nodes = f_block.body[:-3]  # remove none return
-        return alloc_nodes + nodes
-
-    def _gen_col_sum(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.column_sum(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_mean(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.mean(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_var(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.var(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_std(self, out_var, args, col_var):
-        loc = out_var.loc
-        scope = out_var.scope
-        # calculate var() first
-        var_var = ir.Var(scope, mk_unique_var("var_val"), loc)
-        v_nodes = self._gen_col_var(var_var, args, col_var)
-
-        def f(a):  # pragma: no cover
-            a ** 0.5
-        s_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(s_block, [var_var])
-        s_nodes = s_block.body[:-3]
-        assert len(s_nodes) == 3
-        s_nodes[-1].target = out_var
-        return v_nodes + s_nodes
-
-    def _gen_col_quantile(self, out_var, args, col_var):
-        def f(A, q):  # pragma: no cover
-            s = hpat.hiframes_api.quantile(A, q)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var, args[0]])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_nunique(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            s = hpat.hiframes_api.nunique(A)
-
-        f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _gen_col_describe(self, out_var, args, col_var):
-        def f(A):  # pragma: no cover
-            a_count = np.float64(hpat.hiframes_api.count(A))
-            a_min = np.min(A)
-            a_max = np.max(A)
-            a_mean = hpat.hiframes_api.mean(A)
-            a_std = hpat.hiframes_api.var(A)**0.5
-            q25 = hpat.hiframes_api.quantile(A, .25)
-            q50 = hpat.hiframes_api.quantile(A, .5)
-            q75 = hpat.hiframes_api.quantile(A, .75)
-            # TODO: pandas returns dataframe, maybe return namedtuple instread of
-            # string?
-            # TODO: fix string formatting to match python/pandas
-            s = "count    " + str(a_count) + "\n"\
-                "mean     " + str(a_mean) + "\n"\
-                "std      " + str(a_std) + "\n"\
-                "min      " + str(a_min) + "\n"\
-                "25%      " + str(q25) + "\n"\
-                "50%      " + str(q50) + "\n"\
-                "75%      " + str(q75) + "\n"\
-                "max      " + str(a_max) + "\n"
-
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [col_var])
-        nodes = f_block.body[:-3]  # remove none return
-        nodes[-1].target = out_var
-        return nodes
-
-    def _is_groupby(self, agg_var):
-        """determines whether variable is coming from groupby() or groupby()[]
-        """
-        var_def = guard(get_definition, self.func_ir, agg_var)
+        var_def = guard(get_definition, self.func_ir, call_var)
         # groupby()['B'] case
         if (isinstance(var_def, ir.Expr)
                 and var_def.op in ['getitem', 'static_getitem']):
-            return self._is_groupby(var_def.value)
+            return self._is_df_obj_call(var_def.value, obj_name)
         # groupby() called on column or df
         call_def = guard(find_callname, self.func_ir, var_def)
-        if (call_def is not None and call_def[0] == 'groupby'
+        if (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
-                and (call_def[1].name in self.df_cols
-                or self._is_df_var(call_def[1]))):
+                and self._is_df_var(call_def[1])):
             return True
         return False
 
+    def _handle_df_pivot_table(self, lhs, rhs, df_var, label):
+        # TODO: multiple keys (index columns)
+        kws = dict(rhs.kws)
+        values_arg = self._get_str_arg('pivot_table', rhs.args, kws, 0, 'values')
+        index_arg = self._get_str_arg('pivot_table', rhs.args, kws, 1, 'index')
+        columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 2, 'columns')
+        agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 3, 'aggfunc', 'mean')
+
+        agg_func = get_agg_func(self.func_ir, agg_func_arg, rhs)
+
+        in_vars = {values_arg: self.df_vars[df_var.name][values_arg]}
+        # get output type
+        agg_func_dis = numba.njit(agg_func)
+        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
+        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
+        def to_arr(a, _agg_f):
+            b = hpat.hiframes_api.to_arr_from_series(a)
+            res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+        f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [in_vars[values_arg], agg_gb_var])
+        nodes += f_block.body[:-3]  # remove none return
+        out_types = {values_arg: nodes[-1].target}
+
+        pivot_values = self._get_pivot_values(lhs.name)
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        # df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+        #                         for col in [values_arg]})
+        out_df = df_col_map.copy()
+        self._create_df(lhs.name, out_df, label)
+        pivot_arr = self.df_vars[df_var.name][columns_arg]
+        agg_node = hiframes_aggregate.Aggregate(
+            lhs.name, df_var.name, [index_arg], None, df_col_map,
+            in_vars, [self.df_vars[df_var.name][index_arg]],
+            agg_func, out_types, lhs.loc, pivot_arr, pivot_values)
+        nodes.append(agg_node)
+        return nodes
+
+
+    def _get_pivot_values(self, varname):
+        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':pivot') not in self.locals:
+            raise ValueError("pivot_table() requires annotation of pivot values")
+        new_name = self.reverse_copies[varname]
+        values = self.locals.pop(new_name + ":pivot")
+        return values
+
+    def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = guard(find_const, self.func_ir, args[arg_no])
+        elif arg_name in kws:
+            arg = guard(find_const, self.func_ir, kws[arg_name])
+
+        if arg is None:
+            if default is not None:
+                return default
+            if err_msg is None:
+                err_msg = ("{} requires '{}' argument as a "
+                             "constant string").format(f_name, arg_name)
+            raise ValueError(err_msg)
+        return arg
+
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = args[arg_no]
+        elif arg_name in kws:
+            arg = kws[arg_name]
+
+        if arg is None:
+            if default is not None:
+                return default
+            if err_msg is None:
+                err_msg = "{} requires '{}' argument".format(f_name, arg_name)
+            raise ValueError(err_msg)
+        return arg
+
+    def _handle_crosstab(self, lhs, rhs, label):
+        kws = dict(rhs.kws)
+        # TODO: hanlde multiple keys (index args)
+        index_arg = self._get_arg('crosstab', rhs.args, kws, 0, 'index')
+        columns_arg = self._get_arg('crosstab', rhs.args, kws, 1, 'columns')
+        # TODO: handle values and aggfunc options
+
+        in_vars = {}
+        # output of crosstab is array[int64]
+        def to_arr():
+            res = hpat.hiframes_api.to_series_type(np.empty(1, np.int64))
+        f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+        nodes = f_block.body[:-3]  # remove none return
+        out_tp_var = nodes[-1].target
+        out_types = {'__dummy__': out_tp_var}
+
+        pivot_values = self._get_pivot_values(lhs.name)
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        out_df = df_col_map.copy()
+        self._create_df(lhs.name, out_df, label)
+        pivot_arr = columns_arg
+
+        def _agg_len_impl(in_arr):  # pragma: no cover
+            numba.parfor.init_prange()
+            count = 0
+            for i in numba.parfor.internal_prange(len(in_arr)):
+                count += 1
+            return count
+
+        # TODO: make out_key_var an index column
+
+        agg_node = hiframes_aggregate.Aggregate(
+            lhs.name, 'crosstab', [index_arg.name], None, df_col_map,
+            in_vars, [index_arg],
+            _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)
+        nodes.append(agg_node)
+        return nodes
+
     def _handle_aggregate(self, lhs, rhs, obj_var, func_name, label):
         # format df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
-        _supported_agg_funcs = ['agg', 'aggregate', 'sum', 'count', 'mean',
-                                'min', 'max']
         # TODO: support aggregation functions sum, count, etc.
-        if func_name not in _supported_agg_funcs:
+        if func_name not in supported_agg_funcs:
             raise ValueError("only {} supported in groupby".format(
-                                             ", ".join(_supported_agg_funcs)))
+                                             ", ".join(supported_agg_funcs)))
 
-        agg_func = self._get_agg_func(func_name, rhs)
+        agg_func = get_agg_func(self.func_ir, func_name, rhs)
 
         # find selected output columns
-        df_var, key_colname, as_index, out_colnames, explicit_select = self._analyze_agg_select(
-                                                                       obj_var)
+        df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
+        key_colnames, as_index = self._get_agg_obj_args(obj_var)
+        if out_colnames is None:
+            out_colnames = list(self.df_vars[df_var.name].keys())
+            # key arr is not output by default
+            # as_index should be handled separately since it just returns keys
+            for k in key_colnames:
+                out_colnames.remove(k)
 
         # find input vars and output types
         out_types = {}
         in_vars = {}
+        agg_func_dis = numba.njit(agg_func)
+        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
+        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         for out_cname in out_colnames:
             in_var = self.df_vars[df_var.name][out_cname]
             in_vars[out_cname] = in_var
-            def f(A):
-                return map_func(A)
-            out_typ = self._get_func_output_typ(in_var, agg_func, f, label)
-            out_types[out_cname] = out_typ
+            def to_arr(a, _agg_f):
+                b = hpat.hiframes_api.to_arr_from_series(a)
+                res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, agg_gb_var])
+            nodes += f_block.body[:-3]  # remove none return
+            out_types[out_cname] = nodes[-1].target
 
         # output column map, create dataframe if multiple outputs
-        out_key_var = None
-        if len(out_colnames) == 1 and explicit_select:
+        out_key_vars = None
+        # XXX output becomes series if single output and explicitly selected
+        if len(out_colnames) == 1 and explicit_select and as_index:
             df_col_map = {out_colnames[0]: lhs}
-            self.df_cols.add(lhs.name)  # output is series
         else:
+            out_df = {}
+            # keys come first in column list
+            if as_index is False:
+                out_key_vars = []
+                for k in key_colnames:
+                    out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
+                    out_df[k] = out_key_var
+                    out_key_vars.append(out_key_var)
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                                 for col in out_colnames})
-            out_df = df_col_map.copy()
-            if as_index is False:
-                out_key_var = ir.Var(lhs.scope, mk_unique_var(key_colname), lhs.loc)
-                out_df[key_colname] = out_key_var
+            out_df.update(df_col_map)
 
             self._create_df(lhs.name, out_df, label)
 
-        return [hiframes_aggregate.Aggregate(
-            lhs.name, df_var.name, key_colname, out_key_var, df_col_map,
-            in_vars, self.df_vars[df_var.name][key_colname],
-            agg_func, out_types, lhs.loc)]
+        in_key_vars = [self.df_vars[df_var.name][k] for k in key_colnames]
 
-    def _analyze_agg_select(self, obj_var):
-        """analyze selection of columns in after groupby()
-        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
-        """
-        select_def = guard(get_definition, self.func_ir, obj_var)
-        out_colnames = None
-        explicit_select = False
-        if isinstance(select_def, ir.Expr) and select_def.op == 'getitem':
-            agg_var = select_def.value
-            out_colnames = guard(find_const, self.func_ir, select_def.index)
-            if not isinstance(out_colnames, (str, tuple)):
-                raise ValueError("Groupby output column names should be constant")
-            if isinstance(out_colnames, str):
-                out_colnames = [out_colnames]
-            explicit_select = True
-        else:
-            agg_var = obj_var
+        agg_node = hiframes_aggregate.Aggregate(
+            lhs.name, df_var.name, key_colnames, out_key_vars, df_col_map,
+            in_vars, in_key_vars,
+            agg_func, out_types, lhs.loc)
+        nodes.append(agg_node)
+        return nodes
 
+    def _get_agg_obj_args(self, agg_var):
         # find groupby key and as_index
         groubpy_call = guard(get_definition, self.func_ir, agg_var)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
@@ -1381,120 +1533,195 @@ class HiFrames(object):
             by_arg = kws['by']
         else:  # pragma: no cover
             raise ValueError("by argument for groupby() required")
-        key_colname = guard(find_const, self.func_ir, by_arg)
 
+        err_msg = ("groupby() by argument should be "
+                   "list of column names or a column name")
+        key_colnames = self._get_str_or_list(by_arg, True, err_msg=err_msg)
+
+        return key_colnames, as_index
+
+    def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
+        typ = str if typ is None else typ
+        by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+        if by_arg_def is None:
+            # try single key column
+            by_arg_def = guard(find_const, self.func_ir, by_arg)
+            if by_arg_def is None:
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+            key_colnames = [by_arg_def]
+        else:
+            if list_only and by_arg_def[1] != 'build_list':
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+            key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
+            if any(not isinstance(v, typ) for v in key_colnames):
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+        return key_colnames
+
+
+    def _get_df_obj_select(self, obj_var, obj_name):
+        """analyze selection of columns in after groupby() or rolling()
+        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
+        """
+        select_def = guard(get_definition, self.func_ir, obj_var)
+        out_colnames = None
+        explicit_select = False
+        if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
+            obj_var = select_def.value
+            out_colnames = (select_def.index
+                if select_def.op == 'static_getitem'
+                else guard(find_const, self.func_ir, select_def.index))
+            if not isinstance(out_colnames, (str, tuple)):
+                raise ValueError("{} output column names should be constant".format(obj_name))
+            if isinstance(out_colnames, str):
+                out_colnames = [out_colnames]
+            explicit_select = True
+
+        obj_call = guard(get_definition, self.func_ir, obj_var)
         # find dataframe
-        call_def = guard(find_callname, self.func_ir, groubpy_call)
-        assert (call_def is not None and call_def[0] == 'groupby'
+        call_def = guard(find_callname, self.func_ir, obj_call)
+        assert (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1]))
         df_var = call_def[1]
 
+        return df_var, out_colnames, explicit_select, obj_var
+
+
+    def _handle_rolling(self, lhs, rhs, obj_var, func_name, label):
+        # format df.rolling(w)['B'].sum()
+        # TODO: support aggregation functions sum, count, etc.
+        if func_name not in supported_rolling_funcs:
+            raise ValueError("only ({}) supported in rolling".format(
+                                             ", ".join(supported_rolling_funcs)))
+
+        nodes = []
+        # find selected output columns
+        df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
+        rolling_call = guard(get_definition, self.func_ir, obj_var)
+        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        on_arr = self.df_vars[df_var.name][on] if on is not None else None
+        if not isinstance(center, ir.Var):
+            center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
+            nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
+            center = center_var
+        if not isinstance (window, ir.Var):
+            window_var = ir.Var(lhs.scope, mk_unique_var("window"), lhs.loc)
+            nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
+            window = window_var
+        # TODO: get 'on' arg for offset case
         if out_colnames is None:
             out_colnames = list(self.df_vars[df_var.name].keys())
-            # key arr is not output by default
-            # as_index should be handled separately since it just returns keys
-            out_colnames.remove(key_colname)
+            # TODO: remove index col for offset case
 
-        return df_var, key_colname, as_index, out_colnames, explicit_select
+        nan_cols = []
+        if func_name in ('cov', 'corr'):
+            if len(rhs.args) != 1:
+                raise ValueError("rolling {} requires one argument (other)".format(func_name))
+            # XXX pandas only accepts variable window cov/corr
+            # when both inputs have time index
+            if on_arr is not None:
+                raise ValueError("variable window rolling {} not supported yet.".format(func_name))
+            # TODO: support variable window rolling cov/corr which is only
+            # possible in pandas with time index
+            other = rhs.args[0]
+            if self._is_df_var(other):
+                # df on df cov/corr returns common columns only (without
+                # pairwise flag)
+                # TODO: support pairwise arg
+                col_set1 = set(out_colnames)
+                col_set2 = set(self._get_df_col_names(other))
+                out_colnames = list(col_set1 & col_set2)
+                # Pandas makes non-common columns NaNs
+                nan_cols = list(col_set1 ^ col_set2)
 
-    def _get_agg_func(self, func_name, rhs):
-        agg_func_table = {'sum': hpat.hiframes_typed._column_sum_impl,
-                          'count': hpat.hiframes_typed._column_count_impl,
-                          'mean': hpat.hiframes_typed._column_mean_impl,
-                          'max': hpat.hiframes_typed._column_max_impl,
-                          'min': hpat.hiframes_typed._column_min_impl,
-                          }
+        # output column map, create dataframe if multiple outputs
+        out_df = None
+        if len(out_colnames) == 1 and explicit_select:
+            df_col_map = {out_colnames[0]: lhs}
+        else:
+            df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in out_colnames})
+            if on is not None:
+                df_col_map[on] = on_arr
+            out_df = df_col_map.copy()
+            # TODO: add datetime index for offset case
 
-        if func_name in agg_func_table:
-            return agg_func_table[func_name]
+        args = rhs.args
+        for cname, out_col_var in df_col_map.items():
+            if cname == on:
+                continue
+            in_col_var = self.df_vars[df_var.name][cname]
+            if func_name in ('cov', 'corr'):
+                args[0] = self.df_vars[other.name][cname]
+            nodes += self._gen_rolling_call(in_col_var, out_col_var, window, center, args, func_name, on_arr)
 
-        assert func_name in ['agg', 'aggregate']
-        # agg case
-        # error checking: make sure there is function input only
-        if len(rhs.args) != 1:
-            raise ValueError("agg expects 1 argument")
-        agg_func = guard(get_definition, self.func_ir, rhs.args[0])
-        if agg_func is None or not (isinstance(agg_func, ir.Expr)
-                                and agg_func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
+        # create NaN columns for cov/corr case
+        len_arr = self.df_vars[df_var.name][out_colnames[0]]
+        for cname in nan_cols:
+            def f(arr):
+                nan_arr = np.full(len(arr), np.nan)
+            f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [len_arr])
+            nodes += f_block.body[:-3]  # remove none return
+            out_df[cname] = nodes[-1].target
+        if out_df is not None:
+            # Pandas sorts the output column names _flex_binary_moment
+            # line: res_columns = arg1.columns.union(arg2.columns)
+            self._create_df(lhs.name, dict(sorted(out_df.items())), label)
 
-        return agg_func
+        return nodes
 
-    def _gen_rolling_call(self, args, col_var, win_size, center, func, out_var):
-        loc = col_var.loc
-        scope = col_var.scope
-        if func == 'apply':
-            if len(args) != 1:  # pragma: no cover
-                raise ValueError("One argument expected for rolling apply")
-            kernel_func = guard(get_definition, self.func_ir, args[0])
-        elif func in ['sum', 'mean', 'min', 'max', 'std', 'var']:
-            if len(args) != 0:  # pragma: no cover
-                raise ValueError("No argument expected for rolling {}".format(
-                    func))
-            g_pack = "np"
-            if func in ['std', 'var', 'mean']:
-                g_pack = "hpat.hiframes_api"
-            if isinstance(win_size, int) and win_size < LARGE_WIN_SIZE:
-                # unroll if size is less than 5
-                kernel_args = ','.join(['a[{}]'.format(-i)
-                                        for i in range(win_size)])
-                kernel_expr = '{}.{}(np.array([{}]))'.format(
-                    g_pack, func, kernel_args)
-                if func == 'sum':  # simplify sum
-                    kernel_expr = '+'.join(['a[{}]'.format(-i)
-                                            for i in range(win_size)])
+    def _gen_rolling_call(self, in_col_var, out_col_var, window, center, args, func_name, on_arr):
+        nodes = []
+        if func_name in ('cov', 'corr'):
+            other = args[0]
+            if on_arr is not None:
+                if func_name == 'cov':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, on_arr, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, on_arr, w, center)
+                args = [in_col_var, other, on_arr, window, center]
             else:
-                kernel_expr = '{}.{}(a[(-w+1):1])'.format(g_pack, func)
-            func_text = 'def g(a, w):\n  return {}\n'.format(kernel_expr)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            kernel_func = loc_vars['g']
-
-        init_nodes = []
-        col_var, init_nodes = self._fix_rolling_array(col_var, func)
-
-        if isinstance(win_size, int):
-            win_size_var = ir.Var(scope, mk_unique_var("win_size"), loc)
-            init_nodes.append(
-                ir.Assign(ir.Const(win_size, loc), win_size_var, loc))
-            win_size = win_size_var
-
-        index_offsets, win_tuple, option_nodes = self._gen_rolling_init(
-            win_size, func, center)
-
-        init_nodes += option_nodes
-        other_args = [win_size]
-        if func == 'apply':
-            other_args = None
-        options = {'neighborhood': win_tuple}
-        fir_globals = self.func_ir.func_id.func.__globals__
-        stencil_nodes = gen_stencil_call(col_var, out_var, kernel_func,
-                                         index_offsets, fir_globals, other_args,
-                                         options)
-
-        def f(A, w):  # pragma: no cover
-            A[0:w - 1] = np.nan
-        f_block = compile_to_numba_ir(f, {'np': np}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [out_var, win_size])
-        setitem_nodes = f_block.body[:-3]  # remove none return
-
-        if center:
-            def f1(A, w):  # pragma: no cover
-                A[0:w // 2] = np.nan
-
-            def f2(A, w):  # pragma: no cover
-                n = len(A)
-                A[n - (w // 2):n] = np.nan
-            f_block = compile_to_numba_ir(f1, {'np': np}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes1 = f_block.body[:-3]  # remove none return
-            f_block = compile_to_numba_ir(f2, {'np': np}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [out_var, win_size])
-            setitem_nodes2 = f_block.body[:-3]  # remove none return
-            setitem_nodes = setitem_nodes1 + setitem_nodes2
-
-        return init_nodes + stencil_nodes + setitem_nodes
+                if func_name == 'cov':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, w, center)
+                args = [in_col_var, other, window, center]
+        # variable window case
+        elif on_arr is not None:
+            if func_name == 'apply':
+                def f(arr, on_arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, func)
+                args = [in_col_var, on_arr, window, center, args[0]]
+            else:
+                def f(arr, on_arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, _func_name)
+                args = [in_col_var, on_arr, window, center]
+        else:  # fixed window
+            # apply case takes the passed function instead of just name
+            if func_name == 'apply':
+                def f(arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, func)
+                args = [in_col_var, window, center, args[0]]
+            else:
+                def f(arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func_name)
+                args = [in_col_var, window, center]
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, args)
+        nodes += f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_col_var
+        return nodes
 
     def _fix_rolling_array(self, col_var, func):
         """
@@ -1514,6 +1741,7 @@ class HiFrames(object):
         arg_name = arg_assign.value.name
         arg_ind = arg_assign.value.index
         arg_var = arg_assign.target
+        arg_typ = self.args[arg_ind]
         scope = arg_var.scope
         loc = arg_var.loc
 
@@ -1526,12 +1754,7 @@ class HiFrames(object):
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
             if flag== 'series':
-                # XXX hack for agg functions, replace with proper Series type
-                self.df_cols.add(arg_var.name)
                 return nodes
-            # replace assign target with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var(flag + "_input"), loc)
-            arg_assign.target = in_arr_tmp
             if flag == 'distributed':
                 def f(_dist_arr):  # pragma: no cover
                     _d_arr = hpat.distributed_api.dist_input(_dist_arr)
@@ -1542,29 +1765,13 @@ class HiFrames(object):
                 raise ValueError("Invalid input flag")
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr_tmp])
+            replace_arg_nodes(f_block, [arg_var])
             nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = arg_var
-
-        # handle timestamp Series
-        # transform to array[dt64]
-        # could be combined with distributed/threaded input
-        if self.args[arg_ind] == timestamp_series_type:
-            # replace arg var with tmp
-            in_arr_tmp = ir.Var(scope, mk_unique_var("ts_series_input"), loc)
-            nodes[-1].target = in_arr_tmp
-
-            def f(_ts_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.ts_series_to_arr_typ(_ts_series)
-
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr_tmp])
-            nodes += f_block.body[:-3]  # remove none return
-            nodes[-1].target = arg_var
-            # remember that this variable is actually a Series
-            self.df_cols.add(arg_var.name)
-            self.ts_series_vars.add(arg_var.name)
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
+            self._add_node_defs(nodes)
 
         # TODO: handle datetime.date() series
 
@@ -1585,7 +1792,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes_api.unbox_df_column(_df, {}, {})\n".format(col, i, alloc_dt)
+                func_text += "  _col_input_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.unbox_df_column(_df, {}, {}))\n".format(col, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1593,14 +1800,81 @@ class HiFrames(object):
                             {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [arg_var])
                 nodes += f_block.body[:-3]
-                #
-                if col_dtype == types.NPDatetime('ns'):
-                    self.ts_series_vars.add(nodes[-1].target.name)
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)
 
+        if isinstance(arg_typ, BoxedSeriesType):
+            # self.args[arg_ind] = SeriesType(arg_typ.dtype, 1, 'C')
+            # replace arg var with tmp
+            def f(_boxed_series):  # pragma: no cover
+                _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(_boxed_series))
+
+            f_block = compile_to_numba_ir(
+                f, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [arg_var])
+            nodes += f_block.body[:-3]  # remove none return
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
+            self._add_node_defs(nodes)
+
+        # TODO: handle list(series), set(series), etc.
+        # handle tuples that include boxed series
+        if (isinstance(arg_typ, types.BaseTuple) and any(
+                [isinstance(a, BoxedSeriesType) for a in arg_typ.types])):
+            func_text = "def tuple_unpack_func(tup_arg):\n"
+            for i, t in enumerate(arg_typ.types):
+                if isinstance(t, BoxedSeriesType):
+                    func_text += "  _arg_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(tup_arg[{}]))\n".format(i, i)
+                else:
+                    func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
+            pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])
+            func_text += "  res = ({},)\n".format(pack_arg)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            tuple_unpack_func = loc_vars['tuple_unpack_func']
+            f_block = compile_to_numba_ir(tuple_unpack_func, {'hpat': hpat}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [arg_var])
+            nodes += f_block.body[:-3]  # remove none return
+            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
+            nodes[-1].target = new_arg_var
+            self.replace_var_dict[arg_var.name] = new_arg_var
+            arg_var = new_arg_var
+            self._add_node_defs(nodes)
+
+
         return nodes
+
+    def _box_return_df(self, df_map):
+        #
+        arrs = list(df_map.values())
+        names = list(df_map.keys())
+        n_cols = len(arrs)
+
+        arg_names = ", ".join(['in_{}'.format(i) for i in range(n_cols)])
+        col_names = ", ".join(['"{}"'.format(cname) for cname in names])
+
+        func_text = "def f({}):\n".format(arg_names)
+        func_text += "  _dt_arr = hpat.hiframes_api.box_df({}, {})\n".format(col_names, arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, arrs)
+        nodes = f_block.body[:-3]  # remove none return
+        return nodes
+
+
+    def _add_node_defs(self, nodes):
+        # TODO: add node defs for all new nodes
+        loc = ir.Loc("", -1)
+        dummy_block = ir.Block(ir.Scope(None, loc), loc)
+        dummy_block.body = nodes
+        build_definitions({0: dummy_block}, self.func_ir._definitions)
 
     def _run_return(self, ret_node):
         # e.g. {"A:return":"distributed"} -> "A"
@@ -1610,9 +1884,6 @@ class HiFrames(object):
         for v in flagged_returns.keys():
             self.locals.pop(v + ":return")
         nodes = [ret_node]
-        # shortcut if no dist return
-        if len(flagged_returns) == 0:
-            return nodes
         cast = guard(get_definition, self.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
@@ -1620,7 +1891,29 @@ class HiFrames(object):
         loc = cast.loc
         # XXX: using split('.') since the variable might be renamed (e.g. A.2)
         ret_name = cast.value.name.split('.')[0]
-        if ret_name in flagged_returns.keys():
+        # if boxing df is required
+        if self._is_df_var(cast.value):
+            col_map = self.df_vars[cast.value.name]
+            nodes = []
+            # dist return arrays first
+            if ret_name in flagged_returns.keys():
+                new_col_map = {}
+                flag = flagged_returns[ret_name]
+                for cname, var in col_map.items():
+                    nodes += self._gen_replace_dist_return(var, flag)
+                    new_col_map[cname] = nodes[-1].target
+                col_map = new_col_map
+
+            nodes += self._box_return_df(col_map)
+            new_arr = nodes[-1].target
+            new_cast = ir.Expr.cast(new_arr, loc)
+            new_out = ir.Var(scope, mk_unique_var("df_return"), loc)
+            nodes.append(ir.Assign(new_cast, new_out, loc))
+            ret_node.value = new_out
+            nodes.append(ret_node)
+            return nodes
+
+        elif ret_name in flagged_returns.keys():
             flag = flagged_returns[ret_name]
             nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
@@ -1629,6 +1922,10 @@ class HiFrames(object):
             nodes.append(ir.Assign(new_cast, new_out, loc))
             ret_node.value = new_out
             nodes.append(ret_node)
+            return nodes
+
+        # shortcut if no dist return
+        if len(flagged_returns) == 0:
             return nodes
 
         cast_def = guard(get_definition, self.func_ir, cast.value)
@@ -1669,57 +1966,6 @@ class HiFrames(object):
         replace_arg_nodes(f_block, [var])
         return f_block.body[:-3]  # remove none return
 
-    def _gen_rolling_init(self, win_size, func, center):
-        nodes = []
-        right_length = 0
-        scope = win_size.scope
-        loc = win_size.loc
-        right_length = ir.Var(scope, mk_unique_var('zero_var'), scope)
-        nodes.append(ir.Assign(ir.Const(0, loc), right_length, win_size.loc))
-
-        def f(w):  # pragma: no cover
-            return -w + 1
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [win_size])
-        nodes.extend(f_block.body[:-2])  # remove none return
-        left_length = nodes[-1].target
-
-        if center:
-            def f(w):  # pragma: no cover
-                return -(w // 2)
-            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            left_length = nodes[-1].target
-
-            def f(w):  # pragma: no cover
-                return (w // 2)
-            f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [win_size])
-            nodes.extend(f_block.body[:-2])  # remove none return
-            right_length = nodes[-1].target
-
-        def f(a, b):  # pragma: no cover
-            return ((a, b),)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [left_length, right_length])
-        nodes.extend(f_block.body[:-2])  # remove none return
-        win_tuple = nodes[-1].target
-
-        index_offsets = [right_length]
-
-        if func == 'apply':
-            index_offsets = [left_length]
-
-        def f(a):  # pragma: no cover
-            return (a,)
-        f_block = compile_to_numba_ir(f, {}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, index_offsets)
-        nodes.extend(f_block.body[:-2])  # remove none return
-        index_offsets = nodes[-1].target
-
-        return index_offsets, win_tuple, nodes
-
     def _run_df_set_column(self, inst, label, cfg):
         """handle setitem: df['col_name'] = arr
         """
@@ -1735,8 +1981,8 @@ class HiFrames(object):
             raise ValueError("dataframe column name should be a string constant")
 
         df_name = inst.target.name
+        # TODO: handle case where type has to be converted due to int64 NaNs
         self.df_vars[df_name][inst.index] = inst.value
-        self._update_df_cols()
 
         # set dataframe column if it is input and needs to be reflected
         df_def = guard(get_definition, self.func_ir, df_name)
@@ -1749,10 +1995,6 @@ class HiFrames(object):
             def f(_df, _cname, _arr):  # pragma: no cover
                 s = hpat.hiframes_api.set_df_col(_df, _cname, _arr)
 
-            if series_arr.name in self.dt_date_series_vars:
-                def f(_df, _cname, _arr):  # pragma: no cover
-                    s = hpat.pd_timestamp_ext.set_df_datetime_date(_df, _cname, _arr)
-
             f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [inst.target, cname_var, series_arr])
             # copy propagate to enable string Const in typing and lowering
@@ -1762,12 +2004,32 @@ class HiFrames(object):
 
         return []
 
+    def _handle_df_values(self, lhs, df):
+        col_vars = self._get_df_col_vars(df)
+        n_cols = len(col_vars)
+        arg_names = ["C{}".format(i) for i in range(n_cols)]
+        func_text = "def f({}):\n".format(", ".join(arg_names))
+        func_text += "    return np.stack(({}), 1)\n".format(
+            ",".join([s+".values" for s in arg_names]))
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, col_vars)
+
+    def _replace_func(self, func, args, const=False, array_typ_convert=True,
+                      pre_nodes=None, extra_globals=None):
+        glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        if extra_globals is not None:
+            glbls.update(extra_globals)
+        return ReplaceFunc(func, None, args, glbls, pre_nodes)
+
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.
         # starting pandas 0.23 and Python 3.6, regular dict order is OK
         # for <0.23 ordered_df_map = OrderedDict(sorted(df_col_map.items()))
         self.df_vars[df_varname] = df_col_map
-        self._update_df_cols()
         self.df_labels[df_varname] = label
 
     def _is_df_colname(self, df_var, cname):
@@ -1809,87 +2071,13 @@ class HiFrames(object):
         return df_var
 
 
-def gen_empty_like(in_arr, out_arr):
-    scope = in_arr.scope
-    loc = in_arr.loc
-    # g_np_var = Global(numpy)
-    g_np_var = ir.Var(scope, mk_unique_var("$np_g_var"), loc)
-    g_np = ir.Global('np', np, loc)
-    g_np_assign = ir.Assign(g_np, g_np_var, loc)
-    # attr call: empty_attr = getattr(g_np_var, empty_like)
-    empty_attr_call = ir.Expr.getattr(g_np_var, "empty_like", loc)
-    attr_var = ir.Var(scope, mk_unique_var("$empty_attr_attr"), loc)
-    attr_assign = ir.Assign(empty_attr_call, attr_var, loc)
-    # alloc call: out_arr = empty_attr(in_arr)
-    alloc_call = ir.Expr.call(attr_var, [in_arr], (), loc)
-    alloc_assign = ir.Assign(alloc_call, out_arr, loc)
-    return [g_np_assign, attr_assign, alloc_assign]
+def _gen_arr_copy(in_arr, nodes):
+    f_block = compile_to_numba_ir(
+        lambda A: A.copy(), {}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [in_arr])
+    nodes += f_block.body[:-2]
+    return nodes[-1].target
 
-
-def gen_stencil_call(in_arr, out_arr, kernel_func, index_offsets, fir_globals,
-                     other_args=None, options=None):
-    if other_args is None:
-        other_args = []
-    if options is None:
-        options = {}
-    if index_offsets != [0]:
-        options['index_offsets'] = index_offsets
-    scope = in_arr.scope
-    loc = in_arr.loc
-    stencil_nodes = []
-    stencil_nodes += gen_empty_like(in_arr, out_arr)
-
-    kernel_var = ir.Var(scope, mk_unique_var("kernel_var"), scope)
-    if not isinstance(kernel_func, ir.Expr):
-        kernel_func = ir.Expr.make_function("kernel", kernel_func.__code__,
-                                            kernel_func.__closure__,
-                                            kernel_func.__defaults__, loc)
-    stencil_nodes.append(ir.Assign(kernel_func, kernel_var, loc))
-
-    def f(A, B, f):  # pragma: no cover
-        numba.stencil(f)(A, out=B)
-    f_block = compile_to_numba_ir(f, {'numba': numba}).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [in_arr, out_arr, kernel_var])
-    stencil_nodes += f_block.body[:-3]  # remove none return
-    setup_call = stencil_nodes[-2].value
-    stencil_call = stencil_nodes[-1].value
-    setup_call.kws = list(options.items())
-    stencil_call.args += other_args
-
-    return stencil_nodes
-
-
-def remove_return_from_block(last_block):
-    # remove const none, cast, return nodes
-    assert isinstance(last_block.body[-1], ir.Return)
-    last_block.body.pop()
-    assert (isinstance(last_block.body[-1], ir.Assign)
-            and isinstance(last_block.body[-1].value, ir.Expr)
-            and last_block.body[-1].value.op == 'cast')
-    last_block.body.pop()
-    if (isinstance(last_block.body[-1], ir.Assign)
-            and isinstance(last_block.body[-1].value, ir.Const)
-            and last_block.body[-1].value.value is None):
-        last_block.body.pop()
-
-
-def include_new_blocks(blocks, new_blocks, label, new_body):
-    inner_blocks = add_offset_to_labels(new_blocks, ir_utils._max_label + 1)
-    blocks.update(inner_blocks)
-    ir_utils._max_label = max(blocks.keys())
-    scope = blocks[label].scope
-    loc = blocks[label].loc
-    inner_topo_order = find_topo_order(inner_blocks)
-    inner_first_label = inner_topo_order[0]
-    inner_last_label = inner_topo_order[-1]
-    remove_return_from_block(inner_blocks[inner_last_label])
-    new_body.append(ir.Jump(inner_first_label, loc))
-    blocks[label].body = new_body
-    label = ir_utils.next_label()
-    blocks[label] = ir.Block(scope, loc)
-    inner_blocks[inner_last_label].body.append(ir.Jump(label, loc))
-    # new_body.clear()
-    return label
 
 def simple_block_copy_propagate(block):
     """simple copy propagate for a single block before typing, without Parfor"""

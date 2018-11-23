@@ -3,6 +3,7 @@ import hpat
 import numpy as np
 import pandas as pd
 import gc
+import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
 
 class TestString(unittest.TestCase):
@@ -111,7 +112,7 @@ class TestString(unittest.TestCase):
         df = pd.DataFrame({'A': [1,2,3]*33, 'B': ['one', 'two', 'three']*33})
         ds, rs = hpat_func(df.B)
         gc.collect()
-        self.assertTrue(isinstance(ds, np.ndarray) and isinstance(rs, np.ndarray))
+        self.assertTrue(isinstance(ds, pd.Series) and isinstance(rs, pd.Series))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] == True and rs[2] == False)
 
     def test_string_array_bool_getitem(self):
@@ -122,6 +123,13 @@ class TestString(unittest.TestCase):
             return len(C) == 1 and C[0] == 'ABC'
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), True)
+
+    def test_string_NA_box(self):
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return df.five.values
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,8 +6,8 @@ import numba
 import hpat
 import random
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs,
-                                   count_array_OneD_Vars, dist_IR_contains)
+    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
+    dist_IR_contains, get_rank, get_start_end)
 
 def get_np_state_ptr():
     return numba._helperlib.rnd_get_np_state_ptr()
@@ -190,7 +190,7 @@ class TestBasic(BaseTest):
                                             and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(n):
-                A = np.ones(n, dtype=np.{})
+                A = np.arange(0, n, 1, np.{})
                 return A.{}()
             """.format(dtype, func)
             loc_vars = {}
@@ -198,24 +198,85 @@ class TestBasic(BaseTest):
             test_impl = loc_vars['f']
 
             hpat_func = hpat.jit(test_impl)
-            n = 128
+            n = 21  # XXX arange() on float32 has overflow issues on large n
             np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
-    def test_array_reduce(self):
-        def test_impl(N):
-            A = np.ones(3);
-            B = np.ones(3);
-            for i in numba.prange(N):
-                A += B
-            return A
+    def test_reduce2(self):
+        import sys
+        dtypes = ['float32', 'float64', 'int32', 'int64']
+        funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
+        for (dtype, func) in itertools.product(dtypes, funcs):
+            # loc allreduce doesn't support int64 on windows
+            if (sys.platform.startswith('win') and dtype=='int64'
+                                            and func in ['argmin', 'argmax']):
+                continue
+            func_text = """def f(A):
+                return A.{}()
+            """.format(func)
+            loc_vars = {}
+            exec(func_text, {'np': np}, loc_vars)
+            test_impl = loc_vars['f']
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
+            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            n = 21
+            start, end = get_start_end(n)
+            np.random.seed(0)
+            A = np.random.randint(0, 10, n).astype(dtype)
+            np.testing.assert_almost_equal(
+                hpat_func(A[start:end]), test_impl(A), decimal=3)
+            self.assertEqual(count_array_REPs(), 1)
+            self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_reduce_filter1(self):
+        import sys
+        dtypes = ['float32', 'float64', 'int32', 'int64']
+        funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
+        for (dtype, func) in itertools.product(dtypes, funcs):
+            # loc allreduce doesn't support int64 on windows
+            if (sys.platform.startswith('win') and dtype=='int64'
+                                            and func in ['argmin', 'argmax']):
+                continue
+            func_text = """def f(A):
+                A = A[A>5]
+                return A.{}()
+            """.format(func)
+            loc_vars = {}
+            exec(func_text, {'np': np}, loc_vars)
+            test_impl = loc_vars['f']
+
+            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            n = 21
+            start, end = get_start_end(n)
+            np.random.seed(0)
+            A = np.random.randint(0, 10, n).astype(dtype)
+            np.testing.assert_almost_equal(
+                hpat_func(A[start:end]), test_impl(A), decimal=3,
+                err_msg="{} on {}".format(func, dtype))
+            self.assertEqual(count_array_REPs(), 1)
+            self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_array_reduce(self):
+        binops = ['+=', '*=', '+=', '*=', '|=', '|=']
+        dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
+        for (op,typ) in zip(binops,dtypes):
+            func_text = """def f(n):
+                  A = np.arange(0, 10, 1, {})
+                  B = np.arange(0 +  3, 10 + 3, 1, {})
+                  for i in numba.prange(n):
+                      A {} B
+                  return A
+            """.format(typ, typ, op)
+            loc_vars = {}
+            exec(func_text, {'np': np, 'numba': numba}, loc_vars)
+            test_impl = loc_vars['f']
+
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 0)
+            self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_dist_return(self):
         def test_impl(N):
@@ -269,11 +330,15 @@ class TestBasic(BaseTest):
             C = hpat.distributed_api.rebalance_array(B)
             return C.sum()
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 3)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        try:
+            hpat.distributed_analysis.auto_rebalance = True
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 3)
+            self.assertEqual(count_parfor_OneDs(), 2)
+        finally:
+            hpat.distributed_analysis.auto_rebalance = False
 
     def test_rebalance_loop(self):
         def test_impl(N):
@@ -284,12 +349,16 @@ class TestBasic(BaseTest):
                 s += B.sum()
             return s
 
-        hpat_func = hpat.jit(test_impl)
-        n = 128
-        np.testing.assert_allclose(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 4)
-        self.assertEqual(count_parfor_OneDs(), 2)
-        self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
+        try:
+            hpat.distributed_analysis.auto_rebalance = True
+            hpat_func = hpat.jit(test_impl)
+            n = 128
+            np.testing.assert_allclose(hpat_func(n), test_impl(n))
+            self.assertEqual(count_array_OneDs(), 4)
+            self.assertEqual(count_parfor_OneDs(), 2)
+            self.assertIn('allgather', list(hpat_func.inspect_llvm().values())[0])
+        finally:
+            hpat.distributed_analysis.auto_rebalance = False
 
     def test_transpose(self):
         def test_impl(n):
@@ -304,6 +373,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skip("Numba's perfmute generation needs to use np seed properly")
     def test_permuted_array_indexing(self):
 
         # Since Numba uses Python's PRNG for producing random numbers in NumPy,

@@ -307,9 +307,10 @@ def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_ar
     def codegen(context, builder, sig, args):
         typ = sig.return_type
         dtype = StringArrayPayloadType()
-        meminfo, data_pointer = construct_string_array(context, builder)
-        string_array = cgutils.create_struct_proxy(dtype)(context, builder)
-        string_array.size = args[3]
+        meminfo, meminfo_data_ptr = construct_string_array(context, builder)
+        str_arr_payload = cgutils.create_struct_proxy(dtype)(context, builder)
+        string_array = context.make_helper(builder, typ)
+        string_array.num_items = args[3]
 
         ctinfo = context.make_helper(builder, schema_arr_tp, value=args[4])
         fnty = lir.FunctionType(lir.VoidType(),
@@ -322,13 +323,18 @@ def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_ar
 
         fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str")
         res = builder.call(fn, [args[0], args[1], args[2],
-                                string_array._get_ptr_by_name('offsets'),
-                                string_array._get_ptr_by_name('data'), ctinfo.data])
-        builder.store(string_array._getvalue(),
-                      data_pointer)
-        inst_struct = context.make_helper(builder, typ)
-        inst_struct.meminfo = meminfo
-        ret = inst_struct._getvalue()
+                                str_arr_payload._get_ptr_by_name('offsets'),
+                                str_arr_payload._get_ptr_by_name('data'), ctinfo.data])
+        builder.store(str_arr_payload._getvalue(),
+                      meminfo_data_ptr)
+
+        string_array.meminfo = meminfo
+        string_array.offsets = str_arr_payload.offsets
+        string_array.data = str_arr_payload.data
+        # TODO: null_bitmap
+        string_array.num_total_chars = builder.zext(builder.load(
+            builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
+        ret = string_array._getvalue()
         return impl_ret_new_ref(context, builder, typ, ret)
     return signature(string_array_type, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen
 
@@ -337,9 +343,10 @@ def read_xenon_str_parallel(typingctx, connect_tp, dset_tp, col_id_tp, schema_ar
     def codegen(context, builder, sig, args):
         typ = sig.return_type
         dtype = StringArrayPayloadType()
-        meminfo, data_pointer = construct_string_array(context, builder)
-        string_array = cgutils.create_struct_proxy(dtype)(context, builder)
-        string_array.size = args[4]
+        meminfo, meminfo_data_ptr = construct_string_array(context, builder)
+        str_arr_payload = cgutils.create_struct_proxy(dtype)(context, builder)
+        string_array = context.make_helper(builder, typ)
+        string_array.num_items = args[4]
 
         ctinfo = context.make_helper(builder, schema_arr_tp, value=args[3])
         fnty = lir.FunctionType(lir.VoidType(),
@@ -354,13 +361,17 @@ def read_xenon_str_parallel(typingctx, connect_tp, dset_tp, col_id_tp, schema_ar
 
         fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str_parallel")
         res = builder.call(fn, [args[0], args[1], args[2],
-                                string_array._get_ptr_by_name('offsets'),
-                                string_array._get_ptr_by_name('data'), ctinfo.data,
+                                str_arr_payload._get_ptr_by_name('offsets'),
+                                str_arr_payload._get_ptr_by_name('data'), ctinfo.data,
                                 args[4], args[5]])
-        builder.store(string_array._getvalue(),
-                      data_pointer)
-        inst_struct = context.make_helper(builder, typ)
-        inst_struct.meminfo = meminfo
-        ret = inst_struct._getvalue()
+        builder.store(str_arr_payload._getvalue(),
+                      meminfo_data_ptr)
+
+        string_array.meminfo = meminfo
+        string_array.offsets = str_arr_payload.offsets
+        string_array.data = str_arr_payload.data
+        string_array.num_total_chars = builder.zext(builder.load(
+            builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
+        ret = string_array._getvalue()
         return impl_ret_new_ref(context, builder, typ, ret)
     return signature(string_array_type, connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp), codegen

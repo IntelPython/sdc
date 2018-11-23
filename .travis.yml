@@ -5,8 +5,14 @@ dist: trusty
 matrix:
     include:
         - os: osx
-          env: PYTHON=3.6 NUMPY=1.14 CONDA_ENV=travisci
-        - env: PYTHON=3.6 NUMPY=1.14 RUN_COVERAGE=yes CONDA_ENV=travisci
+          env: CONDA_ENV=travisci NUM_PES=1
+        - os: osx
+          env: CONDA_ENV=travisci NUM_PES=2
+        - os: osx
+          env: CONDA_ENV=travisci NUM_PES=3
+        - env: RUN_COVERAGE=yes CONDA_ENV=travisci NUM_PES=1
+        - env: CONDA_ENV=travisci NUM_PES=2
+        - env: CONDA_ENV=travisci NUM_PES=3
 
 branches:
     only:

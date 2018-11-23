@@ -1,9 +1,10 @@
 from __future__ import print_function, division, absolute_import
-
+from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config
+from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import visit_vars_inner, replace_vars_inner
 from numba.typing import signature
+import hpat
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
@@ -14,11 +15,9 @@ class Filter(ir.Stmt):
     def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
         self.df_out = df_out
         self.df_in = df_in
-        self.df_out_vars = df_vars[self.df_out]
-        self.df_in_vars = df_vars[self.df_in]
+        self.df_out_vars = df_vars[self.df_out].copy()
+        self.df_in_vars = df_vars[self.df_in].copy()
         self.bool_arr = bool_arr
-        # needs df columns for type inference stage
-        self.df_vars = df_vars
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -39,9 +38,13 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     # empty filter nodes should be deleted in remove dead
     assert len(filter_node.df_in_vars) > 0, "empty filter in array analysis"
 
-    # arrays of input df have same size in first dimension as bool array
-    col_shape = equiv_set.get_shape(filter_node.bool_arr)
-    all_shapes = [col_shape[0]]
+    # arrays of input df have same size in first dimension
+    all_shapes = []
+    index_typ = typemap[filter_node.bool_arr.name]
+    # add shape for bool array indices
+    if isinstance(index_typ, types.Array) and index_typ.dtype == types.bool_:
+        col_shape = equiv_set.get_shape(filter_node.bool_arr)
+        all_shapes.append(col_shape[0])
     for _, col_var in filter_node.df_in_vars.items():
         typ = typemap[col_var.name]
         if typ == string_array_type:
@@ -85,11 +88,13 @@ def filter_distributed_analysis(filter_node, array_dists):
             min(in_dist.value, array_dists[col_var.name].value))
 
     # bool arr
-    in_dist = Distribution(
-        min(in_dist.value, array_dists[filter_node.bool_arr.name].value))
+    if filter_node.bool_arr.name in array_dists:
+        in_dist = Distribution(
+            min(in_dist.value, array_dists[filter_node.bool_arr.name].value))
     for _, col_var in filter_node.df_in_vars.items():
         array_dists[col_var.name] = in_dist
-    array_dists[filter_node.bool_arr.name] = in_dist
+    if filter_node.bool_arr.name in array_dists:
+        array_dists[filter_node.bool_arr.name] = in_dist
 
     # output columns have same distribution
     out_dist = Distribution.OneD_Var
@@ -106,7 +111,8 @@ def filter_distributed_analysis(filter_node, array_dists):
 
     # output can cause input REP
     if out_dist != Distribution.OneD_Var:
-        array_dists[filter_node.bool_arr.name] = out_dist
+        if filter_node.bool_arr.name in array_dists:
+            array_dists[filter_node.bool_arr.name] = out_dist
         for _, col_var in filter_node.df_in_vars.items():
             array_dists[col_var.name] = out_dist
 
@@ -115,8 +121,19 @@ def filter_distributed_analysis(filter_node, array_dists):
 
 distributed_analysis.distributed_analysis_extensions[Filter] = filter_distributed_analysis
 
+def build_filter_definitions(filter_node, definitions=None):
+    if definitions is None:
+        definitions = defaultdict(list)
 
-def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx):
+    for col_var in filter_node.df_out_vars.values():
+        definitions[col_var.name].append(filter_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[Filter] = build_filter_definitions
+
+
+def filter_distributed_run(filter_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = filter_node.loc
     bool_arr = filter_node.bool_arr
@@ -171,7 +188,9 @@ ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 
 def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, func_ir, typemap):
-    #
+    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+        return filter_node
+
     dead_cols = []
 
     for col_name, col_var in filter_node.df_out_vars.items():

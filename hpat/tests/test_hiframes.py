@@ -1,13 +1,25 @@
 import unittest
 import pandas as pd
 import numpy as np
+import random
+import string
 import pyarrow.parquet as pq
 import numba
 import hpat
 from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                            get_start_end)
+
+_pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                    "bar", "bar", "bar", "bar"],
+            "B": ["one", "one", "one", "two", "two",
+                    "one", "one", "two", "two"],
+            "C": ["small", "large", "large", "small",
+                    "small", "large", "small", "small",
+                    "large"],
+            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 
 class TestHiFrames(unittest.TestCase):
     def test_basics(self):
@@ -23,6 +35,157 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_column_list_select1(self):
+        def test_impl(df):
+            return df[['A', 'C']]
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_column_list_select2(self):
+        # make sure HPAT copies the columns like Pandas does
+        def test_impl(df):
+            df2 = df[['A']]
+            df2['A'] += 10
+            return df2.A, df.A
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        np.testing.assert_array_equal(hpat_func(df.copy())[1], test_impl(df)[1])
+
+    def test_pd_DataFrame_from_series_par(self):
+        def test_impl(n):
+            S1 = pd.Series(np.ones(n))
+            S2 = pd.Series(np.random.ranf(n))
+            df = pd.DataFrame({'A': S1, 'B': S2})
+            return df.A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertEqual(count_parfor_OneDs(), 1)
+
+    def test_df_values1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
+
+    def test_df_values2(self):
+        def test_impl(df):
+            return df.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_df_values_parallel1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df.values.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_df_box(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_df_box2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1,2,3], 'B': ['a', 'bb', 'ccc']})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_df_box3(self):
+        def test_impl(df):
+            df = df[df.A != 'dd']
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_box_dist_return(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        n = 11
+        hres, res = hpat_func(n), test_impl(n)
+        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 2)
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1)  # run to compile
+        np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
+        np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
+
+    def test_df_head1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_df_iat1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+            return df.iat[3, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    def test_df_iat2(self):
+        def test_impl(df):
+            return df.iat[3, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_df_iat3(self):
+        def test_impl(df, n):
+            return df.iat[n-1, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        self.assertEqual(hpat_func(df, n), test_impl(df, n))
+
+    def test_df_iat_set1(self):
+        def test_impl(df, n):
+            df.iat[n-1, 1] = n**2
+            return df
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df, n))
+
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
@@ -35,7 +198,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_set_column2(self):
         # create new column
@@ -49,7 +212,18 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 1)
+
+    def test_set_column_bool1(self):
+        def test_impl(df):
+            df['C'] = df['A'][df['B']]
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
+        df2 = df.copy()
+        test_impl(df2)
+        hpat_func(df)
+        pd.testing.assert_series_equal(df.C, df2.C)
 
     def test_len_df(self):
         def test_impl(n):
@@ -97,15 +271,92 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    def test_column_sum(self):
-        def test_impl():
-            A = np.array([1., 2., 3.])
-            A[0] = np.nan
-            df = pd.DataFrame({'A': A})
-            return df.A.sum()
+    def test_df_fillna1(self):
+        def test_impl(df):
+            return df.fillna(5.0)
 
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_fillna_str1(self):
+        def test_impl(df):
+            return df.fillna("dd")
+
+        df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_fillna_inplace1(self):
+        def test_impl(A):
+            A.fillna(11.0, inplace=True)
+            return A
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        df2 = df.copy()
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
+
+    def test_df_dropna1(self):
+        def test_impl(df):
+            return df.dropna()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df)
+        pd.testing.assert_frame_equal(out, h_out)
+
+    def test_df_dropna2(self):
+        def test_impl(df):
+            return df.dropna()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df)
+        pd.testing.assert_frame_equal(out, h_out)
+
+    def test_df_dropna_inplace1(self):
+        # TODO: fix error when no df is returned
+        def test_impl(df):
+            df.dropna(inplace=True)
+            return df
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        df2 = df.copy()
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df2)
+        pd.testing.assert_frame_equal(out, h_out)
+
+    def test_df_dropna_str1(self):
+        def test_impl(df):
+            return df.dropna()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, 4.0, 1.0], 'B': ['aa', 'b', None, 'ccc']})
+        hpat_func = hpat.jit(test_impl)
+        out = test_impl(df).reset_index(drop=True)
+        h_out = hpat_func(df)
+        pd.testing.assert_frame_equal(out, h_out)
+
+    def test_df_drop1(self):
+        def test_impl(df):
+            return df.drop(columns=['A'])
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_drop_inplace1(self):
+        def test_impl(df):
+            df.drop('A', axis=1, inplace=True)
+            return df
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        df2 = df.copy()
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
     def test_column_mean(self):
         def test_impl():
@@ -171,16 +422,15 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
-    # TODO: enable when namedtuple analysis patch is merged (#2984)
-    # def test_df_apply_branch(self):
-    #     def test_impl(n):
-    #         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
-    #         B = df.apply(lambda r: r.A < 10 and r.B > 20, axis=1)
-    #         return df.B.sum()
-    #
-    #     n = 121
-    #     hpat_func = hpat.jit(test_impl)
-    #     np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+    def test_df_apply_branch(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
+            B = df.apply(lambda r: r.A < 10 and r.B > 20, axis=1)
+            return df.B.sum()
+
+        n = 121
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     def test_cumsum(self):
         def test_impl(n):
@@ -271,6 +521,23 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+
+    def test_nunique_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return df.four.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
 
     def test_nunique_str(self):
         def test_impl(n):
@@ -280,12 +547,58 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     def test_nunique_str_parallel(self):
         # TODO: test without file
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
             return df.two.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        # test compile again for overload related issues
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
+    def test_unique(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        S = pd.Series(np.arange(n))
+        S[2] = 0
+        self.assertEqual(set(hpat_func(S)), set(test_impl(S)))
+
+    def test_unique_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.four.unique() == 3.0).sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+
+    def test_unique_str(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
+
+    def test_unique_str_parallel(self):
+        # TODO: test without file
+        def test_impl():
+            df = pq.read_table('example.parquet').to_pandas()
+            return (df.two.unique() == 'foo').sum()
 
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
@@ -339,9 +652,9 @@ class TestHiFrames(unittest.TestCase):
 
     def test_filter1(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
             df1 = df[df.A > .5]
-            return np.sum(df1.B)
+            return df1.B.sum()
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -351,7 +664,7 @@ class TestHiFrames(unittest.TestCase):
 
     def test_filter2(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.ones(n)})
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
             df1 = df.loc[df.A > .5]
             return np.sum(df1.B)
 
@@ -360,6 +673,67 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_filter3(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df1 = df.iloc[(df.A > .5).values]
+            return np.sum(df1.B)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_iloc1(self):
+        def test_impl(df, n):
+            return df.iloc[1:n].B.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
+
+    def test_iloc2(self):
+        def test_impl(df, n):
+            return df.iloc[np.array([1,4,9])].B.values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
+
+    def test_isin_df1(self):
+        def test_impl(df, df2):
+            return df.isin(df2)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2.A[n//2:] = n
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    def test_isin_dict1(self):
+        def test_impl(df):
+            vals = {'A': [2,3,4], 'C': [4,5,6]}
+            return df.isin(vals)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_isin_list1(self):
+        def test_impl(df):
+            vals = [2,3,4]
+            return df.isin(vals)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_1D_Var_len(self):
         def test_impl(n):
@@ -372,6 +746,17 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_append1(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2.A[n//2:] = n
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     def test_rolling1(self):
         # size 3 without unroll
@@ -406,8 +791,7 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
-        # small input array to mean is REP
-        self.assertEqual(count_array_REPs(), 1)
+        self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_rolling3(self):
@@ -437,7 +821,7 @@ class TestHiFrames(unittest.TestCase):
     def test_shift2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df.A.pct_change()
+            Ac = df.A.pct_change(1)
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -445,19 +829,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-
-    def test_list_convert(self):
-        def test_impl():
-            df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
-                        'two': ['foo', 'bar', 'baz'],
-                        'three': [True, False, True]})
-            return df.one.values, df.two.values, df.three.values
-
-        hpat_func = hpat.jit(test_impl)
-        one, two, three = hpat_func()
-        self.assertTrue(isinstance(one, np.ndarray))
-        self.assertTrue(isinstance(two,  np.ndarray))
-        self.assertTrue(isinstance(three, np.ndarray))
 
     def test_df_input(self):
         def test_impl(df):
@@ -477,36 +848,6 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': np.random.ranf(3*n), 'B': ['one', 'two', 'three']*n})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
-
-    def test_join1(self):
-        def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
-            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
-            return df3.B.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        n = 11111
-        self.assertEqual(hpat_func(n), test_impl(n))
-
-    def test_join1_seq(self):
-        def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
-            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
-            return df3.B
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
-        self.assertEqual(count_array_OneDs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 0)
-        n = 11111
-        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
 
     def test_concat(self):
         def test_impl(n):
@@ -635,6 +976,65 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    def test_agg_seq_prod(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].prod()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_var(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].var()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_seq_std(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].std()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_multikey_seq(self):
+        def test_impl(df):
+            A = df.groupby(['A', 'C'])['B'].sum()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
+                           'C': [3,5,6,5,4,4,3]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_agg_multikey_parallel(self):
+        def test_impl(in_A, in_B, in_C):
+            df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
+            A = df.groupby(['A', 'C'])['B'].sum()
+            return A.sum()
+
+        hpat_func = hpat.jit(locals={'in_A:input': 'distributed',
+            'in_B:input': 'distributed',
+            'in_C:input': 'distributed'})(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
+                           'C': [3,5,6,5,4,4,3]})
+        start, end = get_start_end(len(df))
+        h_A = df.A.values[start:end]
+        h_B = df.B.values[start:end]
+        h_C = df.C.values[start:end]
+        p_A = df.A.values
+        p_B = df.B.values
+        p_C = df.C.values
+        h_res = hpat_func(h_A, h_B, h_C)
+        p_res = test_impl(p_A, p_B, p_C)
+        self.assertEqual(h_res, p_res)
+
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -707,6 +1107,30 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_agg_parallel_var(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].var()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_agg_parallel_std(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
+            A = df.groupby('A')['B'].std()
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_agg_parallel_str(self):
         def test_impl():
             df = pq.read_table("groupby3.pq").to_pandas()
@@ -741,6 +1165,20 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_muti_hiframes_node_filter_agg(self):
+        def test_impl(df, cond):
+            df2 = df[cond]
+            c = df2.groupby('A')['B'].count()
+            return df2.C, c
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7], 'C': [2,3,-1,1,2,3,-1]})
+        cond = df.A > 1
+        res = test_impl(df, cond)
+        h_res = hpat_func(df, cond)
+        self.assertEqual(set(res[1]), set(h_res[1]))
+        np.testing.assert_array_equal(res[0], h_res[0])
 
     def test_itertuples(self):
         def test_impl(df):
@@ -806,6 +1244,16 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
+    def test_sort_values_copy(self):
+        def test_impl(df):
+            df2 = df.sort_values('A')
+            return df2.B.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
     def test_sort_values_single_col(self):
         def test_impl(df):
@@ -817,6 +1265,46 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': np.random.ranf(n)})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_values_single_col_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.A.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+        df = pd.DataFrame({'A': str_vals})
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df.copy()) == test_impl(df)).all())
+
+    def test_sort_values_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.B.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+        str_vals2 = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals2.append(val)
+
+        df = pd.DataFrame({'A': str_vals, 'B': str_vals2})
+        # use mergesort for stability, in str generation equal keys are more probable
+        sorted_df = df.sort_values('A', inplace=False, kind='mergesort')
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
     def test_sort_parallel_single_col(self):
         # TODO: better parallel sort test
@@ -836,6 +1324,68 @@ class TestHiFrames(unittest.TestCase):
         finally:
             hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
 
+    def test_sort_parallel(self):
+        # TODO: better parallel sort test
+        def test_impl():
+            df = pq.read_table('kde.parquet').to_pandas()
+            df['A'] = df.points.astype(np.float64)
+            df.sort_values('points', inplace=True)
+            res = df.A.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
+
+        save_min_samples = hiframes_sort.MIN_SAMPLES
+        try:
+            hiframes_sort.MIN_SAMPLES = 10
+            res = hpat_func()
+            self.assertTrue((np.diff(res)>=0).all())
+        finally:
+            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+
+    def test_pivot(self):
+        def test_impl(df):
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
+
+    def test_pivot_parallel(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_crosstab1(self):
+        def test_impl(df):
+            pt = pd.crosstab(df.A, df.C)
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
+
+    def test_crosstab_parallel1(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = pd.crosstab(df.A, df.C)
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
 
     def test_intraday(self):
         def test_impl(nsyms):

@@ -1,3 +1,4 @@
+import operator
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
@@ -11,6 +12,11 @@ import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hpat
+#from hpat.utils import unliteral_all
+# TODO: resolve import conflict
+def unliteral_all(args):
+    return tuple(types.unliteral(a) for a in args)
+
 import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
@@ -40,7 +46,7 @@ class CharType(types.Type):
 char_type = CharType()
 register_model(CharType)(models.IntegerModel)
 
-@overload('getitem')
+@overload(operator.getitem)
 def char_getitem_overload(_str, ind):
     if _str == string_type and isinstance(ind, types.Integer):
         sig = char_type(
@@ -54,7 +60,7 @@ def char_getitem_overload(_str, ind):
         return impl
 
 # XXX: fix overload for getitem and use it
-@lower_builtin('getitem', StringType, types.Integer)
+@lower_builtin(operator.getitem, StringType, types.Integer)
 def getitem_string(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -102,12 +108,20 @@ def hash_overload(str_typ):
         return lambda s: _hash_str(s)
 
 @infer
+@infer_global(operator.add)
+@infer_global(operator.iadd)
 class StringAdd(ConcreteTemplate):
     key = "+"
     cases = [signature(string_type, string_type, string_type)]
 
 
 @infer
+@infer_global(operator.eq)
+@infer_global(operator.ne)
+@infer_global(operator.ge)
+@infer_global(operator.gt)
+@infer_global(operator.le)
+@infer_global(operator.lt)
 class StringOpEq(AbstractTemplate):
     key = '=='
 
@@ -149,12 +163,12 @@ class StringAttribute(AttributeTemplate):
     def resolve_split(self, dict, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.List(string_type), *args)
+        return signature(types.List(string_type), types.unliteral(args[0]))
 
 
-# @infer
+# @infer_global(operator.getitem)
 # class GetItemString(AbstractTemplate):
-#     key = "getitem"
+#     key = operator.getitem
 #
 #     def generic(self, args, kws):
 #         assert not kws
@@ -216,7 +230,7 @@ class CompileRegexInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(regex_type, *args)
+        return signature(regex_type, *unliteral_all(args))
 
 
 def contains_regex(str, pat):
@@ -233,7 +247,7 @@ class ContainsInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.boolean, *args)
+        return signature(types.boolean, *unliteral_all(args))
 
 ll.add_symbol('init_string', hstr_ext.init_string)
 ll.add_symbol('init_string_const', hstr_ext.init_string_const)
@@ -299,9 +313,15 @@ def getpointer_from_string(context, builder, sig, args):
     c_str = builder.call(fn, [val])
     return c_str
 
-@lower_cast(StringType, types.Const)
+@lower_builtin(getpointer, types.StringLiteral)
+def getpointer_from_string_literal(context, builder, sig, args):
+    cstr = context.insert_const_string(builder.module, sig.args[0].literal_value)
+    return cstr
+
+@lower_cast(StringType, types.StringLiteral)
 def string_type_to_const(context, builder, fromty, toty, val):
-    cstr = context.insert_const_string(builder.module, toty.value)
+    # calling str() since the const value can be non-str like tuple const (CSV)
+    cstr = context.insert_const_string(builder.module, str(toty.literal_value))
     # check to make sure Const value matches stored string
     # call str == cstr
     fnty = lir.FunctionType(lir.IntType(1),
@@ -311,7 +331,7 @@ def string_type_to_const(context, builder, fromty, toty, val):
     with cgutils.if_unlikely(builder, builder.not_(match)):
         # Raise RuntimeError about the assumption violation
         usermsg = "constant string assumption violated"
-        errmsg = "{}: expecting {}".format(usermsg, toty.value)
+        errmsg = "{}: expecting {}".format(usermsg, toty.literal_value)
         context.call_conv.return_user_exc(builder, RuntimeError, (errmsg,))
 
     return impl_ret_untracked(context, builder, toty, cstr)
@@ -327,6 +347,15 @@ def const_string(context, builder, ty, pyval):
     ret = builder.call(fn, [cstr])
     return ret
 
+@lower_cast(types.StringLiteral, StringType)
+def const_to_string_type(context, builder, fromty, toty, val):
+    cstr = context.insert_const_string(builder.module, fromty.literal_value)
+
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    ret = builder.call(fn, [cstr])
+    return ret
 
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):
@@ -340,6 +369,7 @@ def string_from_impl(context, builder, sig, args):
     return builder.call(fn, args)
 
 
+@lower_builtin(operator.add, string_type, string_type)
 @lower_builtin("+", string_type, string_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
@@ -348,6 +378,7 @@ def impl_string_concat(context, builder, sig, args):
     return builder.call(fn, args)
 
 
+@lower_builtin(operator.eq, string_type, string_type)
 @lower_builtin('==', string_type, string_type)
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
@@ -355,6 +386,7 @@ def string_eq_impl(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.call(fn, args)
 
+@lower_builtin(operator.eq, char_type, char_type)
 @lower_builtin('==', char_type, char_type)
 def char_eq_impl(context, builder, sig, args):
     def char_eq_impl(c1, c2):
@@ -364,6 +396,7 @@ def char_eq_impl(context, builder, sig, args):
     return res
 
 
+@lower_builtin(operator.ne, string_type, string_type)
 @lower_builtin('!=', string_type, string_type)
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
@@ -371,6 +404,7 @@ def string_neq_impl(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
 
+@lower_builtin(operator.ge, string_type, string_type)
 @lower_builtin('>=', string_type, string_type)
 def string_ge_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -381,6 +415,7 @@ def string_ge_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
     return res
 
+@lower_builtin(operator.gt, string_type, string_type)
 @lower_builtin('>', string_type, string_type)
 def string_gt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -391,6 +426,7 @@ def string_gt_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
     return res
 
+@lower_builtin(operator.le, string_type, string_type)
 @lower_builtin('<=', string_type, string_type)
 def string_le_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -401,6 +437,7 @@ def string_le_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
     return res
 
+@lower_builtin(operator.lt, string_type, string_type)
 @lower_builtin('<', string_type, string_type)
 def string_lt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
@@ -434,7 +471,7 @@ def string_split_impl(context, builder, sig, args):
     return impl_ret_new_ref(context, builder, sig.return_type, _list.value)
 
 
-# @lower_builtin('getitem', StringType, types.Integer)
+# @lower_builtin(operator.getitem, StringType, types.Integer)
 # def getitem_string(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
 #                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -475,7 +512,7 @@ def lower_compile_regex(context, builder, sig, args):
 
 
 @lower_builtin(contains_regex, string_type, regex_type)
-def impl_string_concat(context, builder, sig, args):
+def impl_string_contains_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
@@ -483,7 +520,7 @@ def impl_string_concat(context, builder, sig, args):
 
 
 @lower_builtin(contains_noregex, string_type, string_type)
-def impl_string_concat(context, builder, sig, args):
+def impl_string_contains_noregex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(

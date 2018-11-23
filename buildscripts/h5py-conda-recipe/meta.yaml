@@ -1,4 +1,4 @@
-{% set version = "2.8.0rc1" %}
+{% set version = "2.8.0" %}
 
 package:
   name: h5py
@@ -6,9 +6,10 @@ package:
 
 source:
    url: https://github.com/h5py/h5py/archive/{{ version }}.tar.gz
+   sha256: eae41382be28b7264824450ce343dd625f972bedaaa3b0cced284986aabcbaee
 
 build:
-  number: 2
+  number: 1005
 
 requirements:
   build:
@@ -16,8 +17,8 @@ requirements:
 
   host:
     - hdf5
-    - python 3.6.*
-    - setuptools
+    - python 3.7
+    - pip
     - numpy
     - cython
     - pkgconfig
@@ -25,13 +26,12 @@ requirements:
     - mpich # [not win]
 
   run:
-    - python
+    - python 3.7
     - numpy
-    - cython
-    - pkgconfig
     - six
     - mpich # [not win]
     - hdf5
+    - pyreadline  # [win]
 
 test:
   imports:

@@ -1,12 +1,15 @@
+import operator
 import numba
 from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
-from numba.targets.arrayobj import make_array
-from numba.targets.boxing import unbox_array
-from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function, signature, infer_global, AbstractTemplate
+from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
+from numba.targets.boxing import unbox_array, box_array
+from numba.typing.templates import (infer_getattr, AttributeTemplate,
+    bound_function, signature, infer_global, AbstractTemplate,
+    ConcreteTemplate)
 
 import numpy as np
 import ctypes
@@ -30,6 +33,9 @@ import llvmlite.binding as ll
 ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
 ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
 ll.add_symbol('np_datetime_date_array_from_packed_ints', hdatetime_ext.np_datetime_date_array_from_packed_ints)
+
+date_fields = ['year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond', 'nanosecond']
+timedelta_fields = ['days', 'seconds', 'microseconds', 'nanoseconds']
 
 #--------------------------------------------------------------
 
@@ -87,229 +93,336 @@ def impl_ctor_pandas_dts(context, builder, sig, args):
     ts = cgutils.create_struct_proxy(typ)(context, builder)
     return ts._getvalue()
 
+
+#-- builtin operators for dt64 ----------------------------------------------
+# TODO: move to Numba
+
+class CompDT64(ConcreteTemplate):
+    cases = signature(
+        types.boolean, types.NPDatetime('ns'), types.NPDatetime('ns'))
+
+@infer_global(operator.lt)
+class CmpOpLt(CompDT64):
+    key = operator.lt
+
+@infer_global(operator.le)
+class CmpOpLe(CompDT64):
+    key = operator.le
+
+@infer_global(operator.gt)
+class CmpOpGt(CompDT64):
+    key = operator.gt
+
+@infer_global(operator.ge)
+class CmpOpGe(CompDT64):
+    key = operator.ge
+
+@infer_global(operator.eq)
+class CmpOpEq(CompDT64):
+    key = operator.eq
+
+@infer_global(operator.ne)
+class CmpOpNe(CompDT64):
+    key = operator.ne
+
+class MinMaxBaseDT64(numba.typing.builtins.MinMaxBase):
+
+    def _unify_minmax(self, tys):
+        for ty in tys:
+            if not ty == types.NPDatetime('ns'):
+                return
+        return self.context.unify_types(*tys)
+
+@infer_global(max)
+class Max(MinMaxBaseDT64):
+    pass
+
+
+@infer_global(min)
+class Min(MinMaxBaseDT64):
+    pass
+
 #---------------------------------------------------------------
 
-intdatetime = True
+# datetime.date implementation that uses a single int to store year/month/day
+class DatetimeDateType(types.Type):
+    def __init__(self):
+        super(DatetimeDateType, self).__init__(
+            name='DatetimeDateType()')
+        self.bitwidth = 64
 
-if intdatetime:
-    class DatetimeDateType(types.Type):
-        def __init__(self):
-            super(DatetimeDateType, self).__init__(
-                name='DatetimeDateType()')
-            self.bitwidth = 64
+datetime_date_type = DatetimeDateType()
 
-    datetime_date_type = DatetimeDateType()
+@typeof_impl.register(datetime.date)
+def typeof_pd_timestamp(val, c):
+    return datetime_date_type
 
-    @typeof_impl.register(datetime.date)
-    def typeof_pd_timestamp(val, c):
+register_model(DatetimeDateType)(models.IntegerModel)
+
+@infer_getattr
+class DatetimeAttribute(AttributeTemplate):
+    key = DatetimeDateType
+
+    def generic_resolve(self, typ, attr):
+        return types.int64
+
+@lower_getattr(DatetimeDateType, 'year')
+def datetime_get_year(context, builder, typ, val):
+    return builder.lshr(val, lir.Constant(lir.IntType(64), 32))
+
+@lower_getattr(DatetimeDateType, 'month')
+def datetime_get_month(context, builder, typ, val):
+    return builder.and_(builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF))
+
+@lower_getattr(DatetimeDateType, 'day')
+def datetime_get_day(context, builder, typ, val):
+    return builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF))
+
+@numba.njit
+def convert_datetime_date_array_to_native(x):
+    return np.array([(val.day + (val.month << 16) + (val.year << 32)) for val in x], dtype=np.int64)
+
+@numba.njit
+def datetime_date_ctor(y, m, d):
+    return datetime.date(y, m, d)
+
+@unbox(DatetimeDateType)
+def unbox_datetime_date(typ, val, c):
+    year_obj = c.pyapi.object_getattr_string(val, "year")
+    month_obj = c.pyapi.object_getattr_string(val, "month")
+    day_obj = c.pyapi.object_getattr_string(val, "day")
+
+    yll = c.pyapi.long_as_longlong(year_obj)
+    mll = c.pyapi.long_as_longlong(month_obj)
+    dll = c.pyapi.long_as_longlong(day_obj)
+
+    nopython_date = c.builder.add(dll,
+        c.builder.add(c.builder.shl(yll, lir.Constant(lir.IntType(64), 32)),
+                        c.builder.shl(mll, lir.Constant(lir.IntType(64), 16))))
+
+    c.pyapi.decref(year_obj)
+    c.pyapi.decref(month_obj)
+    c.pyapi.decref(day_obj)
+
+    is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+    return NativeValue(nopython_date, is_error=is_error)
+
+
+def unbox_datetime_date_array(typ, val, c):
+    #
+    n = object_length(c, val)
+    #cgutils.printf(c.builder, "len %d\n", n)
+    arr_typ = types.Array(types.intp, 1, 'C')
+    out_arr = _empty_nd_impl(c.context, c.builder, arr_typ, [n])
+
+    with cgutils.for_range(c.builder, n) as loop:
+        dt_date = sequence_getitem(c, val, loop.index)
+        int_date = unbox_datetime_date(datetime_date_type, dt_date, c).value
+        dataptr, shapes, strides = basic_indexing(
+            c.context, c.builder, arr_typ, out_arr, (types.intp,), (loop.index,))
+        store_item(c.context, c.builder, arr_typ, int_date, dataptr)
+
+    is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+    return NativeValue(out_arr._getvalue(), is_error=is_error)
+
+def int_to_datetime_date_python(ia):
+    return datetime.date(ia >> 32, (ia >> 16) & 0xffff, ia & 0xffff)
+
+def int_array_to_datetime_date(ia):
+    return np.vectorize(int_to_datetime_date_python)(ia)
+
+def box_datetime_date_array(typ, val, c):
+    ary = box_array(types.Array(types.int64, 1, 'C'), val, c)
+    hpat_name = c.context.insert_const_string(c.builder.module, 'hpat')
+    hpat_mod = c.pyapi.import_module_noblock(hpat_name)
+    pte_mod = c.pyapi.object_getattr_string(hpat_mod, 'pd_timestamp_ext')
+    iatdd = c.pyapi.object_getattr_string(pte_mod, 'int_array_to_datetime_date')
+    res = c.pyapi.call_function_objargs(iatdd, [ary])
+    return res
+
+# TODO: move to utils or Numba
+
+def object_length(c, obj):
+    """
+    len(obj)
+    """
+    pyobj_lltyp = c.context.get_argument_type(types.pyobject)
+    fnty = lir.FunctionType(lir.IntType(64), [pyobj_lltyp])
+    fn = c.builder.module.get_or_insert_function(fnty, name="PyObject_Length")
+    return c.builder.call(fn, (obj,))
+
+def sequence_getitem(c, obj, ind):
+    """
+    seq[ind]
+    """
+    pyobj_lltyp = c.context.get_argument_type(types.pyobject)
+    fnty = lir.FunctionType(pyobj_lltyp, [pyobj_lltyp, lir.IntType(64)])
+    fn = c.builder.module.get_or_insert_function(fnty, name="PySequence_GetItem")
+    return c.builder.call(fn, (obj, ind))
+
+
+@box(DatetimeDateType)
+def box_datetime_date(typ, val, c):
+    year_obj = c.pyapi.long_from_longlong(c.builder.lshr(val, lir.Constant(lir.IntType(64), 32)))
+    month_obj = c.pyapi.long_from_longlong(c.builder.and_(c.builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF)))
+    day_obj = c.pyapi.long_from_longlong(c.builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF)))
+
+    dt_obj = c.pyapi.unserialize(c.pyapi.serialize_object(datetime.date))
+    res = c.pyapi.call_function_objargs(dt_obj, (year_obj, month_obj, day_obj))
+    c.pyapi.decref(year_obj)
+    c.pyapi.decref(month_obj)
+    c.pyapi.decref(day_obj)
+    return res
+
+@type_callable(datetime.date)
+def type_timestamp(context):
+    def typer(year, month, day):
+        # TODO: check types
         return datetime_date_type
+    return typer
 
-    register_model(DatetimeDateType)(models.IntegerModel)
+@lower_builtin(datetime.date, types.int64, types.int64, types.int64)
+def impl_ctor_timestamp(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day = args
+    nopython_date = builder.add(day,
+                    builder.add(builder.shl(year, lir.Constant(lir.IntType(64), 32)),
+                                builder.shl(month, lir.Constant(lir.IntType(64), 16))))
+    return nopython_date
 
-    @infer_getattr
-    class DatetimeAttribute(AttributeTemplate):
-        key = DatetimeDateType
+@intrinsic
+def datetime_date_to_int(typingctx, dt_date_tp):
+    assert dt_date_tp == datetime_date_type
+    def codegen(context, builder, sig, args):
+        return args[0]
+    return signature(types.int64, datetime_date_type), codegen
 
-        def generic_resolve(self, typ, attr):
-            return types.int64
+@intrinsic
+def int_to_datetime_date(typingctx, dt_date_tp):
+    assert dt_date_tp == types.intp
+    def codegen(context, builder, sig, args):
+        return args[0]
+    return signature(datetime_date_type, types.int64), codegen
 
-    @lower_getattr(DatetimeDateType, 'year')
-    def datetime_get_year(context, builder, typ, val):
-        return builder.lshr(val, lir.Constant(lir.IntType(64), 32))
+def set_df_datetime_date(df, cname, arr):
+    df[cname] = arr
 
-    @lower_getattr(DatetimeDateType, 'month')
-    def datetime_get_year(context, builder, typ, val):
-        return builder.and_(builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF))
+@infer_global(set_df_datetime_date)
+class SetDfDTInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 3
+        assert isinstance(args[1], types.Literal)
+        return signature(types.none, *args)
 
-    @lower_getattr(DatetimeDateType, 'day')
-    def datetime_get_year(context, builder, typ, val):
-        return builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF))
+SetDfDTInfer.support_literals = True
 
-    @numba.njit
-    def convert_datetime_date_array_to_native(x):
-        return np.array([(val.day + (val.month << 16) + (val.year << 32)) for val in x], dtype=np.int64)
+@lower_builtin(set_df_datetime_date, types.Any, types.Literal, types.Array)
+def set_df_datetime_date_lower(context, builder, sig, args):
+    #
+    col_name = sig.args[1].literal_value
+    data_arr = make_array(sig.args[2])(context, builder, args[2])
+    num_elems = builder.extract_value(data_arr.shape, 0)
 
-    @unbox(DatetimeDateType)
-    def unbox_datetime_date(typ, val, c):
-        year_obj = c.pyapi.object_getattr_string(val, "year")
-        month_obj = c.pyapi.object_getattr_string(val, "month")
-        day_obj = c.pyapi.object_getattr_string(val, "day")
+    pyapi = context.get_python_api(builder)
+    gil_state = pyapi.gil_ensure()  # acquire GIL
 
-        yll = c.pyapi.long_as_longlong(year_obj)
-        mll = c.pyapi.long_as_longlong(month_obj)
-        dll = c.pyapi.long_as_longlong(day_obj)
+    dt_class = pyapi.unserialize(pyapi.serialize_object(datetime.date))
 
-        nopython_date = c.builder.add(dll,
-            c.builder.add(c.builder.shl(yll, lir.Constant(lir.IntType(64), 32)),
-                          c.builder.shl(mll, lir.Constant(lir.IntType(64), 16))))
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(64).as_pointer(), lir.IntType(64),
+                                                lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="np_datetime_date_array_from_packed_ints")
+    py_arr = builder.call(fn, [data_arr.data, num_elems, dt_class])
 
-        c.pyapi.decref(year_obj)
-        c.pyapi.decref(month_obj)
-        c.pyapi.decref(day_obj)
+    # get column as string obj
+    cstr = context.insert_const_string(builder.module, col_name)
+    cstr_obj = pyapi.string_from_string(cstr)
 
-        is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
-        return NativeValue(nopython_date, is_error=is_error)
+    # set column array
+    pyapi.object_setitem(args[0], cstr_obj, py_arr)
 
-    @box(DatetimeDateType)
-    def box_datetime_date(typ, val, c):
-        year_obj = c.pyapi.long_from_longlong(c.builder.lshr(val, lir.Constant(lir.IntType(64), 32)))
-        month_obj = c.pyapi.long_from_longlong(c.builder.and_(c.builder.lshr(val, lir.Constant(lir.IntType(64), 16)), lir.Constant(lir.IntType(64), 0xFFFF)))
-        day_obj = c.pyapi.long_from_longlong(c.builder.and_(val, lir.Constant(lir.IntType(64), 0xFFFF)))
+    pyapi.decref(py_arr)
+    pyapi.decref(cstr_obj)
 
-        dt_obj = c.pyapi.unserialize(c.pyapi.serialize_object(datetime.date))
-        res = c.pyapi.call_function_objargs(dt_obj, (year_obj, month_obj, day_obj))
-        c.pyapi.decref(year_obj)
-        c.pyapi.decref(month_obj)
-        c.pyapi.decref(day_obj)
-        return res
+    pyapi.gil_release(gil_state)    # release GIL
 
-    @type_callable(datetime.date)
-    def type_timestamp(context):
-        def typer(year, month, day):
-            # TODO: check types
-            return datetime_date_type
-        return typer
-
-    @lower_builtin(datetime.date, types.int64, types.int64, types.int64)
-    def impl_ctor_timestamp(context, builder, sig, args):
-        typ = sig.return_type
-        year, month, day = args
-        nopython_date = builder.add(day,
-                        builder.add(builder.shl(year, lir.Constant(lir.IntType(64), 32)),
-                                    builder.shl(month, lir.Constant(lir.IntType(64), 16))))
-        return nopython_date
-
-    @intrinsic
-    def datetime_date_to_int(typingctx, dt_date_tp):
-        assert dt_date_tp == datetime_date_type
-        def codegen(context, builder, sig, args):
-            return args[0]
-        return signature(types.int64, datetime_date_type), codegen
-
-    @intrinsic
-    def int_to_datetime_date(typingctx, dt_date_tp):
-        assert dt_date_tp == types.intp
-        def codegen(context, builder, sig, args):
-            return args[0]
-        return signature(datetime_date_type, types.int64), codegen
-
-    def set_df_datetime_date(df, cname, arr):
-        df[cname] = arr
-
-    @infer_global(set_df_datetime_date)
-    class SetDfDTInfer(AbstractTemplate):
-        def generic(self, args, kws):
-            assert not kws
-            assert len(args) == 3
-            assert isinstance(args[1], types.Const)
-            return signature(types.none, *args)
-
-    SetDfDTInfer.support_literals = True
-
-    @lower_builtin(set_df_datetime_date, types.Any, types.Const, types.Array)
-    def set_df_datetime_date_lower(context, builder, sig, args):
-        #
-        col_name = sig.args[1].value
-        data_arr = make_array(sig.args[2])(context, builder, args[2])
-        num_elems = builder.extract_value(data_arr.shape, 0)
-
-        pyapi = context.get_python_api(builder)
-        gil_state = pyapi.gil_ensure()  # acquire GIL
-
-        dt_class = pyapi.unserialize(pyapi.serialize_object(datetime.date))
-
-        fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(64).as_pointer(), lir.IntType(64),
-                                                 lir.IntType(8).as_pointer()])
-        fn = builder.module.get_or_insert_function(fnty, name="np_datetime_date_array_from_packed_ints")
-        py_arr = builder.call(fn, [data_arr.data, num_elems, dt_class])
-
-        # get column as string obj
-        cstr = context.insert_const_string(builder.module, col_name)
-        cstr_obj = pyapi.string_from_string(cstr)
-
-        # set column array
-        pyapi.object_setitem(args[0], cstr_obj, py_arr)
-
-        pyapi.decref(py_arr)
-        pyapi.decref(cstr_obj)
-
-        pyapi.gil_release(gil_state)    # release GIL
-
-        return context.get_dummy_value()
-else:
-    class DatetimeDateType(types.Type):
-        def __init__(self):
-            super(DatetimeDateType, self).__init__(
-                name='DatetimeDateType()')
-
-    datetime_date_type = DatetimeDateType()
-
-    @typeof_impl.register(datetime.date)
-    def typeof_pd_timestamp(val, c):
-        return datetime_date_type
+    return context.get_dummy_value()
 
 
-    @register_model(DatetimeDateType)
-    class DatetimeDateModel(models.StructModel):
-        def __init__(self, dmm, fe_type):
-            members = [
-                ('year', types.int64),
-                ('month', types.int64),
-                ('day', types.int64),
-            ]
-            models.StructModel.__init__(self, dmm, fe_type, members)
+# datetime.date implementation that uses multiple ints to store year/month/day
+# class DatetimeDateType(types.Type):
+#     def __init__(self):
+#         super(DatetimeDateType, self).__init__(
+#             name='DatetimeDateType()')
 
-    make_attribute_wrapper(DatetimeDateType, 'year', 'year')
-    make_attribute_wrapper(DatetimeDateType, 'month', 'month')
-    make_attribute_wrapper(DatetimeDateType, 'day', 'day')
+# datetime_date_type = DatetimeDateType()
 
-    @unbox(DatetimeDateType)
-    def unbox_datetime_date(typ, val, c):
-        year_obj = c.pyapi.object_getattr_string(val, "year")
-        month_obj = c.pyapi.object_getattr_string(val, "month")
-        day_obj = c.pyapi.object_getattr_string(val, "day")
+# @typeof_impl.register(datetime.date)
+# def typeof_pd_timestamp(val, c):
+#     return datetime_date_type
 
-        dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder)
-        dt_date.year = c.pyapi.long_as_longlong(year_obj)
-        dt_date.month = c.pyapi.long_as_longlong(month_obj)
-        dt_date.day = c.pyapi.long_as_longlong(day_obj)
 
-        c.pyapi.decref(year_obj)
-        c.pyapi.decref(month_obj)
-        c.pyapi.decref(day_obj)
+# @register_model(DatetimeDateType)
+# class DatetimeDateModel(models.StructModel):
+#     def __init__(self, dmm, fe_type):
+#         members = [
+#             ('year', types.int64),
+#             ('month', types.int64),
+#             ('day', types.int64),
+#         ]
+#         models.StructModel.__init__(self, dmm, fe_type, members)
 
-        is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
-        return NativeValue(dt_date._getvalue(), is_error=is_error)
+# make_attribute_wrapper(DatetimeDateType, 'year', 'year')
+# make_attribute_wrapper(DatetimeDateType, 'month', 'month')
+# make_attribute_wrapper(DatetimeDateType, 'day', 'day')
 
-    @box(DatetimeDateType)
-    def box_datetime_date(typ, val, c):
-        dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
-        year_obj = c.pyapi.long_from_longlong(dt_date.year)
-        month_obj = c.pyapi.long_from_longlong(dt_date.month)
-        day_obj = c.pyapi.long_from_longlong(dt_date.day)
-        dt_obj = c.pyapi.unserialize(c.pyapi.serialize_object(datetime.date))
-        res = c.pyapi.call_function_objargs(dt_obj, (year_obj, month_obj, day_obj))
-        c.pyapi.decref(year_obj)
-        c.pyapi.decref(month_obj)
-        c.pyapi.decref(day_obj)
-        return res
+# @unbox(DatetimeDateType)
+# def unbox_datetime_date(typ, val, c):
+#     year_obj = c.pyapi.object_getattr_string(val, "year")
+#     month_obj = c.pyapi.object_getattr_string(val, "month")
+#     day_obj = c.pyapi.object_getattr_string(val, "day")
 
-    @type_callable(datetime.date)
-    def type_timestamp(context):
-        def typer(year, month, day):
-            # TODO: check types
-            return datetime_date_type
-        return typer
+#     dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder)
+#     dt_date.year = c.pyapi.long_as_longlong(year_obj)
+#     dt_date.month = c.pyapi.long_as_longlong(month_obj)
+#     dt_date.day = c.pyapi.long_as_longlong(day_obj)
 
-    @lower_builtin(datetime.date, types.int64, types.int64, types.int64)
-    def impl_ctor_timestamp(context, builder, sig, args):
-        typ = sig.return_type
-        year, month, day = args
-        ts = cgutils.create_struct_proxy(typ)(context, builder)
-        ts.year = year
-        ts.month = month
-        ts.day = day
-        return ts._getvalue()
+#     c.pyapi.decref(year_obj)
+#     c.pyapi.decref(month_obj)
+#     c.pyapi.decref(day_obj)
+
+#     is_error = cgutils.is_not_null(c.builder, c.pyapi.err_occurred())
+#     return NativeValue(dt_date._getvalue(), is_error=is_error)
+
+# @box(DatetimeDateType)
+# def box_datetime_date(typ, val, c):
+#     dt_date = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
+#     year_obj = c.pyapi.long_from_longlong(dt_date.year)
+#     month_obj = c.pyapi.long_from_longlong(dt_date.month)
+#     day_obj = c.pyapi.long_from_longlong(dt_date.day)
+#     dt_obj = c.pyapi.unserialize(c.pyapi.serialize_object(datetime.date))
+#     res = c.pyapi.call_function_objargs(dt_obj, (year_obj, month_obj, day_obj))
+#     c.pyapi.decref(year_obj)
+#     c.pyapi.decref(month_obj)
+#     c.pyapi.decref(day_obj)
+#     return res
+
+# @type_callable(datetime.date)
+# def type_timestamp(context):
+#     def typer(year, month, day):
+#         # TODO: check types
+#         return datetime_date_type
+#     return typer
+
+# @lower_builtin(datetime.date, types.int64, types.int64, types.int64)
+# def impl_ctor_timestamp(context, builder, sig, args):
+#     typ = sig.return_type
+#     year, month, day = args
+#     ts = cgutils.create_struct_proxy(typ)(context, builder)
+#     ts.year = year
+#     ts.month = month
+#     ts.day = day
+#     return ts._getvalue()
 
 #------------------------------------------------------------------------
 
@@ -322,6 +435,10 @@ pandas_timestamp_type = PandasTimestampType()
 
 @typeof_impl.register(pd.Timestamp)
 def typeof_pd_timestamp(val, c):
+    return pandas_timestamp_type
+
+@typeof_impl.register(datetime.datetime)
+def typeof_datetime_datetime(val, c):
     return pandas_timestamp_type
 
 ts_field_typ = types.int64
@@ -451,6 +568,20 @@ def type_timestamp(context):
         return pandas_timestamp_type
     return typer
 
+@type_callable(pd.Timestamp)
+def type_timestamp(context):
+    def typer(datetime_type):
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
+@type_callable(datetime.datetime)
+def type_timestamp(context):
+    def typer(year, month, day):  # how to handle optional hour, minute, second, us, ns?
+        # TODO: check types
+        return pandas_timestamp_type
+    return typer
+
 @lower_builtin(pd.Timestamp, types.int64, types.int64, types.int64, types.int64,
                 types.int64, types.int64, types.int64, types.int64)
 def impl_ctor_timestamp(context, builder, sig, args):
@@ -467,11 +598,74 @@ def impl_ctor_timestamp(context, builder, sig, args):
     ts.nanosecond = ns
     return ts._getvalue()
 
+@lower_builtin(pd.Timestamp, pandas_timestamp_type)
+def impl_ctor_ts_ts(context, builder, sig, args):
+    typ = sig.return_type
+    rhs = args[0]
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy = cgutils.create_struct_proxy(typ)(context, builder)
+    rhsproxy._setvalue(rhs)
+    cgutils.copy_struct(ts, rhsproxy)
+    return ts._getvalue()
+
+#              , types.int64, types.int64, types.int64, types.int64, types.int64)
+@lower_builtin(datetime.datetime, types.int64, types.int64, types.int64)
+@lower_builtin(datetime.datetime, types.IntegerLiteral, types.IntegerLiteral, types.IntegerLiteral)
+def impl_ctor_datetime(context, builder, sig, args):
+    typ = sig.return_type
+    year, month, day = args
+    #year, month, day, hour, minute, second, us, ns = args
+    ts = cgutils.create_struct_proxy(typ)(context, builder)
+    ts.year = year
+    ts.month = month
+    ts.day = day
+    ts.hour = lir.Constant(lir.IntType(64), 0)
+    ts.minute = lir.Constant(lir.IntType(64), 0)
+    ts.second = lir.Constant(lir.IntType(64), 0)
+    ts.microsecond = lir.Constant(lir.IntType(64), 0)
+    ts.nanosecond = lir.Constant(lir.IntType(64), 0)
+    #ts.hour = hour
+    #ts.minute = minute
+    #ts.second = second
+    #ts.microsecond = us
+    #ts.nanosecond = ns
+    return ts._getvalue()
+
+
 
 @lower_cast(types.NPDatetime('ns'), types.int64)
 def dt64_to_integer(context, builder, fromty, toty, val):
     # dt64 is stored as int64 so just return value
     return val
+
+@numba.njit
+def convert_timestamp_to_datetime64(ts):
+    year = ts.year - 1970
+    days = year * 365
+    if days >= 0:
+        year += 1
+        days += year // 4
+        year += 68
+        days -= year // 100
+        year += 300
+        days += year // 400
+    else:
+        year -= 2
+        days += year // 4
+        year -= 28
+        days -= year // 100
+        days += year // 400
+    leapyear = (ts.year % 400 == 0) or (ts.year %4 == 0 and ts.year %100 != 0)
+    month_len = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if leapyear:
+        month_len[1] = 29
+
+    for i in range(ts.month - 1):
+        days += month_len[i]
+
+    days += ts.day - 1
+
+    return ((((days * 24 + ts.hour) * 60 + ts.minute) * 60 + ts.second) * 1000000 + ts.microsecond) * 1000 + ts.nanosecond
 
 @numba.njit
 def convert_datetime64_to_timestamp(dt64):
@@ -540,6 +734,23 @@ def type_myref(context):
         return types.voidptr
     return typer
 
+#-----------------------------------------------------------
+
+def integer_to_timedelta64(val):
+    return np.timedelta64(val)
+
+@type_callable(integer_to_timedelta64)
+def type_int_to_timedelta64(context):
+    def typer(val):
+        return types.NPTimedelta('ns')
+    return typer
+
+@lower_builtin(integer_to_timedelta64, types.int64)
+def impl_int_to_timedelta64(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+
 def integer_to_dt64(val):
     return np.datetime64(val)
 
@@ -550,11 +761,44 @@ def type_int_to_dt64(context):
     return typer
 
 @lower_builtin(integer_to_dt64, types.int64)
+@lower_builtin(integer_to_dt64, types.IntegerLiteral)
 def impl_int_to_dt64(context, builder, sig, args):
     return args[0]
 
+#-----------------------------------------------------------
+
+def dt64_to_integer(val):
+    return int(val)
+
+@type_callable(dt64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(dt64_to_integer, types.NPDatetime('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+def timedelta64_to_integer(val):
+    return int(val)
+
+@type_callable(timedelta64_to_integer)
+def type_dt64_to_int(context):
+    def typer(val):
+        return types.int64
+    return typer
+
+@lower_builtin(timedelta64_to_integer, types.NPTimedelta('ns'))
+def impl_dt64_to_int(context, builder, sig, args):
+    return args[0]
+
+#-----------------------------------------------------------
+
 @lower_builtin(myref, types.int32)
 @lower_builtin(myref, types.int64)
+@lower_builtin(myref, types.IntegerLiteral)
 def impl_myref_int32(context, builder, sig, args):
     typ = types.voidptr
     val = args[0]
@@ -612,29 +856,12 @@ def parse_datetime_str(str):
 
 #----------------------------------------------------------------------------------------------
 
-class TimestampSeriesType(types.Array):
-    def __init__(self):
-        super(TimestampSeriesType, self).__init__(dtype=types.NPDatetime('ns'), ndim=1, layout='C')
-
-timestamp_series_type = TimestampSeriesType()
-
-@register_model(TimestampSeriesType)
-class TimestampSeriesModel(models.ArrayModel):
-    pass
-
-@unbox(TimestampSeriesType)
-def unbox_timestamp_series(typ, val, c):
-    arr_obj = c.pyapi.object_getattr_string(val, "values")
-    native_val = unbox_array(types.Array(dtype=types.NPDatetime('ns'), ndim=1, layout='C'), arr_obj, c)
-    c.pyapi.decref(arr_obj)
-    return native_val
-
 
 # XXX: code for timestamp series getitem in regular Numba
 
-# @infer
+# @infer_global(operator.getitem)
 # class GetItemTimestampSeries(AbstractTemplate):
-#     key = "getitem"
+#     key = operator.getitem
 #
 #     def generic(self, args, kws):
 #         assert not kws
@@ -651,7 +878,7 @@ def unbox_timestamp_series(typ, val, c):
 # #import hdatetime_ext
 # #ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
 #
-# @lower_builtin('getitem', TimestampSeriesType, types.Integer)
+# @lower_builtin(operator.getitem, TimestampSeriesType, types.Integer)
 # def lower_timestamp_series_getitem(context, builder, sig, args):
 #     #print("lower_timestamp_series_getitem", sig, type(sig), args, type(args), sig.return_type)
 #     old_ret = sig.return_type

@@ -103,19 +103,26 @@ if is_win:
     # hdf5-parallel Windows build uses CMake which needs this flag
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
+hdf5_libs = MPI_LIBS + ['hdf5']
+if not is_win:
+    hdf5_libs += ['boost_filesystem', 'boost_system']
 
 ext_io = Extension(name="hio",
-                   sources=["hpat/_io.cpp"],
-                   libraries = ['hdf5'] + MPI_LIBS + ['boost_filesystem'],
-                   include_dirs = [HDF5_DIR+'/include',] + ind,
+                   sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
+                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h", "hpat/_import_py.h", "hpat/_csv.h", "hpat/_datetime_ext.h"],
+                   libraries = hdf5_libs,
+                   include_dirs = ([HDF5_DIR+'/include',] + ind
+                     + np_compile_args['include_dirs']),
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
                    extra_link_args = ela,
+                   language="c++"
 )
 
 ext_hdist = Extension(name="hdist",
                       sources=["hpat/_distributed.cpp"],
+                      depends=["hpat/_hpat_common.h"],
                       libraries = MPI_LIBS,
                       extra_compile_args = eca,
                       extra_link_args = ela,
@@ -150,9 +157,14 @@ ext_set = Extension(name="hset_ext",
                      library_dirs = lid,
 )
 
+str_libs = np_compile_args['libraries']
+
+if not is_win:
+    str_libs += ['boost_regex']
+
 ext_str = Extension(name="hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
-                    libraries=['boost_regex'] + np_compile_args['libraries'],
+                    libraries=str_libs,
                     define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
                     extra_compile_args = eca,
                     extra_link_args = ela,
@@ -178,6 +190,7 @@ ext_dt = Extension(name="hdatetime_ext",
 
 ext_quantile = Extension(name="quantile_alg",
                          sources=["hpat/_quantile_alg.cpp"],
+                         depends=["hpat/_hpat_common.h"],
                          libraries = MPI_LIBS,
                          extra_compile_args = eca,
                          extra_link_args = ela,
@@ -187,7 +200,12 @@ ext_quantile = Extension(name="quantile_alg",
 
 
 # pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
-pq_libs = MPI_LIBS + ['boost_filesystem']
+pq_libs = MPI_LIBS.copy()
+
+# Windows MSVC can't have boost library names on command line
+# auto-link magic of boost should be used
+if not is_win:
+    pq_libs += ['boost_filesystem']
 
 # if is_win:
 #     pq_libs += ['arrow', 'parquet']
@@ -262,7 +280,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.22',
+      version='0.25.0',
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[

@@ -6,6 +6,9 @@
 #include <cmath>
 #include <algorithm>
 #include <cassert>
+#include <iostream>
+
+#include "_hpat_common.h"
 
 #define root 0
 
@@ -14,17 +17,21 @@ std::pair<T, T> get_lower_upper_kth_parallel(std::vector<T> &my_array,
         int64_t total_size, int myrank, int n_pes, int64_t k, int type_enum);
 
 template <class T>
-double small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
+T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
                               int myrank, int n_pes, int64_t k, int type_enum);
 
 template <class T>
-double get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum);
+T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum);
 
 double quantile_parallel(void* data, int64_t local_size, int64_t total_size, double quantile, int type_enum);
 template<class T>
 double quantile_parallel_int(T* data, int64_t local_size, double at, int type_enum, int myrank, int n_pes);
 template<class T>
 double quantile_parallel_float(T* data, int64_t local_size, double quantile, int type_enum, int myrank, int n_pes);
+
+void nth_sequential(void* res, void* data, int64_t local_size, int64_t k, int type_enum);
+void nth_parallel(void* res, void* data, int64_t local_size, int64_t k, int type_enum);
+
 
 PyMODINIT_FUNC PyInit_quantile_alg(void) {
     PyObject *m;
@@ -36,6 +43,10 @@ PyMODINIT_FUNC PyInit_quantile_alg(void) {
 
     PyObject_SetAttrString(m, "quantile_parallel",
                             PyLong_FromVoidPtr((void*)(&quantile_parallel)));
+    PyObject_SetAttrString(m, "nth_sequential",
+                            PyLong_FromVoidPtr((void*)(&nth_sequential)));
+    PyObject_SetAttrString(m, "nth_parallel",
+                            PyLong_FromVoidPtr((void*)(&nth_parallel)));
     return m;
 }
 
@@ -55,21 +66,27 @@ double quantile_parallel(void* data, int64_t local_size, int64_t total_size, dou
 
     double at = quantile * (total_size-1);
 
-    // FIXME: refactor constants
-    if (type_enum == 0)
-        return quantile_parallel_int((char *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 1)
-        return quantile_parallel_int((unsigned char *) data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 2)
-        return quantile_parallel_int((int *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 3)
-        return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
-    if (type_enum == 4)
-        return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
-    if (type_enum == 5)
-        return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
+    switch (type_enum) {
+        case HPAT_CTypes::INT8:
+            return quantile_parallel_int((char *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT8:
+            return quantile_parallel_int((unsigned char *) data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT32:
+            return quantile_parallel_int((int *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT32:
+            return quantile_parallel_int((uint32_t *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::INT64:
+            return quantile_parallel_int((int64_t *)data, local_size, at, type_enum, myrank, n_pes);
+        case HPAT_CTypes::UINT64:
+            return quantile_parallel_int((uint64_t*)data, local_size, quantile, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT32:
+            return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
+        case HPAT_CTypes::FLOAT64:
+            return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
+        default:
+            std::cerr << "unknown quantile data type" << "\n";
+    }
 
-    printf("unknown quantile data type");
     return -1.0;
 }
 
@@ -80,8 +97,8 @@ double quantile_parallel_int(T* data, int64_t local_size, double at, int type_en
     int64_t k2 = k1+1;
     double fraction = at - (double)k1;
     std::vector<T> my_array(data, data+local_size);
-    double res1 = get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
-    double res2 = get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
+    double res1 = (double) get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
+    double res2 = (double) get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
     // linear method, TODO: support other methods
     return res1 + (res2 - res1) * fraction;
 }
@@ -102,19 +119,20 @@ double quantile_parallel_float(T* data, int64_t local_size, double quantile, int
     int64_t k2 = k1+1;
     double fraction = at - (double)k1;
 
-    double res1 = get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
-    double res2 = get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
+    double res1 = (double) get_nth_parallel(my_array, k1, myrank, n_pes, type_enum);
+    double res2 = (double) get_nth_parallel(my_array, k2, myrank, n_pes, type_enum);
     // linear method, TODO: support other methods
     return res1 + (res2 - res1) * fraction;
 }
 
-// _h5_typ_table = {
+// _numba_to_c_type_map = {
 //     int8:0,
 //     uint8:1,
 //     int32:2,
-//     int64:3,
-//     float32:4,
-//     float64:5
+//     uint32:3,
+//     int64:4,
+//     float32:5,
+//     float64:6
 //     }
 
 // TODO: refactor to header
@@ -122,12 +140,12 @@ MPI_Datatype get_MPI_typ(int typ_enum)
 {
     // printf("h5 type enum:%d\n", typ_enum);
     MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
+            MPI_INT, MPI_UNSIGNED, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
     return types_list[typ_enum];
 }
 
 template <class T>
-double get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum)
+T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum)
 {
     int64_t local_size = my_array.size();
     int64_t total_size;
@@ -220,7 +238,7 @@ double get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_p
         }
         return get_nth_parallel(new_my_array, new_k, myrank, n_pes, type_enum);
     }
-    return -1.0;
+    return (T)-1.0;
 }
 
 template <class T>
@@ -289,7 +307,7 @@ std::pair<T, T> get_lower_upper_kth_parallel(std::vector<T> &my_array,
 }
 
 template <class T>
-double small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
+T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
                               int myrank, int n_pes, int64_t k, int type_enum)
 {
     MPI_Datatype mpi_typ = get_MPI_typ(type_enum);
@@ -344,3 +362,61 @@ double small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
 / T select_probablity =  pow(local_size, -ep); // N^-e
 // MPI_Allreduce(&my_sample_size, &total_sample_size, 1, MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD);
 */
+
+template<class T>
+void get_nth(T* res, T* data, int64_t local_size, int64_t k, int type_enum, int myrank, int n_pes, bool parallel)
+{
+    // get nth element and store in res pointer
+    // assuming NA values of floats are already removed
+    std::vector<T> my_array(data, data+local_size);
+    T val;
+
+    if (parallel)
+    {
+        val = get_nth_parallel(my_array, k, myrank, n_pes, type_enum);
+    }
+    else
+    {
+        std::nth_element(my_array.begin(), my_array.begin() + k, my_array.end());
+        val = my_array[k];
+    }
+    *res = val;
+}
+
+void nth_dispatch(void* res, void* data, int64_t local_size, int64_t k, int type_enum, bool parallel)
+{
+    int myrank, n_pes;
+    MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    switch (type_enum) {
+        case HPAT_CTypes::INT8:
+            return get_nth((char *)res, (char *)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::UINT8:
+            return get_nth((unsigned char *) res, (unsigned char *) data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::INT32:
+            return get_nth((int *) res, (int *)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::UINT32:
+            return get_nth((uint32_t *) res, (uint32_t *)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::INT64:
+            return get_nth((int64_t *) res, (int64_t *)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::UINT64:
+            return get_nth((uint64_t*) res, (uint64_t*)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::FLOAT32:
+            return get_nth((float*) res, (float*)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        case HPAT_CTypes::FLOAT64:
+            return get_nth((double*) res, (double*)data, local_size, k, type_enum, myrank, n_pes, parallel);
+        default:
+            std::cerr << "unknown nth data type" << "\n";
+    }
+}
+
+void nth_sequential(void* res, void* data, int64_t local_size, int64_t k, int type_enum)
+{
+    nth_dispatch(res, data, local_size, k, type_enum, false);
+}
+
+void nth_parallel(void* res, void* data, int64_t local_size, int64_t k, int type_enum)
+{
+    nth_dispatch(res, data, local_size, k, type_enum, true);
+}

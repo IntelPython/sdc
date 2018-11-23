@@ -12,24 +12,16 @@ from numba.typing import signature
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
 import hpat
-from hpat.str_ext import StringType
+from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
-
-_pq_type_to_numba = {'BOOLEAN': types.Array(types.boolean, 1, 'C'),
-                     'INT32': types.Array(types.int32, 1, 'C'),
-                     'INT64': types.Array(types.int64, 1, 'C'),
-                     'FLOAT': types.Array(types.float32, 1, 'C'),
-                     'DOUBLE': types.Array(types.float64, 1, 'C'),
-                     'BYTE_ARRAY': string_array_type,
-                     'INT96': types.Array(types.NPDatetime('ns'), 1, 'C'),
-                     }
+from hpat.utils import unliteral_all
 
 # boolean, int32, int64, int96, float, double
 # XXX arrow converts int96 timestamp to int64
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
                             'int96': 3, 'float32': 4, 'float64': 5,
-                            'datetime64(ns)': 3}
+                            repr(types.NPDatetime('ns')): 3}
 
 
 
@@ -78,7 +70,6 @@ class ParquetHandler(object):
         self.reverse_copies = _reverse_copies
 
     def gen_parquet_read(self, file_name, lhs):
-        import pyarrow.parquet as pq
         scope = file_name.scope
         loc = file_name.loc
 
@@ -106,12 +97,24 @@ class ParquetHandler(object):
             col_types = list(table_types.values())
 
         out_nodes = []
+        # get arrow readers once
+        def init_arrow_readers(fname):
+            arrow_readers = get_arrow_readers(fname)
+
+        f_block = compile_to_numba_ir(init_arrow_readers,
+                                     {'get_arrow_readers': _get_arrow_readers,
+                                     }).blocks.popitem()[1]
+
+        replace_arg_nodes(f_block, [file_name])
+        out_nodes += f_block.body[:-3]
+        arrow_readers_var = out_nodes[-1].target
+
         col_items = []
         for i, cname in enumerate(col_names):
             # get column type from schema
             c_type = col_types[i]
             if cname in convert_types:
-                c_type = convert_types[cname]
+                c_type = convert_types[cname].dtype
 
             # create a variable for column and assign type
             varname = mk_unique_var(cname)
@@ -119,32 +122,43 @@ class ParquetHandler(object):
             cvar = ir.Var(scope, varname, loc)
             col_items.append((cname, cvar))
 
-            out_nodes += get_column_read_nodes(c_type, cvar, file_name, i)
+            out_nodes += get_column_read_nodes(c_type, cvar, arrow_readers_var, i)
 
+        # delete arrow readers
+        def cleanup_arrow_readers(readers):
+            s = del_arrow_readers(readers)
+
+        f_block = compile_to_numba_ir(cleanup_arrow_readers,
+                                     {'del_arrow_readers': _del_arrow_readers,
+                                     }).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arrow_readers_var])
+        out_nodes += f_block.body[:-3]
         return col_items, col_types, out_nodes
 
 
-def get_column_read_nodes(c_type, cvar, file_name, i):
+def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
 
     loc = cvar.loc
 
-    func_text = ('def f(fname):\n  col_size = get_column_size_parquet(fname, {})\n'.
-                 format(i))
+    func_text = 'def f(arrow_readers):\n'
+    func_text += '  col_size = get_column_size_parquet(arrow_readers, {})\n'.format(i)
     # generate strings differently
-    if c_type == string_array_type:
+    if c_type == string_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_parquet_str(fname, {}, col_size)\n'.format(
+        func_text += '  column = read_parquet_str(arrow_readers, {}, col_size)\n'.format(
             i)
     else:
-        el_type = get_element_type(c_type.dtype)
-        if el_type == 'datetime64(ns)':
+        el_type = get_element_type(c_type)
+        if el_type == repr(types.NPDatetime('ns')):
             func_text += '  column_tmp = np.empty(col_size, dtype=np.int64)\n'
+            # TODO: fix alloc
             func_text += '  column = hpat.hiframes_api.ts_series_to_arr_typ(column_tmp)\n'
         else:
             func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
                 el_type)
-        func_text += '  status = read_parquet(fname, {}, column, np.int32({}))\n'.format(
+        func_text += '  status = read_parquet(arrow_readers, {}, column, np.int32({}))\n'.format(
             i, _type_to_pq_dtype_number[el_type])
+
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     size_func = loc_vars['f']
@@ -156,7 +170,7 @@ def get_column_read_nodes(c_type, cvar, file_name, i):
                                       'hpat': hpat,
                                       'StringArray': StringArray}).blocks.popitem()
 
-    replace_arg_nodes(f_block, [file_name])
+    replace_arg_nodes(f_block, [arrow_readers_var])
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("column"):
@@ -173,11 +187,38 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
-def _get_numba_typ_from_pq_typ(pq_typ):
-    if pq_typ not in _pq_type_to_numba:
-        raise ValueError("parquet data type {} not supported yet".format(
-                                                                       pq_typ))
-    return _pq_type_to_numba[pq_typ]
+def _get_numba_typ_from_pa_typ(pa_typ):
+    import pyarrow as pa
+    _typ_map = {
+        # boolean
+        pa.bool_(): types.bool_,
+        # signed int types
+        pa.int8(): types.int8,
+        pa.int16(): types.int16,
+        pa.int32(): types.int32,
+        pa.int64(): types.int64,
+        # unsigned int types
+        pa.uint8(): types.uint8,
+        pa.uint16(): types.uint16,
+        pa.uint32(): types.uint32,
+        pa.uint64(): types.uint64,
+        # float types (TODO: float16?)
+        pa.float32(): types.float32,
+        pa.float64(): types.float64,
+        # String
+        pa.string(): string_type,
+        # date
+        pa.date32(): types.NPDatetime('ns'),
+        pa.date64(): types.NPDatetime('ns'),
+        # time (TODO: time32, time64, ...)
+        pa.timestamp('ns'): types.NPDatetime('ns'),
+        pa.timestamp('us'): types.NPDatetime('ns'),
+        pa.timestamp('ms'): types.NPDatetime('ns'),
+        pa.timestamp('s'): types.NPDatetime('ns'),
+    }
+    if pa_typ not in _typ_map:
+        raise ValueError("Arrow data type {} not supported yet".format(pa_typ))
+    return _typ_map[pa_typ]
 
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
@@ -186,12 +227,15 @@ def parquet_file_schema(file_name):
 
     pq_dataset = pq.ParquetDataset(file_name)
     col_names = pq_dataset.schema.names
-    num_cols = len(col_names)
-    col_types = [_get_numba_typ_from_pq_typ(
-                 pq_dataset.schema.column(i).physical_type)
-                 for i in range(num_cols)]
+    pa_schema = pq_dataset.schema.to_arrow_schema()
+
+    col_types = [_get_numba_typ_from_pa_typ(pa_schema.field_by_name(c).type)
+                 for c in col_names]
     # TODO: close file?
     return col_names, col_types
+
+_get_arrow_readers = types.ExternalFunction("get_arrow_readers", types.Opaque('arrow_reader')(string_type))
+_del_arrow_readers = types.ExternalFunction("del_arrow_readers", types.void(types.Opaque('arrow_reader')))
 
 
 @infer_global(get_column_size_parquet)
@@ -199,7 +243,7 @@ class SizeParquetInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(types.intp, *args)
+        return signature(types.intp, args[0], types.unliteral(args[1]))
 
 
 @infer_global(read_parquet)
@@ -208,9 +252,9 @@ class ReadParquetInfer(AbstractTemplate):
         assert not kws
         assert len(args) == 4
         if args[2] == types.intp:  # string read call, returns string array
-            return signature(string_array_type, *args)
+            return signature(string_array_type, *unliteral_all(args))
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(types.int64, *args)
+        return signature(types.int64, *unliteral_all(args))
 
 
 @infer_global(read_parquet_str)
@@ -218,7 +262,7 @@ class ReadParquetStrInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 3
-        return signature(string_array_type, *args)
+        return signature(string_array_type, *unliteral_all(args))
 
 
 @infer_global(read_parquet_str_parallel)
@@ -226,7 +270,7 @@ class ReadParquetStrParallelInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 4
-        return signature(string_array_type, *args)
+        return signature(string_array_type, *unliteral_all(args))
 
 
 @infer_global(read_parquet_parallel)
@@ -235,7 +279,7 @@ class ReadParallelParquetInfer(AbstractTemplate):
         assert not kws
         assert len(args) == 6
         # array_ty = types.Array(ndim=1, layout='C', dtype=args[2])
-        return signature(types.int32, *args)
+        return signature(types.int32, *unliteral_all(args))
 
 
 from numba import cgutils
@@ -247,6 +291,8 @@ import llvmlite.binding as ll
 from hpat.config import _has_pyarrow
 if _has_pyarrow:
     import parquet_cpp
+    ll.add_symbol('get_arrow_readers', parquet_cpp.get_arrow_readers)
+    ll.add_symbol('del_arrow_readers', parquet_cpp.del_arrow_readers)
     ll.add_symbol('pq_read', parquet_cpp.read)
     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
     ll.add_symbol('pq_get_size', parquet_cpp.get_size)
@@ -254,7 +300,7 @@ if _has_pyarrow:
     ll.add_symbol('pq_read_string_parallel', parquet_cpp.read_string_parallel)
 
 
-@lower_builtin(get_column_size_parquet, StringType, types.intp)
+@lower_builtin(get_column_size_parquet, types.Opaque('arrow_reader'), types.intp)
 def pq_size_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
@@ -262,7 +308,7 @@ def pq_size_lower(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(read_parquet, StringType, types.intp, types.Array, types.int32)
+@lower_builtin(read_parquet, types.Opaque('arrow_reader'), types.intp, types.Array, types.int32)
 def pq_read_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -276,7 +322,7 @@ def pq_read_lower(context, builder, sig, args):
                              args[3]])
 
 
-@lower_builtin(read_parquet_parallel, StringType, types.intp, types.Array, types.int32, types.intp, types.intp)
+@lower_builtin(read_parquet_parallel, types.Opaque('arrow_reader'), types.intp, types.Array, types.int32, types.intp, types.intp)
 def pq_read_parallel_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
@@ -293,52 +339,72 @@ def pq_read_parallel_lower(context, builder, sig, args):
 # read strings
 
 
-@lower_builtin(read_parquet_str, StringType, types.intp, types.intp)
+@lower_builtin(read_parquet_str, types.Opaque('arrow_reader'), types.intp, types.intp)
 def pq_read_string_lower(context, builder, sig, args):
+
     typ = sig.return_type
     dtype = StringArrayPayloadType()
-    meminfo, data_pointer = construct_string_array(context, builder)
-    string_array = cgutils.create_struct_proxy(dtype)(context, builder)
-    string_array.size = args[2]
+    meminfo, meminfo_data_ptr = construct_string_array(context, builder)
+    string_array = context.make_helper(builder, typ)
+
+    str_arr_payload = cgutils.create_struct_proxy(dtype)(context, builder)
+    string_array.num_items = args[2]
+
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer()])
 
     fn = builder.module.get_or_insert_function(fnty, name="pq_read_string")
     res = builder.call(fn, [args[0], args[1],
-                            string_array._get_ptr_by_name('offsets'),
-                            string_array._get_ptr_by_name('data')])
-    builder.store(string_array._getvalue(),
-                  data_pointer)
-    inst_struct = context.make_helper(builder, typ)
-    inst_struct.meminfo = meminfo
-    ret = inst_struct._getvalue()
+                            str_arr_payload._get_ptr_by_name('offsets'),
+                            str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap')])
+    builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
+
+    string_array.meminfo = meminfo
+    string_array.offsets = str_arr_payload.offsets
+    string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
+    string_array.num_total_chars = builder.zext(builder.load(
+        builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
+    ret = string_array._getvalue()
     return impl_ret_new_ref(context, builder, typ, ret)
 
 
-@lower_builtin(read_parquet_str_parallel, StringType, types.intp, types.intp, types.intp)
+@lower_builtin(read_parquet_str_parallel, types.Opaque('arrow_reader'), types.intp, types.intp, types.intp)
 def pq_read_string_parallel_lower(context, builder, sig, args):
     typ = sig.return_type
     dtype = StringArrayPayloadType()
-    meminfo, data_pointer = construct_string_array(context, builder)
-    string_array = cgutils.create_struct_proxy(dtype)(context, builder)
-    string_array.size = args[3]
+    meminfo, meminfo_data_ptr = construct_string_array(context, builder)
+    str_arr_payload = cgutils.create_struct_proxy(dtype)(context, builder)
+    string_array = context.make_helper(builder, typ)
+    string_array.num_items = args[3]
+
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),
+                             lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(), lir.IntType(64), lir.IntType(64)])
+                             lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(64), lir.IntType(64)])
 
     fn = builder.module.get_or_insert_function(
         fnty, name="pq_read_string_parallel")
     res = builder.call(fn, [args[0], args[1],
-                            string_array._get_ptr_by_name('offsets'),
-                            string_array._get_ptr_by_name('data'), args[2],
+                            str_arr_payload._get_ptr_by_name('offsets'),
+                            str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
+                            args[2],
                             args[3]])
 
-    builder.store(string_array._getvalue(),
-                  data_pointer)
-    inst_struct = context.make_helper(builder, typ)
-    inst_struct.meminfo = meminfo
-    ret = inst_struct._getvalue()
+    builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
+
+    string_array.meminfo = meminfo
+    string_array.offsets = str_arr_payload.offsets
+    string_array.data = str_arr_payload.data
+    string_array.null_bitmap = str_arr_payload.null_bitmap
+    string_array.num_total_chars = builder.zext(builder.load(
+        builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
+    ret = string_array._getvalue()
     return impl_ret_new_ref(context, builder, typ, ret)
