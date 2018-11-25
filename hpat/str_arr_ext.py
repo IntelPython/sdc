@@ -239,6 +239,11 @@ def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t=None):
         ind_p1 = builder.add(ind, context.get_constant(types.intp, 1))
         cgutils.memcpy(builder, out_offsets, in_offsets, ind_p1)
         cgutils.memcpy(builder, out_string_array.data, in_string_array.data, builder.load(builder.gep(in_offsets, [ind])))
+        # n_bytes = (num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t)
+        ind_p7 = builder.add(ind, lir.Constant(lir.IntType(64), 7))
+        n_bytes = builder.lshr(ind_p7, lir.Constant(lir.IntType(64), 3))
+        # assuming rest of last byte is set to all ones (e.g. from prealloc)
+        cgutils.memcpy(builder, out_string_array.null_bitmap, in_string_array.null_bitmap, n_bytes)
         return context.get_dummy_value()
 
     return types.void(string_array_type, string_array_type, ind_t), codegen
@@ -800,6 +805,32 @@ def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
         return builder.icmp_unsigned('==', builder.and_(byte, mask), lir.Constant(lir.IntType(8), 0))
 
     return types.bool_(string_array_type, types.intp), codegen
+
+
+@intrinsic
+def str_arr_set_na(typingctx, str_arr_typ, ind_typ=None):
+    # None default to make IntelliSense happy
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+
+        # bits[i / 8] |= kBitmask[i % 8];
+        byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+        bit_ind = builder.urem(ind, lir.Constant(lir.IntType(64), 8))
+        byte_ptr = builder.gep(string_array.null_bitmap, [byte_ind], inbounds=True)
+        byte = builder.load(byte_ptr)
+        ll_typ_mask = lir.ArrayType(lir.IntType(8), 8)
+        mask_tup = cgutils.alloca_once_value(builder, lir.Constant(ll_typ_mask, (1, 2, 4, 8, 16, 32, 64, 128)))
+        mask = builder.load(builder.gep(mask_tup, [lir.Constant(lir.IntType(64), 0), bit_ind], inbounds=True))
+        # flip all bits of mask e.g. 11111101
+        mask = builder.xor(mask, lir.Constant(lir.IntType(8), -1))
+        # unset masked bit
+        builder.store(builder.and_(byte, mask), byte_ptr)
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, types.intp), codegen
+
 
 @intrinsic
 def set_null_bits(typingctx, str_arr_typ=None):

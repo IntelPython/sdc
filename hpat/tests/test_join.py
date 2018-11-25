@@ -54,6 +54,17 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(list(hpat_func()), list(test_impl()))
 
+    def test_join1_seq_str_na(self):
+        # test setting NA in string data column
+        def test_impl():
+            df1 = pd.DataFrame({'key1': ['foo', 'bar', 'baz']})
+            df2 = pd.DataFrame({'key2': ['baz', 'bar', 'baz'], 'B': ['b', 'zzz', 'ss']})
+            df3 = df1.merge(df2, left_on='key1', right_on='key2', how='left')
+            return df3.B
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(set(hpat_func()), set(test_impl()))
+
     def test_join_mutil_seq1(self):
         def test_impl(df1, df2):
             return df1.merge(df2, on=['A', 'B'])
