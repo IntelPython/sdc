@@ -35,7 +35,7 @@ import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
-from hpat.pd_series_ext import SeriesType, BoxedSeriesType
+from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type
 from hpat.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
@@ -785,7 +785,7 @@ class HiFrames(object):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
         # str case
         if isinstance(dtype_def, ir.Global) and dtype_def.value == str:
-            return string_array_type
+            return string_series_type  # string_array_type
         # categorical case
         if isinstance(dtype_def, ir.Expr) and dtype_def.op == 'call':
             if (not guard(find_callname, self.func_ir, dtype_def)

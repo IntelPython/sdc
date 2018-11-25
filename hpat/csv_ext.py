@@ -24,7 +24,7 @@ import pandas as pd
 import numpy as np
 
 from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
-from hpat.pd_series_ext import dt_index_series_type
+from hpat.pd_series_ext import dt_index_series_type, string_series_type
 
 
 class CsvReader(ir.Stmt):
@@ -54,6 +54,7 @@ def csv_array_analysis(csv_node, equiv_set, typemap, array_analysis):
     all_shapes = []
     for col_var in csv_node.out_vars:
         typ = typemap[col_var.name]
+        # TODO: string_series_type also?
         if typ == string_array_type:
             continue
         (shape, c_post) = array_analysis._gen_shape_call(
@@ -275,7 +276,7 @@ def _get_dtype_str(t):
 
     if t == dt_index_series_type:
         dtype = 'NPDatetime("ns")'
-    if t == string_array_type:
+    if t == string_series_type:
         # HACK: add string_array_type to numba.types
         # FIXME: fix after Numba #3372 is resolved
         types.string_array_type = string_array_type
@@ -288,7 +289,7 @@ def _get_pd_dtype_str(t):
         return 'pd.api.types.CategoricalDtype({})'.format(dtype.categories)
     if t == dt_index_series_type:
         dtype = 'str'
-    if t == string_array_type:
+    if t == string_series_type:
         return 'str'
     return 'np.{}'.format(dtype)
 
