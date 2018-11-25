@@ -367,6 +367,11 @@ static MPI_Datatype get_MPI_typ(int typ_enum)
             return MPI_FLOAT;
         case HPAT_CTypes::FLOAT64:
             return MPI_DOUBLE;
+        case HPAT_CTypes::INT16:
+            // TODO: use MPI_INT16_T?
+            return MPI_SHORT;
+        case HPAT_CTypes::UINT16:
+            return MPI_UNSIGNED_SHORT;
         default:
             std::cerr << "Invalid MPI_Type" << "\n";
     }

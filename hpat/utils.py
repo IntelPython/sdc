@@ -28,6 +28,8 @@ class CTypeEnum(Enum):
     UInt64 = 7
     Float32 = 5
     Float64 = 6
+    Int16 = 8
+    UInt16 = 9
 
 
 _numba_to_c_type_map = {
@@ -44,6 +46,8 @@ _numba_to_c_type_map = {
     # are not bytes
     # TODO: handle boolean scalars properly
     types.bool_: CTypeEnum.UInt8.value,
+    types.int16: CTypeEnum.Int16.value,
+    types.uint16: CTypeEnum.UInt16.value,
 }
 
 
