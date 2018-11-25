@@ -50,10 +50,10 @@ void append_bits_to_vec(std::vector<bool> *null_vec, const uint8_t* null_buff, i
 void pq_init_reader(const char* file_name,
         std::shared_ptr<FileReader> *a_reader);
 
-// parquet type sizes (NOT arrow)
-// boolean, int32, int64, int96, float, double
+// parquet type sizes (NOT arrow), parquet/types.h
+// boolean, int32, int64, int96, float, double, byte
 // XXX assuming int96 is always converted to int64 since it's timestamp
-static int pq_type_sizes[] = {1, 4, 8, 8, 4, 8};
+static int pq_type_sizes[] = {1, 4, 8, 8, 4, 8, 1};
 #define PQ_DT64_TYPE 3 // using INT96 value as dt64, TODO: refactor
 #define kNanosecondsInDay 86400000000000LL // TODO: reuse from type_traits.h
 

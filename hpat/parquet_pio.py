@@ -17,11 +17,13 @@ from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_stri
 from hpat.str_arr_ext import string_array_type
 from hpat.utils import unliteral_all
 
-# boolean, int32, int64, int96, float, double
+
+# from parquet/types.h
+# boolean, int32, int64, int96, float, double, byte
 # XXX arrow converts int96 timestamp to int64
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
                             'int96': 3, 'float32': 4, 'float64': 5,
-                            repr(types.NPDatetime('ns')): 3}
+                            repr(types.NPDatetime('ns')): 3, 'int8': 6}
 
 
 
