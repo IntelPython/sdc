@@ -1301,6 +1301,13 @@ def setitem_arr_nan_overload(arr_t, ind_t):
         def b_set(a, i):
             a[i] = False
         return b_set
+    # XXX set integer NA to 0 to avoid unexpected errors (e.g. categorical)
+    # TODO: convert integer to float if nan
+    # TODO: handle categorical
+    if isinstance(arr_t.dtype, types.Integer):
+        def setitem_arr_nan_int(arr, ind):
+            arr[ind] = 0
+        return setitem_arr_nan_int
     return lambda a, i: None
 
 def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
