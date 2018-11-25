@@ -564,6 +564,10 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
     PyObject* ret = PyArray_SimpleNew(1, dims, NPY_OBJECT);
     CHECK(ret, "allocating numpy array failed");
     int err;
+    PyObject* np_mod = PyImport_ImportModule("numpy");
+    CHECK(np_mod, "importing numpy module failed");
+    PyObject* nan_obj = PyObject_GetAttrString(np_mod, "nan");
+    CHECK(nan_obj, "getting np.nan failed");
 
     for(int64_t i = 0; i < no_strings; ++i) {
         PyObject * s = PyString_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
@@ -573,11 +577,13 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
         if (!is_na(null_bitmap, i))
             err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
         else
-            err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, Py_None);
+            err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, nan_obj);
         CHECK(err==0, "setting item in numpy array failed");
         Py_DECREF(s);
     }
 
+    Py_DECREF(np_mod);
+    Py_DECREF(nan_obj);
     PyGILState_Release(gilstate);
     return ret;
 #undef CHECK
