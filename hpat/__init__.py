@@ -55,3 +55,7 @@ def jit(signature_or_function=None, **options):
     # from .compiler import add_hpat_stages
     # return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)
     return numba.jit(signature_or_function, pipeline_class=hpat.compiler.HPATPipeline, **options)
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

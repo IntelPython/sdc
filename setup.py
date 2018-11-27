@@ -6,6 +6,7 @@ import platform, os
 # build dependencies
 import numpy.distutils.misc_util as np_misc
 #import copy
+import versioneer
 
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
@@ -274,7 +275,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.25.0',
+      version=versioneer.get_version(),
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[
@@ -292,4 +293,5 @@ setup(name='hpat',
       packages=['hpat'],
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
+      cmdclass=versioneer.get_cmdclass(),
       ext_modules = _ext_mods)
