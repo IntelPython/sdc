@@ -293,8 +293,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
 
-    #method = 'hash'
-    method = 'sort'
+    method = 'hash'
+    # method = 'sort'
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     n_keys = len(join_node.left_keys)
@@ -852,6 +852,9 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
     out_left_key = alloc_arr_tup(curr_size, left_keys)
     out_data_left = alloc_arr_tup(curr_size, data_left)
     out_data_right = alloc_arr_tup(curr_size, data_right)
+    # keep track of matched keys in case of right join
+    if is_right:
+        r_matched = np.full(r_len, False, np.bool_)
 
     out_ind = 0
     m = hpat.dict_ext.multimap_int64_init()
@@ -872,6 +875,8 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
             r_ind = _check_ind_if_hashed(right_keys, j, l_key)
             if r_ind == -1:
                 continue
+            if is_right:
+                r_matched[r_ind] = True
             out_left_key = copy_elem_buff_tup(out_left_key, out_ind, l_key)
             r_data_val = getitem_arr_tup(data_right, r_ind)
             out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
@@ -885,6 +890,17 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
             out_ind += 1
 
     hpat.dict_ext.multimap_int64_equal_range_dealloc(r)
+
+    # produce NA rows for unmatched right keys
+    if is_right:
+        for i in range(r_len):
+            if not r_matched[i]:
+                r_key = getitem_arr_tup(right_keys, i)
+                r_data_val = getitem_arr_tup(data_right, i)
+                out_left_key = copy_elem_buff_tup(out_left_key, out_ind, r_key)
+                out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
+                out_data_left = setnan_elem_buff_tup(out_data_left, out_ind)
+                out_ind += 1
 
     out_left_key = trim_arr_tup(out_left_key, out_ind)
 
