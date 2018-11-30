@@ -23,7 +23,7 @@ ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
 ll.add_symbol('del_str', hstr_ext.del_str)
 ll.add_symbol('_hash_str', hstr_ext.hash_str)
 
-class StringType(types.Opaque):
+class StringType(types.Opaque, types.Hashable):
     def __init__(self):
         super(StringType, self).__init__(name='StringType')
 
@@ -102,10 +102,20 @@ def str_join(str_typ, iterable_typ):
         return res
     return str_join_impl
 
-@overload(hash)
-def hash_overload(str_typ):
-    if str_typ == string_type:
-        return lambda s: _hash_str(s)
+
+# TODO: using lower_builtin since overload fails for str tuple
+# TODO: constant hash like hash("ss",) fails
+# @overload(hash)
+# def hash_overload(str_typ):
+#     if str_typ == string_type:
+#         return lambda s: _hash_str(s)
+
+@lower_builtin(hash, string_type)
+def hash_str_lower(context, builder, sig, args):
+    return context.compile_internal(
+        builder, lambda s: _hash_str(s), sig, args)
+
+
 
 @infer
 @infer_global(operator.add)
