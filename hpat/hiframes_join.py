@@ -293,6 +293,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
 
+    method = 'sort'
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
     n_keys = len(join_node.left_keys)
@@ -343,7 +344,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
             func_text += "    t2_keys, data_right = parallel_join(t2_keys, data_right)\n"
             #func_text += "    print(t2_key, data_right)\n"
 
-    if join_node.how != 'asof':
+    if method == 'sort' and join_node.how != 'asof':
         # asof key is already sorted, TODO: add error checking
         # local sort
         func_text += "    local_sort_f1(t1_keys, data_left)\n"
@@ -371,9 +372,14 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     if join_node.how == 'asof':
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
         " = hpat.hiframes_join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
-    else:
+    elif method == 'sort':
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
         " = hpat.hiframes_join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
+            join_node.how in ('left', 'outer'), join_node.how == 'outer'))
+    else:
+        assert method == 'hash'
+        func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
+        " = hpat.hiframes_join.local_hash_join(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
             join_node.how in ('left', 'outer'), join_node.how == 'outer'))
 
     for i in range(len(left_other_names)):
@@ -406,21 +412,24 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     # print(func_text)
 
-    left_keys_tup_typ = types.Tuple([typemap[v.name] for v in left_key_vars])
-    left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
-    _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
-    right_keys_tup_typ = types.Tuple([typemap[v.name] for v in right_key_vars])
-    right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
-    _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
-
-    f_block = compile_to_numba_ir(join_impl,
-                                  {'hpat': hpat, 'np': np,
+    glbs = {'hpat': hpat, 'np': np,
                                   'to_string_list': to_string_list,
                                   'cp_str_list_to_array': cp_str_list_to_array,
-                                  'local_sort_f1': _local_sort_f1,
-                                  'local_sort_f2': _local_sort_f2,
                                   'parallel_join': parallel_join,
-                                  'parallel_asof_comm': parallel_asof_comm},
+                                  'parallel_asof_comm': parallel_asof_comm}
+
+    if method == 'sort':
+        left_keys_tup_typ = types.Tuple([typemap[v.name] for v in left_key_vars])
+        left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
+        _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
+        right_keys_tup_typ = types.Tuple([typemap[v.name] for v in right_key_vars])
+        right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
+        _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
+        glbs['local_sort_f1'] = _local_sort_f1
+        glbs['local_sort_f2'] = _local_sort_f2
+
+    f_block = compile_to_numba_ir(join_impl,
+                                  glbs,
                                   typingctx, arg_typs,
                                   typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, arg_vars)
@@ -831,6 +840,48 @@ def setnan_elem_buff_tup_overload(data_t, ind_t):
     cp_impl = loc_vars['f']
     return cp_impl
 
+
+@numba.njit
+def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
+                                                               is_right=False):
+    l_len = len(left_keys[0])
+    r_len = len(right_keys[0])
+    # TODO: approximate output size properly
+    curr_size = 101 + min(l_len, r_len) // 10
+    out_left_key = alloc_arr_tup(curr_size, left_keys)
+    out_data_left = alloc_arr_tup(curr_size, data_left)
+    out_data_right = alloc_arr_tup(curr_size, data_right)
+
+    out_ind = 0
+    m = hpat.dict_ext.multimap_int64_init()
+    for i in range(r_len):
+        hpat.dict_ext.multimap_int64_insert(m, right_keys[0][i], i)
+
+    r = hpat.dict_ext.multimap_int64_equal_range_alloc()
+    for i in range(l_len):
+        k = left_keys[0][i]
+        l_data_val = getitem_arr_tup(data_left, i)
+        hpat.dict_ext.multimap_int64_equal_range_inplace(m, k, r)
+        num_matched = 0
+        for j in r:
+            r_data_val = getitem_arr_tup(data_right, j)
+            out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
+            out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+            out_ind += 1
+            num_matched += 1
+        if is_left and num_matched == 0:
+            out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
+            out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
+
+    hpat.dict_ext.multimap_int64_equal_range_dealloc(r)
+
+    out_left_key = trim_arr_tup(out_left_key, out_ind)
+
+    out_right_key = copy_arr_tup(out_left_key)
+    out_data_left = trim_arr_tup(out_data_left, out_ind)
+    out_data_right = trim_arr_tup(out_data_right, out_ind)
+
+    return out_left_key, out_right_key, out_data_left, out_data_right
 
 @numba.njit
 def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
