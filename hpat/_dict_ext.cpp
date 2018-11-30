@@ -343,6 +343,21 @@ multimap_int64_it_t *multimap_int64_equal_range(multimap_int64_t *m, int64_t k)
     return new multimap_int64_it_t(m->equal_range(k));
 }
 
+multimap_int64_it_t *multimap_int64_equal_range_alloc()
+{
+    return new multimap_int64_it_t;
+}
+
+void multimap_int64_equal_range_dealloc(multimap_int64_it_t *r)
+{
+    delete r;
+}
+
+void multimap_int64_equal_range_inplace(multimap_int64_t *m, int64_t k, multimap_int64_it_t *r)
+{
+    *r = m->equal_range(k);
+}
+
 // auto range = map.equal_range(1);
 // for (auto it = range.first; it != range.second; ++it) {
 //     std::cout << it->first << ' ' << it->second << '\n';
@@ -430,6 +445,8 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     DEC_MOD_METHOD(multimap_int64_it_is_valid);
     DEC_MOD_METHOD(multimap_int64_it_get_value);
     DEC_MOD_METHOD(multimap_int64_it_inc);
-
+    DEC_MOD_METHOD(multimap_int64_equal_range_alloc);
+    DEC_MOD_METHOD(multimap_int64_equal_range_dealloc);
+    DEC_MOD_METHOD(multimap_int64_equal_range_inplace);
     return m;
 }

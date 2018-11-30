@@ -167,9 +167,25 @@ multimap_int64_equal_range = types.ExternalFunction(
     multimap_int64_range_iterator_type(multimap_int64_type, types.int64))
 
 
+# store the iterator pair type in same storage and avoid repeated alloc
+multimap_int64_equal_range_alloc = types.ExternalFunction(
+    'multimap_int64_equal_range_alloc', multimap_int64_range_iterator_type())
+
+multimap_int64_equal_range_dealloc = types.ExternalFunction(
+    'multimap_int64_equal_range_dealloc',
+    types.void(multimap_int64_range_iterator_type))
+
+multimap_int64_equal_range_inplace = types.ExternalFunction(
+    'multimap_int64_equal_range_inplace',
+    multimap_int64_range_iterator_type(multimap_int64_type, types.int64,
+    multimap_int64_range_iterator_type))
+
 ll.add_symbol('multimap_int64_init', hdict_ext.multimap_int64_init)
 ll.add_symbol('multimap_int64_insert', hdict_ext.multimap_int64_insert)
 ll.add_symbol('multimap_int64_equal_range', hdict_ext.multimap_int64_equal_range)
+ll.add_symbol('multimap_int64_equal_range_alloc', hdict_ext.multimap_int64_equal_range_alloc)
+ll.add_symbol('multimap_int64_equal_range_dealloc', hdict_ext.multimap_int64_equal_range_dealloc)
+ll.add_symbol('multimap_int64_equal_range_inplace', hdict_ext.multimap_int64_equal_range_inplace)
 ll.add_symbol('multimap_int64_it_is_valid', hdict_ext.multimap_int64_it_is_valid)
 ll.add_symbol('multimap_int64_it_get_value', hdict_ext.multimap_int64_it_get_value)
 ll.add_symbol('multimap_int64_it_inc', hdict_ext.multimap_int64_it_inc)
