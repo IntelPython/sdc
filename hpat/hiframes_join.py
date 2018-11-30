@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 import operator
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types
+from numba import typeinfer, ir, ir_utils, config, types, generated_jit
 from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
@@ -293,6 +293,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                 and array_dists[v.name] != distributed.Distribution.OneD_Var):
             parallel = False
 
+    #method = 'hash'
     method = 'sort'
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     loc = join_node.loc
@@ -855,23 +856,33 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
     out_ind = 0
     m = hpat.dict_ext.multimap_int64_init()
     for i in range(r_len):
-        hpat.dict_ext.multimap_int64_insert(m, right_keys[0][i], i)
+        # store hash if keys are tuple or non-int
+        k = _hash_if_tup(getitem_arr_tup(right_keys, i))
+        hpat.dict_ext.multimap_int64_insert(m, k, i)
 
     r = hpat.dict_ext.multimap_int64_equal_range_alloc()
     for i in range(l_len):
-        k = left_keys[0][i]
+        l_key = getitem_arr_tup(left_keys, i)
         l_data_val = getitem_arr_tup(data_left, i)
+        k = _hash_if_tup(l_key)
         hpat.dict_ext.multimap_int64_equal_range_inplace(m, k, r)
         num_matched = 0
         for j in r:
-            r_data_val = getitem_arr_tup(data_right, j)
+            # if hash for stored, check left key against the actual right key
+            r_ind = _check_ind_if_hashed(right_keys, j, l_key)
+            if r_ind == -1:
+                continue
+            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, l_key)
+            r_data_val = getitem_arr_tup(data_right, r_ind)
             out_data_right = copy_elem_buff_tup(out_data_right, out_ind, r_data_val)
             out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
             out_ind += 1
             num_matched += 1
         if is_left and num_matched == 0:
+            out_left_key = copy_elem_buff_tup(out_left_key, out_ind, l_key)
             out_data_left = copy_elem_buff_tup(out_data_left, out_ind, l_data_val)
             out_data_right = setnan_elem_buff_tup(out_data_right, out_ind)
+            out_ind += 1
 
     hpat.dict_ext.multimap_int64_equal_range_dealloc(r)
 
@@ -882,6 +893,25 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
     out_data_right = trim_arr_tup(out_data_right, out_ind)
 
     return out_left_key, out_right_key, out_data_left, out_data_right
+
+
+@generated_jit(nopython=True)
+def _hash_if_tup(val):
+    if val == types.Tuple((types.intp,)):
+        return lambda val: val[0]
+    return lambda val: hash(val)
+
+@generated_jit(nopython=True)
+def _check_ind_if_hashed(right_keys, r_ind, l_key):
+    if right_keys == types.Tuple((types.intp[::1],)):
+        return lambda right_keys, r_ind, l_key: r_ind
+    def _impl(right_keys, r_ind, l_key):
+        r_key = getitem_arr_tup(right_keys, r_ind)
+        if r_key != l_key:
+            return -1
+        return r_ind
+    return _impl
+
 
 @numba.njit
 def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
