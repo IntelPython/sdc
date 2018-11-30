@@ -189,7 +189,7 @@ class TestJoin(unittest.TestCase):
             {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
-        np.testing.assert_array_equal(h_res.key.values, res.key.values)
+        self.assertEqual(set(h_res.key.values), set(res.key.values))
         # converting arrays to sets since order of values can be different
         self.assertEqual(set(h_res.B.values), set(res.B.values))
         self.assertEqual(
@@ -206,7 +206,7 @@ class TestJoin(unittest.TestCase):
             {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
-        np.testing.assert_array_equal(h_res.key.values, res.key.values)
+        self.assertEqual(set(h_res.key.values), set(res.key.values))
         # converting arrays to sets since order of values can be different
         self.assertEqual(
             set(h_res.B.dropna().values), set(res.B.dropna().values))
