@@ -52,7 +52,7 @@ class TestJoin(unittest.TestCase):
             return df3.B
 
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(list(hpat_func()), list(test_impl()))
+        self.assertEqual(set(hpat_func()), set(test_impl()))
 
     def test_join1_seq_str_na(self):
         # test setting NA in string data column
