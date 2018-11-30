@@ -445,8 +445,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 distributed.distributed_run_extensions[Join] = join_distributed_run
 
 
-@numba.njit
-def parallel_join(key_arrs, data):
+# @numba.njit
+def parallel_join_impl(key_arrs, data):
     # alloc shuffle meta
     n_pes = hpat.distributed_api.get_size()
     pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data, n_pes, False)
@@ -476,6 +476,11 @@ def parallel_join(key_arrs, data):
     out_data = _get_data_tup(recvs, key_arrs)
 
     return out_keys, out_data
+
+
+@generated_jit(nopython=True, cache=True)
+def parallel_join(key_arrs, data):
+    return parallel_join_impl
 
 @numba.njit
 def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
@@ -842,8 +847,8 @@ def setnan_elem_buff_tup_overload(data_t, ind_t):
     return cp_impl
 
 
-@numba.njit
-def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
+#@numba.njit
+def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=False,
                                                                is_right=False):
     l_len = len(left_keys[0])
     r_len = len(right_keys[0])
@@ -910,14 +915,18 @@ def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
 
     return out_left_key, out_right_key, out_data_left, out_data_right
 
+@generated_jit(nopython=True, cache=True)
+def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
+                                                               is_right=False):
+    return local_hash_join_impl
 
-@generated_jit(nopython=True)
+@generated_jit(nopython=True, cache=True)
 def _hash_if_tup(val):
     if val == types.Tuple((types.intp,)):
         return lambda val: val[0]
     return lambda val: hash(val)
 
-@generated_jit(nopython=True)
+@generated_jit(nopython=True, cache=True)
 def _check_ind_if_hashed(right_keys, r_ind, l_key):
     if right_keys == types.Tuple((types.intp[::1],)):
         return lambda right_keys, r_ind, l_key: r_ind
