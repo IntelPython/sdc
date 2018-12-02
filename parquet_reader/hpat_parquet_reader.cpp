@@ -79,7 +79,8 @@ int64_t pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t co
     // std::cout << "arr: " << arr->ToString() << std::endl;
     std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
     int dtype_size = pq_type_sizes[out_dtype];
-    // printf("arrow_type %d out_dtype %d dtype_size %d\n", arrow_type, out_dtype, dtype_size);
+    // printf("out_dtype %d dtype_size %d\n", out_dtype, dtype_size);
+    // std::cout << arrow_type->name() << "\n";
 
     auto buffers = arr->data()->buffers;
     // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
@@ -594,7 +595,12 @@ std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arro
 
 bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type)
 {
+    // TODO: remove parquet types, use HPAT Ctypes, handle more types
     if (arrow_type->id() == Type::BOOL && pq_type == ::parquet::Type::BOOLEAN)
+        return true;
+    if (arrow_type->id() == Type::UINT8 && pq_type == ::parquet::Type::BYTE_ARRAY)
+        return true;
+    if (arrow_type->id() == Type::INT8 && pq_type == ::parquet::Type::BYTE_ARRAY)
         return true;
     if (arrow_type->id() == Type::INT32 && pq_type == ::parquet::Type::INT32)
         return true;
