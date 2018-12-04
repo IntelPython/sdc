@@ -677,12 +677,12 @@ series_dt_methods_type = SeriesDtMethodType()
 class SeriesDtMethodAttribute(AttributeTemplate):
     key = SeriesDtMethodType
 
-    def resolve_month(self, ary):
-        return SeriesType(types.int64, 1, 'C')
+# all date fields return int64 same as Timestamp fields
+def resolve_date_field(self, ary):
+    return SeriesType(types.int64, 1, 'C')
 
-    def resolve_year(self, ary):
-        return SeriesType(types.int64, 1, 'C')
-    # TODO: other attrs
+for field in hpat.pd_timestamp_ext.date_fields:
+    setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
 
 
 class SeriesRollingType(types.Type):
