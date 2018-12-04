@@ -1658,6 +1658,7 @@ def _var_handle_nan(s, count):  # pragma: no cover
 
 
 def _column_var_impl(A):  # pragma: no cover
+    numba.parfor.init_prange()
     count_m = 0
     m = 0
     for i in numba.parfor.internal_prange(len(A)):
@@ -1666,6 +1667,7 @@ def _column_var_impl(A):  # pragma: no cover
             m += val
             count_m += 1
 
+    numba.parfor.init_prange()
     m = hpat.hiframes_typed._mean_handle_nan(m, count_m)
     s = 0
     count = 0
