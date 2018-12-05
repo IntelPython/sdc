@@ -247,6 +247,14 @@ class HiFramesTyped(object):
                     assign.value = ir.Global("numpy.datetime64", rhs_type.dtype, rhs.loc)
                     return [assign]
 
+                # replace arr.dtype since PA replacement inserts in the
+                # beginning of block, preventing fusion. TODO: fix PA
+                if (rhs.attr == 'dtype' and isinstance(
+                        if_series_to_array_type(rhs_type), types.Array)):
+                    typ_str = str(rhs_type.dtype)
+                    assign.value = ir.Global("np.dtype({})".format(typ_str), np.dtype(typ_str), rhs.loc)
+                    return [assign]
+
                 if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
                     # simply return the column
                     assign.value = rhs.value
