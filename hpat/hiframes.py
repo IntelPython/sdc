@@ -1111,7 +1111,7 @@ class HiFrames(object):
 
         # remove duplicates with set() since a column can be used multiple times
         used_cols = set(used_cols)
-        Row = namedtuple(func_mod.name, used_cols)
+        Row = namedtuple(_sanitize_varname(func_mod.name), used_cols)
         # TODO: handle non numpy alloc types
         # prange func to inline
         col_name_args = ', '.join(["c"+str(i) for i in range(len(used_cols))])
@@ -2119,3 +2119,7 @@ def simple_block_copy_propagate(block):
             for k in lhs_kill:
                 var_dict.pop(k, None)
     return
+
+
+def _sanitize_varname(varname):
+    return varname.replace('$', '_').replace('.', '_')
