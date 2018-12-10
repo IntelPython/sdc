@@ -705,12 +705,14 @@ def ensure_capacity_str(arr, new_size, n_chars):
     new_arr = arr
     curr_len = len(arr)
     curr_num_chars = num_total_chars(arr)
+    needed_total_chars = getitem_str_offset(arr, new_size-1) + n_chars
 
     # TODO: corner case test
     #print("new alloc", new_size, curr_len, getitem_str_offset(arr, new_size-1), n_chars, curr_num_chars)
-    if curr_len < new_size or getitem_str_offset(arr, new_size-1) + n_chars > curr_num_chars:
-        new_len = 2 * curr_len
-        new_num_chars = 2 * curr_num_chars + n_chars
+    if curr_len < new_size or needed_total_chars > curr_num_chars:
+        new_len = int(2 * curr_len if curr_len < new_size else curr_len)
+        new_num_chars = int(2 * curr_num_chars + n_chars
+            if needed_total_chars > curr_num_chars else curr_num_chars)
         new_arr = pre_alloc_string_array(new_len, new_num_chars)
         copy_str_arr_slice(new_arr, arr, new_size-1)
 
