@@ -94,6 +94,9 @@ class ParquetHandler(object):
                 raise ValueError("Parquet schema not available")
             file_name_str = fname_def.value
             col_names, col_types = parquet_file_schema(file_name_str)
+            # remove Pandas index if exists
+            # TODO: handle index properly when indices are supported
+            _rm_pd_index(col_names, col_types)
         else:
             col_names = list(table_types.keys())
             col_types = list(table_types.values())
@@ -235,6 +238,17 @@ def parquet_file_schema(file_name):
                  for c in col_names]
     # TODO: close file?
     return col_names, col_types
+
+def _rm_pd_index(col_names, col_types):
+    """remove pandas index if found in columns
+    """
+    try:
+        pd_index_loc = col_names.index('__index_level_0__')
+        del col_names[pd_index_loc]
+        del col_types[pd_index_loc]
+    except ValueError:
+        pass
+
 
 _get_arrow_readers = types.ExternalFunction("get_arrow_readers", types.Opaque('arrow_reader')(string_type))
 _del_arrow_readers = types.ExternalFunction("del_arrow_readers", types.void(types.Opaque('arrow_reader')))
