@@ -855,7 +855,14 @@ def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=F
     l_len = len(left_keys[0])
     r_len = len(right_keys[0])
     # TODO: approximate output size properly
-    curr_size = 101 + min(l_len, r_len) // 10
+    curr_size = 101 + min(l_len, r_len) // 2
+    if is_left:
+        curr_size = int(1.1 * l_len)
+    if is_right:
+        curr_size = int(1.1 * r_len)
+    if is_left and is_right:
+        curr_size = int(1.1 * (l_len + r_len))
+
     out_left_key = alloc_arr_tup(curr_size, left_keys)
     out_data_left = alloc_arr_tup(curr_size, data_left)
     out_data_right = alloc_arr_tup(curr_size, data_right)
@@ -943,7 +950,17 @@ def _check_ind_if_hashed(right_keys, r_ind, l_key):
 @numba.njit
 def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
                                                                is_outer=False):
-    curr_size = 101 + min(len(left_keys[0]), len(right_keys[0])) // 10
+    l_len = len(left_keys[0])
+    r_len = len(right_keys[0])
+    # TODO: approximate output size properly
+    curr_size = 101 + min(l_len, r_len) // 2
+    if is_left:
+        curr_size = int(1.1 * l_len)
+    if is_outer:
+        curr_size = int(1.1 * r_len)
+    if is_left and is_outer:
+        curr_size = int(1.1 * (l_len + r_len))
+
     out_left_key = alloc_arr_tup(curr_size, left_keys)
     out_data_left = alloc_arr_tup(curr_size, data_left)
     out_data_right = alloc_arr_tup(curr_size, data_right)
