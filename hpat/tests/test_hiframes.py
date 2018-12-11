@@ -1413,6 +1413,26 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    def test_var_dist1(self):
+        def test_impl(A, B):
+            df = pd.DataFrame({'A': A, 'B': B})
+            df2 = df.groupby('A', as_index=False)['B'].sum()
+            # TODO: fix handling of df setitem to force match of array dists
+            # probably with a new node that is appended to the end of basic block
+            # df2['C'] = np.full(len(df2.B), 3, np.int8)
+            # TODO: full_like for Series
+            df2['C'] = np.full_like(df2.B.values, 3, np.int8)
+            return df2
+
+        A = np.array([1,1,2,3])
+        B = np.array([3,4,5,6])
+        hpat_func = hpat.jit(locals={'A:input': 'distributed',
+            'B:input': 'distributed', 'df2:return': 'distributed'})(test_impl)
+        start, end = get_start_end(len(A))
+        df2 = hpat_func(A[start:end], B[start:end])
+        # TODO:
+        # pd.testing.assert_frame_equal(
+        #     hpat_func(A[start:end], B[start:end]), test_impl(A, B))
 
 if __name__ == "__main__":
     unittest.main()

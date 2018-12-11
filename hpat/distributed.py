@@ -741,7 +741,7 @@ class DistributedPass(object):
         if (func_name in ['cumsum', 'cumprod', 'empty_like',
                                      'zeros_like', 'ones_like', 'full_like',
                                      'copy', 'ravel', 'ascontiguousarray']
-                and not self._is_REP(args[0].name)):
+                and self._is_1D_arr(args[0].name)):
             if func_name == 'ravel':
                 assert self.typemap[args[0].name].ndim == 1, "only 1D ravel supported"
             in_arr = args[0].name
