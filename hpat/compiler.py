@@ -180,7 +180,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # Ensure we have an IR and type information.
         assert self.func_ir
         df_pass = HiFrames(self.func_ir, self.typingctx,
-                           self.args, self.locals)
+                           self.args, self.locals, self.metadata)
         df_pass.run()
 
 
@@ -210,8 +210,10 @@ class HPATPipeline(numba.compiler.BasePipeline):
         """
         # Ensure we have an IR and type information.
         assert self.func_ir
-        dist_pass = DistributedPass(self.func_ir, self.typingctx, self.targetctx,
-                                    self.type_annotation.typemap, self.type_annotation.calltypes)
+        dist_pass = DistributedPass(
+            self.func_ir, self.typingctx, self.targetctx,
+            self.type_annotation.typemap, self.type_annotation.calltypes,
+            self.metadata)
         dist_pass.run()
 
 

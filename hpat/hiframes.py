@@ -89,11 +89,12 @@ numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 class HiFrames(object):
     """analyze and transform hiframes calls"""
 
-    def __init__(self, func_ir, typingctx, args, _locals):
+    def __init__(self, func_ir, typingctx, args, _locals, metadata):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.args = args
         self.locals = _locals
+        self.metadata = metadata
         ir_utils._max_label = max(func_ir.blocks.keys())
         # replace inst variables as determined previously during the pass
         # currently use to keep lhs of Arg nodes intact
@@ -115,6 +116,7 @@ class HiFrames(object):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
+        self._handle_dist_args()
         blocks = self.func_ir.blocks
         # topo_order necessary since df vars need to be found before use
         topo_order = find_topo_order(blocks)
@@ -1758,9 +1760,6 @@ class HiFrames(object):
             flag = flagged_inputs[arg_name]
             if flag== 'series':
                 return nodes
-            if flag == 'distributed':
-                def f(_dist_arr):  # pragma: no cover
-                    _d_arr = hpat.distributed_api.dist_input(_dist_arr)
             elif flag == 'threaded':
                 def f(_thread_arr):  # pragma: no cover
                     _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
@@ -1849,6 +1848,32 @@ class HiFrames(object):
 
 
         return nodes
+
+    def _handle_dist_args(self):
+        """remove distributed input annotation from locals and add to metadata
+        """
+        if 'distributed_args' not in self.metadata:
+            self.metadata['distributed_args'] = set()
+
+        # e.g. {"A:input": "distributed"} -> "A"
+        flagged_inputs = { var_name.split(":")[0]
+                    for (var_name, flag) in self.locals.items()
+                    if var_name.endswith(":input") and flag == 'distributed'}
+
+        # check inputs to be in actuall args
+        for arg_name in flagged_inputs:
+            if arg_name not in self.func_ir.arg_names:
+                raise ValueError(
+                    "distributed input {} not found in arguments".format(
+                        arg_name))
+
+        self.metadata['distributed_args'] |= flagged_inputs
+
+        # remove from locals to avoid type inference issue
+        for arg_name in flagged_inputs:
+            self.locals.pop(arg_name + ":input")
+
+        return
 
     def _box_return_df(self, df_map):
         #

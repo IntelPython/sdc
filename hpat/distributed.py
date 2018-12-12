@@ -47,12 +47,14 @@ fir_text = None
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
 
-    def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes):
+    def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes,
+                 metadata):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.targetctx = targetctx
         self.typemap = typemap
         self.calltypes = calltypes
+        self.metadata = metadata
 
         self._dist_analysis = None
         self._T_arrs = None  # set of transposed arrays (taken from analysis)
@@ -78,8 +80,9 @@ class DistributedPass(object):
         remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
-                                                 self.calltypes, self.typingctx)
+        dist_analysis_pass = DistributedAnalysis(
+            self.func_ir, self.typemap, self.calltypes, self.typingctx,
+            self.metadata)
         self._dist_analysis = dist_analysis_pass.run()
         # dprint_func_ir(self.func_ir, "after analysis distributed")
 
@@ -145,6 +148,8 @@ class DistributedPass(object):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
+                    elif isinstance(rhs, ir.Arg):
+                        out_nodes = self._run_arg(inst)
                 elif isinstance(inst, (ir.StaticSetItem, ir.SetItem)):
                     if isinstance(inst, ir.SetItem):
                         index = inst.index
@@ -649,34 +654,6 @@ class DistributedPass(object):
         if fdef == ('threaded_return', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
             return [assign]
-
-        if fdef == ('dist_input', 'hpat.distributed_api'):
-            out = [assign]
-            arr = rhs.args[0]
-            if is_array_container(self.typemap, arr.name):
-                return out
-            # remove sentinel call
-            assign.value = arr
-
-            # gen len() using 1D_Var reduce approach.
-            # TODO: refactor to avoid reduction
-            ndim = self.typemap[arr.name].ndim
-            out += self._gen_1D_Var_len(arr)
-            total_length = out[-1].target
-            div_nodes, start_var, count_var = self._gen_1D_div(
-                total_length, arr.scope, arr.loc, "$input", "get_node_portion",
-                distributed_api.get_node_portion)
-            out += div_nodes
-
-            # XXX: get sizes in lower dimensions
-            self._array_starts[lhs] = [-1]*ndim
-            self._array_counts[lhs] = [-1]*ndim
-            self._array_sizes[lhs] = [-1]*ndim
-            self._array_starts[lhs][0] = start_var
-            self._array_counts[lhs][0] = count_var
-            self._array_sizes[lhs][0] = total_length
-
-            return out
 
         if fdef == ('threaded_input', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
@@ -1501,6 +1478,36 @@ class DistributedPass(object):
             parfor, namevar_table)
         parfor.init_block.body += init_reduce_nodes
         out = prepend + [parfor] + reduce_nodes
+        return out
+
+    def _run_arg(self, assign):
+        rhs = assign.value
+        out = [assign]
+
+        if rhs.name not in self.metadata['distributed_args']:
+            return None
+
+        arr = assign.target
+        if is_array_container(self.typemap, arr.name):
+            return None
+
+        # gen len() using 1D_Var reduce approach.
+        # TODO: refactor to avoid reduction
+        ndim = self.typemap[arr.name].ndim
+        out += self._gen_1D_Var_len(arr)
+        total_length = out[-1].target
+        div_nodes, start_var, count_var = self._gen_1D_div(
+            total_length, arr.scope, arr.loc, "$input", "get_node_portion",
+            distributed_api.get_node_portion)
+        out += div_nodes
+
+        # XXX: get sizes in lower dimensions
+        self._array_starts[arr.name] = [-1]*ndim
+        self._array_counts[arr.name] = [-1]*ndim
+        self._array_sizes[arr.name] = [-1]*ndim
+        self._array_starts[arr.name][0] = start_var
+        self._array_counts[arr.name][0] = count_var
+        self._array_sizes[arr.name][0] = total_length
         return out
 
     def _index_has_par_index(self, index, other_index):

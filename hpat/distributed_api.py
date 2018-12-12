@@ -374,9 +374,6 @@ def dist_time():  # pragma: no cover
 def dist_return(A):  # pragma: no cover
     return A
 
-def dist_input(A):  # pragma: no cover
-    return A
-
 def threaded_input(A):  # pragma: no cover
     return A
 
@@ -392,7 +389,6 @@ def rebalance_array_parallel(A):
 
 @overload(rebalance_array)
 @overload(dist_return)
-@overload(dist_input)
 @overload(threaded_input)
 @overload(threaded_return)
 def dist_return_overload(column):

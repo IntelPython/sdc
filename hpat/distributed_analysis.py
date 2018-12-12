@@ -44,11 +44,12 @@ auto_rebalance = False
 class DistributedAnalysis(object):
     """analyze program for to distributed transfromation"""
 
-    def __init__(self, func_ir, typemap, calltypes, typingctx):
+    def __init__(self, func_ir, typemap, calltypes, typingctx, metadata):
         self.func_ir = func_ir
         self.typemap = typemap
         self.calltypes = calltypes
         self.typingctx = typingctx
+        self.metadata = metadata
 
     def _init_run(self):
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
@@ -155,6 +156,13 @@ class DistributedAnalysis(object):
         elif isinstance(rhs, ir.Expr) and rhs.op in ('getiter', 'iternext'):
             # analyze array container access in pair_first
             return
+        elif isinstance(rhs, ir.Arg):
+            if rhs.name in self.metadata['distributed_args']:
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.OneD
+            else:
+                dprint("replicated input ", rhs.name, lhs)
+                self._set_REP([inst.target], array_dists)
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
@@ -543,11 +551,6 @@ class DistributedAnalysis(object):
                 raise ValueError("threaded return of array {} not valid"
                                  " since it is replicated")
             array_dists[arr_name] = Distribution.Thread
-            return
-
-        if func_name == 'dist_input':
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
             return
 
         if func_name == 'threaded_input':
