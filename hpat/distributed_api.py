@@ -389,10 +389,18 @@ def rebalance_array_parallel(A):
 
 @overload(rebalance_array)
 @overload(dist_return)
-@overload(threaded_input)
-@overload(threaded_return)
 def dist_return_overload(column):
     return dist_return
+
+# TODO: move other funcs to old API?
+@infer_global(threaded_input)
+@infer_global(threaded_return)
+class ThreadedRetTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1  # array
+        return signature(args[0], *args)
+
 
 def irecv():  # pragma: no cover
     return 0
