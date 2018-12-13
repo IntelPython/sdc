@@ -4,6 +4,7 @@ import operator
 import types as pytypes  # avoid confusion with numba.types
 import copy
 import warnings
+from collections import defaultdict
 import numba
 from numba import (ir, types, typing, config, numpy_support,
                    ir_utils, postproc)
@@ -103,7 +104,8 @@ class DistributedPass(object):
             # parfor params need to be updated for multithread_mode since some
             # new variables like alloc_start are introduced by distributed pass
             # and are used in later parfors
-            parfor_ids = get_parfor_params(self.func_ir.blocks, True)
+            parfor_ids = get_parfor_params(
+                self.func_ir.blocks, True, defaultdict(list))
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
