@@ -1806,7 +1806,10 @@ class HiFrames(object):
 
             self._create_df(arg_var.name, df_items, label)
 
-        if isinstance(arg_typ, BoxedSeriesType):
+        # handle BoxedSeries and list/set of BoxedSeries, TODO: others?
+        if (isinstance(arg_typ, BoxedSeriesType) or
+                isinstance(arg_typ, (types.List, types.Set))
+                and isinstance(arg_typ.dtype, BoxedSeriesType)):
             # self.args[arg_ind] = SeriesType(arg_typ.dtype, 1, 'C')
             # replace arg var with tmp
             def f(_boxed_series):  # pragma: no cover
@@ -1822,7 +1825,6 @@ class HiFrames(object):
             arg_var = new_arg_var
             self._add_node_defs(nodes)
 
-        # TODO: handle list(series), set(series), etc.
         # handle tuples that include boxed series
         if (isinstance(arg_typ, types.BaseTuple) and any(
                 [isinstance(a, BoxedSeriesType) for a in arg_typ.types])):
