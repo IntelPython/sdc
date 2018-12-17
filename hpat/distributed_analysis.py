@@ -553,6 +553,11 @@ class DistributedAnalysis(object):
             array_dists[arr_name] = Distribution.Thread
             return
 
+        if func_name == 'dist_input':
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD
+            return
+
         if func_name == 'threaded_input':
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.Thread
