@@ -849,6 +849,22 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
+    def test_df_input_dist1(self):
+        def test_impl(df):
+            return df.B.sum()
+
+        n = 121
+        A = [3,4,5,6,1]
+        B = [5,6,2,1,3]
+        n = 5
+        start, end = get_start_end(n)
+        df = pd.DataFrame({'A': A, 'B': B})
+        df_h = pd.DataFrame({'A': A[start:end], 'B': B[start:end]})
+        hpat_func = hpat.jit(locals={'df:input':'distributed'})(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df_h), test_impl(df))
+        self.assertEqual(count_array_REPs(), 2)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_concat(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})

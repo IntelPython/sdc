@@ -1755,32 +1755,16 @@ class HiFrames(object):
                     for (var_name, flag) in self.locals.items()
                     if var_name.endswith(":input") }
 
+        flag = None  # TODO: support multiple input flags
         if arg_name in flagged_inputs.keys():
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
-            if flag == 'distributed':
-                def f(_dist_arr):  # pragma: no cover
-                    _d_arr = hpat.distributed_api.dist_input(_dist_arr)
-            elif flag == 'threaded':
-                def f(_thread_arr):  # pragma: no cover
-                    _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
-            else:
-                raise ValueError("Invalid input flag")
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [arg_var])
-            nodes += f_block.body[:-3]  # remove none return
-            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
-            nodes[-1].target = new_arg_var
-            self.replace_var_dict[arg_var.name] = new_arg_var
-            arg_var = new_arg_var
-            self._add_node_defs(nodes)
 
         # TODO: handle datetime.date() series
 
         # input dataframe arg
-        # TODO: support distributed input
         if isinstance(self.args[arg_ind], PandasDataFrameType):
+            flag_func_name = self._get_input_flag_func_name(flag)
             df_typ = self.args[arg_ind]
             df_items = {}
             for i, col in enumerate(df_typ.col_names):
@@ -1795,7 +1779,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.unbox_df_column(_df, {}, {}))\n".format(col, i, alloc_dt)
+                func_text += "  _col_input_{} = {}(hpat.hiframes_api.to_series_type(hpat.hiframes_api.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1806,6 +1790,8 @@ class HiFrames(object):
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)
+            self.metadata['distributed_args'].discard(arg_name)
+            return nodes
 
         # handle BoxedSeries and list/set of BoxedSeries, TODO: others?
         if (isinstance(arg_typ, BoxedSeriesType) or
@@ -1823,16 +1809,20 @@ class HiFrames(object):
             new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
             nodes[-1].target = new_arg_var
             self.replace_var_dict[arg_var.name] = new_arg_var
-            arg_var = new_arg_var
             self._add_node_defs(nodes)
+            arg_var = self._handle_input_flag(flag, new_arg_var, nodes)
+            self.metadata['distributed_args'].discard(arg_name)
+            return nodes
+
 
         # handle tuples that include boxed series
         if (isinstance(arg_typ, types.BaseTuple) and any(
                 [isinstance(a, BoxedSeriesType) for a in arg_typ.types])):
+            flag_func_name = self._get_input_flag_func_name(flag)
             func_text = "def tuple_unpack_func(tup_arg):\n"
             for i, t in enumerate(arg_typ.types):
                 if isinstance(t, BoxedSeriesType):
-                    func_text += "  _arg_{} = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(tup_arg[{}]))\n".format(i, i)
+                    func_text += "  _arg_{} = {}(hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
                 else:
                     func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
             pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])
@@ -1848,15 +1838,54 @@ class HiFrames(object):
             self.replace_var_dict[arg_var.name] = new_arg_var
             arg_var = new_arg_var
             self._add_node_defs(nodes)
+            self.metadata['distributed_args'].discard(arg_name)
+            return nodes
 
-
+        # all other types: arrays, containers of arrays, ...
+        arg_var = self._handle_input_flag(flag, arg_var, nodes)
         return nodes
+
+    def _handle_input_flag(self, flag, arg_var, nodes):
+        if flag is None:
+            return arg_var
+
+        if flag == 'distributed':
+                def f(_dist_arr):  # pragma: no cover
+                    _d_arr = hpat.distributed_api.dist_input(_dist_arr)
+        elif flag == 'threaded':
+            def f(_thread_arr):  # pragma: no cover
+                _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
+        else:
+            raise ValueError("Invalid input flag")
+        f_block = compile_to_numba_ir(
+            f, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arg_var])
+        nodes += f_block.body[:-3]  # remove none return
+        new_arg_var = ir.Var(
+            arg_var.scope, mk_unique_var(arg_var.name), arg_var.loc)
+        nodes[-1].target = new_arg_var
+        self.replace_var_dict[arg_var.name] = new_arg_var
+        self._add_node_defs(nodes)
+        return new_arg_var
+
+    def _get_input_flag_func_name(self, flag):
+        if flag is None:
+            return ''
+        fname = None
+        if flag == 'distributed':
+            fname = 'hpat.distributed_api.dist_input'
+        elif flag == 'threaded':
+            fname = 'hpat.distributed_api.threaded_input'
+        else:
+            raise ValueError("Invalid input flag")
+        return fname
 
     def _handle_dist_args(self):
         """remove distributed input annotation from locals and add to metadata
         """
         if 'distributed_args' not in self.metadata:
             self.metadata['distributed_args'] = set()
+        return  # XXX disable for now to enable dist series
 
         # e.g. {"A:input": "distributed"} -> "A"
         flagged_inputs = { var_name.split(":")[0]

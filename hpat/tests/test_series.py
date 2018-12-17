@@ -9,7 +9,7 @@ import hpat
 from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
@@ -594,6 +594,43 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_dist_input1(self):
+        def test_impl(S):
+            return S.max()
+
+        hpat_func = hpat.jit(locals={'S:input': 'distributed'})(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        start, end = get_start_end(n)
+        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
+        self.assertEqual(count_array_REPs(), 2)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_series_tuple_input1(self):
+        def test_impl(s_tup):
+            return s_tup[0].max()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        S2 = pd.Series(np.arange(n)+1.0)
+        s_tup = (S, 1, S2)
+        self.assertEqual(hpat_func(s_tup), test_impl(s_tup))
+
+    @unittest.skip("pending handling of build_tuple in dist pass")
+    def test_series_tuple_input_dist1(self):
+        def test_impl(s_tup):
+            return s_tup[0].max()
+
+        hpat_func = hpat.jit(locals={'s_tup:input': 'distributed'})(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        S2 = pd.Series(np.arange(n)+1.0)
+        start, end = get_start_end(n)
+        s_tup = (S, 1, S2)
+        h_s_tup = (S[start:end], 1, S2[start:end])
+        self.assertEqual(hpat_func(h_s_tup), test_impl(s_tup))
 
     def test_series_rolling1(self):
         def test_impl(S):
