@@ -128,8 +128,10 @@ def join_distributed_analysis(join_node, array_dists):
                 min(out_dist.value, array_dists[col_var.name].value))
 
     # out dist should meet input dist (e.g. REP in causes REP out)
-    out_dist = Distribution(min(out_dist.value, left_dist.value))
-    out_dist = Distribution(min(out_dist.value, right_dist.value))
+    # output can be stay parallel if any of the inputs is parallel, hence max()
+    out_dist1 = Distribution(min(out_dist.value, left_dist.value))
+    out_dist2 = Distribution(min(out_dist.value, right_dist.value))
+    out_dist = Distribution(max(out_dist1.value, out_dist2.value))
     for col_var in join_node.df_out_vars.values():
         array_dists[col_var.name] = out_dist
 
@@ -285,13 +287,9 @@ ir_utils.build_defs_extensions[Join] = build_join_definitions
 
 
 def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
-    parallel = True
-    for v in (list(join_node.left_vars.values())
-              + list(join_node.right_vars.values())
-              + list(join_node.df_out_vars.values())):
-        if (array_dists[v.name] != distributed.Distribution.OneD
-                and array_dists[v.name] != distributed.Distribution.OneD_Var):
-            parallel = False
+
+    left_parallel, right_parallel = _get_table_parallel_flags(
+        join_node, array_dists)
 
     method = 'hash'
     # method = 'sort'
@@ -336,14 +334,18 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     func_text += "    data_right = ({}{})\n".format(",".join(right_other_names),
                                                 "," if len(right_other_names) != 0 else "")
 
-    if parallel:
-        if join_node.how == 'asof':
+
+    if join_node.how == 'asof':
+        if left_parallel or right_parallel:
+            assert left_parallel and right_parallel
             # only the right key needs to be aligned
             func_text += "    t2_keys, data_right = parallel_asof_comm(t1_keys, t2_keys, data_right)\n"
-        else:
+    else:
+        if left_parallel:
             func_text += "    t1_keys, data_left = parallel_join(t1_keys, data_left)\n"
+        if right_parallel:
             func_text += "    t2_keys, data_right = parallel_join(t2_keys, data_right)\n"
-            #func_text += "    print(t2_key, data_right)\n"
+        #func_text += "    print(t2_key, data_right)\n"
 
     if method == 'sort' and join_node.how != 'asof':
         # asof key is already sorted, TODO: add error checking
@@ -443,6 +445,28 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
 
 distributed.distributed_run_extensions[Join] = join_distributed_run
+
+
+def _get_table_parallel_flags(join_node, array_dists):
+    par_dists = (distributed.Distribution.OneD,
+                 distributed.Distribution.OneD_Var)
+
+    left_parallel = all(array_dists[v.name] in par_dists
+                        for v in join_node.left_vars.values())
+    right_parallel = all(array_dists[v.name] in par_dists
+                        for v in join_node.right_vars.values())
+    if not left_parallel:
+        assert not any(array_dists[v.name] in par_dists
+                        for v in join_node.left_vars.values())
+    if not right_parallel:
+        assert not any(array_dists[v.name] in par_dists
+                        for v in join_node.right_vars.values())
+
+    if left_parallel or right_parallel:
+        assert all(array_dists[v.name] in par_dists
+                        for v in join_node.df_out_vars.values())
+
+    return left_parallel, right_parallel
 
 
 # @numba.njit
