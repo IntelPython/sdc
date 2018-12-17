@@ -649,11 +649,12 @@ class DistributedPass(object):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
             # TODO: rebalance strings?
-            return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
-            # assign.value = rhs.args[0]
-            # return [assign]
+            #return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
+            assign.value = rhs.args[0]
+            return [assign]
 
         if fdef == ('dist_input', 'hpat.distributed_api'):
+            assign.value = rhs.args[0]
             out = [assign]
             arr = rhs.args[0]
             if is_array_container(self.typemap, arr.name):

@@ -280,7 +280,7 @@ class TestBasic(BaseTest):
 
     def test_dist_return(self):
         def test_impl(N):
-            A = np.arange(N);
+            A = np.arange(N)
             return A
 
         hpat_func = hpat.jit(locals={'A:return': 'distributed'})(test_impl)
@@ -296,8 +296,8 @@ class TestBasic(BaseTest):
 
     def test_dist_return_tuple(self):
         def test_impl(N):
-            A = np.arange(N);
-            B = np.arange(N)+1.5;
+            A = np.arange(N)
+            B = np.arange(N)+1.5
             return A, B
 
         hpat_func = hpat.jit(locals={'A:return': 'distributed',

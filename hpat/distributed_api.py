@@ -391,7 +391,6 @@ def rebalance_array_parallel(A):
 
 
 @overload(rebalance_array)
-@overload(dist_return)
 def dist_return_overload(column):
     return dist_return
 
@@ -399,6 +398,7 @@ def dist_return_overload(column):
 @infer_global(threaded_input)
 @infer_global(threaded_return)
 @infer_global(dist_input)
+@infer_global(dist_return)
 class ThreadedRetTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
