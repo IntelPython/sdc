@@ -331,6 +331,22 @@ class HiFramesTyped(object):
                 else:
                     func_name, func_mod = fdef
 
+                if (isinstance(func_mod, ir.Var)
+                        and self.typemap[func_mod.name]
+                        == series_str_methods_type):
+                    f_def = guard(get_definition, self.func_ir, rhs.func)
+                    str_def = guard(get_definition, self.func_ir, f_def.value)
+                    if str_def is None:  # TODO: check for errors
+                        raise ValueError("invalid series.str")
+
+                    series_var = str_def.value
+                    if func_name == 'contains':  # TODO: refactor
+                        return self._handle_series_str_contains(
+                            rhs, series_var)
+
+                    return self._run_series_str_method(
+                        assign, assign.target, series_var, func_name, rhs)
+
                 # replace _get_type_max_value(arr.dtype) since parfors
                 # arr.dtype transformation produces invalid code for dt64
                 # TODO: min
@@ -523,7 +539,7 @@ class HiFramesTyped(object):
                 func = func[series_dtype]
             return self._replace_func(func, [series_var])
 
-        if func_name in ['std', 'nunique', 'describe', 'abs', 'str.len', 'isna',
+        if func_name in ['std', 'nunique', 'describe', 'abs', 'isna',
                          'isnull', 'median', 'idxmin', 'idxmax', 'unique']:
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
@@ -580,9 +596,6 @@ class HiFramesTyped(object):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
-
-        if func_name == 'str.contains':
-            return self._handle_series_str_contains(rhs, series_var)
 
         if func_name in ('argsort', 'sort_values'):
             return self._handle_series_sort(
@@ -1171,6 +1184,31 @@ class HiFramesTyped(object):
             return S
 
         return self._replace_func(f, [data])
+
+    def _run_series_str_method(self, assign, lhs, arr, func_name, rhs):
+
+        if func_name not in ('len',):
+            raise NotImplementedError(
+                "Series.str.{} not supported yet".format(func_name))
+
+        if func_name == 'len':
+            out_typ = 'np.int64'
+
+        func_text = 'def f(str_arr):\n'
+        func_text += '    numba.parfor.init_prange()\n'
+        func_text += '    n = len(str_arr)\n'
+        #func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
+        # TODO: use empty_inferred after it is fixed
+        func_text += '    S = np.empty(n, {})\n'.format(out_typ)
+        func_text += '    for i in numba.parfor.internal_prange(n):\n'
+        func_text += '        val = str_arr[i]\n'
+        func_text += '        S[i] = len(val)\n'
+        func_text += '    return S\n'
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        return self._replace_func(f, [arr])
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':
@@ -1779,15 +1817,6 @@ def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
 def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
     return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
 
-def _str_len_impl(str_arr):
-    numba.parfor.init_prange()
-    n = len(str_arr)
-    out_arr = np.empty(n, np.int64)
-    for i in numba.parfor.internal_prange(n):
-        val = str_arr[i]
-        out_arr[i] = len(val)
-    return out_arr
-
 
 
 # TODO: use online algorithm, e.g. StatFunctions.scala
@@ -1883,7 +1912,6 @@ series_replace_funcs = {
     'abs': lambda A: np.abs(A),  # TODO: timedelta
     'cov': _column_cov_impl,
     'corr': _column_corr_impl,
-    'str.len': _str_len_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
     'isna': _series_isna_impl,
