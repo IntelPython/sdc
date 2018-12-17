@@ -1005,8 +1005,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
 
     assert f_ir.arg_count == 1, "agg function should have one input"
     input_name = f_ir.arg_names[0]
-    df_pass = hpat.hiframes.HiFrames(f_ir, typingctx,
-                           arg_typs, {input_name+":input": "series"}, {})
+    df_pass = hpat.hiframes.HiFrames(f_ir, typingctx, arg_typs, {}, {})
     df_pass.run()
     remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
     typemap, return_type, calltypes = compiler.type_inference_stage(

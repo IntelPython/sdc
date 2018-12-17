@@ -1758,9 +1758,7 @@ class HiFrames(object):
         if arg_name in flagged_inputs.keys():
             self.locals.pop(arg_name + ":input")
             flag = flagged_inputs[arg_name]
-            if flag== 'series':
-                return nodes
-            elif flag == 'threaded':
+            if flag == 'threaded':
                 def f(_thread_arr):  # pragma: no cover
                     _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
             else:
