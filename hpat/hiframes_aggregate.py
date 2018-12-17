@@ -1039,7 +1039,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     remove_dels(f_ir.blocks)
     # make sure eval nodes are after the parfor for easier extraction
     # TODO: extract an eval func more robustly
-    numba.parfor.maximize_fusion(f_ir, f_ir.blocks, False)
+    numba.parfor.maximize_fusion(f_ir, f_ir.blocks, typemap, False)
     return f_ir, pm
 
 
