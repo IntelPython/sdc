@@ -40,6 +40,7 @@ fi
 
 $CONDA_INSTALL mpich mpi -c conda-forge --no-deps
 $CONDA_INSTALL -c numba numba
+$CONDA_INSTALL libgfortran
 $CONDA_INSTALL h5py -c ehsantn --override-channels
 
 if [ "$RUN_COVERAGE" == "yes" ]; then $CONDA_INSTALL coveralls; fi
