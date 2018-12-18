@@ -419,6 +419,7 @@ class DistributedPass(object):
         if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
                 and func_name in ('h5read', 'h5write', 'h5read_filter'))
                 and self._is_1D_arr(rhs.args[5].name)):
+            # TODO: make create_dataset/create_group collective
             arr = rhs.args[5].name
             ndims = len(self._array_starts[arr])
             starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
