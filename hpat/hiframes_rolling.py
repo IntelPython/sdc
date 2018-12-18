@@ -3,7 +3,7 @@ import pandas as pd
 import hpat
 import numba
 from numba import types
-from numba.extending import lower_builtin
+from numba.extending import lower_builtin, overload
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -769,8 +769,19 @@ def calc_count_var(minp, count_x):  # pragma: no cover
 
 
 # shift -------------
-@numba.njit
-def shift(in_arr, shift, parallel):  # pragma: no cover
+
+# dummy
+def shift():  # pragma: no cover
+    return
+
+# using overload since njit bakes in Literal[bool](False) for parallel
+@overload(shift)
+def shift_overload(in_arr, shift, parallel):
+    if not isinstance(parallel, types.Literal):
+        return shift_impl
+
+
+def shift_impl(in_arr, shift, parallel):  # pragma: no cover
     N = len(in_arr)
     if parallel:
         rank = hpat.distributed_api.get_rank()
