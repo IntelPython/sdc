@@ -606,6 +606,7 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_arr]
                 self._array_sizes[lhs] = self._array_sizes[in_arr]
             # set parallel flag to true
+            #import pdb; pdb.set_trace()
             true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
             self.typemap[true_var.name] = types.boolean
             rhs.args[2] = true_var

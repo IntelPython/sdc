@@ -823,8 +823,17 @@ def shift_seq(in_arr, shift):  # pragma: no cover
 
 # pct_change -------------
 
-@numba.njit
-def pct_change(in_arr, shift, parallel):  # pragma: no cover
+# dummy
+def pct_change():  # pragma: no cover
+    return
+
+# using overload since njit bakes in Literal[bool](False) for parallel
+@overload(pct_change)
+def pct_change_overload(in_arr, shift, parallel):
+    if not isinstance(parallel, types.Literal):
+        return pct_change_impl
+
+def pct_change_impl(in_arr, shift, parallel):  # pragma: no cover
     N = len(in_arr)
     if parallel:
         rank = hpat.distributed_api.get_rank()
