@@ -951,12 +951,14 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
     return res
 
 
-@typeof_impl.register(np.ndarray)
-def typeof_np_string(val, c):
-    if val.ndim == 1 and isinstance(val[0], str):  # and isinstance(val[-1], str):
-        return string_array_type
-    else:
-        return numba.typing.typeof._typeof_ndarray(val, c)
+# TODO: support array of strings
+# @typeof_impl.register(np.ndarray)
+# def typeof_np_string(val, c):
+#     arr_typ = numba.typing.typeof._typeof_ndarray(val, c)
+#     # match string dtype
+#     if isinstance(arr_typ.dtype, (types.UnicodeCharSeq, types.CharSeq)):
+#         return string_array_type
+#     return arr_typ
 
 
 @unbox(StringArrayType)

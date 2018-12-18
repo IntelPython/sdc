@@ -133,5 +133,14 @@ class TestString(unittest.TestCase):
         # instead of nan for some reason
         np.testing.assert_array_equal(hpat_func().isna(), test_impl().isna())
 
+    @unittest.skip("TODO: explore np array of strings")
+    def test_box_np_arr_string(self):
+        def test_impl(A):
+            return A[0]
+        hpat_func = hpat.jit(test_impl)
+        A = np.array(['AA', 'B'])
+        self.assertEqual(hpat_func(A), test_impl(A))
+
+
 if __name__ == "__main__":
     unittest.main()
