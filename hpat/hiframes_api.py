@@ -22,6 +22,7 @@ from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
     unbox_str_series, is_str_arr_typ, box_str_arr)
 
+from hpat.set_ext import build_set
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
@@ -241,7 +242,7 @@ def lower_nunique(context, builder, sig, args):
 def nunique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def nunique_seq(A):
-        return len(set(A))
+        return len(build_set(A))
     return nunique_seq
 
 @lower_builtin(nunique_parallel, types.Any)  # TODO: replace Any with types
@@ -287,7 +288,7 @@ def lower_unique(context, builder, sig, args):
 def unique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def unique_seq(A):
-        return hpat.utils.to_array(set(A))
+        return hpat.utils.to_array(build_set(A))
     return unique_seq
 
 @lower_builtin(unique_parallel, types.Any)  # TODO: replace Any with types
@@ -300,7 +301,7 @@ def lower_unique_parallel(context, builder, sig, args):
 def unique_overload_parallel(arr_typ):
 
     def unique_par(A):
-        uniq_A = hpat.utils.to_array(set(A))
+        uniq_A = hpat.utils.to_array(build_set(A))
         key_arrs = (uniq_A,)
 
         n_pes = hpat.distributed_api.get_size()
@@ -325,7 +326,7 @@ def unique_overload_parallel(arr_typ):
         # shuffle
         out_arr, = alltoallv_tup(key_arrs, shuffle_meta)
 
-        return hpat.utils.to_array(set(out_arr))
+        return hpat.utils.to_array(build_set(out_arr))
 
     return unique_par
 

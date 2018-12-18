@@ -1,6 +1,6 @@
 import operator
 import numba
-from numba import types, typing
+from numba import types, typing, generated_jit
 from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
@@ -28,7 +28,7 @@ from hpat.str_ext import StringType, string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
                               pre_alloc_string_array, StringArrayPayloadType,
                               is_str_arr_typ)
-from hpat.hiframes_api import dummy_unbox_series
+
 
 # similar to types.Container.Set
 class SetType(types.Container):
@@ -79,19 +79,30 @@ num_total_chars_set_string = types.ExternalFunction("num_total_chars_set_string"
 
 # TODO: box set(string)
 
+
+@generated_jit(nopython=True, cache=True)
+def build_set(A):
+    if is_str_arr_typ(A):
+        return _build_str_set_impl
+    else:
+        return lambda A: set(A)
+
+
+def _build_str_set_impl(A):
+    str_arr = hpat.hiframes_api.dummy_unbox_series(A)
+    str_set = init_set_string()
+    n = len(str_arr)
+    for i in range(n):
+        str = str_arr[i]
+        str_set.add(str)
+        hpat.str_ext.del_str(str)
+    return str_set
+
+# TODO: remove since probably unused
 @overload(set)
 def init_set_string_array(in_typ):
     if is_str_arr_typ(in_typ):
-        def f(A):
-            str_arr = dummy_unbox_series(A)
-            str_set = init_set_string()
-            n = len(str_arr)
-            for i in range(n):
-                str = str_arr[i]
-                str_set.add(str)
-                hpat.str_ext.del_str(str)
-            return str_set
-        return f
+        return _build_str_set_impl
 
 
 @overload_method(SetType, 'add')

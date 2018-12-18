@@ -25,7 +25,7 @@ from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.utils import _numba_to_c_type_map
 from hpat.str_ext import string_type
-from hpat.set_ext import num_total_chars_set_string
+from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
                             setitem_string_array, get_offset_ptr, get_data_ptr)
 from hpat.pd_series_ext import SeriesType
@@ -653,7 +653,7 @@ def agg_parallel_local_iter(key_arrs, data_in, shuffle_meta, data_redvar_dummy,
 @numba.njit
 def agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup, init_vals,
                 __combine_redvars, __eval_res, return_key, data_in, pivot_arr):  # pragma: no cover
-    key_set = _build_set(key_arrs)
+    key_set = _build_set_tup(key_arrs)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
@@ -686,7 +686,7 @@ def agg_parallel_combine_iter(key_arrs, reduce_recvs, out_dummy_tup, init_vals,
 @numba.njit
 def agg_seq_iter(key_arrs, redvar_dummy_tup, out_dummy_tup, data_in, init_vals,
                  __update_redvars, __eval_res, return_key, pivot_arr):  # pragma: no cover
-    key_set = _build_set(key_arrs)
+    key_set = _build_set_tup(key_arrs)
     n_uniq_keys = len(key_set)
     out_arrs = alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in,
                                                                     return_key)
@@ -1706,11 +1706,11 @@ def get_parfor_reductions(parfor, parfor_params, calltypes,
 
     return reduce_varnames, var_to_param
 
-def _build_set(arrs):
-    return set(arrs[0])
+def _build_set_tup(arrs):
+    return build_set(arrs[0])
 
-@overload(_build_set)
-def _build_set_overload(arr_tup_t):
+@overload(_build_set_tup)
+def _build_set_tup_overload(arr_tup_t):
     # TODO: support string in tuple set
     if isinstance(arr_tup_t, types.BaseTuple) and len(arr_tup_t.types) != 1:
         def _impl(arr_tup):
@@ -1720,7 +1720,7 @@ def _build_set_overload(arr_tup_t):
                 s.add(getitem_arr_tup(arr_tup, i))
             return s
         return _impl
-    return _build_set
+    return _build_set_tup
 
 def _sanitize_varname(varname):
     return varname.replace('$', '_').replace('.', '_')
