@@ -224,6 +224,12 @@ class DistributedPass(object):
             if arr not in self._T_arrs and rhs.index == 0:
                 # return parallel size
                 if self._is_1D_arr(arr):
+                    # XXX hack for array container case, TODO: handle properly
+                    if arr not in self._array_sizes:
+                        arr_var = namevar_table[arr]
+                        nodes = self._gen_1D_Var_len(arr_var)
+                        nodes[-1].target = inst.target
+                        return nodes
                     inst.value = self._array_sizes[arr][rhs.index]
                 else:
                     assert self._is_1D_Var_arr(arr)
