@@ -22,7 +22,7 @@ with MPI, requiring only minimal code changes.
 HPAT is orders of magnitude faster than
 alternatives like `Apache Spark <http://spark.apache.org/>`_.
 
-HPAT's documentation can be found `here <https://intellabs.github.io/hpat/>`_.
+HPAT's documentation can be found `here <https://intellabs.github.io/hpat-doc/>`_.
 
 Installation
 ############
