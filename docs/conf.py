@@ -51,7 +51,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'HPAT'
-copyright = '2017, Ehsan Totoni'
+#copyright = '2017, Ehsan Totoni'
 author = 'Ehsan Totoni'
 
 # The version info for the project you're documenting, acts as replacement for
