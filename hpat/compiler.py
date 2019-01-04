@@ -128,6 +128,11 @@ def inline_calls(func_ir):
                         # (included in new blocks)
                         break
 
+    # sometimes type inference fails after inlining since blocks are inserted
+    # at the end and there are agg constraints (categorical_split case)
+    # CFG simplification fixes this case
+    func_ir.blocks = ir_utils.simplify_CFG(func_ir.blocks)
+
 
 class HPATPipeline(numba.compiler.BasePipeline):
     """HPAT compiler pipeline
