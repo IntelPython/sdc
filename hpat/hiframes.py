@@ -1463,7 +1463,6 @@ class HiFrames(object):
             raise ValueError("only {} supported in groupby".format(
                                              ", ".join(supported_agg_funcs)))
 
-        agg_func = get_agg_func(self.func_ir, func_name, rhs)
 
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
@@ -1475,24 +1474,12 @@ class HiFrames(object):
             for k in key_colnames:
                 out_colnames.remove(k)
 
-        # find input vars and output types
-        out_types = {}
-        in_vars = {}
-        # hpat.jit() instead of numba.njit() to handle str arrs etc
-        agg_func_dis = hpat.jit(agg_func)
-        #agg_func_dis = numba.njit(agg_func)
-        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
-        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
-        for out_cname in out_colnames:
-            in_var = self.df_vars[df_var.name][out_cname]
-            in_vars[out_cname] = in_var
-            def to_arr(a, _agg_f):
-                b = hpat.hiframes_api.to_arr_from_series(a)
-                res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
-            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_var, agg_gb_var])
-            nodes += f_block.body[:-3]  # remove none return
-            out_types[out_cname] = nodes[-1].target
+        # find input vars
+        in_vars = {out_cname: self.df_vars[df_var.name][out_cname]
+                    for out_cname in out_colnames}
+
+        nodes, agg_func, out_tp_vars = self._handle_agg_func(
+            in_vars, out_colnames, func_name, lhs, rhs)
 
         # output column map, create dataframe if multiple outputs
         out_key_vars = None
@@ -1519,9 +1506,29 @@ class HiFrames(object):
         agg_node = hiframes_aggregate.Aggregate(
             lhs.name, df_var.name, key_colnames, out_key_vars, df_col_map,
             in_vars, in_key_vars,
-            agg_func, out_types, lhs.loc)
+            agg_func, out_tp_vars, lhs.loc)
         nodes.append(agg_node)
         return nodes
+
+    def _handle_agg_func(self, in_vars, out_colnames, func_name, lhs, rhs):
+        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+        out_tp_vars = {}
+
+        # hpat.jit() instead of numba.njit() to handle str arrs etc
+        agg_func_dis = hpat.jit(agg_func)
+        #agg_func_dis = numba.njit(agg_func)
+        agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
+        nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
+        for out_cname in out_colnames:
+            in_var = in_vars[out_cname]
+            def to_arr(a, _agg_f):
+                b = hpat.hiframes_api.to_arr_from_series(a)
+                res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+            f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_var, agg_gb_var])
+            nodes += f_block.body[:-3]  # remove none return
+            out_tp_vars[out_cname] = nodes[-1].target
+        return nodes, agg_func, out_tp_vars
 
     def _get_agg_obj_args(self, agg_var):
         # find groupby key and as_index
