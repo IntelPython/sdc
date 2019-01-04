@@ -443,7 +443,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: return namedtuple or labeled Series
         return signature(string_type, *args)
 
-    @bound_function("series.fillna", True)
+    @bound_function("series.fillna")
     def resolve_fillna(self, ary, args, kws):
         out = ary
         # output is None for inplace case
@@ -451,7 +451,7 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
-    @bound_function("series.dropna", True)
+    @bound_function("series.dropna")
     def resolve_dropna(self, ary, args, kws):
         out = ary
         # output is None for inplace case
@@ -489,11 +489,11 @@ class SeriesAttribute(AttributeTemplate):
 
         return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
-    @bound_function("series.map", True)
+    @bound_function("series.map")
     def resolve_map(self, ary, args, kws):
         return self._resolve_map_func(ary, args, kws)
 
-    @bound_function("series.apply", True)
+    @bound_function("series.apply")
     def resolve_apply(self, ary, args, kws):
         # TODO: handle apply differences: extra args, np ufuncs etc.
         return self._resolve_map_func(ary, args, kws)
@@ -512,7 +512,7 @@ class SeriesAttribute(AttributeTemplate):
                 self.context, f_ir, (dtype1,dtype2,), None)
         return signature(SeriesType(f_return_type, 1, 'C'), *args)
 
-    @bound_function("series.combine", True)
+    @bound_function("series.combine")
     def resolve_combine(self, ary, args, kws):
         return self._resolve_combine_func(ary, args, kws)
 
@@ -696,16 +696,16 @@ class SeriesRollingType(types.Type):
 class SeriesRollingAttribute(AttributeTemplate):
     key = SeriesRollingType
 
-    @bound_function("rolling.apply", True)
+    @bound_function("rolling.apply")
     def resolve_apply(self, ary, args, kws):
         # result is always float64 (see Pandas window.pyx:roll_generic)
         return signature(SeriesType(types.float64, 1, 'C'), *args)
 
-    @bound_function("rolling.cov", True)
+    @bound_function("rolling.cov")
     def resolve_cov(self, ary, args, kws):
         return signature(SeriesType(types.float64, 1, 'C'), *args)
 
-    @bound_function("rolling.corr", True)
+    @bound_function("rolling.corr")
     def resolve_corr(self, ary, args, kws):
         return signature(SeriesType(types.float64, 1, 'C'), *args)
 
