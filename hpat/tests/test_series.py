@@ -562,6 +562,8 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(hpat_func(S), test_impl(S))
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(['aa', 'bb', np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_mean1(self):
         def test_impl(S):

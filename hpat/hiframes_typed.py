@@ -1543,8 +1543,7 @@ def _column_count_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     for i in numba.parfor.internal_prange(len(A)):
-        val = A[i]
-        if not np.isnan(val):
+        if not hpat.hiframes_api.isna(A, i):
             count += 1
 
     res = count

@@ -1614,15 +1614,29 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
         in_vars.append(in_var)
 
     # replace X[i] with input value
+    index_var = parfor.loop_nests[0].index_variable
     red_ir_vars = [0]*num_red_vars
     for bl in parfor.loop_body.values():
+        new_body = []
         for stmt in bl.body:
+            # remove extra index assignment i = parfor_index for isna(A, i)
+            if is_var_assign(stmt) and stmt.value.name == index_var.name:
+                continue
             if is_getitem(stmt) and stmt.value.value.name == arr_var.name:
                 stmt.value = in_vars[0]
+            # XXX replace hpat.hiframes_api.isna(A, i) for now
+            # TODO: handle actual NA
+            # for test_agg_seq_count_str test
+            if (is_call(stmt) and guard(find_callname, pm.func_ir, stmt.value)
+                    == ('isna', 'hpat.hiframes_api')
+                    and stmt.value.args[0].name == arr_var.name):
+                stmt.value = ir.Const(False, stmt.target.scope)
             # store reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 ind = redvars.index(stmt.target.name)
                 red_ir_vars[ind] = stmt.target
+            new_body.append(stmt)
+        bl.body = new_body
 
     redvar_in_names = ["v{}".format(i) for i in range(num_red_vars)]
     in_names = ["in{}".format(i) for i in range(num_in_vars)]
