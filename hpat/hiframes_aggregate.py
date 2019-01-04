@@ -15,6 +15,7 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             get_definition, find_callname, get_name_var_table,
                             replace_var_names)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
+from numba.analysis import compute_use_defs
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, lower_builtin
@@ -23,7 +24,7 @@ from hpat.utils import (is_call, is_var_assign, is_assign, debug_prints,
         alloc_arr_tup, empty_like_type)
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
-from hpat.utils import _numba_to_c_type_map
+from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
@@ -86,9 +87,21 @@ def _var_combine(ssqdm_a, mean_a, nobs_a, ssqdm_b, mean_b, nobs_b):  # pragma: n
     M2 = ssqdm_a + ssqdm_b + delta * delta * nobs_a * nobs_b / nobs
     return M2, mean_x, nobs
 
-@numba.njit
+# XXX: njit doesn't work when hpat.jit() is used for agg_func in hiframes
+#@numba.njit
 def __special_combine(*args):
     return
+
+@infer_global(__special_combine)
+class SpecialCombineTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        return signature(types.void, *unliteral_all(args))
+
+@lower_builtin(__special_combine, types.VarArg(types.Any))
+def lower_special_combine(context, builder, sig, args):
+    return context.get_dummy_value()
+
 
 # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_var_impl_linear(A):  # pragma: no cover
@@ -1075,7 +1088,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
         block = f_ir.blocks[0]
 
         # find and ignore arg and size/shape nodes for input arr
-        block_body, arr_var = _rm_arg_agg_block(block)
+        block_body, arr_var = _rm_arg_agg_block(block, pm.typemap)
 
         parfor_ind = -1
         for i, stmt in enumerate(block_body):
@@ -1103,6 +1116,11 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
 
         combine_func = gen_combine_func(f_ir, parfor, redvars, var_to_redvar,
             var_types, arr_var, pm, typingctx, targetctx)
+
+        init_nodes = _mv_read_only_init_vars(init_nodes, parfor, eval_nodes)
+        # remove len(arr) for string arrays (not handled by array analysis)
+        if pm.typemap[arr_var.name] == string_array_type:
+            init_nodes = _rm_len_str_arr(init_nodes, arr_var, f_ir)
 
         # XXX: update mutates parfor body
         update_func = gen_update_func(parfor, redvars, var_to_redvar, var_types,
@@ -1138,6 +1156,69 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
 
     return AggFuncStruct(all_vartypes, init_func,
                          update_all_func, combine_all_func, eval_all_func)
+
+def _mv_read_only_init_vars(init_nodes, parfor, eval_nodes):
+    """move stmts that are only used in the parfor body to the beginning of
+    parfor body. For example, in test_agg_seq_str, B='aa' should be moved.
+    """
+    # get parfor body usedefs
+    use_defs = compute_use_defs(parfor.loop_body)
+    parfor_uses = set()
+    for s in use_defs.usemap.values():
+        parfor_uses |= s
+    parfor_defs = set()
+    for s in use_defs.defmap.values():
+        parfor_defs |= s
+
+    # get uses of eval nodes
+    dummy_block = ir.Block(ir.Scope(None, parfor.loc), parfor.loc)
+    dummy_block.body = eval_nodes
+    e_use_defs = compute_use_defs({0: dummy_block})
+    e_uses = e_use_defs.usemap[0]
+
+    # find stmts that are only used in parfor body
+    i_uses = set()  # variables used later in init nodes
+    new_init_nodes = []
+    const_nodes = []
+    for stmt in reversed(init_nodes):
+        stmt_uses = {v.name for v in stmt.list_vars()}
+        if is_assign(stmt):
+            v = stmt.target.name
+            stmt_uses.remove(v)
+            # v is only used in parfor body
+            if (v in parfor_uses and v not in i_uses and v not in e_uses
+                    and v not in parfor_defs):
+                const_nodes.append(stmt)
+                i_uses |= stmt_uses
+                continue
+        i_uses |= stmt_uses
+        new_init_nodes.append(stmt)
+
+    const_nodes.reverse()
+    new_init_nodes.reverse()
+
+    first_body_label = min(parfor.loop_body.keys())
+    first_block = parfor.loop_body[first_body_label]
+    first_block.body = const_nodes + first_block.body
+    return new_init_nodes
+
+
+def _rm_len_str_arr(init_nodes, arr_var, f_ir):
+    """remove len(arr_var) for init_nodes. len() still exists for string
+    arrays since array analysis doesn't handle them.
+    """
+    new_init_nodes = []
+
+    for stmt in reversed(init_nodes):
+        if (is_call(stmt)
+                and find_callname(f_ir, stmt.value) == ('len', 'builtins')
+                and stmt.value.args[0].name == arr_var.name):
+            continue
+        new_init_nodes.append(stmt)
+
+    new_init_nodes.reverse()
+    return new_init_nodes
+
 
 def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
 
@@ -1631,12 +1712,18 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     return imp_dis
 
 
-def _rm_arg_agg_block(block):
+def _rm_arg_agg_block(block, typemap):
     block_body = []
     arr_var = None
     for i, stmt in enumerate(block.body):
         if is_assign(stmt) and isinstance(stmt.value, ir.Arg):
             arr_var = stmt.target
+            arr_typ = typemap[arr_var.name]
+            # string arrays don't have shape generated by array analysis
+            if arr_typ == string_array_type:
+                block_body += block.body[i+1:]
+                break
+            assert isinstance(arr_typ, types.Array), "array type expected"
             # XXX assuming shape/size nodes are right after arg
             shape_nd = block.body[i+1]
             assert (is_assign(shape_nd) and isinstance(shape_nd.value, ir.Expr)

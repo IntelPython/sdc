@@ -1196,6 +1196,17 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(set(res[1]), set(h_res[1]))
         np.testing.assert_array_equal(res[0], h_res[0])
 
+    def test_agg_seq_str(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].agg(lambda x: (x=='aa').sum())
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': ['aa','b','b','b','aa','aa','b'],
+                           'B': ['ccc','a','bb','aa','dd','ggg','rr']})
+        # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
     def test_itertuples(self):
         def test_impl(df):
             res = 0.0

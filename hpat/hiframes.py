@@ -1478,7 +1478,9 @@ class HiFrames(object):
         # find input vars and output types
         out_types = {}
         in_vars = {}
-        agg_func_dis = numba.njit(agg_func)
+        # hpat.jit() instead of numba.njit() to handle str arrs etc
+        agg_func_dis = hpat.jit(agg_func)
+        #agg_func_dis = numba.njit(agg_func)
         agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         for out_cname in out_colnames:
