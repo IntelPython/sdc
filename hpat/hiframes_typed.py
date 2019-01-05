@@ -415,6 +415,10 @@ class HiFramesTyped(object):
                     return self._run_call_series_rolling(
                         assign, assign.target, rhs, func_mod, func_name)
 
+                # handle sorted() with key lambda input
+                if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
+                    return self._handle_sorted_by_key(rhs)
+
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
@@ -1476,6 +1480,36 @@ class HiFramesTyped(object):
         replace_arg_nodes(f_block, [dset, arr])
         nodes = f_block.body[:-3]  # remove none return
         return nodes
+
+    def _handle_sorted_by_key(self, rhs):
+        """generate a sort function with the given key lambda
+        """
+        # TODO: handle reverse
+        from numba.targets import quicksort
+        # get key lambda
+        key_lambda_var = dict(rhs.kws)['key']
+        key_lambda = guard(
+            get_definition, self.func_ir, key_lambda_var)
+        if key_lambda is None or not (
+                isinstance(key_lambda, ir.Expr)
+                and key_lambda.op == 'make_function'):
+            raise ValueError("sorted(): lambda for key not found")
+
+        # wrap lambda in function
+        def key_lambda_wrapper(A):
+            return A
+        key_lambda_wrapper.__code__ = key_lambda.code
+        key_func = numba.njit(key_lambda_wrapper)
+
+        # make quicksort with new lt
+        def lt(a, b):
+            return key_func(a) < key_func(b)
+        sort_func = quicksort.make_jit_quicksort(
+            lt=lt).run_quicksort
+
+        return self._replace_func(
+            lambda a: _sort_func(a), rhs.args,
+            extra_globals={'_sort_func': numba.njit(sort_func)})
 
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)

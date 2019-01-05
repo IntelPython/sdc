@@ -10,7 +10,7 @@ from numba.ir_utils import require, mk_unique_var
 from numba import types
 import numba.array_analysis
 from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
@@ -1215,6 +1215,20 @@ def np_array_array_overload(in_tp):
                 i += 1
             return arr
         return f
+
+# taken from numba/typing/listdecl.py
+@infer_global(sorted)
+class SortedBuiltinLambda(CallableTemplate):
+
+    def generic(self):
+        # TODO: reverse=None
+        def typer(iterable, key=None):
+            if not isinstance(iterable, types.IterableType):
+                return
+            return types.List(iterable.iterator_type.yield_type)
+
+        return typer
+
 
 class DataFrameTupleIterator(types.SimpleIteratorType):
     """
