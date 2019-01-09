@@ -201,6 +201,24 @@ def get_data_ptr(typingctx, str_arr_typ=None):
     return data_ctypes_type(string_array_type), codegen
 
 @intrinsic
+def get_data_ptr_ind(typingctx, str_arr_typ, int_t=None):
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+
+        string_array = context.make_helper(
+            builder, string_array_type, in_str_arr)
+        # Create new ArrayCType structure
+        # TODO: put offset/data in main structure since immutable
+        ctinfo = context.make_helper(builder, data_ctypes_type)
+        ctinfo.data = builder.gep(string_array.data, [ind])
+        ctinfo.meminfo = string_array.meminfo
+        res = ctinfo._getvalue()
+        return impl_ret_borrowed(context, builder, data_ctypes_type, res)
+
+    return data_ctypes_type(string_array_type, types.intp), codegen
+
+@intrinsic
 def getitem_str_offset(typingctx, str_arr_typ, ind_t=None):
     def codegen(context, builder, sig, args):
         in_str_arr, ind = args
@@ -920,31 +938,61 @@ def lower_is_na(context, builder, bull_bitmap, ind):
     return builder.call(fn_getitem, [bull_bitmap,
                                      ind])
 
+
+@intrinsic
+def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
+    def codegen(context, builder, sig, args):
+        dst, src, count, itemsize = args
+        # buff_arr = context.make_array(sig.args[0])(context, builder, buff_arr)
+        # ptr = builder.gep(buff_arr.data, [ind])
+        cgutils.raw_memcpy(builder, dst, src, count, itemsize)
+        return context.get_dummy_value()
+
+    return types.void(types.voidptr, types.voidptr, types.intp, types.intp), codegen
+
+
+# TODO: use overload
 @lower_builtin(operator.getitem, StringArrayType, types.Integer)
+@lower_builtin(operator.getitem, StringArrayType, types.IntegerLiteral)
 def lower_string_arr_getitem(context, builder, sig, args):
-    typ = sig.args[0]
-    ind = args[1]
+    # TODO: support multibyte unicode
+    # TODO: support Null
+    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+    def str_arr_getitem_impl(A, i):
+        start_offset = getitem_str_offset(A, i)
+        end_offset = getitem_str_offset(A, i + 1)
+        length = end_offset - start_offset
+        ret = numba.unicode._empty_string(kind, length)
+        ptr = get_data_ptr_ind(A, start_offset)
+        _memcpy(ret._data, ptr, length, 1)
+        return ret
 
-    string_array = context.make_helper(builder, typ, args[0])
+    res = context.compile_internal(builder, str_arr_getitem_impl, sig, args)
+    return res
 
-    # check for NA
-    # i/8, XXX: lshr since always positive
-    #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
-    #bit_ind = builder.srem
+    # typ = sig.args[0]
+    # ind = args[1]
 
-    # cgutils.printf(builder, "calling bitmap\n")
-    # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
-    #     cgutils.printf(builder, "is_na %d \n", ind)
-    # cgutils.printf(builder, "calling bitmap done\n")
+    # string_array = context.make_helper(builder, typ, args[0])
 
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(32).as_pointer(),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(64)])
-    fn_getitem = builder.module.get_or_insert_function(fnty,
-                                                       name="getitem_string_array_std")
-    return builder.call(fn_getitem, [string_array.offsets,
-                                     string_array.data, args[1]])
+    # # check for NA
+    # # i/8, XXX: lshr since always positive
+    # #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+    # #bit_ind = builder.srem
+
+    # # cgutils.printf(builder, "calling bitmap\n")
+    # # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
+    # #     cgutils.printf(builder, "is_na %d \n", ind)
+    # # cgutils.printf(builder, "calling bitmap done\n")
+
+    # fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+    #                         [lir.IntType(32).as_pointer(),
+    #                          lir.IntType(8).as_pointer(),
+    #                          lir.IntType(64)])
+    # fn_getitem = builder.module.get_or_insert_function(fnty,
+    #                                                    name="getitem_string_array_std")
+    # return builder.call(fn_getitem, [string_array.offsets,
+    #                                  string_array.data, args[1]])
 
 
 @lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
