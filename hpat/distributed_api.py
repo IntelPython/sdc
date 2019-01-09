@@ -6,7 +6,7 @@ from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
 import hpat
 from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
-                              pre_alloc_string_array, del_str, get_offset_ptr,
+                              pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map,
     unliteral_all)
@@ -151,7 +151,6 @@ def gatherv_overload(data_t):
             for i in range(n_loc):
                 _str = data[i]
                 send_arr_lens[i] = len(_str)
-                del_str(_str)
 
             recv_counts = gather_scalar(np.int32(n_loc))
             recv_counts_char = gather_scalar(np.int32(n_all_chars))
@@ -217,7 +216,6 @@ def bcast_overload(data_t):
                 for i in range(n_loc):
                     _str = data[i]
                     send_arr_lens[i] = len(_str)
-                    del_str(_str)
 
                 c_bcast(send_arr_lens.ctypes, np.int32(n_loc), int32_typ_enum)
             else:

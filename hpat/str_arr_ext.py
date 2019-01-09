@@ -10,7 +10,7 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
-from hpat.str_ext import string_type, del_str
+from hpat.str_ext import string_type
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 import llvmlite.llvmpy.core as lc
 from glob import glob
@@ -356,7 +356,6 @@ def cp_str_list_to_array_overload(arr_typ, list_typ):
             for i in range(n):
                 _str = str_list[i]
                 setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
-                del_str(_str)
 
         return cp_str_list_impl
 
@@ -392,7 +391,6 @@ def str_list_to_array_overload(list_typ):
             for i in range(n):
                 _str = str_list[i]
                 setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
-                del_str(_str)  # XXX assuming str list is not used anymore
             return str_arr
 
         return str_list_impl
@@ -963,7 +961,6 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
                 str = str_arr[i]
                 n_strs += 1
                 n_chars += len(str)
-                del_str(str)
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
         for i in range(n):
@@ -971,7 +968,6 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
                 str = str_arr[i]
                 setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), str, str_ind)
                 str_ind += 1
-                del_str(str)
         return out_arr
     res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
     return res
@@ -989,7 +985,6 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
             _str = str_arr[ind_arr[i]]
             n_strs += 1
             n_chars += len(_str)
-            del_str(_str)
 
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
@@ -997,7 +992,6 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
             _str = str_arr[ind_arr[i]]
             setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), _str, str_ind)
             str_ind += 1
-            del_str(_str)
         return out_arr
     res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
     return res

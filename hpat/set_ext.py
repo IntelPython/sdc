@@ -95,7 +95,6 @@ def _build_str_set_impl(A):
     for i in range(n):
         str = str_arr[i]
         str_set.add(str)
-        hpat.str_ext.del_str(str)
     return str_set
 
 # TODO: remove since probably unused

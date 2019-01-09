@@ -345,7 +345,6 @@ def set_recv_counts_chars(key_arr):
         str = key_arr[i]
         node_id = hash(str) % n_pes
         send_counts[node_id] += len(str)
-        hpat.str_ext.del_str(str)
     hpat.distributed_api.alltoall(send_counts, recv_counts, 1)
     return send_counts, recv_counts
 

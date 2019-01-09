@@ -20,7 +20,7 @@ from hpat.utils import (debug_prints, empty_like_type, get_ctypes_ptr,
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
-                              pre_alloc_string_array, del_str, num_total_chars)
+                              pre_alloc_string_array, num_total_chars)
 from hpat.str_ext import string_type
 MIN_SAMPLES = 1000000
 #MIN_SAMPLES = 100
