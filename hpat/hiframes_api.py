@@ -18,7 +18,7 @@ from numba.targets.arrayobj import _getitem_array1d
 from numba.targets.boxing import box_array, unbox_array
 import llvmlite.llvmpy.core as lc
 
-from hpat.str_ext import StringType, string_type
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
     unbox_str_series, is_str_arr_typ, box_str_arr)
 
@@ -1069,7 +1069,7 @@ class FixDfArrayType(AbstractTemplate):
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
             ret_typ = types.Array(column.dtype, 1, 'C')
-        if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+        if isinstance(column, types.List) and column.dtype == string_type:
             ret_typ = string_array_type
         # TODO: add other types
         return signature(ret_typ, column)
@@ -1091,7 +1091,7 @@ def fix_df_array_overload(column):
         return fix_df_array_list_impl
 
     # convert list of strings to string array
-    if isinstance(column, types.List) and isinstance(column.dtype, StringType):
+    if isinstance(column, types.List) and column.dtype == string_type:
         def fix_df_array_str_impl(column):  # pragma: no cover
             return StringArray(column)
         return fix_df_array_str_impl

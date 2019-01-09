@@ -24,7 +24,7 @@ ll.add_symbol('populate_str_arr_from_set', hset_ext.populate_str_arr_from_set)
 
 import hpat
 from hpat.utils import to_array
-from hpat.str_ext import StringType, string_type
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
                               pre_alloc_string_array, StringArrayPayloadType,
                               is_str_arr_typ)

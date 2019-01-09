@@ -23,16 +23,24 @@ ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
 ll.add_symbol('del_str', hstr_ext.del_str)
 ll.add_symbol('_hash_str', hstr_ext.hash_str)
 
+
+string_type = types.unicode_type
+
+
+
+
+
 class StringType(types.Opaque, types.Hashable):
     def __init__(self):
         super(StringType, self).__init__(name='StringType')
 
-string_type = StringType()
 
+# XXX enabling this turns on old std::string implementation
+# string_type = StringType()
 
-@typeof_impl.register(str)
-def _typeof_str(val, c):
-    return string_type
+# @typeof_impl.register(str)
+# def _typeof_str(val, c):
+#     return string_type
 
 
 register_model(StringType)(models.OpaqueModel)
@@ -187,11 +195,11 @@ class StringAttribute(AttributeTemplate):
 #             return signature(args[0], *args)
 
 
-@infer_global(len)
-class LenStringArray(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args) == 1 and args[0] == string_type:
-            return signature(types.intp, *args)
+# @infer_global(len)
+# class LenStringArray(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args) == 1 and args[0] == string_type:
+#             return signature(types.intp, *args)
 
 
 @infer_global(int)
@@ -505,12 +513,12 @@ def cast_str_to_float64(context, builder, fromty, toty, val):
     return builder.call(fn, (val,))
 
 
-@lower_builtin(len, StringType)
-def len_string(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(64),
-                            [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
-    return (builder.call(fn, args))
+# @lower_builtin(len, StringType)
+# def len_string(context, builder, sig, args):
+#     fnty = lir.FunctionType(lir.IntType(64),
+#                             [lir.IntType(8).as_pointer()])
+#     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
+#     return (builder.call(fn, args))
 
 
 @lower_builtin(compile_regex, string_type)
