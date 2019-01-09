@@ -19,7 +19,7 @@ from hpat.hiframes_sort import (
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
-                              pre_alloc_string_array, del_str, num_total_chars,
+                              pre_alloc_string_array, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice,
                               setitem_string_array, str_copy_ptr,
                               setitem_str_offset, str_arr_set_na)
@@ -596,7 +596,6 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
             func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id] + meta.tmp_offset_char_tup[{}][node_id]\n".format(i, n_str, n_str)
             func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}.c_str(), n_chars_{})\n".format(n_str, i, i, i)
             func_text += "  meta.tmp_offset_char_tup[{}][node_id] += n_chars_{}\n".format(n_str, i)
-            # func_text += "  del_str(val_{})\n".format(i)
             n_str += 1
 
     func_text += "  return w_ind\n"
@@ -604,7 +603,7 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
     # print(func_text)
 
     loc_vars = {}
-    exec(func_text, {'del_str': del_str, 'str_copy_ptr': str_copy_ptr}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
 
@@ -635,7 +634,6 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
 #         indc = shuffle_meta.send_disp_char[node_id] + shuffle_meta.tmp_offset_char[node_id]
 #         str_copy_ptr(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
 #         shuffle_meta.tmp_offset_char[node_id] += n_chars
-#         #del_str(val)
 #         return ind
 
 #     return write_str_impl
@@ -660,11 +658,10 @@ def write_data_send_buff_overload(meta_t, node_id_t, ind_t, data_t, key_meta_t):
             func_text += "  indc_{} = meta_tup[{}].send_disp_char[node_id] + meta_tup[{}].tmp_offset_char[node_id]\n".format(i, i, i)
             func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{}, val_{}.c_str(), n_chars_{})\n".format(i, i, i, i)
             func_text += "  meta_tup[{}].tmp_offset_char[node_id] += n_chars_{}\n".format(i, i)
-            func_text += "  del_str(val_{})\n".format(i)
 
     func_text += "  return\n"
     loc_vars = {}
-    exec(func_text, {'del_str': del_str, 'str_copy_ptr': str_copy_ptr}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
 
