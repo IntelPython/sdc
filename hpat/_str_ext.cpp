@@ -54,8 +54,8 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
 void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitmap,
     int64_t num_strings, int64_t total_size);
 
-void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
-                                                                int64_t index);
+void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index);
+
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
                             uint32_t *in_offsets, char *in_data,
                             int64_t start_str_ind, int64_t start_chars_ind,
@@ -322,17 +322,16 @@ void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitma
     return;
 }
 
-void setitem_string_array(uint32_t *offsets, char *data, std::string* str,
-                                                                int64_t index)
+void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index)
 {
     // std::cout << "setitem str: " << *str << " " << index << std::endl;
     if (index==0)
         offsets[index] = 0;
     uint32_t start = offsets[index];
-    uint32_t len = str->length();
     // std::cout << "start " << start << " len " << len << std::endl;
-    memcpy(&data[start], str->c_str(), len);
-    offsets[index+1] = start+len;
+    memcpy(&data[start], str, len);
+    assert(len < std::numeric_limits<uint32_t>::max());
+    offsets[index+1] = start+ (uint32_t)len;
     return;
 }
 

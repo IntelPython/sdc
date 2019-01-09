@@ -27,7 +27,7 @@
 
 // we need a few typedefs to make our macro factory work
 // It requires types to end with '_t'
-typedef std::string StringType_t;
+typedef std::string unicode_type_t;
 typedef bool bool_t;
 typedef int int_t;
 typedef float float32_t;
@@ -394,7 +394,7 @@ void multimap_int64_it_inc(multimap_int64_it_t *r)
                                           bool,               \
                                           float32,            \
                                           float64,            \
-                                          StringType))
+                                          unicode_type))
 
 // Bring our generic dict to life
 DEF_DICT(byte_vec, int64);
