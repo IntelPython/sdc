@@ -69,7 +69,7 @@ def init_set_overload():
     return lambda: _init_set_string()
 
 add_set_string = types.ExternalFunction("insert_set_string",
-                                    types.void(set_string_type, string_type))
+                                    types.void(set_string_type, types.voidptr))
 
 len_set_string = types.ExternalFunction("len_set_string",
                                     types.intp(set_string_type))
@@ -109,7 +109,7 @@ def set_add_overload(set_obj_typ, item_typ):
     # TODO: expand to other set types
     assert set_obj_typ == set_string_type and item_typ == string_type
     def add_impl(set_obj, item):
-        return add_set_string(set_obj, item)
+        return add_set_string(set_obj, item._data)
     return add_impl
 
 @overload(len)
@@ -239,7 +239,21 @@ def iternext_setiter(context, builder, sig, args, result):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                     [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_nextval_string")
+    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+
+    def std_str_to_unicode(std_str):
+        length = hpat.str_ext.get_std_str_len(std_str)
+        ret = numba.unicode._empty_string(kind, length)
+        hpat.str_arr_ext._memcpy(
+            ret._data, hpat.str_ext.get_c_str(std_str), length, 1)
+        hpat.str_ext.del_str(std_str)
+        return ret
 
     with builder.if_then(is_valid):
         val = builder.call(fn, [iterobj.itp])
+        val = context.compile_internal(
+            builder,
+            std_str_to_unicode,
+            string_type(hpat.str_ext.std_str_type),
+            [val])
         result.yield_(val)
