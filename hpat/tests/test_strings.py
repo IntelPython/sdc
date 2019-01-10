@@ -162,6 +162,15 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_dict_string(self):
+        def test_impl():
+            s = hpat.dict_ext.dict_unicode_type_unicode_type_init()
+            s['aa'] = 'bb'
+            return s['aa'], ('aa' in s)
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), ('bb', True))
+
 
 if __name__ == "__main__":
     unittest.main()
