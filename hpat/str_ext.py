@@ -20,6 +20,7 @@ def unliteral_all(args):
 import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
+ll.add_symbol('del_str', hstr_ext.del_str)
 ll.add_symbol('_hash_str', hstr_ext.hash_str)
 
 
@@ -33,6 +34,7 @@ class StringType(types.Opaque, types.Hashable):
     def __init__(self):
         super(StringType, self).__init__(name='StringType')
 
+std_str_type = StringType()
 
 # XXX enabling this turns on old std::string implementation
 # string_type = StringType()
@@ -87,8 +89,9 @@ def box_char(typ, val, c):
     # TODO: delete ptr
     return pystr
 
-_hash_str = types.ExternalFunction("_hash_str", types.int64(string_type))
-get_c_str = types.ExternalFunction("get_c_str", types.voidptr(string_type))
+del_str = types.ExternalFunction("del_str", types.void(std_str_type))
+_hash_str = types.ExternalFunction("_hash_str", types.int64(std_str_type))
+get_c_str = types.ExternalFunction("get_c_str", types.voidptr(std_str_type))
 
 @overload_method(StringType, 'c_str')
 def str_c_str(str_typ):
@@ -284,6 +287,9 @@ ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
 ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
 ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
 ll.add_symbol('str_from_float64', hstr_ext.str_from_float64)
+
+get_std_str_len = types.ExternalFunction(
+    "get_str_len", signature(types.intp, std_str_type))
 
 
 @unbox(StringType)

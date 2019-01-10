@@ -151,6 +151,17 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_set_string(self):
+        def test_impl():
+            s = hpat.set_ext.init_set_string()
+            s.add('ff')
+            for v in s:
+                pass
+            return v
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
