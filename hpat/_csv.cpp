@@ -272,7 +272,7 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  * We evenly distribute by number of lines by working on byte-chunks in parallel
  *   * counting new-lines and allreducing and exscaning numbers
  *   * computing start/end points of desired chunks-of-lines and sending them to corresponding ranks.
- * Using hpat_dist_get_size and hpat_dist_get_start to compute chunk start/end/size as well as 
+ * Using hpat_dist_get_size and hpat_dist_get_start to compute chunk start/end/size as well as
  * the final chunking of lines.
  *
  * @param[in]  f   the input stream
@@ -360,12 +360,12 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
 
 
 // taking a file to create a istream and calling csv_chunk_reader
-extern "C" PyObject* csv_file_chunk_reader(const std::string * fname, bool is_parallel)
+extern "C" PyObject* csv_file_chunk_reader(const char * fname, bool is_parallel)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
-    auto fsz = boost::filesystem::file_size(*fname);
-    std::ifstream * f = new std::ifstream(*fname);
+    auto fsz = boost::filesystem::file_size(fname);
+    std::ifstream * f = new std::ifstream(fname);
     CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
     return csv_chunk_reader(f, fsz, is_parallel);
 }

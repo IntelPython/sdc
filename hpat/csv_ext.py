@@ -267,7 +267,7 @@ def box_stream_reader(typ, val, c):
     return val
 
 csv_file_chunk_reader = types.ExternalFunction(
-    "csv_file_chunk_reader", stream_reader_type(string_type, types.bool_))
+    "csv_file_chunk_reader", stream_reader_type(types.voidptr, types.bool_))
 
 def _get_dtype_str(t):
     dtype = t.dtype
@@ -309,7 +309,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
                           for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
-    func_text += "  f_reader = csv_file_chunk_reader(fname, {})\n".format(
+    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {})\n".format(
                                                                       parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)

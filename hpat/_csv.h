@@ -15,7 +15,7 @@ extern "C" void PyInit_csv(PyObject *);
  * @param[in]  is_parallel   if parallel read of different chunks required
  * @return     HPATIO file-like object to read the owned chunk through pandas.read_csv
  **/
-extern "C" PyObject* csv_file_chunk_reader(const std::string * fname, bool is_parallel);
+extern "C" PyObject* csv_file_chunk_reader(const char * fname, bool is_parallel);
 
 /**
  * Split string into chunks and return a file-like object per rank. The returned object
