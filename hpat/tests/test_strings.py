@@ -2,9 +2,11 @@ import unittest
 import hpat
 import numpy as np
 import pandas as pd
+import glob
 import gc
 import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
+
 
 class TestString(unittest.TestCase):
     def test_pass_return(self):
@@ -140,6 +142,14 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         A = np.array(['AA', 'B'])
         self.assertEqual(hpat_func(A), test_impl(A))
+
+    @unittest.skip("TODO: crashes, llvm ir is invalid?")
+    def test_glob(self):
+        def test_impl():
+            glob.glob("*py")
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":

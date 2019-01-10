@@ -78,8 +78,7 @@ void* str_from_float64(double in);
 bool is_na(const uint8_t* bull_bitmap, int64_t ind);
 void del_str(std::string* in_str);
 int64_t hash_str(std::string* in_str);
-void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
-                                                            std::string* path);
+void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num_strings, char* path);
 
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
@@ -589,14 +588,13 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
 }
 
 // glob support
-void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
-                                                            std::string* path)
+void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num_strings, char* path)
 {
-    // std::cout << "glob: " << *path << std::endl;
+    // std::cout << "glob: " << std::string(path) << std::endl;
     *num_strings = 0;
     #ifndef _WIN32
     glob_t globBuf;
-    int ret = glob(path->c_str(), 0, 0, &globBuf);
+    int ret = glob(path, 0, 0, &globBuf);
 
     if (ret!=0)
     {
@@ -608,6 +606,8 @@ void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
         std::cerr << "glob error" << '\n';
         return;
     }
+
+    // std::cout << "num glob: " << globBuf.gl_pathc << std::endl;
 
     *num_strings = globBuf.gl_pathc;
     *offsets = new uint32_t[globBuf.gl_pathc+1];
@@ -626,11 +626,18 @@ void c_glob(uint32_t **offsets, char **data, int64_t* num_strings,
     {
         strcpy(*data+(*offsets)[i], globBuf.gl_pathv[i]);
     }
+
+    // allocate null bitmap
+    int64_t n_bytes = (*num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t);
+    *null_bitmap = new uint8_t[n_bytes];
+    memset(*null_bitmap, -1, n_bytes);  // set all bits to one for non-null
+
     #else
     // TODO: support glob on Windows
     std::cerr << "no glob support on windows yet" << '\n';
     #endif
 
+    // std::cout << "glob done" << std::endl;
     return;
 }
 

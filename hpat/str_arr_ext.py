@@ -1116,6 +1116,9 @@ class GlobInfer(AbstractTemplate):
 @lower_builtin(glob, string_type)
 def lower_glob(context, builder, sig, args):
     path = args[0]
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=path)
+    path = uni_str.data
     typ = sig.return_type
     dtype = StringArrayPayloadType()
     meminfo, meminfo_data_ptr = construct_string_array(context, builder)
@@ -1126,11 +1129,13 @@ def lower_glob(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64).as_pointer(),
                              lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="c_glob")
     builder.call(fn, [str_arr_payload._get_ptr_by_name('offsets'),
                             str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
                             string_array._get_ptr_by_name('num_items'),
                             path])
 
@@ -1139,10 +1144,11 @@ def lower_glob(context, builder, sig, args):
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
-    # TODO: set null_bitmap
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
+    # cgutils.printf(builder, "n %d\n", string_array.num_items)
     ret = string_array._getvalue()
     #context.nrt.decref(builder, ty, ret)
 
