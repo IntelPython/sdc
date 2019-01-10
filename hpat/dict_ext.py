@@ -8,7 +8,7 @@ from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
 from numba.extending import lower_builtin, overload_method, overload
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
-from hpat.str_ext import string_type
+from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -399,13 +399,23 @@ def impl_dict_int_int(context, builder, sig, args):
 @lower_builtin('setitem', DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
     _, key_typ, val_typ = sig.args
+    dct, key, val = args
     fname = "dict_{}_{}_setitem".format(key_typ, val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+    if val_typ == string_type:
+        val_typ = types.voidptr
+        val = gen_unicode_to_std_str(context, builder, val)
+
     fnty = lir.FunctionType(lir.VoidType(),
         [lir.IntType(8).as_pointer(),
         context.get_value_type(key_typ),
         context.get_value_type(val_typ)])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    return builder.call(fn, [dct, key, val])
 
 
 @lower_builtin("print_item", dict_int_int_type)
@@ -430,11 +440,27 @@ def lower_dict_get(context, builder, sig, args):
 @lower_builtin(operator.getitem, DictType, types.Any)
 def lower_dict_getitem(context, builder, sig, args):
     dict_typ, key_typ = sig.args
-    fnty = lir.FunctionType(context.get_value_type(dict_typ.val_typ),
+    dct, key = args
+    val_typ = dict_typ.val_typ
+
+    fname = "dict_{}_{}_getitem".format(key_typ, val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+    ll_val_typ = context.get_value_type(val_typ)
+    if val_typ == string_type:
+        ll_val_typ = context.get_value_type(types.voidptr)
+
+    fnty = lir.FunctionType(ll_val_typ,
         [lir.IntType(8).as_pointer(), context.get_value_type(key_typ)])
-    fname = "dict_{}_{}_getitem".format(key_typ, dict_typ.val_typ)
+
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    val = builder.call(fn, [dct, key])
+    if val_typ == string_type:
+        val = gen_std_str_to_unicode(context, builder, val)
+    return val
 
 @lower_builtin("dict.pop", DictType, types.intp)
 def lower_dict_pop(context, builder, sig, args):
@@ -468,20 +494,40 @@ def lower_dict_max(context, builder, sig, args):
 @lower_builtin("in", types.Any, DictType)
 def lower_dict_in(context, builder, sig, args):
     key_typ, dict_typ = sig.args
+    key, dct = args
+
     fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, [args[1], args[0]])
+    val = builder.call(fn, [dct, key])
+    if dict_typ.val_typ == string_type:
+        val = gen_std_str_to_unicode(context, builder, val)
+    return val
 
 @lower_builtin(operator.contains, DictType, types.Any)
 def lower_dict_in_op(context, builder, sig, args):
     dict_typ, key_typ = sig.args
+    dct, key = args
+
     fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    return builder.call(fn, [dct, key])
+
 
 @lower_cast(dict_int_int_type, types.boolean)
 def dict_empty(context, builder, fromty, toty, val):
