@@ -31,6 +31,11 @@ class TestIO(unittest.TestCase):
             with open("csv_data_cat1.csv", "w") as f:
                 f.write(data)
 
+            # test_np_io1
+            n = 111
+            A = np.random.ranf(n)
+            A.tofile("np_file1.dat")
+
     def test_h5_read_seq(self):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
@@ -361,6 +366,51 @@ class TestIO(unittest.TestCase):
             return df
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_np_io1(self):
+        def test_impl():
+            A = np.fromfile("np_file1.dat", np.float32)
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+
+    def test_np_io2(self):
+        # parallel version
+        def test_impl():
+            A = np.fromfile("np_file1.dat", np.float32)
+            return A.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_np_io3(self):
+        def test_impl(A):
+            A.tofile("np_file_3.dat")
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        A = np.random.ranf(n)
+        hpat_func(A)
+        B = np.fromfile("np_file_3.dat", np.float64)
+        np.testing.assert_almost_equal(A, B)
+
+
+    def test_np_io4(self):
+        # parallel version
+        def test_impl(n):
+            A = np.arange(n)
+            A.tofile("np_file_3.dat")
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        A = np.arange(n)
+        hpat_func(n)
+        B = np.fromfile("np_file_3.dat", np.int64)
+        np.testing.assert_almost_equal(A, B)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,17 +9,17 @@ from hpat.str_ext import string_type
 from numba.ir_utils import (compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard)
 
-get_file_size = types.ExternalFunction("get_file_size", types.int64(string_type))
+_get_file_size = types.ExternalFunction("get_file_size", types.int64(types.voidptr))
 _file_read = types.ExternalFunction("file_read",
-                types.void(string_type, types.voidptr, types.intp))
+                types.void(types.voidptr, types.voidptr, types.intp))
 _file_read_parallel = types.ExternalFunction("file_read_parallel",
-                types.void(string_type, types.voidptr, types.intp, types.intp))
+                types.void(types.voidptr, types.voidptr, types.intp, types.intp))
 
 file_write = types.ExternalFunction("file_write",
-                types.void(string_type, types.voidptr, types.intp))
+                types.void(types.voidptr, types.voidptr, types.intp))
 
 _file_write_parallel = types.ExternalFunction("file_write_parallel",
-                types.void(string_type, types.voidptr, types.intp, types.intp,
+                types.void(types.voidptr, types.voidptr, types.intp, types.intp,
                 types.intp))
 
 # @overload(np.fromfile)
@@ -62,10 +62,10 @@ def _handle_np_fromfile(assign, lhs, rhs):
     _dtype = rhs.args[1]
 
     def fromfile_impl(fname, dtype):
-        size = get_file_size(fname._data)
+        size = get_file_size(fname)
         dtype_size = get_dtype_size(dtype)
         A = np.empty(size//dtype_size, dtype=dtype)
-        file_read(fname._data, A, size)
+        file_read(fname, A, size)
         read_arr = A
 
     f_block = compile_to_numba_ir(
@@ -78,7 +78,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
 
 
 @intrinsic
-def get_dtype_size(typingctx, dtype):
+def get_dtype_size(typingctx, dtype=None):
     assert isinstance(dtype, types.DTypeSpec)
     def codegen(context, builder, sig, args):
         num_bytes = context.get_abi_sizeof(context.get_data_type(dtype.dtype))
@@ -92,11 +92,12 @@ def tofile_overload(arr_ty, fname_ty):
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
     ll.add_symbol('file_write_parallel', hio.file_write_parallel)
-    if fname_ty == string_type:
+    # TODO: fix Numba to convert literal
+    if fname_ty == string_type or isinstance(fname_ty, types.StringLiteral):
         def tofile_impl(arr, fname):
             A = np.ascontiguousarray(arr)
             dtype_size = get_dtype_size(A.dtype)
-            file_write(fname, A.ctypes, dtype_size * A.size)
+            file_write(fname._data, A.ctypes, dtype_size * A.size)
 
         return tofile_impl
 
@@ -111,21 +112,45 @@ def tofile_overload(arr_ty, fname_ty):
 #         return context.get_dummy_value()
 #     return types.void(arr_ty), codegen
 
-# TODO: fix A.ctype inlined case
-@numba.njit
 def file_write_parallel(fname, arr, start, count):
-    A = np.ascontiguousarray(arr)
-    dtype_size = get_dtype_size(A.dtype)
-    elem_size = dtype_size * hpat.distributed_lower.get_tuple_prod(A.shape[1:])
-    # hpat.cprint(start, count, elem_size)
-    s = _file_write_parallel(fname, A.ctypes,
-                start, count, elem_size)
+    pass
 
-@numba.njit
+# TODO: fix A.ctype inlined case
+@overload(file_write_parallel)
+def file_write_parallel_overload(fname_t, arr, start, count):
+    if fname_t == string_type:  # avoid str literal
+        def _impl(fname, arr, start, count):
+            A = np.ascontiguousarray(arr)
+            dtype_size = get_dtype_size(A.dtype)
+            elem_size = dtype_size * hpat.distributed_lower.get_tuple_prod(A.shape[1:])
+            # hpat.cprint(start, count, elem_size)
+            _file_write_parallel(fname._data, A.ctypes,
+                        start, count, elem_size)
+        return _impl
+
 def file_read_parallel(fname, arr, start, count):
-    dtype_size = get_dtype_size(arr.dtype)
-    _file_read_parallel(fname, arr.ctypes, start*dtype_size, count*dtype_size)
+    return
 
-@numba.njit
+@overload(file_read_parallel)
+def file_read_parallel_overload(fname_t, arr_t, start_t, count_t):
+    if fname_t == string_type:
+        def _impl(fname, arr, start, count):
+            dtype_size = get_dtype_size(arr.dtype)
+            _file_read_parallel(fname._data, arr.ctypes, start*dtype_size, count*dtype_size)
+        return _impl
+
 def file_read(fname, arr, size):
-    _file_read(fname, arr.ctypes, size)
+    return
+
+@overload(file_read)
+def file_read_overload(fname_t, arr, size_t):
+    if fname_t == string_type:
+        return lambda fname, arr, size: _file_read(fname._data, arr.ctypes, size)
+
+def get_file_size(fname):
+    return 0
+
+@overload(get_file_size)
+def get_file_size_overload(fname_t):
+    if fname_t == string_type:
+        return lambda fname: _get_file_size(fname._data)
