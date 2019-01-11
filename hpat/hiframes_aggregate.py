@@ -28,7 +28,7 @@ from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
-                            setitem_string_array, get_offset_ptr, get_data_ptr)
+                              get_offset_ptr, get_data_ptr)
 from hpat.pd_series_ext import SeriesType
 from hpat.hiframes_sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
@@ -929,7 +929,7 @@ def setitem_array_with_str(arr, i, v):  # pragma: no cover
 def setitem_array_with_str_overload(arr_t, ind_t, val_t):
     if arr_t == string_array_type:
         def setitem_str_arr(arr, i, v):
-            setitem_string_array(get_offset_ptr(arr), get_data_ptr(arr), v, i)
+            arr[i] = v
         return setitem_str_arr
 
     # return_key == False case where val could be string resulting in typing
