@@ -838,7 +838,7 @@ convert_datetimestruct_to_datetime = types.ExternalFunction("convert_datetimestr
 
 @numba.njit(locals={'arg1': numba.int32, 'arg3': numba.int32, 'arg4': numba.int32})
 def parse_datetime_str(str):
-    arg0 = hpat.str_ext.getpointer(str)
+    arg0 = hpat.str_ext.unicode_to_char_ptr(str)
     arg1 = len(str)
     arg2 = PANDAS_DATETIMESTRUCT()
     arg3 = np.int32(13)
