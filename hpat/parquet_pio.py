@@ -12,7 +12,7 @@ from numba.typing import signature
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
 import hpat
-from hpat.str_ext import StringType, string_type
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 from hpat.utils import unliteral_all

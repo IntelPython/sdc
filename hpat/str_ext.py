@@ -302,14 +302,15 @@ def gen_unicode_to_std_str(context, builder, unicode_val):
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
     return builder.call(fn, [uni_str.data])
 
-def gen_std_str_to_unicode(context, builder, std_str_val):
+def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
     def std_str_to_unicode(std_str):
         length = hpat.str_ext.get_std_str_len(std_str)
         ret = numba.unicode._empty_string(kind, length)
         hpat.str_arr_ext._memcpy(
             ret._data, hpat.str_ext.get_c_str(std_str), length, 1)
-        #hpat.str_ext.del_str(std_str)
+        if del_str:
+            hpat.str_ext.del_str(std_str)
         return ret
     val = context.compile_internal(
             builder,
@@ -317,6 +318,12 @@ def gen_std_str_to_unicode(context, builder, std_str_val):
             string_type(hpat.str_ext.std_str_type),
             [std_str_val])
     return val
+
+
+def gen_get_unicode_chars(context, builder, unicode_val):
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=unicode_val)
+    return uni_str.data
 
 
 @unbox(StringType)
@@ -418,8 +425,8 @@ def string_from_impl(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(operator.add, string_type, string_type)
-@lower_builtin("+", string_type, string_type)
+@lower_builtin(operator.add, std_str_type, std_str_type)
+@lower_builtin("+", std_str_type, std_str_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])

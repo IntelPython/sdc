@@ -62,10 +62,10 @@ def _handle_np_fromfile(assign, lhs, rhs):
     _dtype = rhs.args[1]
 
     def fromfile_impl(fname, dtype):
-        size = get_file_size(fname)
+        size = get_file_size(fname._data)
         dtype_size = get_dtype_size(dtype)
         A = np.empty(size//dtype_size, dtype=dtype)
-        file_read(fname, A, size)
+        file_read(fname._data, A, size)
         read_arr = A
 
     f_block = compile_to_numba_ir(
