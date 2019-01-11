@@ -157,7 +157,7 @@ class algo_factory(object):
         'double'      : types.float64,
         'float'       : types.float32,
         'bool'        : types.boolean,
-        'std::string&': string_type,
+        'std::string&': string_type,  # TODO: fix and test Numba unicode_type
     }
 
     def from_d4p(self, spec):
