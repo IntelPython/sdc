@@ -231,8 +231,8 @@ class StrConstInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] in [types.int32, types.int64, types.float32, types.float64, std_str_type]
-        return signature(std_str_type, *args)
+        assert args[0] in [types.int32, types.int64, types.float32, types.float64, string_type]
+        return signature(string_type, *args)
 
 
 class RegexType(types.Opaque):
@@ -456,13 +456,14 @@ def const_to_string_type(context, builder, fromty, toty, val):
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):
     in_typ = sig.args[0]
-    if in_typ == std_str_type:
+    if in_typ == string_type:
         return args[0]
     ll_in_typ = context.get_value_type(sig.args[0])
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
     fn = builder.module.get_or_insert_function(
         fnty, name="str_from_" + str(in_typ))
-    return builder.call(fn, args)
+    std_str = builder.call(fn, args)
+    return gen_std_str_to_unicode(context, builder, std_str)
 
 
 @lower_builtin(operator.add, std_str_type, std_str_type)
