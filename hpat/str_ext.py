@@ -124,7 +124,12 @@ def hash_str_lower(context, builder, sig, args):
     return context.compile_internal(
         builder, lambda s: _hash_str(s), sig, args)
 
-
+# XXX: use Numba's hash(str) when available
+@lower_builtin(hash, string_type)
+def hash_unicode_lower(context, builder, sig, args):
+    std_str = gen_unicode_to_std_str(context, builder, args[0])
+    return hash_str_lower(
+        context, builder, signature(sig.return_type, std_str_type), [std_str])
 
 @infer
 @infer_global(operator.add)
