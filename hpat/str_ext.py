@@ -27,7 +27,7 @@ ll.add_symbol('_hash_str', hstr_ext.hash_str)
 string_type = types.unicode_type
 
 
-
+#######################  type for std string pointer  ########################
 
 
 class StringType(types.Opaque, types.Hashable):
@@ -57,9 +57,9 @@ register_model(CharType)(models.IntegerModel)
 
 @overload(operator.getitem)
 def char_getitem_overload(_str, ind):
-    if _str == string_type and isinstance(ind, types.Integer):
+    if _str == std_str_type and isinstance(ind, types.Integer):
         sig = char_type(
-                    string_type,   # string
+                    std_str_type,   # string
                     types.intp,    # index
                     )
         get_char_from_string = types.ExternalFunction("get_char_from_string", sig)
@@ -119,7 +119,7 @@ def str_join(str_typ, iterable_typ):
 #     if str_typ == string_type:
 #         return lambda s: _hash_str(s)
 
-@lower_builtin(hash, string_type)
+@lower_builtin(hash, std_str_type)
 def hash_str_lower(context, builder, sig, args):
     return context.compile_internal(
         builder, lambda s: _hash_str(s), sig, args)
@@ -131,7 +131,7 @@ def hash_str_lower(context, builder, sig, args):
 @infer_global(operator.iadd)
 class StringAdd(ConcreteTemplate):
     key = "+"
-    cases = [signature(string_type, string_type, string_type)]
+    cases = [signature(std_str_type, std_str_type, std_str_type)]
 
 
 @infer
@@ -182,7 +182,7 @@ class StringAttribute(AttributeTemplate):
     def resolve_split(self, dict, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.List(string_type), types.unliteral(args[0]))
+        return signature(types.List(std_str_type), types.unliteral(args[0]))
 
 
 # @infer_global(operator.getitem)
@@ -199,7 +199,7 @@ class StringAttribute(AttributeTemplate):
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):
 #     def generic(self, args, kws):
-#         if not kws and len(args) == 1 and args[0] == string_type:
+#         if not kws and len(args) == 1 and args[0] == std_str_type:
 #             return signature(types.intp, *args)
 
 
@@ -226,8 +226,8 @@ class StrConstInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] in [types.int32, types.int64, types.float32, types.float64, string_type]
-        return signature(string_type, *args)
+        assert args[0] in [types.int32, types.int64, types.float32, types.float64, std_str_type]
+        return signature(std_str_type, *args)
 
 
 class RegexType(types.Opaque):
@@ -427,7 +427,7 @@ def const_to_string_type(context, builder, fromty, toty, val):
 @lower_builtin(str, types.Any)
 def string_from_impl(context, builder, sig, args):
     in_typ = sig.args[0]
-    if in_typ == string_type:
+    if in_typ == std_str_type:
         return args[0]
     ll_in_typ = context.get_value_type(sig.args[0])
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
@@ -445,8 +445,8 @@ def impl_string_concat(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(operator.eq, string_type, string_type)
-@lower_builtin('==', string_type, string_type)
+@lower_builtin(operator.eq, std_str_type, std_str_type)
+@lower_builtin('==', std_str_type, std_str_type)
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -463,16 +463,16 @@ def char_eq_impl(context, builder, sig, args):
     return res
 
 
-@lower_builtin(operator.ne, string_type, string_type)
-@lower_builtin('!=', string_type, string_type)
+@lower_builtin(operator.ne, std_str_type, std_str_type)
+@lower_builtin('!=', std_str_type, std_str_type)
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
 
-@lower_builtin(operator.ge, string_type, string_type)
-@lower_builtin('>=', string_type, string_type)
+@lower_builtin(operator.ge, std_str_type, std_str_type)
+@lower_builtin('>=', std_str_type, std_str_type)
 def string_ge_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -482,8 +482,8 @@ def string_ge_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
     return res
 
-@lower_builtin(operator.gt, string_type, string_type)
-@lower_builtin('>', string_type, string_type)
+@lower_builtin(operator.gt, std_str_type, std_str_type)
+@lower_builtin('>', std_str_type, std_str_type)
 def string_gt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -493,8 +493,8 @@ def string_gt_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
     return res
 
-@lower_builtin(operator.le, string_type, string_type)
-@lower_builtin('<=', string_type, string_type)
+@lower_builtin(operator.le, std_str_type, std_str_type)
+@lower_builtin('<=', std_str_type, std_str_type)
 def string_le_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -504,8 +504,8 @@ def string_le_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
     return res
 
-@lower_builtin(operator.lt, string_type, string_type)
-@lower_builtin('<', string_type, string_type)
+@lower_builtin(operator.lt, std_str_type, std_str_type)
+@lower_builtin('<', std_str_type, std_str_type)
 def string_lt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -516,7 +516,7 @@ def string_lt_impl(context, builder, sig, args):
     return res
 
 
-@lower_builtin("str.split", string_type, string_type)
+@lower_builtin("str.split", std_str_type, std_str_type)
 def string_split_impl(context, builder, sig, args):
     nitems = cgutils.alloca_once(builder, lir.IntType(64))
     # input str, sep, size pointer
@@ -570,7 +570,7 @@ def cast_str_to_float64(context, builder, fromty, toty, val):
 #     return (builder.call(fn, args))
 
 
-@lower_builtin(compile_regex, string_type)
+@lower_builtin(compile_regex, std_str_type)
 def lower_compile_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
@@ -578,7 +578,7 @@ def lower_compile_regex(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(contains_regex, string_type, regex_type)
+@lower_builtin(contains_regex, std_str_type, regex_type)
 def impl_string_contains_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -586,7 +586,7 @@ def impl_string_contains_regex(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(contains_noregex, string_type, string_type)
+@lower_builtin(contains_noregex, std_str_type, std_str_type)
 def impl_string_contains_noregex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
