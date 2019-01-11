@@ -425,8 +425,8 @@ class GetItemStringArray(AbstractTemplate):
         if isinstance(ary, StringArrayType):
             if isinstance(idx, types.SliceType):
                 return signature(string_array_type, *args)
-            elif isinstance(idx, types.Integer):
-                return signature(string_type, *args)
+            # elif isinstance(idx, types.Integer):
+            #     return signature(string_type, *args)
             elif idx == types.Array(types.bool_, 1, 'C'):
                 return signature(string_array_type, *args)
             elif idx == types.Array(types.intp, 1, 'C'):
@@ -952,23 +952,38 @@ def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
 
 
 # TODO: use overload
-@lower_builtin(operator.getitem, StringArrayType, types.Integer)
-@lower_builtin(operator.getitem, StringArrayType, types.IntegerLiteral)
-def lower_string_arr_getitem(context, builder, sig, args):
-    # TODO: support multibyte unicode
-    # TODO: support Null
-    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
-    def str_arr_getitem_impl(A, i):
-        start_offset = getitem_str_offset(A, i)
-        end_offset = getitem_str_offset(A, i + 1)
-        length = end_offset - start_offset
-        ret = numba.unicode._empty_string(kind, length)
-        ptr = get_data_ptr_ind(A, start_offset)
-        _memcpy(ret._data, ptr, length, 1)
-        return ret
+@overload(operator.getitem)
+def str_arr_getitem_int(arr_t, ind_t):
+    if arr_t == string_array_type and isinstance(ind_t, types.Integer):
+        kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+        def str_arr_getitem_impl(A, i):
+            start_offset = getitem_str_offset(A, i)
+            end_offset = getitem_str_offset(A, i + 1)
+            length = end_offset - start_offset
+            ret = numba.unicode._empty_string(kind, length)
+            ptr = get_data_ptr_ind(A, start_offset)
+            _memcpy(ret._data, ptr, length, 1)
+            return ret
 
-    res = context.compile_internal(builder, str_arr_getitem_impl, sig, args)
-    return res
+        return str_arr_getitem_impl
+
+# @lower_builtin(operator.getitem, StringArrayType, types.Integer)
+# @lower_builtin(operator.getitem, StringArrayType, types.IntegerLiteral)
+# def lower_string_arr_getitem(context, builder, sig, args):
+#     # TODO: support multibyte unicode
+#     # TODO: support Null
+#     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+#     def str_arr_getitem_impl(A, i):
+#         start_offset = getitem_str_offset(A, i)
+#         end_offset = getitem_str_offset(A, i + 1)
+#         length = end_offset - start_offset
+#         ret = numba.unicode._empty_string(kind, length)
+#         ptr = get_data_ptr_ind(A, start_offset)
+#         _memcpy(ret._data, ptr, length, 1)
+#         return ret
+
+#     res = context.compile_internal(builder, str_arr_getitem_impl, sig, args)
+#     return res
 
     # typ = sig.args[0]
     # ind = args[1]
