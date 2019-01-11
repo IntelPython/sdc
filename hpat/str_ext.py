@@ -2,7 +2,7 @@ import operator
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
-                             type_callable, overload_method)
+                             type_callable, overload_method, intrinsic)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
@@ -210,6 +210,9 @@ class StrToInt(AbstractTemplate):
         [arg] = args
         if isinstance(arg, StringType):
             return signature(types.intp, arg)
+        # TODO: implement int(str) in Numba
+        if arg == string_type:
+            return signature(types.intp, arg)
 
 
 @infer_global(float)
@@ -219,7 +222,9 @@ class StrToFloat(AbstractTemplate):
         [arg] = args
         if isinstance(arg, StringType):
             return signature(types.float64, arg)
-
+        # TODO: implement int(str) in Numba
+        if arg == string_type:
+            return signature(types.float64, arg)
 
 @infer_global(str)
 class StrConstInfer(AbstractTemplate):
@@ -304,7 +309,7 @@ def gen_unicode_to_std_str(context, builder, unicode_val):
 
 def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
-    def std_str_to_unicode(std_str):
+    def _std_str_to_unicode(std_str):
         length = hpat.str_ext.get_std_str_len(std_str)
         ret = numba.unicode._empty_string(kind, length)
         hpat.str_arr_ext._memcpy(
@@ -314,7 +319,7 @@ def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
         return ret
     val = context.compile_internal(
             builder,
-            std_str_to_unicode,
+            _std_str_to_unicode,
             string_type(hpat.str_ext.std_str_type),
             [std_str_val])
     return val
@@ -335,6 +340,30 @@ def unicode_to_char_ptr_overload(str_t):
     # overload resolves str literal to unicode_type
     if str_t == string_type:
         return lambda a: a._data
+
+
+@intrinsic
+def unicode_to_std_str(typingctx, unicode_t=None):
+    def codegen(context, builder, sig, args):
+        return gen_unicode_to_std_str(context, builder, args[0])
+    return std_str_type(string_type), codegen
+
+@intrinsic
+def str_str_to_unicode(typingctx, unicode_t=None):
+    def codegen(context, builder, sig, args):
+        return gen_std_str_to_unicode(context, builder, args[0], True)
+    return string_type(std_str_type), codegen
+
+# XXX using std_str.split() until Numba can support split()
+@overload_method(types.UnicodeType, 'split')
+def unicode_split_overload(in_str_t, sep_t):
+    if sep_t == string_type or isinstance(sep_t, types.StringLiteral):
+        def _split_impl(in_str, sep):
+            std_str = unicode_to_std_str(in_str)
+            l = std_str.split(unicode_to_std_str(sep))
+            return [str_str_to_unicode(s) for s in l]
+
+        return _split_impl
 
 
 @unbox(StringType)
@@ -554,6 +583,11 @@ def cast_str_to_int64(context, builder, fromty, toty, val):
     fn = builder.module.get_or_insert_function(fnty, name="str_to_int64")
     return builder.call(fn, (val,))
 
+# XXX handle unicode until Numba supports int(str)
+@lower_cast(string_type, types.int64)
+def cast_unicode_str_to_int64(context, builder, fromty, toty, val):
+    std_str = gen_unicode_to_std_str(context, builder, val)
+    return cast_str_to_int64(context, builder, std_str_type, toty, std_str)
 
 @lower_cast(StringType, types.float64)
 def cast_str_to_float64(context, builder, fromty, toty, val):
@@ -561,6 +595,11 @@ def cast_str_to_float64(context, builder, fromty, toty, val):
     fn = builder.module.get_or_insert_function(fnty, name="str_to_float64")
     return builder.call(fn, (val,))
 
+# XXX handle unicode until Numba supports float(str)
+@lower_cast(string_type, types.float64)
+def cast_unicode_str_to_float64(context, builder, fromty, toty, val):
+    std_str = gen_unicode_to_std_str(context, builder, val)
+    return cast_str_to_float64(context, builder, std_str_type, toty, std_str)
 
 # @lower_builtin(len, StringType)
 # def len_string(context, builder, sig, args):
@@ -577,6 +616,11 @@ def lower_compile_regex(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="compile_regex")
     return builder.call(fn, args)
 
+@lower_builtin(compile_regex, string_type)
+def lower_compile_regex_unicode(context, builder, sig, args):
+    val = args[0]
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    return lower_compile_regex(context, builder, sig, [std_val])
 
 @lower_builtin(contains_regex, std_str_type, regex_type)
 def impl_string_contains_regex(context, builder, sig, args):
@@ -584,6 +628,13 @@ def impl_string_contains_regex(context, builder, sig, args):
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
     return builder.call(fn, args)
+
+@lower_builtin(contains_regex, string_type, regex_type)
+def impl_unicode_string_contains_regex(context, builder, sig, args):
+    val, reg = args
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    return impl_string_contains_regex(
+        context, builder, sig, [std_val, reg])
 
 
 @lower_builtin(contains_noregex, std_str_type, std_str_type)
@@ -593,3 +644,11 @@ def impl_string_contains_noregex(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(
         fnty, name="str_contains_noregex")
     return builder.call(fn, args)
+
+@lower_builtin(contains_noregex, string_type, string_type)
+def impl_unicode_string_contains_noregex(context, builder, sig, args):
+    val, pat = args
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    std_pat = gen_unicode_to_std_str(context, builder, pat)
+    return impl_string_contains_noregex(
+        context, builder, sig, [std_val, std_pat])
