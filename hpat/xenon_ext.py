@@ -20,7 +20,7 @@ from numba.targets.arrayobj import make_array
 import numpy as np
 import hpat
 from hpat.utils import get_constant, NOT_CONSTANT
-from hpat.str_ext import string_type, to_char_ptr
+from hpat.str_ext import string_type, unicode_to_char_ptr
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
@@ -197,15 +197,15 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
 
 def gen_init_xenon(address, dset_name):
     # TODO: support non-constant address/dset_name
-    func_text = ('def f():\n  connect_t = xe_connect(to_char_ptr("{}"))\n'.format(address))
-    func_text += '  dset_t = xe_open(connect_t, to_char_ptr("{}"))\n'.format(dset_name)
+    func_text = ('def f():\n  connect_t = xe_connect(unicode_to_char_ptr("{}"))\n'.format(address))
+    func_text += '  dset_t = xe_open(connect_t, unicode_to_char_ptr("{}"))\n'.format(dset_name)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     init_func = loc_vars['f']
     f_block = compile_to_numba_ir(init_func,
                                          {'xe_connect': xe_connect,
-                                         'to_char_ptr': to_char_ptr,
+                                         'unicode_to_char_ptr': unicode_to_char_ptr,
                                          'xe_open': xe_open}).blocks.popitem()[1]
 
     connect_var = None
