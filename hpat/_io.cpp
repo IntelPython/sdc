@@ -23,16 +23,16 @@ hid_t hpat_h5_create_dset(hid_t file_id, char* dset_name, int ndims,
 hid_t hpat_h5_create_group(hid_t file_id, char* group_name);
 int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     int64_t* counts, int64_t is_parallel, void* out, int typ_enum);
-int hpat_h5_get_type_enum(std::string *s);
+int hpat_h5_get_type_enum(char *s);
 hid_t get_h5_typ(int typ_enum);
 int64_t h5g_get_num_objs(hid_t file_id);
 void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind);
 void hpat_h5g_close(hid_t group_id);
-uint64_t get_file_size(std::string* file_name);
-void file_read(std::string* file_name, void* buff, int64_t size);
-void file_write(std::string* file_name, void* buff, int64_t size);
-void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count);
-void file_write_parallel(std::string* file_name, char* buff, int64_t start, int64_t count, int64_t elem_size);
+uint64_t get_file_size(char* file_name);
+void file_read(char* file_name, void* buff, int64_t size);
+void file_write(char* file_name, void* buff, int64_t size);
+void file_read_parallel(char* file_name, char* buff, int64_t start, int64_t count);
+void file_write_parallel(char* file_name, char* buff, int64_t start, int64_t count, int64_t elem_size);
 
 #define ROOT 0
 #define LARGE_DTYPE_SIZE 1024
@@ -324,22 +324,23 @@ hid_t get_h5_typ(int typ_enum)
 //      'f8':5
 //      }
 
-int hpat_h5_get_type_enum(std::string *s)
+// TODO: remove this
+int hpat_h5_get_type_enum(char *s)
 {
     int typ = -1;
-    if ((*s)=="i1")
+    if (strcmp(s, "i1") == 0)
         typ = 0;
-    if ((*s)=="u1")
+    if (strcmp(s, "u1") == 0)
         typ = 1;
-    if ((*s)=="i4")
+    if (strcmp(s, "i4") == 0)
         typ = 2;
-    if ((*s)=="u4")
+    if (strcmp(s, "u4") == 0)
         typ = 3;
-    if ((*s)=="i8")
+    if (strcmp(s, "i8") == 0)
         typ = 4;
-    if ((*s)=="f4")
+    if (strcmp(s, "f4") == 0)
         typ = 5;
-    if ((*s)=="f8")
+    if (strcmp(s, "f8") == 0)
         typ = 6;
 
     return typ;
@@ -476,6 +477,7 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
         (hsize_t)ind, name, size+1, H5P_DEFAULT);
     // printf("g name:%s\n", name);
     std::string *outstr = new std::string(name);
+    delete name;
     // std::cout<<"out: "<<*outstr<<std::endl;
     return outstr;
 }
@@ -485,7 +487,7 @@ void hpat_h5g_close(hid_t group_id)
     herr_t err = H5Gclose(group_id);
 }
 
-uint64_t get_file_size(std::string* file_name)
+uint64_t get_file_size(char* file_name)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -493,11 +495,11 @@ uint64_t get_file_size(std::string* file_name)
 
     if (rank==ROOT)
     {
-        boost::filesystem::path f_path(*file_name);
+        boost::filesystem::path f_path(file_name);
         // TODO: throw FileNotFoundError
         if (!boost::filesystem::exists(f_path))
         {
-            std::cerr << "No such file or directory: " << *file_name << '\n';
+            std::cerr << "No such file or directory: " << file_name << '\n';
             return 0;
         }
         f_size = (uint64_t)boost::filesystem::file_size(f_path);
@@ -506,31 +508,31 @@ uint64_t get_file_size(std::string* file_name)
     return f_size;
 }
 
-void file_read(std::string* file_name, void* buff, int64_t size)
+void file_read(char* file_name, void* buff, int64_t size)
 {
-    FILE* fp = fopen(file_name->c_str(), "rb");
+    FILE* fp = fopen(file_name, "rb");
     size_t ret_code = fread(buff, 1, (size_t)size, fp);
     if (ret_code != (size_t)size)
     {
-        std::cerr << "File read error: " << *file_name << '\n';
+        std::cerr << "File read error: " << file_name << '\n';
     }
     fclose(fp);
     return;
 }
 
-void file_write(std::string* file_name, void* buff, int64_t size)
+void file_write(char* file_name, void* buff, int64_t size)
 {
-    FILE* fp = fopen(file_name->c_str(), "wb");
+    FILE* fp = fopen(file_name, "wb");
     size_t ret_code = fwrite(buff, 1, (size_t)size, fp);
     if (ret_code != (size_t)size)
     {
-        std::cerr << "File write error: " << *file_name << '\n';
+        std::cerr << "File write error: " << file_name << '\n';
     }
     fclose(fp);
     return;
 }
 
-void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64_t count)
+void file_read_parallel(char* file_name, char* buff, int64_t start, int64_t count)
 {
     // printf("MPI READ %lld %lld\n", start, count);
     char err_string[MPI_MAX_ERROR_STRING];
@@ -539,9 +541,9 @@ void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64
     MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     MPI_File fh;
-    int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name->c_str(),
+    int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name,
                              MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
-    if (ierr!=0) std::cerr << "File open error: " << *file_name << '\n';
+    if (ierr!=0) std::cerr << "File open error: " << file_name << '\n';
 
     // work around MPI count limit by using a large dtype
     if (count>=(int64_t)INT_MAX)
@@ -556,7 +558,7 @@ void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64
         if (ierr!=0)
         {
             MPI_Error_class(ierr, &err_class);
-            std::cerr << "File large read error: " << err_class << " " << *file_name << '\n';
+            std::cerr << "File large read error: " << err_class << " " << file_name << '\n';
             MPI_Error_string(ierr, err_string, &err_len);
             printf("Error %s\n", err_string); fflush(stdout);
         }
@@ -573,11 +575,11 @@ void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64
     ierr = MPI_File_read_at_all(fh, (MPI_Offset)start, buff,
                          (int)count, MPI_CHAR, MPI_STATUS_IGNORE);
 
-    // if (ierr!=0) std::cerr << "File read error: " << *file_name << '\n';
+    // if (ierr!=0) std::cerr << "File read error: " << file_name << '\n';
     if (ierr!=0)
     {
         MPI_Error_class(ierr, &err_class);
-        std::cerr << "File read error: " << err_class << " " << *file_name << '\n';
+        std::cerr << "File read error: " << err_class << " " << file_name << '\n';
         MPI_Error_string(ierr, err_string, &err_len);
         printf("Error %s\n", err_string); fflush(stdout);
     }
@@ -587,14 +589,14 @@ void file_read_parallel(std::string* file_name, char* buff, int64_t start, int64
 }
 
 
-void file_write_parallel(std::string* file_name, char* buff, int64_t start, int64_t count, int64_t elem_size)
+void file_write_parallel(char* file_name, char* buff, int64_t start, int64_t count, int64_t elem_size)
 {
-    // std::cout << *file_name;
+    // std::cout << file_name;
     // printf(" MPI WRITE %lld %lld %lld\n", start, count, elem_size);
 
     // TODO: handle large write count
     if (count>=(int64_t)INT_MAX) {
-        std::cerr << "write count too large " << *file_name << '\n';
+        std::cerr << "write count too large " << file_name << '\n';
         return;
     }
 
@@ -604,9 +606,9 @@ void file_write_parallel(std::string* file_name, char* buff, int64_t start, int6
     MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     MPI_File fh;
-    int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name->c_str(),
+    int ierr = MPI_File_open(MPI_COMM_WORLD, (const char*)file_name,
                         MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
-    if (ierr!=0) std::cerr << "File open error (write): " << *file_name << '\n';
+    if (ierr!=0) std::cerr << "File open error (write): " << file_name << '\n';
 
     MPI_Datatype elem_dtype;
     MPI_Type_contiguous(elem_size, MPI_CHAR, &elem_dtype);
@@ -616,11 +618,11 @@ void file_write_parallel(std::string* file_name, char* buff, int64_t start, int6
                          (int)count, elem_dtype, MPI_STATUS_IGNORE);
 
     MPI_Type_free(&elem_dtype);
-    // if (ierr!=0) std::cerr << "File write error: " << *file_name << '\n';
+    // if (ierr!=0) std::cerr << "File write error: " << file_name << '\n';
     if (ierr!=0)
     {
         MPI_Error_class(ierr, &err_class);
-        std::cerr << "File write error: " << err_class << " " << *file_name << '\n';
+        std::cerr << "File write error: " << err_class << " " << file_name << '\n';
         MPI_Error_string(ierr, err_string, &err_len);
         printf("Error %s\n", err_string); fflush(stdout);
     }
