@@ -24,8 +24,8 @@ void read_xenon_col_str_parallel(xe_connection_t xe_connection, xe_dataset_t xe_
                         uint8_t **out_data, uint64_t* xe_typ_enums,
                         uint64_t start, uint64_t count);
 
-xe_connection_t c_xe_connect(std::string* address);
-xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset);
+xe_connection_t c_xe_connect(char* address);
+xe_dataset_t c_xe_open(xe_connection_t xe_connect,  char* dset);
 void c_xe_close(xe_connection_t xe_connect, xe_dataset_t xe_dataset);
 
 inline int16_t get_2byte_val(uint8_t* buf);
@@ -422,18 +422,18 @@ void read_xenon_col_str_parallel(xe_connection_t xe_connection, xe_dataset_t xe_
 
 
 
-xe_connection_t c_xe_connect(std::string* address)
+xe_connection_t c_xe_connect(char* address)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return NULL;}
-    const char* addr = address->c_str();
+    const char* addr = address;
     xe_connection_t xe_connection = xe_connect(addr);
     CHECK(xe_connection, "Fail to connect to Xenon");
     return xe_connection;
 }
 
-xe_dataset_t c_xe_open(xe_connection_t xe_connect,  std::string* dset)
+xe_dataset_t c_xe_open(xe_connection_t xe_connect,  char* dset)
 {
-    const char* dset_name = dset->c_str();
+    const char* dset_name = dset;
 	xe_dataset_t xe_dataset = xe_open(xe_connect, dset_name, 0, 0, XE_O_READONLY);
 	CHECK(xe_dataset, "Fail to open dataset");
     return xe_dataset;
