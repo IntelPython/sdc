@@ -594,7 +594,7 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
             func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
             func_text += "  meta.send_arr_lens_tup[{}][w_ind] = n_chars_{}\n".format(n_str, i)
             func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id] + meta.tmp_offset_char_tup[{}][node_id]\n".format(i, n_str, n_str)
-            func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}.c_str(), n_chars_{})\n".format(n_str, i, i, i)
+            func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}._data, n_chars_{})\n".format(n_str, i, i, i)
             func_text += "  meta.tmp_offset_char_tup[{}][node_id] += n_chars_{}\n".format(n_str, i)
             n_str += 1
 
@@ -632,7 +632,7 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
 #         shuffle_meta.send_arr_lens[ind] = n_chars
 #         # data buff
 #         indc = shuffle_meta.send_disp_char[node_id] + shuffle_meta.tmp_offset_char[node_id]
-#         str_copy_ptr(shuffle_meta.send_arr_chars, indc, val.c_str(), n_chars)
+#         str_copy_ptr(shuffle_meta.send_arr_chars, indc, val._data, n_chars)
 #         shuffle_meta.tmp_offset_char[node_id] += n_chars
 #         return ind
 
@@ -656,7 +656,7 @@ def write_data_send_buff_overload(meta_t, node_id_t, ind_t, data_t, key_meta_t):
             func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
             func_text += "  meta_tup[{}].send_arr_lens[ind_{}] = n_chars_{}\n".format(i, i, i)
             func_text += "  indc_{} = meta_tup[{}].send_disp_char[node_id] + meta_tup[{}].tmp_offset_char[node_id]\n".format(i, i, i)
-            func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{}, val_{}.c_str(), n_chars_{})\n".format(i, i, i, i)
+            func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{}, val_{}._data, n_chars_{})\n".format(i, i, i, i)
             func_text += "  meta_tup[{}].tmp_offset_char[node_id] += n_chars_{}\n".format(i, i)
 
     func_text += "  return\n"

@@ -24,7 +24,7 @@ ll.add_symbol('populate_str_arr_from_set', hset_ext.populate_str_arr_from_set)
 
 import hpat
 from hpat.utils import to_array
-from hpat.str_ext import string_type
+from hpat.str_ext import string_type, gen_unicode_to_std_str
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
                               pre_alloc_string_array, StringArrayPayloadType,
                               is_str_arr_typ)
@@ -93,8 +93,8 @@ def _build_str_set_impl(A):
     str_set = init_set_string()
     n = len(str_arr)
     for i in range(n):
-        str = str_arr[i]
-        str_set.add(str)
+        _str = str_arr[i]
+        str_set.add(_str)
     return str_set
 
 # TODO: remove since probably unused
@@ -157,10 +157,12 @@ def lower_dict_in(context, builder, sig, args):
 
 @lower_builtin(operator.contains, set_string_type, string_type)
 def lower_dict_in_op(context, builder, sig, args):
+    set_str, unicode_str = args
+    std_str = gen_unicode_to_std_str(context, builder, unicode_str)
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                                 lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
-    return builder.call(fn, [args[1], args[0]])
+    return builder.call(fn, [std_str, set_str])
 
 
 @overload(to_array)
