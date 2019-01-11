@@ -21,7 +21,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice,
-                              setitem_string_array, str_copy_ptr,
+                              str_copy_ptr,
                               setitem_str_offset, str_arr_set_na)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
@@ -784,8 +784,7 @@ def copy_elem_buff_overload(arr_t, ind_t, val_t):
     assert arr_t == string_array_type
     def copy_elem_buff_str(arr, ind, val):
         new_arr = ensure_capacity_str(arr, ind+1, len(val))
-        #new_arr[ind] = val
-        setitem_string_array(get_offset_ptr(new_arr), get_data_ptr(new_arr), val, ind)
+        new_arr[ind] = val
         return new_arr
 
     return copy_elem_buff_str
@@ -842,7 +841,7 @@ def setnan_elem_buff_overload(arr_t, ind_t):
         new_arr = ensure_capacity_str(arr, ind+1, 0)
         # TODO: why doesn't setitem_str_offset work
         #setitem_str_offset(arr, ind+1, getitem_str_offset(arr, ind))
-        setitem_string_array(get_offset_ptr(new_arr), get_data_ptr(new_arr), '', ind)
+        new_arr[ind] = ''
         setitem_arr_nan(new_arr, ind)
         #print(getitem_str_offset(arr, ind), getitem_str_offset(arr, ind+1))
         return new_arr
