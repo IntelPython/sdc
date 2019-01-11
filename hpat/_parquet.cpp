@@ -40,7 +40,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader>, int64_t col
 
 #endif  // _MSC_VER
 
-FileReaderVec* get_arrow_readers(std::string* file_name);
+FileReaderVec* get_arrow_readers(char* file_name);
 void del_arrow_readers(FileReaderVec *readers);
 
 PyObject* str_list_to_vec(PyObject* self, PyObject* str_list);
@@ -119,7 +119,7 @@ PyObject* str_list_to_vec(PyObject* self, PyObject* str_list)
     return PyLong_FromVoidPtr((void*) strs_vec);
 }
 
-std::vector<std::string> get_pq_pieces(std::string* file_name)
+std::vector<std::string> get_pq_pieces(char* file_name)
 {
 #define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return std::vector<std::string>();}
 
@@ -131,7 +131,7 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
     PyObject* pq_mod = PyImport_ImportModule("pyarrow.parquet");
 
     // ds = pq.ParquetDataset(file_name)
-    PyObject* ds = PyObject_CallMethod(pq_mod, "ParquetDataset", "s", file_name->c_str());
+    PyObject* ds = PyObject_CallMethod(pq_mod, "ParquetDataset", "s", file_name);
     CHECK(!PyErr_Occurred(), "Python error during Parquet dataset metadata")
     Py_DECREF(pq_mod);
 
@@ -169,7 +169,7 @@ std::vector<std::string> get_pq_pieces(std::string* file_name)
 }
 
 
-FileReaderVec* get_arrow_readers(std::string* file_name)
+FileReaderVec* get_arrow_readers(char* file_name)
 {
     FileReaderVec *readers = new FileReaderVec();
 

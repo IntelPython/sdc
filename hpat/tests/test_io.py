@@ -397,7 +397,6 @@ class TestIO(unittest.TestCase):
         B = np.fromfile("np_file_3.dat", np.float64)
         np.testing.assert_almost_equal(A, B)
 
-
     def test_np_io4(self):
         # parallel version
         def test_impl(n):

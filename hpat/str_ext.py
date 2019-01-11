@@ -326,6 +326,17 @@ def gen_get_unicode_chars(context, builder, unicode_val):
     return uni_str.data
 
 
+def to_char_ptr(in_str):
+    return in_str
+
+@overload(to_char_ptr)
+def to_char_ptr_overload(str_t):
+    # str._data is not safe since str might be literal
+    # overload resolves str literal to unicode_type
+    if str_t == string_type:
+        return lambda a: a._data
+
+
 @unbox(StringType)
 def unbox_string(typ, obj, c):
     """
