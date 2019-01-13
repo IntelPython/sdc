@@ -862,7 +862,15 @@ class GetItemSeries(AbstractTemplate):
 
         # TODO: dt_index
         if in_arr == string_array_type:
-            sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
+            # XXX fails due in overload
+            # compile_internal version results in symbol not found!
+            # sig = self.context.resolve_function_type(
+            #     operator.getitem, (in_arr, in_idx), kws)
+            # HACK to get avoid issues for now
+            if isinstance(in_idx, (types.Integer, types.IntegerLiteral)):
+                sig = string_type(in_arr, in_idx)
+            else:
+                sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
         else:
             out = get_array_index_type(in_arr, in_idx)
             sig = signature(out.result, in_arr, out.index)
