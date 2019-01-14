@@ -369,7 +369,7 @@ class TestIO(unittest.TestCase):
 
     def test_np_io1(self):
         def test_impl():
-            A = np.fromfile("np_file1.dat", np.float32)
+            A = np.fromfile("np_file1.dat", np.float64)
             return A
 
         hpat_func = hpat.jit(test_impl)
@@ -378,7 +378,7 @@ class TestIO(unittest.TestCase):
     def test_np_io2(self):
         # parallel version
         def test_impl():
-            A = np.fromfile("np_file1.dat", np.float32)
+            A = np.fromfile("np_file1.dat", np.float64)
             return A.sum()
 
         hpat_func = hpat.jit(test_impl)
