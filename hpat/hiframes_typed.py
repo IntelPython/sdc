@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 import operator
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 from collections import namedtuple
@@ -21,8 +22,9 @@ import hpat
 from hpat import hiframes_sort
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
     is_whole_slice)
-from hpat.str_ext import string_type
-from hpat.str_arr_ext import string_array_type, StringArrayType, is_str_arr_typ
+from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
+from hpat.str_arr_ext import (string_array_type, StringArrayType,
+    is_str_arr_typ, pre_alloc_string_array)
 from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
@@ -1191,9 +1193,12 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, arr, func_name, rhs):
 
-        if func_name not in ('len',):
+        if func_name not in ('len', 'replace'):
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
+
+        if func_name == 'replace':
+            return self._run_series_str_replace(assign, lhs, arr, rhs)
 
         if func_name == 'len':
             out_typ = 'np.int64'
@@ -1213,6 +1218,27 @@ class HiFramesTyped(object):
         f = loc_vars['f']
 
         return self._replace_func(f, [arr])
+
+    def _run_series_str_replace(self, assign, lhs, arr, rhs):
+        regex = True
+        # TODO: refactor arg parsing
+        kws = dict(rhs.kws)
+        if 'regex' in kws:
+            regex = guard(find_const, self.func_ir, kws['regex'])
+            if regex is None:
+                raise ValueError(
+                    "str.replace regex argument should be constant")
+
+        impl = _str_replace_regex_impl if regex else _str_replace_noregex_impl
+
+        return self._replace_func(
+            impl,
+            [arr, rhs.args[0], rhs.args[1]],
+            extra_globals={'unicode_to_std_str': unicode_to_std_str,
+                            'std_str_to_unicode': std_str_to_unicode,
+                            'pre_alloc_string_array': pre_alloc_string_array}
+        )
+
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':
@@ -1911,7 +1937,50 @@ def _series_astype_str_impl(arr):
         A[i] = str(s)  # TODO: check NA
     return A
 
-from collections import defaultdict
+
+# TODO: refactor regex and noregex
+def _str_replace_regex_impl(str_arr, pat, val):
+    numba.parfor.init_prange()
+    e = hpat.str_ext.compile_regex(unicode_to_std_str(pat))
+    val = unicode_to_std_str(val)
+    n = len(str_arr)
+    n_total_chars = 0
+    str_list = hpat.str_ext.alloc_str_list(n)
+    for i in numba.parfor.internal_prange(n):
+        in_str = unicode_to_std_str(str_arr[i])
+        out_str = std_str_to_unicode(
+            hpat.str_ext.str_replace_regex(in_str, e, val))
+        str_list[i] = out_str
+        n_total_chars += len(out_str)
+    numba.parfor.init_prange()
+    out_arr = pre_alloc_string_array(n, n_total_chars)
+    for i in numba.parfor.internal_prange(n):
+        _str = str_list[i]
+        out_arr[i] = _str
+    return out_arr
+
+
+def _str_replace_noregex_impl(str_arr, pat, val):
+    numba.parfor.init_prange()
+    e = unicode_to_std_str(pat)
+    val = unicode_to_std_str(val)
+    n = len(str_arr)
+    n_total_chars = 0
+    str_list = hpat.str_ext.alloc_str_list(n)
+    for i in numba.parfor.internal_prange(n):
+        in_str = unicode_to_std_str(str_arr[i])
+        out_str = std_str_to_unicode(
+            hpat.str_ext.str_replace_noregex(in_str, e, val))
+        str_list[i] = out_str
+        n_total_chars += len(out_str)
+    numba.parfor.init_prange()
+    out_arr = pre_alloc_string_array(n, n_total_chars)
+    for i in numba.parfor.internal_prange(n):
+        _str = str_list[i]
+        out_arr[i] = _str
+    return out_arr
+
+
 @numba.njit
 def lt_f(a, b):
     return a < b
