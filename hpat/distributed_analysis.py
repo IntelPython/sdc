@@ -238,7 +238,7 @@ class DistributedAnalysis(object):
                 return
             warnings.warn(
                 "function call couldn't be found for distributed analysis")
-            self._analyze_call_set_REP(lhs, args, array_dists)
+            self._analyze_call_set_REP(lhs, args, array_dists, fdef)
             return
         else:
             func_name, func_mod = fdef
@@ -392,7 +392,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, fdef)
 
 
     def _analyze_call_d4p(self, lhs, func_name, mod_name, args, array_dists):
@@ -472,7 +472,7 @@ class DistributedAnalysis(object):
         if func_name == 'stack':
             seq_info = guard(find_build_sequence, self.func_ir, args[0])
             if seq_info is None:
-                self._analyze_call_set_REP(lhs, args, array_dists)
+                self._analyze_call_set_REP(lhs, args, array_dists, 'np.' + func_name)
                 return
             in_arrs, _ = seq_info
 
@@ -496,7 +496,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'np.' + func_name)
 
 
     def _analyze_call_array(self, lhs, arr, func_name, args, array_dists):
@@ -521,7 +521,7 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, in_arr_name, array_dists)
             # TODO: support 1D_Var reshape
             if func_name == 'reshape' and array_dists[lhs] == Distribution.OneD_Var:
-                self._analyze_call_set_REP(lhs, args, array_dists)
+                self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
             return
 
         # Array.tofile() is supported for all distributions
@@ -529,7 +529,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
 
 
     def _analyze_call_hpat_dist(self, lhs, func_name, args, array_dists):
@@ -574,7 +574,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'hpat.distributed_api.' + func_name)
 
     def _analyze_call_np_concatenate(self, lhs, args, array_dists):
         assert len(args) == 1
@@ -651,17 +651,17 @@ class DistributedAnalysis(object):
             return
 
         # set REP if no pattern matched
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'np.dot')
 
-    def _analyze_call_set_REP(self, lhs, args, array_dists):
+    def _analyze_call_set_REP(self, lhs, args, array_dists, fdef=None):
         for v in args:
             if (is_array(self.typemap, v.name)
                     or is_array_container(self.typemap, v.name)):
-                dprint("dist setting call arg REP {}".format(v.name))
+                dprint("dist setting call arg REP {} in {}".format(v.name, fdef))
                 array_dists[v.name] = Distribution.REP
         if (is_array(self.typemap, lhs)
                 or is_array_container(self.typemap, lhs)):
-            dprint("dist setting call out REP {}".format(lhs))
+            dprint("dist setting call out REP {} in {}".format(lhs, fdef))
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
