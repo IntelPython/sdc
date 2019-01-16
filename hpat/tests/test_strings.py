@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 import glob
 import gc
+import re
 import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
+from hpat.str_ext import unicode_to_std_str, std_str_to_unicode
 
 
 class TestString(unittest.TestCase):
@@ -88,6 +90,37 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func('What does the fox say', r'd.*(the |fox ){2}'), True)
         self.assertEqual(hpat_func('What does the fox say', r'[kz]u*'), False)
+
+
+    def test_replace_regex(self):
+        def test_impl(_str, pat, val):
+            s = unicode_to_std_str(_str)
+            e = hpat.str_ext.compile_regex(unicode_to_std_str(pat))
+            val = unicode_to_std_str(val)
+            out = hpat.str_ext.str_replace_regex(s, e, val)
+            return std_str_to_unicode(out)
+
+        _str = 'What does the fox say'
+        pat = r'd.*(the |fox ){2}'
+        val = 'does the cat '
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(_str, pat, val),
+            _str.replace(re.compile(pat).search(_str).group(), val))
+
+    def test_replace_noregex(self):
+        def test_impl(_str, pat, val):
+            s = unicode_to_std_str(_str)
+            e = unicode_to_std_str(pat)
+            val = unicode_to_std_str(val)
+            out = hpat.str_ext.str_replace_noregex(s, e, val)
+            return std_str_to_unicode(out)
+
+        _str = 'What does the fox say'
+        pat = 'does the fox'
+        val = 'does the cat'
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(_str, pat, val),
+            _str.replace(pat, val))
 
 
     # string array tests
