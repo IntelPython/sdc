@@ -379,6 +379,18 @@ def unicode_split_overload(in_str_t, sep_t):
         return _split_impl
 
 
+@intrinsic
+def alloc_str_list(typingctx, n_t=None):
+    def codegen(context, builder, sig, args):
+        nitems = args[0]
+        list_type = types.List(string_type)
+        l = numba.targets.listobj.ListInstance.allocate(
+            context, builder, list_type, nitems)
+        l.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, l.value)
+    return types.List(string_type)(types.intp), codegen
+
+
 @unbox(StringType)
 def unbox_string(typ, obj, c):
     """

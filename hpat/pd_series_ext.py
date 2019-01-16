@@ -664,6 +664,10 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_len(self, ary, args, kws):
         return signature(SeriesType(types.int64, 1, 'C'), *args)
 
+    @bound_function("strmethod.replace")
+    def resolve_replace(self, ary, args, kws):
+        return signature(SeriesType(string_type, 1, 'C'), *args)
+
 
 class SeriesDtMethodType(types.Type):
     def __init__(self):
