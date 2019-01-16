@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
-
+#include <boost/algorithm/string/replace.hpp>
 
 #ifdef USE_BOOST_REGEX
 #include <boost/regex.hpp>
@@ -69,6 +69,8 @@ void print_int(int64_t val);
 void* compile_regex(std::string* pat);
 bool str_contains_regex(std::string* str, regex* e);
 bool str_contains_noregex(std::string* str, std::string* pat);
+std::string* str_replace_regex(std::string* str, regex* e, std::string* val);
+std::string* str_replace_noregex(std::string* str, std::string* pat, std::string* val);
 char get_char_from_string(std::string* str, int64_t index);
 
 void* str_from_int32(int in);
@@ -152,6 +154,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_contains_noregex)));
     PyObject_SetAttrString(m, "str_contains_regex",
                             PyLong_FromVoidPtr((void*)(&str_contains_regex)));
+    PyObject_SetAttrString(m, "str_replace_regex",
+                            PyLong_FromVoidPtr((void*)(&str_replace_regex)));
+    PyObject_SetAttrString(m, "str_replace_noregex",
+                            PyLong_FromVoidPtr((void*)(&str_replace_noregex)));
     PyObject_SetAttrString(m, "str_from_int32",
                             PyLong_FromVoidPtr((void*)(&str_from_int32)));
     PyObject_SetAttrString(m, "str_from_int64",
@@ -412,6 +418,20 @@ bool str_contains_regex(std::string* str, regex* e)
 bool str_contains_noregex(std::string* str, std::string* pat)
 {
     return (str->find(*pat) != std::string::npos);
+}
+
+
+std::string* str_replace_regex(std::string* str, regex* e, std::string* val)
+{
+    return new std::string(regex_replace(*str, *e, *val));
+}
+
+std::string* str_replace_noregex(std::string* str, std::string* pat, std::string* val)
+{
+    std::string* out = new std::string(*str);
+    boost::replace_all(*out, *pat, *val);
+    // std::cout << *out << std::endl;
+    return out;
 }
 
 void print_str(std::string* str)

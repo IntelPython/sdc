@@ -293,6 +293,8 @@ ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('compile_regex', hstr_ext.compile_regex)
 ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
 ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
+ll.add_symbol('str_replace_regex', hstr_ext.str_replace_regex)
+ll.add_symbol('str_replace_noregex', hstr_ext.str_replace_noregex)
 ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
 ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
 ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
@@ -302,6 +304,12 @@ get_std_str_len = types.ExternalFunction(
     "get_str_len", signature(types.intp, std_str_type))
 init_string_from_chars = types.ExternalFunction(
     "init_string_const", std_str_type(types.voidptr))
+
+str_replace_regex = types.ExternalFunction(
+    "str_replace_regex", std_str_type(std_str_type, regex_type, std_str_type))
+
+str_replace_noregex = types.ExternalFunction(
+    "str_replace_noregex", std_str_type(std_str_type, std_str_type, std_str_type))
 
 def gen_unicode_to_std_str(context, builder, unicode_val):
     #
@@ -354,7 +362,7 @@ def unicode_to_std_str(typingctx, unicode_t=None):
     return std_str_type(string_type), codegen
 
 @intrinsic
-def str_str_to_unicode(typingctx, unicode_t=None):
+def std_str_to_unicode(typingctx, unicode_t=None):
     def codegen(context, builder, sig, args):
         return gen_std_str_to_unicode(context, builder, args[0], True)
     return string_type(std_str_type), codegen
@@ -366,7 +374,7 @@ def unicode_split_overload(in_str_t, sep_t):
         def _split_impl(in_str, sep):
             std_str = unicode_to_std_str(in_str)
             l = std_str.split(unicode_to_std_str(sep))
-            return [str_str_to_unicode(s) for s in l]
+            return [std_str_to_unicode(s) for s in l]
 
         return _split_impl
 
