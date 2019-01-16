@@ -650,6 +650,24 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), 1)
 
+    def test_str_replace_regex(self):
+        def test_impl(df):
+            return df.A.str.replace('AB*', 'EE', regex=True)
+
+        df = pd.DataFrame({'A': ['ABCC', 'CABBD']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
+    def test_str_replace_noregex(self):
+        def test_impl(df):
+            return df.A.str.replace('AB', 'EE', regex=False)
+
+        df = pd.DataFrame({'A': ['ABCC', 'CABBD']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
