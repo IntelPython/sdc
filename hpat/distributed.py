@@ -370,6 +370,8 @@ class DistributedPass(object):
         # divide 1D alloc
         # XXX allocs should be matched before going to _run_call_np
         if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
+            # XXX for pre_alloc_string_array(n, nc), we assume nc is local
+            # value (updated only in parfor like _str_replace_regex_impl)
             size_var = rhs.args[0]
             out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
             # empty_inferred is tuple for some reason
@@ -672,7 +674,8 @@ class DistributedPass(object):
 
             # gen len() using 1D_Var reduce approach.
             # TODO: refactor to avoid reduction
-            ndim = self.typemap[arr.name].ndim
+            arr_typ = self.typemap[arr.name]
+            ndim = 1 if arr_typ == string_array_type else arr_typ.ndim
             out += self._gen_1D_Var_len(arr)
             total_length = out[-1].target
             div_nodes, start_var, count_var = self._gen_1D_div(
