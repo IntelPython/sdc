@@ -12,7 +12,7 @@ from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
     NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
     NdConstructorLike)
 import hpat
-from hpat.str_ext import string_type
+from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
@@ -153,6 +153,14 @@ class SeriesModel(models.StructModel):
         # TODO: types other than Array and StringArray?
         if dtype == string_type:
             members = hpat.str_arr_ext.str_arr_model_members
+        elif dtype == types.List(string_type):
+            # for unboxing list(list(str))
+            # copied from numba/datamodels/models
+            payload_type = types.ListPayload(list_string_array_type)
+            members = [
+                ('meminfo', types.MemInfoPointer(payload_type)),
+                ('parent', types.pyobject),
+            ]
         else:
             ndim = 1
             members = [
@@ -193,6 +201,10 @@ register_model(UnBoxedSeriesType)(SeriesModel)
 
 def series_to_array_type(typ, replace_boxed=False):
     dtype = typ.dtype
+    # array(list(str)) as in str.split() case
+    # currently list(list(str))
+    if dtype == types.List(string_type):
+        return list_string_array_type
     if isinstance(dtype, PDCategoricalDtype):
         dtype = get_categories_int_type(dtype)
     if dtype == string_type:
@@ -276,6 +288,7 @@ def if_series_to_unbox(typ):
     return typ
 
 @lower_cast(string_array_type, UnBoxedSeriesType)
+@lower_cast(list_string_array_type, UnBoxedSeriesType)
 @lower_cast(types.Array, UnBoxedSeriesType)
 def cast_string_series_unbox(context, builder, fromty, toty, val):
     return val
@@ -668,6 +681,10 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_replace(self, ary, args, kws):
         return signature(SeriesType(string_type, 1, 'C'), *args)
 
+    @bound_function("strmethod.split")
+    def resolve_split(self, ary, args, kws):
+        return signature(SeriesType(types.List(string_type), 1, 'C'), *args)
+
 
 class SeriesDtMethodType(types.Type):
     def __init__(self):
@@ -875,6 +892,9 @@ class GetItemSeries(AbstractTemplate):
                 sig = string_type(in_arr, in_idx)
             else:
                 sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
+        elif in_arr == list_string_array_type:
+            sig = numba.typing.collections.GetItemSequence.generic(
+                self, (in_arr, in_idx), kws)
         else:
             out = get_array_index_type(in_arr, in_idx)
             sig = signature(out.result, in_arr, out.index)

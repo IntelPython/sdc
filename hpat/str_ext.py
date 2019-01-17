@@ -391,6 +391,22 @@ def alloc_str_list(typingctx, n_t=None):
     return types.List(string_type)(types.intp), codegen
 
 
+# XXX using list of list string instead of array of list string since Numba's
+# arrays can't store lists
+list_string_array_type = types.List(types.List(string_type))
+
+@intrinsic
+def alloc_list_list_str(typingctx, n_t=None):
+    def codegen(context, builder, sig, args):
+        nitems = args[0]
+        list_type = list_string_array_type
+        l = numba.targets.listobj.ListInstance.allocate(
+            context, builder, list_type, nitems)
+        l.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, l.value)
+    return list_string_array_type(types.intp), codegen
+
+
 @unbox(StringType)
 def unbox_string(typ, obj, c):
     """
