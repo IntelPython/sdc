@@ -167,7 +167,9 @@ def is_alloc_callname(func_name, mod_name):
     return isinstance(mod_name, str) and ((mod_name == 'numpy'
         and func_name in np_alloc_callnames)
         or (func_name == 'empty_inferred'
-            and mod_name in ('numba.extending', 'numba.unsafe.ndarray')))
+            and mod_name in ('numba.extending', 'numba.unsafe.ndarray'))
+        or (func_name == 'pre_alloc_string_array'
+            and mod_name == 'hpat.str_arr_ext'))
 
 def find_build_tuple(func_ir, var):
     """Check if a variable is constructed via build_tuple
