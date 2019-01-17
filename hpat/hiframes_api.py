@@ -15,10 +15,10 @@ from numba.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
 from numba.targets.arrayobj import _getitem_array1d
-from numba.targets.boxing import box_array, unbox_array
+from numba.targets.boxing import box_array, unbox_array, box_list
 import llvmlite.llvmpy.core as lc
 
-from hpat.str_ext import string_type
+from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
     unbox_str_series, is_str_arr_typ, box_str_arr)
 
@@ -940,6 +940,8 @@ def box_series(typ, val, c):
         arr = box_datetime_date_array(typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
         arr = box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj)
+    elif dtype == types.List(string_type):
+        arr = box_list(list_string_array_type, val, c)
     else:
         arr = box_array(types.Array(dtype, 1, 'C'), val, c)
 

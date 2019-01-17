@@ -1193,12 +1193,15 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, arr, func_name, rhs):
 
-        if func_name not in ('len', 'replace'):
+        if func_name not in ('len', 'replace', 'split'):
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
 
         if func_name == 'replace':
             return self._run_series_str_replace(assign, lhs, arr, rhs)
+
+        if func_name == 'split':
+            return self._run_series_str_split(assign, lhs, arr, rhs)
 
         if func_name == 'len':
             out_typ = 'np.int64'
@@ -1239,6 +1242,21 @@ class HiFramesTyped(object):
                             'pre_alloc_string_array': pre_alloc_string_array}
         )
 
+
+    def _run_series_str_split(self, assign, lhs, arr, rhs):
+        sep = rhs.args[0]  # TODO: support default whitespace separator
+
+        def _str_split_impl(str_arr, sep):
+            numba.parfor.init_prange()
+            n = len(str_arr)
+            out_arr = hpat.str_ext.alloc_list_list_str(n)
+            for i in numba.parfor.internal_prange(n):
+                in_str = str_arr[i]
+                out_arr[i] = in_str.split(sep)
+
+            return out_arr
+
+        return self._replace_func(_str_split_impl, [arr, sep])
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':
