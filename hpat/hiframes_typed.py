@@ -540,7 +540,7 @@ class HiFramesTyped(object):
                         flat_list.append(s)
 
                 return hpat.hiframes_api.to_series_type(
-                    hpat.hiframes_api.fix_df_array(flat_list))
+                    hpat.hiframes_api.parallel_fix_df_array(flat_list))
             return self._replace_func(_flatten_impl, [rhs.args[0]])
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)

@@ -681,6 +681,10 @@ def lower_dist_quantile(context, builder, sig, args):
 def fix_df_array(c):  # pragma: no cover
     return c
 
+# the same as fix_df_array but can be parallel
+@numba.generated_jit(nopython=True)
+def parallel_fix_df_array(c):  # pragma: no cover
+    return lambda c: fix_df_array(c)
 
 def fix_rolling_array(c):  # pragma: no cover
     return c
