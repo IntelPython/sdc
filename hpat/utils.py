@@ -169,7 +169,9 @@ def is_alloc_callname(func_name, mod_name):
         or (func_name == 'empty_inferred'
             and mod_name in ('numba.extending', 'numba.unsafe.ndarray'))
         or (func_name == 'pre_alloc_string_array'
-            and mod_name == 'hpat.str_arr_ext'))
+            and mod_name == 'hpat.str_arr_ext')
+        or (func_name in ('alloc_str_list', 'alloc_list_list_str')
+            and mod_name == 'hpat.str_ext'))
 
 def find_build_tuple(func_ir, var):
     """Check if a variable is constructed via build_tuple
