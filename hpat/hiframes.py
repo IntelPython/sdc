@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 import warnings
 from collections import namedtuple
+import itertools
 
 import numba
 from numba import ir, ir_utils, types
@@ -23,7 +24,7 @@ import hpat
 from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
                   hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
-    inline_new_blocks, ReplaceFunc)
+    inline_new_blocks, ReplaceFunc, is_call)
 from hpat.hiframes_api import PandasDataFrameType
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
@@ -80,6 +81,8 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     # TODO: move to Numba
     if call_list == ['empty_inferred', 'ndarray', 'unsafe', numba]:
+        return True
+    if call_list == ['chain', itertools]:
         return True
     return False
 
@@ -830,6 +833,19 @@ class HiFrames(object):
                 raise ValueError(
                     "data argument in pd.Series() expected")
             data = rhs.args[0]
+
+        # match flatmap pd.Series(list(itertools.chain(*A))) and flatten
+        data_def = guard(get_definition, self.func_ir, data)
+        if (is_call(data_def) and guard(find_callname, self.func_ir, data_def)
+                == ('list', 'builtins') and len(data_def.args) == 1):
+            arg_def = guard(get_definition, self.func_ir, data_def.args[0])
+            if (is_call(arg_def) and guard(find_callname, self.func_ir,
+                    arg_def) == ('chain', 'itertools')):
+                in_data = arg_def.vararg
+                return self._replace_func(
+                    lambda l: hpat.hiframes_api.flatten_to_series(l),
+                    [in_data]
+                )
 
         return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
                 hpat.hiframes_api.fix_df_array(arr)),

@@ -1,4 +1,5 @@
 import unittest
+import itertools
 import pandas as pd
 import numpy as np
 import random
@@ -710,6 +711,17 @@ class TestHiFrames(unittest.TestCase):
             hpat_func(df), test_impl(df), check_names=False)
         self.assertEqual(count_array_REPs(), 1)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_str_flatten(self):
+        def test_impl(df):
+            A = df.A.str.split(',')
+            return pd.Series(list(itertools.chain(*A)))
+
+        df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
 
     def test_filter1(self):
         def test_impl(n):

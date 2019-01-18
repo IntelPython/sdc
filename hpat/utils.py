@@ -448,11 +448,14 @@ def gen_getitem(out_var, in_var, ind, calltypes, nodes):
     calltypes[getitem] = None
     nodes.append(ir.Assign(getitem, out_var, loc))
 
-def is_call(stmt):
-    """true if stmt is a getitem or static_getitem assignment"""
+def is_call_assign(stmt):
     return (isinstance(stmt, ir.Assign)
             and isinstance(stmt.value, ir.Expr)
             and stmt.value.op == 'call')
+
+def is_call(expr):
+    return (isinstance(expr, ir.Expr)
+            and expr.op == 'call')
 
 def is_var_assign(inst):
     return isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var)

@@ -709,6 +709,22 @@ class DfIsinCol(AbstractTemplate):
         return signature(SeriesType(types.bool_, 1, 'C'), *unliteral_all(args))
 
 
+def flatten_to_series(A):  # pragma: no cover
+    return A
+
+@infer_global(flatten_to_series)
+class FlattenTyp(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        # only list of lists supported
+        assert isinstance(args[0], (types.List, SeriesType))
+        l_dtype = args[0].dtype
+        assert isinstance(l_dtype, types.List)
+        dtype = l_dtype.dtype
+        return signature(SeriesType(dtype, 1, 'C'), *unliteral_all(args))
+
+
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):
         self.col_names = col_names

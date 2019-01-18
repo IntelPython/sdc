@@ -20,7 +20,7 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, lower_builtin
 import hpat
-from hpat.utils import (is_call, is_var_assign, is_assign, debug_prints,
+from hpat.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
         alloc_arr_tup, empty_like_type)
 from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
@@ -1210,7 +1210,7 @@ def _rm_len_str_arr(init_nodes, arr_var, f_ir):
     new_init_nodes = []
 
     for stmt in reversed(init_nodes):
-        if (is_call(stmt)
+        if (is_call_assign(stmt)
                 and find_callname(f_ir, stmt.value) == ('len', 'builtins')
                 and stmt.value.args[0].name == arr_var.name):
             continue
@@ -1232,7 +1232,7 @@ def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
         if (is_assign(stmt) and isinstance(stmt.value, ir.Global)
                 and stmt.value.value in _checker_calls):
             checker_vars.add(stmt.target.name)
-        elif is_call(stmt) and stmt.value.func.name in checker_vars:
+        elif is_call_assign(stmt) and stmt.value.func.name in checker_vars:
             pass  # remove call
         else:
             cleaned_init_nodes.append(stmt)
@@ -1511,7 +1511,7 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     for label in topo_order:
         bl = parfor.loop_body[label]
         for stmt in bl.body:
-            if is_call(stmt) and (guard(find_callname, f_ir, stmt.value)
+            if is_call_assign(stmt) and (guard(find_callname, f_ir, stmt.value)
                     == ('__special_combine', 'hpat.hiframes_aggregate')):
                 args = stmt.value.args
                 l_argnames = []
@@ -1627,7 +1627,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
             # XXX replace hpat.hiframes_api.isna(A, i) for now
             # TODO: handle actual NA
             # for test_agg_seq_count_str test
-            if (is_call(stmt) and guard(find_callname, pm.func_ir, stmt.value)
+            if (is_call_assign(stmt) and guard(find_callname, pm.func_ir, stmt.value)
                     == ('isna', 'hpat.hiframes_api')
                     and stmt.value.args[0].name == arr_var.name):
                 stmt.value = ir.Const(False, stmt.target.scope)

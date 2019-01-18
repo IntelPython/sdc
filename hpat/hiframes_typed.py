@@ -529,6 +529,20 @@ class HiFramesTyped(object):
 
             return self._replace_func(_isin_series, rhs.args)
 
+        if func_name == 'flatten_to_series':
+            def _flatten_impl(A):
+                numba.parfor.init_prange()
+                flat_list = []
+                n = len(A)
+                for i in numba.parfor.internal_prange(n):
+                    l = A[i]
+                    for s in l:
+                        flat_list.append(s)
+
+                return hpat.hiframes_api.to_series_type(
+                    hpat.hiframes_api.fix_df_array(flat_list))
+            return self._replace_func(_flatten_impl, [rhs.args[0]])
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
