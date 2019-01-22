@@ -136,7 +136,7 @@ class SeriesType(types.IterableType):
         return self.layout in 'CF'
 
 
-string_series_type = SeriesType(string_type, 1, 'C', True)
+string_series_type = SeriesType(string_type, 1, 'C')
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
 timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'), 1, 'C')

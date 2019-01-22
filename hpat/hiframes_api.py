@@ -774,6 +774,7 @@ def get_hiframes_dtypes(df):
         if typ == np.dtype('O'):
             # XXX assuming the whole column is strings if 1st val is string
             first_val = df[cname].iloc[0]
+            # TODO: support list(str)
             if isinstance(first_val, str):
                 hi_typs.append(string_type)
                 continue

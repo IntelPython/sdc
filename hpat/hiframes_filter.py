@@ -37,6 +37,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     post = []
     # empty filter nodes should be deleted in remove dead
     assert len(filter_node.df_in_vars) > 0, "empty filter in array analysis"
+    from hpat.str_ext import list_string_array_type
 
     # arrays of input df have same size in first dimension
     all_shapes = []
@@ -47,7 +48,8 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
         all_shapes.append(col_shape[0])
     for _, col_var in filter_node.df_in_vars.items():
         typ = typemap[col_var.name]
-        if typ == string_array_type:
+        # TODO handle list_string_array_type in other nodes
+        if typ in (string_array_type, list_string_array_type):
             continue
         col_shape = equiv_set.get_shape(col_var)
         all_shapes.append(col_shape[0])
@@ -61,7 +63,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     all_shapes = []
     for _, col_var in filter_node.df_out_vars.items():
         typ = typemap[col_var.name]
-        if typ == string_array_type:
+        if typ in (string_array_type, list_string_array_type):
             continue
         (shape, c_post) = array_analysis._gen_shape_call(
             equiv_set, col_var, typ.ndim, None)
