@@ -241,6 +241,17 @@ class HiFrames(object):
                 in_df_col_names = self._get_df_col_names(df)
                 df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in in_df_col_names}
+
+                # column selection like df.iloc[:,0]
+                if (rhs.op == 'static_getitem' and isinstance(rhs.index, tuple)
+                        and len(rhs.index) == 2
+                        and isinstance(rhs.index[1], int)
+                        and rhs.index[0] == slice(None)):
+                    col_no = rhs.index[1]
+                    col_var = self._get_df_colvar(df, in_df_col_names[col_no])
+                    assign.value = col_var
+                    return [assign]
+
                 self._create_df(lhs, df_col_map, label)
                 in_df = self._get_renamed_df(df)
                 return [hiframes_filter.Filter(lhs, in_df.name, index_var,
