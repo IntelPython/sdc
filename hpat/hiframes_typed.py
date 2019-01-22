@@ -1287,6 +1287,7 @@ class HiFramesTyped(object):
             n_total_chars = 0
             str_list = hpat.str_ext.alloc_str_list(n)
             for i in numba.parfor.internal_prange(n):
+                # TODO: support NAN
                 in_list_str = str_arr[i]
                 out_str = in_list_str[ind]
                 str_list[i] = out_str

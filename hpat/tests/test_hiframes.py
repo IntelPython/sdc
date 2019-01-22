@@ -722,6 +722,24 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    def test_str_get_parallel(self):
+        def test_impl(df):
+            A = df.A.str.split(',')
+            B = A.str.get(1)
+            return B
+
+        n = 5
+        start, end = get_start_end(n)
+        A = ['AB,CC', 'C,ABB,D', 'CAD,F', 'CA,D', 'AA,,D']
+        df = pd.DataFrame({'A': A[start:end]})
+        hpat_func = hpat.jit(
+            locals={'df:input':'distributed',
+                    'B:return':'distributed'})(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+        self.assertEqual(count_array_REPs(), 3)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_str_flatten(self):
         def test_impl(df):
             A = df.A.str.split(',')
