@@ -768,6 +768,16 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_to_numeric(self):
+        def test_impl(df):
+            B = pd.to_numeric(df.A, errors='coerce')
+            return B
+
+        df = pd.DataFrame({'A': ['123', '331']})
+        hpat_func = hpat.jit(locals={'B': hpat.int64[:]})(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})

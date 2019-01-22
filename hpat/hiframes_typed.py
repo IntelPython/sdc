@@ -543,6 +543,25 @@ class HiFramesTyped(object):
                     hpat.hiframes_api.parallel_fix_df_array(flat_list))
             return self._replace_func(_flatten_impl, [rhs.args[0]])
 
+        if func_name == 'to_numeric':
+            out_dtype = self.typemap[lhs.name].dtype
+            conv_func = int
+            if out_dtype == types.float64:
+                conv_func = float
+            else:
+                assert out_dtype == types.int64
+
+            def _to_numeric_impl(A):
+                numba.parfor.init_prange()
+                n = len(A)
+                B = np.empty(n, out_dtype)
+                for i in numba.parfor.internal_prange(n):
+                    B[i] = conv_func(A[i])
+
+                return hpat.hiframes_api.to_series_type(B)
+            return self._replace_func(_to_numeric_impl, [rhs.args[0]],
+                extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func})
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):

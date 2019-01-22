@@ -728,6 +728,16 @@ class FlattenTyp(AbstractTemplate):
         dtype = l_dtype.dtype
         return signature(SeriesType(dtype, 1, 'C'), *unliteral_all(args))
 
+def to_numeric(A, dtype):
+    return A
+
+@infer_global(to_numeric)
+class ToNumeric(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        dtype = args[1].dtype
+        return signature(SeriesType(dtype, 1, 'C'), *unliteral_all(args))
 
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):

@@ -339,6 +339,9 @@ class HiFrames(object):
         if fdef == ('crosstab', 'pandas'):
             return self._handle_crosstab(lhs, rhs, label)
 
+        if fdef == ('to_numeric', 'pandas'):
+            return self._handle_pd_to_numeric(assign, lhs, rhs)
+
         if fdef == ('read_ros_images', 'hpat.ros'):
             return self._handle_ros(assign, lhs, rhs)
 
@@ -861,6 +864,25 @@ class HiFrames(object):
         return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
                 hpat.hiframes_api.fix_df_array(arr)),
             [data])
+
+    def _handle_pd_to_numeric(self, assign, lhs, rhs):
+        """transform pd.to_numeric(A, errors='coerce') call here since dtype
+        has to be specified in locals and applied
+        """
+        kws = dict(rhs.kws)
+        if 'errors' not in kws and guard(find_const, self.func_ir, kws['errors']) != 'coerce':
+            raise ValueError("pd.to_numeric() only supports errors='coerce'")
+
+        if lhs.name not in self.reverse_copies or (self.reverse_copies[lhs.name]) not in self.locals:
+            raise ValueError("pd.to_numeric() requires annotation of output type")
+
+        typ = self.locals.pop(self.reverse_copies[lhs.name])
+        dtype = numba.numpy_support.as_dtype(typ.dtype)
+        arg = rhs.args[0]
+
+        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
+                hpat.hiframes_api.to_numeric(arr, dtype)),
+            [arg], extra_globals={'dtype': dtype})
 
     def _df_len(self, lhs, df_var):
         # run len on one of the columns
