@@ -315,7 +315,8 @@ class SeriesAttribute(AttributeTemplate):
         return series_to_array_type(ary, True)
 
     def resolve_str(self, ary):
-        assert ary.dtype == string_type
+        assert ary.dtype in (string_type, types.List(string_type))
+        # TODO: add dtype to series_str_methods_type
         return series_str_methods_type
 
     def resolve_dt(self, ary):
@@ -684,6 +685,11 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     @bound_function("strmethod.split")
     def resolve_split(self, ary, args, kws):
         return signature(SeriesType(types.List(string_type), 1, 'C'), *args)
+
+    @bound_function("strmethod.get")
+    def resolve_get(self, ary, args, kws):
+        # XXX only list(list(str)) supported
+        return signature(SeriesType(string_type, 1, 'C'), *args)
 
 
 class SeriesDtMethodType(types.Type):

@@ -1207,7 +1207,7 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, arr, func_name, rhs):
 
-        if func_name not in ('len', 'replace', 'split'):
+        if func_name not in ('len', 'replace', 'split', 'get'):
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
 
@@ -1216,6 +1216,9 @@ class HiFramesTyped(object):
 
         if func_name == 'split':
             return self._run_series_str_split(assign, lhs, arr, rhs)
+
+        if func_name == 'get':
+            return self._run_series_str_get(assign, lhs, arr, rhs)
 
         if func_name == 'len':
             out_typ = 'np.int64'
@@ -1271,6 +1274,32 @@ class HiFramesTyped(object):
             return out_arr
 
         return self._replace_func(_str_split_impl, [arr, sep])
+
+    def _run_series_str_get(self, assign, lhs, arr, rhs):
+        # XXX only supports get for list(list(str)) input
+        assert (self.typemap[arr.name]
+                    == SeriesType(types.List(string_type), 1, 'C'))
+        ind_var = rhs.args[0]
+
+        def _str_get_impl(str_arr, ind):
+            numba.parfor.init_prange()
+            n = len(str_arr)
+            n_total_chars = 0
+            str_list = hpat.str_ext.alloc_str_list(n)
+            for i in numba.parfor.internal_prange(n):
+                in_list_str = str_arr[i]
+                out_str = in_list_str[ind]
+                str_list[i] = out_str
+                n_total_chars += len(out_str)
+            numba.parfor.init_prange()
+            out_arr = pre_alloc_string_array(n, n_total_chars)
+            for i in numba.parfor.internal_prange(n):
+                _str = str_list[i]
+                out_arr[i] = _str
+            return out_arr
+
+        return self._replace_func(_str_get_impl, [arr, ind_var],
+            extra_globals={'pre_alloc_string_array': pre_alloc_string_array})
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':
