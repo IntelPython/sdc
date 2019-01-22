@@ -895,6 +895,10 @@ def lower_box_df(context, builder, sig, args):
         elif isinstance(dtype, PDCategoricalDtype):
             arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
             context.nrt.incref(builder, arr_typ, arr)
+        elif dtype == types.List(string_type):
+            arr_obj = box_list(list_string_array_type, arr, c)
+            context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+            # pyapi.print_object(arr_obj)
         else:
             arr_obj = box_array(arr_typ, arr, c)
             # TODO: is incref required?
