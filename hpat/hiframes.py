@@ -425,6 +425,10 @@ class HiFrames(object):
             rhs.args.insert(0, df_var)
             return self._handle_merge(assign, lhs, rhs, False, label)
 
+        # df.reset_index(drop=True)
+        if func_name == 'reset_index':
+            return self._handle_df_reset_index(lhs, rhs, df_var, label)
+
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
                 "data frame function {} not implemented yet".format(func_name))
@@ -541,6 +545,22 @@ class HiFrames(object):
 
         # create output df if not inplace
         if (inplace_var.name == inplace_default.name
+                or guard(find_const, self.func_ir, inplace_var) == False):
+            self._create_df(lhs.name, out_col_map, label)
+        return nodes
+
+    def _handle_df_reset_index(self, lhs, rhs, df_var, label):
+        nodes = []
+        drop_var = self._get_arg('reset_index', rhs.args, dict(rhs.kws), 1, 'drop')
+        assert guard(find_const, self.func_ir, drop_var) == True
+
+        inplace_default = False
+        inplace_var = self._get_arg('reset_index', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
+
+        out_col_map = self._get_df_cols(df_var).copy()
+
+        # create output df if not inplace
+        if (inplace_var == False
                 or guard(find_const, self.func_ir, inplace_var) == False):
             self._create_df(lhs.name, out_col_map, label)
         return nodes
