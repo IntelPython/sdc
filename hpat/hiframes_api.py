@@ -1,5 +1,4 @@
-from __future__ import print_function, division, absolute_import
-
+import operator
 from collections import namedtuple
 import pandas as pd
 import datetime
@@ -1264,6 +1263,25 @@ class SortedBuiltinLambda(CallableTemplate):
             return types.List(iterable.iterator_type.yield_type)
 
         return typer
+
+
+@overload(operator.getitem)
+def list_str_arr_getitem_array(arr_t, ind_t):
+    if (arr_t == list_string_array_type and isinstance(ind_t, types.Array)
+            and ind_t.ndim == 1 and isinstance(
+            ind_t.dtype, (types.Integer, types.Boolean))):
+        # TODO: convert to parfor in typed pass
+        def list_str_arr_getitem_impl(A, B):
+            n = B.sum()
+            out_arr = hpat.str_ext.alloc_list_list_str(n)
+            j = 0
+            for i in range(len(B)):
+                if B[i]:
+                    out_arr[j] = A[i]
+                    j += 1
+            return out_arr
+
+        return list_str_arr_getitem_impl
 
 
 class DataFrameTupleIterator(types.SimpleIteratorType):

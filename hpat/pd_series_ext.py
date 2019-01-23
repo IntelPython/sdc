@@ -233,6 +233,8 @@ def arr_to_series_type(arr):
     elif arr == string_array_type:
         # StringArray is readonly
         series_type = string_series_type
+    elif arr == list_string_array_type:
+        series_type = SeriesType(types.List(string_type), 1, 'C')
     return series_type
 
 def arr_to_boxed_series_type(arr):
@@ -262,7 +264,8 @@ def if_series_to_array_type(typ, replace_boxed=False):
     return typ
 
 def if_arr_to_series_type(typ):
-    if isinstance(typ, types.Array) or typ == string_array_type:
+    if isinstance(typ, types.Array) or typ in (string_array_type,
+                                                    list_string_array_type):
         return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
@@ -899,8 +902,14 @@ class GetItemSeries(AbstractTemplate):
             else:
                 sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
         elif in_arr == list_string_array_type:
-            sig = numba.typing.collections.GetItemSequence.generic(
-                self, (in_arr, in_idx), kws)
+            # mimic array indexing for list
+            if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
+                    and isinstance(
+                        in_idx.dtype, (types.Integer, types.Boolean))):
+                sig = signature(in_arr, in_arr, in_idx)
+            else:
+                sig = numba.typing.collections.GetItemSequence.generic(
+                    self, (in_arr, in_idx), kws)
         else:
             out = get_array_index_type(in_arr, in_idx)
             sig = signature(out.result, in_arr, out.index)

@@ -704,6 +704,16 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df).B, test_impl(df).B, check_names=False)
 
+    def test_str_split_bool_index(self):
+        def test_impl(df):
+            C = df.A.str.split(',')
+            return C[df.B == 'aa']
+
+        df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D'], 'B': ['aa', 'bb']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
     def test_str_split_parallel(self):
         def test_impl(df):
             B = df.A.str.split(',')
