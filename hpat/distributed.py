@@ -184,6 +184,8 @@ class DistributedPass(object):
                             block.scope, mk_unique_var("r_dummy"), loc)
                         block.body[i] = ir.Assign(dummy_call, dummy_var, loc)
                     block.body = new_body + block.body[i:]
+                    # TODO: use Parfor loop blocks when replacing funcs in
+                    # parfor loop body
                     inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
                         rp_func.arg_types,

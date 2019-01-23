@@ -447,6 +447,9 @@ def isna(arr, i):
 def isna_overload(arr_typ, ind_typ):
     if arr_typ == string_array_type:
         return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+    # TODO: support NaN in list(list(str))
+    if arr_typ == list_string_array_type:
+        return lambda arr, i: False
     # TODO: extend to other types
     assert isinstance(arr_typ, types.Array)
     dtype = arr_typ.dtype

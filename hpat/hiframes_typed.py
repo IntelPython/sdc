@@ -1532,7 +1532,10 @@ class HiFramesTyped(object):
                      for i in range(len(in_vars))]
         out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
                      for i in range(len(in_vars))]
-        str_colnames = [in_names[i] for i, t in enumerate(in_typ.types) if t == string_series_type]
+        str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
+                                                    if t == string_series_type]
+        list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
+                        if t == SeriesType(types.List(string_type), 1, 'C')]
         isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
@@ -1549,6 +1552,8 @@ class HiFramesTyped(object):
         for v, out in zip(in_names, out_names):
             if v in str_colnames:
                 func_text += "  {} = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars_{})\n".format(out, v)
+            elif v in list_str_colnames:
+                func_text += "  {} = hpat.str_ext.alloc_list_list_str(new_len)\n".format(out)
             else:
                 func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
         func_text += "  curr_ind = 0\n"
