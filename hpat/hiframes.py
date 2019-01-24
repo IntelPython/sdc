@@ -1849,6 +1849,8 @@ class HiFrames(object):
                 col_dtype = df_typ.col_types[i]
                 if col_dtype == string_type:
                     alloc_dt = 11  # dummy string value
+                elif col_dtype == types.List(string_type):
+                    alloc_dt = 13  # dummy list(str) value
                 elif col_dtype == types.boolean:
                     alloc_dt = "np.bool_"
                 elif col_dtype == types.NPDatetime('ns'):

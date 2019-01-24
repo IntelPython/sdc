@@ -81,7 +81,8 @@ bool is_na(const uint8_t* bull_bitmap, int64_t ind);
 void del_str(std::string* in_str);
 int64_t hash_str(std::string* in_str);
 void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num_strings, char* path);
-
+npy_intp array_size(PyArrayObject* arr);
+void* array_getptr1(PyArrayObject* arr, npy_intp ind);
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -174,6 +175,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&hash_str)));
     PyObject_SetAttrString(m, "c_glob",
                             PyLong_FromVoidPtr((void*)(&c_glob)));
+    PyObject_SetAttrString(m, "array_size",
+                            PyLong_FromVoidPtr((void*)(&array_size)));
+    PyObject_SetAttrString(m, "array_getptr1",
+                            PyLong_FromVoidPtr((void*)(&array_getptr1)));
     return m;
 }
 
@@ -605,6 +610,19 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
     PyGILState_Release(gilstate);
     return ret;
 #undef CHECK
+}
+
+// helper functions for call Numpy APIs
+npy_intp array_size(PyArrayObject* arr)
+{
+    // std::cout << "get size\n";
+    return PyArray_SIZE(arr);
+}
+
+void* array_getptr1(PyArrayObject* arr, npy_intp ind)
+{
+    // std::cout << "get array ptr " << ind << '\n';
+    return PyArray_GETPTR1(arr, ind);
 }
 
 // glob support

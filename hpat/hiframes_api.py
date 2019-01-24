@@ -50,12 +50,19 @@ enable_hiframes_remove_dead = True
 from llvmlite import ir as lir
 import quantile_alg
 import llvmlite.binding as ll
+from llvmlite.llvmpy.core import Type as LLType
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
 ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
 ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
 from numba.targets.arrayobj import make_array
+from numba.targets.boxing import _NumbaTypeHelper
+from numba.targets import listobj
 from numba import cgutils
 from hpat.utils import _numba_to_c_type_map, unliteral_all
+
+import hstr_ext
+ll.add_symbol('array_size', hstr_ext.array_size)
+ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
 # boxing/unboxing
 from numba.extending import typeof_impl, unbox, register_model, models, NativeValue, box
@@ -776,7 +783,10 @@ def get_hiframes_dtypes(df):
         if typ == np.dtype('O'):
             # XXX assuming the whole column is strings if 1st val is string
             first_val = df[cname].iloc[0]
-            # TODO: support list(str)
+            if isinstance(first_val, list):
+                typ = _infer_series_list_type(df[cname], cname)
+                hi_typs.append(typ)
+                continue
             if isinstance(first_val, str):
                 hi_typs.append(string_type)
                 continue
@@ -789,6 +799,25 @@ def get_hiframes_dtypes(df):
             raise ValueError("data type for column {} not supported".format(cname))
 
     return hi_typs
+
+
+def _infer_series_list_type(S, cname):
+    for i in range(len(S)):
+        first_val = S.iloc[i]
+        if not isinstance(first_val, list):
+            raise ValueError(
+                "data type for column {} not supported".format(cname))
+        if len(first_val) > 0:
+            # TODO: support more types
+            if isinstance(first_val[0], str):
+                return types.List(string_type)
+            else:
+                raise ValueError(
+                    "data type for column {} not supported".format(cname))
+    raise ValueError(
+            "data type for column {} not supported".format(cname))
+
+
 
 def unbox_df_column(df, col_name, dtype):
     return df[col_name]
@@ -804,6 +833,8 @@ class UnBoxDfCol(AbstractTemplate):
                 out_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             elif dtype_typ.literal_value == 11:  # FIXME dtype for str
                 out_typ = string_array_type
+            elif dtype_typ.literal_value == 13:  # FIXME dtype for list(str)
+                out_typ = list_string_array_type
             else:
                 raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.literal_value))
         else:
@@ -935,6 +966,8 @@ def lower_unbox_df_column(context, builder, sig, args):
 
     if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 11:  # FIXME: str code
         native_val = unbox_str_series(string_array_type, arr_obj, c)
+    if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 13:  # FIXME: list(str) code
+        native_val = _unbox_array_list_str(arr_obj, c)
     else:
         if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 12:  # FIXME: dt64 code
             dtype = types.NPDatetime('ns')
@@ -988,6 +1021,105 @@ def box_series(typ, val, c):
     # res = c.pyapi.call_function_objargs(class_obj, (arr,))
     c.pyapi.decref(pd_class_obj)
     return res
+
+
+def _unbox_array_list_str(obj, c):
+    #
+    typ = list_string_array_type
+    # from unbox_list
+    errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
+    listptr = cgutils.alloca_once(c.builder, c.context.get_value_type(typ))
+
+    # get size of array
+    arr_size_fnty = LLType.function(c.pyapi.py_ssize_t, [c.pyapi.pyobj])
+    arr_size_fn = c.pyapi._get_function(arr_size_fnty, name="array_size")
+    size = c.builder.call(arr_size_fn, [obj])
+    # cgutils.printf(c.builder, 'size %d\n', size)
+
+    _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr)
+
+    return NativeValue(c.builder.load(listptr),
+                       is_error=c.builder.load(errorptr))
+
+
+def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
+    """
+    Construct a new native list from a Python array of objects.
+    copied from _python_list_to_native but list_getitem is converted to array
+    getitem.
+    """
+    def check_element_type(nth, itemobj, expected_typobj):
+        typobj = nth.typeof(itemobj)
+        # Check if *typobj* is NULL
+        with c.builder.if_then(
+                cgutils.is_null(c.builder, typobj),
+                likely=False,
+                ):
+            c.builder.store(cgutils.true_bit, errorptr)
+            loop.do_break()
+        # Mandate that objects all have the same exact type
+        type_mismatch = c.builder.icmp_signed('!=', typobj, expected_typobj)
+
+        with c.builder.if_then(type_mismatch, likely=False):
+            c.builder.store(cgutils.true_bit, errorptr)
+            c.pyapi.err_format(
+                "PyExc_TypeError",
+                "can't unbox heterogeneous list: %S != %S",
+                expected_typobj, typobj,
+                )
+            c.pyapi.decref(typobj)
+            loop.do_break()
+        c.pyapi.decref(typobj)
+
+    # Allocate a new native list
+    ok, list = listobj.ListInstance.allocate_ex(c.context, c.builder, typ, size)
+    # Array getitem call
+    arr_get_fnty = LLType.function(LLType.pointer(c.pyapi.pyobj), [c.pyapi.pyobj, c.pyapi.py_ssize_t])
+    arr_get_fn = c.pyapi._get_function(arr_get_fnty, name="array_getptr1")
+
+    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+        with if_ok:
+            list.size = size
+            zero = lir.Constant(size.type, 0)
+            with c.builder.if_then(c.builder.icmp_signed('>', size, zero),
+                                   likely=True):
+                # Traverse Python list and unbox objects into native list
+                with _NumbaTypeHelper(c) as nth:
+                    # Note: *expected_typobj* can't be NULL
+                    expected_typobj = nth.typeof(c.builder.load(
+                                    c.builder.call(arr_get_fn, [obj, zero])))
+                    with cgutils.for_range(c.builder, size) as loop:
+                        itemobj = c.builder.call(arr_get_fn, [obj, loop.index])
+                        # extra load since we have ptr to object
+                        itemobj = c.builder.load(itemobj)
+                        #c.pyapi.print_object(itemobj)
+                        check_element_type(nth, itemobj, expected_typobj)
+                        # XXX we don't call native cleanup for each
+                        # list element, since that would require keeping
+                        # of which unboxings have been successful.
+                        native = c.unbox(typ.dtype, itemobj)
+                        with c.builder.if_then(native.is_error, likely=False):
+                            c.builder.store(cgutils.true_bit, errorptr)
+                            loop.do_break()
+                        # The reference is borrowed so incref=False
+                        list.setitem(loop.index, native.value, incref=False)
+                    c.pyapi.decref(expected_typobj)
+            if typ.reflected:
+                list.parent = obj
+            # Stuff meminfo pointer into the Python object for
+            # later reuse.
+            with c.builder.if_then(c.builder.not_(c.builder.load(errorptr)),
+                                                  likely=False):
+                c.pyapi.object_set_private_data(obj, list.meminfo)
+            list.set_dirty(False)
+            c.builder.store(list.value, listptr)
+
+        with if_not_ok:
+            c.builder.store(cgutils.true_bit, errorptr)
+
+    # If an error occurred, drop the whole native list
+    with c.builder.if_then(c.builder.load(errorptr)):
+        c.context.nrt.decref(c.builder, typ, list.value)
 
 
 def to_series_type(arr):
