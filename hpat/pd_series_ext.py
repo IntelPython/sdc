@@ -215,6 +215,14 @@ def series_to_array_type(typ, replace_boxed=False):
             new_typ = types.Array(dtype, 1, 'C')
     else:
         # TODO: other types?
+        # use recarray data layout for series of tuples
+        if isinstance(dtype, types.BaseTuple):
+            if any(not isinstance(t, types.Number) for t in dtype.types):
+                # TODO: support more types. what types can be in recarrays?
+                raise ValueError("series tuple dtype {} includes non-numerics".format(dtype))
+            np_dtype = np.dtype(
+                ','.join(str(t) for t in dtype.types), align=True)
+            dtype = numba.numpy_support.from_dtype(np_dtype)
         new_typ = types.Array(
         dtype, typ.ndim, typ.layout, not typ.mutable,
         aligned=typ.aligned)

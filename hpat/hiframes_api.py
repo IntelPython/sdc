@@ -1226,6 +1226,47 @@ def agg_typer(a, _agg_f):
     return np.full(1, _agg_f(a))
 
 
+def convert_tup_to_rec(val):
+    return val
+
+@infer_global(convert_tup_to_rec)
+class ConvertTupRecType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        in_dtype = args[0]
+        out_dtype = in_dtype
+
+        if isinstance(in_dtype, types.BaseTuple):
+            np_dtype = np.dtype(
+                ','.join(str(t) for t in in_dtype.types), align=True)
+            out_dtype = numba.numpy_support.from_dtype(np_dtype)
+
+        return signature(out_dtype, in_dtype)
+
+@lower_builtin(convert_tup_to_rec, types.Any)
+def lower_convert_impl(context, builder, sig, args):
+    val, = args
+    in_typ = sig.args[0]
+    rec_typ = sig.return_type
+
+    if not isinstance(in_typ, types.BaseTuple):
+        return impl_ret_borrowed(context, builder, sig.return_type, val)
+
+    res = cgutils.alloca_once(builder, context.get_data_type(rec_typ))
+
+    func_text = "def _set_rec(r, val):\n"
+    for i in range(len(rec_typ.members)):
+        func_text += "  r.f{} = val[{}]\n".format(i, i)
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    set_rec = loc_vars['_set_rec']
+
+    context.compile_internal(builder, set_rec, types.void(rec_typ, in_typ), [res, val])
+    return impl_ret_new_ref(context, builder, sig.return_type, res)
+
+
 # XXX: use infer_global instead of overload, since overload fails if the same
 # user function is compiled twice
 @infer_global(fix_df_array)

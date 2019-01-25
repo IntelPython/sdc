@@ -826,7 +826,9 @@ class HiFramesTyped(object):
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "    t = A[i]\n"
-        func_text += "    S[i] = map_func(t)\n"
+        func_text += "    v = map_func(t)\n"
+        func_text += "    S[i] = hpat.hiframes_api.convert_tup_to_rec(v)\n"
+        # func_text += "    print(S[i])\n"
         if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
             func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
         else:
