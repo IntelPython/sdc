@@ -966,7 +966,7 @@ def lower_unbox_df_column(context, builder, sig, args):
 
     if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 11:  # FIXME: str code
         native_val = unbox_str_series(string_array_type, arr_obj, c)
-    if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 13:  # FIXME: list(str) code
+    elif isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 13:  # FIXME: list(str) code
         native_val = _unbox_array_list_str(arr_obj, c)
     else:
         if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 12:  # FIXME: dt64 code
