@@ -833,6 +833,7 @@ class HiFramesTyped(object):
             func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
+        #func_text += "  return hpat.hiframes_api.to_series_type(ret)\n"
         func_text += "  return ret\n"
 
         loc_vars = {}

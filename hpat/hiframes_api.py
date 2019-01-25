@@ -1004,6 +1004,11 @@ def box_series(typ, val, c):
     pd_class_obj = c.pyapi.import_module_noblock(mod_name)
     dtype = typ.dtype
 
+    if isinstance(dtype, types.BaseTuple):
+        np_dtype = np.dtype(
+            ','.join(str(t) for t in dtype.types), align=True)
+        dtype = numba.numpy_support.from_dtype(np_dtype)
+
     if dtype == string_type:
         arr = box_str_arr(typ, val, c)
     elif dtype == datetime_date_type:
@@ -1014,6 +1019,12 @@ def box_series(typ, val, c):
         arr = box_list(list_string_array_type, val, c)
     else:
         arr = box_array(types.Array(dtype, 1, 'C'), val, c)
+
+    if isinstance(dtype, types.Record):
+        o_str = c.context.insert_const_string(c.builder.module, "O")
+        o_str = c.pyapi.string_from_string(o_str)
+        arr = c.pyapi.call_method(arr, "astype", (o_str,))
+
 
     res = c.pyapi.call_method(pd_class_obj, "Series", (arr,))
     # c.pyapi.decref(arr)  # TODO needed?

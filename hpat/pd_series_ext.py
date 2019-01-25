@@ -150,6 +150,10 @@ class SeriesModel(models.StructModel):
         dtype = fe_type.dtype
         if isinstance(dtype, PDCategoricalDtype):
             dtype = get_categories_int_type(dtype)
+        if isinstance(dtype, types.BaseTuple):
+            np_dtype = np.dtype(
+                ','.join(str(t) for t in dtype.types), align=True)
+            dtype = numba.numpy_support.from_dtype(np_dtype)
         # TODO: types other than Array and StringArray?
         if dtype == string_type:
             members = hpat.str_arr_ext.str_arr_model_members
