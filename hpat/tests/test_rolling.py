@@ -7,7 +7,7 @@ import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
-from hpat.hiframes_rolling import supported_rolling_funcs
+from hpat.hiframes.rolling import supported_rolling_funcs
 
 LONG_TEST = (int(os.environ['HPAT_LONG_ROLLING_TEST']) != 0
              if 'HPAT_LONG_ROLLING_TEST' in os.environ else False)

@@ -89,7 +89,7 @@ def build_set(A):
 
 
 def _build_str_set_impl(A):
-    str_arr = hpat.hiframes_api.dummy_unbox_series(A)
+    str_arr = hpat.hiframes.api.dummy_unbox_series(A)
     str_set = init_set_string()
     n = len(str_arr)
     for i in range(n):

@@ -810,7 +810,7 @@ def shift_impl(in_arr, shift, parallel):  # pragma: no cover
 @numba.njit
 def shift_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
-    output = hpat.hiframes_api.alloc_shift(in_arr)
+    output = hpat.hiframes.api.alloc_shift(in_arr)
     shift = min(shift, N)
     output[:shift] = np.nan
 
@@ -863,7 +863,7 @@ def pct_change_impl(in_arr, shift, parallel):  # pragma: no cover
 @numba.njit
 def pct_change_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
-    output = hpat.hiframes_api.alloc_shift(in_arr)
+    output = hpat.hiframes.api.alloc_shift(in_arr)
     shift = min(shift, N)
     output[:shift] = np.nan
 

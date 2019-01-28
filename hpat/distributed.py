@@ -561,7 +561,7 @@ class DistributedPass(object):
 
             return self._replace_func(f, rhs.args)
 
-        if (func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+        if (func_mod == 'hpat.hiframes.api' and func_name in ('to_series_type',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type')
                 and self._is_1D_arr(rhs.args[0].name)):
@@ -570,7 +570,7 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
-        if fdef == ('isna', 'hpat.hiframes_api') and self._is_1D_arr(rhs.args[0].name):
+        if fdef == ('isna', 'hpat.hiframes.api') and self._is_1D_arr(rhs.args[0].name):
             # fix index in call to isna
             arr = rhs.args[0]
             ind = rhs.args[1]
@@ -578,7 +578,7 @@ class DistributedPass(object):
             rhs.args[1] = out[-1].target
             out.append(assign)
 
-        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling') and (
+        if fdef == ('rolling_fixed', 'hpat.hiframes.rolling') and (
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
@@ -592,7 +592,7 @@ class DistributedPass(object):
             rhs.args[3] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if fdef == ('rolling_variable', 'hpat.hiframes_rolling') and (
+        if fdef == ('rolling_variable', 'hpat.hiframes.rolling') and (
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
@@ -606,7 +606,7 @@ class DistributedPass(object):
             rhs.args[4] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if (func_mod == 'hpat.hiframes_rolling'
+        if (func_mod == 'hpat.hiframes.rolling'
                     and func_name in ('shift', 'pct_change')
                     and (self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name))):
@@ -622,7 +622,7 @@ class DistributedPass(object):
             rhs.args[2] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('quantile', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
             if arr in self._array_sizes:
@@ -633,28 +633,28 @@ class DistributedPass(object):
                 size_var = self._set0_var
             rhs.args += [size_var]
 
-            f = lambda arr, q, size: hpat.hiframes_api.quantile_parallel(
+            f = lambda arr, q, size: hpat.hiframes.api.quantile_parallel(
                                                                   arr, q, size)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('nunique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('nunique', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.nunique_parallel(arr)
+            f = lambda arr: hpat.hiframes.api.nunique_parallel(arr)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('unique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('unique', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.unique_parallel(arr)
+            f = lambda arr: hpat.hiframes.api.unique_parallel(arr)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('nlargest', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr, k, i, f: hpat.hiframes_api.nlargest_parallel(arr, k, i, f)
+            f = lambda arr, k, i, f: hpat.hiframes.api.nlargest_parallel(arr, k, i, f)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('median', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('median', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.median(arr, True)
+            f = lambda arr: hpat.hiframes.api.median(arr, True)
             return self._replace_func(f, rhs.args)
 
         if fdef == ('dist_return', 'hpat.distributed_api'):

@@ -35,12 +35,12 @@ from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
 
 from hpat.pd_categorical_ext import PDCategoricalDtype, box_categorical_series_dtype_fix
 
-from hpat.hiframes_sort import (
+from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
     )
-from hpat.hiframes_join import write_send_buff
+from hpat.hiframes.join import write_send_buff
 
 # XXX: used in agg func output to avoid mutating filter, agg, join, etc.
 # TODO: fix type inferrer and remove this
@@ -262,7 +262,7 @@ def nunique_overload_parallel(arr_typ):
     sum_op = hpat.distributed_api.Reduce_Type.Sum.value
 
     def nunique_par(A):
-        uniq_A = hpat.hiframes_api.unique_parallel(A)
+        uniq_A = hpat.hiframes.api.unique_parallel(A)
         loc_nuniq = len(uniq_A)
         return hpat.distributed_api.dist_reduce(loc_nuniq, np.int32(sum_op))
 
@@ -1223,11 +1223,11 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
 
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
-    numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes_api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes_api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes_api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
 
 @numba.njit
 def agg_typer(a, _agg_f):

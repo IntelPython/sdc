@@ -128,7 +128,7 @@ def gatherv_overload(data):
             # displacements
             displs = np.empty(1, np.int32)
             if rank == MPI_ROOT:
-                displs = hpat.hiframes_join.calc_disp(recv_counts)
+                displs = hpat.hiframes.join.calc_disp(recv_counts)
             #  print(rank, n_loc, n_total, recv_counts, displs)
             c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32(typ_val))
             return all_data
@@ -165,8 +165,8 @@ def gatherv_overload(data):
 
             if rank == MPI_ROOT:
                 all_data = pre_alloc_string_array(n_total, n_total_char)
-                displs = hpat.hiframes_join.calc_disp(recv_counts)
-                displs_char = hpat.hiframes_join.calc_disp(recv_counts_char)
+                displs = hpat.hiframes.join.calc_disp(recv_counts)
+                displs_char = hpat.hiframes.join.calc_disp(recv_counts_char)
 
             #  print(rank, n_loc, n_total, recv_counts, displs)
             offset_ptr = get_offset_ptr(all_data)

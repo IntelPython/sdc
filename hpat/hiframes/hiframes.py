@@ -21,11 +21,11 @@ from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
 
 import hpat
-from hpat import (hiframes_api, utils, pio, parquet_pio, config, hiframes_filter,
-                  hiframes_join, hiframes_aggregate, hiframes_sort, hiframes_typed)
+from hpat import utils, pio, parquet_pio, config
+from hpat.hiframes import filter, hiframes_typed, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
     inline_new_blocks, ReplaceFunc, is_call)
-from hpat.hiframes_api import PandasDataFrameType
+from hpat.hiframes.api import PandasDataFrameType
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat import csv_ext
@@ -38,8 +38,8 @@ from hpat.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type
 from hpat.pd_categorical_ext import PDCategoricalDtype
-from hpat.hiframes_rolling import get_rolling_setup_args, supported_rolling_funcs
-from hpat.hiframes_aggregate import get_agg_func, supported_agg_funcs
+from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
+from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
 
 LARGE_WIN_SIZE = 10
 
@@ -55,21 +55,21 @@ def remove_hiframes(rhs, lives, call_list):
     # used in stencil generation of rolling
     if call_list == ['ceil', math]:
         return True
-    if (len(call_list) == 3 and call_list[1:] == ['hiframes_api', hpat] and
+    if (len(call_list) == 4 and call_list[1:] == ['api', 'hiframes', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
             'concat', 'count', 'mean', 'quantile', 'var',
             'str_contains_regex', 'str_contains_noregex', 'column_sum',
             'nunique']):
         return True
-    if (len(call_list) == 3 and call_list[1:] == ['hiframes_typed', hpat] and
+    if (len(call_list) == 4 and call_list[1:] == ['hiframes_typed', 'hiframes', hpat] and
             call_list[0]
             in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
         return True
     if call_list == ['dist_return', 'distributed_api', hpat]:
         return True
-    if call_list == ['unbox_df_column', 'hiframes_api', hpat]:
+    if call_list == ['unbox_df_column', 'api', 'hiframes', hpat]:
         return True
-    if call_list == ['agg_typer', 'hiframes_api', hpat]:
+    if call_list == ['agg_typer', 'api', 'hiframes', hpat]:
         return True
     if call_list == [list]:
         return True
@@ -254,7 +254,7 @@ class HiFrames(object):
 
                 self._create_df(lhs, df_col_map, label)
                 in_df = self._get_renamed_df(df)
-                return [hiframes_filter.Filter(lhs, in_df.name, index_var,
+                return [filter.Filter(lhs, in_df.name, index_var,
                                                self.df_vars, rhs.loc)]
 
             # d = df.column
@@ -487,10 +487,10 @@ class HiFrames(object):
                 other_colmap = {c: other for c in df_col_map.keys()}
 
         out_df_map = {}
-        isin_func = lambda A, B: hpat.hiframes_api.df_isin(A, B)
-        isin_vals_func = lambda A, B: hpat.hiframes_api.df_isin_vals(A, B)
+        isin_func = lambda A, B: hpat.hiframes.api.df_isin(A, B)
+        isin_vals_func = lambda A, B: hpat.hiframes.api.df_isin_vals(A, B)
         # create array of False values used when other col not available
-        bool_arr_func = lambda A: hpat.hiframes_api.to_series_type(np.zeros(len(A), np.bool_))
+        bool_arr_func = lambda A: hpat.hiframes.api.to_series_type(np.zeros(len(A), np.bool_))
         # use the first array of df to get len. TODO: check for empty df
         false_arr_args = [list(df_col_map.values())[0]]
 
@@ -577,7 +577,7 @@ class HiFrames(object):
         out_names = ", ".join([mk_unique_var(cname).replace('.', '_') for cname in col_names])
 
         func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
-        func_text += "  ({},) = hpat.hiframes_api.dropna(({},), inplace)\n".format(
+        func_text += "  ({},) = hpat.hiframes.api.dropna(({},), inplace)\n".format(
             out_names, arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -877,12 +877,12 @@ class HiFrames(object):
                     arg_def) == ('chain', 'itertools')):
                 in_data = arg_def.vararg
                 return self._replace_func(
-                    lambda l: hpat.hiframes_api.flatten_to_series(l),
+                    lambda l: hpat.hiframes.api.flatten_to_series(l),
                     [in_data]
                 )
 
-        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
-                hpat.hiframes_api.fix_df_array(arr)),
+        return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
+                hpat.hiframes.api.fix_df_array(arr)),
             [data])
 
     def _handle_pd_to_numeric(self, assign, lhs, rhs):
@@ -900,8 +900,8 @@ class HiFrames(object):
         dtype = numba.numpy_support.as_dtype(typ.dtype)
         arg = rhs.args[0]
 
-        return self._replace_func(lambda arr: hpat.hiframes_api.to_series_type(
-                hpat.hiframes_api.to_numeric(arr, dtype)),
+        return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
+                hpat.hiframes.api.to_numeric(arr, dtype)),
             [arg], extra_globals={'dtype': dtype})
 
     def _df_len(self, lhs, df_var):
@@ -993,7 +993,7 @@ class HiFrames(object):
         df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
                                 for col in right_colnames})
         self._create_df(lhs.name, df_col_map, label)
-        return [hiframes_join.Join(lhs.name, self._get_renamed_df(left_df).name,
+        return [join.Join(lhs.name, self._get_renamed_df(left_df).name,
                                    self._get_renamed_df(right_df).name,
                                    left_on, right_on, self.df_vars, how,
                                    lhs.loc)]
@@ -1039,7 +1039,7 @@ class HiFrames(object):
         # gen concat function
         arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
         func_text = "def _concat_imp({}):\n".format(arg_names)
-        func_text += "    return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(({})))\n".format(
+        func_text += "    return hpat.hiframes.api.to_series_type(hpat.hiframes.api.concat(({})))\n".format(
             arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -1076,7 +1076,7 @@ class HiFrames(object):
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            return hpat.hiframes_api.to_series_type(hpat.hiframes_api.concat(arr_list))
+            return hpat.hiframes.api.to_series_type(hpat.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
 
     def _handle_ros(self, assign, lhs, rhs):
@@ -1096,7 +1096,7 @@ class HiFrames(object):
             col_arr = self._fix_df_list_of_array(col_arr)
 
             def f(arr):  # pragma: no cover
-                df_arr = hpat.hiframes_api.fix_df_array(arr)
+                df_arr = hpat.hiframes.api.fix_df_array(arr)
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [col_arr])
@@ -1125,7 +1125,7 @@ class HiFrames(object):
                         "data frame column names should be constant")
             # cast to series type
             def f(arr):  # pragma: no cover
-                df_arr = hpat.hiframes_api.to_series_type(arr)
+                df_arr = hpat.hiframes.api.to_series_type(arr)
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [item[1]])
@@ -1240,14 +1240,14 @@ class HiFrames(object):
         func_text = "def f({}):\n".format(', '.join(col_name_args))
         # compute stat values
         for c in col_name_args:
-            func_text += "  {}_count = np.float64(hpat.hiframes_api.count({}))\n".format(c, c)
+            func_text += "  {}_count = np.float64(hpat.hiframes.api.count({}))\n".format(c, c)
             func_text += "  {}_min = np.min({})\n".format(c, c)
             func_text += "  {}_max = np.max({})\n".format(c, c)
-            func_text += "  {}_mean = hpat.hiframes_api.mean({})\n".format(c, c)
-            func_text += "  {}_std = hpat.hiframes_api.var({})**0.5\n".format(c, c)
-            func_text += "  {}_q25 = hpat.hiframes_api.quantile({}, .25)\n".format(c, c)
-            func_text += "  {}_q50 = hpat.hiframes_api.quantile({}, .5)\n".format(c, c)
-            func_text += "  {}_q75 = hpat.hiframes_api.quantile({}, .75)\n".format(c, c)
+            func_text += "  {}_mean = hpat.hiframes.api.mean({})\n".format(c, c)
+            func_text += "  {}_std = hpat.hiframes.api.var({})**0.5\n".format(c, c)
+            func_text += "  {}_q25 = hpat.hiframes.api.quantile({}, .25)\n".format(c, c)
+            func_text += "  {}_q50 = hpat.hiframes.api.quantile({}, .5)\n".format(c, c)
+            func_text += "  {}_q75 = hpat.hiframes.api.quantile({}, .75)\n".format(c, c)
 
 
         col_header = "      ".join([c for c in col_names])
@@ -1305,7 +1305,7 @@ class HiFrames(object):
         key_vars = [in_df.pop(k) for k in key_names]
         out_key_vars = [out_df.pop(k) for k in key_names]
 
-        out.append(hiframes_sort.Sort(df.name, lhs.name, key_vars, out_key_vars,
+        out.append(sort.Sort(df.name, lhs.name, key_vars, out_key_vars,
                                       in_df, out_df, inplace, lhs.loc))
         return out
 
@@ -1320,7 +1320,7 @@ class HiFrames(object):
         name_consts = ', '.join(["'{}'".format(c) for c in col_names])
 
         func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  return hpat.hiframes_api.get_itertuples({}, {})\n"\
+        func_text += "  return hpat.hiframes.api.get_itertuples({}, {})\n"\
                                             .format(name_consts, col_name_args)
 
         loc_vars = {}
@@ -1373,10 +1373,10 @@ class HiFrames(object):
         dummy_ir.blocks[0].body.append(ir.Jump(first_label, col_var.loc))
         # dead df code can cause type inference issues
         # TODO: remove this
-        hiframes_api.enable_hiframes_remove_dead = False
+        hiframes.api.enable_hiframes_remove_dead = False
         while remove_dead(dummy_ir.blocks, dummy_ir.arg_names, dummy_ir):
             pass
-        hiframes_api.enable_hiframes_remove_dead = True
+        hiframes.api.enable_hiframes_remove_dead = True
 
         # run type inference on the dummy IR
         warnings = numba.errors.WarningsFixer(numba.errors.NumbaWarning)
@@ -1423,8 +1423,8 @@ class HiFrames(object):
         agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         def to_arr(a, _agg_f):
-            b = hpat.hiframes_api.to_arr_from_series(a)
-            res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+            b = hpat.hiframes.api.to_arr_from_series(a)
+            res = hpat.hiframes.api.to_series_type(hpat.hiframes.api.agg_typer(b, _agg_f))
         f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [in_vars[values_arg], agg_gb_var])
         nodes += f_block.body[:-3]  # remove none return
@@ -1438,7 +1438,7 @@ class HiFrames(object):
         out_df = df_col_map.copy()
         self._create_df(lhs.name, out_df, label)
         pivot_arr = self.df_vars[df_var.name][columns_arg]
-        agg_node = hiframes_aggregate.Aggregate(
+        agg_node = aggregate.Aggregate(
             lhs.name, df_var.name, [index_arg], None, df_col_map,
             in_vars, [self.df_vars[df_var.name][index_arg]],
             agg_func, out_types, lhs.loc, pivot_arr, pivot_values)
@@ -1496,7 +1496,7 @@ class HiFrames(object):
         in_vars = {}
         # output of crosstab is array[int64]
         def to_arr():
-            res = hpat.hiframes_api.to_series_type(np.empty(1, np.int64))
+            res = hpat.hiframes.api.to_series_type(np.empty(1, np.int64))
         f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         nodes = f_block.body[:-3]  # remove none return
         out_tp_var = nodes[-1].target
@@ -1518,7 +1518,7 @@ class HiFrames(object):
 
         # TODO: make out_key_var an index column
 
-        agg_node = hiframes_aggregate.Aggregate(
+        agg_node = aggregate.Aggregate(
             lhs.name, 'crosstab', [index_arg.name], None, df_col_map,
             in_vars, [index_arg],
             _agg_len_impl, out_types, lhs.loc, pivot_arr, pivot_values, True)
@@ -1572,7 +1572,7 @@ class HiFrames(object):
 
         in_key_vars = [self.df_vars[df_var.name][k] for k in key_colnames]
 
-        agg_node = hiframes_aggregate.Aggregate(
+        agg_node = aggregate.Aggregate(
             lhs.name, df_var.name, key_colnames, out_key_vars, df_col_map,
             in_vars, in_key_vars,
             agg_func, out_tp_vars, lhs.loc)
@@ -1591,8 +1591,8 @@ class HiFrames(object):
         for out_cname in out_colnames:
             in_var = in_vars[out_cname]
             def to_arr(a, _agg_f):
-                b = hpat.hiframes_api.to_arr_from_series(a)
-                res = hpat.hiframes_api.to_series_type(hpat.hiframes_api.agg_typer(b, _agg_f))
+                b = hpat.hiframes.api.to_arr_from_series(a)
+                res = hpat.hiframes.api.to_series_type(hpat.hiframes.api.agg_typer(b, _agg_f))
             f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_var, agg_gb_var])
             nodes += f_block.body[:-3]  # remove none return
@@ -1767,38 +1767,38 @@ class HiFrames(object):
             if on_arr is not None:
                 if func_name == 'cov':
                     def f(arr, other, on_arr, w, center):  # pragma: no cover
-                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, on_arr, w, center)
+                        df_arr = hpat.hiframes.rolling.rolling_cov(arr, other, on_arr, w, center)
                 if func_name == 'corr':
                     def f(arr, other, on_arr, w, center):  # pragma: no cover
-                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, on_arr, w, center)
+                        df_arr = hpat.hiframes.rolling.rolling_corr(arr, other, on_arr, w, center)
                 args = [in_col_var, other, on_arr, window, center]
             else:
                 if func_name == 'cov':
                     def f(arr, other, w, center):  # pragma: no cover
-                        df_arr = hpat.hiframes_rolling.rolling_cov(arr, other, w, center)
+                        df_arr = hpat.hiframes.rolling.rolling_cov(arr, other, w, center)
                 if func_name == 'corr':
                     def f(arr, other, w, center):  # pragma: no cover
-                        df_arr = hpat.hiframes_rolling.rolling_corr(arr, other, w, center)
+                        df_arr = hpat.hiframes.rolling.rolling_corr(arr, other, w, center)
                 args = [in_col_var, other, window, center]
         # variable window case
         elif on_arr is not None:
             if func_name == 'apply':
                 def f(arr, on_arr, w, center, func):  # pragma: no cover
-                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, func)
+                    df_arr = hpat.hiframes.rolling.rolling_variable(arr, on_arr, w, center, False, func)
                 args = [in_col_var, on_arr, window, center, args[0]]
             else:
                 def f(arr, on_arr, w, center):  # pragma: no cover
-                    df_arr = hpat.hiframes_rolling.rolling_variable(arr, on_arr, w, center, False, _func_name)
+                    df_arr = hpat.hiframes.rolling.rolling_variable(arr, on_arr, w, center, False, _func_name)
                 args = [in_col_var, on_arr, window, center]
         else:  # fixed window
             # apply case takes the passed function instead of just name
             if func_name == 'apply':
                 def f(arr, w, center, func):  # pragma: no cover
-                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, func)
+                    df_arr = hpat.hiframes.rolling.rolling_fixed(arr, w, center, False, func)
                 args = [in_col_var, window, center, args[0]]
             else:
                 def f(arr, w, center):  # pragma: no cover
-                    df_arr = hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func_name)
+                    df_arr = hpat.hiframes.rolling.rolling_fixed(arr, w, center, False, _func_name)
                 args = [in_col_var, window, center]
         f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func_name': func_name}).blocks.popitem()[1]
         replace_arg_nodes(f_block, args)
@@ -1812,7 +1812,7 @@ class HiFrames(object):
         """
         # TODO: check all possible funcs
         def f(arr):  # pragma: no cover
-            df_arr = hpat.hiframes_api.fix_rolling_array(arr)
+            df_arr = hpat.hiframes.api.fix_rolling_array(arr)
         f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [col_var])
         nodes = f_block.body[:-3]  # remove none return
@@ -1859,7 +1859,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = {}(hpat.hiframes_api.to_series_type(hpat.hiframes_api.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
+                func_text += "  _col_input_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.api.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1880,7 +1880,7 @@ class HiFrames(object):
             # self.args[arg_ind] = SeriesType(arg_typ.dtype)
             # replace arg var with tmp
             def f(_boxed_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(_boxed_series))
+                _dt_arr = hpat.hiframes.api.to_series_type(hpat.hiframes.api.dummy_unbox_series(_boxed_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
@@ -1902,7 +1902,7 @@ class HiFrames(object):
             func_text = "def tuple_unpack_func(tup_arg):\n"
             for i, t in enumerate(arg_typ.types):
                 if isinstance(t, BoxedSeriesType):
-                    func_text += "  _arg_{} = {}(hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
+                    func_text += "  _arg_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
                 else:
                     func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
             pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])
@@ -1997,7 +1997,7 @@ class HiFrames(object):
         col_names = ", ".join(['"{}"'.format(cname) for cname in names])
 
         func_text = "def f({}):\n".format(arg_names)
-        func_text += "  _dt_arr = hpat.hiframes_api.box_df({}, {})\n".format(col_names, arg_names)
+        func_text += "  _dt_arr = hpat.hiframes.api.box_df({}, {})\n".format(col_names, arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
@@ -2133,7 +2133,7 @@ class HiFrames(object):
             series_arr = inst.value
 
             def f(_df, _cname, _arr):  # pragma: no cover
-                s = hpat.hiframes_api.set_df_col(_df, _cname, _arr)
+                s = hpat.hiframes.api.set_df_col(_df, _cname, _arr)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [inst.target, cname_var, series_arr])

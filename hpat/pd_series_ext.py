@@ -17,7 +17,7 @@ from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
-from hpat.hiframes_rolling import supported_rolling_funcs
+from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
 
 # TODO: implement type inference instead of subtyping array since Pandas as of

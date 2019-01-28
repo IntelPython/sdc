@@ -277,15 +277,15 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if fdef == ('quantile', 'hpat.hiframes_api'):
+        if fdef == ('quantile', 'hpat.hiframes.api'):
             # quantile doesn't affect input's distribution
             return
 
-        if fdef == ('nunique', 'hpat.hiframes_api'):
+        if fdef == ('nunique', 'hpat.hiframes.api'):
             # nunique doesn't affect input's distribution
             return
 
-        if fdef == ('unique', 'hpat.hiframes_api'):
+        if fdef == ('unique', 'hpat.hiframes.api'):
             # doesn't affect distribution of input since input can stay 1D
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD_Var
@@ -295,43 +295,43 @@ class DistributedAnalysis(object):
             array_dists[lhs] = new_dist
             return
 
-        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling'):
+        if fdef == ('rolling_fixed', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('rolling_variable', 'hpat.hiframes_rolling'):
+        if fdef == ('rolling_variable', 'hpat.hiframes.rolling'):
             # lhs, in_arr, on_arr should have the same distribution
             new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
             array_dists[rhs.args[0].name] = new_dist
             return
 
-        if fdef == ('shift', 'hpat.hiframes_rolling'):
+        if fdef == ('shift', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('pct_change', 'hpat.hiframes_rolling'):
+        if fdef == ('pct_change', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('nlargest', 'hpat.hiframes_api'):
+        if fdef == ('nlargest', 'hpat.hiframes.api'):
             # output of nlargest is REP
             array_dists[lhs] = Distribution.REP
             return
 
-        if fdef == ('median', 'hpat.hiframes_api'):
+        if fdef == ('median', 'hpat.hiframes.api'):
             return
 
-        if fdef == ('concat', 'hpat.hiframes_api'):
+        if fdef == ('concat', 'hpat.hiframes.api'):
             # hiframes concat is similar to np.concatenate
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
-        if fdef == ('isna', 'hpat.hiframes_api'):
+        if fdef == ('isna', 'hpat.hiframes.api'):
             return
 
         # dummy hiframes functions
-        if func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+        if func_mod == 'hpat.hiframes.api' and func_name in ('to_series_type',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type', 'dummy_unbox_series',
                 'parallel_fix_df_array'):

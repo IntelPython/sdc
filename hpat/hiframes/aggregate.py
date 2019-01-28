@@ -29,13 +29,13 @@ from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
                               get_offset_ptr, get_data_ptr)
-from hpat.hiframes_sort import (
+from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
     alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup
     )
-from hpat.hiframes_join import write_send_buff
+from hpat.hiframes.join import write_send_buff
 from hpat.timsort import getitem_arr_tup
 from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
 
@@ -48,7 +48,7 @@ supported_agg_funcs = ['sum', 'count', 'mean',
 
 
 def get_agg_func(func_ir, func_name, rhs):
-    from hpat.hiframes_typed import series_replace_funcs
+    from hpat.hiframes.hiframes_typed import series_replace_funcs
     if func_name == 'var':
         return _column_var_impl_linear
     if func_name == 'std':
@@ -109,8 +109,8 @@ def _column_var_impl_linear(A):  # pragma: no cover
     ssqdm_x = 0.0
     N = len(A)
     for i in numba.parfor.internal_prange(N):
-        hpat.hiframes_aggregate.__special_combine(
-            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
+        hpat.hiframes.aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes.aggregate._var_combine)
         val = A[i]
         if not np.isnan(val):
             nobs += 1
@@ -120,7 +120,7 @@ def _column_var_impl_linear(A):  # pragma: no cover
             # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
             delta2 = val - mean_x
             ssqdm_x += delta * delta2
-    return hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+    return hpat.hiframes.rolling.calc_var(2, nobs, mean_x, ssqdm_x)
 
 # TODO: avoid code duplication
 def _column_std_impl_linear(A):  # pragma: no cover
@@ -129,8 +129,8 @@ def _column_std_impl_linear(A):  # pragma: no cover
     ssqdm_x = 0.0
     N = len(A)
     for i in numba.parfor.internal_prange(N):
-        hpat.hiframes_aggregate.__special_combine(
-            ssqdm_x, mean_x, nobs, hpat.hiframes_aggregate._var_combine)
+        hpat.hiframes.aggregate.__special_combine(
+            ssqdm_x, mean_x, nobs, hpat.hiframes.aggregate._var_combine)
         val = A[i]
         if not np.isnan(val):
             nobs += 1
@@ -140,7 +140,7 @@ def _column_std_impl_linear(A):  # pragma: no cover
             # ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
             delta2 = val - mean_x
             ssqdm_x += delta * delta2
-    v = hpat.hiframes_rolling.calc_var(2, nobs, mean_x, ssqdm_x)
+    v = hpat.hiframes.rolling.calc_var(2, nobs, mean_x, ssqdm_x)
     return v**0.5
 
 
@@ -243,7 +243,7 @@ numba.analysis.ir_extension_usedefs[Aggregate] = aggregate_usedefs
 
 def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir, typemap):
     #
-    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+    if not hpat.hiframes.api.enable_hiframes_remove_dead:
         return aggregate_node
 
     dead_cols = []
@@ -1017,7 +1017,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
 
     assert f_ir.arg_count == 1, "agg function should have one input"
     input_name = f_ir.arg_names[0]
-    df_pass = hpat.hiframes.HiFrames(f_ir, typingctx, arg_typs, {}, {})
+    df_pass = hpat.hiframes.hiframes.HiFrames(f_ir, typingctx, arg_typs, {}, {})
     df_pass.run()
     remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
     typemap, return_type, calltypes = compiler.type_inference_stage(
@@ -1040,7 +1040,7 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
             )
     preparfor_pass.run()
     f_ir._definitions = build_definitions(f_ir.blocks)
-    df_t_pass = hpat.hiframes_typed.HiFramesTyped(f_ir, typingctx, typemap, calltypes)
+    df_t_pass = hpat.hiframes.hiframes_typed.HiFramesTyped(f_ir, typingctx, typemap, calltypes)
     df_t_pass.run()
     numba.rewrites.rewrite_registry.apply('after-inference', pm, f_ir)
     parfor_pass = numba.parfor.ParforPass(f_ir, typemap,
@@ -1511,7 +1511,7 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
         bl = parfor.loop_body[label]
         for stmt in bl.body:
             if is_call_assign(stmt) and (guard(find_callname, f_ir, stmt.value)
-                    == ('__special_combine', 'hpat.hiframes_aggregate')):
+                    == ('__special_combine', 'hpat.hiframes.aggregate')):
                 args = stmt.value.args
                 l_argnames = []
                 r_argnames = []
@@ -1527,8 +1527,8 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
                 sp_func = guard(find_callname, f_ir, dummy_call)
                 # XXX: only var supported for now
                 # TODO: support general functions
-                assert sp_func == ('_var_combine', 'hpat.hiframes_aggregate')
-                sp_func = hpat.hiframes_aggregate._var_combine
+                assert sp_func == ('_var_combine', 'hpat.hiframes.aggregate')
+                sp_func = hpat.hiframes.aggregate._var_combine
                 special_combines[comb_name] = sp_func
 
             # reduction variables
@@ -1623,11 +1623,11 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
                 continue
             if is_getitem(stmt) and stmt.value.value.name == arr_var.name:
                 stmt.value = in_vars[0]
-            # XXX replace hpat.hiframes_api.isna(A, i) for now
+            # XXX replace hpat.hiframes.api.isna(A, i) for now
             # TODO: handle actual NA
             # for test_agg_seq_count_str test
             if (is_call_assign(stmt) and guard(find_callname, pm.func_ir, stmt.value)
-                    == ('isna', 'hpat.hiframes_api')
+                    == ('isna', 'hpat.hiframes.api')
                     and stmt.value.args[0].name == arr_var.name):
                 stmt.value = ir.Const(False, stmt.target.scope)
             # store reduction variables

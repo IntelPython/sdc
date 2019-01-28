@@ -7,7 +7,7 @@ import string
 import pyarrow.parquet as pq
 import numba
 import hpat
-from hpat import hiframes_sort
+from hpat import hiframes
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
@@ -1519,13 +1519,13 @@ class TestHiFrames(unittest.TestCase):
 
         hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
 
-        save_min_samples = hiframes_sort.MIN_SAMPLES
+        save_min_samples = hiframes.sort.MIN_SAMPLES
         try:
-            hiframes_sort.MIN_SAMPLES = 10
+            hiframes.sort.MIN_SAMPLES = 10
             res = hpat_func()
             self.assertTrue((np.diff(res)>=0).all())
         finally:
-            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+            hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
 
     def test_sort_parallel(self):
         # TODO: better parallel sort test
@@ -1538,13 +1538,13 @@ class TestHiFrames(unittest.TestCase):
 
         hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
 
-        save_min_samples = hiframes_sort.MIN_SAMPLES
+        save_min_samples = hiframes.sort.MIN_SAMPLES
         try:
-            hiframes_sort.MIN_SAMPLES = 10
+            hiframes.sort.MIN_SAMPLES = 10
             res = hpat_func()
             self.assertTrue((np.diff(res)>=0).all())
         finally:
-            hiframes_sort.MIN_SAMPLES = save_min_samples  # restore global val
+            hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
 
     def test_pivot(self):
         def test_impl(df):

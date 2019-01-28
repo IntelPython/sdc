@@ -6,7 +6,6 @@ import string
 import pyarrow.parquet as pq
 import numba
 import hpat
-from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)

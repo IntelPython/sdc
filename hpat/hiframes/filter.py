@@ -190,7 +190,7 @@ ir_utils.visit_vars_extensions[Filter] = visit_vars_filter
 
 
 def remove_dead_filter(filter_node, lives, arg_aliases, alias_map, func_ir, typemap):
-    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+    if not hpat.hiframes.api.enable_hiframes_remove_dead:
         return filter_node
 
     dead_cols = []

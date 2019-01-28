@@ -11,7 +11,7 @@ import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
 from hpat.distributed_analysis import Distribution
-from hpat.hiframes_sort import (
+from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
     update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
@@ -190,7 +190,7 @@ ir_utils.visit_vars_extensions[Join] = visit_vars_join
 
 
 def remove_dead_join(join_node, lives, arg_aliases, alias_map, func_ir, typemap):
-    if not hpat.hiframes_api.enable_hiframes_remove_dead:
+    if not hpat.hiframes.api.enable_hiframes_remove_dead:
         return join_node
     # if an output column is dead, the related input column is not needed
     # anymore in the join
@@ -374,15 +374,15 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     if join_node.how == 'asof':
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
+        " = hpat.hiframes.join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
     elif method == 'sort':
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
+        " = hpat.hiframes.join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
             join_node.how in ('left', 'outer'), join_node.how == 'outer'))
     else:
         assert method == 'hash'
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes_join.local_hash_join(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
+        " = hpat.hiframes.join.local_hash_join(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
             join_node.how in ('left', 'outer'), join_node.how == 'outer'))
 
     for i in range(len(left_other_names)):
@@ -424,10 +424,10 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     if method == 'sort':
         left_keys_tup_typ = types.Tuple([typemap[v.name] for v in left_key_vars])
         left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
-        _local_sort_f1 = hpat.hiframes_sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
+        _local_sort_f1 = hpat.hiframes.sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
         right_keys_tup_typ = types.Tuple([typemap[v.name] for v in right_key_vars])
         right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
-        _local_sort_f2 = hpat.hiframes_sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
+        _local_sort_f2 = hpat.hiframes.sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
         glbs['local_sort_f1'] = _local_sort_f1
         glbs['local_sort_f2'] = _local_sort_f2
 
@@ -550,7 +550,7 @@ def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
     out_r_keys = np.empty(n_total_recv, right_key_arrs[0].dtype)
     # TODO: support string
     out_r_data = alloc_arr_tup(n_total_recv, right_data)
-    recv_disp = hpat.hiframes_join.calc_disp(recv_counts)
+    recv_disp = hpat.hiframes.join.calc_disp(recv_counts)
     hpat.distributed_api.alltoallv(right_key_arrs[0], out_r_keys, send_counts,
                                    recv_counts, send_disp, recv_disp)
     hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts,

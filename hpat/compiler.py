@@ -2,8 +2,8 @@ from __future__ import print_function, division, absolute_import
 
 # from .pio import PIO
 from .distributed import DistributedPass
-from .hiframes import HiFrames
-from .hiframes_typed import HiFramesTyped
+from .hiframes.hiframes import HiFrames
+from .hiframes.hiframes_typed import HiFramesTyped
 import numba
 import numba.compiler
 from numba import ir_utils, ir, postproc

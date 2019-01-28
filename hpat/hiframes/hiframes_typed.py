@@ -19,7 +19,7 @@ from numba.typing.arraydecl import ArrayAttribute
 from numba.extending import overload
 from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
-from hpat import hiframes_sort
+from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
     is_whole_slice)
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
@@ -31,8 +31,8 @@ from hpat.pd_series_ext import (SeriesType, string_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
     explicit_binop_funcs, series_dt_methods_type)
 from hpat.pio_api import h5dataset_type
-from hpat.hiframes_rolling import get_rolling_setup_args
-from hpat.hiframes_aggregate import Aggregate
+from hpat.hiframes.rolling import get_rolling_setup_args
+from hpat.hiframes.aggregate import Aggregate
 import datetime
 
 LARGE_WIN_SIZE = 10
@@ -199,7 +199,7 @@ class HiFramesTyped(object):
                 if call in self.calltypes and new_sig is not None:
                     # for box_df, don't change return type so that information
                     # such as Categorical dtype is preserved
-                    if isinstance(sig.return_type, hpat.hiframes_api.PandasDataFrameType):
+                    if isinstance(sig.return_type, hpat.hiframes.api.PandasDataFrameType):
                         new_sig.return_type = sig.return_type
                         replace_calltype[call] = new_sig
                         continue
@@ -352,7 +352,7 @@ class HiFramesTyped(object):
                 # replace _get_type_max_value(arr.dtype) since parfors
                 # arr.dtype transformation produces invalid code for dt64
                 # TODO: min
-                if fdef == ('_get_type_max_value', 'hpat.hiframes_typed'):
+                if fdef == ('_get_type_max_value', 'hpat.hiframes.hiframes_typed'):
                     if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
                         return self._replace_func(
                             lambda: hpat.pd_timestamp_ext.integer_to_dt64(
@@ -398,10 +398,10 @@ class HiFramesTyped(object):
                 if fdef == ('DatetimeIndex', 'pandas'):
                     return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
-                if func_mod == 'hpat.hiframes_api':
+                if func_mod == 'hpat.hiframes.api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
 
-                if func_mod == 'hpat.hiframes_rolling':
+                if func_mod == 'hpat.hiframes.rolling':
                     return self._run_call_rolling(assign, assign.target, rhs, func_name)
 
                 if fdef == ('empty_like', 'numpy'):
@@ -539,8 +539,8 @@ class HiFramesTyped(object):
                     for s in l:
                         flat_list.append(s)
 
-                return hpat.hiframes_api.to_series_type(
-                    hpat.hiframes_api.parallel_fix_df_array(flat_list))
+                return hpat.hiframes.api.to_series_type(
+                    hpat.hiframes.api.parallel_fix_df_array(flat_list))
             return self._replace_func(_flatten_impl, [rhs.args[0]])
 
         if func_name == 'to_numeric':
@@ -558,7 +558,7 @@ class HiFramesTyped(object):
                 for i in numba.parfor.internal_prange(n):
                     B[i] = conv_func(A[i])
 
-                return hpat.hiframes_api.to_series_type(B)
+                return hpat.hiframes.api.to_series_type(B)
             return self._replace_func(_to_numeric_impl, [rhs.args[0]],
                 extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func})
 
@@ -589,7 +589,7 @@ class HiFramesTyped(object):
 
         if func_name == 'quantile':
             return self._replace_func(
-                lambda A, q: hpat.hiframes_api.quantile(A, q),
+                lambda A, q: hpat.hiframes.api.quantile(A, q),
                 [series_var, rhs.args[0]]
             )
 
@@ -717,7 +717,7 @@ class HiFramesTyped(object):
                 self.typemap[series_var.name])
 
 
-        nodes.append(hiframes_sort.Sort(series_var.name, lhs.name, [series_var],
+        nodes.append(hiframes.sort.Sort(series_var.name, lhs.name, [series_var],
             [out_key_arr], in_df, out_df, False, lhs.loc))
         return nodes
 
@@ -745,7 +745,7 @@ class HiFramesTyped(object):
                 def str_fillna_impl(A, fill):
                     # not using A.fillna since definition list is not working
                     # for A to find callname
-                    hpat.hiframes_api.fillna_str_alloc(A, fill)
+                    hpat.hiframes.api.fillna_str_alloc(A, fill)
                     #A.fillna(fill)
                 fill_var = rhs.args[0]
                 arg_typs = (self.typemap[series_var.name], self.typemap[fill_var.name])
@@ -759,7 +759,7 @@ class HiFramesTyped(object):
                 return {0: f_block}
             else:
                 return self._replace_func(
-                    lambda a,b,c: hpat.hiframes_api.fillna(a,b,c),
+                    lambda a,b,c: hpat.hiframes.api.fillna(a,b,c),
                     [series_var, series_var, val])
         else:
             if dtype == string_type:
@@ -784,7 +784,7 @@ class HiFramesTyped(object):
             def dropna_impl(A):
                 # not using A.dropna since definition list is not working
                 # for A to find callname
-                res = hpat.hiframes_api.dropna(A)
+                res = hpat.hiframes.api.dropna(A)
 
             arg_typs = (self.typemap[series_var.name],)
             f_block = compile_to_numba_ir(dropna_impl,
@@ -827,13 +827,13 @@ class HiFramesTyped(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "    t = A[i]\n"
         func_text += "    v = map_func(t)\n"
-        func_text += "    S[i] = hpat.hiframes_api.convert_tup_to_rec(v)\n"
+        func_text += "    S[i] = hpat.hiframes.api.convert_tup_to_rec(v)\n"
         # func_text += "    print(S[i])\n"
         if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
-            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
+            func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
-        #func_text += "  return hpat.hiframes_api.to_series_type(ret)\n"
+        #func_text += "  return hpat.hiframes.api.to_series_type(ret)\n"
         func_text += "  return ret\n"
 
         loc_vars = {}
@@ -877,9 +877,9 @@ class HiFramesTyped(object):
     def _run_call_rolling(self, assign, lhs, rhs, func_name):
         if func_name == 'rolling_corr':
             def rolling_corr_impl(arr, other, win, center):
-                cov = hpat.hiframes_rolling.rolling_cov(arr, other, win, center)
-                a_std = hpat.hiframes_rolling.rolling_fixed(arr, win, center, False, 'std')
-                b_std = hpat.hiframes_rolling.rolling_fixed(other, win, center, False, 'std')
+                cov = hpat.hiframes.rolling.rolling_cov(arr, other, win, center)
+                a_std = hpat.hiframes.rolling.rolling_fixed(arr, win, center, False, 'std')
+                b_std = hpat.hiframes.rolling.rolling_fixed(other, win, center, False, 'std')
                 return cov / (a_std * b_std)
             return self._replace_func(rolling_corr_impl, rhs.args)
         if func_name == 'rolling_cov':
@@ -889,10 +889,10 @@ class HiFramesTyped(object):
                 Y = other.astype(np.float64)
                 XpY = X + Y
                 XtY = X * Y
-                count = hpat.hiframes_rolling.rolling_fixed(XpY, w, center, False, 'count')
-                mean_XtY = hpat.hiframes_rolling.rolling_fixed(XtY, w, center, False, 'mean')
-                mean_X = hpat.hiframes_rolling.rolling_fixed(X, w, center, False, 'mean')
-                mean_Y = hpat.hiframes_rolling.rolling_fixed(Y, w, center, False, 'mean')
+                count = hpat.hiframes.rolling.rolling_fixed(XpY, w, center, False, 'count')
+                mean_XtY = hpat.hiframes.rolling.rolling_fixed(XtY, w, center, False, 'mean')
+                mean_X = hpat.hiframes.rolling.rolling_fixed(X, w, center, False, 'mean')
+                mean_Y = hpat.hiframes.rolling.rolling_fixed(Y, w, center, False, 'mean')
                 bias_adj = count / (count - ddof)
                 return (mean_XtY - mean_X * mean_Y) * bias_adj
             return self._replace_func(rolling_cov_impl, rhs.args)
@@ -907,7 +907,7 @@ class HiFramesTyped(object):
             imp_dis = self._handle_rolling_apply_func(
                 func_node, dtype, out_dtype)
             def f(arr, w, center):  # pragma: no cover
-                df_arr = hpat.hiframes_rolling.rolling_fixed(
+                df_arr = hpat.hiframes.rolling.rolling_fixed(
                                                 arr, w, center, False, _func)
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
                         self.typingctx,
@@ -927,7 +927,7 @@ class HiFramesTyped(object):
             imp_dis = self._handle_rolling_apply_func(
                 func_node, dtype, out_dtype)
             def f(arr, on_arr, w, center):  # pragma: no cover
-                df_arr = hpat.hiframes_rolling.rolling_variable(
+                df_arr = hpat.hiframes.rolling.rolling_variable(
                                                 arr, on_arr, w, center, False, _func)
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
                         self.typingctx,
@@ -997,7 +997,7 @@ class HiFramesTyped(object):
             func_text += "      t2 = B[i]\n"
         func_text += "    S[i] = map_func(t1, t2)\n"
         if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
-            func_text += "  ret = hpat.hiframes_api.to_date_series_type(S)\n"
+            func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
         func_text += "  return ret\n"
@@ -1071,9 +1071,9 @@ class HiFramesTyped(object):
             else:
                 other = series_var
             if func_name == 'cov':
-                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_cov(a,b,w,c)
+                f = lambda a,b,w,c: hpat.hiframes.rolling.rolling_cov(a,b,w,c)
             if func_name == 'corr':
-                f = lambda a,b,w,c: hpat.hiframes_rolling.rolling_corr(a,b,w,c)
+                f = lambda a,b,w,c: hpat.hiframes.rolling.rolling_corr(a,b,w,c)
             return self._replace_func(f, [series_var, other, window, center],
                                       pre_nodes=nodes)
         elif func_name == 'apply':
@@ -1085,7 +1085,7 @@ class HiFramesTyped(object):
         else:
             func_global = func_name
         def f(arr, w, center):  # pragma: no cover
-            return hpat.hiframes_rolling.rolling_fixed(arr, w, center, False, _func)
+            return hpat.hiframes.rolling.rolling_fixed(arr, w, center, False, _func)
         args = [series_var, window, center]
         return self._replace_func(
             f, args, pre_nodes=nodes, extra_globals={'_func': func_global})
@@ -1214,7 +1214,7 @@ class HiFramesTyped(object):
         if not (in_typ == string_array_type or in_typ == string_series_type):
             # already dt_index or int64
             # TODO: check for other types
-            f = lambda A: hpat.hiframes_api.ts_series_to_arr_typ(A)
+            f = lambda A: hpat.hiframes.api.ts_series_to_arr_typ(A)
             return self._replace_func(f, [data])
 
         def f(str_arr):
@@ -1539,7 +1539,7 @@ class HiFramesTyped(object):
                                                     if t == string_series_type]
         list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
                         if t == SeriesType(types.List(string_type))]
-        isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
+        isna_calls = ['hpat.hiframes.api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
         func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
@@ -1675,7 +1675,7 @@ def _fix_typ_undefs(new_typ, old_typ):
 
 
 def _column_filter_impl_float(df, cname, B, ind):  # pragma: no cover
-    dtype = hpat.hiframes_api.shift_dtype(B.dtype)
+    dtype = hpat.hiframes.api.shift_dtype(B.dtype)
     A = np.empty(len(B), dtype)
     for i in numba.parfor.internal_prange(len(A)):
         s = 0
@@ -1684,7 +1684,7 @@ def _column_filter_impl_float(df, cname, B, ind):  # pragma: no cover
         else:
             s = np.nan
         A[i] = s
-    hpat.hiframes_api.set_df_col(df, cname, A)
+    hpat.hiframes.api.set_df_col(df, cname, A)
     return
 
 
@@ -1692,7 +1692,7 @@ def _column_count_impl(A):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
     for i in numba.parfor.internal_prange(len(A)):
-        if not hpat.hiframes_api.isna(A, i):
+        if not hpat.hiframes.api.isna(A, i):
             count += 1
 
     res = count
@@ -1702,7 +1702,7 @@ def _column_count_impl(A):  # pragma: no cover
 def _column_fillna_impl(A, B, fill):  # pragma: no cover
     for i in numba.parfor.internal_prange(len(A)):
         s = B[i]
-        if hpat.hiframes_api.isna(B, i):
+        if hpat.hiframes.api.isna(B, i):
             s = fill
         A[i] = s
 
@@ -1712,17 +1712,17 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
     # get total chars in new array
     for i in numba.parfor.internal_prange(n):
         s = B[i]
-        if hpat.hiframes_api.isna(B, i):
+        if hpat.hiframes.api.isna(B, i):
             num_chars += len(fill)
         else:
             num_chars += len(s)
     A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
-    hpat.hiframes_api.fillna(A, B, fill)
+    hpat.hiframes.api.fillna(A, B, fill)
     return A
 
 def _series_dropna_float_impl(S):  # pragma: no cover
     old_len = len(S)
-    new_len = old_len - hpat.hiframes_api.to_series_type(S).isna().sum()
+    new_len = old_len - hpat.hiframes.api.to_series_type(S).isna().sum()
     A = np.empty(new_len, S.dtype)
     curr_ind = 0
     for i in numba.parfor.internal_prange(old_len):
@@ -1736,7 +1736,7 @@ def _series_dropna_float_impl(S):  # pragma: no cover
 def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     old_len = len(B)
     # TODO: more efficient null counting
-    new_len = old_len - hpat.hiframes_api.to_series_type(B).isna().sum()
+    new_len = old_len - hpat.hiframes.api.to_series_type(B).isna().sum()
     num_chars = hpat.str_arr_ext.num_total_chars(B)
     A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
     hpat.str_arr_ext.copy_non_null_offsets(A, B)
@@ -1778,7 +1778,7 @@ class TypeDt64(AbstractTemplate):
 @numba.njit
 def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
-        s = hpat.hiframes_typed._get_nan(s)
+        s = hpat.hiframes.hiframes_typed._get_nan(s)
     return s
 
 def _column_sum_impl_basic(A):  # pragma: no cover
@@ -1804,7 +1804,7 @@ def _column_sum_impl_count(A):  # pragma: no cover
             s += val
             count += 1
 
-    res = hpat.hiframes_typed._sum_handle_nan(s, count)
+    res = hpat.hiframes.hiframes_typed._sum_handle_nan(s, count)
     return res
 
 def _column_prod_impl_basic(A):  # pragma: no cover
@@ -1838,7 +1838,7 @@ def _column_mean_impl(A):  # pragma: no cover
             s += val
             count += 1
 
-    res = hpat.hiframes_typed._mean_handle_nan(s, count)
+    res = hpat.hiframes.hiframes_typed._mean_handle_nan(s, count)
     return res
 
 
@@ -1862,7 +1862,7 @@ def _column_var_impl(A):  # pragma: no cover
             count_m += 1
 
     numba.parfor.init_prange()
-    m = hpat.hiframes_typed._mean_handle_nan(m, count_m)
+    m = hpat.hiframes.hiframes_typed._mean_handle_nan(m, count_m)
     s = 0
     count = 0
     for i in numba.parfor.internal_prange(len(A)):
@@ -1871,23 +1871,23 @@ def _column_var_impl(A):  # pragma: no cover
             s += (val - m)**2
             count += 1
 
-    res = hpat.hiframes_typed._var_handle_nan(s, count)
+    res = hpat.hiframes.hiframes_typed._var_handle_nan(s, count)
     return res
 
 def _column_std_impl(A):  # pragma: no cover
-    var = hpat.hiframes_api.var(A)
+    var = hpat.hiframes.api.var(A)
     return var**0.5
 
 def _column_min_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
-    s = hpat.hiframes_typed._get_type_max_value(in_arr.dtype)
+    s = hpat.hiframes.hiframes_typed._get_type_max_value(in_arr.dtype)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
-        if not hpat.hiframes_api.isna(in_arr, i):
+        if not hpat.hiframes.api.isna(in_arr, i):
             s = min(s, val)
             count += 1
-    res = hpat.hiframes_typed._sum_handle_nan(s, count)
+    res = hpat.hiframes.hiframes_typed._sum_handle_nan(s, count)
     return res
 
 def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
@@ -1908,7 +1908,7 @@ def _column_max_impl(in_arr):  # pragma: no cover
         if not np.isnan(val):
             s = max(s, val)
             count += 1
-    res = hpat.hiframes_typed._sum_handle_nan(s, count)
+    res = hpat.hiframes.hiframes_typed._sum_handle_nan(s, count)
     return res
 
 def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
@@ -1929,15 +1929,15 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     return S
 
 def _column_describe_impl(A):  # pragma: no cover
-    S = hpat.hiframes_api.to_series_type(A)
-    a_count = np.float64(hpat.hiframes_api.count(A))
+    S = hpat.hiframes.api.to_series_type(A)
+    a_count = np.float64(hpat.hiframes.api.count(A))
     a_min = S.min()
     a_max = S.max()
-    a_mean = hpat.hiframes_api.mean(A)
-    a_std = hpat.hiframes_api.var(A)**0.5
-    q25 = hpat.hiframes_api.quantile(A, .25)
-    q50 = hpat.hiframes_api.quantile(A, .5)
-    q75 = hpat.hiframes_api.quantile(A, .75)
+    a_mean = hpat.hiframes.api.mean(A)
+    a_std = hpat.hiframes.api.var(A)**0.5
+    q25 = hpat.hiframes.api.quantile(A, .25)
+    q50 = hpat.hiframes.api.quantile(A, .5)
+    q75 = hpat.hiframes.api.quantile(A, .75)
     # TODO: pandas returns dataframe, maybe return namedtuple instread of
     # string?
     # TODO: fix string formatting to match python/pandas
@@ -1954,24 +1954,24 @@ def _column_describe_impl(A):  # pragma: no cover
 def _column_fillna_alloc_impl(S, val):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
-    hpat.hiframes_api.fillna(B, S, val)
+    hpat.hiframes.api.fillna(B, S, val)
     return B
 
 
 def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
     e = hpat.str_ext.compile_regex(pat)
-    return hpat.hiframes_api.str_contains_regex(str_arr, e)
+    return hpat.hiframes.api.str_contains_regex(str_arr, e)
 
 def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
-    return hpat.hiframes_api.str_contains_noregex(str_arr, pat)
+    return hpat.hiframes.api.str_contains_noregex(str_arr, pat)
 
 
 
 # TODO: use online algorithm, e.g. StatFunctions.scala
 # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_cov_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes_api.to_series_type(A)
-    S2 = hpat.hiframes_api.to_series_type(B)
+    S1 = hpat.hiframes.api.to_series_type(A)
+    S2 = hpat.hiframes.api.to_series_type(B)
     # TODO: check lens
     ma = S1.mean()
     mb = S2.mean()
@@ -1980,8 +1980,8 @@ def _column_cov_impl(A, B):  # pragma: no cover
 
 
 def _column_corr_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes_api.to_series_type(A)
-    S2 = hpat.hiframes_api.to_series_type(B)
+    S1 = hpat.hiframes.api.to_series_type(A)
+    S2 = hpat.hiframes.api.to_series_type(B)
     n = S1.count()
     # TODO: check lens
     ma = S1.sum()
@@ -1996,20 +1996,20 @@ def _column_corr_impl(A, B):  # pragma: no cover
 
 
 def _series_append_single_impl(arr, other):
-    return hpat.hiframes_api.concat((arr, other))
+    return hpat.hiframes.api.concat((arr, other))
 
 def _series_append_tuple_impl(arr, other):
-    tup_other = hpat.hiframes_api.to_const_tuple(other)
+    tup_other = hpat.hiframes.api.to_const_tuple(other)
     arrs = (arr,) + tup_other
-    c_arrs = hpat.hiframes_api.to_const_tuple(arrs)
-    return hpat.hiframes_api.concat(c_arrs)
+    c_arrs = hpat.hiframes.api.to_const_tuple(arrs)
+    return hpat.hiframes.api.concat(c_arrs)
 
 def _series_isna_impl(arr):
     numba.parfor.init_prange()
     n = len(arr)
     out_arr = np.empty(n, np.bool_)
     for i in numba.parfor.internal_prange(n):
-        out_arr[i] = hpat.hiframes_api.isna(arr, i)
+        out_arr[i] = hpat.hiframes.api.isna(arr, i)
     return out_arr
 
 def _series_astype_str_impl(arr):
@@ -2087,17 +2087,17 @@ series_replace_funcs = {
     'min': defaultdict(lambda: _column_min_impl, [(numba.types.scalars.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
-    'nunique': lambda A: hpat.hiframes_api.nunique(A),
-    'unique': lambda A: hpat.hiframes_api.unique(A),
+    'nunique': lambda A: hpat.hiframes.api.nunique(A),
+    'unique': lambda A: hpat.hiframes.api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
     'dropna_float': _series_dropna_float_impl,
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
-    'shift': lambda A, shift: hpat.hiframes_rolling.shift(A, shift, False),
-    'shift_default': lambda A: hpat.hiframes_rolling.shift(A, 1, False),
-    'pct_change': lambda A, shift: hpat.hiframes_rolling.pct_change(A, shift, False),
-    'pct_change_default': lambda A: hpat.hiframes_rolling.pct_change(A, 1, False),
+    'shift': lambda A, shift: hpat.hiframes.rolling.shift(A, shift, False),
+    'shift_default': lambda A: hpat.hiframes.rolling.shift(A, 1, False),
+    'pct_change': lambda A, shift: hpat.hiframes.rolling.pct_change(A, shift, False),
+    'pct_change_default': lambda A: hpat.hiframes.rolling.pct_change(A, 1, False),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
@@ -2109,13 +2109,13 @@ series_replace_funcs = {
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
-    'nlargest': lambda A, k: hpat.hiframes_api.nlargest(A, k, True, gt_f),
-    'nlargest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, True, gt_f),
-    'nsmallest': lambda A, k: hpat.hiframes_api.nlargest(A, k, False, lt_f),
-    'nsmallest_default': lambda A: hpat.hiframes_api.nlargest(A, 5, False, lt_f),
+    'nlargest': lambda A, k: hpat.hiframes.api.nlargest(A, k, True, gt_f),
+    'nlargest_default': lambda A: hpat.hiframes.api.nlargest(A, 5, True, gt_f),
+    'nsmallest': lambda A, k: hpat.hiframes.api.nlargest(A, k, False, lt_f),
+    'nsmallest_default': lambda A: hpat.hiframes.api.nlargest(A, 5, False, lt_f),
     'head': lambda A, k: A[:k],
     'head_default': lambda A: A[:5],
-    'median': lambda A: hpat.hiframes_api.median(A),
+    'median': lambda A: hpat.hiframes.api.median(A),
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),
     'idxmax': lambda A: A.argmax(),
