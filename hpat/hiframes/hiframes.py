@@ -67,7 +67,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['dist_return', 'distributed_api', hpat]:
         return True
-    if call_list == ['unbox_df_column', 'api', 'hiframes', hpat]:
+    if call_list == ['unbox_df_column', 'boxing', 'hiframes', hpat]:
         return True
     if call_list == ['agg_typer', 'api', 'hiframes', hpat]:
         return True
@@ -1859,7 +1859,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.api.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
+                func_text += "  _col_input_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.boxing.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1997,7 +1997,7 @@ class HiFrames(object):
         col_names = ", ".join(['"{}"'.format(cname) for cname in names])
 
         func_text = "def f({}):\n".format(arg_names)
-        func_text += "  _dt_arr = hpat.hiframes.api.box_df({}, {})\n".format(col_names, arg_names)
+        func_text += "  _dt_arr = hpat.hiframes.boxing.box_df({}, {})\n".format(col_names, arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']

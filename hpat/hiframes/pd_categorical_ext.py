@@ -3,7 +3,7 @@ import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method)
-from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing, cgutils
 from numba.targets.boxing import box_array, unbox_array
 
