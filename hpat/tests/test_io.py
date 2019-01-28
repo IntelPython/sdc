@@ -395,8 +395,9 @@ class TestIO(unittest.TestCase):
         n = 111
         A = np.random.ranf(n)
         hpat_func(A)
-        B = np.fromfile("np_file_3.dat", np.float64)
-        np.testing.assert_almost_equal(A, B)
+        if get_rank() == 0:
+            B = np.fromfile("np_file_3.dat", np.float64)
+            np.testing.assert_almost_equal(A, B)
 
     def test_np_io4(self):
         # parallel version
