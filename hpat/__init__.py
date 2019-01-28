@@ -14,7 +14,7 @@ from numba.types import List
 from hpat.utils import cprint, distribution_report
 import hpat.compiler
 import hpat.io
-import hpat.pd_timestamp_ext
+import hpat.hiframes.pd_timestamp_ext
 import hpat.config
 import hpat.timsort
 

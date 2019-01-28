@@ -235,7 +235,8 @@ def box_datetime_date_array(typ, val, c):
     ary = box_array(types.Array(types.int64, 1, 'C'), val, c)
     hpat_name = c.context.insert_const_string(c.builder.module, 'hpat')
     hpat_mod = c.pyapi.import_module_noblock(hpat_name)
-    pte_mod = c.pyapi.object_getattr_string(hpat_mod, 'pd_timestamp_ext')
+    hi_mod = c.pyapi.object_getattr_string(hpat_mod, 'hiframes')
+    pte_mod = c.pyapi.object_getattr_string(hi_mod, 'pd_timestamp_ext')
     iatdd = c.pyapi.object_getattr_string(pte_mod, 'int_array_to_datetime_date')
     res = c.pyapi.call_function_objargs(iatdd, [ary])
     return res

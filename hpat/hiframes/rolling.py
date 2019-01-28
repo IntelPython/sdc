@@ -10,7 +10,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.ir_utils import guard, find_const
 
 from hpat.distributed_api import Reduce_Type
-from hpat.pd_timestamp_ext import integer_to_dt64
+from hpat.hiframes.pd_timestamp_ext import integer_to_dt64
 from hpat.utils import unliteral_all
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',

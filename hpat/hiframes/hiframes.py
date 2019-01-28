@@ -34,10 +34,10 @@ import pandas as pd
 import numpy as np
 import math
 from hpat.parquet_pio import ParquetHandler
-from hpat.pd_timestamp_ext import (datetime_date_type,
+from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
-from hpat.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type
-from hpat.pd_categorical_ext import PDCategoricalDtype
+from hpat.hiframes.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
 

@@ -23,8 +23,8 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
-from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
-from hpat.pd_series_ext import dt_index_series_type, string_series_type
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
+from hpat.hiframes.pd_series_ext import dt_index_series_type, string_series_type
 
 
 class CsvReader(ir.Stmt):

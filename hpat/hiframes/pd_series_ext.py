@@ -15,8 +15,8 @@ import hpat
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
-from hpat.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
+from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
 
@@ -723,7 +723,7 @@ class SeriesDtMethodAttribute(AttributeTemplate):
 def resolve_date_field(self, ary):
     return SeriesType(types.int64)
 
-for field in hpat.pd_timestamp_ext.date_fields:
+for field in hpat.hiframes.pd_timestamp_ext.date_fields:
     setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
 
 

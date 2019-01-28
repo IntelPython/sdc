@@ -25,7 +25,7 @@ from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
-from hpat.pd_series_ext import (SeriesType, string_series_type,
+from hpat.hiframes.pd_series_ext import (SeriesType, string_series_type,
     series_to_array_type, BoxedSeriesType, dt_index_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
@@ -263,7 +263,7 @@ class HiFramesTyped(object):
                     return [assign]
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
-                    if rhs.attr in hpat.pd_timestamp_ext.date_fields:
+                    if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
                         return self._run_DatetimeIndex_field(assign, assign.target, rhs)
                     if rhs.attr == 'date':
                         return self._run_DatetimeIndex_date(assign, assign.target, rhs)
@@ -276,7 +276,7 @@ class HiFramesTyped(object):
                     return self._run_DatetimeIndex_field(assign, assign.target, rhs)
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
-                    if rhs.attr in hpat.pd_timestamp_ext.timedelta_fields:
+                    if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
                         return self._run_Timedelta_field(assign, assign.target, rhs)
 
             res = self._handle_string_array_expr(lhs, rhs, assign)
@@ -303,7 +303,7 @@ class HiFramesTyped(object):
                 def f(_in_arr, _ind):
                     dt = _in_arr[_ind]
                     s = np.int64(dt)
-                    res = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+                    res = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
                 assert isinstance(self.typemap[ind_var.name],
                     (types.Integer, types.IntegerLiteral))
@@ -355,7 +355,7 @@ class HiFramesTyped(object):
                 if fdef == ('_get_type_max_value', 'hpat.hiframes.hiframes_typed'):
                     if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
                         return self._replace_func(
-                            lambda: hpat.pd_timestamp_ext.integer_to_dt64(
+                            lambda: hpat.hiframes.pd_timestamp_ext.integer_to_dt64(
                                 numba.targets.builtins.get_type_max_value(
                                     numba.types.int64)), [])
                     return self._replace_func(
@@ -829,7 +829,7 @@ class HiFramesTyped(object):
         func_text += "    v = map_func(t)\n"
         func_text += "    S[i] = hpat.hiframes.api.convert_tup_to_rec(v)\n"
         # func_text += "    print(S[i])\n"
-        if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
+        if out_typ == hpat.hiframes.pd_timestamp_ext.datetime_date_type:
             func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
@@ -996,7 +996,7 @@ class HiFramesTyped(object):
             func_text += "    if i < n2:\n"
             func_text += "      t2 = B[i]\n"
         func_text += "    S[i] = map_func(t1, t2)\n"
-        if out_typ == hpat.pd_timestamp_ext.datetime_date_type:
+        if out_typ == hpat.hiframes.pd_timestamp_ext.datetime_date_type:
             func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
@@ -1133,8 +1133,8 @@ class HiFramesTyped(object):
         # TODO: why doesn't empty_inferred work for t4 mortgage test?
         func_text += '    S = np.empty(n, np.int64)\n'
         func_text += '    for i in numba.parfor.internal_prange(n):\n'
-        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
-        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        dt64 = hpat.hiframes.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
         func_text += '        S[i] = ts.' + field + '\n'
         func_text += '    return S\n'
         loc_vars = {}
@@ -1154,9 +1154,9 @@ class HiFramesTyped(object):
         func_text += '    n = len(dti)\n'
         func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
         func_text += '    for i in numba.parfor.internal_prange(n):\n'
-        func_text += '        dt64 = hpat.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
-        func_text += '        ts = hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
-        func_text += '        S[i] = hpat.pd_timestamp_ext.datetime_date_ctor(ts.year, ts.month, ts.day)\n'
+        func_text += '        dt64 = hpat.hiframes.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
+        func_text += '        ts = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
+        func_text += '        S[i] = hpat.hiframes.pd_timestamp_ext.datetime_date_ctor(ts.year, ts.month, ts.day)\n'
         #func_text += '        S[i] = datetime.date(ts.year, ts.month, ts.day)\n'
         #func_text += '        S[i] = ts.day + (ts.month << 16) + (ts.year << 32)\n'
         func_text += '    return S\n'
@@ -1177,7 +1177,7 @@ class HiFramesTyped(object):
         func_text += '    n = len(dti)\n'
         func_text += '    S = numba.unsafe.ndarray.empty_inferred((n,))\n'
         func_text += '    for i in numba.parfor.internal_prange(n):\n'
-        func_text += '        dt64 = hpat.pd_timestamp_ext.timedelta64_to_integer(dti[i])\n'
+        func_text += '        dt64 = hpat.hiframes.pd_timestamp_ext.timedelta64_to_integer(dti[i])\n'
         if field == 'nanoseconds':
             func_text += '        S[i] = dt64 % 1000\n'
         elif field == 'microseconds':
@@ -1222,7 +1222,7 @@ class HiFramesTyped(object):
             n = len(str_arr)
             S = numba.unsafe.ndarray.empty_inferred((n,))
             for i in numba.parfor.internal_prange(n):
-                S[i] = hpat.pd_timestamp_ext.parse_datetime_str(str_arr[i])
+                S[i] = hpat.hiframes.pd_timestamp_ext.parse_datetime_str(str_arr[i])
             return S
 
         return self._replace_func(f, [data])
@@ -1345,7 +1345,7 @@ class HiFramesTyped(object):
 
         # TODO: this has to be more generic to support all combinations.
         if (self.typemap[arg1.name] == dt_index_series_type and
-            self.typemap[arg2.name] == hpat.pd_timestamp_ext.pandas_timestamp_type and
+            self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type and
             rhs.fn in ('-', operator.sub)):
             return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
 
@@ -1363,7 +1363,7 @@ class HiFramesTyped(object):
             func_text += '  dt_index, _str = arg2, arg1\n'
             comp = 'other {} dt_index[i]'.format(op_str)
         func_text += '  l = len(dt_index)\n'
-        func_text += '  other = hpat.pd_timestamp_ext.parse_datetime_str(_str)\n'
+        func_text += '  other = hpat.hiframes.pd_timestamp_ext.parse_datetime_str(_str)\n'
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}\n'.format(comp)
@@ -1761,7 +1761,7 @@ def _get_type_max_value(dtype):
 @overload(_get_type_max_value)
 def _get_type_max_value_overload(dtype):
     if isinstance(dtype.dtype, (types.NPDatetime, types.NPTimedelta)):
-        return lambda dtype: hpat.pd_timestamp_ext.integer_to_dt64(
+        return lambda dtype: hpat.hiframes.pd_timestamp_ext.integer_to_dt64(
             numba.targets.builtins.get_type_max_value(numba.types.int64))
     return lambda dtype: numba.targets.builtins.get_type_max_value(dtype)
 
@@ -1894,9 +1894,9 @@ def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     s = numba.targets.builtins.get_type_max_value(numba.types.int64)
     for i in numba.parfor.internal_prange(len(in_arr)):
-        val = hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i])
+        val = hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i])
         s = min(s, val)
-    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+    return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
 # TODO: fix for dt64
 def _column_max_impl(in_arr):  # pragma: no cover
@@ -1916,16 +1916,16 @@ def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
     s = numba.targets.builtins.get_type_min_value(numba.types.int64)
     for i in numba.parfor.internal_prange(len(in_arr)):
         val = in_arr[i]
-        s = max(s, hpat.pd_timestamp_ext.dt64_to_integer(val))
-    return hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+        s = max(s, hpat.hiframes.pd_timestamp_ext.dt64_to_integer(val))
+    return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
 def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     numba.parfor.init_prange()
     n = len(in_arr)
     S = numba.unsafe.ndarray.empty_inferred((n,))
-    tsint = hpat.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
+    tsint = hpat.hiframes.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
     for i in numba.parfor.internal_prange(n):
-        S[i] = hpat.pd_timestamp_ext.integer_to_timedelta64(hpat.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
     return S
 
 def _column_describe_impl(A):  # pragma: no cover

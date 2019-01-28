@@ -5,7 +5,8 @@
 /dist
 
 # cache
-*/__pycache__
+hpat/__pycache__
+hpat/hiframes/__pycache__
 
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info

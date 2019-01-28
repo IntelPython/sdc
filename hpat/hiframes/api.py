@@ -25,15 +25,15 @@ from hpat.set_ext import build_set
 from numba.typing.arraydecl import get_array_index_type
 from numba.targets.imputils import lower_builtin, impl_ret_untracked, impl_ret_borrowed
 import numpy as np
-from hpat.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
+from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type,
     set_df_datetime_date_lower, unbox_datetime_date_array, box_datetime_date_array)
 import hpat
-from hpat.pd_series_ext import (SeriesType, BoxedSeriesType,
+from hpat.hiframes.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
 
-from hpat.pd_categorical_ext import PDCategoricalDtype, box_categorical_series_dtype_fix
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, box_categorical_series_dtype_fix
 
 from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
@@ -1574,7 +1574,7 @@ def iternext_itertuples(context, builder, sig, args, result):
             if arr_typ == types.Array(types.NPDatetime('ns'), 1, 'C'):
                 getitem_sig = signature(pandas_timestamp_type, arr_typ, types.intp)
                 val = context.compile_internal(builder,
-                    lambda a,i: hpat.pd_timestamp_ext.convert_datetime64_to_timestamp(np.int64(a[i])),
+                    lambda a,i: hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(np.int64(a[i])),
                         getitem_sig, [arr_ptr, index])
             else:
                 getitem_sig = signature(arr_typ.dtype, arr_typ, types.intp)
