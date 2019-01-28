@@ -338,18 +338,18 @@ def to_string_list(arr):
     return arr
 
 @overload(to_string_list)
-def to_string_list_overload(arr_typ):
-    if is_str_arr_typ(arr_typ):
-        def to_string_impl(str_arr):
-            n = len(str_arr)
+def to_string_list_overload(data):
+    if is_str_arr_typ(data):
+        def to_string_impl(data):
+            n = len(data)
             l_str = []
             for i in range(n):
-                l_str.append(str_arr[i])
+                l_str.append(data[i])
             return l_str
         return to_string_impl
 
-    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
-        count = arr_typ.count
+    if isinstance(data, (types.Tuple, types.UniTuple)):
+        count = data.count
 
         func_text = "def f(data):\n"
         func_text += "  return ({}{})\n".format(','.join(["to_string_list(data[{}])".format(
@@ -367,22 +367,22 @@ def cp_str_list_to_array(str_arr, str_list):
     return
 
 @overload(cp_str_list_to_array)
-def cp_str_list_to_array_overload(arr_typ, list_typ):
-    if is_str_arr_typ(arr_typ):
-        def cp_str_list_impl(str_arr, str_list):
-            n = len(str_list)
+def cp_str_list_to_array_overload(str_arr, list_data):
+    if is_str_arr_typ(str_arr):
+        def cp_str_list_impl(str_arr, list_data):
+            n = len(list_data)
             for i in range(n):
-                _str = str_list[i]
+                _str = list_data[i]
                 str_arr[i] = _str
 
         return cp_str_list_impl
 
-    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
-        count = arr_typ.count
+    if isinstance(str_arr, (types.Tuple, types.UniTuple)):
+        count = str_arr.count
 
-        func_text = "def f(data, l_data):\n"
+        func_text = "def f(str_arr, list_data):\n"
         for i in range(count):
-            func_text += "  cp_str_list_to_array(data[{}], l_data[{}])\n".format(i, i)
+            func_text += "  cp_str_list_to_array(str_arr[{}], list_data[{}])\n".format(i, i)
         func_text += "  return\n"
 
         loc_vars = {}
@@ -397,8 +397,8 @@ def str_list_to_array(str_list):
     return str_list
 
 @overload(str_list_to_array)
-def str_list_to_array_overload(list_typ):
-    if list_typ == types.List(string_type):
+def str_list_to_array_overload(str_list):
+    if str_list == types.List(string_type):
         def str_list_impl(str_list):
             n = len(str_list)
             n_char = 0
@@ -413,7 +413,7 @@ def str_list_to_array_overload(list_typ):
 
         return str_list_impl
 
-    return lambda a: a
+    return lambda str_list: str_list
 
 @infer_global(operator.getitem)
 class GetItemStringArray(AbstractTemplate):
@@ -571,8 +571,8 @@ def str_arr_size_impl(context, builder, typ, val):
 @overload(len)
 def str_arr_len_overload(str_arr):
     if is_str_arr_typ(str_arr):
-        def str_arr_len(s):
-            return s.size
+        def str_arr_len(str_arr):
+            return str_arr.size
         return str_arr_len
 
 
@@ -953,8 +953,8 @@ def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
 
 # TODO: use overload
 @overload(operator.getitem)
-def str_arr_getitem_int(arr_t, ind_t):
-    if arr_t == string_array_type and isinstance(ind_t, types.Integer):
+def str_arr_getitem_int(A, i):
+    if A == string_array_type and isinstance(i, types.Integer):
         kind = numba.unicode.PY_UNICODE_1BYTE_KIND
         def str_arr_getitem_impl(A, i):
             start_offset = getitem_str_offset(A, i)

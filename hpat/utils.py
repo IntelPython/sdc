@@ -309,12 +309,12 @@ def to_array(A):
     return np.array(A)
 
 @overload(to_array)
-def to_array_overload(in_typ):
+def to_array_overload(A):
     # try regular np.array and return it if it works
     def to_array_impl(A):
         return np.array(A)
     try:
-        numba.njit(to_array_impl).get_call_template((in_typ,), {})
+        numba.njit(to_array_impl).get_call_template((A,), {})
         return to_array_impl
     except:
         pass  # should be handled elsewhere (e.g. Set)
@@ -323,16 +323,16 @@ def empty_like_type(n, arr):
     return np.empty(n, arr.dtype)
 
 @overload(empty_like_type)
-def empty_like_type_overload(size_t, arr_typ):
-    if isinstance(arr_typ, types.Array):
-        return lambda a,b: np.empty(a, b.dtype)
-    if isinstance(arr_typ, types.List) and arr_typ.dtype == string_type:
+def empty_like_type_overload(n, arr):
+    if isinstance(arr, types.Array):
+        return lambda n, arr: np.empty(n, arr.dtype)
+    if isinstance(arr, types.List) and arr.dtype == string_type:
         def empty_like_type_str_list(n, arr):
             return [''] * n
         return empty_like_type_str_list
 
     # string array buffer for join
-    assert arr_typ == string_array_type
+    assert arr == string_array_type
     def empty_like_type_str_arr(n, arr):
         # average character heuristic
         avg_chars = 20  # heuristic
@@ -350,18 +350,18 @@ def alloc_arr_tup(n, arr_tup, init_vals=()):
     return tuple(arrs)
 
 @overload(alloc_arr_tup)
-def alloc_arr_tup_overload(n_t, data_t, init_vals_t=None):
-    count = data_t.count
+def alloc_arr_tup_overload(n, data, init_vals=()):
+    count = data.count
 
-    allocs = ','.join(["empty_like_type(n, d[{}])".format(i)
+    allocs = ','.join(["empty_like_type(n, data[{}])".format(i)
                         for i in range(count)])
 
-    if init_vals_t is not None:
+    if init_vals is not ():
         # TODO check for numeric value
-        allocs = ','.join(["np.full(n, init_vals[{}], d[{}].dtype)".format(i, i)
+        allocs = ','.join(["np.full(n, init_vals[{}], data[{}].dtype)".format(i, i)
                         for i in range(count)])
 
-    func_text = "def f(n, d, init_vals=()):\n"
+    func_text = "def f(n, data, init_vals=()):\n"
     func_text += "  return ({}{})\n".format(allocs,
         "," if count == 1 else "")  # single value needs comma to become tuple
 
