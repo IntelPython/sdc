@@ -1300,7 +1300,7 @@ class HiFramesTyped(object):
     def _run_series_str_get(self, assign, lhs, arr, rhs):
         # XXX only supports get for list(list(str)) input
         assert (self.typemap[arr.name]
-                    == SeriesType(types.List(string_type), 1, 'C'))
+                    == SeriesType(types.List(string_type)))
         ind_var = rhs.args[0]
 
         def _str_get_impl(str_arr, ind):
@@ -1538,7 +1538,7 @@ class HiFramesTyped(object):
         str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
                                                     if t == string_series_type]
         list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
-                        if t == SeriesType(types.List(string_type), 1, 'C')]
+                        if t == SeriesType(types.List(string_type))]
         isna_calls = ['hpat.hiframes_api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"

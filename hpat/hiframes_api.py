@@ -719,7 +719,7 @@ class DfIsinCol(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(SeriesType(types.bool_, 1, 'C'), *unliteral_all(args))
+        return signature(SeriesType(types.bool_), *unliteral_all(args))
 
 
 def flatten_to_series(A):  # pragma: no cover
@@ -735,7 +735,7 @@ class FlattenTyp(AbstractTemplate):
         l_dtype = args[0].dtype
         assert isinstance(l_dtype, types.List)
         dtype = l_dtype.dtype
-        return signature(SeriesType(dtype, 1, 'C'), *unliteral_all(args))
+        return signature(SeriesType(dtype), *unliteral_all(args))
 
 def to_numeric(A, dtype):
     return A
@@ -746,7 +746,7 @@ class ToNumeric(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         dtype = args[1].dtype
-        return signature(SeriesType(dtype, 1, 'C'), *unliteral_all(args))
+        return signature(SeriesType(dtype), *unliteral_all(args))
 
 class PandasDataFrameType(types.Type):
     def __init__(self, col_names, col_types):
@@ -1140,7 +1140,7 @@ class ToSeriesType(AbstractTemplate):
         assert len(args) == 1
         arr = args[0]
         if isinstance(arr, BoxedSeriesType):
-            series_type = SeriesType(arr.dtype, 1, 'C')
+            series_type = SeriesType(arr.dtype)
         else:
             series_type = if_arr_to_series_type(arr)
         assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
@@ -1412,7 +1412,7 @@ class DatetimeIndexTyper(AbstractTemplate):
             raise ValueError(msg)
 
         sig = signature(
-            SeriesType(types.NPDatetime('ns'), 1, 'C'), bound.args).replace(
+            SeriesType(types.NPDatetime('ns')), bound.args).replace(
                 pysig=pysig)
         return sig
 

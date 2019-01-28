@@ -136,11 +136,11 @@ class SeriesType(types.IterableType):
         return self.layout in 'CF'
 
 
-string_series_type = SeriesType(string_type, 1, 'C')
+string_series_type = SeriesType(string_type)
 # TODO: create a separate DatetimeIndex type from Series
-dt_index_series_type = SeriesType(types.NPDatetime('ns'), 1, 'C')
-timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'), 1, 'C')
-date_series_type = SeriesType(datetime_date_type, 1, 'C')
+dt_index_series_type = SeriesType(types.NPDatetime('ns'))
+timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'))
+date_series_type = SeriesType(datetime_date_type)
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
@@ -246,7 +246,7 @@ def arr_to_series_type(arr):
         # StringArray is readonly
         series_type = string_series_type
     elif arr == list_string_array_type:
-        series_type = SeriesType(types.List(string_type), 1, 'C')
+        series_type = SeriesType(types.List(string_type))
     return series_type
 
 def arr_to_boxed_series_type(arr):
@@ -516,7 +516,7 @@ class SeriesAttribute(AttributeTemplate):
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.context, f_ir, (dtype,), None)
 
-        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+        return signature(SeriesType(f_return_type), *args)
 
     @bound_function("series.map")
     def resolve_map(self, ary, args, kws):
@@ -539,7 +539,7 @@ class SeriesAttribute(AttributeTemplate):
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.context, f_ir, (dtype1,dtype2,), None)
-        return signature(SeriesType(f_return_type, 1, 'C'), *args)
+        return signature(SeriesType(f_return_type), *args)
 
     @bound_function("series.combine")
     def resolve_combine(self, ary, args, kws):
@@ -687,24 +687,24 @@ class SeriesStrMethodAttribute(AttributeTemplate):
 
     @bound_function("strmethod.contains")
     def resolve_contains(self, ary, args, kws):
-        return signature(SeriesType(types.bool_, 1, 'C'), *args)
+        return signature(SeriesType(types.bool_), *args)
 
     @bound_function("strmethod.len")
     def resolve_len(self, ary, args, kws):
-        return signature(SeriesType(types.int64, 1, 'C'), *args)
+        return signature(SeriesType(types.int64), *args)
 
     @bound_function("strmethod.replace")
     def resolve_replace(self, ary, args, kws):
-        return signature(SeriesType(string_type, 1, 'C'), *args)
+        return signature(SeriesType(string_type), *args)
 
     @bound_function("strmethod.split")
     def resolve_split(self, ary, args, kws):
-        return signature(SeriesType(types.List(string_type), 1, 'C'), *args)
+        return signature(SeriesType(types.List(string_type)), *args)
 
     @bound_function("strmethod.get")
     def resolve_get(self, ary, args, kws):
         # XXX only list(list(str)) supported
-        return signature(SeriesType(string_type, 1, 'C'), *args)
+        return signature(SeriesType(string_type), *args)
 
 
 class SeriesDtMethodType(types.Type):
@@ -721,7 +721,7 @@ class SeriesDtMethodAttribute(AttributeTemplate):
 
 # all date fields return int64 same as Timestamp fields
 def resolve_date_field(self, ary):
-    return SeriesType(types.int64, 1, 'C')
+    return SeriesType(types.int64)
 
 for field in hpat.pd_timestamp_ext.date_fields:
     setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
@@ -741,15 +741,15 @@ class SeriesRollingAttribute(AttributeTemplate):
     @bound_function("rolling.apply")
     def resolve_apply(self, ary, args, kws):
         # result is always float64 (see Pandas window.pyx:roll_generic)
-        return signature(SeriesType(types.float64, 1, 'C'), *args)
+        return signature(SeriesType(types.float64), *args)
 
     @bound_function("rolling.cov")
     def resolve_cov(self, ary, args, kws):
-        return signature(SeriesType(types.float64, 1, 'C'), *args)
+        return signature(SeriesType(types.float64), *args)
 
     @bound_function("rolling.corr")
     def resolve_corr(self, ary, args, kws):
-        return signature(SeriesType(types.float64, 1, 'C'), *args)
+        return signature(SeriesType(types.float64), *args)
 
 # similar to install_array_method in arraydecl.py
 def install_rolling_method(name, generic):
@@ -762,7 +762,7 @@ def install_rolling_method(name, generic):
 
 def rolling_generic(self, args, kws):
     # output is always float64
-    return signature(SeriesType(types.float64, 1, 'C'), *args)
+    return signature(SeriesType(types.float64), *args)
 
 for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
@@ -800,11 +800,11 @@ class SeriesCompEqual(AbstractTemplate):
             # inputs should be either string array or string
             assert is_str_arr_typ(va) or va == string_type
             assert is_str_arr_typ(vb) or vb == string_type
-            return signature(SeriesType(types.boolean, 1, 'C'), va, vb)
+            return signature(SeriesType(types.boolean), va, vb)
 
         if ((va == dt_index_series_type and vb == string_type)
                 or (vb == dt_index_series_type and va == string_type)):
-            return signature(SeriesType(types.boolean, 1, 'C'), va, vb)
+            return signature(SeriesType(types.boolean), va, vb)
 
 @infer
 class CmpOpNEqSeries(SeriesCompEqual):

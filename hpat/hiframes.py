@@ -814,7 +814,7 @@ class HiFrames(object):
                 raise ValueError("dtype column names should be constant")
             typ = self._get_const_dtype(dtype_var)
             if i in date_cols:
-                typ = SeriesType(types.NPDatetime('ns'), 1, 'C')
+                typ = SeriesType(types.NPDatetime('ns'))
             out_types.append(typ)
             col_map[col_name] = ir.Var(
                 lhs.scope, mk_unique_var(col_name), lhs.loc)
@@ -839,7 +839,7 @@ class HiFrames(object):
             err_msg = "categories should be constant list"
             cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
             typ = PDCategoricalDtype(cats)
-            return SeriesType(typ, 1, 'C')
+            return SeriesType(typ)
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
         glob_def = guard(get_definition, self.func_ir, dtype_def.value)
@@ -850,7 +850,7 @@ class HiFrames(object):
         typ_name = 'int64' if typ_name == 'int' else typ_name
         typ_name = 'float64' if typ_name == 'float' else typ_name
         typ = getattr(types, typ_name)
-        typ = SeriesType(typ, 1, 'C')
+        typ = SeriesType(typ)
         return typ
 
     def _handle_pd_Series(self, assign, lhs, rhs):
@@ -1877,7 +1877,7 @@ class HiFrames(object):
         if (isinstance(arg_typ, BoxedSeriesType) or
                 isinstance(arg_typ, (types.List, types.Set))
                 and isinstance(arg_typ.dtype, BoxedSeriesType)):
-            # self.args[arg_ind] = SeriesType(arg_typ.dtype, 1, 'C')
+            # self.args[arg_ind] = SeriesType(arg_typ.dtype)
             # replace arg var with tmp
             def f(_boxed_series):  # pragma: no cover
                 _dt_arr = hpat.hiframes_api.to_series_type(hpat.hiframes_api.dummy_unbox_series(_boxed_series))
