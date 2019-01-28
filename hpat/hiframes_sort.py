@@ -518,16 +518,16 @@ def alloc_pre_shuffle_metadata(arr, data, n_pes, is_contig):
     return PreShuffleMeta(np.zeros(n_pes, np.int32), ())
 
 @overload(alloc_pre_shuffle_metadata)
-def alloc_pre_shuffle_metadata_overload(key_arrs_t, data_t, n_pes_t, is_contig_t):
+def alloc_pre_shuffle_metadata_overload(key_arrs, data, n_pes, is_contig):
 
     func_text = "def f(key_arrs, data, n_pes, is_contig):\n"
     # send_counts
     func_text += "  send_counts = np.zeros(n_pes, np.int32)\n"
 
     # send_counts_char, send_arr_lens for strings
-    n_keys = len(key_arrs_t.types)
+    n_keys = len(key_arrs.types)
     n_str = 0
-    for i, typ in enumerate(key_arrs_t.types + data_t.types):
+    for i, typ in enumerate(key_arrs.types + data.types):
         if typ == string_array_type:
             func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys
                 else "  arr = data[{}]\n".format(i - n_keys))
@@ -560,12 +560,12 @@ def update_shuffle_meta(pre_shuffle_meta, node_id, ind, val, data, is_contig=Tru
     pre_shuffle_meta.send_counts[node_id] += 1
 
 @overload(update_shuffle_meta)
-def update_shuffle_meta_overload(meta_t, node_id_t, ind_t, val_t, data_t, is_contig_t=None):
+def update_shuffle_meta_overload(pre_shuffle_meta, node_id, ind, val, data, is_contig=True):
     func_text = "def f(pre_shuffle_meta, node_id, ind, val, data, is_contig=True):\n"
     func_text += "  pre_shuffle_meta.send_counts[node_id] += 1\n"
-    n_keys = len(val_t.types)
+    n_keys = len(val.types)
     n_str = 0
-    for i, typ in enumerate(val_t.types + data_t.types):
+    for i, typ in enumerate(val.types + data.types):
         if typ in (string_type, string_array_type):
             val_or_data = 'val[{}]'.format(i) if i < n_keys else 'data[{}]'.format(i - n_keys)
             func_text += "  n_chars = len({})\n".format(val_or_data)
@@ -587,7 +587,7 @@ def finalize_shuffle_meta(arrs, data, pre_shuffle_meta, n_pes, is_contig, init_v
     return ShuffleMeta()
 
 @overload(finalize_shuffle_meta)
-def finalize_shuffle_meta_overload(key_arrs_t, data_t, pre_shuffle_meta_t, n_pes_t, is_contig_t, init_vals_t=None):
+def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals=()):
 
     func_text = "def f(key_arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals=()):\n"
     # common metas: send_counts, recv_counts, tmp_offset, n_out, n_send, send_disp, recv_disp
@@ -600,18 +600,18 @@ def finalize_shuffle_meta_overload(key_arrs_t, data_t, pre_shuffle_meta_t, n_pes
     func_text += "  send_disp = hpat.hiframes_join.calc_disp(send_counts)\n"
     func_text += "  recv_disp = hpat.hiframes_join.calc_disp(recv_counts)\n"
 
-    n_keys = len(key_arrs_t.types)
-    n_all = len(key_arrs_t.types + data_t.types)
+    n_keys = len(key_arrs.types)
+    n_all = len(key_arrs.types + data.types)
     n_str = 0
 
-    for i, typ in enumerate(key_arrs_t.types + data_t.types):
+    for i, typ in enumerate(key_arrs.types + data.types):
         func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys
                       else "  arr = data[{}]\n".format(i - n_keys))
         if isinstance(typ, types.Array):
             func_text += "  out_arr_{} = np.empty(n_out, arr.dtype)\n".format(i)
             func_text += "  send_buff_{} = arr\n".format(i)
             func_text += "  if not is_contig:\n"
-            if i >= n_keys and init_vals_t is not None:
+            if i >= n_keys and init_vals != ():
                 func_text += "    send_buff_{} = np.full(n_send, init_vals[{}], arr.dtype)\n".format(i, i - n_keys)
             else:
                 func_text += "    send_buff_{} = np.empty(n_send, arr.dtype)\n".format(i)
@@ -687,15 +687,15 @@ def alltoallv(arr, m):
     return
 
 @overload(alltoallv)
-def alltoallv_impl(arr_t, metadata_t):
-    if isinstance(arr_t, types.Array):
+def alltoallv_impl(arr, metadata):
+    if isinstance(arr, types.Array):
         def a2av_impl(arr, metadata):
             hpat.distributed_api.alltoallv(
                 metadata.send_buff, metadata.out_arr, metadata.send_counts,
                 metadata.recv_counts, metadata.send_disp, metadata.recv_disp)
         return a2av_impl
 
-    assert arr_t == string_array_type
+    assert arr == string_array_type
     int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
     char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
     def a2av_str_impl(arr, metadata):
@@ -716,10 +716,10 @@ def alltoallv_tup(arrs, shuffle_meta):
     return arrs
 
 @overload(alltoallv_tup)
-def alltoallv_tup_overload(arrs_t, shuffle_meta_t):
+def alltoallv_tup_overload(arrs, meta):
     func_text = "def f(arrs, meta):\n"
     n_str = 0
-    for i, typ in enumerate(arrs_t.types):
+    for i, typ in enumerate(arrs.types):
         if isinstance(typ, types.Array):
             func_text += ("  hpat.distributed_api.alltoallv("
                 "meta.send_buff_tup[{}], meta.out_arr_tup[{}], meta.send_counts,"
@@ -742,8 +742,8 @@ def alltoallv_tup_overload(arrs_t, shuffle_meta_t):
             n_str += 1
 
     func_text += "  return ({}{})\n".format(
-        ','.join(['meta.out_arr_tup[{}]'.format(i) for i in range(arrs_t.count)]),
-        "," if arrs_t.count == 1 else "")
+        ','.join(['meta.out_arr_tup[{}]'.format(i) for i in range(arrs.count)]),
+        "," if arrs.count == 1 else "")
 
     int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
     char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
@@ -760,8 +760,8 @@ def _get_keys_tup(recvs, key_arrs):
     return recvs[:len(key_arrs)]
 
 @overload(_get_keys_tup)
-def _get_keys_tup_overload(recvs_t, key_arrs_t):
-    n_keys = len(key_arrs_t.types)
+def _get_keys_tup_overload(recvs, key_arrs):
+    n_keys = len(key_arrs.types)
     func_text = "def f(recvs, key_arrs):\n"
     res = ",".join("recvs[{}]".format(i) for i in range(n_keys))
     func_text += "  return ({}{})\n".format(res, "," if n_keys==1 else "")
@@ -775,9 +775,9 @@ def _get_data_tup(recvs, key_arrs):
     return recvs[len(key_arrs):]
 
 @overload(_get_data_tup)
-def _get_data_tup_overload(recvs_t, key_arrs_t):
-    n_keys = len(key_arrs_t.types)
-    n_all = len(recvs_t.types)
+def _get_data_tup_overload(recvs, key_arrs):
+    n_keys = len(key_arrs.types)
+    n_all = len(recvs.types)
     n_data = n_all - n_keys
     func_text = "def f(recvs, key_arrs):\n"
     res = ",".join("recvs[{}]".format(i) for i in range(n_keys, n_all))

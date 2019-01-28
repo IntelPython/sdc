@@ -579,12 +579,12 @@ def write_send_buff(shuffle_meta, node_id, i, val, data):
     return i
 
 @overload(write_send_buff)
-def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
+def write_data_buff_overload(meta, node_id, i, val, data):
     func_text = "def f(meta, node_id, i, val, data):\n"
     func_text += "  w_ind = meta.send_disp[node_id] + meta.tmp_offset[node_id]\n"
-    n_keys = len(val_t.types)
+    n_keys = len(val.types)
     n_str = 0
-    for i, typ in enumerate(val_t.types + data_t.types):
+    for i, typ in enumerate(val.types + data.types):
         val = ("val[{}]".format(i) if i < n_keys
                else "data[{}][i]".format(i - n_keys))
         func_text += "  val_{} = {}\n".format(i, val)
@@ -614,9 +614,9 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
 #     return 0
 
 # @overload(write_send_buff)
-# def write_send_buff_overload(meta_t, node_id_t, val_t):
-#     arr_t = meta_t.struct['out_arr']
-#     if isinstance(arr_t, types.Array):
+# def write_send_buff_overload(meta, node_id, val):
+#     arr = meta.struct['out_arr']
+#     if isinstance(arr, types.Array):
 #         def write_impl(shuffle_meta, node_id, val):
 #             # TODO: refactor to use only tmp_offset
 #             ind = shuffle_meta.send_disp[node_id] + shuffle_meta.tmp_offset[node_id]
@@ -624,7 +624,7 @@ def write_data_buff_overload(meta_t, node_id_t, i_t, val_t, data_t):
 #             return ind
 
 #         return write_impl
-#     assert arr_t == string_array_type
+#     assert arr == string_array_type
 #     def write_str_impl(shuffle_meta, node_id, val):
 #         n_chars = len(val)
 #         # offset buff
@@ -643,9 +643,9 @@ def write_data_send_buff(data_shuffle_meta, node_id, i, data, key_meta):
     return
 
 @overload(write_data_send_buff)
-def write_data_send_buff_overload(meta_t, node_id_t, ind_t, data_t, key_meta_t):
+def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
     func_text = "def f(meta_tup, node_id, ind, data, key_meta):\n"
-    for i, typ in enumerate(data_t.types):
+    for i, typ in enumerate(data.types):
         func_text += "  val_{} = data[{}][ind]\n".format(i, i)
         func_text += "  ind_{} = key_meta.send_disp[node_id] + key_meta.tmp_offset[node_id]\n".format(i)
         if isinstance(typ, types.Array):
@@ -703,14 +703,14 @@ def ensure_capacity(arr, new_size):
     return new_arr
 
 @overload(ensure_capacity)
-def ensure_capacity_overload(arr_t, new_size_t):
-    if isinstance(arr_t, types.Array):
+def ensure_capacity_overload(arr, new_size):
+    if isinstance(arr, types.Array):
         return ensure_capacity
-    assert isinstance(arr_t, (types.Tuple, types.UniTuple))
-    count = arr_t.count
+    assert isinstance(arr, (types.Tuple, types.UniTuple))
+    count = arr.count
 
-    func_text = "def f(data, new_size):\n"
-    func_text += "  return ({}{})\n".format(','.join(["ensure_capacity(data[{}], new_size)".format(
+    func_text = "def f(arr, new_size):\n"
+    func_text += "  return ({}{})\n".format(','.join(["ensure_capacity(arr[{}], new_size)".format(
         i) for i in range(count)]),
         "," if count == 1 else "")  # single value needs comma to become tuple
 
@@ -744,9 +744,9 @@ def trim_arr_tup(data, new_size):  # pragma: no cover
     return data
 
 @overload(trim_arr_tup)
-def trim_arr_tup_overload(data_t, new_size_t):
-    assert isinstance(data_t, (types.Tuple, types.UniTuple))
-    count = data_t.count
+def trim_arr_tup_overload(data, new_size):
+    assert isinstance(data, (types.Tuple, types.UniTuple))
+    count = data.count
 
     func_text = "def f(data, new_size):\n"
     func_text += "  return ({}{})\n".format(','.join(["trim_arr(data[{}], new_size)".format(
@@ -777,11 +777,11 @@ def copy_elem_buff(arr, ind, val):  # pragma: no cover
     return new_arr
 
 @overload(copy_elem_buff)
-def copy_elem_buff_overload(arr_t, ind_t, val_t):
-    if isinstance(arr_t, types.Array):
+def copy_elem_buff_overload(arr, ind, val):
+    if isinstance(arr, types.Array):
         return copy_elem_buff
 
-    assert arr_t == string_array_type
+    assert arr == string_array_type
     def copy_elem_buff_str(arr, ind, val):
         new_arr = ensure_capacity_str(arr, ind+1, len(val))
         new_arr[ind] = val
@@ -793,9 +793,9 @@ def copy_elem_buff_tup(arr, ind, val):  # pragma: no cover
     return arr
 
 @overload(copy_elem_buff_tup)
-def copy_elem_buff_tup_overload(data_t, ind_t, val_t):
-    assert isinstance(data_t, (types.Tuple, types.UniTuple))
-    count = data_t.count
+def copy_elem_buff_tup_overload(data, ind, val):
+    assert isinstance(data, (types.Tuple, types.UniTuple))
+    count = data.count
 
     func_text = "def f(data, ind, val):\n"
     for i in range(count):
@@ -813,11 +813,11 @@ def trim_arr(arr, size):  # pragma: no cover
     return arr[:size]
 
 @overload(trim_arr)
-def trim_arr_overload(arr_t, size_t):
-    if isinstance(arr_t, types.Array):
+def trim_arr_overload(arr, size):
+    if isinstance(arr, types.Array):
         return trim_arr
 
-    assert arr_t == string_array_type
+    assert arr == string_array_type
     def trim_arr_str(arr, size):
         # print("trim size", size, arr[size-1], getitem_str_offset(arr, size))
         new_arr = pre_alloc_string_array(size, np.int64(getitem_str_offset(arr, size)))
@@ -832,11 +832,11 @@ def setnan_elem_buff(arr, ind):  # pragma: no cover
     return new_arr
 
 @overload(setnan_elem_buff)
-def setnan_elem_buff_overload(arr_t, ind_t):
-    if isinstance(arr_t, types.Array):
+def setnan_elem_buff_overload(arr, ind):
+    if isinstance(arr, types.Array):
         return setnan_elem_buff
 
-    assert arr_t == string_array_type
+    assert arr == string_array_type
     def setnan_elem_buff_str(arr, ind):
         new_arr = ensure_capacity_str(arr, ind+1, 0)
         # TODO: why doesn't setitem_str_offset work
@@ -852,9 +852,9 @@ def setnan_elem_buff_tup(arr, ind):  # pragma: no cover
     return arr
 
 @overload(setnan_elem_buff_tup)
-def setnan_elem_buff_tup_overload(data_t, ind_t):
-    assert isinstance(data_t, (types.Tuple, types.UniTuple))
-    count = data_t.count
+def setnan_elem_buff_tup_overload(data, ind):
+    assert isinstance(data, (types.Tuple, types.UniTuple))
+    count = data.count
 
     func_text = "def f(data, ind):\n"
     for i in range(count):
@@ -1096,41 +1096,41 @@ def setitem_arr_nan(arr, ind):
     arr[ind] = np.nan
 
 @overload(setitem_arr_nan)
-def setitem_arr_nan_overload(arr_t, ind_t):
-    if isinstance(arr_t.dtype, types.Float):
+def setitem_arr_nan_overload(arr, ind):
+    if isinstance(arr.dtype, types.Float):
         return setitem_arr_nan
 
-    if isinstance(arr_t.dtype, (types.NPDatetime, types.NPTimedelta)):
-        nat = arr_t.dtype('NaT')
+    if isinstance(arr.dtype, (types.NPDatetime, types.NPTimedelta)):
+        nat = arr.dtype('NaT')
         def _setnan_impl(arr, ind):
             arr[ind] = nat
         return _setnan_impl
 
-    if arr_t == string_array_type:
-        return lambda arr,i: str_arr_set_na(arr, i)
+    if arr == string_array_type:
+        return lambda arr, ind: str_arr_set_na(arr, ind)
     # TODO: support strings, bools, etc.
     # XXX: set NA values in bool arrays to False
     # FIXME: replace with proper NaN
-    if arr_t.dtype == types.bool_:
-        def b_set(a, i):
-            a[i] = False
+    if arr.dtype == types.bool_:
+        def b_set(arr, ind):
+            arr[ind] = False
         return b_set
     # XXX set integer NA to 0 to avoid unexpected errors (e.g. categorical)
     # TODO: convert integer to float if nan
     # TODO: handle categorical
-    if isinstance(arr_t.dtype, types.Integer):
+    if isinstance(arr.dtype, types.Integer):
         def setitem_arr_nan_int(arr, ind):
             arr[ind] = 0
         return setitem_arr_nan_int
-    return lambda a, i: None
+    return lambda arr, ind: None
 
 def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
     for arr in arr_tup:
         arr[ind] = np.nan
 
 @overload(setitem_arr_tup_nan)
-def setitem_arr_tup_nan_overload(arr_tup_t, ind_t):
-    count = arr_tup_t.count
+def setitem_arr_tup_nan_overload(arr_tup, ind):
+    count = arr_tup.count
 
     func_text = "def f(arr_tup, ind):\n"
     for i in range(count):
@@ -1146,8 +1146,8 @@ def copy_arr_tup(arrs):
     return tuple(a.copy() for a in arrs)
 
 @overload(copy_arr_tup)
-def copy_arr_tup_overload(arrs_t):
-    count = arrs_t.count
+def copy_arr_tup_overload(arrs):
+    count = arrs.count
     func_text = "def f(arrs):\n"
     func_text += "  return ({},)\n".format(",".join("arrs[{}].copy()".format(i) for i in range(count)))
 

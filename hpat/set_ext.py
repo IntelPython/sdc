@@ -99,8 +99,8 @@ def _build_str_set_impl(A):
 
 # TODO: remove since probably unused
 @overload(set)
-def init_set_string_array(in_typ):
-    if is_str_arr_typ(in_typ):
+def init_set_string_array(A):
+    if is_str_arr_typ(A):
         return _build_str_set_impl
 
 
@@ -113,10 +113,10 @@ def set_add_overload(set_obj_typ, item_typ):
     return add_impl
 
 @overload(len)
-def len_set_str_overload(in_typ):
-    if in_typ == set_string_type:
-        def len_impl(str_set):
-            return len_set_string(str_set)
+def len_set_str_overload(A):
+    if A == set_string_type:
+        def len_impl(A):
+            return len_set_string(A)
         return len_impl
 
 # FIXME: overload fails in lowering sometimes!
@@ -166,14 +166,14 @@ def lower_dict_in_op(context, builder, sig, args):
 
 
 @overload(to_array)
-def to_array_overload(in_typ):
-    if in_typ == set_string_type:
+def to_array_overload(A):
+    if A == set_string_type:
         #
-        def set_string_to_array(str_set):
-            num_total_chars = num_total_chars_set_string(str_set)
-            num_strs = len(str_set)
+        def set_string_to_array(A):
+            num_total_chars = num_total_chars_set_string(A)
+            num_strs = len(A)
             str_arr = pre_alloc_string_array(num_strs, num_total_chars)
-            populate_str_arr_from_set(str_set, str_arr)
+            populate_str_arr_from_set(A, str_arr)
             return str_arr
 
         return set_string_to_array

@@ -63,8 +63,8 @@ def char_getitem_overload(_str, ind):
                     types.intp,    # index
                     )
         get_char_from_string = types.ExternalFunction("get_char_from_string", sig)
-        def impl(s, i):
-            return get_char_from_string(s, i)
+        def impl(_str, ind):
+            return get_char_from_string(_str, ind)
 
         return impl
 
@@ -348,10 +348,10 @@ def unicode_to_char_ptr(in_str):
     return in_str
 
 @overload(unicode_to_char_ptr)
-def unicode_to_char_ptr_overload(str_t):
+def unicode_to_char_ptr_overload(a):
     # str._data is not safe since str might be literal
     # overload resolves str literal to unicode_type
-    if str_t == string_type:
+    if a == string_type:
         return lambda a: a._data
 
 

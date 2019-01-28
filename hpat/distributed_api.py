@@ -269,7 +269,7 @@ def prealloc_str_for_bcast_overload(arr):
 
         return prealloc_impl
 
-    return lambda a: a
+    return lambda arr: arr
 
 # send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,

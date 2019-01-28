@@ -23,10 +23,10 @@ _file_write_parallel = types.ExternalFunction("file_write_parallel",
                 types.intp))
 
 # @overload(np.fromfile)
-# def fromfile_overload(fname_t, dtype_t):
-#     if fname_t != string_type:
+# def fromfile_overload(fname, dtype):
+#     if fname != string_type:
 #         raise("np.fromfile() invalid filename type")
-#     if dtype_t is not None and not isinstance(dtype_t, types.DTypeSpec):
+#     if dtype is not None and not isinstance(dtype, types.DTypeSpec):
 #         raise("np.fromfile() invalid dtype")
 #
 #     # FIXME: import here since hio has hdf5 which might not be available
@@ -117,8 +117,8 @@ def file_write_parallel(fname, arr, start, count):
 
 # TODO: fix A.ctype inlined case
 @overload(file_write_parallel)
-def file_write_parallel_overload(fname_t, arr, start, count):
-    if fname_t == string_type:  # avoid str literal
+def file_write_parallel_overload(fname, arr, start, count):
+    if fname == string_type:  # avoid str literal
         def _impl(fname, arr, start, count):
             A = np.ascontiguousarray(arr)
             dtype_size = get_dtype_size(A.dtype)
@@ -132,8 +132,8 @@ def file_read_parallel(fname, arr, start, count):
     return
 
 @overload(file_read_parallel)
-def file_read_parallel_overload(fname_t, arr_t, start_t, count_t):
-    if fname_t == string_type:
+def file_read_parallel_overload(fname, arr, start, count):
+    if fname == string_type:
         def _impl(fname, arr, start, count):
             dtype_size = get_dtype_size(arr.dtype)
             _file_read_parallel(fname._data, arr.ctypes, start*dtype_size, count*dtype_size)
@@ -143,14 +143,14 @@ def file_read(fname, arr, size):
     return
 
 @overload(file_read)
-def file_read_overload(fname_t, arr, size_t):
-    if fname_t == string_type:
+def file_read_overload(fname, arr, size):
+    if fname == string_type:
         return lambda fname, arr, size: _file_read(fname._data, arr.ctypes, size)
 
 def get_file_size(fname):
     return 0
 
 @overload(get_file_size)
-def get_file_size_overload(fname_t):
-    if fname_t == string_type:
+def get_file_size_overload(fname):
+    if fname == string_type:
         return lambda fname: _get_file_size(fname._data)

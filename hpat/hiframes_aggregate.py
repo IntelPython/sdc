@@ -799,7 +799,7 @@ def _getitem_keys_overload(arrs, ind, b_v):
         getitem_impl = loc_vars['getitem_impl']
         return getitem_impl
 
-    return lambda arrs, i, b: arrs[0][i]
+    return lambda arrs, ind, b_v: arrs[0][ind]
 
 
 def _set_out_keys(out_arrs, w_ind, key_arrs, i, k):
@@ -1807,8 +1807,8 @@ def get_parfor_reductions(parfor, parfor_params, calltypes,
 
     return reduce_varnames, var_to_param
 
-def _build_set_tup(arrs):
-    return build_set(arrs[0])
+def _build_set_tup(arr_tup):
+    return build_set(arr_tup[0])
 
 @overload(_build_set_tup)
 def _build_set_tup_overload(arr_tup):

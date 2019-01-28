@@ -500,8 +500,8 @@ def str_2d(a):
     return res
 
 @overload(str)
-def ts_str_overload(in_typ):
-    if in_typ == pandas_timestamp_type:
+def ts_str_overload(a):
+    if a == pandas_timestamp_type:
         return lambda a: a.isoformat(' ')
 
 @unbox(PandasTimestampType)

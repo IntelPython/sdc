@@ -361,7 +361,7 @@ def to_string_list_overload(data):
         to_str_impl = loc_vars['f']
         return to_str_impl
 
-    return lambda a: a
+    return lambda data: data
 
 def cp_str_list_to_array(str_arr, str_list):
     return
@@ -390,7 +390,7 @@ def cp_str_list_to_array_overload(str_arr, list_data):
         cp_str_impl = loc_vars['f']
         return cp_str_impl
 
-    return lambda a,b: None
+    return lambda str_arr, list_data: None
 
 
 def str_list_to_array(str_list):
@@ -439,7 +439,8 @@ class SetItemStringArray(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         ary, idx, val = args
-        if ary == string_array_type:
+        if (ary == string_array_type and isinstance(idx, types.Integer)
+                and val == string_type):
             return signature(types.none, *args)
 
 

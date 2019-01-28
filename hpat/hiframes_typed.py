@@ -1748,22 +1748,22 @@ def _get_nan(val):
     return np.nan
 
 @overload(_get_nan)
-def _get_nan_overload(val_t):
-    if isinstance(val_t, (types.NPDatetime, types.NPTimedelta)):
-        nat = val_t('NaT')
-        return lambda v: nat
+def _get_nan_overload(val):
+    if isinstance(val, (types.NPDatetime, types.NPTimedelta)):
+        nat = val('NaT')
+        return lambda val: nat
     # TODO: other types
-    return lambda v: np.nan
+    return lambda val: np.nan
 
 def _get_type_max_value(dtype):
     return 0
 
 @overload(_get_type_max_value)
-def _get_type_max_value_overload(dtype_t):
-    if isinstance(dtype_t.dtype, (types.NPDatetime, types.NPTimedelta)):
-        return lambda d: hpat.pd_timestamp_ext.integer_to_dt64(
+def _get_type_max_value_overload(dtype):
+    if isinstance(dtype.dtype, (types.NPDatetime, types.NPTimedelta)):
+        return lambda dtype: hpat.pd_timestamp_ext.integer_to_dt64(
             numba.targets.builtins.get_type_max_value(numba.types.int64))
-    return lambda d: numba.targets.builtins.get_type_max_value(d)
+    return lambda dtype: numba.targets.builtins.get_type_max_value(dtype)
 
 # type(dtype) is called by np.full (used in agg_typer)
 @infer_global(type)
