@@ -432,8 +432,8 @@ def alloc_shift(A):
     return np.empty_like(A)
 
 @overload(alloc_shift)
-def alloc_shift_overload(A_typ):
-    if isinstance(A_typ.dtype, types.Integer):
+def alloc_shift_overload(A):
+    if isinstance(A.dtype, types.Integer):
         return lambda A: np.empty(len(A), np.float64)
     return lambda A: np.empty(len(A), A.dtype)
 
@@ -441,8 +441,8 @@ def shift_dtype(d):
     return d
 
 @overload(shift_dtype)
-def shift_dtype_overload(d_typ):
-    if isinstance(d_typ.dtype, types.Integer):
+def shift_dtype_overload(a):
+    if isinstance(a.dtype, types.Integer):
         return lambda a: np.float64
     else:
         return lambda a: a
@@ -451,26 +451,26 @@ def isna(arr, i):
     return False
 
 @overload(isna)
-def isna_overload(arr_typ, ind_typ):
-    if arr_typ == string_array_type:
-        return lambda arr,i: hpat.str_arr_ext.str_arr_is_na(arr, i)
+def isna_overload(arr, i):
+    if arr == string_array_type:
+        return lambda arr, i: hpat.str_arr_ext.str_arr_is_na(arr, i)
     # TODO: support NaN in list(list(str))
-    if arr_typ == list_string_array_type:
+    if arr == list_string_array_type:
         return lambda arr, i: False
     # TODO: extend to other types
-    assert isinstance(arr_typ, types.Array)
-    dtype = arr_typ.dtype
+    assert isinstance(arr, types.Array)
+    dtype = arr.dtype
     if isinstance(dtype, types.Float):
-        return lambda arr,i: np.isnan(arr[i])
+        return lambda arr, i: np.isnan(arr[i])
 
     # NaT for dt64
     if isinstance(dtype, (types.NPDatetime, types.NPTimedelta)):
         nat = dtype('NaT')
         # TODO: replace with np.isnat
-        return lambda arr,i: arr[i] == nat
+        return lambda arr, i: arr[i] == nat
 
     # XXX integers don't have nans, extend to boolean
-    return lambda arr,i: False
+    return lambda arr, i: False
 
 
 @numba.njit
@@ -494,8 +494,8 @@ def select_k_nonan(A, m, k):  # pragma: no cover
     return A
 
 @overload(select_k_nonan)
-def select_k_nonan_overload(A_t, m_t, k_t):
-    dtype = A_t.dtype
+def select_k_nonan_overload(A, m, k):
+    dtype = A.dtype
     if isinstance(dtype, types.Integer):
         # ints don't have nans
         return lambda A,m,k: (A[:k].copy(), k)
@@ -1420,19 +1420,19 @@ class DatetimeIndexTyper(AbstractTemplate):
         return sig
 
 @overload(np.array)
-def np_array_array_overload(in_tp):
-    if isinstance(in_tp, types.Array):
-        return lambda a: a
+def np_array_array_overload(A):
+    if isinstance(A, types.Array):
+        return lambda A: A
 
-    if isinstance(in_tp, types.containers.Set):
+    if isinstance(A, types.containers.Set):
         # TODO: naive implementation, data from set can probably
         # be copied to array more efficienty
-        dtype = in_tp.dtype
-        def f(in_set):
-            n = len(in_set)
+        dtype = A.dtype
+        def f(A):
+            n = len(A)
             arr = np.empty(n, dtype)
             i = 0
-            for a in in_set:
+            for a in A:
                 arr[i] = a
                 i += 1
             return arr
@@ -1453,18 +1453,18 @@ class SortedBuiltinLambda(CallableTemplate):
 
 
 @overload(operator.getitem)
-def list_str_arr_getitem_array(arr_t, ind_t):
-    if (arr_t == list_string_array_type and isinstance(ind_t, types.Array)
-            and ind_t.ndim == 1 and isinstance(
-            ind_t.dtype, (types.Integer, types.Boolean))):
+def list_str_arr_getitem_array(arr, ind):
+    if (arr == list_string_array_type and isinstance(ind, types.Array)
+            and ind.ndim == 1 and isinstance(
+            ind.dtype, (types.Integer, types.Boolean))):
         # TODO: convert to parfor in typed pass
-        def list_str_arr_getitem_impl(A, B):
-            n = B.sum()
+        def list_str_arr_getitem_impl(arr, ind):
+            n = ind.sum()
             out_arr = hpat.str_ext.alloc_list_list_str(n)
             j = 0
-            for i in range(len(B)):
-                if B[i]:
-                    out_arr[j] = A[i]
+            for i in range(len(ind)):
+                if ind[i]:
+                    out_arr[j] = arr[i]
                     j += 1
             return out_arr
 
