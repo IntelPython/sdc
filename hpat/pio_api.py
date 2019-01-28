@@ -189,7 +189,6 @@ class H5ReadType(AbstractTemplate):
         ret_typ = types.Array(dtype, ndim, 'C')
         return signature(ret_typ, *args)
 
-H5ReadType.support_literals = True
 
 @infer_global(h5py.File)
 class H5File(AbstractTemplate):

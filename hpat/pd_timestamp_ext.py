@@ -315,7 +315,6 @@ class SetDfDTInfer(AbstractTemplate):
         assert isinstance(args[1], types.Literal)
         return signature(types.none, *args)
 
-SetDfDTInfer.support_literals = True
 
 @lower_builtin(set_df_datetime_date, types.Any, types.Literal, types.Array)
 def set_df_datetime_date_lower(context, builder, sig, args):

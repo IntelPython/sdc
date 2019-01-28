@@ -81,7 +81,6 @@ class RollingType(AbstractTemplate):
         return signature(arr.copy(dtype=types.float64), arr, types.intp,
                          types.bool_, types.bool_, f_type)
 
-RollingType.support_literals = True
 
 
 @infer_global(rolling_variable)
@@ -95,7 +94,6 @@ class RollingVarType(AbstractTemplate):
         return signature(arr.copy(dtype=types.float64), arr, on_arr, types.intp,
                          types.bool_, types.bool_, f_type)
 
-RollingVarType.support_literals = True
 
 
 @infer_global(rolling_cov)

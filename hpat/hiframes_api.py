@@ -842,7 +842,6 @@ class UnBoxDfCol(AbstractTemplate):
         # FIXME: last arg should be types.DType?
         return signature(out_typ, *args)
 
-UnBoxDfCol.support_literals = True
 
 def set_df_col(df, cname, arr):
     df[cname] = arr
@@ -855,7 +854,6 @@ class SetDfColInfer(AbstractTemplate):
         assert isinstance(args[1], types.Literal)
         return signature(types.none, *args)
 
-SetDfColInfer.support_literals = True
 
 @lower_builtin(set_df_col, PandasDataFrameType, types.Literal, types.Array)
 def set_df_col_lower(context, builder, sig, args):
@@ -901,7 +899,6 @@ class BoxDfTyper(AbstractTemplate):
         df_typ = PandasDataFrameType(col_names, col_types)
         return signature(df_typ, *args)
 
-BoxDfTyper.support_literals = True
 
 @lower_builtin(box_df, types.Literal, types.VarArg(types.Any))
 def lower_box_df(context, builder, sig, args):
@@ -1509,7 +1506,6 @@ class TypeIterTuples(AbstractTemplate):
         iter_typ = DataFrameTupleIterator(col_names, arr_types)
         return signature(iter_typ, *args)
 
-TypeIterTuples.support_literals = True
 
 @register_model(DataFrameTupleIterator)
 class DataFrameTupleIteratorModel(models.StructModel):

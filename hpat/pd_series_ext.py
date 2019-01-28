@@ -752,11 +752,9 @@ class SeriesRollingAttribute(AttributeTemplate):
         return signature(SeriesType(types.float64, 1, 'C'), *args)
 
 # similar to install_array_method in arraydecl.py
-def install_rolling_method(name, generic, support_literals=False):
+def install_rolling_method(name, generic):
     my_attr = {"key": "rolling." + name, "generic": generic}
     temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
-    if support_literals:
-        temp_class.support_literals = support_literals
     def rolling_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
@@ -844,12 +842,10 @@ class CmpOpLTSeries(SeriesCompEqual):
 #         if out is not None and out.result == types.NPDatetime('ns'):
 #             return signature(pandas_timestamp_type, ary, out.index)
 
-def install_array_method(name, generic, support_literals=False):
+def install_array_method(name, generic):
     # taken from arraydecl.py, Series instead of Array
     my_attr = {"key": "array." + name, "generic": generic}
     temp_class = type("Series_" + name, (AbstractTemplate,), my_attr)
-    if support_literals:
-        temp_class.support_literals = support_literals
     def array_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
@@ -984,12 +980,10 @@ class SeriesOpUfuncs(NumpyRulesArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesOpUfuncs, self, args, kws)
 
-def install_series_method(op, name, generic, support_literals=False):
+def install_series_method(op, name, generic):
     # taken from arraydecl.py, Series instead of Array
     my_attr = {"key": op, "generic": generic}
     temp_class = type("Series_" + name, (SeriesOpUfuncs,), my_attr)
-    if support_literals:
-        temp_class.support_literals = support_literals
     def array_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
