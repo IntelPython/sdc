@@ -43,9 +43,9 @@ def get_type_enum(arr):
     return np.int32(-1)
 
 @overload(get_type_enum)
-def get_type_enum_overload(arr_typ):
-    typ_val = _numba_to_c_type_map[arr_typ.dtype]
-    return lambda a: np.int32(typ_val)
+def get_type_enum_overload(arr):
+    typ_val = _numba_to_c_type_map[arr.dtype]
+    return lambda arr: np.int32(typ_val)
 
 INT_MAX = np.iinfo(np.int32).max
 
@@ -86,10 +86,10 @@ c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voi
 
 # TODO: test
 @overload(gather_scalar)
-def gather_scalar_overload(data_t):
-    assert isinstance(data_t, (types.Integer, types.Float))
+def gather_scalar_overload(val):
+    assert isinstance(val, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _numba_to_c_type_map[data_t]
+    typ_val = _numba_to_c_type_map[val]
     func_text = (
     "def gather_scalar_impl(val):\n"
     "  n_pes = hpat.distributed_api.get_size()\n"
@@ -98,7 +98,7 @@ def gather_scalar_overload(data_t):
     "  res_size = n_pes if rank == {} else 0\n"
     "  res = np.empty(res_size, np.{})\n"
     "  c_gather_scalar(send.ctypes, res.ctypes, np.int32({}))\n"
-    "  return res\n").format(data_t, MPI_ROOT, data_t, typ_val)
+    "  return res\n").format(val, MPI_ROOT, val, typ_val)
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np, 'c_gather_scalar': c_gather_scalar}, loc_vars)
@@ -114,10 +114,10 @@ c_gatherv = types.ExternalFunction("c_gatherv",
     types.void(types.voidptr, types.int32, types.voidptr, types.voidptr, types.voidptr, types.int32))
 
 @overload(gatherv)
-def gatherv_overload(data_t):
-    if isinstance(data_t, types.Array):
+def gatherv_overload(data):
+    if isinstance(data, types.Array):
         # TODO: other types like boolean
-        typ_val = _numba_to_c_type_map[data_t.dtype]
+        typ_val = _numba_to_c_type_map[data.dtype]
 
         def gatherv_impl(data):
             rank = hpat.distributed_api.get_rank()
@@ -135,7 +135,7 @@ def gatherv_overload(data_t):
 
         return gatherv_impl
 
-    if data_t == string_array_type:
+    if data == string_array_type:
         int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
         char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
@@ -187,8 +187,8 @@ def bcast(data):  # pragma: no cover
     return
 
 @overload(bcast)
-def bcast_overload(data_t):
-    if isinstance(data_t, types.Array):
+def bcast_overload(data):
+    if isinstance(data, types.Array):
         def bcast_impl(data):
             typ_enum = get_type_enum(data)
             count = len(data)
@@ -197,7 +197,7 @@ def bcast_overload(data_t):
             return
         return bcast_impl
 
-    if data_t == string_array_type:
+    if data == string_array_type:
         int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
         char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
@@ -236,16 +236,16 @@ def bcast_scalar(val):  # pragma: no cover
 
 # TODO: test
 @overload(bcast_scalar)
-def bcast_scalar_overload(data_t):
-    assert isinstance(data_t, (types.Integer, types.Float))
+def bcast_scalar_overload(val):
+    assert isinstance(val, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _numba_to_c_type_map[data_t]
+    typ_val = _numba_to_c_type_map[val]
     # TODO: fix np.full and refactor
     func_text = (
     "def bcast_scalar_impl(val):\n"
     "  send = np.full(1, val, np.{})\n"
     "  c_bcast(send.ctypes, np.int32(1), np.int32({}))\n"
-    "  return send[0]\n").format(data_t, typ_val)
+    "  return send[0]\n").format(val, typ_val)
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np, 'c_bcast': c_bcast}, loc_vars)
@@ -257,8 +257,8 @@ def prealloc_str_for_bcast(arr):
     return arr
 
 @overload(prealloc_str_for_bcast)
-def prealloc_str_for_bcast_overload(arr_t):
-    if arr_t == string_array_type:
+def prealloc_str_for_bcast_overload(arr):
+    if arr == string_array_type:
         def prealloc_impl(arr):
             rank = hpat.distributed_api.get_rank()
             n_loc = bcast_scalar(len(arr))
@@ -291,10 +291,10 @@ def alltoallv_tup(send_data, out_data, send_counts, recv_counts, send_disp, recv
     return
 
 @overload(alltoallv_tup)
-def alltoallv_tup_overload(send_data_typ, out_data_typ, send_counts_typ, recv_counts_typ, send_disp_typ, recv_disp_typ):
+def alltoallv_tup_overload(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):
 
-    count = send_data_typ.count
-    assert out_data_typ.count == count
+    count = send_data.count
+    assert out_data.count == count
 
     func_text = "def f(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):\n"
     for i in range(count):
@@ -389,7 +389,7 @@ def rebalance_array_parallel(A):
 
 
 @overload(rebalance_array)
-def dist_return_overload(column):
+def dist_return_overload(A):
     return dist_return
 
 # TODO: move other funcs to old API?

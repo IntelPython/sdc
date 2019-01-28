@@ -733,9 +733,9 @@ def get_shuffle_data_send_buffs(sh, karrs, data):  # pragma: no cover
     return ()
 
 @overload(get_shuffle_data_send_buffs)
-def get_shuffle_data_send_buffs_overload(shuffle_meta_t, key_arrs_t, data_t):
-    n_keys = len(key_arrs_t.types)
-    count = len(data_t.types)
+def get_shuffle_data_send_buffs_overload(meta, key_arrs, data):
+    n_keys = len(key_arrs.types)
+    count = len(data.types)
 
     func_text = "def send_buff_impl(meta, key_arrs, data):\n"
     func_text += "  return ({}{})\n".format(','.join(["meta.send_buff_tup[{}]".format(
@@ -753,23 +753,23 @@ def get_key_dict(arr):  # pragma: no cover
     return dict()
 
 @overload(get_key_dict)
-def get_key_dict_overload(arr_t):
+def get_key_dict_overload(arr):
     """returns dictionary and possibly a byte_vec for multi-key case
     """
     # get byte_vec dict for multi-key case
-    if isinstance(arr_t, types.BaseTuple) and len(arr_t.types) != 1:
+    if isinstance(arr, types.BaseTuple) and len(arr.types) != 1:
         n_bytes = 0
         context = numba.targets.registry.cpu_target.target_context
-        for t in arr_t.types:
+        for t in arr.types:
             n_bytes += context.get_abi_sizeof(context.get_data_type(t.dtype))
-        def _impl(arrs):
+        def _impl(arr):
             b_v = hpat.dict_ext.byte_vec_init(n_bytes, 0)
             b_dict = hpat.dict_ext.dict_byte_vec_int64_init()
             return b_dict, b_v
         return _impl
 
     # regular scalar keys
-    dtype = arr_t.types[0].dtype
+    dtype = arr.types[0].dtype
     func_text = "def k_dict_impl(arr):\n"
     func_text += "  b_v = hpat.dict_ext.byte_vec_init(1, 0)\n"
     func_text += "  return hpat.dict_ext.dict_{}_int64_init(), b_v\n".format(dtype)
@@ -782,12 +782,12 @@ def _getitem_keys(key_arrs, i, b_v):
     return key_arrs[i]
 
 @overload(_getitem_keys)
-def _getitem_keys_overload(arr_t, i_t, b_v_t):
-    if isinstance(arr_t, types.BaseTuple) and len(arr_t.types) != 1:
+def _getitem_keys_overload(arrs, ind, b_v):
+    if isinstance(arrs, types.BaseTuple) and len(arrs.types) != 1:
         func_text = "def getitem_impl(arrs, ind, b_v):\n"
         offset = 0
         context = numba.targets.registry.cpu_target.target_context
-        for i, t in enumerate(arr_t.types):
+        for i, t in enumerate(arrs.types):
             n_bytes = context.get_abi_sizeof(context.get_data_type(t.dtype))
             func_text += "  arr_ptr = arrs[{}].ctypes.data + ind * {}\n".format(i, n_bytes)
             func_text += "  hpat.dict_ext.byte_vec_set(b_v, {}, arr_ptr, {})\n".format(offset, n_bytes)
@@ -806,10 +806,10 @@ def _set_out_keys(out_arrs, w_ind, key_arrs, i, k):
     setitem_array_with_str(out_arrs[-1], w_ind, k)
 
 @overload(_set_out_keys)
-def _set_out_keys_overload(out_arrs_t, w_ind_t, key_arrs_t, i_t, k_t):
-    if isinstance(key_arrs_t, types.BaseTuple):
-        n_keys = len(key_arrs_t.types)
-        n_outs = len(out_arrs_t.types)
+def _set_out_keys_overload(out_arrs, w_ind, key_arrs, i, k):
+    if isinstance(key_arrs, types.BaseTuple):
+        n_keys = len(key_arrs.types)
+        n_outs = len(out_arrs.types)
         key_start = n_outs - n_keys
 
         func_text = "def set_keys_impl(out_arrs, w_ind, key_arrs, i, k):\n"
@@ -830,15 +830,15 @@ def get_key_set(arr):  # pragma: no cover
     return set()
 
 @overload(get_key_set)
-def get_key_set_overload(arr_t):
-    if arr_t == string_array_type or (isinstance(arr_t, types.BaseTuple)
-            and len(arr_t.types) == 1 and arr_t.types[0] == string_array_type):
-        return lambda a: hpat.set_ext.init_set_string()
+def get_key_set_overload(arr):
+    if arr == string_array_type or (isinstance(arr, types.BaseTuple)
+            and len(arr.types) == 1 and arr.types[0] == string_array_type):
+        return lambda arr: hpat.set_ext.init_set_string()
 
-    if isinstance(arr_t, types.BaseTuple):
-        def get_set_tup(arrs):
+    if isinstance(arr, types.BaseTuple):
+        def get_set_tup(arr):
             s = set()
-            v = getitem_arr_tup_single(arrs, 0)
+            v = getitem_arr_tup_single(arr, 0)
             s.add(v)
             s.remove(v)
             return s
@@ -858,19 +858,19 @@ def alloc_agg_output(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key): 
     return out_dummy_tup
 
 @overload(alloc_agg_output)
-def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t,
-                                                      data_in_t, return_key_t):
+def alloc_agg_output_overload(n_uniq_keys, out_dummy_tup, key_set,
+                                                      data_in, return_key):
 
     # return key is either True or None
-    if return_key_t == types.boolean:
+    if return_key == types.boolean:
         # TODO: handle pivot_table/crosstab with return key
-        dtype = key_set_t.dtype
+        dtype = key_set.dtype
         key_types = list(dtype.types) if isinstance(dtype, types.BaseTuple) else [dtype]
         n_keys = len(key_types)
-        assert out_dummy_tup_t.count == data_in_t.count + n_keys
+        assert out_dummy_tup.count == data_in.count + n_keys
 
         func_text = "def out_alloc_f(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key):\n"
-        for i in range(data_in_t.count):
+        for i in range(data_in.count):
             func_text += "  c_{} = empty_like_type(n_uniq_keys, out_dummy_tup[{}])\n".format(i, i)
 
         # string special case
@@ -883,8 +883,8 @@ def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t,
                 func_text += "  out_key_{} = np.empty(n_uniq_keys, np.{})\n".format(i, key_typ)
 
         func_text += "  return ({}{}{},)\n".format(
-            ", ".join(["c_{}".format(i) for i in range(data_in_t.count)]),
-            "," if data_in_t.count != 0 else "",
+            ", ".join(["c_{}".format(i) for i in range(data_in.count)]),
+            "," if data_in.count != 0 else "",
             ", ".join(["out_key_{}".format(i) for i in range(n_keys)]))
 
         loc_vars = {}
@@ -895,7 +895,7 @@ def alloc_agg_output_overload(n_uniq_keys_t, out_dummy_tup_t, key_set_t,
         alloc_impl = loc_vars['out_alloc_f']
         return alloc_impl
 
-    assert return_key_t == types.none
+    assert return_key == types.none
 
     def no_key_out_alloc(n_uniq_keys, out_dummy_tup, key_set, data_in, return_key):
         return alloc_arr_tup(n_uniq_keys, out_dummy_tup)
@@ -926,19 +926,19 @@ def setitem_array_with_str(arr, i, v):  # pragma: no cover
     return
 
 @overload(setitem_array_with_str)
-def setitem_array_with_str_overload(arr_t, ind_t, val_t):
-    if arr_t == string_array_type:
-        def setitem_str_arr(arr, i, v):
-            arr[i] = v
+def setitem_array_with_str_overload(arr, i, val):
+    if arr == string_array_type:
+        def setitem_str_arr(arr, i, val):
+            arr[i] = val
         return setitem_str_arr
 
     # return_key == False case where val could be string resulting in typing
     # issue, no need to set
-    if val_t == string_type:
-        return lambda a,i,v: None
+    if val == string_type:
+        return lambda arr, i, val: None
 
-    def setitem_impl(arr, i, v):
-        arr[i] = v
+    def setitem_impl(arr, i, val):
+        arr[i] = val
 
     return setitem_impl
 
@@ -1811,9 +1811,9 @@ def _build_set_tup(arrs):
     return build_set(arrs[0])
 
 @overload(_build_set_tup)
-def _build_set_tup_overload(arr_tup_t):
+def _build_set_tup_overload(arr_tup):
     # TODO: support string in tuple set
-    if isinstance(arr_tup_t, types.BaseTuple) and len(arr_tup_t.types) != 1:
+    if isinstance(arr_tup, types.BaseTuple) and len(arr_tup.types) != 1:
         def _impl(arr_tup):
             n = len(arr_tup[0])
             s = set()

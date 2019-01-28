@@ -492,7 +492,7 @@ def get_tuple_prod(t):
 def get_tuple_prod_overload(t):
     # handle empty tuple seperately since empty getiter doesn't work
     if t == numba.types.containers.Tuple(()):
-        return lambda a: 1
+        return lambda t: 1
 
     def get_tuple_prod_impl(t):
         res = 1
