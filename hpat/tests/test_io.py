@@ -388,7 +388,8 @@ class TestIO(unittest.TestCase):
 
     def test_np_io3(self):
         def test_impl(A):
-            A.tofile("np_file_3.dat")
+            if get_rank() == 0:
+                A.tofile("np_file_3.dat")
 
         hpat_func = hpat.jit(test_impl)
         n = 111
