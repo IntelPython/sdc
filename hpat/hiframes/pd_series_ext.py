@@ -21,95 +21,53 @@ from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
 
-# TODO: implement type inference instead of subtyping array since Pandas as of
-# 0.23 is deprecating things like itemsize etc.
-# class SeriesType(types.ArrayCompatible):
+
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
-    # array_priority = 1000
-    def __init__(self, dtype, ndim=1, layout='C', readonly=False, name=None,
-                 aligned=True):
-        # same as types.Array, except name is Series, and buffer attributes
-        # initialized here
-        assert ndim == 1, "Series() should be one dimensional"
-        assert name is None
-        self.mutable = True
-        self.aligned = True
+    def __init__(self, dtype, data=None, index=None):
+        # keeping data array in type since operators can make changes such
+        # as making array unaligned etc.
+        data = _get_series_array_type(dtype) if data is None else data
         self.dtype = dtype
-        self.ndim = ndim
-        self.layout = layout
+        self.data = data
+        self.index = index
+        super(SeriesType, self).__init__(
+            name="series({}, {}, {})".format(dtype, data, index))
 
-        if readonly:
-            self.mutable = False
-        if (not aligned or
-            (isinstance(dtype, types.Record) and not dtype.aligned)):
-            self.aligned = False
-        if name is None:
-            type_name = "series"
-            if not self.mutable:
-                type_name = "readonly " + type_name
-            if not self.aligned:
-                type_name = "unaligned " + type_name
-            name = "%s(%s, %sd, %s)" % (type_name, dtype, ndim, layout)
-        super(SeriesType, self).__init__(name=name)
-
-    @property
-    def mangling_args(self):
-        # same as types.Array
-        args = [self.dtype, self.ndim, self.layout,
-                'mutable' if self.mutable else 'readonly',
-                'aligned' if self.aligned else 'unaligned']
-        return self.__class__.__name__, args
-
-    def copy(self, dtype=None, ndim=None, layout=None, readonly=None):
-        # same as types.Array, except Series return type
-        if dtype is None:
-            dtype = self.dtype
-        if ndim is None:
-            ndim = self.ndim
-        if layout is None:
-            layout = self.layout
-        if readonly is None:
-            readonly = not self.mutable
-        return SeriesType(dtype=dtype, ndim=ndim, layout=layout, readonly=readonly,
-                     aligned=self.aligned)
+    def copy(self, dtype=None):
+        # XXX is copy necessary?
+        index = None if self.index is None else self.index.copy()
+        dtype = dtype if dtype is not None else self.dtype
+        data = _get_series_array_type(dtype)
+        return SeriesType(dtype, data, index)
 
     @property
     def key(self):
-        # same as types.Array
-        return self.dtype, self.ndim, self.layout, self.mutable, self.aligned
+        # needed?
+        return self.dtype, self.data, self.index
 
     def unify(self, typingctx, other):
-        # same as types.Array, except returns Series for Series/Series
-        # If other is array and the ndim matches
-        if isinstance(other, SeriesType) and other.ndim == self.ndim:
+        if isinstance(other, SeriesType):
+            new_index = None
+            if self.index is not None:
+                new_index = self.index.unify(other.index)
+            if other.index is not None:
+                new_index = other.index.unify(self.index)
+
             # If dtype matches or other.dtype is undefined (inferred)
             if other.dtype == self.dtype or not other.dtype.is_precise():
-                if self.layout == other.layout:
-                    layout = self.layout
-                else:
-                    layout = 'A'
-                readonly = not (self.mutable and other.mutable)
-                aligned = self.aligned and other.aligned
-                return SeriesType(dtype=self.dtype, ndim=self.ndim, layout=layout,
-                             readonly=readonly, aligned=aligned)
+                return SeriesType(
+                    self.dtype, self.data.unify(other.data), new_index)
 
         # XXX: unify Series/Array as Array
         return super(SeriesType, self).unify(typingctx, other)
 
-    # @property
-    # def as_array(self):
-    #     return types.Array(self.dtype, self.ndim, self.layout)
-
     def can_convert_to(self, typingctx, other):
-        # same as types.Array, TODO: add Series?
-        if (isinstance(other, types.Array) and other.ndim == self.ndim
-            and other.dtype == self.dtype):
-            if (other.layout in ('A', self.layout)
-                and (self.mutable or not other.mutable)
-                and (self.aligned or not other.aligned)):
-                return types.Conversion.safe
+        # same as types.Array
+        if (isinstance(other, SeriesType) and other.dtype == self.dtype):
+            # TODO: index?
+            return self.data.can_convert_to(other.data)
 
     def is_precise(self):
         # same as types.Array
@@ -119,22 +77,35 @@ class SeriesType(types.IterableType):
     def iterator_type(self):
         # same as Buffer
         # TODO: fix timestamp
-        return types.iterators.ArrayIterator(self)
+        return types.iterators.ArrayIterator(self.data)
 
-    @property
-    def is_c_contig(self):
-        # same as Buffer
-        return self.layout == 'C' or (self.ndim <= 1 and self.layout in 'CF')
 
-    @property
-    def is_f_contig(self):
-        # same as Buffer
-        return self.layout == 'F' or (self.ndim <= 1 and self.layout in 'CF')
+def _get_series_array_type(dtype):
+    """get underlying array type of series based on its dtype
+    """
+    # list(list(str))
+    if dtype == types.List(string_type):
+        return list_string_array_type
+    # string array
+    elif dtype == string_type:
+        return string_array_type
 
-    @property
-    def is_contig(self):
-        # same as Buffer
-        return self.layout in 'CF'
+    # categorical
+    if isinstance(dtype, PDCategoricalDtype):
+        dtype = get_categories_int_type(dtype)
+
+    # use recarray data layout for series of tuples
+    if isinstance(dtype, types.BaseTuple):
+        if any(not isinstance(t, types.Number) for t in dtype.types):
+            # TODO: support more types. what types can be in recarrays?
+            raise ValueError("series tuple dtype {} includes non-numerics".format(dtype))
+        np_dtype = np.dtype(
+            ','.join(str(t) for t in dtype.types), align=True)
+        dtype = numba.numpy_support.from_dtype(np_dtype)
+
+    # TODO: other types?
+    # regular numpy array
+    return types.Array(dtype, 1, 'C')
 
 
 string_series_type = SeriesType(string_type)
@@ -204,34 +175,14 @@ class UnBoxedSeriesType(types.Type):
 
 register_model(UnBoxedSeriesType)(SeriesModel)
 
+
 def series_to_array_type(typ, replace_boxed=False):
-    dtype = typ.dtype
-    # array(list(str)) as in str.split() case
-    # currently list(list(str))
-    if dtype == types.List(string_type):
-        return list_string_array_type
-    if isinstance(dtype, PDCategoricalDtype):
-        dtype = get_categories_int_type(dtype)
-    if dtype == string_type:
-        new_typ = string_array_type
-    elif isinstance(typ, BoxedSeriesType):
-        new_typ = typ
-        if replace_boxed:
-            new_typ = types.Array(dtype, 1, 'C')
-    else:
-        # TODO: other types?
-        # use recarray data layout for series of tuples
-        if isinstance(dtype, types.BaseTuple):
-            if any(not isinstance(t, types.Number) for t in dtype.types):
-                # TODO: support more types. what types can be in recarrays?
-                raise ValueError("series tuple dtype {} includes non-numerics".format(dtype))
-            np_dtype = np.dtype(
-                ','.join(str(t) for t in dtype.types), align=True)
-            dtype = numba.numpy_support.from_dtype(np_dtype)
-        new_typ = types.Array(
-        dtype, typ.ndim, typ.layout, not typ.mutable,
-        aligned=typ.aligned)
-    return new_typ
+    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
+    # it results in cast error for call dummy_unbox_series
+    if isinstance(typ, BoxedSeriesType) and not replace_boxed:
+        return typ
+    return _get_series_array_type(typ.dtype)
+
 
 def is_series_type(typ):
     # XXX: UnBoxedSeriesType only used in unboxing
@@ -241,8 +192,7 @@ def is_series_type(typ):
 def arr_to_series_type(arr):
     series_type = None
     if isinstance(arr, types.Array):
-        series_type = SeriesType(arr.dtype, arr.ndim, arr.layout,
-            not arr.mutable, aligned=arr.aligned)
+        series_type = SeriesType(arr.dtype, arr)
     elif arr == string_array_type:
         # StringArray is readonly
         series_type = string_series_type
@@ -260,12 +210,9 @@ def arr_to_boxed_series_type(arr):
 
 
 def if_series_to_array_type(typ, replace_boxed=False):
-    if isinstance(typ, SeriesType):
+    if isinstance(typ, (SeriesType, BoxedSeriesType)):
         return series_to_array_type(typ, replace_boxed)
-    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
-    # it results in cast error for call dummy_unbox_series
-    if replace_boxed and isinstance(typ, BoxedSeriesType):
-        return series_to_array_type(typ, replace_boxed)
+
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple(
             [if_series_to_array_type(t, replace_boxed) for t in typ.types])
@@ -411,19 +358,20 @@ class SeriesAttribute(AttributeTemplate):
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_astype.__wrapped__
-            sig = resolver(self, ary, args, kws)
+            sig = resolver(self, ary.data, args, kws)
             sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
     @bound_function("array.copy")
     def resolve_copy(self, ary, args, kws):
+        # TODO: copy other types like list(str)
         dtype = ary.dtype
         if dtype == string_type:
             ret_type = string_series_type
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_copy.__wrapped__
-            sig = resolver(self, ary, args, kws)
+            sig = resolver(self, ary.data, args, kws)
             sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
@@ -434,7 +382,7 @@ class SeriesAttribute(AttributeTemplate):
     @bound_function("array.argsort")
     def resolve_argsort(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_argsort.__wrapped__
-        sig = resolver(self, ary, args, kws)
+        sig = resolver(self, ary.data, args, kws)
         sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
@@ -445,7 +393,7 @@ class SeriesAttribute(AttributeTemplate):
     @bound_function("array.take")
     def resolve_take(self, ary, args, kws):
         resolver = ArrayAttribute.resolve_take.__wrapped__
-        sig = resolver(self, ary, args, kws)
+        sig = resolver(self, ary.data, args, kws)
         sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
@@ -857,8 +805,7 @@ def generic_expand_cumulative_series(self, args, kws):
     assert not args
     assert not kws
     assert isinstance(self.this, SeriesType)
-    return_type = SeriesType(dtype=_expand_integer(self.this.dtype),
-                              ndim=1, layout='C')
+    return_type = SeriesType(_expand_integer(self.this.dtype))
     return signature(return_type, recvr=self.this)
 
 # replacing cumsum/cumprod since arraydecl.py definition uses types.Array
