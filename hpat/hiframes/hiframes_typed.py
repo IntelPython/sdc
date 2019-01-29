@@ -319,118 +319,121 @@ class HiFramesTyped(object):
                 return nodes
 
             if rhs.op == 'call':
-
-                fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
-                if fdef is None:
-                    from numba.stencil import StencilFunc
-                    # could be make_function from list comprehension which is ok
-                    func_def = guard(get_definition, self.func_ir, rhs.func)
-                    if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
-                        return [assign]
-                    if isinstance(func_def, ir.Global) and isinstance(func_def.value, StencilFunc):
-                        return [assign]
-                    warnings.warn(
-                        "function call couldn't be found for initial analysis")
-                    return [assign]
-                else:
-                    func_name, func_mod = fdef
-
-                if (isinstance(func_mod, ir.Var)
-                        and self.typemap[func_mod.name]
-                        == series_str_methods_type):
-                    f_def = guard(get_definition, self.func_ir, rhs.func)
-                    str_def = guard(get_definition, self.func_ir, f_def.value)
-                    if str_def is None:  # TODO: check for errors
-                        raise ValueError("invalid series.str")
-
-                    series_var = str_def.value
-                    if func_name == 'contains':  # TODO: refactor
-                        return self._handle_series_str_contains(
-                            rhs, series_var)
-
-                    return self._run_series_str_method(
-                        assign, assign.target, series_var, func_name, rhs)
-
-                # replace _get_type_max_value(arr.dtype) since parfors
-                # arr.dtype transformation produces invalid code for dt64
-                # TODO: min
-                if fdef == ('_get_type_max_value', 'hpat.hiframes.hiframes_typed'):
-                    if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
-                        return self._replace_func(
-                            lambda: hpat.hiframes.pd_timestamp_ext.integer_to_dt64(
-                                numba.targets.builtins.get_type_max_value(
-                                    numba.types.int64)), [])
-                    return self._replace_func(
-                        lambda d: numba.targets.builtins.get_type_max_value(
-                                    d), rhs.args)
-
-                if fdef == ('h5_read_dummy', 'hpat.pio_api'):
-                    ndim = guard(find_const, self.func_ir, rhs.args[1])
-                    dtype_str = guard(find_const, self.func_ir, rhs.args[2])
-                    index_var = rhs.args[3]
-                    filter_read = False
-
-                    func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
-                    if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
-                        func_text += "  size_0 = hpat.pio_api.h5size(dset_id, np.int32(0))\n"
-                    else:
-                        # TODO: check index format for this case
-                        filter_read = True
-                        assert isinstance(self.typemap[index_var.name], types.BaseTuple)
-                        func_text += "  read_indices = hpat.pio_api.get_filter_read_indices(index[0])\n"
-                        func_text += "  size_0 = len(read_indices)\n"
-                    for i in range(1, ndim):
-                        func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
-                    func_text += "  arr_shape = ({},)\n".format(
-                        ", ".join(["size_{}".format(i) for i in range(ndim)]))
-                    func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
-                    func_text += "  A = np.empty(arr_shape, np.{})\n".format(
-                        dtype_str)
-                    if filter_read:
-                        func_text += "  err = hpat.pio_api.h5read_filter(dset_id, np.int32({}), zero_tup, arr_shape, 0, A, read_indices)\n".format(ndim)
-                    else:
-                        func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
-                    func_text += "  return A\n"
-
-                    loc_vars = {}
-                    exec(func_text, {}, loc_vars)
-                    _h5_read_impl = loc_vars['_h5_read_impl']
-                    return self._replace_func(_h5_read_impl, rhs.args)
-
-                if fdef == ('DatetimeIndex', 'pandas'):
-                    return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
-
-                if fdef == ('Series', 'pandas'):
-                    in_typ = self.typemap[rhs.args[0].name]
-                    impl = hpat.hiframes.pd_series_ext.pd_series_overload(in_typ)
-                    return self._replace_func(impl, rhs.args)
-
-                if func_mod == 'hpat.hiframes.api':
-                    return self._run_call_hiframes(assign, assign.target, rhs, func_name)
-
-                if func_mod == 'hpat.hiframes.rolling':
-                    return self._run_call_rolling(assign, assign.target, rhs, func_name)
-
-                if fdef == ('empty_like', 'numpy'):
-                    return self._handle_empty_like(assign, lhs, rhs)
-
-                if (isinstance(func_mod, ir.Var)
-                        and is_series_type(self.typemap[func_mod.name])):
-                    return self._run_call_series(
-                        assign, assign.target, rhs, func_mod, func_name)
-
-                if (isinstance(func_mod, ir.Var) and isinstance(
-                        self.typemap[func_mod.name], SeriesRollingType)):
-                    return self._run_call_series_rolling(
-                        assign, assign.target, rhs, func_mod, func_name)
-
-                # handle sorted() with key lambda input
-                if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
-                    return self._handle_sorted_by_key(rhs)
+                return self._run_call(assign, lhs, rhs)
 
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
 
+        return [assign]
+
+    def _run_call(self, assign, lhs, rhs):
+        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        if fdef is None:
+            from numba.stencil import StencilFunc
+            # could be make_function from list comprehension which is ok
+            func_def = guard(get_definition, self.func_ir, rhs.func)
+            if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
+                return [assign]
+            if isinstance(func_def, ir.Global) and isinstance(func_def.value, StencilFunc):
+                return [assign]
+            warnings.warn(
+                "function call couldn't be found for initial analysis")
+            return [assign]
+        else:
+            func_name, func_mod = fdef
+
+        if (isinstance(func_mod, ir.Var)
+                and self.typemap[func_mod.name]
+                == series_str_methods_type):
+            f_def = guard(get_definition, self.func_ir, rhs.func)
+            str_def = guard(get_definition, self.func_ir, f_def.value)
+            if str_def is None:  # TODO: check for errors
+                raise ValueError("invalid series.str")
+
+            series_var = str_def.value
+            if func_name == 'contains':  # TODO: refactor
+                return self._handle_series_str_contains(
+                    rhs, series_var)
+
+            return self._run_series_str_method(
+                assign, assign.target, series_var, func_name, rhs)
+
+        # replace _get_type_max_value(arr.dtype) since parfors
+        # arr.dtype transformation produces invalid code for dt64
+        # TODO: min
+        if fdef == ('_get_type_max_value', 'hpat.hiframes.hiframes_typed'):
+            if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
+                return self._replace_func(
+                    lambda: hpat.hiframes.pd_timestamp_ext.integer_to_dt64(
+                        numba.targets.builtins.get_type_max_value(
+                            numba.types.int64)), [])
+            return self._replace_func(
+                lambda d: numba.targets.builtins.get_type_max_value(
+                            d), rhs.args)
+
+        if fdef == ('h5_read_dummy', 'hpat.pio_api'):
+            ndim = guard(find_const, self.func_ir, rhs.args[1])
+            dtype_str = guard(find_const, self.func_ir, rhs.args[2])
+            index_var = rhs.args[3]
+            filter_read = False
+
+            func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
+            if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+                func_text += "  size_0 = hpat.pio_api.h5size(dset_id, np.int32(0))\n"
+            else:
+                # TODO: check index format for this case
+                filter_read = True
+                assert isinstance(self.typemap[index_var.name], types.BaseTuple)
+                func_text += "  read_indices = hpat.pio_api.get_filter_read_indices(index[0])\n"
+                func_text += "  size_0 = len(read_indices)\n"
+            for i in range(1, ndim):
+                func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
+            func_text += "  arr_shape = ({},)\n".format(
+                ", ".join(["size_{}".format(i) for i in range(ndim)]))
+            func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
+            func_text += "  A = np.empty(arr_shape, np.{})\n".format(
+                dtype_str)
+            if filter_read:
+                func_text += "  err = hpat.pio_api.h5read_filter(dset_id, np.int32({}), zero_tup, arr_shape, 0, A, read_indices)\n".format(ndim)
+            else:
+                func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+            func_text += "  return A\n"
+
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            _h5_read_impl = loc_vars['_h5_read_impl']
+            return self._replace_func(_h5_read_impl, rhs.args)
+
+        if fdef == ('DatetimeIndex', 'pandas'):
+            return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
+
+        if fdef == ('Series', 'pandas'):
+            in_typ = self.typemap[rhs.args[0].name]
+            impl = hpat.hiframes.pd_series_ext.pd_series_overload(in_typ)
+            return self._replace_func(impl, rhs.args)
+
+        if func_mod == 'hpat.hiframes.api':
+            return self._run_call_hiframes(assign, assign.target, rhs, func_name)
+
+        if func_mod == 'hpat.hiframes.rolling':
+            return self._run_call_rolling(assign, assign.target, rhs, func_name)
+
+        if fdef == ('empty_like', 'numpy'):
+            return self._handle_empty_like(assign, lhs, rhs)
+
+        if (isinstance(func_mod, ir.Var)
+                and is_series_type(self.typemap[func_mod.name])):
+            return self._run_call_series(
+                assign, assign.target, rhs, func_mod, func_name)
+
+        if (isinstance(func_mod, ir.Var) and isinstance(
+                self.typemap[func_mod.name], SeriesRollingType)):
+            return self._run_call_series_rolling(
+                assign, assign.target, rhs, func_mod, func_name)
+
+        # handle sorted() with key lambda input
+        if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
+            return self._handle_sorted_by_key(rhs)
         return [assign]
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
