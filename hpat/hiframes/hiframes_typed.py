@@ -182,15 +182,17 @@ class HiFramesTyped(object):
             if sig is None:
                 continue
             assert isinstance(sig, Signature)
-            sig.return_type = if_series_to_array_type(sig.return_type)
+            # XXX using replace() since it copies, otherwise cached overload
+            # functions fail
+            sig = sig.replace(return_type=if_series_to_array_type(sig.return_type))
             sig.args = tuple(map(if_series_to_array_type, sig.args))
+            replace_calltype[call] = sig
             # XXX: side effect: force update of call signatures
             if isinstance(call, ir.Expr) and call.op == 'call':
                 # StencilFunc requires kws for typing so sig.args can't be used
                 # reusing sig.args since some types become Const in sig
                 argtyps = sig.args[:len(call.args)]
                 kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
-
                 new_sig = self.typemap[call.func.name].get_call_type(
                     self.typingctx , argtyps, kwtyps)
                 # calltypes of things like BoundFunction (array.call) need to
@@ -398,6 +400,11 @@ class HiFramesTyped(object):
                 if fdef == ('DatetimeIndex', 'pandas'):
                     return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
+                if fdef == ('Series', 'pandas'):
+                    in_typ = self.typemap[rhs.args[0].name]
+                    impl = hpat.hiframes.pd_series_ext.pd_series_overload(in_typ)
+                    return self._replace_func(impl, rhs.args)
+
                 if func_mod == 'hpat.hiframes.api':
                     return self._run_call_hiframes(assign, assign.target, rhs, func_name)
 
@@ -435,11 +442,10 @@ class HiFramesTyped(object):
             return self._handle_str_contains(assign, lhs, rhs, func_name)
 
         # arr = fix_df_array(col) -> arr=col if col is array
-        if (func_name == 'fix_df_array'
-                and isinstance(self.typemap[rhs.args[0].name],
-                               (types.Array, StringArrayType, SeriesType))):
-            assign.value = rhs.args[0]
-            return [assign]
+        if func_name == 'fix_df_array':
+            in_typ = self.typemap[rhs.args[0].name]
+            impl = hpat.hiframes.api.fix_df_array_overload(in_typ)
+            return self._replace_func(impl, rhs.args)
 
         # arr = fix_rolling_array(col) -> arr=col if col is float array
         if func_name == 'fix_rolling_array':
@@ -1641,6 +1647,21 @@ class HiFramesTyped(object):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         if extra_globals is not None:
             glbls.update(extra_globals)
+
+        # create explicit arg variables for defaults if func has any
+        # XXX: inine_closure_call() can't handle defaults properly
+        if func.__defaults__:
+            defaults = func.__defaults__[len(args):]
+            scope = next(iter(self.func_ir.blocks.values())).scope
+            loc = scope.loc
+            pre_nodes = [] if pre_nodes is None else pre_nodes
+            for val in defaults:
+                d_var = ir.Var(scope, mk_unique_var('defaults'), loc)
+                self.typemap[d_var.name] = numba.typeof(val)
+                node = ir.Assign(ir.Const(val, loc), d_var, loc)
+                args.append(d_var)
+                pre_nodes.append(node)
+
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
             arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
@@ -1661,7 +1682,8 @@ class HiFramesTyped(object):
 
 def _fix_typ_undefs(new_typ, old_typ):
     if isinstance(old_typ, (types.Array, SeriesType)):
-        assert isinstance(new_typ, (types.Array, SeriesType))
+        assert isinstance(new_typ, (types.Array, SeriesType, StringArrayType,
+            types.List))
         if new_typ.dtype == types.undefined:
             return new_typ.copy(old_typ.dtype)
     if isinstance(old_typ, (types.Tuple, types.UniTuple)):

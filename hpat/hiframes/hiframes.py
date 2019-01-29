@@ -857,16 +857,7 @@ class HiFrames(object):
         """transform pd.Series(A) call
         """
         kws = dict(rhs.kws)
-        if 'data' in kws:
-            data = kws['data']
-            if len(rhs.args) != 0:  # pragma: no cover
-                raise ValueError(
-                    "only data argument suppoted in pd.Series()")
-        else:
-            if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError(
-                    "data argument in pd.Series() expected")
-            data = rhs.args[0]
+        data = self._get_arg('pd.Series', rhs.args, kws, 0, 'data')
 
         # match flatmap pd.Series(list(itertools.chain(*A))) and flatten
         data_def = guard(get_definition, self.func_ir, data)
@@ -881,9 +872,11 @@ class HiFrames(object):
                     [in_data]
                 )
 
-        return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
-                hpat.hiframes.api.fix_df_array(arr)),
-            [data])
+        # pd.Series() is handled in typed pass now
+        # return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
+        #         hpat.hiframes.api.fix_df_array(arr)),
+        #     [data])
+        return [assign]
 
     def _handle_pd_to_numeric(self, assign, lhs, rhs):
         """transform pd.to_numeric(A, errors='coerce') call here since dtype

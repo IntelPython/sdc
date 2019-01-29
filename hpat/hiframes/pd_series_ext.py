@@ -1,9 +1,10 @@
 import operator
+import pandas as pd
 import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer)
+    type_callable, infer, overload)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
@@ -1073,3 +1074,9 @@ def type_sub(context):
 
 type_callable('-')(type_sub)
 type_callable(operator.sub)(type_sub)
+
+@overload(pd.Series)
+def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+    return (lambda data=None, index=None, dtype=None, name=None, copy=False,
+        fastpath=False: hpat.hiframes.api.to_series_type(
+            hpat.hiframes.api.fix_df_array(data)))

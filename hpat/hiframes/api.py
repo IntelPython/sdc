@@ -18,7 +18,7 @@ from numba.extending import register_model, models
 
 import hpat
 from hpat.str_ext import string_type, list_string_array_type
-from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
+from hpat.str_arr_ext import (StringArrayType, string_array_type,
     is_str_arr_typ)
 
 from hpat.set_ext import build_set
@@ -937,7 +937,7 @@ class FixDfArrayType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        column = args[0]
+        column = types.unliteral(args[0])
         ret_typ = column
         if (isinstance(column, types.List)
             and (isinstance(column.dtype, types.Number)
@@ -967,11 +967,11 @@ def fix_df_array_overload(column):
     # convert list of strings to string array
     if isinstance(column, types.List) and column.dtype == string_type:
         def fix_df_array_str_impl(column):  # pragma: no cover
-            return StringArray(column)
+            return hpat.str_arr_ext.StringArray(column)
         return fix_df_array_str_impl
 
     # column is array if not list
-    assert isinstance(column, (types.Array, StringArrayType))
+    assert isinstance(column, (types.Array, StringArrayType, SeriesType))
     def fix_df_array_impl(column):  # pragma: no cover
         return column
     # FIXME: np.array() for everything else?
