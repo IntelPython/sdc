@@ -219,7 +219,8 @@ class HiFramesTyped(object):
             print("calltypes: ", self.calltypes)
 
         # XXX remove slice() of h5 read due to Numba's #3380 bug
-        while ir_utils.remove_dead(self.func_ir.blocks, self.func_ir.arg_names, self.func_ir, self.typemap):
+        while ir_utils.remove_dead(self.func_ir.blocks, self.func_ir.arg_names,
+                                   self.func_ir, self.typemap):
             pass
 
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
@@ -245,43 +246,55 @@ class HiFramesTyped(object):
                 return res
 
             # replace getitems on Series.iat
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and isinstance(self.typemap[rhs.value.name], SeriesIatType)):
-                val_def = guard(get_definition, self.func_ir, rhs.value)
-                assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
-                series_var = val_def.value
-                rhs.value = series_var
-
-            # replace getitems on dt_index/dt64 series with Timestamp function
-            if (rhs.op in ['getitem', 'static_getitem']
-                    and self.typemap[rhs.value.name] == dt_index_series_type):
-                if rhs.op == 'getitem':
-                    ind_var = rhs.index
-                else:
-                    ind_var = rhs.index_var
-
-                in_arr = rhs.value
-                def f(_in_arr, _ind):
-                    dt = _in_arr[_ind]
-                    s = np.int64(dt)
-                    res = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
-
-                assert isinstance(self.typemap[ind_var.name],
-                    (types.Integer, types.IntegerLiteral))
-                f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
-                                                'hpat': hpat}, self.typingctx,
-                                            (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
-                                            self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [in_arr, ind_var])
-                nodes = f_block.body[:-3]  # remove none return
-                nodes[-1].target = assign.target
-                return nodes
+            if rhs.op in ['getitem', 'static_getitem']:
+                return self._run_getitem(assign, rhs)
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)
 
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
+
+        return [assign]
+
+    def _run_getitem(self, assign, rhs):
+        if isinstance(self.typemap[rhs.value.name], SeriesIatType):
+            val_def = guard(get_definition, self.func_ir, rhs.value)
+            assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr in ('iat', 'iloc', 'loc'))
+            series_var = val_def.value
+            rhs.value = series_var
+
+        # replace getitems on dt_index/dt64 series with Timestamp function
+        if self.typemap[rhs.value.name] == dt_index_series_type:
+            if rhs.op == 'getitem':
+                ind_var = rhs.index
+            else:
+                ind_var = rhs.index_var
+
+            in_arr = rhs.value
+            def f(_in_arr, _ind):
+                dt = _in_arr[_ind]
+                s = np.int64(dt)
+                res = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+
+            assert isinstance(self.typemap[ind_var.name],
+                (types.Integer, types.IntegerLiteral))
+            f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
+                                            'hpat': hpat}, self.typingctx,
+                                        (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
+                                        self.typemap, self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [in_arr, ind_var])
+            nodes = f_block.body[:-3]  # remove none return
+            nodes[-1].target = assign.target
+            return nodes
+
+        if isinstance(self.typemap[rhs.value.name], SeriesType):
+            nodes = []
+            rhs.value = self._get_series_data(rhs.value, nodes)
+            self._convert_series_calltype(rhs)
+            nodes.append(assign)
+            return nodes
 
         return [assign]
 
@@ -1708,6 +1721,44 @@ class HiFramesTyped(object):
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
         return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
+
+    def _convert_series_calltype(self, call):
+        sig = self.calltypes[call]
+        if sig is None:
+            return
+        assert isinstance(sig, Signature)
+
+        # XXX using replace() since it copies, otherwise cached overload
+        # functions fail
+        new_sig = sig.replace(return_type=if_series_to_array_type(sig.return_type))
+        new_sig.args = tuple(map(if_series_to_array_type, sig.args))
+
+        # XXX: side effect: force update of call signatures
+        if isinstance(call, ir.Expr) and call.op == 'call':
+            # StencilFunc requires kws for typing so sig.args can't be used
+            # reusing sig.args since some types become Const in sig
+            argtyps = sig.args[:len(call.args)]
+            kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+            new_sig = self.typemap[call.func.name].get_call_type(
+                self.typingctx , argtyps, kwtyps)
+            # calltypes of things like BoundFunction (array.call) need to
+            # be updated for lowering to work
+            # XXX: new_sig could be None for things like np.int32()
+            if call in self.calltypes and new_sig is not None:
+                # for box_df, don't change return type so that information
+                # such as Categorical dtype is preserved
+                if isinstance(sig.return_type, hpat.hiframes.api.PandasDataFrameType):
+                    new_sig.return_type = sig.return_type
+                else:
+                    old_sig = self.calltypes[call]
+                    # fix types with undefined dtypes in empty_inferred, etc.
+                    return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
+                    args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
+                    new_sig = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
+
+        self.calltypes.pop(call)
+        self.calltypes[call] = new_sig
+        return
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
