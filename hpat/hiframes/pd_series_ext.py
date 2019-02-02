@@ -4,7 +4,7 @@ import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload)
+    type_callable, infer, overload, make_attribute_wrapper)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
@@ -129,6 +129,11 @@ class SeriesModel(models.StructModel):
             ('name', string_type),
         ]
         super(SeriesModel, self).__init__(dmm, fe_type, members)
+
+make_attribute_wrapper(SeriesType, 'data', '_data')
+make_attribute_wrapper(SeriesType, 'index', '_index')
+make_attribute_wrapper(SeriesType, 'name', '_name')
+
 
 class BoxedSeriesType(types.Type):
     """Series type before unboxing. Using a different type to avoid data model
