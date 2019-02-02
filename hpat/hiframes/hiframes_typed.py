@@ -261,8 +261,11 @@ class HiFramesTyped(object):
 
                 if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
                     # simply return the column
-                    assign.value = rhs.value
-                    return [assign]
+                    nodes = []
+                    var = self._get_series_data(rhs.value, nodes)
+                    assign.value = var
+                    nodes.append(assign)
+                    return nodes
 
                 if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
                     if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
@@ -1649,6 +1652,15 @@ class HiFramesTyped(object):
             if tup_def.op in ('build_tuple', 'build_list'):
                 return tup_def.items
         raise ValueError("constant tuple expected")
+
+    def _get_series_data(self, series_var, nodes):
+        loc = series_var.loc
+        data_var = ir.Var(
+            series_var.scope, mk_unique_var(series_var.name + '_data'), loc)
+        self.typemap[data_var.name] = self.typemap[series_var.name].data
+        nodes.append(ir.Assign(
+            ir.Expr.getattr(series_var, '_data', loc), data_var, loc))
+        return data_var
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,
                       pre_nodes=None, extra_globals=None, pysig=None, kws=None):
