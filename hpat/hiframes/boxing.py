@@ -264,9 +264,17 @@ def box_series(typ, val, c):
     if typ.index is types.none:
         index = c.pyapi.make_none()
     else:
+        # TODO: index-specific boxing like RangeIndex() etc.
         index = _box_series_data(typ.index.dtype, typ.index, series.index, c)
 
-    res = c.pyapi.call_method(pd_class_obj, "Series", (arr, index))
+    if typ.is_named:
+        name = c.pyapi.from_native_value(string_type, series.name)
+    else:
+        name = c.pyapi.make_none()
+
+    dtype = c.pyapi.make_none()  # TODO: dtype
+    res = c.pyapi.call_method(
+        pd_class_obj, "Series", (arr, index, dtype, name))
 
     c.pyapi.decref(pd_class_obj)
     return res

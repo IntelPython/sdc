@@ -65,7 +65,7 @@ class TestSeries(unittest.TestCase):
             return A
 
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_create_series_index2(self):
         def test_impl():
@@ -73,7 +73,23 @@ class TestSeries(unittest.TestCase):
             return A
 
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index3(self):
+        def test_impl():
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'], name='A')
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index4(self):
+        def test_impl(name):
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'], name=name)
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func('A'), test_impl('A'))
 
     def test_create_str(self):
         def test_impl():
