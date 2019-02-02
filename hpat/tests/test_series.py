@@ -292,9 +292,9 @@ class TestSeries(unittest.TestCase):
             return A[0]
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
+        A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        self.assertEqual(hpat_func(A), test_impl(A))
 
     def test_getitem_series1(self):
         def test_impl(A, i):
