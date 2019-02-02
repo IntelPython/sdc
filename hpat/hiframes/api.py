@@ -1035,6 +1035,9 @@ def init_series(typingctx, data, index, name=None):
     data has changed, and get the array variables from init_series() args if
     not changed.
     """
+
+    is_named = False if name is types.none else True
+
     def codegen(context, builder, signature, args):
         data_val, index_val, name_val = args
         # create series struct and store values
@@ -1042,19 +1045,23 @@ def init_series(typingctx, data, index, name=None):
             signature.return_type)(context, builder)
         series.data = data_val
         series.index = index_val
-        if signature.args[2] != types.none:
-            series.name = name_val
+        if is_named:
+            if isinstance(name, types.StringLiteral):
+                series.name = numba.unicode.make_string_from_constant(
+                    context, builder, string_type, name.literal_value)
+            else:
+                series.name = name_val
 
         # increase refcount of stored values
         if context.enable_nrt:
             context.nrt.incref(builder, signature.args[0], data_val)
             context.nrt.incref(builder, signature.args[1], index_val)
-            if signature.args[2] != types.none:
+            if is_named:
                 context.nrt.incref(builder, signature.args[2], name_val)
 
         return series._getvalue()
 
-    ret_typ = SeriesType(data.dtype, data, index)
+    ret_typ = SeriesType(data.dtype, data, index, is_named)
     sig = signature(ret_typ, data, index, name)
     return sig, codegen
 

@@ -25,7 +25,7 @@ import datetime
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
-    def __init__(self, dtype, data=None, index=None):
+    def __init__(self, dtype, data=None, index=None, is_named=False):
         # keeping data array in type since operators can make changes such
         # as making array unaligned etc.
         data = _get_series_array_type(dtype) if data is None else data
@@ -34,8 +34,10 @@ class SeriesType(types.IterableType):
         if index is None:
             index = types.none
         self.index = index
+        # keep is_named in type to enable boxing
+        self.is_named = is_named
         super(SeriesType, self).__init__(
-            name="series({}, {}, {})".format(dtype, data, index))
+            name="series({}, {}, {}, {})".format(dtype, data, index, is_named))
 
     def copy(self, dtype=None):
         # XXX is copy necessary?
