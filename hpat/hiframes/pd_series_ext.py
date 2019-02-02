@@ -31,6 +31,8 @@ class SeriesType(types.IterableType):
         data = _get_series_array_type(dtype) if data is None else data
         self.dtype = dtype
         self.data = data
+        if index is None:
+            index = types.none
         self.index = index
         super(SeriesType, self).__init__(
             name="series({}, {}, {})".format(dtype, data, index))
@@ -119,37 +121,11 @@ date_series_type = SeriesType(datetime_date_type)
 @register_model(SeriesType)
 class SeriesModel(models.StructModel):
     def __init__(self, dmm, fe_type):
-        dtype = fe_type.dtype
-        if isinstance(dtype, PDCategoricalDtype):
-            dtype = get_categories_int_type(dtype)
-        if isinstance(dtype, types.BaseTuple):
-            np_dtype = np.dtype(
-                ','.join(str(t) for t in dtype.types), align=True)
-            dtype = numba.numpy_support.from_dtype(np_dtype)
-        # TODO: types other than Array and StringArray?
-        if dtype == string_type:
-            members = hpat.str_arr_ext.str_arr_model_members
-        elif dtype == types.List(string_type):
-            # for unboxing list(list(str))
-            # copied from numba/datamodels/models
-            payload_type = types.ListPayload(list_string_array_type)
-            members = [
-                ('meminfo', types.MemInfoPointer(payload_type)),
-                ('parent', types.pyobject),
-            ]
-        else:
-            ndim = 1
-            members = [
-                ('meminfo', types.MemInfoPointer(dtype)),
-                ('parent', types.pyobject),
-                ('nitems', types.intp),
-                ('itemsize', types.intp),
-                ('data', types.CPointer(dtype)),
-                ('shape', types.UniTuple(types.intp, ndim)),
-                ('strides', types.UniTuple(types.intp, ndim)),
-
-            ]
-
+        members = [
+            ('data', fe_type.data),
+            ('index', fe_type.index),
+            ('name', string_type),
+        ]
         super(SeriesModel, self).__init__(dmm, fe_type, members)
 
 class BoxedSeriesType(types.Type):
@@ -168,8 +144,10 @@ class UnBoxedSeriesType(types.Type):
     """Series type before boxing. Using a different type to avoid data model
     issues and confusion.
     """
-    def __init__(self, dtype):
+    def __init__(self, dtype, data, index):
         self.dtype = dtype
+        self.data = data
+        self.index = index
         name = "UnBoxedSeriesType({})".format(dtype)
         super(UnBoxedSeriesType, self).__init__(name)
 
@@ -238,7 +216,7 @@ def if_arr_to_series_type(typ):
 
 def if_series_to_unbox(typ):
     if isinstance(typ, SeriesType):
-        return UnBoxedSeriesType(typ.dtype)
+        return UnBoxedSeriesType(typ.dtype, typ.data, typ.index)
 
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple(
@@ -1024,6 +1002,15 @@ type_callable(operator.sub)(type_sub)
 
 @overload(pd.Series)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+
+    if index is not None:
+        return (lambda data=None, index=None, dtype=None, name=None, copy=False,
+        fastpath=False: hpat.hiframes.api.init_series(
+            hpat.hiframes.api.fix_df_array(data),
+            hpat.hiframes.api.fix_df_array(index),
+            name
+        ))
+
     return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-        fastpath=False: hpat.hiframes.api.to_series_type(
-            hpat.hiframes.api.fix_df_array(data)))
+        fastpath=False: hpat.hiframes.api.init_series(
+            hpat.hiframes.api.fix_df_array(data), index, name))
