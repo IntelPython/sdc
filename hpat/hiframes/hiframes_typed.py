@@ -1,5 +1,3 @@
-from __future__ import print_function, division, absolute_import
-
 import operator
 from collections import defaultdict
 import numpy as np
@@ -96,7 +94,8 @@ class HiFramesTyped(object):
             replaced = False
             for i, inst in enumerate(block.body):
                 if isinstance(inst, Aggregate):
-                    #import pdb; pdb.set_trace()
+                    # now that type inference is done, remove type vars to
+                    # enable dead code elimination
                     inst.out_typer_vars = None
                 if isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst)
@@ -238,51 +237,8 @@ class HiFramesTyped(object):
             self._type_changed_vars.append(lhs)
 
         if isinstance(rhs, ir.Expr):
-            # arr = S.values
-            if (rhs.op == 'getattr'):
-                rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
-
-                # replace arr.dtype for dt64 since PA replaces with
-                # np.datetime64[ns] which invalid, TODO: fix PA
-                if (rhs.attr == 'dtype' and (is_series_type(rhs_type)
-                        or isinstance(rhs_type, types.Array)) and isinstance(
-                            rhs_type.dtype,
-                            (types.NPDatetime, types.NPTimedelta))):
-                    assign.value = ir.Global("numpy.datetime64", rhs_type.dtype, rhs.loc)
-                    return [assign]
-
-                # replace arr.dtype since PA replacement inserts in the
-                # beginning of block, preventing fusion. TODO: fix PA
-                if (rhs.attr == 'dtype' and isinstance(
-                        if_series_to_array_type(rhs_type), types.Array)):
-                    typ_str = str(rhs_type.dtype)
-                    assign.value = ir.Global("np.dtype({})".format(typ_str), np.dtype(typ_str), rhs.loc)
-                    return [assign]
-
-                if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
-                    # simply return the column
-                    nodes = []
-                    var = self._get_series_data(rhs.value, nodes)
-                    assign.value = var
-                    nodes.append(assign)
-                    return nodes
-
-                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPDatetime):
-                    if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
-                        return self._run_DatetimeIndex_field(assign, assign.target, rhs)
-                    if rhs.attr == 'date':
-                        return self._run_DatetimeIndex_date(assign, assign.target, rhs)
-
-                if rhs_type == series_dt_methods_type:
-                    dt_def = guard(get_definition, self.func_ir, rhs.value)
-                    if dt_def is None:  # TODO: check for errors
-                        raise ValueError("invalid series.dt")
-                    rhs.value = dt_def.value
-                    return self._run_DatetimeIndex_field(assign, assign.target, rhs)
-
-                if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype, types.scalars.NPTimedelta):
-                    if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
-                        return self._run_Timedelta_field(assign, assign.target, rhs)
+            if rhs.op == 'getattr':
+                return self._run_getattr(assign, rhs)
 
             res = self._handle_string_array_expr(lhs, rhs, assign)
             if res is not None:
@@ -326,6 +282,55 @@ class HiFramesTyped(object):
 
             if self._is_dt_index_binop(rhs):
                 return self._handle_dt_index_binop(lhs, rhs, assign)
+
+        return [assign]
+
+    def _run_getattr(self, assign, rhs):
+        rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
+
+        # replace arr.dtype for dt64 since PA replaces with
+        # np.datetime64[ns] which invalid, TODO: fix PA
+        if (rhs.attr == 'dtype' and (is_series_type(rhs_type)
+                or isinstance(rhs_type, types.Array)) and isinstance(
+                    rhs_type.dtype,
+                    (types.NPDatetime, types.NPTimedelta))):
+            assign.value = ir.Global("numpy.datetime64", rhs_type.dtype, rhs.loc)
+            return [assign]
+
+        # replace arr.dtype since PA replacement inserts in the
+        # beginning of block, preventing fusion. TODO: fix PA
+        if (rhs.attr == 'dtype' and isinstance(
+                if_series_to_array_type(rhs_type), types.Array)):
+            typ_str = str(rhs_type.dtype)
+            assign.value = ir.Global("np.dtype({})".format(typ_str), np.dtype(typ_str), rhs.loc)
+            return [assign]
+
+        if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
+            # simply return the column
+            nodes = []
+            var = self._get_series_data(rhs.value, nodes)
+            assign.value = var
+            nodes.append(assign)
+            return nodes
+
+        if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
+                                                    types.scalars.NPDatetime):
+            if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
+                return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+            if rhs.attr == 'date':
+                return self._run_DatetimeIndex_date(assign, assign.target, rhs)
+
+        if rhs_type == series_dt_methods_type:
+            dt_def = guard(get_definition, self.func_ir, rhs.value)
+            if dt_def is None:  # TODO: check for errors
+                raise ValueError("invalid series.dt")
+            rhs.value = dt_def.value
+            return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+
+        if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
+                                                    types.scalars.NPTimedelta):
+            if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
+                return self._run_Timedelta_field(assign, assign.target, rhs)
 
         return [assign]
 
