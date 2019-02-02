@@ -1027,6 +1027,38 @@ def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
+@intrinsic
+def init_series(typingctx, data, index, name=None):
+    """Create a Series with provided data, index and name values.
+    Used as a single constructor for Series and assigning its data, so that
+    optimization passes can look for init_series() to see if underlying
+    data has changed, and get the array variables from init_series() args if
+    not changed.
+    """
+    def codegen(context, builder, signature, args):
+        data_val, index_val, name_val = args
+        # create series struct and store values
+        series = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+        series.data = data_val
+        series.index = index_val
+        if signature.args[2] != types.none:
+            series.name = name_val
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, signature.args[0], data_val)
+            context.nrt.incref(builder, signature.args[1], index_val)
+            if signature.args[2] != types.none:
+                context.nrt.incref(builder, signature.args[2], name_val)
+
+        return series._getvalue()
+
+    ret_typ = SeriesType(data.dtype, data, index)
+    sig = signature(ret_typ, data, index, name)
+    return sig, codegen
+
+
 # TODO: separate pd.DatetimeIndex type
 #@typeof_impl.register(pd.DatetimeIndex)
 

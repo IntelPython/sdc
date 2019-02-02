@@ -58,6 +58,23 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_create_series_index1(self):
+        # create and box an indexed Series
+        def test_impl():
+            A = pd.Series([1,2,3], ['A', 'C', 'B'])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_create_series_index2(self):
+        def test_impl():
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})

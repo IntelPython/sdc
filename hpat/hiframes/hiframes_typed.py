@@ -141,79 +141,79 @@ class HiFramesTyped(object):
             print("--- types before Series replacement:", self.typemap)
             print("calltypes: ", self.calltypes)
 
-        replace_series = {}
-        for vname, typ in self.typemap.items():
-            new_typ = if_series_to_array_type(typ)
-            if new_typ != typ:
-                # print("replacing series type", vname)
-                replace_series[vname] = new_typ
-            # replace array.call() variable types
-            if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
-                # TODO: handle string arrays, etc.
-                assert (typ.typing_key in explicit_binop_funcs.keys()
-                    or typ.typing_key.startswith('array.')
-                    or typ.typing_key.startswith('series.'))
-                # skip if series.func since it is replaced here
-                if (not isinstance(typ.typing_key, str)
-                        or not typ.typing_key.startswith('array.')):
-                    continue
-                this = series_to_array_type(typ.this)
-                attr = typ.typing_key[len('array.'):]
-                # string array copy() shouldn't go to np array resolver
-                if this == string_array_type and attr == 'copy':
-                    replace_series[vname] = hpat.str_arr_ext.StrArrayAttribute(
-                        self.typingctx).resolve_copy(this)
-                    continue
-                resolver = getattr(ArrayAttribute, 'resolve_'+attr)
-                # methods are either installed with install_array_method or
-                # using @bound_function in arraydecl.py
-                if hasattr(resolver, '__wrapped__'):
-                    resolver = bound_function(typ.typing_key)(resolver.__wrapped__)
-                new_typ = resolver(ArrayAttribute(self.typingctx), this)
-                replace_series[vname] = new_typ
+        # replace_series = {}
+        # for vname, typ in self.typemap.items():
+        #     new_typ = if_series_to_array_type(typ)
+        #     if new_typ != typ:
+        #         # print("replacing series type", vname)
+        #         replace_series[vname] = new_typ
+        #     # replace array.call() variable types
+        #     if isinstance(typ, types.BoundFunction) and isinstance(typ.this, SeriesType):
+        #         # TODO: handle string arrays, etc.
+        #         assert (typ.typing_key in explicit_binop_funcs.keys()
+        #             or typ.typing_key.startswith('array.')
+        #             or typ.typing_key.startswith('series.'))
+        #         # skip if series.func since it is replaced here
+        #         if (not isinstance(typ.typing_key, str)
+        #                 or not typ.typing_key.startswith('array.')):
+        #             continue
+        #         this = series_to_array_type(typ.this)
+        #         attr = typ.typing_key[len('array.'):]
+        #         # string array copy() shouldn't go to np array resolver
+        #         if this == string_array_type and attr == 'copy':
+        #             replace_series[vname] = hpat.str_arr_ext.StrArrayAttribute(
+        #                 self.typingctx).resolve_copy(this)
+        #             continue
+        #         resolver = getattr(ArrayAttribute, 'resolve_'+attr)
+        #         # methods are either installed with install_array_method or
+        #         # using @bound_function in arraydecl.py
+        #         if hasattr(resolver, '__wrapped__'):
+        #             resolver = bound_function(typ.typing_key)(resolver.__wrapped__)
+        #         new_typ = resolver(ArrayAttribute(self.typingctx), this)
+        #         replace_series[vname] = new_typ
 
-        for vname, typ in replace_series.items():
-            self.typemap.pop(vname)
-            self.typemap[vname] = typ
+        # for vname, typ in replace_series.items():
+        #     self.typemap.pop(vname)
+        #     self.typemap[vname] = typ
 
-        replace_calltype = {}
-        # replace sig of getitem/setitem/... series type with array
-        for call, sig in self.calltypes.items():
-            if sig is None:
-                continue
-            assert isinstance(sig, Signature)
-            # XXX using replace() since it copies, otherwise cached overload
-            # functions fail
-            sig = sig.replace(return_type=if_series_to_array_type(sig.return_type))
-            sig.args = tuple(map(if_series_to_array_type, sig.args))
-            replace_calltype[call] = sig
-            # XXX: side effect: force update of call signatures
-            if isinstance(call, ir.Expr) and call.op == 'call':
-                # StencilFunc requires kws for typing so sig.args can't be used
-                # reusing sig.args since some types become Const in sig
-                argtyps = sig.args[:len(call.args)]
-                kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
-                new_sig = self.typemap[call.func.name].get_call_type(
-                    self.typingctx , argtyps, kwtyps)
-                # calltypes of things like BoundFunction (array.call) need to
-                # be update for lowering to work
-                # XXX: new_sig could be None for things like np.int32()
-                if call in self.calltypes and new_sig is not None:
-                    # for box_df, don't change return type so that information
-                    # such as Categorical dtype is preserved
-                    if isinstance(sig.return_type, hpat.hiframes.api.PandasDataFrameType):
-                        new_sig.return_type = sig.return_type
-                        replace_calltype[call] = new_sig
-                        continue
-                    old_sig = self.calltypes[call]
-                    # fix types with undefined dtypes in empty_inferred, etc.
-                    return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
-                    args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
-                    replace_calltype[call] = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
+        # replace_calltype = {}
+        # # replace sig of getitem/setitem/... series type with array
+        # for call, sig in self.calltypes.items():
+        #     if sig is None:
+        #         continue
+        #     assert isinstance(sig, Signature)
+        #     # XXX using replace() since it copies, otherwise cached overload
+        #     # functions fail
+        #     sig = sig.replace(return_type=if_series_to_array_type(sig.return_type))
+        #     sig.args = tuple(map(if_series_to_array_type, sig.args))
+        #     replace_calltype[call] = sig
+        #     # XXX: side effect: force update of call signatures
+        #     if isinstance(call, ir.Expr) and call.op == 'call':
+        #         # StencilFunc requires kws for typing so sig.args can't be used
+        #         # reusing sig.args since some types become Const in sig
+        #         argtyps = sig.args[:len(call.args)]
+        #         kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+        #         new_sig = self.typemap[call.func.name].get_call_type(
+        #             self.typingctx , argtyps, kwtyps)
+        #         # calltypes of things like BoundFunction (array.call) need to
+        #         # be update for lowering to work
+        #         # XXX: new_sig could be None for things like np.int32()
+        #         if call in self.calltypes and new_sig is not None:
+        #             # for box_df, don't change return type so that information
+        #             # such as Categorical dtype is preserved
+        #             if isinstance(sig.return_type, hpat.hiframes.api.PandasDataFrameType):
+        #                 new_sig.return_type = sig.return_type
+        #                 replace_calltype[call] = new_sig
+        #                 continue
+        #             old_sig = self.calltypes[call]
+        #             # fix types with undefined dtypes in empty_inferred, etc.
+        #             return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
+        #             args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
+        #             replace_calltype[call] = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
 
-        for call, sig in replace_calltype.items():
-            self.calltypes.pop(call)
-            self.calltypes[call] = sig
+        # for call, sig in replace_calltype.items():
+        #     self.calltypes.pop(call)
+        #     self.calltypes[call] = sig
 
         if debug_prints():  # pragma: no cover
             print("--- types after Series replacement:", self.typemap)
@@ -225,7 +225,7 @@ class HiFramesTyped(object):
 
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes_typed")
-        return if_series_to_unbox(self.return_type)
+        return (self.return_type)
 
     def _run_assign(self, assign):
         lhs = assign.target.name
@@ -408,8 +408,12 @@ class HiFramesTyped(object):
             return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
         if fdef == ('Series', 'pandas'):
-            in_typ = self.typemap[rhs.args[0].name]
-            impl = hpat.hiframes.pd_series_ext.pd_series_overload(in_typ)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                        for name, v in dict(rhs.kws).items()}
+
+            impl = hpat.hiframes.pd_series_ext.pd_series_overload(
+                *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args)
 
         if func_mod == 'hpat.hiframes.api':

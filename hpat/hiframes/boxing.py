@@ -21,7 +21,7 @@ from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     box_categorical_series_dtype_fix)
-from hpat.hiframes.pd_series_ext import (BoxedSeriesType,
+from hpat.hiframes.pd_series_ext import (BoxedSeriesType, SeriesType,
     arr_to_boxed_series_type, UnBoxedSeriesType)
 
 import hstr_ext
@@ -248,7 +248,7 @@ def unbox_series(typ, val, c):
     c.pyapi.decref(arr_obj)
     return native_val
 
-@box(UnBoxedSeriesType)
+@box(SeriesType)
 def box_series(typ, val, c):
     """
     """
@@ -256,34 +256,46 @@ def box_series(typ, val, c):
     pd_class_obj = c.pyapi.import_module_noblock(mod_name)
     dtype = typ.dtype
 
+    series = cgutils.create_struct_proxy(
+            typ)(c.context, c.builder, val)
+
+    arr = _box_series_data(dtype, typ.data, series.data, c)
+
+    if typ.index is types.none:
+        index = c.pyapi.make_none()
+    else:
+        index = _box_series_data(typ.index.dtype, typ.index, series.index, c)
+
+    res = c.pyapi.call_method(pd_class_obj, "Series", (arr, index))
+
+    c.pyapi.decref(pd_class_obj)
+    return res
+
+
+def _box_series_data(dtype, data_typ, val, c):
+
     if isinstance(dtype, types.BaseTuple):
         np_dtype = np.dtype(
             ','.join(str(t) for t in dtype.types), align=True)
         dtype = numba.numpy_support.from_dtype(np_dtype)
 
     if dtype == string_type:
-        arr = box_str_arr(typ, val, c)
+        arr = box_str_arr(string_array_type, val, c)
     elif dtype == datetime_date_type:
-        arr = box_datetime_date_array(typ, val, c)
+        arr = box_datetime_date_array(data_typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
         arr = box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:
-        arr = box_array(types.Array(dtype, 1, 'C'), val, c)
+        arr = box_array(data_typ, val, c)
 
     if isinstance(dtype, types.Record):
         o_str = c.context.insert_const_string(c.builder.module, "O")
         o_str = c.pyapi.string_from_string(o_str)
         arr = c.pyapi.call_method(arr, "astype", (o_str,))
 
-
-    res = c.pyapi.call_method(pd_class_obj, "Series", (arr,))
-    # c.pyapi.decref(arr)  # TODO needed?
-    # class_obj = c.pyapi.unserialize(c.pyapi.serialize_object(pd.Series))
-    # res = c.pyapi.call_function_objargs(class_obj, (arr,))
-    c.pyapi.decref(pd_class_obj)
-    return res
+    return arr
 
 
 def _unbox_array_list_str(obj, c):
