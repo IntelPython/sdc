@@ -414,7 +414,8 @@ class HiFramesTyped(object):
 
             impl = hpat.hiframes.pd_series_ext.pd_series_overload(
                 *arg_typs, **kw_typs)
-            return self._replace_func(impl, rhs.args)
+            return self._replace_func(impl, rhs.args,
+                            pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if func_mod == 'hpat.hiframes.api':
             return self._run_call_hiframes(assign, assign.target, rhs, func_name)
@@ -1650,24 +1651,32 @@ class HiFramesTyped(object):
         raise ValueError("constant tuple expected")
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,
-                      pre_nodes=None, extra_globals=None):
+                      pre_nodes=None, extra_globals=None, pysig=None, kws=None):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         if extra_globals is not None:
             glbls.update(extra_globals)
 
         # create explicit arg variables for defaults if func has any
         # XXX: inine_closure_call() can't handle defaults properly
-        if func.__defaults__:
-            defaults = func.__defaults__[len(args):]
+        if pysig is not None:
+            pre_nodes = [] if pre_nodes is None else pre_nodes
             scope = next(iter(self.func_ir.blocks.values())).scope
             loc = scope.loc
-            pre_nodes = [] if pre_nodes is None else pre_nodes
-            for val in defaults:
+            def normal_handler(index, param, default):
+                return default
+
+            def default_handler(index, param, default):
                 d_var = ir.Var(scope, mk_unique_var('defaults'), loc)
-                self.typemap[d_var.name] = numba.typeof(val)
-                node = ir.Assign(ir.Const(val, loc), d_var, loc)
-                args.append(d_var)
+                self.typemap[d_var.name] = numba.typeof(default)
+                node = ir.Assign(ir.Const(default, loc), d_var, loc)
                 pre_nodes.append(node)
+                return d_var
+
+            # TODO: stararg needs special handling?
+            args = numba.typing.fold_arguments(
+                pysig, args, kws, normal_handler, default_handler,
+                normal_handler)
+
 
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
