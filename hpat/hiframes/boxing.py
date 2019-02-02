@@ -259,13 +259,14 @@ def box_series(typ, val, c):
     series = cgutils.create_struct_proxy(
             typ)(c.context, c.builder, val)
 
-    arr = _box_series_data(dtype, typ.data, series.data, c)
+    arr = _box_series_data(dtype, typ.data, series.data, c, pd_class_obj)
 
     if typ.index is types.none:
         index = c.pyapi.make_none()
     else:
         # TODO: index-specific boxing like RangeIndex() etc.
-        index = _box_series_data(typ.index.dtype, typ.index, series.index, c)
+        index = _box_series_data(
+            typ.index.dtype, typ.index, series.index, c, pd_class_obj)
 
     if typ.is_named:
         name = c.pyapi.from_native_value(string_type, series.name)
@@ -280,7 +281,7 @@ def box_series(typ, val, c):
     return res
 
 
-def _box_series_data(dtype, data_typ, val, c):
+def _box_series_data(dtype, data_typ, val, c, pd_class_obj):
 
     if isinstance(dtype, types.BaseTuple):
         np_dtype = np.dtype(
