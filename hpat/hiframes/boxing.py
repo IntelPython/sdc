@@ -21,8 +21,7 @@ from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     box_categorical_series_dtype_fix)
-from hpat.hiframes.pd_series_ext import (BoxedSeriesType, SeriesType,
-    arr_to_boxed_series_type, UnBoxedSeriesType)
+from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
 
 import hstr_ext
 import llvmlite.binding as ll
@@ -51,17 +50,17 @@ def typeof_pd_str_series(val, c):
     elif len(val) > 0 and isinstance(val.values[0], datetime.date):
         # XXX: using .values to check date type since DatetimeIndex returns
         # Timestamp which is subtype of datetime.date
-        return BoxedSeriesType(datetime_date_type)
+        return SeriesType(datetime_date_type)
     else:
         arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
 
-    return arr_to_boxed_series_type(arr_typ)
+    return arr_to_series_type(arr_typ)
 
 
 @typeof_impl.register(pd.Index)
 def typeof_pd_index(val, c):
     if len(val) > 0 and isinstance(val[0], datetime.date):
-        return BoxedSeriesType(datetime_date_type)
+        return SeriesType(datetime_date_type)
     else:
         raise NotImplementedError("unsupported pd.Index type")
 
@@ -233,20 +232,24 @@ def lower_unbox_df_column(context, builder, sig, args):
     return native_val.value
 
 
-@unbox(BoxedSeriesType)
+@unbox(SeriesType)
 def unbox_series(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "values")
-
-    if typ.dtype == string_type:
-        native_val = unbox_str_series(string_array_type, arr_obj, c)
-    elif typ.dtype == datetime_date_type:
-        native_val = unbox_datetime_date_array(typ, val, c)
-    else:
-        # TODO: error handling like Numba callwrappers.py
-        native_val = unbox_array(types.Array(dtype=typ.dtype, ndim=1, layout='C'), arr_obj, c)
-
+    series = cgutils.create_struct_proxy(typ)(c.context, c.builder)
+    series.data = _unbox_series_data(typ.dtype, typ.data, val, c, arr_obj)
+    # TODO: handle index and name
     c.pyapi.decref(arr_obj)
-    return native_val
+    return NativeValue(series._getvalue())
+
+def _unbox_series_data(dtype, data_typ, val, c, arr_obj):
+    if dtype == string_type:
+        return unbox_str_series(string_array_type, arr_obj, c).value
+    elif dtype == datetime_date_type:
+        return unbox_datetime_date_array(data_typ, val, c).value
+
+    # TODO: error handling like Numba callwrappers.py
+    return unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c).value
+
 
 @box(SeriesType)
 def box_series(typ, val, c):
