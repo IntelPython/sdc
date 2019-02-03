@@ -270,7 +270,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+        self.assertEqual(hpat_func(df.A.copy(), 0), test_impl(df.A.copy(), 0))
 
     def test_setitem_series2(self):
         def test_impl(A, i):
