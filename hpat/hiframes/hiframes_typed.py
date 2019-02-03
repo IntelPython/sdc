@@ -494,7 +494,21 @@ class HiFramesTyped(object):
         # handle sorted() with key lambda input
         if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
             return self._handle_sorted_by_key(rhs)
-        return [assign]
+
+        # convert Series to Array for unhandled calls
+        # TODO check all the functions that get here and handle if necessary
+        nodes = []
+        new_args = []
+        for arg in rhs.args:
+            if isinstance(self.typemap[arg.name], SeriesType):
+                new_args.append(self._get_series_data(arg, nodes))
+            else:
+                new_args.append(arg)
+
+        self._convert_series_calltype(rhs)
+        rhs.args = new_args
+        nodes.append(assign)
+        return nodes
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
         if func_name in ('to_series_type', 'to_arr_from_series'):
