@@ -244,6 +244,13 @@ class HiFramesTyped(object):
             if rhs.op == 'binop':
                 return self._run_binop(assign, rhs)
 
+            # XXX handling inplace_binop similar to binop for now
+            # TODO handle inplace alignment similar to
+            # add_special_arithmetic_methods() in pandas ops.py
+            # TODO: inplace of str array?
+            if rhs.op == 'inplace_binop':
+                return self._run_binop(assign, rhs)
+
             # replace getitems on Series.iat
             if rhs.op in ['getitem', 'static_getitem']:
                 return self._run_getitem(assign, rhs)
