@@ -749,7 +749,8 @@ class HiFramesTyped(object):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             _binop_impl = loc_vars['_binop_impl']
-            return self._replace_func(_binop_impl, [series_var] + rhs.args)
+            return self._replace_func(_binop_impl, [series_var] + rhs.args,
+                array_typ_convert=False)
 
         # functions we revert to Numpy for now, otherwise warning
         # TODO: handle series-specific cases for this funcs
