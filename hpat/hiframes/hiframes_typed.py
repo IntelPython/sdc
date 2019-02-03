@@ -1726,6 +1726,17 @@ class HiFramesTyped(object):
         raise ValueError("constant tuple expected")
 
     def _get_series_data(self, series_var, nodes):
+        # optimization: return data var directly if
+        # S = init_series(A, None, None)
+        # XXX assuming init_series is the only call to create a series
+        # and series._data is never overwritten
+        var_def = guard(get_definition, self.func_ir, series_var)
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if (call_def == ('init_series', 'hpat.hiframes.api')
+                and self._is_const_none(var_def.args[1])
+                and self._is_const_none(var_def.args[2])):
+            return var_def.args[0]
+
         loc = series_var.loc
         data_var = ir.Var(
             series_var.scope, mk_unique_var(series_var.name + '_data'), loc)
@@ -1817,6 +1828,11 @@ class HiFramesTyped(object):
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
         return isinstance(if_series_to_array_type(typ), types.npytypes.Array) and typ.dtype == types.bool_
+
+    def _is_const_none(self, var):
+        var_def = guard(get_definition, self.func_ir, var)
+        return isinstance(var_def, ir.Const) and var_def.value is None
+
 
 def _fix_typ_undefs(new_typ, old_typ):
     if isinstance(old_typ, (types.Array, SeriesType)):
