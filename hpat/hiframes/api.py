@@ -873,11 +873,18 @@ class ToConstTupleTyper(AbstractTemplate):
         return signature(ret_typ, arr)
 
 
+# this function should be used for getting S._data for alias analysis to work
+@numba.generated_jit(nopython=True)
+def get_series_data(S):
+    return lambda S: S._data
+
+
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
 
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
+    numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func

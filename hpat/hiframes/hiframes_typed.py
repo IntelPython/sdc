@@ -1754,13 +1754,19 @@ class HiFramesTyped(object):
                 and self._is_const_none(var_def.args[2])):
             return var_def.args[0]
 
-        loc = series_var.loc
-        data_var = ir.Var(
-            series_var.scope, mk_unique_var(series_var.name + '_data'), loc)
-        self.typemap[data_var.name] = self.typemap[series_var.name].data
-        nodes.append(ir.Assign(
-            ir.Expr.getattr(series_var, '_data', loc), data_var, loc))
-        return data_var
+        # XXX use get_series_data() for getting data instead of S._data
+        # to enable alias analysis
+        f_block = compile_to_numba_ir(
+            lambda S: hpat.hiframes.api.get_series_data(S),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[series_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,
                       pre_nodes=None, extra_globals=None, pysig=None, kws=None):
