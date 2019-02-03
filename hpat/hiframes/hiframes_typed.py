@@ -241,9 +241,8 @@ class HiFramesTyped(object):
             if rhs.op == 'getattr':
                 return self._run_getattr(assign, rhs)
 
-            res = self._handle_string_array_expr(lhs, rhs, assign)
-            if res is not None:
-                return res
+            if rhs.op == 'binop':
+                return self._run_binop(assign, rhs)
 
             # replace getitems on Series.iat
             if rhs.op in ['getitem', 'static_getitem']:
@@ -251,9 +250,6 @@ class HiFramesTyped(object):
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)
-
-            if self._is_dt_index_binop(rhs):
-                return self._handle_dt_index_binop(lhs, rhs, assign)
 
         return [assign]
 
@@ -346,6 +342,37 @@ class HiFramesTyped(object):
                 return self._run_Timedelta_field(assign, assign.target, rhs)
 
         return [assign]
+
+    def _run_binop(self, assign, rhs):
+        res = self._handle_string_array_expr(assign, rhs)
+        if res is not None:
+            return res
+
+        if self._is_dt_index_binop(rhs):
+            return self._handle_dt_index_binop(assign, rhs)
+
+        arg1, arg2 = rhs.lhs, rhs.rhs
+        typ1, typ2 = self.typemap[arg1.name], self.typemap[arg2.name]
+        nodes = []
+        # TODO: support alignment, dt, etc.
+        # S3 = S1 + S2 ->
+        # S3_data = S1_data + S2_data; S3 = init_series(S3_data)
+        if isinstance(typ1, SeriesType):
+            arg1 = self._get_series_data(arg1, nodes)
+        if isinstance(typ2, SeriesType):
+            arg2 = self._get_series_data(arg2, nodes)
+
+        rhs.lhs, rhs.rhs = arg1, arg2
+        self._convert_series_calltype(rhs)
+        out_data = ir.Var(
+            arg1.scope, mk_unique_var(assign.target.name+'_data'), rhs.loc)
+        self.typemap[out_data.name] = self.calltypes[rhs].return_type
+        nodes.append(ir.Assign(rhs, out_data, rhs.loc))
+        return self._replace_func(
+            lambda data: hpat.hiframes.api.init_series(data, None, None),
+            [out_data],
+            pre_nodes=nodes
+        )
 
     def _run_call(self, assign, lhs, rhs):
         fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
@@ -1374,7 +1401,7 @@ class HiFramesTyped(object):
 
         return False
 
-    def _handle_dt_index_binop(self, lhs, rhs, assign):
+    def _handle_dt_index_binop(self, assign, rhs):
         arg1, arg2 = rhs.lhs, rhs.rhs
         allowed_types = (dt_index_series_type, string_type)
 
@@ -1409,7 +1436,7 @@ class HiFramesTyped(object):
         # print(func_text)
         return self._replace_func(f, [arg1, arg2])
 
-    def _handle_string_array_expr(self, lhs, rhs, assign):
+    def _handle_string_array_expr(self, assign, rhs):
         # convert str_arr==str into parfor
         if (rhs.op == 'binop'
                 and rhs.fn in _string_array_comp_ops
