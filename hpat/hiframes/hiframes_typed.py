@@ -360,6 +360,9 @@ class HiFramesTyped(object):
 
         arg1, arg2 = rhs.lhs, rhs.rhs
         typ1, typ2 = self.typemap[arg1.name], self.typemap[arg2.name]
+        if not (isinstance(typ1, SeriesType) or isinstance(typ2, SeriesType)):
+            return [assign]
+
         nodes = []
         # TODO: support alignment, dt, etc.
         # S3 = S1 + S2 ->
@@ -659,7 +662,9 @@ class HiFramesTyped(object):
             func = series_replace_funcs[func_name]
             if isinstance(func, dict):
                 func = func[series_dtype]
-            return self._replace_func(func, [series_var])
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in ['std', 'nunique', 'describe', 'abs', 'isna',
                          'isnull', 'median', 'idxmin', 'idxmax', 'unique']:
