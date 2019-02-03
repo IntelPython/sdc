@@ -358,7 +358,8 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A, 0), test_impl(df.A, 0))
+        pd.testing.assert_series_equal(hpat_func(df.A, 0), test_impl(df.A, 0),
+            check_names=False)
 
     def test_series_op2(self):
         def test_impl(A, i):
@@ -367,7 +368,8 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
+        pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1),
+            check_names=False)
 
     def test_series_op3(self):
         def test_impl(A, i):
@@ -377,7 +379,8 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A.copy(), 1), test_impl(df.A, 1))
+        pd.testing.assert_series_equal(
+            hpat_func(df.A.copy(), 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op4(self):
         def test_impl(A):
@@ -386,7 +389,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_op5(self):
         def test_impl(A):
@@ -395,7 +398,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_op6(self):
         def test_impl(A, B):
@@ -405,7 +408,33 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         B = pd.Series(np.arange(n)**2)
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A, B), test_impl(A, B))
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    def test_series_fusion1(self):
+        def test_impl(A, B):
+            return A + B + 1
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 1)
+
+    def test_series_fusion2(self):
+        # make sure getting data var avoids incorrect single def assumption
+        def test_impl(A, B):
+            S = B + 2
+            if A[0] == 0:
+                S = A + 1
+            return S + B
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 3)
 
     def test_series_len(self):
         def test_impl(A, i):
