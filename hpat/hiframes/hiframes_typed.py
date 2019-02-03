@@ -93,46 +93,39 @@ class HiFramesTyped(object):
             new_body = []
             replaced = False
             for i, inst in enumerate(block.body):
-                if isinstance(inst, Aggregate):
+                out_nodes = [inst]
+
+                if isinstance(inst, ir.Assign):
+                    out_nodes = self._run_assign(inst)
+                elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
+                    out_nodes = self._run_setitem(inst)
+                elif isinstance(inst, Aggregate):
                     # now that type inference is done, remove type vars to
                     # enable dead code elimination
                     inst.out_typer_vars = None
-                if isinstance(inst, ir.Assign):
-                    out_nodes = self._run_assign(inst)
-                    if isinstance(out_nodes, list):
-                        new_body.extend(out_nodes)
-                    if isinstance(out_nodes, ReplaceFunc):
-                        rp_func = out_nodes
-                        if rp_func.pre_nodes is not None:
-                            new_body.extend(rp_func.pre_nodes)
-                        # replace inst.value to a call with target args
-                        # as expected by inline_closure_call
-                        inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
-                        block.body = new_body + block.body[i:]
-                        inline_closure_call(self.func_ir, rp_func.glbls,
-                            block, len(new_body), rp_func.func, self.typingctx,
-                            rp_func.arg_types,
-                            self.typemap, self.calltypes, work_list)
-                        replaced = True
-                        break
-                    if isinstance(out_nodes, dict):
-                        block.body = new_body + block.body[i:]
-                        inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
-                        replaced = True
-                        break
-                elif (isinstance(inst, ir.StaticSetItem)
-                        and self.typemap[inst.target.name] == h5dataset_type):
-                    out_nodes = self._handle_h5_write(inst.target, inst.index, inst.value)
+
+                if isinstance(out_nodes, list):
                     new_body.extend(out_nodes)
-                elif (isinstance(inst, (ir.SetItem, ir.StaticSetItem))
-                        and isinstance(self.typemap[inst.target.name], SeriesIatType)):
-                    val_def = guard(get_definition, self.func_ir, inst.target)
-                    assert isinstance(val_def, ir.Expr) and val_def.op == 'getattr' and val_def.attr in ('iat', 'iloc', 'loc')
-                    series_var = val_def.value
-                    inst.target = series_var
-                    new_body.append(inst)
-                else:
-                    new_body.append(inst)
+                if isinstance(out_nodes, ReplaceFunc):
+                    rp_func = out_nodes
+                    if rp_func.pre_nodes is not None:
+                        new_body.extend(rp_func.pre_nodes)
+                    # replace inst.value to a call with target args
+                    # as expected by inline_closure_call
+                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    block.body = new_body + block.body[i:]
+                    inline_closure_call(self.func_ir, rp_func.glbls,
+                        block, len(new_body), rp_func.func, self.typingctx,
+                        rp_func.arg_types,
+                        self.typemap, self.calltypes, work_list)
+                    replaced = True
+                    break
+                if isinstance(out_nodes, dict):
+                    block.body = new_body + block.body[i:]
+                    inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
+                    replaced = True
+                    break
+
             if not replaced:
                 blocks[label].body = new_body
 
@@ -300,6 +293,30 @@ class HiFramesTyped(object):
             return nodes
 
         return [assign]
+
+    def _run_setitem(self, inst):
+        target_typ = self.typemap[inst.target.name]
+
+        if target_typ == h5dataset_type:
+            return self._handle_h5_write(inst.target, inst.index, inst.value)
+
+        if isinstance(target_typ, SeriesIatType):
+            val_def = guard(get_definition, self.func_ir, inst.target)
+            assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
+                and val_def.attr in ('iat', 'iloc', 'loc'))
+            series_var = val_def.value
+            inst.target = series_var
+
+        if isinstance(target_typ, SeriesType):
+            # TODO: handle index
+            nodes = []
+            data = self._get_series_data(inst.target, nodes)
+            inst.target = data
+            nodes.append(inst)
+            self._convert_series_calltype(inst)
+            return nodes
+
+        return [inst]
 
     def _run_getattr(self, assign, rhs):
         rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
