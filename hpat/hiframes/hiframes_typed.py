@@ -819,8 +819,13 @@ class HiFramesTyped(object):
         """
         in_df = {}
         out_df = {}
-        out_key_arr = lhs
+        arr_lhs = ir.Var(lhs.scope, mk_unique_var(rhs.name + '_data'), lhs.loc)
+        self.typemap[arr_lhs.name] = if_series_to_array_type(
+            self.typemap[lhs.name])
+        out_key_arr = arr_lhs
         nodes = []
+        data = self._get_series_data(series_var, nodes)
+
         if is_argsort:
             def _get_data(S):  # pragma: no cover
                 n = len(S)
@@ -828,20 +833,31 @@ class HiFramesTyped(object):
 
             f_block = compile_to_numba_ir(
                 _get_data, {'np': np}, self.typingctx,
-                (if_series_to_array_type(self.typemap[series_var.name]),),
+                (if_series_to_array_type(self.typemap[data.name]),),
                 self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [series_var])
+            replace_arg_nodes(f_block, [data])
             nodes = f_block.body[:-2]
             in_df = {'inds': nodes[-1].target}
-            out_df = {'inds': lhs}
+            out_df = {'inds': arr_lhs}
             # dummy output key, TODO: remove
             out_key_arr = ir.Var(lhs.scope, mk_unique_var('dummy'), lhs.loc)
             self.typemap[out_key_arr.name] = if_series_to_array_type(
-                self.typemap[series_var.name])
+                self.typemap[data.name])
 
 
-        nodes.append(hiframes.sort.Sort(series_var.name, lhs.name, [series_var],
+        nodes.append(hiframes.sort.Sort(data.name, lhs.name, [data],
             [out_key_arr], in_df, out_df, False, lhs.loc))
+        f_block = compile_to_numba_ir(
+            lambda A: hpat.hiframes.api.init_series(A),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[arr_lhs.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [arr_lhs])
+        nodes += f_block.body[:-2]
+        nodes[-1].target = lhs
         return nodes
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
