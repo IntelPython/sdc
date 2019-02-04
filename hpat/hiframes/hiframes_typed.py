@@ -743,12 +743,15 @@ class HiFramesTyped(object):
 
         if func_name == 'head':
             # TODO: kws
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
             if len(rhs.args) == 0 and not rhs.kws:
                 return self._replace_func(
-                    series_replace_funcs['head_default'], [series_var])
+                    series_replace_funcs['head_default'], [data],
+                    pre_nodes=nodes)
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, n_arg])
+            return self._replace_func(func, [data, n_arg], pre_nodes=nodes)
 
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
@@ -2338,8 +2341,8 @@ series_replace_funcs = {
     'nlargest_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, True, gt_f)),
     'nsmallest': lambda A, k: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, False, lt_f)),
     'nsmallest_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, False, lt_f)),
-    'head': lambda A, k: A[:k],
-    'head_default': lambda A: A[:5],
+    'head': lambda A, k: hpat.hiframes.api.init_series(A[:k]),
+    'head_default': lambda A: hpat.hiframes.api.init_series(A[:5]),
     'median': lambda A: hpat.hiframes.api.median(A),
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),
