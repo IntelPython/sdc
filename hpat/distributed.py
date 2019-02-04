@@ -10,7 +10,7 @@ from numba import (ir, types, typing, config, numpy_support,
                    ir_utils, postproc)
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
-                            get_global_func_typ, find_op_typ, get_name_var_table,
+                            get_global_func_typ, get_name_var_table,
                             get_call_table, get_tuple_table, remove_dels,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
@@ -1702,7 +1702,9 @@ class DistributedPass(object):
                 self.typemap[rank_comp_var.name] = types.boolean
                 comp_expr = ir.Expr.binop(
                     operator.eq, self._rank_var, self._set0_var, loc)
-                expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
+                expr_typ = self.typingctx.resolve_function_type(
+                    operator.eq, (types.int32, types.int64), {})
+                #expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
                 prev_block.body.append(comp_assign)
