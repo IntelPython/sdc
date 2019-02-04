@@ -1346,20 +1346,23 @@ class HiFramesTyped(object):
 
         return self._replace_func(f, [data])
 
-    def _run_series_str_method(self, assign, lhs, arr, func_name, rhs):
+    def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
         if func_name not in ('len', 'replace', 'split', 'get'):
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
 
+        nodes = []
+        arr = self._get_series_data(series_var, nodes)
+
         if func_name == 'replace':
-            return self._run_series_str_replace(assign, lhs, arr, rhs)
+            return self._run_series_str_replace(assign, lhs, arr, rhs, nodes)
 
         if func_name == 'split':
-            return self._run_series_str_split(assign, lhs, arr, rhs)
+            return self._run_series_str_split(assign, lhs, arr, rhs, nodes)
 
         if func_name == 'get':
-            return self._run_series_str_get(assign, lhs, arr, rhs)
+            return self._run_series_str_get(assign, lhs, arr, rhs, nodes)
 
         if func_name == 'len':
             out_typ = 'np.int64'
@@ -1373,14 +1376,14 @@ class HiFramesTyped(object):
         func_text += '    for i in numba.parfor.internal_prange(n):\n'
         func_text += '        val = str_arr[i]\n'
         func_text += '        S[i] = len(val)\n'
-        func_text += '    return S\n'
+        func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        return self._replace_func(f, [arr])
+        return self._replace_func(f, [arr], pre_nodes=nodes)
 
-    def _run_series_str_replace(self, assign, lhs, arr, rhs):
+    def _run_series_str_replace(self, assign, lhs, arr, rhs, nodes):
         regex = True
         # TODO: refactor arg parsing
         kws = dict(rhs.kws)
@@ -1394,14 +1397,14 @@ class HiFramesTyped(object):
 
         return self._replace_func(
             impl,
-            [arr, rhs.args[0], rhs.args[1]],
+            [arr, rhs.args[0], rhs.args[1]], pre_nodes=nodes,
             extra_globals={'unicode_to_std_str': unicode_to_std_str,
                             'std_str_to_unicode': std_str_to_unicode,
                             'pre_alloc_string_array': pre_alloc_string_array}
         )
 
 
-    def _run_series_str_split(self, assign, lhs, arr, rhs):
+    def _run_series_str_split(self, assign, lhs, arr, rhs, nodes):
         sep = rhs.args[0]  # TODO: support default whitespace separator
 
         def _str_split_impl(str_arr, sep):
@@ -1412,14 +1415,14 @@ class HiFramesTyped(object):
                 in_str = str_arr[i]
                 out_arr[i] = in_str.split(sep)
 
-            return out_arr
+            return hpat.hiframes.api.init_series(out_arr)
 
-        return self._replace_func(_str_split_impl, [arr, sep])
+        return self._replace_func(_str_split_impl, [arr, sep], pre_nodes=nodes)
 
-    def _run_series_str_get(self, assign, lhs, arr, rhs):
+    def _run_series_str_get(self, assign, lhs, arr, rhs, nodes):
         # XXX only supports get for list(list(str)) input
         assert (self.typemap[arr.name]
-                    == SeriesType(types.List(string_type)))
+                    == types.List(types.List(string_type)))
         ind_var = rhs.args[0]
 
         def _str_get_impl(str_arr, ind):
@@ -1438,9 +1441,10 @@ class HiFramesTyped(object):
             for i in numba.parfor.internal_prange(n):
                 _str = str_list[i]
                 out_arr[i] = _str
-            return out_arr
+            return hpat.hiframes.api.init_series(out_arr)
 
         return self._replace_func(_str_get_impl, [arr, ind_var],
+            pre_nodes=nodes,
             extra_globals={'pre_alloc_string_array': pre_alloc_string_array})
 
     def _is_dt_index_binop(self, rhs):
@@ -2259,7 +2263,7 @@ def _str_replace_regex_impl(str_arr, pat, val):
     for i in numba.parfor.internal_prange(n):
         _str = str_list[i]
         out_arr[i] = _str
-    return out_arr
+    return hpat.hiframes.api.init_series(out_arr)
 
 
 def _str_replace_noregex_impl(str_arr, pat, val):
@@ -2280,7 +2284,7 @@ def _str_replace_noregex_impl(str_arr, pat, val):
     for i in numba.parfor.internal_prange(n):
         _str = str_list[i]
         out_arr[i] = _str
-    return out_arr
+    return hpat.hiframes.api.init_series(out_arr)
 
 
 @numba.njit
