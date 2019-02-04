@@ -521,7 +521,8 @@ class TestSeries(unittest.TestCase):
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
 
     def test_series_fillna_str1(self):
         def test_impl(A):
@@ -529,7 +530,8 @@ class TestSeries(unittest.TestCase):
 
         df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
 
     def test_series_fillna_str_inplace1(self):
         def test_impl(A):

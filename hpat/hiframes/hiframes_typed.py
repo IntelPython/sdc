@@ -868,6 +868,8 @@ class HiFramesTyped(object):
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype
         val = rhs.args[0]
+        nodes = []
+        data = self._get_series_data(series_var, nodes)
         kws = dict(rhs.kws)
         inplace = False
         if 'inplace' in kws:
@@ -881,7 +883,8 @@ class HiFramesTyped(object):
                 if guard(find_const, self.func_ir, val) == "":
                     return self._replace_func(
                         lambda A: hpat.str_arr_ext.set_null_bits(A),
-                        [series_var])
+                        [data],
+                        pre_nodes=nodes)
                 # Since string arrays can't be changed, we have to create a new
                 # array and assign it back to the same Series variable
                 # result back to the same variable
@@ -892,25 +895,27 @@ class HiFramesTyped(object):
                     hpat.hiframes.api.fillna_str_alloc(A, fill)
                     #A.fillna(fill)
                 fill_var = rhs.args[0]
-                arg_typs = (self.typemap[series_var.name], self.typemap[fill_var.name])
+                arg_typs = (self.typemap[data.name], self.typemap[fill_var.name])
                 f_block = compile_to_numba_ir(str_fillna_impl,
                                   {'hpat': hpat},
                                   self.typingctx, arg_typs,
                                   self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [series_var, fill_var])
+                replace_arg_nodes(f_block, [data, fill_var])
                 # assign output back to series variable
-                f_block.body[-4].target = series_var
+                f_block.body[-4].target = data
+                f_block.body = nodes + f_block.body
                 return {0: f_block}
             else:
                 return self._replace_func(
                     lambda a,b,c: hpat.hiframes.api.fillna(a,b,c),
-                    [series_var, series_var, val])
+                    [data, data, val],
+                    pre_nodes=nodes)
         else:
             if dtype == string_type:
                 func = series_replace_funcs['fillna_str_alloc']
             else:
                 func = series_replace_funcs['fillna_alloc']
-            return self._replace_func(func, [series_var, val])
+            return self._replace_func(func, [data, val], pre_nodes=nodes)
 
     def _run_call_series_dropna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype
@@ -1967,7 +1972,7 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
             num_chars += len(s)
     A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
     hpat.hiframes.api.fillna(A, B, fill)
-    return A
+    return hpat.hiframes.api.init_series(A)
 
 def _series_dropna_float_impl(S):  # pragma: no cover
     old_len = len(S)
@@ -2204,7 +2209,7 @@ def _column_fillna_alloc_impl(S, val):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
     hpat.hiframes.api.fillna(B, S, val)
-    return B
+    return hpat.hiframes.api.init_series(B)
 
 
 def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
