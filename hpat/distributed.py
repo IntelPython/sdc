@@ -561,7 +561,7 @@ class DistributedPass(object):
 
             return self._replace_func(f, rhs.args)
 
-        if (func_mod == 'hpat.hiframes.api' and func_name in ('to_series_type',
+        if (func_mod == 'hpat.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type')
                 and self._is_1D_arr(rhs.args[0].name)):

@@ -490,7 +490,7 @@ class HiFrames(object):
         isin_func = lambda A, B: hpat.hiframes.api.df_isin(A, B)
         isin_vals_func = lambda A, B: hpat.hiframes.api.df_isin_vals(A, B)
         # create array of False values used when other col not available
-        bool_arr_func = lambda A: hpat.hiframes.api.to_series_type(np.zeros(len(A), np.bool_))
+        bool_arr_func = lambda A: hpat.hiframes.api.init_series(np.zeros(len(A), np.bool_))
         # use the first array of df to get len. TODO: check for empty df
         false_arr_args = [list(df_col_map.values())[0]]
 
@@ -873,7 +873,7 @@ class HiFrames(object):
                 )
 
         # pd.Series() is handled in typed pass now
-        # return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
+        # return self._replace_func(lambda arr: hpat.hiframes.api.init_series(
         #         hpat.hiframes.api.fix_df_array(arr)),
         #     [data])
         return [assign]
@@ -893,8 +893,8 @@ class HiFrames(object):
         dtype = numba.numpy_support.as_dtype(typ.dtype)
         arg = rhs.args[0]
 
-        return self._replace_func(lambda arr: hpat.hiframes.api.to_series_type(
-                hpat.hiframes.api.to_numeric(arr, dtype)),
+        return self._replace_func(
+            lambda arr: hpat.hiframes.api.to_numeric(arr, dtype),
             [arg], extra_globals={'dtype': dtype})
 
     def _df_len(self, lhs, df_var):
@@ -1032,7 +1032,7 @@ class HiFrames(object):
         # gen concat function
         arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
         func_text = "def _concat_imp({}):\n".format(arg_names)
-        func_text += "    return hpat.hiframes.api.to_series_type(hpat.hiframes.api.concat(({})))\n".format(
+        func_text += "    return hpat.hiframes.api.init_series(hpat.hiframes.api.concat(({})))\n".format(
             arg_names)
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -1069,7 +1069,7 @@ class HiFrames(object):
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
         def f(arr_list):  # pragma: no cover
-            return hpat.hiframes.api.to_series_type(hpat.hiframes.api.concat(arr_list))
+            return hpat.hiframes.api.init_series(hpat.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
 
     def _handle_ros(self, assign, lhs, rhs):
@@ -1118,7 +1118,7 @@ class HiFrames(object):
                         "data frame column names should be constant")
             # cast to series type
             def f(arr):  # pragma: no cover
-                df_arr = hpat.hiframes.api.to_series_type(arr)
+                df_arr = hpat.hiframes.api.init_series(arr)
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [item[1]])
@@ -1417,7 +1417,7 @@ class HiFrames(object):
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         def to_arr(a, _agg_f):
             b = hpat.hiframes.api.to_arr_from_series(a)
-            res = hpat.hiframes.api.to_series_type(hpat.hiframes.api.agg_typer(b, _agg_f))
+            res = hpat.hiframes.api.init_series(hpat.hiframes.api.agg_typer(b, _agg_f))
         f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [in_vars[values_arg], agg_gb_var])
         nodes += f_block.body[:-3]  # remove none return
@@ -1489,7 +1489,7 @@ class HiFrames(object):
         in_vars = {}
         # output of crosstab is array[int64]
         def to_arr():
-            res = hpat.hiframes.api.to_series_type(np.empty(1, np.int64))
+            res = hpat.hiframes.api.init_series(np.empty(1, np.int64))
         f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
         nodes = f_block.body[:-3]  # remove none return
         out_tp_var = nodes[-1].target
@@ -1585,7 +1585,7 @@ class HiFrames(object):
             in_var = in_vars[out_cname]
             def to_arr(a, _agg_f):
                 b = hpat.hiframes.api.to_arr_from_series(a)
-                res = hpat.hiframes.api.to_series_type(hpat.hiframes.api.agg_typer(b, _agg_f))
+                res = hpat.hiframes.api.init_series(hpat.hiframes.api.agg_typer(b, _agg_f))
             f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
             replace_arg_nodes(f_block, [in_var, agg_gb_var])
             nodes += f_block.body[:-3]  # remove none return
@@ -1852,7 +1852,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.boxing.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
+                func_text += "  _col_input_{} = {}(hpat.hiframes.api.init_series(hpat.hiframes.boxing.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1873,7 +1873,7 @@ class HiFrames(object):
             # self.args[arg_ind] = SeriesType(arg_typ.dtype)
             # replace arg var with tmp
             def f(_boxed_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes.api.to_series_type(hpat.hiframes.api.dummy_unbox_series(_boxed_series))
+                _dt_arr = hpat.hiframes.api.init_series(hpat.hiframes.api.dummy_unbox_series(_boxed_series))
 
             f_block = compile_to_numba_ir(
                 f, {'hpat': hpat}).blocks.popitem()[1]
@@ -1895,7 +1895,7 @@ class HiFrames(object):
             func_text = "def tuple_unpack_func(tup_arg):\n"
             for i, t in enumerate(arg_typ.types):
                 if isinstance(t, BoxedSeriesType):
-                    func_text += "  _arg_{} = {}(hpat.hiframes.api.to_series_type(hpat.hiframes.api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
+                    func_text += "  _arg_{} = {}(hpat.hiframes.api.init_series(hpat.hiframes.api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
                 else:
                     func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
             pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])

@@ -785,27 +785,6 @@ def set_df_col_lower(context, builder, sig, args):
     return context.get_dummy_value()
 
 
-def to_series_type(arr):
-    return arr
-
-@infer_global(to_series_type)
-class ToSeriesType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        arr = args[0]
-        if isinstance(arr, BoxedSeriesType):
-            series_type = SeriesType(arr.dtype)
-        else:
-            series_type = if_arr_to_series_type(arr)
-        assert series_type is not None, "unknown type for pd.Series: {}".format(arr)
-        return signature(series_type, arr)
-
-@lower_builtin(to_series_type, types.Any)
-def to_series_dummy_impl(context, builder, sig, args):
-    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-
 def to_arr_from_series(arr):
     return arr
 
@@ -887,7 +866,6 @@ if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
@@ -1036,7 +1014,7 @@ def lower_ts_series_to_arr_typ(context, builder, sig, args):
 
 
 @intrinsic
-def init_series(typingctx, data, index, name=None):
+def init_series(typingctx, data, index=None, name=None):
     """Create a Series with provided data, index and name values.
     Used as a single constructor for Series and assigning its data, so that
     optimization passes can look for init_series() to see if underlying
@@ -1044,6 +1022,8 @@ def init_series(typingctx, data, index, name=None):
     not changed.
     """
 
+    index = types.none if index is None else index
+    name = types.none if name is None else name
     is_named = False if name is types.none else True
 
     def codegen(context, builder, signature, args):
