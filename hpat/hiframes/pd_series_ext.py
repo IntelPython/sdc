@@ -49,7 +49,7 @@ class SeriesType(types.IterableType):
     @property
     def key(self):
         # needed?
-        return self.dtype, self.data, self.index
+        return self.dtype, self.data, self.index, self.is_named
 
     def unify(self, typingctx, other):
         if isinstance(other, SeriesType):

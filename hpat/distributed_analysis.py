@@ -331,7 +331,7 @@ class DistributedAnalysis(object):
             return
 
         # dummy hiframes functions
-        if func_mod == 'hpat.hiframes.api' and func_name in ('to_series_type',
+        if func_mod == 'hpat.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type', 'dummy_unbox_series',
                 'parallel_fix_df_array'):

@@ -531,7 +531,7 @@ class HiFramesTyped(object):
         return nodes
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
-        if func_name in ('to_series_type', 'to_arr_from_series'):
+        if func_name in ('to_arr_from_series',):
             assign.value = rhs.args[0]
             return [assign]
 
@@ -642,7 +642,7 @@ class HiFramesTyped(object):
                     for s in l:
                         flat_list.append(s)
 
-                return hpat.hiframes.api.to_series_type(
+                return hpat.hiframes.api.init_series(
                     hpat.hiframes.api.parallel_fix_df_array(flat_list))
             return self._replace_func(_flatten_impl, [rhs.args[0]])
 
@@ -654,6 +654,8 @@ class HiFramesTyped(object):
             else:
                 assert out_dtype == types.int64
 
+            # TODO: handle non-Series input
+
             def _to_numeric_impl(A):
                 numba.parfor.init_prange()
                 n = len(A)
@@ -661,8 +663,12 @@ class HiFramesTyped(object):
                 for i in numba.parfor.internal_prange(n):
                     B[i] = conv_func(A[i])
 
-                return hpat.hiframes.api.to_series_type(B)
-            return self._replace_func(_to_numeric_impl, [rhs.args[0]],
+                return hpat.hiframes.api.init_series(B)
+
+            nodes = []
+            data = self._get_series_data(rhs.args[0], nodes)
+            return self._replace_func(_to_numeric_impl, [data],
+                pre_nodes=nodes,
                 extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func})
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
@@ -939,7 +945,7 @@ class HiFramesTyped(object):
             func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
-        #func_text += "  return hpat.hiframes.api.to_series_type(ret)\n"
+        #func_text += "  return hpat.hiframes.api.init_series(ret)\n"
         func_text += "  return ret\n"
 
         loc_vars = {}
@@ -1743,16 +1749,16 @@ class HiFramesTyped(object):
         raise ValueError("constant tuple expected")
 
     def _get_series_data(self, series_var, nodes):
-        # optimization: return data var directly if
-        # S = init_series(A, None, None)
+        # optimization: return data var directly if index is None
+        # e.g. S = init_series(A, None)
         # XXX assuming init_series is the only call to create a series
         # and series._data is never overwritten
         var_def = guard(get_definition, self.func_ir, series_var)
         call_def = guard(find_callname, self.func_ir, var_def)
+        args = var_def.args
         if (call_def == ('init_series', 'hpat.hiframes.api')
-                and self._is_const_none(var_def.args[1])
-                and self._is_const_none(var_def.args[2])):
-            return var_def.args[0]
+                and (len(args) < 2 or self._is_const_none(args[1]))):
+            return args[0]
 
         # XXX use get_series_data() for getting data instead of S._data
         # to enable alias analysis
@@ -1921,7 +1927,7 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
 
 def _series_dropna_float_impl(S):  # pragma: no cover
     old_len = len(S)
-    new_len = old_len - hpat.hiframes.api.to_series_type(S).isna().sum()
+    new_len = old_len - hpat.hiframes.api.init_series(S).isna().sum()
     A = np.empty(new_len, S.dtype)
     curr_ind = 0
     for i in numba.parfor.internal_prange(old_len):
@@ -1935,7 +1941,7 @@ def _series_dropna_float_impl(S):  # pragma: no cover
 def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     old_len = len(B)
     # TODO: more efficient null counting
-    new_len = old_len - hpat.hiframes.api.to_series_type(B).isna().sum()
+    new_len = old_len - hpat.hiframes.api.init_series(B).isna().sum()
     num_chars = hpat.str_arr_ext.num_total_chars(B)
     A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
     hpat.str_arr_ext.copy_non_null_offsets(A, B)
@@ -2128,7 +2134,7 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     return S
 
 def _column_describe_impl(A):  # pragma: no cover
-    S = hpat.hiframes.api.to_series_type(A)
+    S = hpat.hiframes.api.init_series(A)
     a_count = np.float64(hpat.hiframes.api.count(A))
     a_min = S.min()
     a_max = S.max()
@@ -2169,8 +2175,8 @@ def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
 # TODO: use online algorithm, e.g. StatFunctions.scala
 # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 def _column_cov_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes.api.to_series_type(A)
-    S2 = hpat.hiframes.api.to_series_type(B)
+    S1 = hpat.hiframes.api.init_series(A)
+    S2 = hpat.hiframes.api.init_series(B)
     # TODO: check lens
     ma = S1.mean()
     mb = S2.mean()
@@ -2179,8 +2185,8 @@ def _column_cov_impl(A, B):  # pragma: no cover
 
 
 def _column_corr_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes.api.to_series_type(A)
-    S2 = hpat.hiframes.api.to_series_type(B)
+    S1 = hpat.hiframes.api.init_series(A)
+    S2 = hpat.hiframes.api.init_series(B)
     n = S1.count()
     # TODO: check lens
     ma = S1.sum()
