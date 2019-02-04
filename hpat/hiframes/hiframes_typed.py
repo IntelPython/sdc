@@ -527,8 +527,15 @@ class HiFramesTyped(object):
 
         self._convert_series_calltype(rhs)
         rhs.args = new_args
-        nodes.append(assign)
-        return nodes
+        if isinstance(self.typemap[lhs], SeriesType):
+            scope = assign.target.scope
+            new_lhs = ir.Var(scope, mk_unique_var(lhs+'_data'), rhs.loc)
+            self.typemap[new_lhs.name] = self.calltypes[rhs].return_type
+            nodes.append(ir.Assign(rhs, new_lhs, rhs.loc))
+            return self._replace_func(lambda A: hpat.hiframes.api.init_series(A), [new_lhs], pre_nodes=nodes)
+        else:
+            nodes.append(assign)
+            return nodes
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
         if func_name in ('to_arr_from_series',):
@@ -1831,8 +1838,9 @@ class HiFramesTyped(object):
         if isinstance(call, ir.Expr) and call.op == 'call':
             # StencilFunc requires kws for typing so sig.args can't be used
             # reusing sig.args since some types become Const in sig
-            argtyps = sig.args[:len(call.args)]
+            argtyps = new_sig.args[:len(call.args)]
             kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+            sig = new_sig
             new_sig = self.typemap[call.func.name].get_call_type(
                 self.typingctx , argtyps, kwtyps)
             # calltypes of things like BoundFunction (array.call) need to
