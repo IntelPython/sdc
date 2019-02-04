@@ -884,6 +884,7 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
 
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
+    numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
