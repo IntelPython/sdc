@@ -426,9 +426,6 @@ class HiFramesTyped(object):
                 raise ValueError("invalid series.str")
 
             series_var = str_def.value
-            if func_name == 'contains':  # TODO: refactor
-                return self._handle_series_str_contains(
-                    rhs, series_var)
 
             return self._run_series_str_method(
                 assign, assign.target, series_var, func_name, rhs)
@@ -1348,12 +1345,15 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
-        if func_name not in ('len', 'replace', 'split', 'get'):
+        if func_name not in ('len', 'replace', 'split', 'get', 'contains'):
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
 
         nodes = []
         arr = self._get_series_data(series_var, nodes)
+
+        if func_name == 'contains':
+            return self._run_series_str_contains(rhs, arr, nodes)
 
         if func_name == 'replace':
             return self._run_series_str_replace(assign, lhs, arr, rhs, nodes)
@@ -1537,7 +1537,7 @@ class HiFramesTyped(object):
 
         return None
 
-    def _handle_series_str_contains(self, rhs, series_var):
+    def _run_series_str_contains(self, rhs, series_var, nodes):
         """
         Handle string contains like:
           B = df.column.str.contains('oo*', regex=True)
@@ -1554,7 +1554,8 @@ class HiFramesTyped(object):
         else:
             fname = "str_contains_noregex"
 
-        return self._replace_func(series_replace_funcs[fname], [series_var, pat])
+        return self._replace_func(
+            series_replace_funcs[fname], [series_var, pat], pre_nodes=nodes)
 
 
     def _handle_empty_like(self, assign, lhs, rhs):
@@ -1592,7 +1593,7 @@ class HiFramesTyped(object):
         func_text += '  S = np.empty(l, dtype=np.bool_)\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}(str_arr[i], pat)\n'.format(comp_func)
-        func_text += '  return S\n'
+        func_text += '  return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
