@@ -1755,10 +1755,10 @@ class HiFramesTyped(object):
         # and series._data is never overwritten
         var_def = guard(get_definition, self.func_ir, series_var)
         call_def = guard(find_callname, self.func_ir, var_def)
-        args = var_def.args
         if (call_def == ('init_series', 'hpat.hiframes.api')
-                and (len(args) < 2 or self._is_const_none(args[1]))):
-            return args[0]
+                and (len(var_def.args) < 2
+                    or self._is_const_none(var_def.args[1]))):
+            return var_def.args[0]
 
         # XXX use get_series_data() for getting data instead of S._data
         # to enable alias analysis
