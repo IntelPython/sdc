@@ -275,8 +275,6 @@ class TestSeries(unittest.TestCase):
     def test_setitem_series2(self):
         def test_impl(A, i):
             A[i] = 100
-            # TODO: remove return after aliasing fix
-            return A
 
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
@@ -286,6 +284,21 @@ class TestSeries(unittest.TestCase):
         hpat_func(A1, 0)
         test_impl(A2, 0)
         np.testing.assert_array_equal(A1.values, A2.values)
+
+    @unittest.skip("enable after remove dead in hiframes is removed")
+    def test_setitem_series3(self):
+        def test_impl(A, i):
+            S = pd.Series(A)
+            S[i] = 100
+
+        n = 11
+        A = np.arange(n)
+        A1 = A.copy()
+        A2 = A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, 0)
+        test_impl(A2, 0)
+        np.testing.assert_array_equal(A1, A2)
 
     def test_static_getitem_series1(self):
         def test_impl(A):
