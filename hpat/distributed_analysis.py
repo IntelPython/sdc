@@ -15,7 +15,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.hiframes.pd_series_ext import BoxedSeriesType
+from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
                         is_np_array, find_build_tuple, debug_prints)
@@ -110,6 +110,7 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
+                or isinstance(self.typemap[lhs], SeriesType)
                                      or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
@@ -331,10 +332,11 @@ class DistributedAnalysis(object):
             return
 
         # dummy hiframes functions
-        if func_mod == 'hpat.hiframes.api' and func_name in (
+        if func_mod == 'hpat.hiframes.api' and func_name in ('get_series_data',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type', 'dummy_unbox_series',
                 'parallel_fix_df_array'):
+            # TODO: support Series type similar to Array
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
@@ -781,7 +783,7 @@ class DistributedAnalysis(object):
             # have user-defined distribution
             if (is_array(self.typemap, varname)
                     or is_array_container(self.typemap, varname)
-                    or isinstance(self.typemap[varname], BoxedSeriesType)):
+                    or isinstance(self.typemap[varname], SeriesType)):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
