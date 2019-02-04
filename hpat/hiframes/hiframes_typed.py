@@ -700,12 +700,17 @@ class HiFramesTyped(object):
                     func_name))
             func = series_replace_funcs[func_name]
             # TODO: handle skipna, min_count arguments
-            return self._replace_func(func, [series_var])
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name == 'quantile':
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
             return self._replace_func(
                 lambda A, q: hpat.hiframes.api.quantile(A, q),
-                [series_var, rhs.args[0]]
+                [data, rhs.args[0]],
+                pre_nodes=nodes
             )
 
         if func_name == 'fillna':
@@ -2254,7 +2259,7 @@ def _series_isna_impl(arr):
     out_arr = np.empty(n, np.bool_)
     for i in numba.parfor.internal_prange(n):
         out_arr[i] = hpat.hiframes.api.isna(arr, i)
-    return out_arr
+    return hpat.hiframes.api.init_series(out_arr)
 
 def _series_astype_str_impl(arr):
     n = len(arr)
