@@ -728,14 +728,18 @@ class HiFramesTyped(object):
 
         if func_name in ('nlargest', 'nsmallest'):
             # TODO: kws
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
             if len(rhs.args) == 0 and not rhs.kws:
                 return self._replace_func(
-                    series_replace_funcs[func_name + '_default'], [series_var],
-                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
+                    series_replace_funcs[func_name + '_default'], [data],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f},
+                                    pre_nodes=nodes)
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, n_arg],
-                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f})
+            return self._replace_func(func, [data, n_arg],
+                                    extra_globals={'gt_f': gt_f, 'lt_f': lt_f},
+                                    pre_nodes=nodes)
 
         if func_name == 'head':
             # TODO: kws
@@ -1863,8 +1867,11 @@ class HiFramesTyped(object):
                     args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
                     new_sig = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
 
-        self.calltypes.pop(call)
-        self.calltypes[call] = new_sig
+        if new_sig is not None:
+            # XXX sometimes new_sig is None for some reason
+            # FIXME e.g. test_series_nlargest_parallel1 np.int32()
+            self.calltypes.pop(call)
+            self.calltypes[call] = new_sig
         return
 
     def is_bool_arr(self, varname):
@@ -2327,10 +2334,10 @@ series_replace_funcs = {
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
-    'nlargest': lambda A, k: hpat.hiframes.api.nlargest(A, k, True, gt_f),
-    'nlargest_default': lambda A: hpat.hiframes.api.nlargest(A, 5, True, gt_f),
-    'nsmallest': lambda A, k: hpat.hiframes.api.nlargest(A, k, False, lt_f),
-    'nsmallest_default': lambda A: hpat.hiframes.api.nlargest(A, 5, False, lt_f),
+    'nlargest': lambda A, k: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, True, gt_f)),
+    'nlargest_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, True, gt_f)),
+    'nsmallest': lambda A, k: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, False, lt_f)),
+    'nsmallest_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, False, lt_f)),
     'head': lambda A, k: A[:k],
     'head_default': lambda A: A[:5],
     'median': lambda A: hpat.hiframes.api.median(A),
