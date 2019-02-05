@@ -1210,6 +1210,8 @@ class HiFramesTyped(object):
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
         nodes = []
+        data = self._get_series_data(series_var, nodes)
+
         window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
         if not isinstance(center, ir.Var):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
@@ -1220,26 +1222,30 @@ class HiFramesTyped(object):
         if func_name in ('cov', 'corr'):
             # TODO: variable window
             if len(rhs.args) == 1:
-                other = rhs.args[0]
+                other = self._get_series_data(rhs.args[0], nodes)
             else:
-                other = series_var
+                other = data
             if func_name == 'cov':
-                f = lambda a,b,w,c: hpat.hiframes.rolling.rolling_cov(a,b,w,c)
+                f = lambda a,b,w,c: hpat.hiframes.api.init_series(
+                        hpat.hiframes.rolling.rolling_cov(a,b,w,c))
             if func_name == 'corr':
-                f = lambda a,b,w,c: hpat.hiframes.rolling.rolling_corr(a,b,w,c)
-            return self._replace_func(f, [series_var, other, window, center],
+                f = lambda a,b,w,c: hpat.hiframes.api.init_series(
+                        hpat.hiframes.rolling.rolling_corr(a,b,w,c))
+            return self._replace_func(f, [data, other, window, center],
                                       pre_nodes=nodes)
         elif func_name == 'apply':
             func_node = guard(get_definition, self.func_ir, rhs.args[0])
-            dtype = self.typemap[series_var.name].dtype
+            dtype = self.typemap[data.name].dtype
             out_dtype = self.typemap[lhs.name].dtype
             func_global = self._handle_rolling_apply_func(
                 func_node, dtype, out_dtype)
         else:
             func_global = func_name
         def f(arr, w, center):  # pragma: no cover
-            return hpat.hiframes.rolling.rolling_fixed(arr, w, center, False, _func)
-        args = [series_var, window, center]
+            return hpat.hiframes.api.init_series(
+                hpat.hiframes.rolling.rolling_fixed(
+                    arr, w, center, False, _func))
+        args = [data, window, center]
         return self._replace_func(
             f, args, pre_nodes=nodes, extra_globals={'_func': func_global})
 
