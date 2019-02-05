@@ -914,7 +914,7 @@ class HiFramesTyped(object):
                 (self.typemap[data.name],),
                 self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [data])
-            nodes = f_block.body[:-2]
+            nodes += f_block.body[:-2]
             in_df = {'inds': nodes[-1].target}
             out_df = {'inds': arr_lhs}
             # dummy output key, TODO: remove
