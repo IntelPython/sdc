@@ -811,9 +811,12 @@ class HiFramesTyped(object):
         if func_name == 'astype' and self.typemap[lhs.name] == string_series_type:
             # just return input if string
             if self.typemap[series_var.name] == string_series_type:
-                return self._replace_func(lambda a: a, [series_var])
+                return self._replace_func(lambda a: a, [series_var],
+                    array_typ_convert=False)
             func = series_replace_funcs['astype_str']
-            return self._replace_func(func, [series_var])
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in explicit_binop_funcs.values():
             binop_map = {v: _binop_to_str[k] for k, v in explicit_binop_funcs.items()}
@@ -2309,7 +2312,7 @@ def _series_astype_str_impl(arr):
     for i in numba.parfor.internal_prange(n):
         s = arr[i]
         A[i] = str(s)  # TODO: check NA
-    return A
+    return hpat.hiframes.api.init_series(A)
 
 
 # TODO: refactor regex and noregex
@@ -2385,7 +2388,7 @@ series_replace_funcs = {
     'pct_change_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.rolling.pct_change(A, 1, False)),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
-    'abs': lambda A: np.abs(A),  # TODO: timedelta
+    'abs': lambda A: hpat.hiframes.api.init_series(np.abs(A)),  # TODO: timedelta
     'cov': _column_cov_impl,
     'corr': _column_corr_impl,
     'append_single': _series_append_single_impl,
