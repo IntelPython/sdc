@@ -720,16 +720,18 @@ class HiFramesTyped(object):
             return self._run_call_series_dropna(assign, lhs, rhs, series_var)
 
         if func_name in ('shift', 'pct_change'):
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
             # TODO: support default period argument
             if len(rhs.args) == 0:
-                args = [series_var]
+                args = [data]
                 func = series_replace_funcs[func_name + "_default"]
             else:
                 assert len(rhs.args) == 1, "invalid args for " + func_name
                 shift_const = rhs.args[0]
-                args = [series_var, shift_const]
+                args = [data, shift_const]
                 func = series_replace_funcs[func_name]
-            return self._replace_func(func, args)
+            return self._replace_func(func, args, pre_nodes=nodes)
 
         if func_name in ('nlargest', 'nsmallest'):
             # TODO: kws
@@ -2350,10 +2352,10 @@ series_replace_funcs = {
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
     'dropna_float': _series_dropna_float_impl,
     'dropna_str_alloc': _series_dropna_str_alloc_impl,
-    'shift': lambda A, shift: hpat.hiframes.rolling.shift(A, shift, False),
-    'shift_default': lambda A: hpat.hiframes.rolling.shift(A, 1, False),
-    'pct_change': lambda A, shift: hpat.hiframes.rolling.pct_change(A, shift, False),
-    'pct_change_default': lambda A: hpat.hiframes.rolling.pct_change(A, 1, False),
+    'shift': lambda A, shift: hpat.hiframes.api.init_series(hpat.hiframes.rolling.shift(A, shift, False)),
+    'shift_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.rolling.shift(A, 1, False)),
+    'pct_change': lambda A, shift: hpat.hiframes.api.init_series(hpat.hiframes.rolling.pct_change(A, shift, False)),
+    'pct_change_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.rolling.pct_change(A, 1, False)),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     'abs': lambda A: np.abs(A),  # TODO: timedelta
