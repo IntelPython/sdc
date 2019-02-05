@@ -892,19 +892,15 @@ class HiFramesTyped(object):
                 def str_fillna_impl(A, fill):
                     # not using A.fillna since definition list is not working
                     # for A to find callname
-                    hpat.hiframes.api.fillna_str_alloc(A, fill)
+                    return hpat.hiframes.api.fillna_str_alloc(A, fill)
                     #A.fillna(fill)
+
                 fill_var = rhs.args[0]
-                arg_typs = (self.typemap[data.name], self.typemap[fill_var.name])
-                f_block = compile_to_numba_ir(str_fillna_impl,
-                                  {'hpat': hpat},
-                                  self.typingctx, arg_typs,
-                                  self.typemap, self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [data, fill_var])
-                # assign output back to series variable
-                f_block.body[-4].target = data
-                f_block.body = nodes + f_block.body
-                return {0: f_block}
+                assign.target = series_var  # replace output
+                return self._replace_func(
+                    str_fillna_impl,
+                    [data, fill_var],
+                    pre_nodes=nodes)
             else:
                 return self._replace_func(
                     lambda a,b,c: hpat.hiframes.api.fillna(a,b,c),
