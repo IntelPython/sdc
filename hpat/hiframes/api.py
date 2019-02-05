@@ -852,6 +852,20 @@ class ToConstTupleTyper(AbstractTemplate):
         return signature(ret_typ, arr)
 
 
+# convert tuple of Series to tuple of arrays statically (for append)
+def series_tup_to_arr_tup(arrs):  # pragma: no cover
+    return arrs
+
+@infer_global(series_tup_to_arr_tup)
+class SeriesTupleToArrTupleTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        arr = args[0]
+        ret_typ = if_series_to_array_type(arr)
+        return signature(ret_typ, arr)
+
+
 # this function should be used for getting S._data for alias analysis to work
 @numba.generated_jit(nopython=True)
 def get_series_data(S):
