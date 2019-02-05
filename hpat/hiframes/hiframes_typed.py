@@ -763,7 +763,8 @@ class HiFramesTyped(object):
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, S2])
+            return self._replace_func(func, [series_var, S2],
+                array_typ_convert=False)
 
         if func_name in ('argsort', 'sort_values'):
             return self._handle_series_sort(
@@ -2233,9 +2234,7 @@ def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
 
 # TODO: use online algorithm, e.g. StatFunctions.scala
 # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
-def _column_cov_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes.api.init_series(A)
-    S2 = hpat.hiframes.api.init_series(B)
+def _column_cov_impl(S1, S2):  # pragma: no cover
     # TODO: check lens
     ma = S1.mean()
     mb = S2.mean()
@@ -2243,9 +2242,7 @@ def _column_cov_impl(A, B):  # pragma: no cover
     return ((S1-ma)*(S2-mb)).sum()/(S1.count()-1.0)
 
 
-def _column_corr_impl(A, B):  # pragma: no cover
-    S1 = hpat.hiframes.api.init_series(A)
-    S2 = hpat.hiframes.api.init_series(B)
+def _column_corr_impl(S1, S2):  # pragma: no cover
     n = S1.count()
     # TODO: check lens
     ma = S1.sum()
