@@ -365,6 +365,23 @@ class HiFramesTyped(object):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
                 return self._run_Timedelta_field(assign, assign.target, rhs)
 
+        if isinstance(rhs_type, SeriesType) and rhs.attr in ('size', 'shape'):
+            # simply return the column
+            nodes = []
+            var = self._get_series_data(rhs.value, nodes)
+            rhs.value = var
+            nodes.append(assign)
+            return nodes
+
+        # TODO: test ndim and T
+        if isinstance(rhs_type, SeriesType) and rhs.attr == 'ndim':
+            rhs.value = ir.Const(1, rhs.loc)
+            return [assign]
+
+        if isinstance(rhs_type, SeriesType) and rhs.attr == 'T':
+            rhs = rhs.value
+            return [assign]
+
         return [assign]
 
     def _run_binop(self, assign, rhs):
