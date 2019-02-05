@@ -922,6 +922,9 @@ class HiFramesTyped(object):
             if inplace == None:  # pragma: no cover
                 raise ValueError("inplace arg to dropna should be constant")
 
+        nodes = []
+        data = self._get_series_data(series_var, nodes)
+
         if inplace:
             # Since arrays can't resize inplace, we have to create a new
             # array and assign it back to the same Series variable
@@ -929,17 +932,10 @@ class HiFramesTyped(object):
             def dropna_impl(A):
                 # not using A.dropna since definition list is not working
                 # for A to find callname
-                res = hpat.hiframes.api.dropna(A)
+                return hpat.hiframes.api.dropna(A)
 
-            arg_typs = (self.typemap[series_var.name],)
-            f_block = compile_to_numba_ir(dropna_impl,
-                                {'hpat': hpat},
-                                self.typingctx, arg_typs,
-                                self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [series_var])
-            # assign output back to series variable
-            f_block.body[-4].target = series_var
-            return {0: f_block}
+            assign.target = series_var  # replace output
+            return self._replace_func(dropna_impl, [data], pre_nodes=nodes)
         else:
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
@@ -947,8 +943,8 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['dropna_float']
             else:
                 # integer case, TODO: bool, date etc.
-                func = lambda A: A
-            return self._replace_func(func, [series_var])
+                func = lambda A: hpat.hiframes.api.init_series(A)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
         """translate df.A.map(lambda a:...) to prange()
@@ -1666,7 +1662,7 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['dropna_float']
             else:
                 # integer case, TODO: bool, date etc.
-                func = lambda A: A
+                func = lambda A: hpat.hiframes.api.init_series(A)
             return self._replace_func(func, rhs.args)
 
         if func_name == 'column_sum':
@@ -1981,7 +1977,7 @@ def _series_dropna_float_impl(S):  # pragma: no cover
             A[curr_ind] = val
             curr_ind += 1
 
-    return A
+    return hpat.hiframes.api.init_series(A)
 
 def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     old_len = len(B)
@@ -1991,7 +1987,7 @@ def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
     hpat.str_arr_ext.copy_non_null_offsets(A, B)
     hpat.str_arr_ext.copy_data(A, B)
-    return A
+    return hpat.hiframes.api.init_series(A)
 
 # return the nan value for the type (handle dt64)
 def _get_nan(val):
