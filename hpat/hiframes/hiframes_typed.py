@@ -289,6 +289,18 @@ class HiFramesTyped(object):
             nodes = []
             rhs.value = self._get_series_data(rhs.value, nodes)
             self._convert_series_calltype(rhs)
+            lhs = assign.target
+            # convert output to Series from Array
+            if isinstance(self.typemap[lhs.name], SeriesType):
+                new_lhs = ir.Var(
+                    lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
+                self.typemap[new_lhs.name] = series_to_array_type(
+                    self.typemap[lhs.name])
+                nodes.append(ir.Assign(rhs, new_lhs, lhs.loc))
+                return self._replace_func(
+                    lambda A: hpat.hiframes.api.init_series(A), [new_lhs],
+                    pre_nodes=nodes)
+
             nodes.append(assign)
             return nodes
 
@@ -306,6 +318,7 @@ class HiFramesTyped(object):
                 and val_def.attr in ('iat', 'iloc', 'loc'))
             series_var = val_def.value
             inst.target = series_var
+            target_typ = target_typ.stype
 
         if isinstance(target_typ, SeriesType):
             # TODO: handle index
