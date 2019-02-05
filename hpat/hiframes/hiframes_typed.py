@@ -632,8 +632,28 @@ class HiFramesTyped(object):
                 argtyps = tuple(self.typemap[a.name] for a in rhs.args)
                 old_sig = self.calltypes.pop(rhs)
                 new_sig = self.typemap[rhs.func.name].get_call_type(
-                    self.typingctx , argtyps, rhs.kws)
+                    self.typingctx, argtyps, rhs.kws)
                 self.calltypes[rhs] = new_sig
+
+            # replace tuple of Series with tuple of Arrays
+            in_vars, _ = guard(find_build_sequence, self.func_ir, rhs.args[0])
+            nodes = []
+            s_arrs = [self._get_series_data(v, nodes) if isinstance(
+                self.typemap[v.name], SeriesType) else v for v in in_vars]
+            new_tup = ir.Expr.build_tuple(s_arrs, lhs.loc)
+            new_arg = ir.Var(lhs.scope, mk_unique_var(
+                rhs.args[0].name + '_arrs'), lhs.loc)
+            self.typemap[new_arg.name] = if_series_to_array_type(
+                self.typemap[rhs.args[0].name])
+            nodes.append(ir.Assign(new_tup, new_arg, lhs.loc))
+            self.func_ir._definitions[new_arg.name] = new_tup
+            rhs.args[0] = new_arg
+            nodes.append(assign)
+            self.calltypes.pop(rhs)
+            new_sig = self.typemap[rhs.func.name].get_call_type(
+                    self.typingctx, (self.typemap[new_arg.name],), rhs.kws)
+            self.calltypes[rhs] = new_sig
+            return nodes
 
         # replace isna early to enable more optimization in PA
         # TODO: handle more types
