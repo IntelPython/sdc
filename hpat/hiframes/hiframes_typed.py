@@ -1100,6 +1100,10 @@ class HiFramesTyped(object):
             raise ValueError("lambda for combine not found")
 
         out_typ = self.typemap[lhs.name].dtype
+        other = rhs.args[0]
+        nodes = []
+        data = self._get_series_data(series_var, nodes)
+        other_data = self._get_series_data(other, nodes)
 
         # If we are called with 3 arguments, we must use 3rd arg as a fill value,
         # instead of Nan.
@@ -1115,7 +1119,7 @@ class HiFramesTyped(object):
         func_text += "  n = max(n1, n2)\n"
         if not isinstance(self.typemap[series_var.name].dtype, types.Float) and use_nan:
             func_text += "  assert n1 == n, 'can not use NAN for non-float series, with different length'\n"
-        if not isinstance(self.typemap[rhs.args[0].name].dtype, types.Float) and use_nan:
+        if not isinstance(self.typemap[other.name].dtype, types.Float) and use_nan:
             func_text += "  assert n2 == n, 'can not use NAN for non-float series, with different length'\n"
         func_text += "  numba.parfor.init_prange()\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
@@ -1132,7 +1136,7 @@ class HiFramesTyped(object):
             func_text += "    if i < n1:\n"
             func_text += "      t1 = A[i]\n"
         # same, but for 2nd argument
-        if use_nan and isinstance(self.typemap[rhs.args[0].name].dtype, types.Float):
+        if use_nan and isinstance(self.typemap[other.name].dtype, types.Float):
             func_text += "    t2 = np.nan\n"
             func_text += "    if i < n2:\n"
             func_text += "      t2 = B[i]\n"
@@ -1147,7 +1151,7 @@ class HiFramesTyped(object):
             func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
-        func_text += "  return ret\n"
+        func_text += "  return hpat.hiframes.api.init_series(ret)\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -1175,11 +1179,10 @@ class HiFramesTyped(object):
         # remove sentinel global to avoid type inference issues
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
         f_ir._definitions = build_definitions(f_ir.blocks)
-        if use_nan:
-            arg_typs = (self.typemap[series_var.name], self.typemap[rhs.args[0].name],)
-        else:
-            arg_typs = (self.typemap[series_var.name], self.typemap[rhs.args[0].name], self.typemap[rhs.args[2].name],)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+        arg_typs = (self.typemap[data.name], self.typemap[other_data.name],)
+        if not use_nan:
+            arg_typs += (self.typemap[rhs.args[2].name],)
+        f_typemap, _f_ret_t, f_calltypes = numba.compiler.type_inference_stage(
                 self.typingctx, f_ir, arg_typs, None)
         # remove argument entries like arg.a from typemap
         arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
@@ -1187,10 +1190,12 @@ class HiFramesTyped(object):
             f_typemap.pop(a)
         self.typemap.update(f_typemap)
         self.calltypes.update(f_calltypes)
-        func_args = [series_var, rhs.args[0]]
+        func_args = [data, other_data]
         if not use_nan:
             func_args.append(rhs.args[2])
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], func_args)
+        first_block = f_ir.blocks[topo_order[0]]
+        replace_arg_nodes(first_block, func_args)
+        first_block.body = nodes + first_block.body
         return f_ir.blocks
 
     def _run_call_series_rolling(self, assign, lhs, rhs, rolling_var, func_name):
