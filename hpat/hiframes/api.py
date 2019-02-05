@@ -362,7 +362,7 @@ class FillNaStrType(AbstractTemplate):
         assert not kws
         assert len(args) == 2
         # args: in_arr, value
-        return signature(string_array_type, *args)
+        return signature(SeriesType(string_type), *args)
 
 @infer_global(dropna)
 class DropNAType(AbstractTemplate):
