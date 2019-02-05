@@ -957,6 +957,8 @@ class HiFramesTyped(object):
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
 
+        nodes = []
+        data = self._get_series_data(series_var, nodes)
         out_typ = self.typemap[lhs.name].dtype
 
         # TODO: handle non numpy alloc types like string array
@@ -968,14 +970,17 @@ class HiFramesTyped(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         func_text += "    t = A[i]\n"
         func_text += "    v = map_func(t)\n"
-        func_text += "    S[i] = hpat.hiframes.api.convert_tup_to_rec(v)\n"
+        if isinstance(out_typ, types.BaseTuple):
+            func_text += "    S[i] = hpat.hiframes.api.convert_tup_to_rec(v)\n"
+        else:
+            func_text += "    S[i] = v\n"
         # func_text += "    print(S[i])\n"
         if out_typ == hpat.hiframes.pd_timestamp_ext.datetime_date_type:
             func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
         else:
             func_text += "  ret = S\n"
-        #func_text += "  return hpat.hiframes.api.init_series(ret)\n"
-        func_text += "  return ret\n"
+        func_text += "  return hpat.hiframes.api.init_series(ret)\n"
+        #func_text += "  return ret\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -1003,8 +1008,8 @@ class HiFramesTyped(object):
         # remove sentinel global to avoid type inference issues
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
         f_ir._definitions = build_definitions(f_ir.blocks)
-        arg_typs = (self.typemap[series_var.name],)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+        arg_typs = (self.typemap[data.name],)
+        f_typemap, _f_ret_t, f_calltypes = numba.compiler.type_inference_stage(
                 self.typingctx, f_ir, arg_typs, None)
         # remove argument entries like arg.a from typemap
         arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
@@ -1012,7 +1017,8 @@ class HiFramesTyped(object):
             f_typemap.pop(a)
         self.typemap.update(f_typemap)
         self.calltypes.update(f_calltypes)
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], [series_var])
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], [data])
+        f_ir.blocks[topo_order[0]].body = nodes + f_ir.blocks[topo_order[0]].body
         return f_ir.blocks
 
     def _run_call_rolling(self, assign, lhs, rhs, func_name):

@@ -29,6 +29,10 @@ class SeriesType(types.IterableType):
         # keeping data array in type since operators can make changes such
         # as making array unaligned etc.
         data = _get_series_array_type(dtype) if data is None else data
+        # convert Record to tuple (for tuple output of map)
+        # TODO: handle actual Record objects in Series?
+        dtype = (types.Tuple(list(dict(dtype.members).values()))
+                if isinstance(dtype, types.Record) else dtype)
         self.dtype = dtype
         self.data = data
         if index is None:
@@ -41,7 +45,7 @@ class SeriesType(types.IterableType):
 
     def copy(self, dtype=None):
         # XXX is copy necessary?
-        index = None if self.index is None else self.index.copy()
+        index = types.none if self.index == types.none else self.index.copy()
         dtype = dtype if dtype is not None else self.dtype
         data = _get_series_array_type(dtype)
         return SeriesType(dtype, data, index)
@@ -53,16 +57,20 @@ class SeriesType(types.IterableType):
 
     def unify(self, typingctx, other):
         if isinstance(other, SeriesType):
-            new_index = None
-            if self.index is not None:
-                new_index = self.index.unify(other.index)
-            if other.index is not None:
-                new_index = other.index.unify(self.index)
+            new_index = types.none
+            if self.index != types.none and other.index != types.none:
+                new_index = self.index.unify(typingctx, other.index)
+            elif other.index != types.none:
+                new_index = other.index
+            elif self.index != types.none:
+                new_index = self.index
 
             # If dtype matches or other.dtype is undefined (inferred)
             if other.dtype == self.dtype or not other.dtype.is_precise():
                 return SeriesType(
-                    self.dtype, self.data.unify(other.data), new_index)
+                    self.dtype,
+                    self.data.unify(typingctx, other.data),
+                    new_index)
 
         # XXX: unify Series/Array as Array
         return super(SeriesType, self).unify(typingctx, other)
