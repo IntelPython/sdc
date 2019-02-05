@@ -865,11 +865,29 @@ class HiFramesTyped(object):
                 array_typ_convert=False)
 
         # functions we revert to Numpy for now, otherwise warning
+        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'take', 'astype')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
-                not in ('copy', 'cumsum', 'cumprod', 'take', 'astype')):
+                not in _conv_to_np_funcs):
             warnings.warn("unknown Series call {}, reverting to Numpy".format(
                 func_name))
+
+        if func_name in _conv_to_np_funcs:
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+
+            n_args = len(rhs.args)
+            arg_names = ", ".join("arg{}".format(i) for i in range(n_args))
+            sep_comma = ", " if n_args > 0 else ""
+            func_text = "def _func_impl(A{}{}):\n".format(sep_comma, arg_names)
+            func_text += ("  return hpat.hiframes.api.init_series(A.{}({}))\n"
+                ).format(func_name, arg_names)
+
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            _func_impl = loc_vars['_func_impl']
+            return self._replace_func(_func_impl, [data] + rhs.args,
+                array_typ_convert=False, pre_nodes=nodes)
 
         return [assign]
 
