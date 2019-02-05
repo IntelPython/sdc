@@ -824,7 +824,8 @@ class HiFramesTyped(object):
         """
         in_df = {}
         out_df = {}
-        arr_lhs = ir.Var(lhs.scope, mk_unique_var(rhs.name + '_data'), lhs.loc)
+        # output array for results, before conversion to Series
+        arr_lhs = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
         self.typemap[arr_lhs.name] = if_series_to_array_type(
             self.typemap[lhs.name])
         out_key_arr = arr_lhs
@@ -838,7 +839,7 @@ class HiFramesTyped(object):
 
             f_block = compile_to_numba_ir(
                 _get_data, {'np': np}, self.typingctx,
-                (if_series_to_array_type(self.typemap[data.name]),),
+                (self.typemap[data.name],),
                 self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [data])
             nodes = f_block.body[:-2]
@@ -846,9 +847,7 @@ class HiFramesTyped(object):
             out_df = {'inds': arr_lhs}
             # dummy output key, TODO: remove
             out_key_arr = ir.Var(lhs.scope, mk_unique_var('dummy'), lhs.loc)
-            self.typemap[out_key_arr.name] = if_series_to_array_type(
-                self.typemap[data.name])
-
+            self.typemap[out_key_arr.name] = self.typemap[data.name]
 
         nodes.append(hiframes.sort.Sort(data.name, lhs.name, [data],
             [out_key_arr], in_df, out_df, False, lhs.loc))
