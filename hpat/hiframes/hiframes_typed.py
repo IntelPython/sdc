@@ -539,6 +539,19 @@ class HiFramesTyped(object):
             assign.value = rhs.args[0]
             return [assign]
 
+        # pd.DataFrame() calls init_series for even Series since it's untyped
+        # remove the call since it is invalid for analysis here
+        # XXX remove when df pass is typed? (test_pass_series2)
+        if func_name == 'init_series' and isinstance(
+                self.typemap[rhs.args[0].name], SeriesType):
+            assign.value = rhs.args[0]
+            # fix definitions
+            # TODO: fix definitions for all changes
+            self.func_ir._definitions[lhs.name] = [
+                d if d != rhs else rhs.args[0]
+                for d in self.func_ir._definitions[lhs.name]]
+            return [assign]
+
         if func_name in ('str_contains_regex', 'str_contains_noregex'):
             return self._handle_str_contains(assign, lhs, rhs, func_name)
 
@@ -546,7 +559,7 @@ class HiFramesTyped(object):
         if func_name == 'fix_df_array':
             in_typ = self.typemap[rhs.args[0].name]
             impl = hpat.hiframes.api.fix_df_array_overload(in_typ)
-            return self._replace_func(impl, rhs.args)
+            return self._replace_func(impl, rhs.args, array_typ_convert=False)
 
         # arr = fix_rolling_array(col) -> arr=col if col is float array
         if func_name == 'fix_rolling_array':

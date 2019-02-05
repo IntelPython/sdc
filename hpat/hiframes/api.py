@@ -1049,7 +1049,10 @@ def init_series(typingctx, data, index=None, name=None):
 
         return series._getvalue()
 
-    ret_typ = SeriesType(data.dtype, data, index, is_named)
+    dtype = data.dtype
+    # XXX pd.DataFrame() calls init_series for even Series since it's untyped
+    data = if_series_to_array_type(data)
+    ret_typ = SeriesType(dtype, data, index, is_named)
     sig = signature(ret_typ, data, index, name)
     return sig, codegen
 
