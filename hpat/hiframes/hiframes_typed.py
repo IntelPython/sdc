@@ -1543,12 +1543,20 @@ class HiFramesTyped(object):
 
     def _handle_string_array_expr(self, assign, rhs):
         # convert str_arr==str into parfor
-        if (rhs.op == 'binop'
-                and rhs.fn in _string_array_comp_ops
-                and (is_str_arr_typ(self.typemap[rhs.lhs.name])
-                     or is_str_arr_typ(self.typemap[rhs.rhs.name]))):
+        if (rhs.fn in _string_array_comp_ops
+                and is_str_arr_typ(self.typemap[rhs.lhs.name])
+                     or is_str_arr_typ(self.typemap[rhs.rhs.name])):
+            nodes = []
             arg1 = rhs.lhs
             arg2 = rhs.rhs
+            is_series = False
+            if self.typemap[arg1.name] == string_series_type:
+                arg1 = self._get_series_data(arg1, nodes)
+                is_series = True
+            if self.typemap[arg2.name] == string_series_type:
+                arg2 = self._get_series_data(arg2, nodes)
+                is_series = True
+
             arg1_access = 'A'
             arg2_access = 'B'
             len_call = 'len(A)'
@@ -1572,12 +1580,15 @@ class HiFramesTyped(object):
             func_text += '  for i in numba.parfor.internal_prange(l):\n'
             func_text += '    S[i] = {} {} {}\n'.format(arg1_access, op_str,
                                                         arg2_access)
-            func_text += '  return S\n'
+            if is_series:
+                func_text += '  return hpat.hiframes.api.init_series(S)\n'
+            else:
+                func_text += '  return S\n'
 
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
-            return self._replace_func(f, [arg1, arg2])
+            return self._replace_func(f, [arg1, arg2], pre_nodes=nodes)
 
         return None
 
