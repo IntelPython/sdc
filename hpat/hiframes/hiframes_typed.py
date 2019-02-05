@@ -590,10 +590,24 @@ class HiFramesTyped(object):
             # fix type and definition of lhs
             self.typemap.pop(lhs.name)
             self._type_changed_vars.append(lhs.name)
-            self.typemap[lhs.name] = types.Tuple(tuple(if_series_to_array_type(
-                                     self.typemap[a.name]) for a in tup_items))
+            self.typemap[lhs.name] = types.Tuple(tuple(
+                                     self.typemap[a.name] for a in tup_items))
             self.func_ir._definitions[lhs.name] = [new_tup]
             return [assign]
+
+        if func_name == 'series_tup_to_arr_tup':
+            in_typ = self.typemap[rhs.args[0].name]
+            assert isinstance(in_typ, types.BaseTuple), 'tuple expected'
+            series_vars = guard(get_definition, self.func_ir, rhs.args[0]).items
+            nodes = []
+            tup_items = [self._get_series_data(v, nodes) for v in series_vars]
+            new_tup = ir.Expr.build_tuple(tup_items, lhs.loc)
+            assign.value = new_tup
+            self.func_ir._definitions[lhs.name] = [
+                d if d != rhs else new_tup
+                for d in self.func_ir._definitions[lhs.name]]
+            nodes.append(assign)
+            return nodes
 
         if func_name == 'concat':
             # concat() case where tuple type changes by to_const_type()
@@ -794,12 +808,16 @@ class HiFramesTyped(object):
             return self._handle_series_map(assign, lhs, rhs, series_var)
 
         if func_name == 'append':
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
             other = rhs.args[0]
             if isinstance(self.typemap[other.name], SeriesType):
                 func = series_replace_funcs['append_single']
+                other = self._get_series_data(other, nodes)
             else:
                 func = series_replace_funcs['append_tuple']
-            return self._replace_func(func, [series_var, other])
+            return self._replace_func(func, [data, other], pre_nodes=nodes,
+                array_typ_convert=False)
 
         if func_name == 'notna':
             # TODO: make sure this is fused and optimized properly
@@ -2284,13 +2302,16 @@ def _column_corr_impl(S1, S2):  # pragma: no cover
 
 
 def _series_append_single_impl(arr, other):
-    return hpat.hiframes.api.concat((arr, other))
+    return hpat.hiframes.api.init_series(
+        hpat.hiframes.api.concat((arr, other)))
 
 def _series_append_tuple_impl(arr, other):
     tup_other = hpat.hiframes.api.to_const_tuple(other)
+    tup_other = hpat.hiframes.api.series_tup_to_arr_tup(tup_other)
     arrs = (arr,) + tup_other
     c_arrs = hpat.hiframes.api.to_const_tuple(arrs)
-    return hpat.hiframes.api.concat(c_arrs)
+    return hpat.hiframes.api.init_series(
+        hpat.hiframes.api.concat(c_arrs))
 
 def _series_isna_impl(arr):
     numba.parfor.init_prange()
