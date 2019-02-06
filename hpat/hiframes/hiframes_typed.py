@@ -105,6 +105,15 @@ class HiFramesTyped(object):
                         # now that type inference is done, remove type vars to
                         # enable dead code elimination
                         inst.out_typer_vars = None
+                        use_vars = inst.key_arrs + list(inst.df_in_vars.values())
+                        if inst.pivot_arr is not None:
+                            use_vars.append(inst.pivot_arr)
+                        def_vars = list(inst.df_out_vars.values())
+                        if inst.out_key_vars is not None:
+                            def_vars += inst.out_key_vars
+                        apply_copies_func = hiframes.aggregate.apply_copies_aggregate
+                        out_nodes = self._convert_series_hiframes_nodes(
+                            inst, use_vars, def_vars, apply_copies_func)
                     if isinstance(inst, hiframes.filter.Filter):
                         use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
                         def_vars = list(inst.df_out_vars.values())
