@@ -96,20 +96,31 @@ class HiFramesTyped(object):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
+                    self.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)
-                elif isinstance(inst, Aggregate):
-                    # now that type inference is done, remove type vars to
-                    # enable dead code elimination
-                    inst.out_typer_vars = None
+                else:
+                    if isinstance(inst, Aggregate):
+                        # now that type inference is done, remove type vars to
+                        # enable dead code elimination
+                        inst.out_typer_vars = None
+                    if isinstance(inst, hiframes.filter.Filter):
+                        use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
+                        def_vars = list(inst.df_out_vars.values())
+                        apply_copies_func = hiframes.filter.apply_copies_filter
+                        out_nodes = self._convert_series_hiframes_nodes(
+                            inst, use_vars, def_vars, apply_copies_func)
+
 
                 if isinstance(out_nodes, list):
                     new_body.extend(out_nodes)
+                    self._update_definitions(out_nodes)
                 if isinstance(out_nodes, ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
+                        self._update_definitions(rp_func.pre_nodes)
                     # replace inst.value to a call with target args
                     # as expected by inline_closure_call
                     inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
@@ -575,11 +586,6 @@ class HiFramesTyped(object):
         if func_name == 'init_series' and isinstance(
                 self.typemap[rhs.args[0].name], SeriesType):
             assign.value = rhs.args[0]
-            # fix definitions
-            # TODO: fix definitions for all changes
-            self.func_ir._definitions[lhs.name] = [
-                d if d != rhs else rhs.args[0]
-                for d in self.func_ir._definitions[lhs.name]]
             return [assign]
 
         if func_name in ('str_contains_regex', 'str_contains_noregex'):
@@ -622,7 +628,6 @@ class HiFramesTyped(object):
             self._type_changed_vars.append(lhs.name)
             self.typemap[lhs.name] = types.Tuple(tuple(
                                      self.typemap[a.name] for a in tup_items))
-            self.func_ir._definitions[lhs.name] = [new_tup]
             return [assign]
 
         if func_name == 'series_tup_to_arr_tup':
@@ -633,9 +638,6 @@ class HiFramesTyped(object):
             tup_items = [self._get_series_data(v, nodes) for v in series_vars]
             new_tup = ir.Expr.build_tuple(tup_items, lhs.loc)
             assign.value = new_tup
-            self.func_ir._definitions[lhs.name] = [
-                d if d != rhs else new_tup
-                for d in self.func_ir._definitions[lhs.name]]
             nodes.append(assign)
             return nodes
 
@@ -659,7 +661,6 @@ class HiFramesTyped(object):
             self.typemap[new_arg.name] = if_series_to_array_type(
                 self.typemap[rhs.args[0].name])
             nodes.append(ir.Assign(new_tup, new_arg, lhs.loc))
-            self.func_ir._definitions[new_arg.name] = new_tup
             rhs.args[0] = new_arg
             nodes.append(assign)
             self.calltypes.pop(rhs)
@@ -849,6 +850,7 @@ class HiFramesTyped(object):
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
+            self.func_ir._definitions[lhs.name].append(rhs)
             return []
 
         if func_name == 'combine':
@@ -2034,6 +2036,43 @@ class HiFramesTyped(object):
     def _is_const_none(self, var):
         var_def = guard(get_definition, self.func_ir, var)
         return isinstance(var_def, ir.Const) and var_def.value is None
+
+    def _update_definitions(self, node_list):
+        dumm_block = ir.Block(None, None)
+        dumm_block.body = node_list
+        build_definitions({0: dumm_block}, self.func_ir._definitions)
+        return
+
+    def _convert_series_hiframes_nodes(self, inst, use_vars, def_vars,
+                                                            apply_copies_func):
+        #
+        out_nodes = []
+        varmap = {v.name: self._get_series_data(v, out_nodes) for v in use_vars}
+        apply_copies_func(inst, varmap, None, None, None, None)
+        out_nodes.append(inst)
+
+        for v in def_vars:
+            self.func_ir._definitions[v.name].remove(inst)
+        varmap = {}
+        for v in def_vars:
+            data_var = ir.Var(
+                v.scope, mk_unique_var(v.name + 'data'), v.loc)
+            self.typemap[data_var.name] = series_to_array_type(self.typemap[v.name])
+            f_block = compile_to_numba_ir(
+                lambda A: hpat.hiframes.api.init_series(A),
+                {'hpat': hpat},
+                self.typingctx,
+                (self.typemap[data_var.name],),
+                self.typemap,
+                self.calltypes
+            ).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [data_var])
+            out_nodes += f_block.body[:-2]
+            out_nodes[-1].target = v
+            varmap[v.name] = data_var
+
+        apply_copies_func(inst, varmap, None, None, None, None)
+        return out_nodes
 
 
 def _fix_typ_undefs(new_typ, old_typ):
