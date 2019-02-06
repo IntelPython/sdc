@@ -101,39 +101,9 @@ class HiFramesTyped(object):
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)
                 else:
-                    if isinstance(inst, Aggregate):
-                        # now that type inference is done, remove type vars to
-                        # enable dead code elimination
-                        inst.out_typer_vars = None
-                        use_vars = inst.key_arrs + list(inst.df_in_vars.values())
-                        if inst.pivot_arr is not None:
-                            use_vars.append(inst.pivot_arr)
-                        def_vars = list(inst.df_out_vars.values())
-                        if inst.out_key_vars is not None:
-                            def_vars += inst.out_key_vars
-                        apply_copies_func = hiframes.aggregate.apply_copies_aggregate
-                        out_nodes = self._convert_series_hiframes_nodes(
-                            inst, use_vars, def_vars, apply_copies_func)
-                    if isinstance(inst, hiframes.sort.Sort):
-                        use_vars = inst.key_arrs + list(inst.df_in_vars.values())
-                        def_vars = []
-                        if not inst.inplace:
-                            def_vars = inst.out_key_arrs + list(inst.df_out_vars.values())
-                        apply_copies_func = hiframes.sort.apply_copies_sort
-                        out_nodes = self._convert_series_hiframes_nodes(
-                            inst, use_vars, def_vars, apply_copies_func)
-                    if isinstance(inst, hiframes.join.Join):
-                        use_vars = list(inst.right_vars.values()) + list(inst.left_vars.values())
-                        def_vars = list(inst.df_out_vars.values())
-                        apply_copies_func = hiframes.join.apply_copies_join
-                        out_nodes = self._convert_series_hiframes_nodes(
-                            inst, use_vars, def_vars, apply_copies_func)
-                    if isinstance(inst, hiframes.filter.Filter):
-                        use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
-                        def_vars = list(inst.df_out_vars.values())
-                        apply_copies_func = hiframes.filter.apply_copies_filter
-                        out_nodes = self._convert_series_hiframes_nodes(
-                            inst, use_vars, def_vars, apply_copies_func)
+                    if isinstance(inst, (Aggregate, hiframes.sort.Sort,
+                            hiframes.join.Join, hiframes.filter.Filter)):
+                        out_nodes = self._handle_hiframes_nodes(inst)
 
 
                 if isinstance(out_nodes, list):
@@ -2059,6 +2029,39 @@ class HiFramesTyped(object):
     def _is_const_none(self, var):
         var_def = guard(get_definition, self.func_ir, var)
         return isinstance(var_def, ir.Const) and var_def.value is None
+
+    def _handle_hiframes_nodes(self, inst):
+        if isinstance(inst, Aggregate):
+            # now that type inference is done, remove type vars to
+            # enable dead code elimination
+            inst.out_typer_vars = None
+            use_vars = inst.key_arrs + list(inst.df_in_vars.values())
+            if inst.pivot_arr is not None:
+                use_vars.append(inst.pivot_arr)
+            def_vars = list(inst.df_out_vars.values())
+            if inst.out_key_vars is not None:
+                def_vars += inst.out_key_vars
+            apply_copies_func = hiframes.aggregate.apply_copies_aggregate
+        elif isinstance(inst, hiframes.sort.Sort):
+            use_vars = inst.key_arrs + list(inst.df_in_vars.values())
+            def_vars = []
+            if not inst.inplace:
+                def_vars = inst.out_key_arrs + list(inst.df_out_vars.values())
+            apply_copies_func = hiframes.sort.apply_copies_sort
+        elif isinstance(inst, hiframes.join.Join):
+            use_vars = list(inst.right_vars.values()) + list(inst.left_vars.values())
+            def_vars = list(inst.df_out_vars.values())
+            apply_copies_func = hiframes.join.apply_copies_join
+        else:
+            assert isinstance(inst, hiframes.filter.Filter)
+            use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
+            def_vars = list(inst.df_out_vars.values())
+            apply_copies_func = hiframes.filter.apply_copies_filter
+
+        out_nodes = self._convert_series_hiframes_nodes(
+                inst, use_vars, def_vars, apply_copies_func)
+
+        return out_nodes
 
     def _update_definitions(self, node_list):
         dumm_block = ir.Block(None, None)
