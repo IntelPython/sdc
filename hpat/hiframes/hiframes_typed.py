@@ -2054,7 +2054,9 @@ class HiFramesTyped(object):
             apply_copies_func = hiframes.join.apply_copies_join
         else:
             assert isinstance(inst, hiframes.filter.Filter)
-            use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
+            use_vars = list(inst.df_in_vars.values())
+            if isinstance(self.typemap[inst.bool_arr.name], SeriesType):
+                use_vars.append(inst.bool_arr)
             def_vars = list(inst.df_out_vars.values())
             apply_copies_func = hiframes.filter.apply_copies_filter
 
