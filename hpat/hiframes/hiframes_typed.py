@@ -122,6 +122,12 @@ class HiFramesTyped(object):
                         apply_copies_func = hiframes.sort.apply_copies_sort
                         out_nodes = self._convert_series_hiframes_nodes(
                             inst, use_vars, def_vars, apply_copies_func)
+                    if isinstance(inst, hiframes.join.Join):
+                        use_vars = list(inst.right_vars.values()) + list(inst.left_vars.values())
+                        def_vars = list(inst.df_out_vars.values())
+                        apply_copies_func = hiframes.join.apply_copies_join
+                        out_nodes = self._convert_series_hiframes_nodes(
+                            inst, use_vars, def_vars, apply_copies_func)
                     if isinstance(inst, hiframes.filter.Filter):
                         use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
                         def_vars = list(inst.df_out_vars.values())
