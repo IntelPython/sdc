@@ -1121,13 +1121,29 @@ class HiFramesTyped(object):
         return f_ir.blocks
 
     def _run_call_rolling(self, assign, lhs, rhs, func_name):
+        # replace input arguments with data arrays from Series
+        nodes = []
+        new_args = []
+        for arg in rhs.args:
+            if isinstance(self.typemap[arg.name], SeriesType):
+                new_args.append(self._get_series_data(arg, nodes))
+            else:
+                new_args.append(arg)
+
+        self._convert_series_calltype(rhs)
+        rhs.args = new_args
+
         if func_name == 'rolling_corr':
             def rolling_corr_impl(arr, other, win, center):
-                cov = hpat.hiframes.rolling.rolling_cov(arr, other, win, center)
-                a_std = hpat.hiframes.rolling.rolling_fixed(arr, win, center, False, 'std')
-                b_std = hpat.hiframes.rolling.rolling_fixed(other, win, center, False, 'std')
+                cov = hpat.hiframes.rolling.rolling_cov(
+                    arr, other, win, center)
+                a_std = hpat.hiframes.rolling.rolling_fixed(
+                    arr, win, center, False, 'std')
+                b_std = hpat.hiframes.rolling.rolling_fixed(
+                    other, win, center, False, 'std')
                 return cov / (a_std * b_std)
-            return self._replace_func(rolling_corr_impl, rhs.args)
+            return self._replace_func(
+                rolling_corr_impl, rhs.args, pre_nodes=nodes)
         if func_name == 'rolling_cov':
             def rolling_cov_impl(arr, other, w, center):  # pragma: no cover
                 ddof = 1
@@ -1135,13 +1151,18 @@ class HiFramesTyped(object):
                 Y = other.astype(np.float64)
                 XpY = X + Y
                 XtY = X * Y
-                count = hpat.hiframes.rolling.rolling_fixed(XpY, w, center, False, 'count')
-                mean_XtY = hpat.hiframes.rolling.rolling_fixed(XtY, w, center, False, 'mean')
-                mean_X = hpat.hiframes.rolling.rolling_fixed(X, w, center, False, 'mean')
-                mean_Y = hpat.hiframes.rolling.rolling_fixed(Y, w, center, False, 'mean')
+                count = hpat.hiframes.rolling.rolling_fixed(
+                    XpY, w, center, False, 'count')
+                mean_XtY = hpat.hiframes.rolling.rolling_fixed(
+                    XtY, w, center, False, 'mean')
+                mean_X = hpat.hiframes.rolling.rolling_fixed(
+                    X, w, center, False, 'mean')
+                mean_Y = hpat.hiframes.rolling.rolling_fixed(
+                    Y, w, center, False, 'mean')
                 bias_adj = count / (count - ddof)
                 return (mean_XtY - mean_X * mean_Y) * bias_adj
-            return self._replace_func(rolling_cov_impl, rhs.args)
+            return self._replace_func(
+                rolling_cov_impl, rhs.args, pre_nodes=nodes)
         # replace apply function with dispatcher obj, now the type is known
         if (func_name == 'rolling_fixed' and isinstance(
                 self.typemap[rhs.args[4].name], types.MakeFunctionLiteral)):
@@ -1160,7 +1181,7 @@ class HiFramesTyped(object):
                         tuple(self.typemap[v.name] for v in rhs.args[:-2]),
                         self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args[:-2])
-            nodes = f_block.body[:-3]  # remove none return
+            nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
             return nodes
         elif (func_name == 'rolling_variable' and isinstance(
@@ -1180,10 +1201,12 @@ class HiFramesTyped(object):
                         tuple(self.typemap[v.name] for v in rhs.args[:-2]),
                         self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args[:-2])
-            nodes = f_block.body[:-3]  # remove none return
+            nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
             return nodes
-        return [assign]
+
+        nodes.append(assign)
+        return nodes
 
     def _handle_series_combine(self, assign, lhs, rhs, series_var):
         """translate s1.combine(s2,lambda x1,x2 :...) to prange()
