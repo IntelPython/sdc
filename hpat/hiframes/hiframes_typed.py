@@ -114,6 +114,14 @@ class HiFramesTyped(object):
                         apply_copies_func = hiframes.aggregate.apply_copies_aggregate
                         out_nodes = self._convert_series_hiframes_nodes(
                             inst, use_vars, def_vars, apply_copies_func)
+                    if isinstance(inst, hiframes.sort.Sort):
+                        use_vars = inst.key_arrs + list(inst.df_in_vars.values())
+                        def_vars = []
+                        if not inst.inplace:
+                            def_vars = inst.out_key_arrs + list(inst.df_out_vars.values())
+                        apply_copies_func = hiframes.sort.apply_copies_sort
+                        out_nodes = self._convert_series_hiframes_nodes(
+                            inst, use_vars, def_vars, apply_copies_func)
                     if isinstance(inst, hiframes.filter.Filter):
                         use_vars = [inst.bool_arr] + list(inst.df_in_vars.values())
                         def_vars = list(inst.df_out_vars.values())

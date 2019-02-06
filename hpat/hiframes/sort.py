@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
@@ -51,8 +51,8 @@ class Sort(ir.Stmt):
             out_cols += "'{}':{}, ".format(c, v.name)
         df_out_str = "{}{{{}}}".format(self.df_out, out_cols)
         return "sort: [key: {}] {} [key: {}] {}".format(
-            (v.name for v in self.key_arrs), df_in_str,
-            (v.name for v in self.out_key_arrs), df_out_str)
+            ", ".join(v.name for v in self.key_arrs), df_in_str,
+            ", ".join(v.name for v in self.out_key_arrs), df_out_str)
 
 
 def sort_array_analysis(sort_node, equiv_set, typemap, array_analysis):
@@ -141,6 +141,19 @@ def sort_typeinfer(sort_node, typeinferer):
 
 typeinfer.typeinfer_extensions[Sort] = sort_typeinfer
 
+def build_sort_definitions(sort_node, definitions=None):
+    if definitions is None:
+        definitions = defaultdict(list)
+
+    # output arrays are defined
+    if not sort_node.inplace:
+        for col_var in (sort_node.out_key_arrs
+                + list(sort_node.df_out_vars.values())):
+            definitions[col_var.name].append(sort_node)
+
+    return definitions
+
+ir_utils.build_defs_extensions[Sort] = build_sort_definitions
 
 def visit_vars_sort(sort_node, callback, cbdata):
     if debug_prints():  # pragma: no cover
