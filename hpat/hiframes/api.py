@@ -817,24 +817,6 @@ def dummy_unbox_series_impl(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
-def to_date_series_type(arr):
-    return arr
-
-@infer_global(to_date_series_type)
-class ToDateSeriesType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        arr = args[0]
-        assert (arr == types.Array(types.intp, 1, 'C')
-            or arr == types.Array(datetime_date_type, 1, 'C'))
-        return signature(date_series_type, arr)
-
-@lower_builtin(to_date_series_type, types.Any)
-def to_date_series_type_impl(context, builder, sig, args):
-    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-
 # convert const tuple expressions or const list to tuple statically
 def to_const_tuple(arrs):  # pragma: no cover
     return tuple(arrs)

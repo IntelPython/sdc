@@ -375,7 +375,7 @@ class HiFramesTyped(object):
             return nodes
 
         if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
-                                                    types.scalars.NPDatetime):
+                                                             types.NPDatetime):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
                 return self._run_DatetimeIndex_field(assign, assign.target, rhs)
             if rhs.attr == 'date':
@@ -389,7 +389,7 @@ class HiFramesTyped(object):
             return self._run_DatetimeIndex_field(assign, assign.target, rhs)
 
         if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
-                                                    types.scalars.NPTimedelta):
+                                                            types.NPTimedelta):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
                 return self._run_Timedelta_field(assign, assign.target, rhs)
 
@@ -1103,11 +1103,7 @@ class HiFramesTyped(object):
         else:
             func_text += "    S[i] = v\n"
         # func_text += "    print(S[i])\n"
-        if out_typ == hpat.hiframes.pd_timestamp_ext.datetime_date_type:
-            func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
-        else:
-            func_text += "  ret = S\n"
-        func_text += "  return hpat.hiframes.api.init_series(ret)\n"
+        func_text += "  return hpat.hiframes.api.init_series(S)\n"
         #func_text += "  return ret\n"
 
         loc_vars = {}
@@ -1298,11 +1294,7 @@ class HiFramesTyped(object):
             func_text += "    if i < n2:\n"
             func_text += "      t2 = B[i]\n"
         func_text += "    S[i] = map_func(t1, t2)\n"
-        if out_typ == hpat.hiframes.pd_timestamp_ext.datetime_date_type:
-            func_text += "  ret = hpat.hiframes.api.to_date_series_type(S)\n"
-        else:
-            func_text += "  ret = S\n"
-        func_text += "  return hpat.hiframes.api.init_series(ret)\n"
+        func_text += "  return hpat.hiframes.api.init_series(S)\n"
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
