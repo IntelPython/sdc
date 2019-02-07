@@ -11,7 +11,10 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
 import hpat
 from hpat.str_ext import string_type
 import hpat.hiframes
-from hpat.hiframes.pd_series_ext import string_series_type, string_array_type
+from hpat.hiframes.pd_series_ext import (string_series_type, string_array_type,
+    SeriesType)
+from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.hiframes.datetime_date_ext import array_datetime_date
 
 _dt_index_data_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
 
@@ -63,6 +66,19 @@ class DatetimeIndexAttribute(AttributeTemplate):
 
     def resolve_values(self, ary):
         return _dt_index_data_typ
+
+    def resolve_date(self, ary):
+        return array_datetime_date
+
+
+# all datetimeindex fields return int64 same as Timestamp fields
+def resolve_date_field(self, ary):
+    # TODO: return Int64Index
+    return SeriesType(types.int64)
+
+for field in hpat.hiframes.pd_timestamp_ext.date_fields:
+    setattr(DatetimeIndexAttribute, "resolve_" + field, resolve_date_field)
+
 
 
 @overload(pd.DatetimeIndex)

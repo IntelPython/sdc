@@ -379,8 +379,7 @@ class HiFramesTyped(object):
             nodes.append(assign)
             return nodes
 
-        if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
-                                                             types.NPDatetime):
+        if isinstance(rhs_type, DatetimeIndexType):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
                 return self._run_DatetimeIndex_field(assign, assign.target, rhs)
             if rhs.attr == 'date':
@@ -391,7 +390,10 @@ class HiFramesTyped(object):
             if dt_def is None:  # TODO: check for errors
                 raise ValueError("invalid series.dt")
             rhs.value = dt_def.value
-            return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+            if rhs.attr in hpat.hiframes.pd_timestamp_ext.date_fields:
+                return self._run_DatetimeIndex_field(assign, assign.target, rhs)
+            if rhs.attr == 'date':
+                return self._run_DatetimeIndex_date(assign, assign.target, rhs)
 
         if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
                                                             types.NPTimedelta):
@@ -1427,9 +1429,16 @@ class HiFramesTyped(object):
         return impl_disp
 
     def _run_DatetimeIndex_field(self, assign, lhs, rhs):
-        """transform DatetimeIndex.<field>
+        """transform DatetimeIndex.<field> and Series.dt.<field>
         """
-        arr = rhs.value
+        nodes = []
+        in_typ = self.typemap[rhs.value.name]
+        if isinstance(in_typ, DatetimeIndexType):
+            arr = self._get_dt_index_data(rhs.value, nodes)
+            is_dt_index = True
+        else:
+            arr = self._get_series_data(rhs.value, nodes)
+            is_dt_index = False
         field = rhs.attr
 
         func_text = 'def f(dti):\n'
@@ -1442,18 +1451,27 @@ class HiFramesTyped(object):
         func_text += '        dt64 = hpat.hiframes.pd_timestamp_ext.dt64_to_integer(dti[i])\n'
         func_text += '        ts = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
         func_text += '        S[i] = ts.' + field + '\n'
-        func_text += '    return S\n'
+        if is_dt_index:  # TODO: support Int64Index
+            func_text += '    return S\n'
+        else:
+            func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        return self._replace_func(f, [arr])
+        return self._replace_func(f, [arr], pre_nodes=nodes)
 
     def _run_DatetimeIndex_date(self, assign, lhs, rhs):
-        """transform DatetimeIndex.date
+        """transform DatetimeIndex.date and Series.dt.date
         """
-        arr = rhs.value
-        field = rhs.attr
+        nodes = []
+        in_typ = self.typemap[rhs.value.name]
+        if isinstance(in_typ, DatetimeIndexType):
+            arr = self._get_dt_index_data(rhs.value, nodes)
+            is_dt_index = True
+        else:
+            arr = self._get_series_data(rhs.value, nodes)
+            is_dt_index = False
 
         func_text = 'def f(dti):\n'
         func_text += '    numba.parfor.init_prange()\n'
@@ -1465,12 +1483,15 @@ class HiFramesTyped(object):
         func_text += '        S[i] = hpat.hiframes.pd_timestamp_ext.datetime_date_ctor(ts.year, ts.month, ts.day)\n'
         #func_text += '        S[i] = datetime.date(ts.year, ts.month, ts.day)\n'
         #func_text += '        S[i] = ts.day + (ts.month << 16) + (ts.year << 32)\n'
-        func_text += '    return S\n'
+        if is_dt_index:  # DatetimeIndex returns Array but Series.dt returns Series
+            func_text += '    return hpat.hiframes.datetime_date_ext.np_arr_to_array_datetime_date(S)\n'
+        else:
+            func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        return self._replace_func(f, [arr])
+        return self._replace_func(f, [arr], pre_nodes=nodes)
 
     def _run_Timedelta_field(self, assign, lhs, rhs):
         """transform Timedelta.<field>
