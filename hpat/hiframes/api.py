@@ -29,7 +29,7 @@ from hpat.hiframes.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
-from hpat.hiframes.pd_index_ext import DatetimeIndexType
+from hpat.hiframes.pd_index_ext import DatetimeIndexType, TimedeltaIndexType
 from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
@@ -1106,6 +1106,39 @@ def init_datetime_index(typingctx, data, name=None):
         return dt_index._getvalue()
 
     ret_typ = DatetimeIndexType(is_named)
+    sig = signature(ret_typ, data, name)
+    return sig, codegen
+
+
+@intrinsic
+def init_timedelta_index(typingctx, data, name=None):
+    """Create a TimedeltaIndex with provided data and name values.
+    """
+    name = types.none if name is None else name
+    is_named = False if name is types.none else True
+
+    def codegen(context, builder, signature, args):
+        data_val, name_val = args
+        # create timedelta_index struct and store values
+        timedelta_index = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+        timedelta_index.data = data_val
+        if is_named:
+            if isinstance(name, types.StringLiteral):
+                timedelta_index.name = numba.unicode.make_string_from_constant(
+                    context, builder, string_type, name.literal_value)
+            else:
+                timedelta_index.name = name_val
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, signature.args[0], data_val)
+            if is_named:
+                context.nrt.incref(builder, signature.args[1], name_val)
+
+        return timedelta_index._getvalue()
+
+    ret_typ = TimedeltaIndexType(is_named)
     sig = signature(ret_typ, data, name)
     return sig, codegen
 

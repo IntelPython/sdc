@@ -18,6 +18,7 @@ from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_
 from hpat.hiframes.datetime_date_ext import array_datetime_date
 
 _dt_index_data_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+_timedelta_index_data_typ = types.Array(types.NPTimedelta('ns'), 1, 'C')
 
 
 class DatetimeIndexType(types.IterableType):
@@ -140,3 +141,73 @@ def pd_datetimeindex_overload(data=None, freq=None, start=None, end=None,
         return hpat.hiframes.api.init_datetime_index(S, name)
 
     return f
+
+
+
+# ----------- Timedelta
+
+# similar to DatetimeIndex
+class TimedeltaIndexType(types.IterableType):
+    """Temporary type class for TimedeltaIndex objects.
+    """
+    def __init__(self, is_named=False):
+        # TODO: support other properties like unit/freq?
+        self.is_named = is_named
+        super(TimedeltaIndexType, self).__init__(
+            name="TimedeltaIndexType(is_named = {})".format(is_named))
+
+    def copy(self):
+        # XXX is copy necessary?
+        return TimedeltaIndexType(self.is_named)
+
+    @property
+    def key(self):
+        # needed?
+        return self.is_named
+
+    def unify(self, typingctx, other):
+        # needed?
+        return super(TimedeltaIndexType, self).unify(typingctx, other)
+
+    @property
+    def iterator_type(self):
+        # same as Buffer
+        # TODO: fix timedelta
+        return types.iterators.ArrayIterator(_timedelta_index_data_typ)
+
+
+@register_model(TimedeltaIndexType)
+class TimedeltaIndexTypeModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [
+            ('data', _timedelta_index_data_typ),
+            ('name', string_type),
+        ]
+        super(TimedeltaIndexTypeModel, self).__init__(dmm, fe_type, members)
+
+@infer_getattr
+class TimedeltaIndexAttribute(AttributeTemplate):
+    key = TimedeltaIndexType
+
+    def resolve_values(self, ary):
+        return _timedelta_index_data_typ
+
+    # TODO: support pd.Timedelta
+    # @bound_function("timedelta_index.max")
+    # def resolve_max(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(pandas_timestamp_type, *args)
+
+    # @bound_function("timedelta_index.min")
+    # def resolve_min(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(pandas_timestamp_type, *args)
+
+
+# all datetimeindex fields return int64 same as Timestamp fields
+def resolve_timedelta_field(self, ary):
+    # TODO: return Int64Index
+    return types.Array(types.int64, 1, 'C')
+
+for field in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
+    setattr(TimedeltaIndexAttribute, "resolve_" + field, resolve_timedelta_field)

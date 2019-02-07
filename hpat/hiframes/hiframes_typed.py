@@ -395,8 +395,7 @@ class HiFramesTyped(object):
             if rhs.attr == 'date':
                 return self._run_DatetimeIndex_date(assign, assign.target, rhs)
 
-        if isinstance(rhs_type, SeriesType) and isinstance(rhs_type.dtype,
-                                                            types.NPTimedelta):
+        if isinstance(rhs_type, hpat.hiframes.pd_index_ext.TimedeltaIndexType):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
                 return self._run_Timedelta_field(assign, assign.target, rhs)
 
@@ -1513,7 +1512,8 @@ class HiFramesTyped(object):
     def _run_Timedelta_field(self, assign, lhs, rhs):
         """transform Timedelta.<field>
         """
-        arr = rhs.value
+        nodes = []
+        arr = self._get_timedelta_index_data(rhs.value, nodes)
         field = rhs.attr
 
         func_text = 'def f(dti):\n'
@@ -1537,7 +1537,7 @@ class HiFramesTyped(object):
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
 
-        return self._replace_func(f, [arr])
+        return self._replace_func(f, [arr], pre_nodes=nodes)
 
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
@@ -1667,6 +1667,10 @@ class HiFramesTyped(object):
                 and not (arg1 == dt_index_series_type and arg2 == dt_index_series_type)):
             return True
 
+        if ((isinstance(arg1, DatetimeIndexType) or isinstance(arg2, DatetimeIndexType))
+                and not (arg1 == dt_index_series_type and arg2 == dt_index_series_type)):
+            return True
+
         return False
 
     def _handle_dt_index_binop(self, assign, rhs):
@@ -1677,7 +1681,14 @@ class HiFramesTyped(object):
         if (self.typemap[arg1.name] == dt_index_series_type and
             self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type and
             rhs.fn in ('-', operator.sub)):
-            return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2])
+            return self._replace_func(_column_sub_impl_datetime_series_timestamp, [arg1, arg2])
+
+        if (isinstance(self.typemap[arg1.name], DatetimeIndexType) and
+            self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type and
+            rhs.fn in ('-', operator.sub)):
+            nodes = []
+            arg1 = self._get_dt_index_data(arg1, nodes)
+            return self._replace_func(_column_sub_impl_datetimeindex_timestamp, [arg1, arg2], pre_nodes=nodes)
 
         if (types.unliteral(self.typemap[arg1.name]) not in allowed_types
                 or types.unliteral(self.typemap[arg2.name]) not in allowed_types):
@@ -2029,6 +2040,24 @@ class HiFramesTyped(object):
             self.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
+
+    def _get_timedelta_index_data(self, dt_var, nodes):
+        var_def = guard(get_definition, self.func_ir, dt_var)
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if call_def == ('init_timedelta_index', 'hpat.hiframes.api'):
+            return var_def.args[0]
+
+        f_block = compile_to_numba_ir(
+            lambda S: hpat.hiframes.api.get_index_data(S),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[dt_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [dt_var])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
@@ -2458,6 +2487,16 @@ def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
         s = max(s, hpat.hiframes.pd_timestamp_ext.dt64_to_integer(val))
     return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
+def _column_sub_impl_datetime_series_timestamp(in_arr, ts):  # pragma: no cover
+    numba.parfor.init_prange()
+    n = len(in_arr)
+    S = numba.unsafe.ndarray.empty_inferred((n,))
+    tsint = hpat.hiframes.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
+    for i in numba.parfor.internal_prange(n):
+        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+    return hpat.hiframes.api.init_series(S)
+
+
 def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     numba.parfor.init_prange()
     n = len(in_arr)
@@ -2465,7 +2504,8 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     tsint = hpat.hiframes.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
     for i in numba.parfor.internal_prange(n):
         S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
-    return S
+    return hpat.hiframes.api.init_timedelta_index(S)
+
 
 def _column_describe_impl(A):  # pragma: no cover
     S = hpat.hiframes.api.init_series(A)
