@@ -277,16 +277,18 @@ class HiFramesTyped(object):
             def f(_in_arr, _ind):
                 dt = _in_arr[_ind]
                 s = np.int64(dt)
-                res = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
+                return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
+            nodes = []
+            data = self._get_series_data(in_arr, nodes)
             assert isinstance(self.typemap[ind_var.name],
                 (types.Integer, types.IntegerLiteral))
             f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
                                             'hpat': hpat}, self.typingctx,
-                                        (if_series_to_array_type(self.typemap[in_arr.name]), types.intp),
+                                        (self.typemap[data.name], types.intp),
                                         self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [in_arr, ind_var])
-            nodes = f_block.body[:-3]  # remove none return
+            replace_arg_nodes(f_block, [data, ind_var])
+            nodes += f_block.body[:-2]
             nodes[-1].target = assign.target
             return nodes
 
