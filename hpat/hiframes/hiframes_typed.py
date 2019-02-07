@@ -1081,6 +1081,7 @@ class HiFramesTyped(object):
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
 
+        dtype = self.typemap[series_var.name].dtype
         nodes = []
         data = self._get_series_data(series_var, nodes)
         out_typ = self.typemap[lhs.name].dtype
@@ -1092,7 +1093,10 @@ class HiFramesTyped(object):
         func_text += "  n = len(A)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        func_text += "    t = A[i]\n"
+        if dtype == types.NPDatetime('ns'):
+            func_text += "    t = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(np.int64(A[i]))\n"
+        else:
+            func_text += "    t = A[i]\n"
         func_text += "    v = map_func(t)\n"
         if isinstance(out_typ, types.BaseTuple):
             func_text += "    S[i] = hpat.hiframes.api.convert_tup_to_rec(v)\n"
