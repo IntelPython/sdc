@@ -236,7 +236,8 @@ class TestDate(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        pd.testing.assert_index_equal(hpat_func(df), test_impl(df),
+            check_names=False)
 
     def test_datetime_index_year(self):
         def test_impl(df):
