@@ -261,7 +261,8 @@ class HiFramesTyped(object):
     def _run_getitem(self, assign, rhs):
         nodes = []
         # Series(bool) as index
-        if rhs.op == 'getitem' and self.typemap[rhs.index.name] == SeriesType(types.bool_):
+        if (rhs.op == 'getitem'
+                and self.typemap[rhs.index.name] == SeriesType(types.bool_)):
             rhs.index = self._get_series_data(rhs.index, nodes)
 
         if isinstance(self.typemap[rhs.value.name], SeriesIatType):
