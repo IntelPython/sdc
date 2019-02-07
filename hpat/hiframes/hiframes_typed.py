@@ -560,6 +560,12 @@ class HiFramesTyped(object):
             return self._run_call_series_rolling(
                 assign, assign.target, rhs, func_mod, func_name)
 
+        if (isinstance(func_mod, ir.Var)
+                and isinstance(
+                    self.typemap[func_mod.name], DatetimeIndexType)):
+            return self._run_call_dt_index(
+                assign, assign.target, rhs, func_mod, func_name)
+
         # handle sorted() with key lambda input
         if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
             return self._handle_sorted_by_key(rhs)
@@ -1452,7 +1458,7 @@ class HiFramesTyped(object):
         func_text += '        ts = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(dt64)\n'
         func_text += '        S[i] = ts.' + field + '\n'
         if is_dt_index:  # TODO: support Int64Index
-            func_text += '    return S\n'
+            func_text += '    return hpat.hiframes.api.init_series(S)\n'
         else:
             func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
@@ -1492,6 +1498,17 @@ class HiFramesTyped(object):
         f = loc_vars['f']
 
         return self._replace_func(f, [arr], pre_nodes=nodes)
+
+    def _run_call_dt_index(self, assign, lhs, rhs, dt_index_var, func_name):
+        if func_name in ('min', 'max'):
+            if rhs.args or rhs.kws:
+                raise ValueError(
+                    "unsupported DatetimeIndex.{}() arguments".format(
+                    func_name))
+            func = series_replace_funcs[func_name][types.NPDatetime('ns')]
+            nodes = []
+            data = self._get_dt_index_data(dt_index_var, nodes)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
     def _run_Timedelta_field(self, assign, lhs, rhs):
         """transform Timedelta.<field>
@@ -2604,8 +2621,8 @@ series_replace_funcs = {
     'prod': _column_prod_impl_basic,
     'count': _column_count_impl,
     'mean': _column_mean_impl,
-    'max': defaultdict(lambda: _column_max_impl, [(numba.types.scalars.NPDatetime('ns'), _column_max_impl_no_isnan)]),
-    'min': defaultdict(lambda: _column_min_impl, [(numba.types.scalars.NPDatetime('ns'), _column_min_impl_no_isnan)]),
+    'max': defaultdict(lambda: _column_max_impl, [(types.NPDatetime('ns'), _column_max_impl_no_isnan)]),
+    'min': defaultdict(lambda: _column_min_impl, [(types.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes.api.nunique(A),
