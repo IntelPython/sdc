@@ -960,10 +960,16 @@ class LenSeriesType(AbstractTemplate):
 
 #@infer_global(np.full_like)
 
+# TODO: handle all timedelta args
 def type_sub(context):
     def typer(val1, val2):
-        if(val1 == dt_index_series_type and val2 == pandas_timestamp_type):
+        if val1 == dt_index_series_type and val2 == pandas_timestamp_type:
             return timedelta_index_series_type
+
+        from hpat.hiframes.pd_index_ext import DatetimeIndexType
+        if isinstance(val1, DatetimeIndexType) and val2 == pandas_timestamp_type:
+            from hpat.hiframes.pd_index_ext import TimedeltaIndexType
+            return TimedeltaIndexType(False)
     return typer
 
 type_callable('-')(type_sub)
