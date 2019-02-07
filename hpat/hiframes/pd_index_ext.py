@@ -4,9 +4,10 @@ import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload, make_attribute_wrapper)
+    type_callable, infer, overload, make_attribute_wrapper, box)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
+from numba.targets.boxing import box_array
 
 import hpat
 from hpat.str_ext import string_type
@@ -58,6 +59,30 @@ class DatetimeIndexModel(models.StructModel):
             ('name', string_type),
         ]
         super(DatetimeIndexModel, self).__init__(dmm, fe_type, members)
+
+
+@box(DatetimeIndexType)
+def box_dt_index(typ, val, c):
+    """
+    """
+    mod_name = c.context.insert_const_string(c.builder.module, "pandas")
+    pd_class_obj = c.pyapi.import_module_noblock(mod_name)
+
+    dt_index = numba.cgutils.create_struct_proxy(
+            typ)(c.context, c.builder, val)
+
+    arr = box_array(_dt_index_data_typ, dt_index.data, c)
+
+    # TODO: support name boxing
+    # if typ.is_named:
+    #     name = c.pyapi.from_native_value(string_type, series.name)
+    # else:
+    #     name = c.pyapi.make_none()
+
+    res = c.pyapi.call_method(pd_class_obj, "DatetimeIndex", (arr,))
+
+    c.pyapi.decref(pd_class_obj)
+    return res
 
 
 @infer_getattr
