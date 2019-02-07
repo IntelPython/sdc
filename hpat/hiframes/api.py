@@ -29,7 +29,7 @@ from hpat.hiframes.pd_series_ext import (SeriesType, BoxedSeriesType,
     string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
     date_series_type, UnBoxedSeriesType)
-
+from hpat.hiframes.pd_index_ext import DatetimeIndexType
 from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
     alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
@@ -871,6 +871,9 @@ class SeriesTupleToArrTupleTyper(AbstractTemplate):
 def get_series_data(S):
     return lambda S: S._data
 
+@numba.generated_jit(nopython=True)
+def get_index_data(S):
+    return lambda S: S._data
 
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
@@ -879,6 +882,7 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('get_index_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes.api')] = alias_ext_dummy_func
@@ -1027,6 +1031,25 @@ def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
+def parse_datetimes_from_strings(A):
+    return A
+
+@infer_global(parse_datetimes_from_strings)
+class ParseDTArrType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        assert args[0] in (string_array_type, string_series_type)
+        return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
+
+@lower_builtin(parse_datetimes_from_strings, types.Any)
+def lower_parse_datetimes_from_strings(context, builder, sig, args):
+    # dummy implementation to avoid @overload errors
+    # replaced in hiframes_typed pass
+    res = make_array(sig.return_type)(context, builder)
+    return impl_ret_borrowed(context, builder, sig.return_type, res._getvalue())
+
+
 @intrinsic
 def init_series(typingctx, data, index=None, name=None):
     """Create a Series with provided data, index and name values.
@@ -1071,26 +1094,38 @@ def init_series(typingctx, data, index=None, name=None):
     return sig, codegen
 
 
-# TODO: separate pd.DatetimeIndex type
-#@typeof_impl.register(pd.DatetimeIndex)
+@intrinsic
+def init_datetime_index(typingctx, data, name=None):
+    """Create a DatetimeIndex with provided data and name values.
+    """
+    name = types.none if name is None else name
+    is_named = False if name is types.none else True
 
-def pd_dt_index_stub(data):  # pragma: no cover
-    return data
+    def codegen(context, builder, signature, args):
+        data_val, name_val = args
+        # create dt_index struct and store values
+        dt_index = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+        dt_index.data = data_val
+        if is_named:
+            if isinstance(name, types.StringLiteral):
+                dt_index.name = numba.unicode.make_string_from_constant(
+                    context, builder, string_type, name.literal_value)
+            else:
+                dt_index.name = name_val
 
-@infer_global(pd.DatetimeIndex)
-class DatetimeIndexTyper(AbstractTemplate):
-    def generic(self, args, kws):
-        pysig = numba.utils.pysignature(pd_dt_index_stub)
-        try:
-            bound = pysig.bind(*args, **kws)
-        except TypeError:  # pragma: no cover
-            msg = "Unsupported arguments for pd.DatetimeIndex()"
-            raise ValueError(msg)
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, signature.args[0], data_val)
+            if is_named:
+                context.nrt.incref(builder, signature.args[1], name_val)
 
-        sig = signature(
-            SeriesType(types.NPDatetime('ns')), bound.args).replace(
-                pysig=pysig)
-        return sig
+        return dt_index._getvalue()
+
+    ret_typ = DatetimeIndexType(is_named)
+    sig = signature(ret_typ, data, name)
+    return sig, codegen
+
 
 @overload(np.array)
 def np_array_array_overload(A):

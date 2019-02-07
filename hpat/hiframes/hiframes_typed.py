@@ -28,6 +28,7 @@ from hpat.hiframes.pd_series_ext import (SeriesType, string_series_type,
     if_series_to_array_type, if_series_to_unbox, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
     explicit_binop_funcs, series_dt_methods_type)
+from hpat.hiframes.pd_index_ext import DatetimeIndexType
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.aggregate import Aggregate
@@ -359,6 +360,14 @@ class HiFramesTyped(object):
             # simply return the column
             nodes = []
             var = self._get_series_data(rhs.value, nodes)
+            assign.value = var
+            nodes.append(assign)
+            return nodes
+
+        if isinstance(rhs_type, DatetimeIndexType) and rhs.attr == 'values':
+            # simply return the data array
+            nodes = []
+            var = self._get_dt_index_data(rhs.value, nodes)
             assign.value = var
             nodes.append(assign)
             return nodes
@@ -745,6 +754,20 @@ class HiFramesTyped(object):
             return self._replace_func(_to_numeric_impl, [data],
                 pre_nodes=nodes,
                 extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func})
+
+        if func_name == 'parse_datetimes_from_strings':
+            nodes = []
+            data = self._get_series_data(rhs.args[0], nodes)
+
+            def parse_impl(data):
+                numba.parfor.init_prange()
+                n = len(data)
+                S = numba.unsafe.ndarray.empty_inferred((n,))
+                for i in numba.parfor.internal_prange(n):
+                    S[i] = hpat.hiframes.pd_timestamp_ext.parse_datetime_str(data[i])
+                return S
+
+            return self._replace_func(parse_impl, [data], pre_nodes=nodes)
 
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
@@ -1478,34 +1501,13 @@ class HiFramesTyped(object):
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
         """
-        kws = dict(rhs.kws)
-        if 'data' in kws:
-            data = kws['data']
-            if len(rhs.args) != 0:  # pragma: no cover
-                raise ValueError(
-                    "only data argument suppoted in pd.DatetimeIndex()")
-        else:
-            if len(rhs.args) != 1:  # pragma: no cover
-                raise ValueError(
-                    "data argument in pd.DatetimeIndex() expected")
-            data = rhs.args[0]
-
-        in_typ = self.typemap[data.name]
-        if not (in_typ == string_array_type or in_typ == string_series_type):
-            # already dt_index or int64
-            # TODO: check for other types
-            f = lambda A: hpat.hiframes.api.ts_series_to_arr_typ(A)
-            return self._replace_func(f, [data])
-
-        def f(str_arr):
-            numba.parfor.init_prange()
-            n = len(str_arr)
-            S = numba.unsafe.ndarray.empty_inferred((n,))
-            for i in numba.parfor.internal_prange(n):
-                S[i] = hpat.hiframes.pd_timestamp_ext.parse_datetime_str(str_arr[i])
-            return S
-
-        return self._replace_func(f, [data])
+        arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+        kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+        impl = hpat.hiframes.pd_index_ext.pd_datetimeindex_overload(
+            *arg_typs, **kw_typs)
+        return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
@@ -1935,6 +1937,24 @@ class HiFramesTyped(object):
                 return tup_def.items
         raise ValueError("constant tuple expected")
 
+    def _get_dt_index_data(self, dt_var, nodes):
+        var_def = guard(get_definition, self.func_ir, dt_var)
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if call_def == ('init_datetime_index', 'hpat.hiframes.api'):
+            return var_def.args[0]
+
+        f_block = compile_to_numba_ir(
+            lambda S: hpat.hiframes.api.get_index_data(S),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[dt_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [dt_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
+
     def _get_series_data(self, series_var, nodes):
         # optimization: return data var directly if index is None
         # e.g. S = init_series(A, None)
@@ -1987,7 +2007,6 @@ class HiFramesTyped(object):
             args = numba.typing.fold_arguments(
                 pysig, args, kws, normal_handler, default_handler,
                 normal_handler)
-
 
         arg_typs = tuple(self.typemap[v.name] for v in args)
         if array_typ_convert:
