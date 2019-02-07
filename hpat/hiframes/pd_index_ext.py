@@ -70,6 +70,16 @@ class DatetimeIndexAttribute(AttributeTemplate):
     def resolve_date(self, ary):
         return array_datetime_date
 
+    @bound_function("dt_index.max")
+    def resolve_max(self, ary, args, kws):
+        assert not kws
+        return signature(pandas_timestamp_type, *args)
+
+    @bound_function("dt_index.min")
+    def resolve_min(self, ary, args, kws):
+        assert not kws
+        return signature(pandas_timestamp_type, *args)
+
 
 # all datetimeindex fields return int64 same as Timestamp fields
 def resolve_date_field(self, ary):
