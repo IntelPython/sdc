@@ -849,7 +849,8 @@ class SeriesTupleToArrTupleTyper(AbstractTemplate):
 
 
 # this function should be used for getting S._data for alias analysis to work
-@numba.generated_jit(nopython=True)
+# no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
+@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_series_data(S):
     return lambda S: S._data
 
