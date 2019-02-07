@@ -1668,7 +1668,7 @@ class HiFramesTyped(object):
             return True
 
         if ((isinstance(arg1, DatetimeIndexType) or isinstance(arg2, DatetimeIndexType))
-                and not (arg1 == dt_index_series_type and arg2 == dt_index_series_type)):
+                and not (isinstance(arg1, DatetimeIndexType) and isinstance(arg2, DatetimeIndexType))):
             return True
 
         return False
@@ -1694,13 +1694,28 @@ class HiFramesTyped(object):
                 or types.unliteral(self.typemap[arg2.name]) not in allowed_types):
             raise ValueError("DatetimeIndex operation not supported")
 
+        # string comparison with DatetimeIndex
         op_str = _binop_to_str[rhs.fn]
+        typ1 = self.typemap[arg1.name]
+        typ2 = self.typemap[arg2.name]
+        nodes = []
+        is_out_series = False
 
         func_text = 'def f(arg1, arg2):\n'
-        if self.typemap[arg1.name] == dt_index_series_type:
+        if typ1 == dt_index_series_type or isinstance(typ1, DatetimeIndexType):
+            if typ1 == dt_index_series_type:
+                is_out_series = True
+                arg1 = self._get_series_data(arg1, nodes)
+            else:
+                arg1 = self._get_dt_index_data(arg1, nodes)
             func_text += '  dt_index, _str = arg1, arg2\n'
             comp = 'dt_index[i] {} other'.format(op_str)
         else:
+            if typ2 == dt_index_series_type:
+                is_out_series = True
+                arg2 = self._get_series_data(arg2, nodes)
+            else:
+                arg2 = self._get_dt_index_data(arg2, nodes)
             func_text += '  dt_index, _str = arg2, arg1\n'
             comp = 'other {} dt_index[i]'.format(op_str)
         func_text += '  l = len(dt_index)\n'
@@ -1708,7 +1723,10 @@ class HiFramesTyped(object):
         func_text += '  S = numba.unsafe.ndarray.empty_inferred((l,))\n'
         func_text += '  for i in numba.parfor.internal_prange(l):\n'
         func_text += '    S[i] = {}\n'.format(comp)
-        func_text += '  return S\n'
+        if is_out_series:  # TODO: test
+            func_text += '  return hpat.hiframes.api.init_series(S)\n'
+        else:
+            func_text += '  return S\n'
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         f = loc_vars['f']
