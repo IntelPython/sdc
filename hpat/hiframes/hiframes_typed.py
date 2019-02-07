@@ -259,6 +259,11 @@ class HiFramesTyped(object):
         return [assign]
 
     def _run_getitem(self, assign, rhs):
+        nodes = []
+        # Series(bool) as index
+        if rhs.op == 'getitem' and self.typemap[rhs.index.name] == SeriesType(types.bool_):
+            rhs.index = self._get_series_data(rhs.index, nodes)
+
         if isinstance(self.typemap[rhs.value.name], SeriesIatType):
             val_def = guard(get_definition, self.func_ir, rhs.value)
             assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
@@ -279,7 +284,6 @@ class HiFramesTyped(object):
                 s = np.int64(dt)
                 return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
-            nodes = []
             data = self._get_series_data(in_arr, nodes)
             assert isinstance(self.typemap[ind_var.name],
                 (types.Integer, types.IntegerLiteral))
@@ -293,7 +297,6 @@ class HiFramesTyped(object):
             return nodes
 
         if isinstance(self.typemap[rhs.value.name], SeriesType):
-            nodes = []
             rhs.value = self._get_series_data(rhs.value, nodes)
             self._convert_series_calltype(rhs)
             lhs = assign.target
@@ -311,7 +314,8 @@ class HiFramesTyped(object):
             nodes.append(assign)
             return nodes
 
-        return [assign]
+        nodes.append(assign)
+        return nodes
 
     def _run_setitem(self, inst):
         target_typ = self.typemap[inst.target.name]

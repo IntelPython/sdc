@@ -226,6 +226,14 @@ class TestHiFrames(unittest.TestCase):
         hpat_func(df)
         pd.testing.assert_series_equal(df.C, df2.C)
 
+    def test_getitem_bool_series(self):
+        def test_impl(df):
+            return df['A'][df['B']].values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
+        np.testing.assert_array_equal(test_impl(df), hpat_func(df))
+
     def test_len_df(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
