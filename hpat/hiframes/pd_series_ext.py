@@ -279,10 +279,6 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == types.NPDatetime('ns')
         return series_dt_methods_type
 
-    def resolve_date(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return date_series_type
-
     def resolve_iat(self, ary):
         return SeriesIatType(ary)
 
@@ -293,54 +289,6 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_loc(self, ary):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
-
-    def resolve_year(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_month(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_day(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_hour(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_minute(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_second(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_microsecond(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_nanosecond(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPDatetime):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_days(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPTimedelta):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_seconds(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPTimedelta):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_microseconds(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPTimedelta):
-            return types.Array(types.int64, 1, 'C')
-
-    def resolve_nanoseconds(self, ary):
-        if isinstance(ary.dtype, types.scalars.NPTimedelta):
-            return types.Array(types.int64, 1, 'C')
 
     @bound_function("array.astype")
     def resolve_astype(self, ary, args, kws):
@@ -660,6 +608,10 @@ series_dt_methods_type = SeriesDtMethodType()
 @infer_getattr
 class SeriesDtMethodAttribute(AttributeTemplate):
     key = SeriesDtMethodType
+
+    def resolve_date(self, ary):
+        return date_series_type
+
 
 # all date fields return int64 same as Timestamp fields
 def resolve_date_field(self, ary):
