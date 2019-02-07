@@ -1233,14 +1233,14 @@ class HiFrames(object):
         func_text = "def f({}):\n".format(', '.join(col_name_args))
         # compute stat values
         for c in col_name_args:
-            func_text += "  {}_count = np.float64(hpat.hiframes.api.count({}))\n".format(c, c)
-            func_text += "  {}_min = np.min({})\n".format(c, c)
-            func_text += "  {}_max = np.max({})\n".format(c, c)
-            func_text += "  {}_mean = hpat.hiframes.api.mean({})\n".format(c, c)
-            func_text += "  {}_std = hpat.hiframes.api.var({})**0.5\n".format(c, c)
-            func_text += "  {}_q25 = hpat.hiframes.api.quantile({}, .25)\n".format(c, c)
-            func_text += "  {}_q50 = hpat.hiframes.api.quantile({}, .5)\n".format(c, c)
-            func_text += "  {}_q75 = hpat.hiframes.api.quantile({}, .75)\n".format(c, c)
+            func_text += "  {}_count = np.float64({}.count())\n".format(c, c)
+            func_text += "  {}_min = {}.min()\n".format(c, c)
+            func_text += "  {}_max = {}.max()\n".format(c, c)
+            func_text += "  {}_mean = {}.mean()\n".format(c, c)
+            func_text += "  {}_std = {}.var()**0.5\n".format(c, c)
+            func_text += "  {}_q25 = {}.quantile(.25)\n".format(c, c)
+            func_text += "  {}_q50 = {}.quantile(.5)\n".format(c, c)
+            func_text += "  {}_q75 = {}.quantile(.75)\n".format(c, c)
 
 
         col_header = "      ".join([c for c in col_names])

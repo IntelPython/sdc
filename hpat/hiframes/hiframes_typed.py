@@ -787,7 +787,7 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ['sum', 'count', 'mean', 'var', 'min', 'max', 'prod']:
+        if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max', 'prod'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -801,16 +801,20 @@ class HiFramesTyped(object):
             data = self._get_series_data(series_var, nodes)
             return self._replace_func(func, [data], pre_nodes=nodes)
 
-        if func_name in ['std', 'nunique', 'describe', 'abs', 'isna',
-                         'isnull', 'median', 'idxmin', 'idxmax', 'unique']:
+        if func_name in ('std', 'nunique', 'describe', 'abs', 'isna',
+                         'isnull', 'median', 'idxmin', 'idxmax', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
             func = series_replace_funcs[func_name]
             # TODO: handle skipna, min_count arguments
             nodes = []
-            data = self._get_series_data(series_var, nodes)
-            return self._replace_func(func, [data], pre_nodes=nodes)
+            if func_name == 'describe':
+                data = series_var
+            else:
+                data = self._get_series_data(series_var, nodes)
+            return self._replace_func(func, [data], pre_nodes=nodes,
+                array_typ_convert=False)
 
         if func_name == 'quantile':
             nodes = []
@@ -2525,16 +2529,15 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     return hpat.hiframes.api.init_timedelta_index(S)
 
 
-def _column_describe_impl(A):  # pragma: no cover
-    S = hpat.hiframes.api.init_series(A)
-    a_count = np.float64(hpat.hiframes.api.count(A))
+def _column_describe_impl(S):  # pragma: no cover
+    a_count = np.float64(S.count())
     a_min = S.min()
     a_max = S.max()
-    a_mean = hpat.hiframes.api.mean(A)
-    a_std = hpat.hiframes.api.var(A)**0.5
-    q25 = hpat.hiframes.api.quantile(A, .25)
-    q50 = hpat.hiframes.api.quantile(A, .5)
-    q75 = hpat.hiframes.api.quantile(A, .75)
+    a_mean = S.mean()
+    a_std = S.std()
+    q25 = S.quantile(.25)
+    q50 = S.quantile(.5)
+    q75 = S.quantile(.75)
     # TODO: pandas returns dataframe, maybe return namedtuple instread of
     # string?
     # TODO: fix string formatting to match python/pandas
