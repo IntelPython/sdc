@@ -19,7 +19,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-    is_whole_slice)
+    is_whole_slice, is_array)
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
@@ -1775,20 +1775,30 @@ class HiFramesTyped(object):
         return self._replace_func(f, rhs.args)
 
     def _handle_df_col_filter(self, assign, lhs, rhs):
+        nodes = []
+        if is_series_type(self.typemap[rhs.args[2].name]):
+            rhs.args[2] = self._get_series_data(rhs.args[2], nodes)
+            self._convert_series_calltype(rhs)
         arr_def = guard(get_definition, self.func_ir, rhs.args[2])
+
         # find df['col2'] = df['col1'][arr]
         # since columns should have the same size, output is filled with NaNs
         # TODO: check for float, make sure col1 and col2 are in the same df
         if (isinstance(arr_def, ir.Expr)  and arr_def.op == 'getitem'
-                and is_series_type(self.typemap[arr_def.value.name])
+                and is_array(self.typemap, arr_def.value.name)
                 and self.is_bool_arr(arr_def.index.name)):
+            bool_arr = arr_def.index
+            if is_series_type(self.typemap[bool_arr.name]):
+                bool_arr = self._get_series_data(bool_arr, nodes)
             # TODO: handle filter str arr, etc.
             # XXX: can't handle int64 to float64 nans properly since df column
             # bookkeeping is before typing
             return self._replace_func(_column_filter_impl_float,
-                [rhs.args[0], rhs.args[1], arr_def.value, arr_def.index], True)
-        return [assign]
+                [rhs.args[0], rhs.args[1], arr_def.value, bool_arr], True,
+                pre_nodes=nodes)
 
+        nodes.append(assign)
+        return nodes
 
     def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
 
@@ -2064,7 +2074,8 @@ class HiFramesTyped(object):
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
-        return isinstance(if_series_to_array_type(typ), types.npytypes.Array) and typ.dtype == types.bool_
+        return (isinstance(if_series_to_array_type(typ), types.Array)
+            and typ.dtype == types.bool_)
 
     def _is_const_none(self, var):
         var_def = guard(get_definition, self.func_ir, var)
