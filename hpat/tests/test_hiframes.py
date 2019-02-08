@@ -801,7 +801,7 @@ class TestHiFrames(unittest.TestCase):
                     'B:return':'distributed'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
-        self.assertEqual(count_array_REPs(), 3)
+        self.assertEqual(count_array_REPs(), 4)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_to_numeric(self):
