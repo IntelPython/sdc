@@ -790,6 +790,21 @@ class HiFramesTyped(object):
 
             return self._replace_func(parse_impl, [data], pre_nodes=nodes)
 
+        if func_name == 'get_itertuples':
+            nodes = []
+            new_args = []
+            for arg in rhs.args:
+                if isinstance(self.typemap[arg.name], SeriesType):
+                    new_args.append(self._get_series_data(arg, nodes))
+                else:
+                    new_args.append(arg)
+
+            self._convert_series_calltype(rhs)
+            rhs.args = new_args
+
+            nodes.append(assign)
+            return nodes
+
         return self._handle_df_col_calls(assign, lhs, rhs, func_name)
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
