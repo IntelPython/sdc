@@ -106,7 +106,8 @@ class HiFramesTyped(object):
                     out_nodes = self._run_setitem(inst)
                 else:
                     if isinstance(inst, (Aggregate, hiframes.sort.Sort,
-                            hiframes.join.Join, hiframes.filter.Filter)):
+                            hiframes.join.Join, hiframes.filter.Filter,
+                            hpat.csv_ext.CsvReader)):
                         out_nodes = self._handle_hiframes_nodes(inst)
 
 
@@ -2264,6 +2265,10 @@ class HiFramesTyped(object):
             use_vars = list(inst.right_vars.values()) + list(inst.left_vars.values())
             def_vars = list(inst.df_out_vars.values())
             apply_copies_func = hiframes.join.apply_copies_join
+        elif isinstance(inst, hpat.csv_ext.CsvReader):
+            use_vars = []
+            def_vars = inst.out_vars
+            apply_copies_func = hpat.csv_ext.apply_copies_csv
         else:
             assert isinstance(inst, hiframes.filter.Filter)
             use_vars = list(inst.df_in_vars.values())
