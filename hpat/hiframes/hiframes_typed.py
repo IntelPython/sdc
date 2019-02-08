@@ -1927,7 +1927,7 @@ class HiFramesTyped(object):
         isna_calls = ['hpat.hiframes.api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
-        func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
+        func_text += "  ({},) = hpat.hiframes.api.series_tup_to_arr_tup(arr_tup)\n".format(", ".join(in_names))
         func_text += "  old_len = len({})\n".format(in_names[0])
         func_text += "  new_len = 0\n"
         for c in str_colnames:
@@ -1950,12 +1950,15 @@ class HiFramesTyped(object):
         for v, out in zip(in_names, out_names):
             func_text += "      {}[curr_ind] = {}[i]\n".format(out, v)
         func_text += "      curr_ind += 1\n"
+        for out in out_names:
+            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(out, out)
         func_text += "  return ({},)\n".format(", ".join(out_names))
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         _dropna_impl = loc_vars['_dropna_impl']
-        return self._replace_func(_dropna_impl, rhs.args)
+        return self._replace_func(_dropna_impl, rhs.args,
+            array_typ_convert=False)
 
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):
