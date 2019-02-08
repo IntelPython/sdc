@@ -88,7 +88,10 @@ class HiFramesTyped(object):
 
     def run(self):
         blocks = self.func_ir.blocks
-        work_list = list(blocks.items())
+        # topo_order necessary so Series data replacement optimization can be
+        # performed in one pass
+        topo_order = find_topo_order(blocks)
+        work_list = list((l, blocks[l]) for l in reversed(topo_order))
         while work_list:
             label, block = work_list.pop()
             new_body = []
@@ -762,6 +765,12 @@ class HiFramesTyped(object):
                 _isin_series, [data, rhs.args[1]], pre_nodes=nodes)
 
         if func_name == 'flatten_to_series':
+            arg = rhs.args[0]
+            in_typ = self.typemap[arg.name]
+            nodes = []
+            if isinstance(in_typ, SeriesType):
+                arg = self._get_series_data(arg, nodes)
+
             def _flatten_impl(A):
                 numba.parfor.init_prange()
                 flat_list = []
@@ -773,7 +782,7 @@ class HiFramesTyped(object):
 
                 return hpat.hiframes.api.init_series(
                     hpat.hiframes.api.parallel_fix_df_array(flat_list))
-            return self._replace_func(_flatten_impl, [rhs.args[0]])
+            return self._replace_func(_flatten_impl, [arg], pre_nodes=nodes)
 
         if func_name == 'to_numeric':
             out_dtype = self.typemap[lhs.name].dtype
