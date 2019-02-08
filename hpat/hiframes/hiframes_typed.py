@@ -708,6 +708,9 @@ class HiFramesTyped(object):
             # XXX df isin is different than Series.isin, df.isin considers
             #  index but Series.isin ignores it (everything is set)
             # TODO: support strings and other types
+            nodes = []
+            data = self._get_series_data(rhs.args[0], nodes)
+            other = self._get_series_data(rhs.args[1], nodes)
             def _isin_series(A, B):
                 numba.parfor.init_prange()
                 n = len(A)
@@ -715,20 +718,24 @@ class HiFramesTyped(object):
                 S = np.empty(n, np.bool_)
                 for i in numba.parfor.internal_prange(n):
                     S[i] = (A[i] == B[i] if i < m else False)
-                return S
+                return hpat.hiframes.api.init_series(S)
 
-            return self._replace_func(_isin_series, rhs.args)
+            return self._replace_func(
+                _isin_series, [data, other], pre_nodes=nodes)
 
         if func_name == 'df_isin_vals':
+            nodes = []
+            data = self._get_series_data(rhs.args[0], nodes)
             def _isin_series(A, vals):
                 numba.parfor.init_prange()
                 n = len(A)
                 S = np.empty(n, np.bool_)
                 for i in numba.parfor.internal_prange(n):
                     S[i] = A[i] in vals
-                return S
+                return hpat.hiframes.api.init_series(S)
 
-            return self._replace_func(_isin_series, rhs.args)
+            return self._replace_func(
+                _isin_series, [data, rhs.args[1]], pre_nodes=nodes)
 
         if func_name == 'flatten_to_series':
             def _flatten_impl(A):
