@@ -62,6 +62,10 @@ class DatetimeIndexModel(models.StructModel):
         super(DatetimeIndexModel, self).__init__(dmm, fe_type, members)
 
 
+make_attribute_wrapper(DatetimeIndexType, 'data', '_data')
+make_attribute_wrapper(DatetimeIndexType, 'name', '_name')
+
+
 @box(DatetimeIndexType)
 def box_dt_index(typ, val, c):
     """
