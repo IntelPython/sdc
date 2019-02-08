@@ -254,8 +254,11 @@ def cast_string_series_unbox(context, builder, fromty, toty, val):
 def cast_string_series(context, builder, fromty, toty, val):
     return val
 
+# cast Series(int8) to Series(cat) for init_series() in test_csv_cat1
+# TODO: separate array type for Categorical data
 @lower_cast(SeriesType, types.Array)
 @lower_cast(types.Array, SeriesType)
+@lower_cast(SeriesType, SeriesType)
 def cast_series(context, builder, fromty, toty, val):
     return val
 
