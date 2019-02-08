@@ -249,8 +249,11 @@ class HiFramesTyped(object):
             if rhs.op == 'inplace_binop':
                 return self._run_binop(assign, rhs)
 
+            if rhs.op == 'unary':
+                return self._run_unary(assign, rhs)
+
             # replace getitems on Series.iat
-            if rhs.op in ['getitem', 'static_getitem']:
+            if rhs.op in ('getitem', 'static_getitem'):
                 return self._run_getitem(assign, rhs)
 
             if rhs.op == 'call':
@@ -451,6 +454,27 @@ class HiFramesTyped(object):
             [out_data],
             pre_nodes=nodes
         )
+
+    def _run_unary(self, assign, rhs):
+        arg = rhs.value
+        typ = self.typemap[arg.name]
+
+        if isinstance(typ, SeriesType):
+            nodes = []
+            arg = self._get_series_data(arg, nodes)
+            rhs.value = arg
+            self._convert_series_calltype(rhs)
+            out_data = ir.Var(
+                arg.scope, mk_unique_var(assign.target.name+'_data'), rhs.loc)
+            self.typemap[out_data.name] = self.calltypes[rhs].return_type
+            nodes.append(ir.Assign(rhs, out_data, rhs.loc))
+            return self._replace_func(
+                lambda data: hpat.hiframes.api.init_series(data),
+                [out_data],
+                pre_nodes=nodes
+            )
+
+        return [assign]
 
     def _run_call(self, assign, lhs, rhs):
         fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
