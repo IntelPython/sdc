@@ -631,6 +631,15 @@ class HiFramesTyped(object):
             assign.value = rhs.args[0]
             return [assign]
 
+        if func_name == 'get_index_data':
+            # fix_df_array() calls get_index_data() for DatetimeIndex
+            # but it can be removed sometimes
+            var_def = guard(get_definition, self.func_ir, rhs.args[0])
+            call_def = guard(find_callname, self.func_ir, var_def)
+            if call_def == ('init_datetime_index', 'hpat.hiframes.api'):
+                assign.value = var_def.args[0]
+                return [assign]
+
         if func_name in ('str_contains_regex', 'str_contains_noregex'):
             return self._handle_str_contains(assign, lhs, rhs, func_name)
 

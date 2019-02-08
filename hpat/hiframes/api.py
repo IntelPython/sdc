@@ -865,6 +865,7 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('init_datetime_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_index_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
@@ -932,6 +933,8 @@ class FixDfArrayType(AbstractTemplate):
             ret_typ = types.Array(column.dtype, 1, 'C')
         if isinstance(column, types.List) and column.dtype == string_type:
             ret_typ = string_array_type
+        if isinstance(column, DatetimeIndexType):
+            ret_typ = hpat.hiframes.pd_index_ext._dt_index_data_typ
         # TODO: add other types
         return signature(ret_typ, column)
 
@@ -956,6 +959,9 @@ def fix_df_array_overload(column):
         def fix_df_array_str_impl(column):  # pragma: no cover
             return hpat.str_arr_ext.StringArray(column)
         return fix_df_array_str_impl
+
+    if isinstance(column, DatetimeIndexType):
+        return lambda column: hpat.hiframes.api.get_index_data(column)
 
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType, SeriesType))
