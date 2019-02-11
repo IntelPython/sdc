@@ -372,12 +372,6 @@ def dist_time():  # pragma: no cover
 def dist_return(A):  # pragma: no cover
     return A
 
-def dist_input(A):  # pragma: no cover
-    return A
-
-def threaded_input(A):  # pragma: no cover
-    return A
-
 def threaded_return(A):  # pragma: no cover
     return A
 
@@ -393,9 +387,7 @@ def dist_return_overload(A):
     return dist_return
 
 # TODO: move other funcs to old API?
-@infer_global(threaded_input)
 @infer_global(threaded_return)
-@infer_global(dist_input)
 @infer_global(dist_return)
 class ThreadedRetTyper(AbstractTemplate):
     def generic(self, args, kws):

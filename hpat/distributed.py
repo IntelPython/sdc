@@ -31,6 +31,8 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis)
+from hpat.hiframes.pd_series_ext import SeriesType
+
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
@@ -665,19 +667,14 @@ class DistributedPass(object):
             assign.value = rhs.args[0]
             return [assign]
 
-        if fdef == ('dist_input', 'hpat.distributed_api'):
-            assign.value = rhs.args[0]
+        if (fdef == ('get_series_data', 'hpat.hiframes.api')
+                or fdef == ('unbox_df_column', 'hpat.hiframes.boxing')):
             out = [assign]
-            arr = rhs.args[0]
-            if is_array_container(self.typemap, arr.name):
-                return out
-            # remove sentinel call
-            assign.value = arr
-
+            arr = assign.target
             # gen len() using 1D_Var reduce approach.
-            # TODO: refactor to avoid reduction
-            arr_typ = self.typemap[arr.name]
-            ndim = 1 if arr_typ == string_array_type else arr_typ.ndim
+            # TODO: refactor to avoid reduction for 1D
+            # arr_typ = self.typemap[arr.name]
+            ndim = 1
             out += self._gen_1D_Var_len(arr)
             total_length = out[-1].target
             div_nodes, start_var, count_var = self._gen_1D_div(
@@ -697,10 +694,6 @@ class DistributedPass(object):
 
 
         if fdef == ('threaded_return', 'hpat.distributed_api'):
-            assign.value = rhs.args[0]
-            return [assign]
-
-        if fdef == ('threaded_input', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
             return [assign]
 
@@ -1529,11 +1522,17 @@ class DistributedPass(object):
         rhs = assign.value
         out = [assign]
 
-        if rhs.name not in self.metadata['distributed_args']:
+        if rhs.name not in self.metadata['distributed']:
             return None
 
         arr = assign.target
+        typ = self.typemap[arr.name]
         if is_array_container(self.typemap, arr.name):
+            return None
+
+        # TODO: comprehensive support for Series vars
+        if isinstance(typ, (SeriesType,
+                hpat.hiframes.api.PandasDataFrameType)):
             return None
 
         # gen len() using 1D_Var reduce approach.

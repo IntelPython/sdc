@@ -18,6 +18,12 @@ def jit(signature_or_function=None, **options):
     for var, vals in h5_types.items():
         _locals[var+":h5_types"] = vals
 
+    distributed = set(options.pop('distributed', set()))
+    _locals["##distributed"] = distributed
+
+    threaded = set(options.pop('threaded', set()))
+    _locals["##threaded"] = threaded
+
     options['locals'] = _locals
 
     #options['parallel'] = True

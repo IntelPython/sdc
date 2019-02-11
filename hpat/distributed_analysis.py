@@ -158,9 +158,12 @@ class DistributedAnalysis(object):
             # analyze array container access in pair_first
             return
         elif isinstance(rhs, ir.Arg):
-            if rhs.name in self.metadata['distributed_args']:
+            if rhs.name in self.metadata['distributed']:
                 if lhs not in array_dists:
                     array_dists[lhs] = Distribution.OneD
+            elif rhs.name in self.metadata['threaded']:
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.Thread
             else:
                 dprint("replicated input ", rhs.name, lhs)
                 self._set_REP([inst.target], array_dists)
@@ -337,6 +340,10 @@ class DistributedAnalysis(object):
                 'to_date_series_type', 'dummy_unbox_series',
                 'parallel_fix_df_array'):
             # TODO: support Series type similar to Array
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
+        if fdef == ('unbox_df_column', 'hpat.hiframes.boxing'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
@@ -554,16 +561,6 @@ class DistributedAnalysis(object):
                 raise ValueError("threaded return of array {} not valid"
                                  " since it is replicated")
             array_dists[arr_name] = Distribution.Thread
-            return
-
-        if func_name == 'dist_input':
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
-        if func_name == 'threaded_input':
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.Thread
             return
 
         if func_name == 'rebalance_array':

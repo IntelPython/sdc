@@ -119,7 +119,7 @@ class HiFrames(object):
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting hiframes")
-        self._handle_dist_args()
+        self._handle_metadata()
         blocks = self.func_ir.blocks
         # topo_order necessary since df vars need to be found before use
         topo_order = find_topo_order(blocks)
@@ -1837,21 +1837,10 @@ class HiFrames(object):
         scope = arg_var.scope
         loc = arg_var.loc
 
-        # e.g. {"A:return":"distributed"} -> "A"
-        flagged_inputs = { var_name.split(":")[0]: flag
-                    for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":input") }
-
-        flag = None  # TODO: support multiple input flags
-        if arg_name in flagged_inputs.keys():
-            self.locals.pop(arg_name + ":input")
-            flag = flagged_inputs[arg_name]
-
         # TODO: handle datetime.date() series
 
         # input dataframe arg
         if isinstance(self.args[arg_ind], PandasDataFrameType):
-            flag_func_name = self._get_input_flag_func_name(flag)
             df_typ = self.args[arg_ind]
             df_items = {}
             for i, col in enumerate(df_typ.col_names):
@@ -1868,7 +1857,7 @@ class HiFrames(object):
                     alloc_dt = "np.{}".format(col_dtype)
 
                 func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = {}(hpat.hiframes.api.init_series(hpat.hiframes.boxing.unbox_df_column(_df, {}, {})))\n".format(col, flag_func_name, i, alloc_dt)
+                func_text += "  _col_input_{} = hpat.hiframes.api.init_series(hpat.hiframes.boxing.unbox_df_column(_df, {}, {}))\n".format(col, i, alloc_dt)
                 loc_vars = {}
                 exec(func_text, {}, loc_vars)
                 f = loc_vars['f']
@@ -1879,71 +1868,42 @@ class HiFrames(object):
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)
-            self.metadata['distributed_args'].discard(arg_name)
             return nodes
 
-        # all other types: arrays, containers of arrays, ...
-        arg_var = self._handle_input_flag(flag, arg_var, nodes)
         return nodes
 
-    def _handle_input_flag(self, flag, arg_var, nodes):
-        if flag is None:
-            return arg_var
-
-        if flag == 'distributed':
-                def f(_dist_arr):  # pragma: no cover
-                    _d_arr = hpat.distributed_api.dist_input(_dist_arr)
-        elif flag == 'threaded':
-            def f(_thread_arr):  # pragma: no cover
-                _th_arr = hpat.distributed_api.threaded_input(_thread_arr)
-        else:
-            raise ValueError("Invalid input flag")
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [arg_var])
-        nodes += f_block.body[:-3]  # remove none return
-        new_arg_var = ir.Var(
-            arg_var.scope, mk_unique_var(arg_var.name), arg_var.loc)
-        nodes[-1].target = new_arg_var
-        self.replace_var_dict[arg_var.name] = new_arg_var
-        self._add_node_defs(nodes)
-        return new_arg_var
-
-    def _get_input_flag_func_name(self, flag):
-        if flag is None:
-            return ''
-        fname = None
-        if flag == 'distributed':
-            fname = 'hpat.distributed_api.dist_input'
-        elif flag == 'threaded':
-            fname = 'hpat.distributed_api.threaded_input'
-        else:
-            raise ValueError("Invalid input flag")
-        return fname
-
-    def _handle_dist_args(self):
+    def _handle_metadata(self):
         """remove distributed input annotation from locals and add to metadata
         """
-        if 'distributed_args' not in self.metadata:
-            self.metadata['distributed_args'] = set()
-        return  # XXX disable for now to enable dist series
+        if 'distributed' not in self.metadata:
+            # TODO: keep updated in variable renaming?
+            self.metadata['distributed'] = self.locals.pop('##distributed')
 
+        if 'threaded' not in self.metadata:
+            self.metadata['threaded'] = self.locals.pop('##threaded')
+
+        # handle old flags
         # e.g. {"A:input": "distributed"} -> "A"
-        flagged_inputs = { var_name.split(":")[0]
+        dist_inputs = { var_name.split(":")[0]
                     for (var_name, flag) in self.locals.items()
                     if var_name.endswith(":input") and flag == 'distributed'}
 
+        thread_inputs = { var_name.split(":")[0]
+                    for (var_name, flag) in self.locals.items()
+                    if var_name.endswith(":input") and flag == 'threaded'}
+
         # check inputs to be in actuall args
-        for arg_name in flagged_inputs:
+        for arg_name in dist_inputs | thread_inputs:
             if arg_name not in self.func_ir.arg_names:
                 raise ValueError(
                     "distributed input {} not found in arguments".format(
                         arg_name))
 
-        self.metadata['distributed_args'] |= flagged_inputs
+        self.metadata['distributed'] |= dist_inputs
+        self.metadata['threaded'] |= thread_inputs
 
         # remove from locals to avoid type inference issue
-        for arg_name in flagged_inputs:
+        for arg_name in dist_inputs | thread_inputs:
             self.locals.pop(arg_name + ":input")
 
         return

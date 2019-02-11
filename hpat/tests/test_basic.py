@@ -317,7 +317,7 @@ class TestBasic(BaseTest):
         def test_impl(A):
             return len(A)
 
-        hpat_func = hpat.jit(locals={'A:input': 'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed=['A'])(test_impl)
         n = 128
         arr = np.ones(n)
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))

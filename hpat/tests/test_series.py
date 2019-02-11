@@ -686,12 +686,12 @@ class TestSeries(unittest.TestCase):
         def test_impl(S):
             return S.max()
 
-        hpat_func = hpat.jit(locals={'S:input': 'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
         n = 111
         S = pd.Series(np.arange(n))
         start, end = get_start_end(n)
         self.assertEqual(hpat_func(S[start:end]), test_impl(S))
-        self.assertEqual(count_array_REPs(), 2)
+        self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_series_tuple_input1(self):

@@ -686,12 +686,11 @@ class TestHiFrames(unittest.TestCase):
         A = ['ABCC', 'CABBD', 'CCD', 'CCDAABB', 'ED']
         start, end = get_start_end(n)
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = hpat.jit(
-            locals={'df:input':'distributed',
-                    'B:return':'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df'},
+                    locals={'B:return':'distributed'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
-        self.assertEqual(count_array_REPs(), 4)
+        self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_str_split(self):
