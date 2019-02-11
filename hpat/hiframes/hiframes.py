@@ -1892,6 +1892,19 @@ class HiFrames(object):
                     for (var_name, flag) in self.locals.items()
                     if var_name.endswith(":input") and flag == 'threaded'}
 
+        # e.g. {"A:return":"distributed"} -> "A"
+        flagged_returns = { var_name.split(":")[0]: flag
+                    for (var_name, flag) in self.locals.items()
+                    if var_name.endswith(":return") }
+
+        for v, flag in flagged_returns.items():
+            if flag == 'distributed':
+                dist_inputs.add(v)
+            elif flag == 'threaded':
+                thread_inputs.add(v)
+
+            self.locals.pop(v + ":return")
+
         # check inputs to be in actuall args
         for arg_name in dist_inputs | thread_inputs:
             if arg_name not in self.func_ir.arg_names:
@@ -1938,12 +1951,9 @@ class HiFrames(object):
         build_definitions({0: dummy_block}, self.func_ir._definitions)
 
     def _run_return(self, ret_node):
-        # e.g. {"A:return":"distributed"} -> "A"
-        flagged_returns = { var_name.split(":")[0]: flag
-                    for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":return") }
-        for v in flagged_returns.keys():
-            self.locals.pop(v + ":return")
+        # TODO: handle distributed analysis, requires handling variable name
+        # change in simplify() and replace_var_names()
+        flagged_vars = self.metadata['distributed'] | self.metadata['threaded']
         nodes = [ret_node]
         cast = guard(get_definition, self.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
@@ -1957,9 +1967,10 @@ class HiFrames(object):
             col_map = self.df_vars[cast.value.name]
             nodes = []
             # dist return arrays first
-            if ret_name in flagged_returns.keys():
+            if ret_name in flagged_vars:
                 new_col_map = {}
-                flag = flagged_returns[ret_name]
+                flag = ('distributed' if ret_name in self.metadata['distributed']
+                        else 'threaded')
                 for cname, var in col_map.items():
                     nodes += self._gen_replace_dist_return(var, flag)
                     new_col_map[cname] = nodes[-1].target
@@ -1974,8 +1985,9 @@ class HiFrames(object):
             nodes.append(ret_node)
             return nodes
 
-        elif ret_name in flagged_returns.keys():
-            flag = flagged_returns[ret_name]
+        elif ret_name in flagged_vars:
+            flag = ('distributed' if ret_name in self.metadata['distributed']
+                        else 'threaded')
             nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
@@ -1986,7 +1998,7 @@ class HiFrames(object):
             return nodes
 
         # shortcut if no dist return
-        if len(flagged_returns) == 0:
+        if len(flagged_vars) == 0:
             return nodes
 
         cast_def = guard(get_definition, self.func_ir, cast.value)
@@ -1996,8 +2008,9 @@ class HiFrames(object):
             new_var_list = []
             for v in cast_def.items:
                 vname = v.name.split('.')[0]
-                if vname in flagged_returns.keys():
-                    flag = flagged_returns[vname]
+                if vname in flagged_vars:
+                    flag = ('distributed' if vname in self.metadata['distributed']
+                        else 'threaded')
                     nodes += self._gen_replace_dist_return(v, flag)
                     new_var_list.append(nodes[-1].target)
                 else:
