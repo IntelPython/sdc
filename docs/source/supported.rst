@@ -67,6 +67,27 @@ as a 9 by 2 array, on three processors:
 HPAT replicates the arrays that are not distributed.
 This is called `REP` distribution for consistency.
 
+Argument and Return Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+HPAT assumes argument and return variables to jitted functions are
+replicated. However, the user can annotate these variables to indicate
+distributed data. In this case,
+the user is responsile for handling of the distributed data chunks outside
+the HPAT scope. For example, the data can come from other jitted functions::
+
+    @hpat.jit(distributed={'A'})
+    def example_return(n):
+        A = np.arange(n)
+        return A
+
+    @hpat.jit(distributed={'B'})
+    def example_arg(B):
+        return B.sum()
+
+    n = 100
+    A = example_return(n)
+    s = example_arg(A)
 
 Distribution Report
 ~~~~~~~~~~~~~~~~~~~
