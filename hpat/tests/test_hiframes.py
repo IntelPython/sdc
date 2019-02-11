@@ -738,12 +738,10 @@ class TestHiFrames(unittest.TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = hpat.jit(
-            locals={'df:input':'distributed',
-                    'B:return':'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
-        self.assertEqual(count_array_REPs(), 4)
+        self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_str_get(self):
@@ -766,12 +764,10 @@ class TestHiFrames(unittest.TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD,F', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = hpat.jit(
-            locals={'df:input':'distributed',
-                    'B:return':'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
-        self.assertEqual(count_array_REPs(), 4)
+        self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_str_flatten(self):
@@ -794,12 +790,10 @@ class TestHiFrames(unittest.TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = hpat.jit(
-            locals={'df:input':'distributed',
-                    'B:return':'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
-        self.assertEqual(count_array_REPs(), 4)
+        self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_to_numeric(self):
@@ -1031,9 +1025,9 @@ class TestHiFrames(unittest.TestCase):
         start, end = get_start_end(n)
         df = pd.DataFrame({'A': A, 'B': B})
         df_h = pd.DataFrame({'A': A[start:end], 'B': B[start:end]})
-        hpat_func = hpat.jit(locals={'df:input':'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df'})(test_impl)
         np.testing.assert_almost_equal(hpat_func(df_h), test_impl(df))
-        self.assertEqual(count_array_REPs(), 2)
+        self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_concat(self):

@@ -1877,12 +1877,13 @@ class HiFrames(object):
         """
         if 'distributed' not in self.metadata:
             # TODO: keep updated in variable renaming?
-            self.metadata['distributed'] = self.locals.pop('##distributed')
+            self.metadata['distributed'] = self.locals.pop(
+                '##distributed', set())
 
         if 'threaded' not in self.metadata:
-            self.metadata['threaded'] = self.locals.pop('##threaded')
+            self.metadata['threaded'] = self.locals.pop('##threaded', set())
 
-        # handle old flags
+        # handle old input flags
         # e.g. {"A:input": "distributed"} -> "A"
         dist_inputs = { var_name.split(":")[0]
                     for (var_name, flag) in self.locals.items()
@@ -1892,6 +1893,19 @@ class HiFrames(object):
                     for (var_name, flag) in self.locals.items()
                     if var_name.endswith(":input") and flag == 'threaded'}
 
+        # check inputs to be in actuall args
+        for arg_name in dist_inputs | thread_inputs:
+            if arg_name not in self.func_ir.arg_names:
+                raise ValueError(
+                    "distributed input {} not found in arguments".format(
+                        arg_name))
+            self.locals.pop(arg_name + ":input")
+
+        self.metadata['distributed'] |= dist_inputs
+        self.metadata['threaded'] |= thread_inputs
+
+
+        # handle old return flags
         # e.g. {"A:return":"distributed"} -> "A"
         flagged_returns = { var_name.split(":")[0]: flag
                     for (var_name, flag) in self.locals.items()
@@ -1899,25 +1913,11 @@ class HiFrames(object):
 
         for v, flag in flagged_returns.items():
             if flag == 'distributed':
-                dist_inputs.add(v)
+                self.metadata['distributed'].add(v)
             elif flag == 'threaded':
-                thread_inputs.add(v)
+                self.metadata['threaded'].add(v)
 
             self.locals.pop(v + ":return")
-
-        # check inputs to be in actuall args
-        for arg_name in dist_inputs | thread_inputs:
-            if arg_name not in self.func_ir.arg_names:
-                raise ValueError(
-                    "distributed input {} not found in arguments".format(
-                        arg_name))
-
-        self.metadata['distributed'] |= dist_inputs
-        self.metadata['threaded'] |= thread_inputs
-
-        # remove from locals to avoid type inference issue
-        for arg_name in dist_inputs | thread_inputs:
-            self.locals.pop(arg_name + ":input")
 
         return
 

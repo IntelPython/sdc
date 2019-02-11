@@ -226,7 +226,7 @@ class TestBasic(BaseTest):
             A = np.random.randint(0, 10, n).astype(dtype)
             np.testing.assert_almost_equal(
                 hpat_func(A[start:end]), test_impl(A), decimal=3)
-            self.assertEqual(count_array_REPs(), 1)
+            self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
     def test_reduce_filter1(self):
@@ -254,7 +254,7 @@ class TestBasic(BaseTest):
             np.testing.assert_almost_equal(
                 hpat_func(A[start:end]), test_impl(A), decimal=3,
                 err_msg="{} on {}".format(func, dtype))
-            self.assertEqual(count_array_REPs(), 1)
+            self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
     def test_array_reduce(self):
