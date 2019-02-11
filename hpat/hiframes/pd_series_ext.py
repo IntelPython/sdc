@@ -143,44 +143,12 @@ make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
-class BoxedSeriesType(types.Type):
-    """Series type before unboxing. Using a different type to avoid data model
-    issues and confusion.
-    """
-    def __init__(self, dtype):
-        self.dtype = dtype
-        name = "BoxedSeriesType({})".format(dtype)
-        super(BoxedSeriesType, self).__init__(name)
-
-# register_model(BoxedSeriesType)(models.OpaqueModel)
-register_model(BoxedSeriesType)(SeriesModel)
-
-class UnBoxedSeriesType(types.Type):
-    """Series type before boxing. Using a different type to avoid data model
-    issues and confusion.
-    """
-    def __init__(self, dtype, data, index):
-        self.dtype = dtype
-        self.data = data
-        self.index = index
-        name = "UnBoxedSeriesType({})".format(dtype)
-        super(UnBoxedSeriesType, self).__init__(name)
-
-register_model(UnBoxedSeriesType)(SeriesModel)
-
-
 def series_to_array_type(typ, replace_boxed=False):
-    # XXX: Boxed series variable types shouldn't be replaced in hiframes_typed
-    # it results in cast error for call dummy_unbox_series
-    if isinstance(typ, BoxedSeriesType) and not replace_boxed:
-        return typ
     return _get_series_array_type(typ.dtype)
 
 
 def is_series_type(typ):
-    # XXX: UnBoxedSeriesType only used in unboxing
-    assert not isinstance(typ, UnBoxedSeriesType)
-    return isinstance(typ, (SeriesType, BoxedSeriesType))
+    return isinstance(typ, SeriesType)
 
 def arr_to_series_type(arr):
     series_type = None
@@ -193,17 +161,9 @@ def arr_to_series_type(arr):
         series_type = SeriesType(types.List(string_type))
     return series_type
 
-def arr_to_boxed_series_type(arr):
-    series_type = None
-    if isinstance(arr, types.Array):
-        series_type = BoxedSeriesType(arr.dtype)
-    elif arr == string_array_type:
-        series_type = BoxedSeriesType(string_type)
-    return series_type
-
 
 def if_series_to_array_type(typ, replace_boxed=False):
-    if isinstance(typ, (SeriesType, BoxedSeriesType)):
+    if isinstance(typ, SeriesType):
         return series_to_array_type(typ, replace_boxed)
 
     if isinstance(typ, (types.Tuple, types.UniTuple)):
@@ -229,25 +189,6 @@ def if_arr_to_series_type(typ):
     # TODO: other types that can have Arrays inside?
     return typ
 
-def if_series_to_unbox(typ):
-    if isinstance(typ, SeriesType):
-        return UnBoxedSeriesType(typ.dtype, typ.data, typ.index)
-
-    if isinstance(typ, (types.Tuple, types.UniTuple)):
-        return types.Tuple(
-            [if_series_to_unbox(t) for t in typ.types])
-    if isinstance(typ, types.List):
-        return types.List(if_series_to_unbox(typ.dtype))
-    if isinstance(typ, types.Set):
-        return types.Set(if_series_to_unbox(typ.dtype))
-    # TODO: other types that can have Series inside?
-    return typ
-
-@lower_cast(string_array_type, UnBoxedSeriesType)
-@lower_cast(list_string_array_type, UnBoxedSeriesType)
-@lower_cast(types.Array, UnBoxedSeriesType)
-def cast_string_series_unbox(context, builder, fromty, toty, val):
-    return val
 
 @lower_cast(string_series_type, string_array_type)
 @lower_cast(string_array_type, string_series_type)

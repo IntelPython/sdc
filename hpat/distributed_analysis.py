@@ -779,7 +779,7 @@ class DistributedAnalysis(object):
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
-            # Handle BoxedSeriesType since it comes from Arg node and it could
+            # Handle SeriesType since it comes from Arg node and it could
             # have user-defined distribution
             if (is_array(self.typemap, varname)
                     or is_array_container(self.typemap, varname)

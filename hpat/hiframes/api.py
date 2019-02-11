@@ -25,10 +25,10 @@ from hpat.set_ext import build_set
 from numba.targets.imputils import lower_builtin, impl_ret_untracked
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type,
     datetime_date_type, set_df_datetime_date_lower)
-from hpat.hiframes.pd_series_ext import (SeriesType, BoxedSeriesType,
-    string_series_type, if_arr_to_series_type, arr_to_boxed_series_type,
+from hpat.hiframes.pd_series_ext import (SeriesType,
+    string_series_type, if_arr_to_series_type,
     series_to_array_type, if_series_to_array_type, dt_index_series_type,
-    date_series_type, UnBoxedSeriesType)
+    date_series_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType, TimedeltaIndexType
 from hpat.hiframes.sort import (
     alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,

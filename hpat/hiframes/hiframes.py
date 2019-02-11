@@ -36,7 +36,7 @@ import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
-from hpat.hiframes.pd_series_ext import SeriesType, BoxedSeriesType, string_series_type
+from hpat.hiframes.pd_series_ext import SeriesType, string_series_type
 from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
@@ -1879,54 +1879,6 @@ class HiFrames(object):
                 df_items[col] = nodes[-1].target
 
             self._create_df(arg_var.name, df_items, label)
-            self.metadata['distributed_args'].discard(arg_name)
-            return nodes
-
-        # handle BoxedSeries and list/set of BoxedSeries, TODO: others?
-        if (isinstance(arg_typ, BoxedSeriesType) or
-                isinstance(arg_typ, (types.List, types.Set))
-                and isinstance(arg_typ.dtype, BoxedSeriesType)):
-            # self.args[arg_ind] = SeriesType(arg_typ.dtype)
-            # replace arg var with tmp
-            def f(_boxed_series):  # pragma: no cover
-                _dt_arr = hpat.hiframes.api.init_series(hpat.hiframes.api.dummy_unbox_series(_boxed_series))
-
-            f_block = compile_to_numba_ir(
-                f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [arg_var])
-            nodes += f_block.body[:-3]  # remove none return
-            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
-            nodes[-1].target = new_arg_var
-            self.replace_var_dict[arg_var.name] = new_arg_var
-            self._add_node_defs(nodes)
-            arg_var = self._handle_input_flag(flag, new_arg_var, nodes)
-            self.metadata['distributed_args'].discard(arg_name)
-            return nodes
-
-
-        # handle tuples that include boxed series
-        if (isinstance(arg_typ, types.BaseTuple) and any(
-                [isinstance(a, BoxedSeriesType) for a in arg_typ.types])):
-            flag_func_name = self._get_input_flag_func_name(flag)
-            func_text = "def tuple_unpack_func(tup_arg):\n"
-            for i, t in enumerate(arg_typ.types):
-                if isinstance(t, BoxedSeriesType):
-                    func_text += "  _arg_{} = {}(hpat.hiframes.api.init_series(hpat.hiframes.api.dummy_unbox_series(tup_arg[{}])))\n".format(i, flag_func_name, i)
-                else:
-                    func_text += "  _arg_{} = tup_arg[{}]\n".format(i, i)
-            pack_arg = ",".join(["_arg_{}".format(i) for i in range(len(arg_typ.types))])
-            func_text += "  res = ({},)\n".format(pack_arg)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            tuple_unpack_func = loc_vars['tuple_unpack_func']
-            f_block = compile_to_numba_ir(tuple_unpack_func, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [arg_var])
-            nodes += f_block.body[:-3]  # remove none return
-            new_arg_var = ir.Var(scope, mk_unique_var(arg_name), loc)
-            nodes[-1].target = new_arg_var
-            self.replace_var_dict[arg_var.name] = new_arg_var
-            arg_var = new_arg_var
-            self._add_node_defs(nodes)
             self.metadata['distributed_args'].discard(arg_name)
             return nodes
 

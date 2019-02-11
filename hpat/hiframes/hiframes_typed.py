@@ -24,8 +24,8 @@ from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
 from hpat.hiframes.pd_series_ext import (SeriesType, string_series_type,
-    series_to_array_type, BoxedSeriesType, dt_index_series_type,
-    if_series_to_array_type, if_series_to_unbox, is_series_type,
+    series_to_array_type, dt_index_series_type,
+    if_series_to_array_type, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
     explicit_binop_funcs, series_dt_methods_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType
