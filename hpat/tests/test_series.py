@@ -432,6 +432,17 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    def test_series_inplace_binop_array(self):
+        def test_impl(A, B):
+            A += B
+            return A
+
+        n = 11
+        A = np.arange(n)**2.0  # TODO: use 2 for test int casting
+        B = pd.Series(np.ones(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
+
     def test_series_fusion1(self):
         def test_impl(A, B):
             return A + B + 1
