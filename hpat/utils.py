@@ -11,6 +11,7 @@ from numba.targets.imputils import lower_builtin
 from numba.extending import overload, intrinsic, lower_cast
 import collections
 import numpy as np
+import hpat
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 from hpat.hiframes.pd_timestamp_ext import pandas_dts_type
@@ -289,7 +290,8 @@ def get_slice_step(typemap, func_ir, var):
 def is_array(typemap, varname):
     return (varname in typemap
         and (is_np_array(typemap, varname)
-        or typemap[varname] in (string_array_type, list_string_array_type)))
+        or typemap[varname] in (string_array_type, list_string_array_type,
+        hpat.hiframes.pd_series_ext.SeriesType)))
 
 def is_np_array(typemap, varname):
     return (varname in typemap
@@ -299,7 +301,9 @@ def is_array_container(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], (types.List, types.Set))
                 and (isinstance(typemap[varname].dtype, types.Array)
-                or typemap[varname].dtype == string_array_type))
+                or typemap[varname].dtype == string_array_type
+                or isinstance(typemap[varname].dtype,
+                hpat.hiframes.pd_series_ext.SeriesType)))
 
 
 # converts an iterable to array, similar to np.array, but can support

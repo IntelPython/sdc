@@ -449,6 +449,12 @@ class HiFramesTyped(object):
 
         rhs.lhs, rhs.rhs = arg1, arg2
         self._convert_series_calltype(rhs)
+
+        # output stays as Array in A += B where A is Array
+        if isinstance(self.typemap[assign.target.name], types.Array):
+            assert isinstance(self.calltypes[rhs].return_type, types.Array)
+            return nodes
+
         out_data = ir.Var(
             arg1.scope, mk_unique_var(assign.target.name+'_data'), rhs.loc)
         self.typemap[out_data.name] = self.calltypes[rhs].return_type

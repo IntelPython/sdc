@@ -801,6 +801,20 @@ class SetItemSeriesIat(SetItemSeries):
         if isinstance(args[0], SeriesIatType):
             return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
+inplace_ops = [
+    operator.iadd,
+    operator.isub,
+    operator.imul,
+    operator.itruediv,
+    operator.ifloordiv,
+    operator.imod,
+    operator.ipow,
+    operator.ilshift,
+    operator.irshift,
+    operator.iand,
+    operator.ior,
+    operator.ixor,
+]
 
 def series_op_generic(cls, self, args, kws):
     # return if no Series
@@ -811,8 +825,11 @@ def series_op_generic(cls, self, args, kws):
     sig = super(cls, self).generic(new_args, kws)
     # convert back to Series
     if sig is not None:
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        sig.args = tuple(if_arr_to_series_type(a) for a in sig.args)
+        # if A += B and A is array but B is Series, the output is Array
+        # TODO: other cases?
+        if not (self.key in inplace_ops and isinstance(args[0], types.Array)):
+            sig.return_type = if_arr_to_series_type(sig.return_type)
+        sig.args = args
     return sig
 
 class SeriesOpUfuncs(NumpyRulesArrayOperator):
