@@ -347,6 +347,14 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
+        if fdef == ('init_series', 'hpat.hiframes.api'):
+            # lhs, in_arr, and index should have the same distribution
+            new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            if len(rhs.args) > 1 and self.typemap[rhs.args[1].name] != types.none:
+                new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
+                array_dists[rhs.args[0].name] = new_dist
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return

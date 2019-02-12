@@ -565,8 +565,9 @@ class DistributedPass(object):
 
         if (func_mod == 'hpat.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
-                'to_date_series_type')
+                'to_date_series_type', 'init_series')
                 and self._is_1D_arr(rhs.args[0].name)):
+            # TODO: handle index
             in_arr = rhs.args[0].name
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]
@@ -618,7 +619,6 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_arr]
                 self._array_sizes[lhs] = self._array_sizes[in_arr]
             # set parallel flag to true
-            #import pdb; pdb.set_trace()
             true_var = ir.Var(scope, mk_unique_var("true_var"), loc)
             self.typemap[true_var.name] = types.boolean
             rhs.args[2] = true_var
@@ -1075,7 +1075,6 @@ class DistributedPass(object):
 
             # size should be either int or tuple of ints
             #assert size_var.name in self._tuple_table
-            #import pdb; pdb.set_trace()
             # self._tuple_table[size_var.name]
             size_list = self._get_tuple_varlist(size_var, out)
             size_list = [ir_utils.convert_size_to_var(s, self.typemap, scope, loc, out)
