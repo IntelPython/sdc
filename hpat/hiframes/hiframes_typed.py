@@ -453,6 +453,7 @@ class HiFramesTyped(object):
         # output stays as Array in A += B where A is Array
         if isinstance(self.typemap[assign.target.name], types.Array):
             assert isinstance(self.calltypes[rhs].return_type, types.Array)
+            nodes.append(assign)
             return nodes
 
         out_data = ir.Var(
