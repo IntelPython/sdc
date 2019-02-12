@@ -551,7 +551,7 @@ class DistributedAnalysis(object):
             assert arr_name in array_dists, "array distribution not found"
             if array_dists[arr_name] == Distribution.REP:
                 raise ValueError("distributed return of array {} not valid"
-                                 " since it is replicated")
+                                 " since it is replicated".format(arr_name))
             return
 
         if func_name == 'threaded_return':

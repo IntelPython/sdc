@@ -120,7 +120,7 @@ def inline_calls(func_ir):
                     if isinstance(func_def, ir.Global) and isinstance(func_def.value, CPUDispatcher):
                         py_func = func_def.value.py_func
                         new_blocks = inline_closure_call(func_ir,
-                                                         func_ir.func_id.func.__globals__,
+                                                         py_func.__globals__,
                                                          block, i, py_func, work_list=work_list)
                         # for block in new_blocks:
                         #     work_list.append(block)
