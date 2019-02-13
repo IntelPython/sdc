@@ -693,6 +693,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_value_counts(self):
+        def test_impl(S):
+            return S.value_counts()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['AA', 'BB', 'C', 'AA', 'C'])
+        pd.testing.assert_series_equal(hpat_func(S).sort_values(),
+            test_impl(S).sort_values())
+
     def test_series_dist_input1(self):
         def test_impl(S):
             return S.max()
