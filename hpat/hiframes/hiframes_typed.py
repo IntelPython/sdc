@@ -1056,17 +1056,15 @@ class HiFramesTyped(object):
     def _handle_series_sort(self, lhs, rhs, series_var, is_argsort):
         """creates an index list and passes it to a Sort node as data
         """
-        in_df = {}
-        out_df = {}
-        # output array for results, before conversion to Series
-        arr_lhs = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-        self.typemap[arr_lhs.name] = if_series_to_array_type(
-            self.typemap[lhs.name])
-        out_key_arr = arr_lhs
+        # get data array
         nodes = []
         data = self._get_series_data(series_var, nodes)
 
-        if is_argsort:
+        # get index array
+        if self.typemap[series_var.name].index != types.none:
+            index_var = self._get_series_index(series_var, nodes)
+        else:
+            # generating the range Index, TODO: general get_index_values()
             def _get_data(S):  # pragma: no cover
                 n = len(S)
                 return np.arange(n)
@@ -1077,26 +1075,39 @@ class HiFramesTyped(object):
                 self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [data])
             nodes += f_block.body[:-2]
-            in_df = {'inds': nodes[-1].target}
-            out_df = {'inds': arr_lhs}
-            # dummy output key, TODO: remove
-            out_key_arr = ir.Var(lhs.scope, mk_unique_var('dummy'), lhs.loc)
-            self.typemap[out_key_arr.name] = self.typemap[data.name]
+            index_var = nodes[-1].target
 
-        nodes.append(hiframes.sort.Sort(data.name, lhs.name, [data],
-            [out_key_arr], in_df, out_df, False, lhs.loc))
-        f_block = compile_to_numba_ir(
-            lambda A: hpat.hiframes.api.init_series(A),
-            {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[arr_lhs.name],),
-            self.typemap,
-            self.calltypes
-        ).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [arr_lhs])
-        nodes += f_block.body[:-2]
-        nodes[-1].target = lhs
-        return nodes
+        # output data arrays for results, before conversion to Series
+        out_data = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
+        self.typemap[out_data.name] = self.typemap[lhs.name].data
+        out_index = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
+        self.typemap[out_index.name] = self.typemap[index_var.name]
+
+        # indexes are input/output Sort data
+        in_df = {'inds': index_var}
+        out_df = {'inds': out_index}
+        # data arrays are Sort key
+        in_keys = [data]
+        out_keys = [out_data]
+        args = [out_data, out_index]
+
+        if is_argsort:
+            # output of argsort doesn't have new index so assign None
+            none_index = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
+            self.typemap[none_index.name] = types.none
+            nodes.append(ir.Assign(
+                ir.Const(None, lhs.loc), none_index, lhs.loc))
+            args = [out_index, none_index]
+
+        # Sort node
+        nodes.append(hiframes.sort.Sort(data.name, lhs.name, in_keys,
+            out_keys, in_df, out_df, False, lhs.loc))
+
+        # create output Series
+        return self._replace_func(
+            lambda A, B: hpat.hiframes.api.init_series(A, B),
+            args,
+            pre_nodes=nodes)
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype
@@ -2151,6 +2162,30 @@ class HiFramesTyped(object):
         # to enable alias analysis
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_series_data(S),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[series_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
+
+    def _get_series_index(self, series_var, nodes):
+        # XXX assuming init_series is the only call to create a series
+        # and series._index is never overwritten
+        var_def = guard(get_definition, self.func_ir, series_var)
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if (call_def == ('init_series', 'hpat.hiframes.api')
+                and (len(var_def.args) >= 2
+                    and not self._is_const_none(var_def.args[1]))):
+            return var_def.args[1]
+
+        # XXX use get_series_index() for getting data instead of S._index
+        # to enable alias analysis
+        f_block = compile_to_numba_ir(
+            lambda S: hpat.hiframes.api.get_series_index(S),
             {'hpat': hpat},
             self.typingctx,
             (self.typemap[series_var.name],),

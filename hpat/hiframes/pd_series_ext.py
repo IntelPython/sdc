@@ -78,8 +78,13 @@ class SeriesType(types.IterableType):
     def can_convert_to(self, typingctx, other):
         # same as types.Array
         if (isinstance(other, SeriesType) and other.dtype == self.dtype):
-            # TODO: index?
-            return self.data.can_convert_to(other.data)
+            # called for overload selection sometimes
+            # TODO: fix index
+            if self.index == types.none and other.index == types.none:
+                return self.data.can_convert_to(typingctx, other.data)
+            if self.index != types.none and other.index != types.none:
+                return max(self.data.can_convert_to(typingctx, other.data),
+                    self.index.can_convert_to(typingctx, other.index))
 
     def is_precise(self):
         # same as types.Array
@@ -273,7 +278,12 @@ class SeriesAttribute(AttributeTemplate):
 
     @bound_function("series.sort_values")
     def resolve_sort_values(self, ary, args, kws):
-        return signature(ary, *args)
+        # output will have permuted input index
+        out_index = ary.index
+        if out_index == types.none:
+            out_index = types.Array(types.intp, 1, 'C')
+        out = SeriesType(ary.dtype, ary.data, out_index)
+        return signature(out, *args)
 
     @bound_function("array.take")
     def resolve_take(self, ary, args, kws):

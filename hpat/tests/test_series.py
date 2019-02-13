@@ -183,12 +183,12 @@ class TestSeries(unittest.TestCase):
 
     def test_series_argsort1(self):
         def test_impl(A):
-            return A.argsort().values
+            return A.argsort()
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
+        A = pd.Series(np.random.ranf(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_attr6(self):
         def test_impl(A):
@@ -1122,7 +1122,21 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.ranf(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values_index1(self):
+        def test_impl(A, B):
+            S = pd.Series(A, B)
+            return S.sort_values()
+
+        n = 11
+        np.random.seed(0)
+        # TODO: support passing Series with Index
+        # S = pd.Series(np.random.ranf(n), np.random.randint(0, 100, n))
+        A = np.random.ranf(n)
+        B = np.random.ranf(n)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
     def test_series_sort_values_parallel1(self):
         def test_impl():

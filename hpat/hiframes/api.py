@@ -854,6 +854,12 @@ class SeriesTupleToArrTupleTyper(AbstractTemplate):
 def get_series_data(S):
     return lambda S: S._data
 
+# TODO: use separate index type instead of just storing array
+@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
+def get_series_index(S):
+    return lambda S: S._index
+
+
 @numba.generated_jit(nopython=True)
 def get_index_data(S):
     return lambda S: S._data
@@ -865,6 +871,7 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('get_series_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('init_datetime_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_index_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
