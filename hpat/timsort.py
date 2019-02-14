@@ -418,7 +418,7 @@ class SortState:  # pragma: no cover
         # Find where the first element of run2 goes in run1. Prior elements
         # in run1 can be ignored (because they're already in place).
 
-        k = gallopRight(self, getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
+        k = gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
         assert k >= 0
         base1 += k
         len1 -= k
@@ -429,7 +429,7 @@ class SortState:  # pragma: no cover
         # Find where the last element of run1 goes in run2. Subsequent elements
         # in run2 can be ignored (because they're already in place).
 
-        len2 = gallopLeft(self, getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
+        len2 = gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
         assert len2 >= 0
         if len2 == 0:
             return
@@ -458,7 +458,7 @@ class SortState:  # pragma: no cover
 #   the first k elements of a should precede key, and the last n - k
 #   should follow it.
 @numba.njit(no_cpython_wrapper=True)
-def gallopLeft(self, key, arr, base, _len, hint):
+def gallopLeft(key, arr, base, _len, hint):
     assert _len > 0 and hint >= 0 and hint < _len
     lastOfs = 0
     ofs = 1
@@ -528,7 +528,7 @@ def gallopLeft(self, key, arr, base, _len, hint):
 # @param c the comparator used to order the range, and to search
 # @return the k,  0 <= k <= n such that a[b + k - 1] <= key < a[b + k]
 @numba.njit(no_cpython_wrapper=True)
-def gallopRight(self, key, arr, base, _len, hint):
+def gallopRight(key, arr, base, _len, hint):
     assert _len > 0 and hint >= 0 and hint < _len
 
     ofs = 1
@@ -712,7 +712,7 @@ def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
 
         while True:
             assert len1 > 1 and len2 > 0
-            count1 = gallopRight(self, getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
+            count1 = gallopRight(getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
             if count1 != 0:
                 copyRange_tup(tmp, cursor1, arr, dest, count1)
                 copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
@@ -730,7 +730,7 @@ def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
             if len2 == 0:
                 return len1, len2, cursor1, cursor2, dest, minGallop
 
-            count2 = gallopLeft(self, getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
+            count2 = gallopLeft(getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
             if count2 != 0:
                 copyRange_tup(arr, cursor2, arr, dest, count2)
                 copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
@@ -882,7 +882,7 @@ def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallo
 
         while True:
             assert len1 > 0 and len2 > 1
-            count1 = len1 - gallopRight(self, getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
+            count1 = len1 - gallopRight(getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
             if count1 != 0:
                 dest -= count1
                 cursor1 -= count1
@@ -900,7 +900,7 @@ def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallo
             if len2 == 1:
                 return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-            count2 = len2 - gallopLeft(self, getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
+            count2 = len2 - gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
             if count2 != 0:
                 dest -= count2
                 cursor2 -= count2
