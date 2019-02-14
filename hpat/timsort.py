@@ -438,8 +438,14 @@ def mergeAt(self, i):
 
     # Merge remaining runs, using tmp array with min(len1, len2) elements
     if len1 <= len2:
+        self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
+            self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+            len1)
         mergeLo(self, base1, len1, base2, len2)
     else:
+        self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
+            self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+            len2)
         mergeHi(self, base1, len1, base2, len2)
 
 
@@ -608,9 +614,6 @@ def mergeLo(self, base1, len1, base2, len2):
     # Copy first run into temp array
     arr = self.key_arrs
     arr_data = self.data
-    self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
-        self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
-        len1)
     tmp = self.tmp
     tmp_data = self.tmp_data
     copyRange_tup(arr, base1, tmp, 0, len1)
@@ -777,9 +780,6 @@ def mergeHi(self, base1, len1, base2, len2):
     # Copy second run into temp array
     arr = self.key_arrs
     arr_data = self.data
-    self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
-        self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
-        len2)
     tmp = self.tmp
     tmp_data = self.tmp_data
     copyRange_tup(arr, base2, tmp, 0, len2)
