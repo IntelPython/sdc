@@ -644,7 +644,8 @@ def mergeLo(self, base1, len1, base2, len2):
     minGallop = self.minGallop
 
     # XXX *************** refactored nested break into func
-    len1, len2, cursor1, cursor2, dest, minGallop = mergeLo_inner(self,
+    len1, len2, cursor1, cursor2, dest, minGallop = mergeLo_inner(
+        self.key_arrs, self.data, self.tmp_data,
         len1, len2, tmp, cursor1, cursor2, dest, minGallop)
     # XXX *****************
 
@@ -666,10 +667,7 @@ def mergeLo(self, base1, len1, base2, len2):
         copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
 
 @numba.njit(no_cpython_wrapper=True)
-def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-    arr = self.key_arrs
-    arr_data = self.data
-    tmp_data = self.tmp_data
+def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
 
     while True:
         count1 = 0 # Number of times in a row that first run won
@@ -813,7 +811,8 @@ def mergeHi(self, base1, len1, base2, len2):
 
     # XXX *************** refactored nested break into func
     len1, len2, tmp, cursor1, cursor2, dest, minGallop = mergeHi_inner(
-        self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop)
+        self.key_arrs, self.data, self.tmp_data,
+        base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop)
     # XXX *****************
 
     self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
@@ -837,10 +836,7 @@ def mergeHi(self, base1, len1, base2, len2):
 
 # XXX refactored nested loop break
 @numba.njit(no_cpython_wrapper=True)
-def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-    arr = self.key_arrs
-    arr_data = self.data
-    tmp_data = self.tmp_data
+def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
 
     while True:
         count1 = 0 # Number of times in a row that first run won
