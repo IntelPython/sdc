@@ -441,12 +441,14 @@ def mergeAt(self, i):
         self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
             self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
             len1)
-        mergeLo(self, base1, len1, base2, len2)
+        self.minGallop = mergeLo(self.key_arrs, self.data, self.tmp,
+            self.tmp_data, self.minGallop, base1, len1, base2, len2)
     else:
         self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
             self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
             len2)
-        mergeHi(self, base1, len1, base2, len2)
+        self.minGallop = mergeHi(self.key_arrs, self.data, self.tmp,
+            self.tmp_data, self.minGallop, base1, len1, base2, len2)
 
 
 # Locates the position at which to insert the specified key into the
@@ -608,14 +610,12 @@ def gallopRight(key, arr, base, _len, hint):
 #       (must be aBase + aLen)
 # @param len2  length of second run to be merged (must be > 0)
 @numba.njit(no_cpython_wrapper=True)
-def mergeLo(self, base1, len1, base2, len2):
+def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
     # Copy first run into temp array
-    arr = self.key_arrs
-    arr_data = self.data
-    tmp = self.tmp
-    tmp_data = self.tmp_data
+    arr = key_arrs
+    arr_data = data
     copyRange_tup(arr, base1, tmp, 0, len1)
     #tmp[:len1] = arr[base1:base1+len1]
     copyRange_tup(arr_data, base1, tmp_data, 0, len1)
@@ -646,16 +646,14 @@ def mergeLo(self, base1, len1, base2, len2):
         return
 
 
-    minGallop = self.minGallop
-
     # XXX *************** refactored nested break into func
     len1, len2, cursor1, cursor2, dest, minGallop = mergeLo_inner(
-        self.key_arrs, self.data, self.tmp_data,
+        key_arrs, data, tmp_data,
         len1, len2, tmp, cursor1, cursor2, dest, minGallop)
     # XXX *****************
 
 
-    self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
+    minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
 
     if len1 == 1:
         assert len2 > 0
@@ -670,6 +668,9 @@ def mergeLo(self, base1, len1, base2, len2):
         assert len1 > 1
         copyRange_tup(tmp, cursor1, arr, dest, len1)
         copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
+
+    return minGallop
+
 
 @numba.njit(no_cpython_wrapper=True)
 def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
@@ -774,14 +775,12 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, de
 #       (must be aBase + aLen)
 # @param len2  length of second run to be merged (must be > 0)
 @numba.njit(no_cpython_wrapper=True)
-def mergeHi(self, base1, len1, base2, len2):
+def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
     # Copy second run into temp array
-    arr = self.key_arrs
-    arr_data = self.data
-    tmp = self.tmp
-    tmp_data = self.tmp_data
+    arr = key_arrs
+    arr_data = data
     copyRange_tup(arr, base2, tmp, 0, len2)
     copyRange_tup(arr_data, base2, tmp_data, 0, len2)
 
@@ -809,15 +808,13 @@ def mergeHi(self, base1, len1, base2, len2):
         copyElement_tup(tmp_data, cursor2, arr_data, dest)
         return
 
-    minGallop = self.minGallop
-
     # XXX *************** refactored nested break into func
     len1, len2, tmp, cursor1, cursor2, dest, minGallop = mergeHi_inner(
-        self.key_arrs, self.data, self.tmp_data,
+        key_arrs, data, tmp_data,
         base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop)
     # XXX *****************
 
-    self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
+    minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
 
     if len2 == 1:
         assert len1 > 0
@@ -834,6 +831,8 @@ def mergeHi(self, base1, len1, base2, len2):
         assert len2 > 0
         copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
         copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
+
+    return minGallop
 
 
 # XXX refactored nested loop break
