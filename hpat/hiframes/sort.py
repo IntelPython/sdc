@@ -426,7 +426,7 @@ def local_sort(key_arrs, data):
     cp_str_list_to_array(data, l_data)
 
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def parallel_sort(key_arrs, data):
     n_local = len(key_arrs)
     n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))

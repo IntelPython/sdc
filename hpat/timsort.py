@@ -57,7 +57,7 @@ MIN_MERGE = 32
 # sort, assuming the input array is large enough to warrant the full-blown
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
 
     nRemaining  = hi - lo
@@ -119,7 +119,7 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
 #       not already known to be sorted ({@code lo <= start <= hi})
 # @param c comparator to used for the sort
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
     assert lo <= start and start <= hi
     if start == lo:
@@ -196,7 +196,7 @@ def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
 # @return  the length of the run beginning at the specified position in
 #         the specified array
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
     assert lo < hi
     runHi = lo + 1
@@ -223,7 +223,7 @@ def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
 # @param lo the index of the first element in the range to be reversed
 # @param hi the index after the last element in the range to be reversed
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def reverseRange(key_arrs, lo, hi, data):  # pragma: no cover
     hi -= 1
     while lo < hi:
@@ -260,7 +260,7 @@ def reverseRange(key_arrs, lo, hi, data):  # pragma: no cover
 # @return the length of the minimum run to be merged
 
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def minRunLength(n):  # pragma: no cover
     assert n >= 0
     r = 0      # Becomes 1 if any 1 bits are shifted off
@@ -976,7 +976,7 @@ def swap_arrs_overload(arr_tup, lo, hi):
     return swap_impl
 
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):  # pragma: no cover
     dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
@@ -999,7 +999,7 @@ def copyRange_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
     copy_impl = loc_vars['f']
     return copy_impl
 
-@numba.njit
+@numba.njit(no_cpython_wrapper=True)
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):  # pragma: no cover
     dst_arr[dst_pos] = src_arr[src_pos]
 
