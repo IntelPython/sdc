@@ -86,8 +86,8 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
             runLen = force
 
         # Push run onto pending-run stack, and maybe merge
-        sortState.pushRun(lo, runLen)
-        sortState.mergeCollapse()
+        pushRun(sortState, lo, runLen)
+        mergeCollapse(sortState)
 
         # Advance to find next run
         lo += runLen
@@ -97,7 +97,7 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
 
     # Merge all remaining runs to complete sort
     assert lo == hi
-    sortState.mergeForceCollapse()
+    mergeForceCollapse(sortState)
     assert sortState.stackSize == 1
 
 
@@ -341,104 +341,104 @@ class SortState:  # pragma: no cover
         self.runBase = np.empty(stackLen, np.int64)
         self.runLen = np.empty(stackLen, np.int64)
 
-    # Pushes the specified run onto the pending-run stack.
+# Pushes the specified run onto the pending-run stack.
 
-    # @param runBase index of the first element in the run
-    # @param runLen  the number of elements in the run
+# @param runBase index of the first element in the run
+# @param runLen  the number of elements in the run
+@numba.njit(no_cpython_wrapper=True)
+def pushRun(self, runBase, runLen):
+    self.runBase[self.stackSize] = runBase
+    self.runLen[self.stackSize] = runLen
+    self.stackSize += 1
 
-    def pushRun(self, runBase, runLen):
-        self.runBase[self.stackSize] = runBase
-        self.runLen[self.stackSize] = runLen
-        self.stackSize += 1
+# Examines the stack of runs waiting to be merged and merges adjacent runs
+# until the stack invariants are reestablished:
 
-    # Examines the stack of runs waiting to be merged and merges adjacent runs
-    # until the stack invariants are reestablished:
+#    1. runLen[i - 3] > runLen[i - 2] + runLen[i - 1]
+#    2. runLen[i - 2] > runLen[i - 1]
 
-    #    1. runLen[i - 3] > runLen[i - 2] + runLen[i - 1]
-    #    2. runLen[i - 2] > runLen[i - 1]
-
-    # This method is called each time a new run is pushed onto the stack,
-    # so the invariants are guaranteed to hold for i < stackSize upon
-    # entry to the method.
-
-    def mergeCollapse(self):
-        while self.stackSize > 1:
-            n = self.stackSize - 2
-            if ((n >= 1 and self.runLen[n-1] <= self.runLen[n] + self.runLen[n+1])
-                    or (n >= 2 and self.runLen[n-2] <= self.runLen[n] + self.runLen[n-1])):
-                if self.runLen[n - 1] < self.runLen[n + 1]:
-                    n -= 1
-            elif self.runLen[n] > self.runLen[n + 1]:
-                break  # Invariant is established
-
-            self.mergeAt(n)
-
-
-    # Merges all runs on the stack until only one remains.  This method is
-    # called once, to complete the sort.
-
-    def mergeForceCollapse(self):
-        while self.stackSize > 1:
-            n = self.stackSize - 2
-            if n > 0 and self.runLen[n-1] < self.runLen[n+1]:
+# This method is called each time a new run is pushed onto the stack,
+# so the invariants are guaranteed to hold for i < stackSize upon
+# entry to the method.
+@numba.njit(no_cpython_wrapper=True)
+def mergeCollapse(self):
+    while self.stackSize > 1:
+        n = self.stackSize - 2
+        if ((n >= 1 and self.runLen[n-1] <= self.runLen[n] + self.runLen[n+1])
+                or (n >= 2 and self.runLen[n-2] <= self.runLen[n] + self.runLen[n-1])):
+            if self.runLen[n - 1] < self.runLen[n + 1]:
                 n -= 1
-            self.mergeAt(n)
+        elif self.runLen[n] > self.runLen[n + 1]:
+            break  # Invariant is established
+
+        mergeAt(self, n)
 
 
-    # Merges the two runs at stack indices i and i+1.  Run i must be
-    # the penultimate or antepenultimate run on the stack.  In other words,
-    # i must be equal to stackSize-2 or stackSize-3.
-
-    # @param i stack index of the first of the two runs to merge
-
-    def mergeAt(self, i):
-        assert self.stackSize >= 2
-        assert i >= 0
-        assert i == self.stackSize - 2 or i == self.stackSize - 3
-
-        base1 = self.runBase[i]
-        len1 = self.runLen[i]
-        base2 = self.runBase[i+1]
-        len2 = self.runLen[i+1]
-        assert len1 > 0 and len2 > 0
-        assert base1 + len1 == base2
+# Merges all runs on the stack until only one remains.  This method is
+# called once, to complete the sort.
+@numba.njit(no_cpython_wrapper=True)
+def mergeForceCollapse(self):
+    while self.stackSize > 1:
+        n = self.stackSize - 2
+        if n > 0 and self.runLen[n-1] < self.runLen[n+1]:
+            n -= 1
+        mergeAt(self, n)
 
 
-        # Record the length of the combined runs. if i is the 3rd-last
-        # run now, also slide over the last run (which isn't involved
-        # in this merge).  The current run (i+1) goes away in any case.
+# Merges the two runs at stack indices i and i+1.  Run i must be
+# the penultimate or antepenultimate run on the stack.  In other words,
+# i must be equal to stackSize-2 or stackSize-3.
 
-        self.runLen[i] = len1 + len2
-        if i == self.stackSize - 3:
-            self.runBase[i+1] = self.runBase[i+2]
-            self.runLen[i+1] = self.runLen[i+2]
+# @param i stack index of the first of the two runs to merge
+@numba.njit(no_cpython_wrapper=True)
+def mergeAt(self, i):
+    assert self.stackSize >= 2
+    assert i >= 0
+    assert i == self.stackSize - 2 or i == self.stackSize - 3
 
-        self.stackSize -= 1
-
-        # Find where the first element of run2 goes in run1. Prior elements
-        # in run1 can be ignored (because they're already in place).
-
-        k = gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
-        assert k >= 0
-        base1 += k
-        len1 -= k
-        if len1 == 0:
-            return
+    base1 = self.runBase[i]
+    len1 = self.runLen[i]
+    base2 = self.runBase[i+1]
+    len2 = self.runLen[i+1]
+    assert len1 > 0 and len2 > 0
+    assert base1 + len1 == base2
 
 
-        # Find where the last element of run1 goes in run2. Subsequent elements
-        # in run2 can be ignored (because they're already in place).
+    # Record the length of the combined runs. if i is the 3rd-last
+    # run now, also slide over the last run (which isn't involved
+    # in this merge).  The current run (i+1) goes away in any case.
 
-        len2 = gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
-        assert len2 >= 0
-        if len2 == 0:
-            return
+    self.runLen[i] = len1 + len2
+    if i == self.stackSize - 3:
+        self.runBase[i+1] = self.runBase[i+2]
+        self.runLen[i+1] = self.runLen[i+2]
 
-        # Merge remaining runs, using tmp array with min(len1, len2) elements
-        if len1 <= len2:
-            mergeLo(self, base1, len1, base2, len2)
-        else:
-            mergeHi(self, base1, len1, base2, len2)
+    self.stackSize -= 1
+
+    # Find where the first element of run2 goes in run1. Prior elements
+    # in run1 can be ignored (because they're already in place).
+
+    k = gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
+    assert k >= 0
+    base1 += k
+    len1 -= k
+    if len1 == 0:
+        return
+
+
+    # Find where the last element of run1 goes in run2. Subsequent elements
+    # in run2 can be ignored (because they're already in place).
+
+    len2 = gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
+    assert len2 >= 0
+    if len2 == 0:
+        return
+
+    # Merge remaining runs, using tmp array with min(len1, len2) elements
+    if len1 <= len2:
+        mergeLo(self, base1, len1, base2, len2)
+    else:
+        mergeHi(self, base1, len1, base2, len2)
 
 
 # Locates the position at which to insert the specified key into the
