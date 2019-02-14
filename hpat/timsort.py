@@ -86,7 +86,8 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
             runLen = force
 
         # Push run onto pending-run stack, and maybe merge
-        pushRun(sortState, lo, runLen)
+        sortState.stackSize = pushRun(sortState.stackSize, sortState.runBase,
+            sortState.runLen, lo, runLen)
         mergeCollapse(sortState)
 
         # Advance to find next run
@@ -346,10 +347,11 @@ class SortState:  # pragma: no cover
 # @param runBase index of the first element in the run
 # @param runLen  the number of elements in the run
 @numba.njit(no_cpython_wrapper=True)
-def pushRun(self, runBase, runLen):
-    self.runBase[self.stackSize] = runBase
-    self.runLen[self.stackSize] = runLen
-    self.stackSize += 1
+def pushRun(stackSize, runBase, runLen, runBase_val, runLen_val):
+    runBase[stackSize] = runBase_val
+    runLen[stackSize] = runLen_val
+    stackSize += 1
+    return stackSize
 
 # Examines the stack of runs waiting to be merged and merges adjacent runs
 # until the stack invariants are reestablished:
