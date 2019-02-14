@@ -655,7 +655,7 @@ class HiFramesTyped(object):
         if func_name == 'fix_df_array':
             in_typ = self.typemap[rhs.args[0].name]
             impl = hpat.hiframes.api.fix_df_array_overload(in_typ)
-            return self._replace_func(impl, rhs.args, array_typ_convert=False)
+            return self._replace_func(impl, rhs.args)
 
         # arr = fix_rolling_array(col) -> arr=col if col is float array
         if func_name == 'fix_rolling_array':
@@ -885,8 +885,7 @@ class HiFramesTyped(object):
                 data = series_var
             else:
                 data = self._get_series_data(series_var, nodes)
-            return self._replace_func(func, [data], pre_nodes=nodes,
-                array_typ_convert=False)
+            return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name == 'quantile':
             nodes = []
@@ -947,8 +946,7 @@ class HiFramesTyped(object):
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [series_var, S2],
-                array_typ_convert=False)
+            return self._replace_func(func, [series_var, S2])
 
         if func_name in ('argsort', 'sort_values'):
             return self._handle_series_sort(
@@ -974,14 +972,12 @@ class HiFramesTyped(object):
                 other = self._get_series_data(other, nodes)
             else:
                 func = series_replace_funcs['append_tuple']
-            return self._replace_func(func, [data, other], pre_nodes=nodes,
-                array_typ_convert=False)
+            return self._replace_func(func, [data, other], pre_nodes=nodes)
 
         if func_name == 'notna':
             # TODO: make sure this is fused and optimized properly
             return self._replace_func(
-                lambda S: S.isna()==False, [series_var],
-                array_typ_convert=False)
+                lambda S: S.isna()==False, [series_var])
 
         if func_name == 'value_counts':
             nodes = []
@@ -1008,8 +1004,7 @@ class HiFramesTyped(object):
         if func_name == 'astype' and self.typemap[lhs.name] == string_series_type:
             # just return input if string
             if self.typemap[series_var.name] == string_series_type:
-                return self._replace_func(lambda a: a, [series_var],
-                    array_typ_convert=False)
+                return self._replace_func(lambda a: a, [series_var])
             func = series_replace_funcs['astype_str']
             nodes = []
             data = self._get_series_data(series_var, nodes)
@@ -1023,8 +1018,7 @@ class HiFramesTyped(object):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             _binop_impl = loc_vars['_binop_impl']
-            return self._replace_func(_binop_impl, [series_var] + rhs.args,
-                array_typ_convert=False)
+            return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
         _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'take', 'astype')
@@ -1049,7 +1043,7 @@ class HiFramesTyped(object):
             exec(func_text, {}, loc_vars)
             _func_impl = loc_vars['_func_impl']
             return self._replace_func(_func_impl, [data] + rhs.args,
-                array_typ_convert=False, pre_nodes=nodes)
+                pre_nodes=nodes)
 
         return [assign]
 
@@ -2061,8 +2055,7 @@ class HiFramesTyped(object):
         loc_vars = {}
         exec(func_text, {}, loc_vars)
         _dropna_impl = loc_vars['_dropna_impl']
-        return self._replace_func(_dropna_impl, rhs.args,
-            array_typ_convert=False)
+        return self._replace_func(_dropna_impl, rhs.args)
 
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):
@@ -2214,7 +2207,7 @@ class HiFramesTyped(object):
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
-    def _replace_func(self, func, args, const=False, array_typ_convert=True,
+    def _replace_func(self, func, args, const=False,
                       pre_nodes=None, extra_globals=None, pysig=None, kws=None):
         glbls = {'numba': numba, 'np': np, 'hpat': hpat}
         if extra_globals is not None:
@@ -2242,8 +2235,7 @@ class HiFramesTyped(object):
                 normal_handler)
 
         arg_typs = tuple(self.typemap[v.name] for v in args)
-        if array_typ_convert:
-            arg_typs = tuple(if_series_to_array_type(a) for a in arg_typs)
+
         if const:
             new_args = []
             for i, arg in enumerate(args):
