@@ -58,7 +58,7 @@ MIN_MERGE = 32
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
 @numba.njit(no_cpython_wrapper=True)
-def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
+def sort(key_arrs, lo, hi, data):  # pragma: no cover
 
     nRemaining  = hi - lo
     if nRemaining < 2:
@@ -74,38 +74,37 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
     # extending short natural runs to minRun elements, and merging runs
     # to maintain stack invariant.
 
+    stackSize, runBase, runLen, tmpLength, tmp, tmp_data, minGallop = init_sort_start(key_arrs, data)
+
     minRun = minRunLength(nRemaining)
     while True:  # emulating do-while
         # Identify next run
-        runLen = countRunAndMakeAscending(key_arrs, lo, hi, data)
+        run_len = countRunAndMakeAscending(key_arrs, lo, hi, data)
 
         # If run is short, extend to min(minRun, nRemaining)
-        if runLen < minRun:
+        if run_len < minRun:
             force = nRemaining if nRemaining <= minRun else minRun
-            binarySort(key_arrs, lo, lo + force, lo + runLen, data)
-            runLen = force
+            binarySort(key_arrs, lo, lo + force, lo + run_len, data)
+            run_len = force
 
         # Push run onto pending-run stack, and maybe merge
-        sortState.stackSize = pushRun(sortState.stackSize, sortState.runBase,
-            sortState.runLen, lo, runLen)
-        sortState.stackSize, sortState.tmpLength, sortState.tmp, sortState.tmp_data, sortState.minGallop = mergeCollapse(
-            sortState.stackSize, sortState.runBase, sortState.runLen,
-            sortState.key_arrs, sortState.data, sortState.tmpLength, sortState.tmp,
-                                    sortState.tmp_data, sortState.minGallop)
+        stackSize = pushRun(stackSize, runBase, runLen, lo, run_len)
+        stackSize, tmpLength, tmp, tmp_data, minGallop = mergeCollapse(
+            stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
+            tmp_data, minGallop)
 
         # Advance to find next run
-        lo += runLen
-        nRemaining -= runLen
+        lo += run_len
+        nRemaining -= run_len
         if nRemaining == 0:
             break
 
     # Merge all remaining runs to complete sort
     assert lo == hi
-    sortState.stackSize, sortState.tmpLength, sortState.tmp, sortState.tmp_data, sortState.minGallop = mergeForceCollapse(
-        sortState.stackSize, sortState.runBase, sortState.runLen,
-        sortState.key_arrs, sortState.data, sortState.tmpLength, sortState.tmp,
-                                    sortState.tmp_data, sortState.minGallop)
-    assert sortState.stackSize == 1
+    stackSize, tmpLength, tmp, tmp_data, minGallop = mergeForceCollapse(
+        stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
+        tmp_data, minGallop)
+    assert stackSize == 1
 
 
 
@@ -291,60 +290,49 @@ MIN_GALLOP = 7
 INITIAL_TMP_STORAGE_LENGTH = 256
 
 
-# spec = [
-#     ('key_arrs', numba.float64[:]),
-#     ('minGallop', numba.intp),
-#     ('tmpLength', numba.intp),
-#     ('tmp', numba.float64[:]),
-#     ('stackSize', numba.intp),
-#     ('runBase', numba.int64[:]),
-#     ('runLen', numba.int64[:]),
-# ]
+@numba.njit(no_cpython_wrapper=True)
+def init_sort_start(key_arrs, data):
 
-# Creates a TimSort instance to maintain the state of an ongoing sort.
-#@numba.jitclass(spec)
-class SortState:  # pragma: no cover
-    def __init__(self, key_arrs, data):
-        self.key_arrs = key_arrs
-        self.data = data
+    # This controls when we get *into* galloping mode.  It is initialized
+    # to MIN_GALLOP.  The mergeLo and mergeHi methods nudge it higher for
+    # random data, and lower for highly structured data.
+    minGallop = MIN_GALLOP
 
-        # This controls when we get *into* galloping mode.  It is initialized
-        # to MIN_GALLOP.  The mergeLo and mergeHi methods nudge it higher for
-        # random data, and lower for highly structured data.
-        self.minGallop = MIN_GALLOP
-
-        arr_len = len(key_arrs[0])
-        # Allocate temp storage (which may be increased later if necessary)
-        self.tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
-        self.tmp = alloc_arr_tup(self.tmpLength, self.key_arrs)
-        self.tmp_data = alloc_arr_tup(self.tmpLength, data)
+    arr_len = len(key_arrs[0])
+    # Allocate temp storage (which may be increased later if necessary)
+    tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
+    tmp = alloc_arr_tup(tmpLength, key_arrs)
+    tmp_data = alloc_arr_tup(tmpLength, data)
 
 
-        # A stack of pending runs yet to be merged.  Run i starts at
-        # address base[i] and extends for len[i] elements.  It's always
-        # true (so long as the indices are in bounds) that:
-        #
-        #    runBase[i] + runLen[i] == runBase[i + 1]
-        #
-        # so we could cut the storage for this, but it's a minor amount,
-        # and keeping all the info explicit simplifies the code.
+    # A stack of pending runs yet to be merged.  Run i starts at
+    # address base[i] and extends for len[i] elements.  It's always
+    # true (so long as the indices are in bounds) that:
+    #
+    #    runBase[i] + runLen[i] == runBase[i + 1]
+    #
+    # so we could cut the storage for this, but it's a minor amount,
+    # and keeping all the info explicit simplifies the code.
 
-        # Allocate runs-to-be-merged stack (which cannot be expanded).  The
-        # stack length requirements are described in listsort.txt.  The C
-        # version always uses the same stack length (85), but this was
-        # measured to be too expensive when sorting "mid-sized" arrays (e.g.,
-        # 100 elements) in Java.  Therefore, we use smaller (but sufficiently
-        # large) stack lengths for smaller arrays.  The "magic numbers" in the
-        # computation below must be changed if MIN_MERGE is decreased.  See
-        # the MIN_MERGE declaration above for more information.
+    # Allocate runs-to-be-merged stack (which cannot be expanded).  The
+    # stack length requirements are described in listsort.txt.  The C
+    # version always uses the same stack length (85), but this was
+    # measured to be too expensive when sorting "mid-sized" arrays (e.g.,
+    # 100 elements) in Java.  Therefore, we use smaller (but sufficiently
+    # large) stack lengths for smaller arrays.  The "magic numbers" in the
+    # computation below must be changed if MIN_MERGE is decreased.  See
+    # the MIN_MERGE declaration above for more information.
 
-        self.stackSize = 0  # Number of pending runs on stack
-        stackLen = 5 if arr_len < 120 else (
-                   10 if arr_len < 1542 else (
-                   19 if arr_len < 119151 else 40
-                   ))
-        self.runBase = np.empty(stackLen, np.int64)
-        self.runLen = np.empty(stackLen, np.int64)
+    stackSize = 0  # Number of pending runs on stack
+    stackLen = 5 if arr_len < 120 else (
+                10 if arr_len < 1542 else (
+                19 if arr_len < 119151 else 40
+                ))
+    runBase = np.empty(stackLen, np.int64)
+    runLen = np.empty(stackLen, np.int64)
+
+    return stackSize, runBase, runLen, tmpLength, tmp, tmp_data, minGallop
+
 
 # Pushes the specified run onto the pending-run stack.
 
@@ -1083,25 +1071,11 @@ def setitem_arr_tup_overload(arr_tup, ind, val_tup):
 
 def test():  # pragma: no cover
     import time
-    #SortStateCL = SortState #numba.jitclass(spec)(SortState)
     # warm up
     t1 = time.time()
     T = np.ones(3)
     data = (np.arange(3), np.ones(3),)
-    spec = [
-    ('key_arrs', numba.types.Tuple((numba.float64[::1],))),
-    ('minGallop', numba.intp),
-    ('tmpLength', numba.intp),
-    ('tmp', numba.types.Tuple((numba.float64[::1],))),
-    ('stackSize', numba.intp),
-    ('runBase', numba.int64[:]),
-    ('runLen', numba.int64[:]),
-    ('data', numba.typeof(data)),
-    ('tmp_data', numba.typeof(data)),
-    ]
-    SortStateCL = numba.jitclass(spec)(SortState)
-    sortState = SortStateCL((T,), data)
-    sort(sortState, (T,), 0, 3, data)
+    sort((T,), 0, 3, data)
     print("compile time", time.time()-t1)
     n = 210000
     np.random.seed(2)
@@ -1112,8 +1086,7 @@ def test():  # pragma: no cover
     #B = np.sort(A)
     df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
-    sortState = SortStateCL((A,), data)
-    sort(sortState, (A,), 0, n, data)
+    sort((A,), 0, n, data)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
     # print(df2.B)
     # print(data)
