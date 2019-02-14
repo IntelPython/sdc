@@ -1,6 +1,7 @@
-from __future__ import print_function, division, absolute_import
 import operator
 from collections import defaultdict
+import numpy as np
+
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, generated_jit
 from numba.extending import overload
@@ -11,11 +12,7 @@ import hpat
 from hpat import distributed, distributed_analysis
 from hpat.utils import debug_prints, alloc_arr_tup, empty_like_type
 from hpat.distributed_analysis import Distribution
-from hpat.hiframes.sort import (
-      alltoallv,
-    alltoallv_tup, finalize_shuffle_meta,
-    update_shuffle_meta,  alloc_pre_shuffle_metadata,
-    _get_keys_tup, _get_data_tup)
+
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
@@ -25,8 +22,10 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               setitem_str_offset, str_arr_set_na)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
-from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
-import numpy as np
+from hpat.shuffle_utils import (getitem_arr_tup_single, val_to_tup, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta,
+    update_shuffle_meta,  alloc_pre_shuffle_metadata,
+    _get_keys_tup, _get_data_tup)
 
 
 class Join(ir.Stmt):

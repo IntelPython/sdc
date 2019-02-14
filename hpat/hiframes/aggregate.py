@@ -29,15 +29,13 @@ from hpat.str_ext import string_type
 from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
                               get_offset_ptr, get_data_ptr)
-from hpat.hiframes.sort import (
-      alltoallv,
-    alltoallv_tup, finalize_shuffle_meta,
-    update_shuffle_meta,
-    alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup
-    )
+
 from hpat.hiframes.join import write_send_buff
 from hpat.timsort import getitem_arr_tup
-from hpat.shuffle_utils import getitem_arr_tup_single, val_to_tup
+from hpat.shuffle_utils import (getitem_arr_tup_single, val_to_tup, alltoallv,
+    alltoallv_tup, finalize_shuffle_meta, update_shuffle_meta,
+    alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup)
+
 
 AggFuncStruct = namedtuple('AggFuncStruct',
     ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
