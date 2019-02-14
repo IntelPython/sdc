@@ -455,16 +455,6 @@ def parallel_sort(key_arrs, data):
 
     return out_key, out_data
 
-def alloc_shuffle_metadata():
-    pass
-def data_alloc_shuffle_metadata():
-    pass
-
-def finalize_data_shuffle_meta():
-    pass
-
-def update_data_shuffle_meta():
-    pass
 
 
 ########## metadata required for shuffle

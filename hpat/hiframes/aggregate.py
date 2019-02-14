@@ -30,9 +30,9 @@ from hpat.set_ext import num_total_chars_set_string, build_set
 from hpat.str_arr_ext import (string_array_type, pre_alloc_string_array,
                               get_offset_ptr, get_data_ptr)
 from hpat.hiframes.sort import (
-    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
-    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
-    update_shuffle_meta, update_data_shuffle_meta, finalize_data_shuffle_meta,
+      alltoallv,
+    alltoallv_tup, finalize_shuffle_meta,
+    update_shuffle_meta,
     alloc_pre_shuffle_metadata, _get_keys_tup, _get_data_tup
     )
 from hpat.hiframes.join import write_send_buff

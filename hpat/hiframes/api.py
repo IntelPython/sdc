@@ -31,9 +31,9 @@ from hpat.hiframes.pd_series_ext import (SeriesType,
     date_series_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType, TimedeltaIndexType
 from hpat.hiframes.sort import (
-    alloc_shuffle_metadata, data_alloc_shuffle_metadata, alltoallv,
-    alltoallv_tup, finalize_shuffle_meta, finalize_data_shuffle_meta,
-    update_shuffle_meta, update_data_shuffle_meta, alloc_pre_shuffle_metadata,
+      alltoallv,
+    alltoallv_tup, finalize_shuffle_meta,
+    update_shuffle_meta,  alloc_pre_shuffle_metadata,
     )
 from hpat.hiframes.join import write_send_buff
 
