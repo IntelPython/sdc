@@ -396,7 +396,6 @@ def to_string_list_typ(typ):
 def get_local_sort_func(key_typ, data_tup_typ):
     sort_state_spec = [
         ('key_arrs', to_string_list_typ(key_typ)),
-        ('aLength', numba.intp),
         ('minGallop', numba.intp),
         ('tmpLength', numba.intp),
         ('tmp', to_string_list_typ(key_typ)),
@@ -420,7 +419,7 @@ def local_sort(key_arrs, data):
     l_key_arrs = to_string_list(key_arrs)
     l_data = to_string_list(data)
     n_out = len(key_arrs[0])
-    sort_state_o = SortState(l_key_arrs, n_out, l_data)
+    sort_state_o = SortState(l_key_arrs, l_data)
     hpat.timsort.sort(sort_state_o, l_key_arrs, 0, n_out, l_data)
     cp_str_list_to_array(key_arrs, l_key_arrs)
     cp_str_list_to_array(data, l_data)

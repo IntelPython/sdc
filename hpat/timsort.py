@@ -287,7 +287,6 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 
 # spec = [
 #     ('key_arrs', numba.float64[:]),
-#     ('aLength', numba.intp),
 #     ('minGallop', numba.intp),
 #     ('tmpLength', numba.intp),
 #     ('tmp', numba.float64[:]),
@@ -299,17 +298,16 @@ INITIAL_TMP_STORAGE_LENGTH = 256
 # Creates a TimSort instance to maintain the state of an ongoing sort.
 #@numba.jitclass(spec)
 class SortState:  # pragma: no cover
-    def __init__(self, key_arrs, aLength, data):
+    def __init__(self, key_arrs, data):
         self.key_arrs = key_arrs
         self.data = data
-        self.aLength = aLength
 
         # This controls when we get *into* galloping mode.  It is initialized
         # to MIN_GALLOP.  The mergeLo and mergeHi methods nudge it higher for
         # random data, and lower for highly structured data.
         self.minGallop = MIN_GALLOP
 
-        arr_len = aLength
+        arr_len = len(key_arrs[0])
         # Allocate temp storage (which may be increased later if necessary)
         self.tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
         self.tmp = alloc_arr_tup(self.tmpLength, self.key_arrs)
@@ -1081,7 +1079,6 @@ def test():  # pragma: no cover
     data = (np.arange(3), np.ones(3),)
     spec = [
     ('key_arrs', numba.types.Tuple((numba.float64[::1],))),
-    ('aLength', numba.intp),
     ('minGallop', numba.intp),
     ('tmpLength', numba.intp),
     ('tmp', numba.types.Tuple((numba.float64[::1],))),
@@ -1092,7 +1089,7 @@ def test():  # pragma: no cover
     ('tmp_data', numba.typeof(data)),
     ]
     SortStateCL = numba.jitclass(spec)(SortState)
-    sortState = SortStateCL((T,), 3, data)
+    sortState = SortStateCL((T,), data)
     sort(sortState, (T,), 0, 3, data)
     print("compile time", time.time()-t1)
     n = 210000
@@ -1104,7 +1101,7 @@ def test():  # pragma: no cover
     #B = np.sort(A)
     df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
-    sortState = SortStateCL((A,), n, data)
+    sortState = SortStateCL((A,), data)
     sort(sortState, (A,), 0, n, data)
     print("HPAT", time.time()-t2, "Numpy", t2-t1)
     # print(df2.B)
