@@ -88,7 +88,10 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
         # Push run onto pending-run stack, and maybe merge
         sortState.stackSize = pushRun(sortState.stackSize, sortState.runBase,
             sortState.runLen, lo, runLen)
-        mergeCollapse(sortState)
+        sortState.stackSize, sortState.tmpLength, sortState.tmp, sortState.tmp_data, sortState.minGallop = mergeCollapse(
+            sortState.stackSize, sortState.runBase, sortState.runLen,
+            sortState.key_arrs, sortState.data, sortState.tmpLength, sortState.tmp,
+                                    sortState.tmp_data, sortState.minGallop)
 
         # Advance to find next run
         lo += runLen
@@ -98,7 +101,10 @@ def sort(sortState, key_arrs, lo, hi, data):  # pragma: no cover
 
     # Merge all remaining runs to complete sort
     assert lo == hi
-    mergeForceCollapse(sortState)
+    sortState.stackSize, sortState.tmpLength, sortState.tmp, sortState.tmp_data, sortState.minGallop = mergeForceCollapse(
+        sortState.stackSize, sortState.runBase, sortState.runLen,
+        sortState.key_arrs, sortState.data, sortState.tmpLength, sortState.tmp,
+                                    sortState.tmp_data, sortState.minGallop)
     assert sortState.stackSize == 1
 
 
@@ -361,32 +367,37 @@ def pushRun(stackSize, runBase, runLen, runBase_val, runLen_val):
 # so the invariants are guaranteed to hold for i < stackSize upon
 # entry to the method.
 @numba.njit(no_cpython_wrapper=True)
-def mergeCollapse(self):
-    while self.stackSize > 1:
-        n = self.stackSize - 2
-        if ((n >= 1 and self.runLen[n-1] <= self.runLen[n] + self.runLen[n+1])
-                or (n >= 2 and self.runLen[n-2] <= self.runLen[n] + self.runLen[n-1])):
-            if self.runLen[n - 1] < self.runLen[n + 1]:
+def mergeCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
+                                                          tmp_data, minGallop):
+    while stackSize > 1:
+        n = stackSize - 2
+        if ((n >= 1 and runLen[n-1] <= runLen[n] + runLen[n+1])
+                or (n >= 2 and runLen[n-2] <= runLen[n] + runLen[n-1])):
+            if runLen[n - 1] < runLen[n + 1]:
                 n -= 1
-        elif self.runLen[n] > self.runLen[n + 1]:
+        elif runLen[n] > runLen[n + 1]:
             break  # Invariant is established
 
-        self.stackSize, self.tmpLength, self.tmp, self.tmp_data, self.minGallop = mergeAt(
-            self.stackSize, self.runBase, self.runLen, self.key_arrs, self.data,
-            self.tmpLength, self.tmp, self.tmp_data, self.minGallop, n)
+        stackSize, tmpLength, tmp, tmp_data, minGallop = mergeAt(
+            stackSize, runBase, runLen, key_arrs, data,
+            tmpLength, tmp, tmp_data, minGallop, n)
 
+    return stackSize, tmpLength, tmp, tmp_data, minGallop
 
 # Merges all runs on the stack until only one remains.  This method is
 # called once, to complete the sort.
 @numba.njit(no_cpython_wrapper=True)
-def mergeForceCollapse(self):
-    while self.stackSize > 1:
-        n = self.stackSize - 2
-        if n > 0 and self.runLen[n-1] < self.runLen[n+1]:
+def mergeForceCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength,
+                                                     tmp, tmp_data, minGallop):
+    while stackSize > 1:
+        n = stackSize - 2
+        if n > 0 and runLen[n-1] < runLen[n+1]:
             n -= 1
-        self.stackSize, self.tmpLength, self.tmp, self.tmp_data, self.minGallop = mergeAt(
-            self.stackSize, self.runBase, self.runLen, self.key_arrs, self.data,
-            self.tmpLength, self.tmp, self.tmp_data, self.minGallop, n)
+        stackSize, tmpLength, tmp, tmp_data, minGallop = mergeAt(
+            stackSize, runBase, runLen, key_arrs, data,
+            tmpLength, tmp, tmp_data, minGallop, n)
+
+    return stackSize, tmpLength, tmp, tmp_data, minGallop
 
 
 # Merges the two runs at stack indices i and i+1.  Run i must be
