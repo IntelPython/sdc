@@ -373,7 +373,9 @@ def mergeCollapse(self):
         elif self.runLen[n] > self.runLen[n + 1]:
             break  # Invariant is established
 
-        mergeAt(self, n)
+        self.stackSize, self.tmpLength, self.tmp, self.tmp_data, self.minGallop = mergeAt(
+            self.stackSize, self.runBase, self.runLen, self.key_arrs, self.data,
+            self.tmpLength, self.tmp, self.tmp_data, self.minGallop, n)
 
 
 # Merges all runs on the stack until only one remains.  This method is
@@ -384,7 +386,9 @@ def mergeForceCollapse(self):
         n = self.stackSize - 2
         if n > 0 and self.runLen[n-1] < self.runLen[n+1]:
             n -= 1
-        mergeAt(self, n)
+        self.stackSize, self.tmpLength, self.tmp, self.tmp_data, self.minGallop = mergeAt(
+            self.stackSize, self.runBase, self.runLen, self.key_arrs, self.data,
+            self.tmpLength, self.tmp, self.tmp_data, self.minGallop, n)
 
 
 # Merges the two runs at stack indices i and i+1.  Run i must be
@@ -393,15 +397,15 @@ def mergeForceCollapse(self):
 
 # @param i stack index of the first of the two runs to merge
 @numba.njit(no_cpython_wrapper=True)
-def mergeAt(self, i):
-    assert self.stackSize >= 2
+def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp, tmp_data, minGallop, i):
+    assert stackSize >= 2
     assert i >= 0
-    assert i == self.stackSize - 2 or i == self.stackSize - 3
+    assert i == stackSize - 2 or i == stackSize - 3
 
-    base1 = self.runBase[i]
-    len1 = self.runLen[i]
-    base2 = self.runBase[i+1]
-    len2 = self.runLen[i+1]
+    base1 = runBase[i]
+    len1 = runLen[i]
+    base2 = runBase[i+1]
+    len2 = runLen[i+1]
     assert len1 > 0 and len2 > 0
     assert base1 + len1 == base2
 
@@ -410,17 +414,17 @@ def mergeAt(self, i):
     # run now, also slide over the last run (which isn't involved
     # in this merge).  The current run (i+1) goes away in any case.
 
-    self.runLen[i] = len1 + len2
-    if i == self.stackSize - 3:
-        self.runBase[i+1] = self.runBase[i+2]
-        self.runLen[i+1] = self.runLen[i+2]
+    runLen[i] = len1 + len2
+    if i == stackSize - 3:
+        runBase[i+1] = runBase[i+2]
+        runLen[i+1] = runLen[i+2]
 
-    self.stackSize -= 1
+    stackSize -= 1
 
     # Find where the first element of run2 goes in run1. Prior elements
     # in run1 can be ignored (because they're already in place).
 
-    k = gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
+    k = gallopRight(getitem_arr_tup(key_arrs, base2), key_arrs, base1, len1, 0)
     assert k >= 0
     base1 += k
     len1 -= k
@@ -431,24 +435,26 @@ def mergeAt(self, i):
     # Find where the last element of run1 goes in run2. Subsequent elements
     # in run2 can be ignored (because they're already in place).
 
-    len2 = gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
+    len2 = gallopLeft(getitem_arr_tup(key_arrs, base1+len1-1), key_arrs, base2, len2, len2 - 1)
     assert len2 >= 0
     if len2 == 0:
         return
 
     # Merge remaining runs, using tmp array with min(len1, len2) elements
     if len1 <= len2:
-        self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
-            self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+        tmpLength, tmp, tmp_data = ensureCapacity(
+            tmpLength, tmp, tmp_data, key_arrs, data,
             len1)
-        self.minGallop = mergeLo(self.key_arrs, self.data, self.tmp,
-            self.tmp_data, self.minGallop, base1, len1, base2, len2)
+        minGallop = mergeLo(key_arrs, data, tmp,
+            tmp_data, minGallop, base1, len1, base2, len2)
     else:
-        self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
-            self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+        tmpLength, tmp, tmp_data = ensureCapacity(
+            tmpLength, tmp, tmp_data, key_arrs, data,
             len2)
-        self.minGallop = mergeHi(self.key_arrs, self.data, self.tmp,
-            self.tmp_data, self.minGallop, base1, len1, base2, len2)
+        minGallop = mergeHi(key_arrs, data, tmp,
+            tmp_data, minGallop, base1, len1, base2, len2)
+
+    return stackSize, tmpLength, tmp, tmp_data, minGallop
 
 
 # Locates the position at which to insert the specified key into the
