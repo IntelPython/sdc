@@ -57,7 +57,7 @@ MIN_MERGE = 32
 # sort, assuming the input array is large enough to warrant the full-blown
 # TimSort. Small arrays are sorted in place, using a binary insertion sort.
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def sort(key_arrs, lo, hi, data):  # pragma: no cover
 
     nRemaining  = hi - lo
@@ -74,7 +74,8 @@ def sort(key_arrs, lo, hi, data):  # pragma: no cover
     # extending short natural runs to minRun elements, and merging runs
     # to maintain stack invariant.
 
-    stackSize, runBase, runLen, tmpLength, tmp, tmp_data, minGallop = init_sort_start(key_arrs, data)
+    (stackSize, runBase, runLen, tmpLength, tmp, tmp_data,
+        minGallop) = init_sort_start(key_arrs, data)
 
     minRun = minRunLength(nRemaining)
     while True:  # emulating do-while
@@ -125,7 +126,7 @@ def sort(key_arrs, lo, hi, data):  # pragma: no cover
 #       not already known to be sorted ({@code lo <= start <= hi})
 # @param c comparator to used for the sort
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
     assert lo <= start and start <= hi
     if start == lo:
@@ -202,7 +203,7 @@ def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
 # @return  the length of the run beginning at the specified position in
 #         the specified array
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
     assert lo < hi
     runHi = lo + 1
@@ -229,7 +230,7 @@ def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
 # @param lo the index of the first element in the range to be reversed
 # @param hi the index after the last element in the range to be reversed
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def reverseRange(key_arrs, lo, hi, data):  # pragma: no cover
     hi -= 1
     while lo < hi:
@@ -266,7 +267,7 @@ def reverseRange(key_arrs, lo, hi, data):  # pragma: no cover
 # @return the length of the minimum run to be merged
 
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def minRunLength(n):  # pragma: no cover
     assert n >= 0
     r = 0      # Becomes 1 if any 1 bits are shifted off
@@ -290,7 +291,7 @@ MIN_GALLOP = 7
 INITIAL_TMP_STORAGE_LENGTH = 256
 
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def init_sort_start(key_arrs, data):
 
     # This controls when we get *into* galloping mode.  It is initialized
@@ -300,7 +301,8 @@ def init_sort_start(key_arrs, data):
 
     arr_len = len(key_arrs[0])
     # Allocate temp storage (which may be increased later if necessary)
-    tmpLength = arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH else INITIAL_TMP_STORAGE_LENGTH
+    tmpLength = (arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH
+        else INITIAL_TMP_STORAGE_LENGTH)
     tmp = alloc_arr_tup(tmpLength, key_arrs)
     tmp_data = alloc_arr_tup(tmpLength, data)
 
@@ -338,7 +340,7 @@ def init_sort_start(key_arrs, data):
 
 # @param runBase index of the first element in the run
 # @param runLen  the number of elements in the run
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def pushRun(stackSize, runBase, runLen, runBase_val, runLen_val):
     runBase[stackSize] = runBase_val
     runLen[stackSize] = runLen_val
@@ -354,7 +356,7 @@ def pushRun(stackSize, runBase, runLen, runBase_val, runLen_val):
 # This method is called each time a new run is pushed onto the stack,
 # so the invariants are guaranteed to hold for i < stackSize upon
 # entry to the method.
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
                                                           tmp_data, minGallop):
     while stackSize > 1:
@@ -374,7 +376,7 @@ def mergeCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
 
 # Merges all runs on the stack until only one remains.  This method is
 # called once, to complete the sort.
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeForceCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength,
                                                      tmp, tmp_data, minGallop):
     while stackSize > 1:
@@ -393,8 +395,9 @@ def mergeForceCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength,
 # i must be equal to stackSize-2 or stackSize-3.
 
 # @param i stack index of the first of the two runs to merge
-@numba.njit(no_cpython_wrapper=True)
-def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp, tmp_data, minGallop, i):
+@numba.njit(no_cpython_wrapper=True, cache=True)
+def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
+                                                       tmp_data, minGallop, i):
     assert stackSize >= 2
     assert i >= 0
     assert i == stackSize - 2 or i == stackSize - 3
@@ -432,7 +435,8 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp, tmp_data
     # Find where the last element of run1 goes in run2. Subsequent elements
     # in run2 can be ignored (because they're already in place).
 
-    len2 = gallopLeft(getitem_arr_tup(key_arrs, base1+len1-1), key_arrs, base2, len2, len2 - 1)
+    len2 = gallopLeft(getitem_arr_tup(key_arrs, base1+len1-1), key_arrs, base2,
+                                                                len2, len2 - 1)
     assert len2 >= 0
     if len2 == 0:
         return
@@ -470,7 +474,7 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp, tmp_data
 #   In other words, key belongs at index b + k, or in other words,
 #   the first k elements of a should precede key, and the last n - k
 #   should follow it.
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def gallopLeft(key, arr, base, _len, hint):
     assert _len > 0 and hint >= 0 and hint < _len
     lastOfs = 0
@@ -540,7 +544,7 @@ def gallopLeft(key, arr, base, _len, hint):
 #    The closer hint is to the result, the faster this method will run.
 # @param c the comparator used to order the range, and to search
 # @return the k,  0 <= k <= n such that a[b + k - 1] <= key < a[b + k]
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def gallopRight(key, arr, base, _len, hint):
     assert _len > 0 and hint >= 0 and hint < _len
 
@@ -612,7 +616,7 @@ def gallopRight(key, arr, base, _len, hint):
 # @param base2 index of first element in second run to be merged
 #       (must be aBase + aLen)
 # @param len2  length of second run to be merged (must be > 0)
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
@@ -675,8 +679,9 @@ def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     return minGallop
 
 
-@numba.njit(no_cpython_wrapper=True)
-def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
+@numba.njit(no_cpython_wrapper=True, cache=True)
+def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2,
+                                                              dest, minGallop):
 
     while True:
         count1 = 0 # Number of times in a row that first run won
@@ -719,7 +724,8 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, de
 
         while True:
             assert len1 > 1 and len2 > 0
-            count1 = gallopRight(getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
+            count1 = gallopRight(
+                getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
             if count1 != 0:
                 copyRange_tup(tmp, cursor1, arr, dest, count1)
                 copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
@@ -737,7 +743,8 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, de
             if len2 == 0:
                 return len1, len2, cursor1, cursor2, dest, minGallop
 
-            count2 = gallopLeft(getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
+            count2 = gallopLeft(
+                getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
             if count2 != 0:
                 copyRange_tup(arr, cursor2, arr, dest, count2)
                 copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
@@ -777,7 +784,7 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2, de
 # @param base2 index of first element in second run to be merged
 #       (must be aBase + aLen)
 # @param len2  length of second run to be merged (must be > 0)
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
@@ -839,8 +846,9 @@ def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
 
 
 # XXX refactored nested loop break
-@numba.njit(no_cpython_wrapper=True)
-def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
+@numba.njit(no_cpython_wrapper=True, cache=True)
+def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
+                                                     cursor2, dest, minGallop):
 
     while True:
         count1 = 0 # Number of times in a row that first run won
@@ -882,7 +890,8 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1, curs
 
         while True:
             assert len1 > 0 and len2 > 1
-            count1 = len1 - gallopRight(getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
+            count1 = len1 - gallopRight(getitem_arr_tup(tmp, cursor2), arr,
+                                                         base1, len1, len1 - 1)
             if count1 != 0:
                 dest -= count1
                 cursor1 -= count1
@@ -900,7 +909,8 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1, curs
             if len2 == 1:
                 return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-            count2 = len2 - gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
+            count2 = len2 - gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0,
+                                                                len2, len2 - 1)
             if count2 != 0:
                 dest -= count2
                 cursor2 -= count2
@@ -935,7 +945,7 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1, curs
 # @param minCapacity the minimum required capacity of the tmp array
 # @return tmp, whether or not it grew
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def ensureCapacity(tmpLength, tmp, tmp_data, key_arrs, data, minCapacity):
     aLength = len(key_arrs[0])
     if tmpLength < minCapacity:
@@ -986,7 +996,7 @@ def swap_arrs_overload(arr_tup, lo, hi):
     return swap_impl
 
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):  # pragma: no cover
     dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
@@ -1009,7 +1019,7 @@ def copyRange_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
     copy_impl = loc_vars['f']
     return copy_impl
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):  # pragma: no cover
     dst_arr[dst_pos] = src_arr[src_pos]
 

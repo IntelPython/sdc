@@ -391,7 +391,7 @@ def to_string_list_typ(typ):
     return typ
 
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def local_sort(key_arrs, data):
     # convert StringArray to list(string) to enable swapping in sort
     l_key_arrs = to_string_list(key_arrs)
@@ -402,7 +402,7 @@ def local_sort(key_arrs, data):
     cp_str_list_to_array(data, l_data)
 
 
-@numba.njit(no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, cache=True)
 def parallel_sort(key_arrs, data):
     n_local = len(key_arrs)
     n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))
