@@ -418,7 +418,7 @@ class SortState:  # pragma: no cover
         # Find where the first element of run2 goes in run1. Prior elements
         # in run1 can be ignored (because they're already in place).
 
-        k = self.gallopRight(getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
+        k = gallopRight(self, getitem_arr_tup(self.key_arrs, base2), self.key_arrs, base1, len1, 0)
         assert k >= 0
         base1 += k
         len1 -= k
@@ -429,529 +429,539 @@ class SortState:  # pragma: no cover
         # Find where the last element of run1 goes in run2. Subsequent elements
         # in run2 can be ignored (because they're already in place).
 
-        len2 = self.gallopLeft(getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
+        len2 = gallopLeft(self, getitem_arr_tup(self.key_arrs, base1+len1-1), self.key_arrs, base2, len2, len2 - 1)
         assert len2 >= 0
         if len2 == 0:
             return
 
         # Merge remaining runs, using tmp array with min(len1, len2) elements
         if len1 <= len2:
-            self.mergeLo(base1, len1, base2, len2)
+            mergeLo(self, base1, len1, base2, len2)
         else:
-            self.mergeHi(base1, len1, base2, len2)
+            mergeHi(self, base1, len1, base2, len2)
 
 
-    # Locates the position at which to insert the specified key into the
-    # specified sorted range, if the range contains an element equal to key,
-    # returns the index of the leftmost equal element.
+# Locates the position at which to insert the specified key into the
+# specified sorted range, if the range contains an element equal to key,
+# returns the index of the leftmost equal element.
 
-    # @param key the key whose insertion point to search for
-    # @param a the array in which to search
-    # @param base the index of the first element in the range
-    # @param len the length of the range, must be > 0
-    # @param hint the index at which to begin the search, 0 <= hint < n.
-    #    The closer hint is to the result, the faster this method will run.
-    # @param c the comparator used to order the range, and to search
-    # @return the k,  0 <= k <= n such that a[b + k - 1] < key <= a[b + k],
-    #   pretending that a[b - 1] is minus infinity and a[b + n] is infinity.
-    #   In other words, key belongs at index b + k, or in other words,
-    #   the first k elements of a should precede key, and the last n - k
-    #   should follow it.
+# @param key the key whose insertion point to search for
+# @param a the array in which to search
+# @param base the index of the first element in the range
+# @param len the length of the range, must be > 0
+# @param hint the index at which to begin the search, 0 <= hint < n.
+#    The closer hint is to the result, the faster this method will run.
+# @param c the comparator used to order the range, and to search
+# @return the k,  0 <= k <= n such that a[b + k - 1] < key <= a[b + k],
+#   pretending that a[b - 1] is minus infinity and a[b + n] is infinity.
+#   In other words, key belongs at index b + k, or in other words,
+#   the first k elements of a should precede key, and the last n - k
+#   should follow it.
+@numba.njit(no_cpython_wrapper=True)
+def gallopLeft(self, key, arr, base, _len, hint):
+    assert _len > 0 and hint >= 0 and hint < _len
+    lastOfs = 0
+    ofs = 1
 
-    def gallopLeft(self, key, arr, base, _len, hint):
-        assert _len > 0 and hint >= 0 and hint < _len
-        lastOfs = 0
-        ofs = 1
-
-        if key > getitem_arr_tup(arr, base+hint):
-            # Gallop right until a[base+hint+lastOfs] < key <= a[base+hint+ofs]
-            maxOfs = _len - hint
-            while ofs < maxOfs and key > getitem_arr_tup(arr, base+hint+ofs):
-                lastOfs = ofs
-                ofs = (ofs << 1) + 1
-                if ofs <= 0:   # overflow
-                    ofs = maxOfs
-
-            if ofs > maxOfs:
+    if key > getitem_arr_tup(arr, base+hint):
+        # Gallop right until a[base+hint+lastOfs] < key <= a[base+hint+ofs]
+        maxOfs = _len - hint
+        while ofs < maxOfs and key > getitem_arr_tup(arr, base+hint+ofs):
+            lastOfs = ofs
+            ofs = (ofs << 1) + 1
+            if ofs <= 0:   # overflow
                 ofs = maxOfs
 
-            # Make offsets relative to base
-            lastOfs += hint
-            ofs += hint
-        else:  # key <= a[base + hint]
-            # Gallop left until a[base+hint-ofs] < key <= a[base+hint-lastOfs]
-            maxOfs = hint + 1
-            while ofs < maxOfs and key <= getitem_arr_tup(arr, base+hint-ofs):
-                lastOfs = ofs
-                ofs = (ofs << 1) + 1
-                if ofs <= 0:   # overflow
-                    ofs = maxOfs
+        if ofs > maxOfs:
+            ofs = maxOfs
 
-            if ofs > maxOfs:
+        # Make offsets relative to base
+        lastOfs += hint
+        ofs += hint
+    else:  # key <= a[base + hint]
+        # Gallop left until a[base+hint-ofs] < key <= a[base+hint-lastOfs]
+        maxOfs = hint + 1
+        while ofs < maxOfs and key <= getitem_arr_tup(arr, base+hint-ofs):
+            lastOfs = ofs
+            ofs = (ofs << 1) + 1
+            if ofs <= 0:   # overflow
                 ofs = maxOfs
 
-            # Make offsets relative to base
-            tmp = lastOfs
-            lastOfs = hint - ofs
-            ofs = hint - tmp
+        if ofs > maxOfs:
+            ofs = maxOfs
 
-        assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
+        # Make offsets relative to base
+        tmp = lastOfs
+        lastOfs = hint - ofs
+        ofs = hint - tmp
 
-
-        # Now a[base+lastOfs] < key <= a[base+ofs], so key belongs somewhere
-        # to the right of lastOfs but no farther right than ofs.  Do a binary
-        # search, with invariant a[base + lastOfs - 1] < key <= a[base + ofs].
-
-        lastOfs += 1
-        while lastOfs < ofs:
-            m = lastOfs + ((ofs - lastOfs) >> 1)
-
-            if key > getitem_arr_tup(arr, base+m):
-                lastOfs = m + 1  # a[base + m] < key
-            else:
-                ofs = m          # key <= a[base + m]
-
-        assert lastOfs == ofs    # so a[base + ofs - 1] < key <= a[base + ofs]
-        return ofs
+    assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
 
 
+    # Now a[base+lastOfs] < key <= a[base+ofs], so key belongs somewhere
+    # to the right of lastOfs but no farther right than ofs.  Do a binary
+    # search, with invariant a[base + lastOfs - 1] < key <= a[base + ofs].
 
-    # Like gallopLeft, except that if the range contains an element equal to
-    # key, gallopRight returns the index after the rightmost equal element.
+    lastOfs += 1
+    while lastOfs < ofs:
+        m = lastOfs + ((ofs - lastOfs) >> 1)
 
-    # @param key the key whose insertion point to search for
-    # @param a the array in which to search
-    # @param base the index of the first element in the range
-    # @param len the length of the range must be > 0
-    # @param hint the index at which to begin the search, 0 <= hint < n.
-    #    The closer hint is to the result, the faster this method will run.
-    # @param c the comparator used to order the range, and to search
-    # @return the k,  0 <= k <= n such that a[b + k - 1] <= key < a[b + k]
-
-    def gallopRight(self, key, arr, base, _len, hint):
-        assert _len > 0 and hint >= 0 and hint < _len
-
-        ofs = 1
-        lastOfs = 0
-
-        if key < getitem_arr_tup(arr, base + hint):
-            # Gallop left until a[b+hint - ofs] <= key < a[b+hint - lastOfs]
-            maxOfs = hint + 1
-            while ofs < maxOfs and key < getitem_arr_tup(arr, base + hint - ofs):
-                lastOfs = ofs
-                ofs = (ofs << 1) + 1
-                if ofs <= 0:   # overflow
-                    ofs = maxOfs
-
-            if ofs > maxOfs:
-                ofs = maxOfs
-
-            # Make offsets relative to b
-            tmp = lastOfs
-            lastOfs = hint - ofs
-            ofs = hint - tmp
-        else:  #  a[b + hint] <= key
-            # Gallop right until a[b+hint + lastOfs] <= key < a[b+hint + ofs]
-            maxOfs = _len - hint
-            while ofs < maxOfs and key >= getitem_arr_tup(arr, base+hint+ofs):
-                lastOfs = ofs
-                ofs = (ofs << 1) + 1
-                if ofs <= 0:   # overflow
-                    ofs = maxOfs
-
-            if ofs > maxOfs:
-                ofs = maxOfs
-
-            # Make offsets relative to b
-            lastOfs += hint
-            ofs += hint
-
-        assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
-
-
-        # Now a[b + lastOfs] <= key < a[b + ofs], so key belongs somewhere to
-        # the right of lastOfs but no farther right than ofs.  Do a binary
-        # search, with invariant a[b + lastOfs - 1] <= key < a[b + ofs].
-
-        lastOfs += 1
-        while lastOfs < ofs:
-            m = lastOfs + ((ofs - lastOfs) >> 1)
-
-            if key < getitem_arr_tup(arr, base + m):
-                ofs = m          # key < a[b + m]
-            else:
-                lastOfs = m + 1  # a[b + m] <= key
-
-        assert lastOfs == ofs    # so a[b + ofs - 1] <= key < a[b + ofs]
-        return ofs
-
-    # Merges two adjacent runs in place, in a stable fashion.  The first
-    # element of the first run must be greater than the first element of the
-    # second run (a[base1] > a[base2]), and the last element of the first run
-    # (a[base1 + len1-1]) must be greater than all elements of the second run.
-
-    # For performance, this method should be called only when len1 <= len2
-    # its twin, mergeHi should be called if len1 >= len2.  (Either method
-    # may be called if len1 == len2.)
-
-    # @param base1 index of first element in first run to be merged
-    # @param len1  length of first run to be merged (must be > 0)
-    # @param base2 index of first element in second run to be merged
-    #       (must be aBase + aLen)
-    # @param len2  length of second run to be merged (must be > 0)
-
-    def mergeLo(self, base1, len1, base2, len2):
-        assert len1 > 0 and len2 > 0 and base1 + len1 == base2
-
-        # Copy first run into temp array
-        arr = self.key_arrs
-        arr_data = self.data
-        tmp = self.ensureCapacity(len1)
-        tmp_data = self.tmp_data
-        copyRange_tup(arr, base1, tmp, 0, len1)
-        #tmp[:len1] = arr[base1:base1+len1]
-        copyRange_tup(arr_data, base1, tmp_data, 0, len1)
-
-        cursor1 = 0       # Indexes into tmp array
-        cursor2 = base2   # Indexes a
-        dest = base1      # Indexes a
-
-        # Move first element of second run and deal with degenerate cases
-        # copyElement(arr, cursor2, arr, dest)
-        setitem_arr_tup(arr, dest, getitem_arr_tup(arr, cursor2))
-        copyElement_tup(arr_data, cursor2, arr_data, dest)
-
-        cursor2 += 1
-        dest += 1
-        len2 -= 1
-        if len2 == 0:
-            copyRange_tup(tmp, cursor1, arr, dest, len1)
-            copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
-            #arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
-            return
-
-        if len1 == 1:
-            copyRange_tup(arr, cursor2, arr, dest, len2)
-            copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-            copyElement_tup(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
-            copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
-            return
-
-
-        minGallop = self.minGallop
-
-        # XXX *************** refactored nested break into func
-        len1, len2, cursor1, cursor2, dest, minGallop = self.mergeLo_inner(
-            len1, len2, tmp, cursor1, cursor2, dest, minGallop)
-        # XXX *****************
-
-
-        self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
-
-        if len1 == 1:
-            assert len2 > 0
-            copyRange_tup(arr, cursor2, arr, dest, len2)
-            copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-            copyElement_tup(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
-            copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
-        elif len1 == 0:
-            raise ValueError("Comparison method violates its general contract!")
+        if key > getitem_arr_tup(arr, base+m):
+            lastOfs = m + 1  # a[base + m] < key
         else:
-            assert len2 == 0
-            assert len1 > 1
-            copyRange_tup(tmp, cursor1, arr, dest, len1)
-            copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
+            ofs = m          # key <= a[base + m]
+
+    assert lastOfs == ofs    # so a[base + ofs - 1] < key <= a[base + ofs]
+    return ofs
 
 
-    def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-        arr = self.key_arrs
-        arr_data = self.data
-        tmp_data = self.tmp_data
+
+# Like gallopLeft, except that if the range contains an element equal to
+# key, gallopRight returns the index after the rightmost equal element.
+
+# @param key the key whose insertion point to search for
+# @param a the array in which to search
+# @param base the index of the first element in the range
+# @param len the length of the range must be > 0
+# @param hint the index at which to begin the search, 0 <= hint < n.
+#    The closer hint is to the result, the faster this method will run.
+# @param c the comparator used to order the range, and to search
+# @return the k,  0 <= k <= n such that a[b + k - 1] <= key < a[b + k]
+@numba.njit(no_cpython_wrapper=True)
+def gallopRight(self, key, arr, base, _len, hint):
+    assert _len > 0 and hint >= 0 and hint < _len
+
+    ofs = 1
+    lastOfs = 0
+
+    if key < getitem_arr_tup(arr, base + hint):
+        # Gallop left until a[b+hint - ofs] <= key < a[b+hint - lastOfs]
+        maxOfs = hint + 1
+        while ofs < maxOfs and key < getitem_arr_tup(arr, base + hint - ofs):
+            lastOfs = ofs
+            ofs = (ofs << 1) + 1
+            if ofs <= 0:   # overflow
+                ofs = maxOfs
+
+        if ofs > maxOfs:
+            ofs = maxOfs
+
+        # Make offsets relative to b
+        tmp = lastOfs
+        lastOfs = hint - ofs
+        ofs = hint - tmp
+    else:  #  a[b + hint] <= key
+        # Gallop right until a[b+hint + lastOfs] <= key < a[b+hint + ofs]
+        maxOfs = _len - hint
+        while ofs < maxOfs and key >= getitem_arr_tup(arr, base+hint+ofs):
+            lastOfs = ofs
+            ofs = (ofs << 1) + 1
+            if ofs <= 0:   # overflow
+                ofs = maxOfs
+
+        if ofs > maxOfs:
+            ofs = maxOfs
+
+        # Make offsets relative to b
+        lastOfs += hint
+        ofs += hint
+
+    assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
+
+
+    # Now a[b + lastOfs] <= key < a[b + ofs], so key belongs somewhere to
+    # the right of lastOfs but no farther right than ofs.  Do a binary
+    # search, with invariant a[b + lastOfs - 1] <= key < a[b + ofs].
+
+    lastOfs += 1
+    while lastOfs < ofs:
+        m = lastOfs + ((ofs - lastOfs) >> 1)
+
+        if key < getitem_arr_tup(arr, base + m):
+            ofs = m          # key < a[b + m]
+        else:
+            lastOfs = m + 1  # a[b + m] <= key
+
+    assert lastOfs == ofs    # so a[b + ofs - 1] <= key < a[b + ofs]
+    return ofs
+
+# Merges two adjacent runs in place, in a stable fashion.  The first
+# element of the first run must be greater than the first element of the
+# second run (a[base1] > a[base2]), and the last element of the first run
+# (a[base1 + len1-1]) must be greater than all elements of the second run.
+
+# For performance, this method should be called only when len1 <= len2
+# its twin, mergeHi should be called if len1 >= len2.  (Either method
+# may be called if len1 == len2.)
+
+# @param base1 index of first element in first run to be merged
+# @param len1  length of first run to be merged (must be > 0)
+# @param base2 index of first element in second run to be merged
+#       (must be aBase + aLen)
+# @param len2  length of second run to be merged (must be > 0)
+@numba.njit(no_cpython_wrapper=True)
+def mergeLo(self, base1, len1, base2, len2):
+    assert len1 > 0 and len2 > 0 and base1 + len1 == base2
+
+    # Copy first run into temp array
+    arr = self.key_arrs
+    arr_data = self.data
+    self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
+        self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+        len1)
+    tmp = self.tmp
+    tmp_data = self.tmp_data
+    copyRange_tup(arr, base1, tmp, 0, len1)
+    #tmp[:len1] = arr[base1:base1+len1]
+    copyRange_tup(arr_data, base1, tmp_data, 0, len1)
+
+    cursor1 = 0       # Indexes into tmp array
+    cursor2 = base2   # Indexes a
+    dest = base1      # Indexes a
+
+    # Move first element of second run and deal with degenerate cases
+    # copyElement(arr, cursor2, arr, dest)
+    setitem_arr_tup(arr, dest, getitem_arr_tup(arr, cursor2))
+    copyElement_tup(arr_data, cursor2, arr_data, dest)
+
+    cursor2 += 1
+    dest += 1
+    len2 -= 1
+    if len2 == 0:
+        copyRange_tup(tmp, cursor1, arr, dest, len1)
+        copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
+        #arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
+        return
+
+    if len1 == 1:
+        copyRange_tup(arr, cursor2, arr, dest, len2)
+        copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
+        copyElement_tup(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
+        copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
+        return
+
+
+    minGallop = self.minGallop
+
+    # XXX *************** refactored nested break into func
+    len1, len2, cursor1, cursor2, dest, minGallop = mergeLo_inner(self,
+        len1, len2, tmp, cursor1, cursor2, dest, minGallop)
+    # XXX *****************
+
+
+    self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
+
+    if len1 == 1:
+        assert len2 > 0
+        copyRange_tup(arr, cursor2, arr, dest, len2)
+        copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
+        copyElement_tup(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
+        copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
+    elif len1 == 0:
+        raise ValueError("Comparison method violates its general contract!")
+    else:
+        assert len2 == 0
+        assert len1 > 1
+        copyRange_tup(tmp, cursor1, arr, dest, len1)
+        copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
+
+@numba.njit(no_cpython_wrapper=True)
+def mergeLo_inner(self, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
+    arr = self.key_arrs
+    arr_data = self.data
+    tmp_data = self.tmp_data
+
+    while True:
+        count1 = 0 # Number of times in a row that first run won
+        count2 = 0 # Number of times in a row that second run won
+
+
+        # Do the straightforward thing until (if ever) one run starts
+        # winning consistently.
 
         while True:
-            count1 = 0 # Number of times in a row that first run won
-            count2 = 0 # Number of times in a row that second run won
-
-
-            # Do the straightforward thing until (if ever) one run starts
-            # winning consistently.
-
-            while True:
-                assert len1 > 1 and len2 > 0
-                if getitem_arr_tup(arr, cursor2) < getitem_arr_tup(tmp, cursor1):
-                    copyElement_tup(arr, cursor2, arr, dest)
-                    copyElement_tup(arr_data, cursor2, arr_data, dest)
-                    cursor2 += 1
-                    dest += 1
-                    count2 += 1
-                    count1 = 0
-                    len2 -= 1
-                    if len2 == 0:
-                        return len1, len2, cursor1, cursor2, dest, minGallop
-                else:
-                    copyElement_tup(tmp, cursor1, arr, dest)
-                    copyElement_tup(tmp_data, cursor1, arr_data, dest)
-                    cursor1 += 1
-                    dest += 1
-                    count1 += 1
-                    count2 = 0
-                    len1 -= 1
-                    if len1 == 1:
-                        return len1, len2, cursor1, cursor2, dest, minGallop
-
-                if not ((count1 | count2) < minGallop):
-                    break
-
-
-            # One run is winning so consistently that galloping may be a
-            # huge win. So try that, and continue galloping until (if ever)
-            # neither run appears to be winning consistently anymore.
-
-            while True:
-                assert len1 > 1 and len2 > 0
-                count1 = self.gallopRight(getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
-                if count1 != 0:
-                    copyRange_tup(tmp, cursor1, arr, dest, count1)
-                    copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
-                    dest += count1
-                    cursor1 += count1
-                    len1 -= count1
-                    if len1 <= 1: # len1 == 1 or len1 == 0
-                        return len1, len2, cursor1, cursor2, dest, minGallop
-
+            assert len1 > 1 and len2 > 0
+            if getitem_arr_tup(arr, cursor2) < getitem_arr_tup(tmp, cursor1):
                 copyElement_tup(arr, cursor2, arr, dest)
                 copyElement_tup(arr_data, cursor2, arr_data, dest)
                 cursor2 += 1
                 dest += 1
+                count2 += 1
+                count1 = 0
                 len2 -= 1
                 if len2 == 0:
                     return len1, len2, cursor1, cursor2, dest, minGallop
-
-                count2 = self.gallopLeft(getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
-                if count2 != 0:
-                    copyRange_tup(arr, cursor2, arr, dest, count2)
-                    copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
-                    dest += count2
-                    cursor2 += count2
-                    len2 -= count2
-                    if len2 == 0:
-                        return len1, len2, cursor1, cursor2, dest, minGallop
-
+            else:
                 copyElement_tup(tmp, cursor1, arr, dest)
                 copyElement_tup(tmp_data, cursor1, arr_data, dest)
                 cursor1 += 1
                 dest += 1
+                count1 += 1
+                count2 = 0
                 len1 -= 1
                 if len1 == 1:
                     return len1, len2, cursor1, cursor2, dest, minGallop
-                minGallop -= 1
 
-                if not (count1 >= MIN_GALLOP | count2 >= MIN_GALLOP):
-                    break
-
-            if minGallop < 0:
-                minGallop = 0
-
-            minGallop += 2  # Penalize for leaving gallop mode
-
-        return len1, len2, cursor1, cursor2, dest, minGallop
+            if not ((count1 | count2) < minGallop):
+                break
 
 
-
-    # Like mergeLo, except that this method should be called only if
-    # len1 >= len2 mergeLo should be called if len1 <= len2.  (Either method
-    # may be called if len1 == len2.)
-
-    # @param base1 index of first element in first run to be merged
-    # @param len1  length of first run to be merged (must be > 0)
-    # @param base2 index of first element in second run to be merged
-    #       (must be aBase + aLen)
-    # @param len2  length of second run to be merged (must be > 0)
-
-    def mergeHi(self, base1, len1, base2, len2):
-        assert len1 > 0 and len2 > 0 and base1 + len1 == base2
-
-        # Copy second run into temp array
-        arr = self.key_arrs
-        arr_data = self.data
-        tmp = self.ensureCapacity(len2)
-        tmp_data = self.tmp_data
-        copyRange_tup(arr, base2, tmp, 0, len2)
-        copyRange_tup(arr_data, base2, tmp_data, 0, len2)
-
-        cursor1 = base1 + len1 - 1  # Indexes into arr
-        cursor2 = len2 - 1          # Indexes into tmp array
-        dest = base2 + len2 - 1     # Indexes into arr
-
-        # Move last element of first run and deal with degenerate cases
-        copyElement_tup(arr, cursor1, arr, dest)
-        copyElement_tup(arr_data, cursor1, arr_data, dest)
-        cursor1 -= 1
-        dest -= 1
-        len1 -= 1
-        if len1 == 0:
-            copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
-            copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
-            return
-
-        if len2 == 1:
-            dest -= len1
-            cursor1 -= len1
-            copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
-            copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
-            copyElement_tup(tmp, cursor2, arr, dest)
-            copyElement_tup(tmp_data, cursor2, arr_data, dest)
-            return
-
-        minGallop = self.minGallop
-
-        # XXX *************** refactored nested break into func
-        len1, len2, tmp, cursor1, cursor2, dest, minGallop = self.mergeHi_inner(
-            base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop)
-        # XXX *****************
-
-        self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
-
-        if len2 == 1:
-            assert len1 > 0
-            dest -= len1
-            cursor1 -= len1
-            copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
-            copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
-            copyElement_tup(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
-            copyElement_tup(tmp_data, cursor2, arr_data, dest)
-        elif len2 == 0:
-            raise ValueError("Comparison method violates its general contract!")
-        else:
-            assert len1 == 0
-            assert len2 > 0
-            copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
-            copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
-
-
-    # XXX refactored nested loop break
-    def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
-        arr = self.key_arrs
-        arr_data = self.data
-        tmp_data = self.tmp_data
+        # One run is winning so consistently that galloping may be a
+        # huge win. So try that, and continue galloping until (if ever)
+        # neither run appears to be winning consistently anymore.
 
         while True:
-            count1 = 0 # Number of times in a row that first run won
-            count2 = 0 # Number of times in a row that second run won
+            assert len1 > 1 and len2 > 0
+            count1 = gallopRight(self, getitem_arr_tup(arr, cursor2), tmp, cursor1, len1, 0)
+            if count1 != 0:
+                copyRange_tup(tmp, cursor1, arr, dest, count1)
+                copyRange_tup(tmp_data, cursor1, arr_data, dest, count1)
+                dest += count1
+                cursor1 += count1
+                len1 -= count1
+                if len1 <= 1: # len1 == 1 or len1 == 0
+                    return len1, len2, cursor1, cursor2, dest, minGallop
 
-            # Do the straightforward thing until (if ever) one run
-            # appears to win consistently.
+            copyElement_tup(arr, cursor2, arr, dest)
+            copyElement_tup(arr_data, cursor2, arr_data, dest)
+            cursor2 += 1
+            dest += 1
+            len2 -= 1
+            if len2 == 0:
+                return len1, len2, cursor1, cursor2, dest, minGallop
 
-            while True:
-                assert len1 > 0 and len2 > 1
-                if getitem_arr_tup(tmp, cursor2) < getitem_arr_tup(arr, cursor1):
-                    copyElement_tup(arr, cursor1, arr, dest)
-                    copyElement_tup(arr_data, cursor1, arr_data, dest)
-                    cursor1 -= 1
-                    dest -= 1
-                    count1 += 1
-                    count2 = 0
-                    len1 -= 1
-                    if len1 == 0:
-                        return len1, len2, tmp, cursor1, cursor2, dest, minGallop
-                else:
-                    copyElement_tup(tmp, cursor2, arr, dest)
-                    copyElement_tup(tmp_data, cursor2, arr_data, dest)
-                    cursor2 -=1
-                    dest -= 1
-                    count2 += 1
-                    count1 = 0
-                    len2 -= 1
-                    if len2 == 1:
-                        return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+            count2 = gallopLeft(self, getitem_arr_tup(tmp, cursor1), arr, cursor2, len2, 0)
+            if count2 != 0:
+                copyRange_tup(arr, cursor2, arr, dest, count2)
+                copyRange_tup(arr_data, cursor2, arr_data, dest, count2)
+                dest += count2
+                cursor2 += count2
+                len2 -= count2
+                if len2 == 0:
+                    return len1, len2, cursor1, cursor2, dest, minGallop
 
-                if not ((count1 | count2) < minGallop):
-                    break
+            copyElement_tup(tmp, cursor1, arr, dest)
+            copyElement_tup(tmp_data, cursor1, arr_data, dest)
+            cursor1 += 1
+            dest += 1
+            len1 -= 1
+            if len1 == 1:
+                return len1, len2, cursor1, cursor2, dest, minGallop
+            minGallop -= 1
+
+            if not (count1 >= MIN_GALLOP | count2 >= MIN_GALLOP):
+                break
+
+        if minGallop < 0:
+            minGallop = 0
+
+        minGallop += 2  # Penalize for leaving gallop mode
+
+    return len1, len2, cursor1, cursor2, dest, minGallop
 
 
-            # One run is winning so consistently that galloping may be a
-            # huge win. So try that, and continue galloping until (if ever)
-            # neither run appears to be winning consistently anymore.
 
-            while True:
-                assert len1 > 0 and len2 > 1
-                count1 = len1 - self.gallopRight(getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
-                if count1 != 0:
-                    dest -= count1
-                    cursor1 -= count1
-                    len1 -= count1
-                    copyRange_tup(arr, cursor1 + 1, arr, dest + 1, count1)
-                    copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, count1)
-                    if len1 == 0:
-                        return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+# Like mergeLo, except that this method should be called only if
+# len1 >= len2 mergeLo should be called if len1 <= len2.  (Either method
+# may be called if len1 == len2.)
 
-                copyElement_tup(tmp, cursor2, arr, dest)
-                copyElement_tup(tmp_data, cursor2, arr_data, dest)
-                cursor2 -= 1
-                dest -= 1
-                len2 -= 1
-                if len2 == 1:
-                    return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+# @param base1 index of first element in first run to be merged
+# @param len1  length of first run to be merged (must be > 0)
+# @param base2 index of first element in second run to be merged
+#       (must be aBase + aLen)
+# @param len2  length of second run to be merged (must be > 0)
+@numba.njit(no_cpython_wrapper=True)
+def mergeHi(self, base1, len1, base2, len2):
+    assert len1 > 0 and len2 > 0 and base1 + len1 == base2
 
-                count2 = len2 - self.gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
-                if count2 != 0:
-                    dest -= count2
-                    cursor2 -= count2
-                    len2 -= count2
-                    copyRange_tup(tmp, cursor2 + 1, arr, dest + 1, count2)
-                    copyRange_tup(tmp_data, cursor2 + 1, arr_data, dest + 1, count2)
-                    if len2 <= 1:  # len2 == 1 or len2 == 0
-                        return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+    # Copy second run into temp array
+    arr = self.key_arrs
+    arr_data = self.data
+    self.tmpLength, self.tmp, self.tmp_data = ensureCapacity(
+        self.tmpLength, self.tmp, self.tmp_data, self.key_arrs, self.data,
+        len2)
+    tmp = self.tmp
+    tmp_data = self.tmp_data
+    copyRange_tup(arr, base2, tmp, 0, len2)
+    copyRange_tup(arr_data, base2, tmp_data, 0, len2)
 
+    cursor1 = base1 + len1 - 1  # Indexes into arr
+    cursor2 = len2 - 1          # Indexes into tmp array
+    dest = base2 + len2 - 1     # Indexes into arr
+
+    # Move last element of first run and deal with degenerate cases
+    copyElement_tup(arr, cursor1, arr, dest)
+    copyElement_tup(arr_data, cursor1, arr_data, dest)
+    cursor1 -= 1
+    dest -= 1
+    len1 -= 1
+    if len1 == 0:
+        copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
+        copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
+        return
+
+    if len2 == 1:
+        dest -= len1
+        cursor1 -= len1
+        copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
+        copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
+        copyElement_tup(tmp, cursor2, arr, dest)
+        copyElement_tup(tmp_data, cursor2, arr_data, dest)
+        return
+
+    minGallop = self.minGallop
+
+    # XXX *************** refactored nested break into func
+    len1, len2, tmp, cursor1, cursor2, dest, minGallop = mergeHi_inner(
+        self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop)
+    # XXX *****************
+
+    self.minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
+
+    if len2 == 1:
+        assert len1 > 0
+        dest -= len1
+        cursor1 -= len1
+        copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
+        copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
+        copyElement_tup(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
+        copyElement_tup(tmp_data, cursor2, arr_data, dest)
+    elif len2 == 0:
+        raise ValueError("Comparison method violates its general contract!")
+    else:
+        assert len1 == 0
+        assert len2 > 0
+        copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
+        copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
+
+
+# XXX refactored nested loop break
+@numba.njit(no_cpython_wrapper=True)
+def mergeHi_inner(self, base1, len1, len2, tmp, cursor1, cursor2, dest, minGallop):
+    arr = self.key_arrs
+    arr_data = self.data
+    tmp_data = self.tmp_data
+
+    while True:
+        count1 = 0 # Number of times in a row that first run won
+        count2 = 0 # Number of times in a row that second run won
+
+        # Do the straightforward thing until (if ever) one run
+        # appears to win consistently.
+
+        while True:
+            assert len1 > 0 and len2 > 1
+            if getitem_arr_tup(tmp, cursor2) < getitem_arr_tup(arr, cursor1):
                 copyElement_tup(arr, cursor1, arr, dest)
                 copyElement_tup(arr_data, cursor1, arr_data, dest)
                 cursor1 -= 1
                 dest -= 1
+                count1 += 1
+                count2 = 0
                 len1 -= 1
                 if len1 == 0:
                     return len1, len2, tmp, cursor1, cursor2, dest, minGallop
-                minGallop -= 1
-                if not (count1 >= MIN_GALLOP | count2 >= MIN_GALLOP):
-                    break
-
-            if minGallop < 0:
-                minGallop = 0
-            minGallop += 2  # Penalize for leaving gallop mode
-
-        return len1, len2, tmp, cursor1, cursor2, dest, minGallop
-
-
-    # Ensures that the external array tmp has at least the specified
-    # number of elements, increasing its size if necessary.  The size
-    # increases exponentially to ensure amortized linear time complexity.
-
-    # @param minCapacity the minimum required capacity of the tmp array
-    # @return tmp, whether or not it grew
-
-    def ensureCapacity(self, minCapacity):
-        if self.tmpLength < minCapacity:
-            # Compute smallest power of 2 > minCapacity
-            newSize = minCapacity
-            newSize |= newSize >> 1
-            newSize |= newSize >> 2
-            newSize |= newSize >> 4
-            newSize |= newSize >> 8
-            newSize |= newSize >> 16
-            newSize += 1
-
-            if newSize < 0:  # Not bloody likely!
-                newSize = minCapacity
             else:
-                newSize = min(newSize, self.aLength >> 1)
+                copyElement_tup(tmp, cursor2, arr, dest)
+                copyElement_tup(tmp_data, cursor2, arr_data, dest)
+                cursor2 -=1
+                dest -= 1
+                count2 += 1
+                count1 = 0
+                len2 -= 1
+                if len2 == 1:
+                    return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
-            self.tmp = alloc_arr_tup(newSize, self.key_arrs)
-            self.tmp_data = alloc_arr_tup(newSize, self.data)
-            self.tmpLength = newSize
+            if not ((count1 | count2) < minGallop):
+                break
 
-        return self.tmp
+
+        # One run is winning so consistently that galloping may be a
+        # huge win. So try that, and continue galloping until (if ever)
+        # neither run appears to be winning consistently anymore.
+
+        while True:
+            assert len1 > 0 and len2 > 1
+            count1 = len1 - gallopRight(self, getitem_arr_tup(tmp, cursor2), arr, base1, len1, len1 - 1)
+            if count1 != 0:
+                dest -= count1
+                cursor1 -= count1
+                len1 -= count1
+                copyRange_tup(arr, cursor1 + 1, arr, dest + 1, count1)
+                copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, count1)
+                if len1 == 0:
+                    return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+
+            copyElement_tup(tmp, cursor2, arr, dest)
+            copyElement_tup(tmp_data, cursor2, arr_data, dest)
+            cursor2 -= 1
+            dest -= 1
+            len2 -= 1
+            if len2 == 1:
+                return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+
+            count2 = len2 - gallopLeft(self, getitem_arr_tup(arr, cursor1), tmp, 0, len2, len2 - 1)
+            if count2 != 0:
+                dest -= count2
+                cursor2 -= count2
+                len2 -= count2
+                copyRange_tup(tmp, cursor2 + 1, arr, dest + 1, count2)
+                copyRange_tup(tmp_data, cursor2 + 1, arr_data, dest + 1, count2)
+                if len2 <= 1:  # len2 == 1 or len2 == 0
+                    return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+
+            copyElement_tup(arr, cursor1, arr, dest)
+            copyElement_tup(arr_data, cursor1, arr_data, dest)
+            cursor1 -= 1
+            dest -= 1
+            len1 -= 1
+            if len1 == 0:
+                return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+            minGallop -= 1
+            if not (count1 >= MIN_GALLOP | count2 >= MIN_GALLOP):
+                break
+
+        if minGallop < 0:
+            minGallop = 0
+        minGallop += 2  # Penalize for leaving gallop mode
+
+    return len1, len2, tmp, cursor1, cursor2, dest, minGallop
+
+
+# Ensures that the external array tmp has at least the specified
+# number of elements, increasing its size if necessary.  The size
+# increases exponentially to ensure amortized linear time complexity.
+
+# @param minCapacity the minimum required capacity of the tmp array
+# @return tmp, whether or not it grew
+
+@numba.njit(no_cpython_wrapper=True)
+def ensureCapacity(tmpLength, tmp, tmp_data, key_arrs, data, minCapacity):
+    aLength = len(key_arrs[0])
+    if tmpLength < minCapacity:
+        # Compute smallest power of 2 > minCapacity
+        newSize = minCapacity
+        newSize |= newSize >> 1
+        newSize |= newSize >> 2
+        newSize |= newSize >> 4
+        newSize |= newSize >> 8
+        newSize |= newSize >> 16
+        newSize += 1
+
+        if newSize < 0:  # Not bloody likely!
+            newSize = minCapacity
+        else:
+            newSize = min(newSize, aLength >> 1)
+
+        tmp = alloc_arr_tup(newSize, key_arrs)
+        tmp_data = alloc_arr_tup(newSize, data)
+        tmpLength = newSize
+
+    return tmpLength, tmp, tmp_data
 
 
 ################### Utils #############
+
 
 def swap_arrs(data, lo, hi):  # pragma: no cover
     for arr in data:
@@ -1098,6 +1108,7 @@ def test():  # pragma: no cover
     # print(data)
     np.testing.assert_almost_equal(data[0], df2.B.values)
     np.testing.assert_almost_equal(data[1], df2.C.values)
+
 
 if __name__ == '__main__':  # pragma: no cover
     test()
