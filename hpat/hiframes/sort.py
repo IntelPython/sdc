@@ -291,7 +291,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     func_text += "  key_arrs = ({},)\n".format(key_name_args)
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(in_vars) == 1 else "")  # single value needs comma to become tuple
-    func_text += "  local_sort_f(key_arrs, data)\n"
+    func_text += "  hpat.hiframes.sort.local_sort(key_arrs, data)\n"
     func_text += "  return key_arrs, data\n"
 
     loc_vars = {}
@@ -300,11 +300,9 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
 
     key_typ = types.Tuple([typemap[v.name] for v in key_arrs])
     data_tup_typ = types.Tuple([typemap[v.name] for v in in_vars])
-    _local_sort_f = get_local_sort_func(key_typ, data_tup_typ)
 
     f_block = compile_to_numba_ir(sort_impl,
                                     {'hpat': hpat,
-                                    'local_sort_f': _local_sort_f,
                                     'to_string_list': to_string_list,
                                     'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
@@ -334,15 +332,14 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
         out_key, out_data = parallel_sort(key_arrs, data)
         # TODO: use k-way merge instead of sort
         # sort output
-        local_sort_f(out_key, out_data)
+        hpat.hiframes.sort.local_sort(out_key, out_data)
         return out_key, out_data
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat,
                                     'parallel_sort': parallel_sort,
                                     'to_string_list': to_string_list,
-                                    'cp_str_list_to_array': cp_str_list_to_array,
-                                    'local_sort_f': _local_sort_f},
+                                    'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
                                     (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
@@ -393,34 +390,14 @@ def to_string_list_typ(typ):
 
     return typ
 
-def get_local_sort_func(key_typ, data_tup_typ):
-    sort_state_spec = [
-        ('key_arrs', to_string_list_typ(key_typ)),
-        ('minGallop', numba.intp),
-        ('tmpLength', numba.intp),
-        ('tmp', to_string_list_typ(key_typ)),
-        ('stackSize', numba.intp),
-        ('runBase', numba.int64[:]),
-        ('runLen', numba.int64[:]),
-        ('data', to_string_list_typ(data_tup_typ)),
-        ('tmp_data', to_string_list_typ(data_tup_typ)),
-    ]
-    SortStateCL = numba.jitclass(sort_state_spec)(hpat.timsort.SortState)
 
-    # XXX: make sure function is not using old SortState
-    local_sort.__globals__['SortState'] = SortStateCL
-    _local_sort_f = numba.njit(local_sort)
-    _local_sort_f.compile(signature(types.none, key_typ, data_tup_typ))
-    return _local_sort_f
-
-
+@numba.njit(no_cpython_wrapper=True)
 def local_sort(key_arrs, data):
     # convert StringArray to list(string) to enable swapping in sort
     l_key_arrs = to_string_list(key_arrs)
     l_data = to_string_list(data)
     n_out = len(key_arrs[0])
-    sort_state_o = SortState(l_key_arrs, l_data)
-    hpat.timsort.sort(sort_state_o, l_key_arrs, 0, n_out, l_data)
+    hpat.timsort.sort(l_key_arrs, 0, n_out, l_data)
     cp_str_list_to_array(key_arrs, l_key_arrs)
     cp_str_list_to_array(data, l_data)
 

@@ -350,8 +350,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     if method == 'sort' and join_node.how != 'asof':
         # asof key is already sorted, TODO: add error checking
         # local sort
-        func_text += "    local_sort_f1(t1_keys, data_left)\n"
-        func_text += "    local_sort_f2(t2_keys, data_right)\n"
+        func_text += "    hpat.hiframes.sort.local_sort(t1_keys, data_left)\n"
+        func_text += "    hpat.hiframes.sort.local_sort(t2_keys, data_right)\n"
 
     # align output variables for local merge
     # add keys first (TODO: remove dead keys)
@@ -420,16 +420,6 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
                                   'cp_str_list_to_array': cp_str_list_to_array,
                                   'parallel_join': parallel_join,
                                   'parallel_asof_comm': parallel_asof_comm}
-
-    if method == 'sort':
-        left_keys_tup_typ = types.Tuple([typemap[v.name] for v in left_key_vars])
-        left_data_tup_typ = types.Tuple([typemap[v.name] for v in left_other_col_vars])
-        _local_sort_f1 = hpat.hiframes.sort.get_local_sort_func(left_keys_tup_typ, left_data_tup_typ)
-        right_keys_tup_typ = types.Tuple([typemap[v.name] for v in right_key_vars])
-        right_data_tup_typ = types.Tuple([typemap[v.name] for v in right_other_col_vars])
-        _local_sort_f2 = hpat.hiframes.sort.get_local_sort_func(right_keys_tup_typ, right_data_tup_typ)
-        glbs['local_sort_f1'] = _local_sort_f1
-        glbs['local_sort_f2'] = _local_sort_f2
 
     f_block = compile_to_numba_ir(join_impl,
                                   glbs,
