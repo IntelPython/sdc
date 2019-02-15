@@ -37,7 +37,7 @@ MPI_ROOT = 0
 
 class Sort(ir.Stmt):
     def __init__(self, df_in, df_out, key_arrs, out_key_arrs, df_in_vars,
-                                                    df_out_vars, inplace, loc):
+                                    df_out_vars, inplace, loc, ascending=True):
         # for printing only
         self.df_in = df_in
         self.df_out = df_out
@@ -46,6 +46,7 @@ class Sort(ir.Stmt):
         self.df_in_vars = df_in_vars
         self.df_out_vars = df_out_vars
         self.inplace = inplace
+        self.ascending = ascending
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
@@ -298,7 +299,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     func_text += "  key_arrs = ({},)\n".format(key_name_args)
     func_text += "  data = ({}{})\n".format(col_name_args,
         "," if len(in_vars) == 1 else "")  # single value needs comma to become tuple
-    func_text += "  hpat.hiframes.sort.local_sort(key_arrs, data)\n"
+    func_text += "  hpat.hiframes.sort.local_sort(key_arrs, data, {})\n".format(sort_node.ascending)
     func_text += "  return key_arrs, data\n"
 
     loc_vars = {}
@@ -334,9 +335,10 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
             gen_getitem(var, data_tup_var, i, calltypes, nodes)
         return nodes
 
+    ascending = sort_node.ascending
     # parallel case
     def par_sort_impl(key_arrs, data):
-        out_key, out_data = parallel_sort(key_arrs, data)
+        out_key, out_data = parallel_sort(key_arrs, data, ascending)
         # TODO: use k-way merge instead of sort
         # sort output
         hpat.hiframes.sort.local_sort(out_key, out_data)
@@ -346,7 +348,8 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
                                     {'hpat': hpat,
                                     'parallel_sort': parallel_sort,
                                     'to_string_list': to_string_list,
-                                    'cp_str_list_to_array': cp_str_list_to_array},
+                                    'cp_str_list_to_array': cp_str_list_to_array,
+                                    'ascending': ascending},
                                     typingctx,
                                     (key_typ, data_tup_typ),
                                     typemap, calltypes).blocks.popitem()[1]
@@ -399,18 +402,20 @@ def to_string_list_typ(typ):
 
 
 @numba.njit(no_cpython_wrapper=True, cache=True)
-def local_sort(key_arrs, data):
+def local_sort(key_arrs, data, ascending=True):
     # convert StringArray to list(string) to enable swapping in sort
     l_key_arrs = to_string_list(key_arrs)
     l_data = to_string_list(data)
     n_out = len(key_arrs[0])
     hpat.timsort.sort(l_key_arrs, 0, n_out, l_data)
+    if not ascending:
+        hpat.timsort.reverseRange(l_key_arrs, 0, n_out, l_data)
     cp_str_list_to_array(key_arrs, l_key_arrs)
     cp_str_list_to_array(data, l_data)
 
 
 @numba.njit(no_cpython_wrapper=True, cache=True)
-def parallel_sort(key_arrs, data):
+def parallel_sort(key_arrs, data, ascending=True):
     n_local = len(key_arrs)
     n_total = hpat.distributed_api.dist_reduce(n_local, np.int32(Reduce_Type.Sum.value))
 
@@ -432,6 +437,8 @@ def parallel_sort(key_arrs, data):
 
     if my_rank == MPI_ROOT:
         all_samples.sort()
+        if not ascending:
+            all_samples = all_samples[::-1]
         n_samples = len(all_samples)
         step = math.ceil(n_samples / n_pes)
         for i in range(n_pes - 1):
@@ -447,7 +454,9 @@ def parallel_sort(key_arrs, data):
     node_id = 0
     for i in range(n_local):
         val = key_arrs[0][i]
-        if node_id < (n_pes - 1) and val >= bounds[node_id]:
+        # TODO: refactor
+        if node_id < (n_pes - 1) and (ascending and val >= bounds[node_id]
+                                or (not ascending) and val <= bounds[node_id]):
             node_id += 1
         update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
             getitem_arr_tup(data, i), True)

@@ -997,7 +997,8 @@ class HiFramesTyped(object):
                 None, lhs.loc)
             nodes.append(agg_node)
             # TODO: handle args like sort=False
-            func = lambda A, B: hpat.hiframes.api.init_series(A, B)
+            func = lambda A, B: hpat.hiframes.api.init_series(
+                A, B).sort_values(ascending=False)
             return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
@@ -1092,10 +1093,18 @@ class HiFramesTyped(object):
             nodes.append(ir.Assign(
                 ir.Const(None, lhs.loc), none_index, lhs.loc))
             args = [out_index, none_index]
+            ascending = True
+        else:
+            # TODO refactor to use overload_method
+            ascending = self._get_arg(
+                'sort_values', rhs.args, dict(rhs.kws), 1, 'ascending',
+                default=True)
+            if isinstance(ascending, ir.Var):  # TODO: check error
+                ascending = find_const(self.func_ir, ascending)
 
         # Sort node
         nodes.append(hiframes.sort.Sort(data.name, lhs.name, in_keys,
-            out_keys, in_df, out_df, False, lhs.loc))
+            out_keys, in_df, out_df, False, lhs.loc, ascending))
 
         # create output Series
         return self._replace_func(
@@ -2374,6 +2383,21 @@ class HiFramesTyped(object):
         apply_copies_func(inst, varmap, None, None, None, None)
         return out_nodes
 
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = args[arg_no]
+        elif arg_name in kws:
+            arg = kws[arg_name]
+
+        if arg is None:
+            if default is not None:
+                return default
+            if err_msg is None:
+                err_msg = "{} requires '{}' argument".format(f_name, arg_name)
+            raise ValueError(err_msg)
+        return arg
 
 def _fix_typ_undefs(new_typ, old_typ):
     if isinstance(old_typ, (types.Array, SeriesType)):
