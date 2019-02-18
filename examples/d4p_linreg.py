@@ -2,7 +2,7 @@ import daal4py
 import hpat
 import numpy as np
 
-daal4py.daalinit(spmd=True)
+daal4py.daalinit()
 
 @hpat.jit
 def lr_predict(N, D, model):

@@ -2,13 +2,13 @@ import daal4py
 import hpat
 import numpy as np
 
-daal4py.daalinit(spmd=True)
+daal4py.daalinit()
 
-@hpat.jit
+@hpat.jit(nopython=True)
 def kmeans(N, D, nClusters, maxit):
     a = np.random.ranf((N,D)) # doesn't make much sense, but ok for now
     kmi = daal4py.kmeans_init(nClusters, method='plusPlusDense')
-    km = daal4py.kmeans(nClusters, maxit, assignFlag=True)
+    km = daal4py.kmeans(nClusters, maxit)
     kmr = km.compute(a, kmi.compute(a).centroids)
     return (kmr.centroids, kmr.assignments, kmr.objectiveFunction, kmr.goalFunction, kmr.nIterations)
 
