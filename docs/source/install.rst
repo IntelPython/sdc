@@ -6,7 +6,10 @@ Installing HPAT
 HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_ environment
 easily. On Linux/Mac/Windows::
 
-    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge hpat
+    conda create -n HPAT -c ehsantn -c anaconda -c conda-forge hpat
+
+.. used if master of Numba is needed for latest hpat package
+.. conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
 
 Windows installaton requires
 `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
@@ -25,7 +28,7 @@ such as Numba on Ubuntu Linux::
     export PATH=$HOME/miniconda3/bin:$PATH
     conda create -n HPAT -q -y numpy scipy pandas boost cmake
     source activate HPAT
-    conda install -c numba numba
+    conda install -c numba/label/dev numba
     conda install mpich mpi -c conda-forge
     conda install pyarrow
     conda install h5py -c ehsantn
@@ -62,7 +65,7 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and 
 * Start 'Anaconda prompt'
 * Setup the Conda environment in Anaconda Prompt::
 
-    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge python=3.6 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
+    conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge python=3.6 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
     activate HPAT
     git clone https://github.com/IntelLabs/hpat.git
     cd hpat

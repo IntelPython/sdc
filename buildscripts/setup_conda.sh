@@ -39,7 +39,7 @@ else
 fi
 
 $CONDA_INSTALL mpich mpi -c conda-forge --no-deps
-$CONDA_INSTALL -c numba numba
+$CONDA_INSTALL -c numba/label/dev numba
 $CONDA_INSTALL libgfortran
 $CONDA_INSTALL h5py -c ehsantn --override-channels
 

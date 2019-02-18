@@ -30,7 +30,10 @@ Installation
 HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_
 environment easily (Linux/Mac/Windows)::
 
-    conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge hpat
+    conda create -n HPAT -c ehsantn -c anaconda -c conda-forge hpat
+
+.. used if master of Numba is needed for latest hpat package
+.. conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
 
 Windows installaton requires
 `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
