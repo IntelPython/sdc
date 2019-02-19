@@ -388,17 +388,6 @@ def std_str_to_unicode(typingctx, unicode_t=None):
         return gen_std_str_to_unicode(context, builder, args[0], True)
     return string_type(std_str_type), codegen
 
-# XXX using std_str.split() until Numba can support split()
-@overload_method(types.UnicodeType, 'split')
-def unicode_split_overload(in_str_t, sep_t):
-    if sep_t == string_type or isinstance(sep_t, types.StringLiteral):
-        def _split_impl(in_str, sep):
-            std_str = unicode_to_std_str(in_str)
-            l = std_str.split(unicode_to_std_str(sep))
-            return [std_str_to_unicode(s) for s in l]
-
-        return _split_impl
-
 
 @intrinsic
 def alloc_str_list(typingctx, n_t=None):
