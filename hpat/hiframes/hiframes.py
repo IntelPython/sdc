@@ -22,7 +22,7 @@ from numba.analysis import compute_cfg_from_blocks
 
 import hpat
 from hpat import utils, pio, parquet_pio, config
-from hpat.hiframes import filter, hiframes_typed, join, aggregate, sort
+from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
     inline_new_blocks, ReplaceFunc, is_call)
 from hpat.hiframes.api import PandasDataFrameType
@@ -61,7 +61,7 @@ def remove_hiframes(rhs, lives, call_list):
             'str_contains_regex', 'str_contains_noregex', 'column_sum',
             'nunique', 'init_series', 'init_datetime_index']):
         return True
-    if (len(call_list) == 4 and call_list[1:] == ['hiframes_typed', 'hiframes', hpat] and
+    if (len(call_list) == 4 and call_list[1:] == ['series_kernels', 'hiframes', hpat] and
             call_list[0]
             in ['_sum_handle_nan', '_mean_handle_nan', '_var_handle_nan']):
         return True

@@ -46,7 +46,7 @@ supported_agg_funcs = ['sum', 'count', 'mean',
 
 
 def get_agg_func(func_ir, func_name, rhs):
-    from hpat.hiframes.hiframes_typed import series_replace_funcs
+    from hpat.hiframes.series_kernels import series_replace_funcs
     if func_name == 'var':
         return _column_var_impl_linear
     if func_name == 'std':
@@ -74,6 +74,18 @@ def get_agg_func(func_ir, func_name, rhs):
     agg_func_wrapper.__code__ = agg_func.code
     agg_func = agg_func_wrapper
     return agg_func
+
+
+# type(dtype) is called by np.full (used in agg_typer)
+@infer_global(type)
+class TypeDt64(AbstractTemplate):
+
+    def generic(self, args, kws):
+        assert not kws
+        if len(args) == 1 and isinstance(args[0], (types.NPDatetime, types.NPTimedelta)):
+            classty = types.DType(args[0])
+            return signature(classty, *args)
+
 
 # combine function takes the reduce vars in reverse order of their user
 @numba.njit
