@@ -37,7 +37,6 @@ from hpat.hiframes import series_kernels
 from hpat.hiframes.series_kernels import series_replace_funcs
 
 
-LARGE_WIN_SIZE = 10
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
                 operator.eq, operator.ne, operator.ge, operator.gt,

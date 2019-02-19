@@ -41,7 +41,6 @@ from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
 
-LARGE_WIN_SIZE = 10
 
 
 def remove_hiframes(rhs, lives, call_list):
