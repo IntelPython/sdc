@@ -27,6 +27,27 @@ ll.add_symbol('_hash_str', hstr_ext.hash_str)
 string_type = types.unicode_type
 
 
+# XXX setting hash secret for hash(unicode_type) to be consistent across
+# processes. Other wise, shuffle operators like unique_str_parallel will fail.
+# TODO: use a seperate implementation?
+# TODO: make sure hash(str) is not already instantiated in overloads
+# def _rm_hash_str_overload():
+#     try:
+#         fn = numba.targets.registry.cpu_target.typing_context.resolve_value_type(hash)
+#         sig = signature(types.int64, types.unicode_type)
+#         key = fn.get_impl_key(sig)
+#         numba.targets.registry.cpu_target.target_context._defns[key]._cache.pop(sig.args)
+#     except:
+#         pass
+
+# _rm_hash_str_overload()
+
+import numba.targets.hashing
+numba.targets.hashing._Py_HashSecret_djbx33a_suffix = 0
+numba.targets.hashing._Py_HashSecret_siphash_k0 = 0
+numba.targets.hashing._Py_HashSecret_siphash_k1 = 0
+
+
 #######################  type for std string pointer  ########################
 
 
