@@ -103,6 +103,7 @@ class DistributedAnalysis(object):
                 self._set_REP(inst.list_vars(), array_dists)
 
     def _analyze_assign(self, inst, array_dists, parfor_dists):
+        from hpat.hiframes.api import PandasDataFrameType
         lhs = inst.target.name
         rhs = inst.value
         # treat return casts like assignments
@@ -110,7 +111,7 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
-                or isinstance(self.typemap[lhs], SeriesType)
+                or isinstance(self.typemap[lhs], (SeriesType, PandasDataFrameType))
                                      or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
@@ -782,13 +783,14 @@ class DistributedAnalysis(object):
         return new_dist
 
     def _set_REP(self, var_list, array_dists):
+        from hpat.hiframes.api import PandasDataFrameType
         for var in var_list:
             varname = var.name
             # Handle SeriesType since it comes from Arg node and it could
             # have user-defined distribution
             if (is_array(self.typemap, varname)
                     or is_array_container(self.typemap, varname)
-                    or isinstance(self.typemap[varname], SeriesType)):
+                    or isinstance(self.typemap[varname], (SeriesType, PandasDataFrameType))):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
