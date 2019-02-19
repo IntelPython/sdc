@@ -80,12 +80,11 @@ _binop_to_str = {
 class HiFramesTyped(object):
     """Analyze and transform hiframes calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes, return_type=None):
+    def __init__(self, func_ir, typingctx, typemap, calltypes):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.typemap = typemap
         self.calltypes = calltypes
-        self.return_type = return_type
         # keep track of tuple variables change by to_const_tuple
         self._type_changed_vars = []
 
@@ -230,7 +229,7 @@ class HiFramesTyped(object):
 
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "after hiframes_typed")
-        return (self.return_type)
+        return
 
     def _run_assign(self, assign):
         lhs = assign.target.name
