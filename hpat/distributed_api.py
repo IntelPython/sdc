@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 import numba
 from numba import types
@@ -581,10 +582,8 @@ class DistCommReqDeAlloc(AbstractTemplate):
         assert len(args) == 1 and args[0] == req_array_type
         return signature(types.none, *unliteral_all(args))
 
-@infer
+@infer_global(operator.setitem)
 class SetItemReqArray(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         [ary, idx, val] = args

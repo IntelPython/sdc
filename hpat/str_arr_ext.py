@@ -432,10 +432,8 @@ class GetItemStringArray(AbstractTemplate):
             elif idx == types.Array(types.intp, 1, 'C'):
                 return signature(string_array_type, *args)
 
-@infer
+@infer_global(operator.setitem)
 class SetItemStringArray(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         ary, idx, val = args
@@ -912,7 +910,7 @@ def set_null_bits(typingctx, str_arr_typ=None):
     return types.none(string_array_type), codegen
 
 # XXX: setitem works only if value is same size as the previous value
-@lower_builtin('setitem', StringArrayType, types.Integer, string_type)
+@lower_builtin(operator.setitem, StringArrayType, types.Integer, string_type)
 def setitem_str_arr(context, builder, sig, args):
     arr, ind, val = args
     uni_str = cgutils.create_struct_proxy(string_type)(

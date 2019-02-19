@@ -236,7 +236,7 @@ def iternext_listiter(context, builder, sig, args, result):
 #     return f
 
 # XXX possible overload bug
-# @overload("setitem")
+# @overload(operator.setitem)
 # def setitem_dict(dict_typ, key_typ, val_typ):
 #     def f(k, dict_int):
 #         return dict_int_int_in(dict_int, k)
@@ -298,10 +298,8 @@ def type_dict_int32(context):
     return typer
 
 
-@infer
+@infer_global(operator.setitem)
 class SetItemDict(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         dict_t, _, _ = args
         if isinstance(dict_t, DictType):
@@ -396,7 +394,7 @@ def impl_dict_int_int(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-@lower_builtin('setitem', DictType, types.Any, types.Any)
+@lower_builtin(operator.setitem, DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
     _, key_typ, val_typ = sig.args
     dct, key, val = args
@@ -546,7 +544,7 @@ def impl_dict_int32_int32(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-# @lower_builtin('setitem', DictType, types.int32, types.int32)
+# @lower_builtin(operator.setitem, DictType, types.int32, types.int32)
 # def setitem_dict_int32(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
 #         8).as_pointer(), lir.IntType(32), lir.IntType(32)])

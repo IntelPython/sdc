@@ -1,3 +1,4 @@
+import operator
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
@@ -407,7 +408,7 @@ def lower_dist_comm_req_dealloc(context, builder, sig, args):
     return context.get_dummy_value()
 
 
-@lower_builtin('setitem', ReqArrayType, types.intp, mpi_req_numba_type)
+@lower_builtin(operator.setitem, ReqArrayType, types.intp, mpi_req_numba_type)
 def setitem_req_array(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
                                              lir.IntType(64),

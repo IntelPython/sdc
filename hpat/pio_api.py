@@ -131,10 +131,8 @@ class GetItemH5File(AbstractTemplate):
         if in_f == h5dataset_or_group_type and in_idx == string_type:
             return signature(h5dataset_or_group_type, in_f, in_idx)
 
-@infer
+@infer_global(operator.setitem)
 class SetItemH5Dset(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         if args[0] == h5dataset_type:

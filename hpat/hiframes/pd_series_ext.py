@@ -793,10 +793,8 @@ class GetItemSeries(AbstractTemplate):
                 sig.return_type = pandas_timestamp_type
         return sig
 
-@infer
+@infer_global(operator.setitem)
 class SetItemSeries(SetItemBuffer):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         series, idx, val = args
@@ -810,10 +808,8 @@ class SetItemSeries(SetItemBuffer):
             res.args = (new_series, res.args[1], res.args[2])
             return res
 
-@infer
+@infer_global(operator.setitem)
 class SetItemSeriesIat(SetItemSeries):
-    key = "setitem"
-
     def generic(self, args, kws):
         # iat[] is the same as regular setitem
         if isinstance(args[0], SeriesIatType):
