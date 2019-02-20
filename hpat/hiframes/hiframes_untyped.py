@@ -40,7 +40,7 @@ from hpat.hiframes.pd_series_ext import SeriesType, string_series_type
 from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
-
+import hpat.hiframes.pd_dataframe_ext
 
 
 def remove_hiframes(rhs, lives, call_list):
@@ -748,11 +748,34 @@ class HiFrames(object):
             raise ValueError(
                 "Invalid DataFrame() arguments (constant dict of columns expected)")
         nodes, items = self._fix_df_arrays(arg_def.items)
-        df_nodes, col_map = self._process_df_build_map(items)
-        nodes += df_nodes
-        self._create_df(lhs.name, col_map, label)
-        # remove DataFrame call
-        return nodes
+
+        n_cols = len(items)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+        col_args = ", ".join('col{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}, index, {}):\n".format(data_args, col_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, index, {})\n".format(
+            data_args, col_args)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        # TODO: support index var
+        index = ir.Var(lhs.scope, mk_unique_var('df_index_none'), lhs.loc)
+        nodes.append(ir.Assign(ir.Const(None, lhs.loc), index, lhs.loc))
+        data_vars = [a[1] for a in items]
+        col_vars = [a[0] for a in items]
+        args = data_vars + [index] + col_vars
+
+        return self._replace_func(_init_df, args,
+                    pre_nodes=nodes
+                )
+
+        # df_nodes, col_map = self._process_df_build_map(items)
+        # nodes += df_nodes
+        # self._create_df(lhs.name, col_map, label)
+        # # remove DataFrame call
+        # return nodes
 
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call

@@ -524,6 +524,9 @@ class HiFramesTyped(object):
         if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
             return self._handle_sorted_by_key(rhs)
 
+        if fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
+            return [assign]
+
         # convert Series to Array for unhandled calls
         # TODO check all the functions that get here and handle if necessary
         nodes = []

@@ -1,0 +1,151 @@
+import operator
+import pandas as pd
+import numpy as np
+import numba
+from numba import types, cgutils
+from numba.extending import (models, register_model, lower_cast, infer_getattr,
+    type_callable, infer, overload, make_attribute_wrapper, intrinsic)
+from numba.typing.templates import (infer_global, AbstractTemplate, signature,
+    AttributeTemplate, bound_function)
+from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
+    ArrayAttribute, SetItemBuffer)
+from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
+    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
+    NdConstructorLike)
+import hpat
+from hpat.hiframes.pd_series_ext import SeriesType
+from hpat.str_ext import string_type, list_string_array_type
+from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
+    str_arr_payload_type, StringArrayType, GetItemStringArray)
+from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
+from hpat.hiframes.rolling import supported_rolling_funcs
+import datetime
+
+
+class DataFrameType(types.Type):  # TODO: IterableType over column names
+    """Temporary type class for DataFrame objects.
+    """
+    def __init__(self, data=None, index=None, columns=None):
+        # data is tuple of Array types
+        # index is Array type (TODO: Index obj)
+        # columns is tuple of strings
+
+        self.data = data
+        if index is None:
+            index = types.none
+        self.index = index
+        self.columns = columns
+        super(DataFrameType, self).__init__(
+            name="dataframe({}, {}, {})".format(data, index, columns))
+
+    def copy(self):
+        # XXX is copy necessary?
+        index = types.none if self.index == types.none else self.index.copy()
+        data = tuple(a.copy() for a in self.data)
+        return DataFrameType(data, index, self.columns)
+
+    @property
+    def key(self):
+        # needed?
+        return self.data, self.index, self.columns
+
+    def unify(self, typingctx, other):
+        if (isinstance(other, DataFrameType)
+                and len(other.data) == len(self.data)
+                and other.columns == self.columns):
+            new_index = types.none
+            if self.index != types.none and other.index != types.none:
+                new_index = self.index.unify(typingctx, other.index)
+            elif other.index != types.none:
+                new_index = other.index
+            elif self.index != types.none:
+                new_index = self.index
+
+            data = tuple(a.unify(typingctx, b) for a,b in zip(self.data, other.data))
+            return DataFrameType(data, new_index, self.columns)
+
+    def can_convert_to(self, typingctx, other):
+        if (isinstance(other, DataFrameType)
+                and len(other.data) == len(self.data)
+                and other.columns == self.columns):
+            data_convert = max(a.can_convert_to(b)
+                                for a,b in zip(self.data, other.data))
+            if self.index == types.none and other.index == types.none:
+                return data_convert
+            if self.index != types.none and other.index != types.none:
+                return max(data_convert,
+                    self.index.can_convert_to(typingctx, other.index))
+
+    def is_precise(self):
+        return all(a.is_precise() for a in self.data) and self.index.is_precise()
+
+@register_model(DataFrameType)
+class DataFrameModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [
+            ('data', types.Tuple(fe_type.data)),
+            ('index', fe_type.index),
+            ('columns', types.UniTuple(string_type, len(fe_type.columns))),
+        ]
+        super(DataFrameModel, self).__init__(dmm, fe_type, members)
+
+make_attribute_wrapper(DataFrameType, 'data', '_data')
+make_attribute_wrapper(DataFrameType, 'index', '_index')
+make_attribute_wrapper(DataFrameType, 'columns', '_columns')
+
+
+@infer_getattr
+class DataFrameAttribute(AttributeTemplate):
+    key = DataFrameType
+
+    def generic_resolve(self, df, attr):
+        ind = df.columns.index(attr)
+        arr_typ = df.data[ind]
+        return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
+
+
+@intrinsic
+def init_dataframe(typingctx, *args):
+    """Create a DataFrame with provided data, index and columns values.
+    Used as a single constructor for DataFrame and assigning its data, so that
+    optimization passes can look for init_dataframe() to see if underlying
+    data has changed, and get the array variables from init_dataframe() args if
+    not changed.
+    """
+
+    n_cols = len(args)//2
+    data_typs = tuple(args[:n_cols])
+    index_typ = args[n_cols]
+    column_names = tuple(a.literal_value for a in args[n_cols+1:])
+
+    def codegen(context, builder, signature, args):
+        in_tup = args[0]
+        data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
+        index = builder.extract_value(in_tup, n_cols)
+        column_strs = [numba.unicode.make_string_from_constant(
+                    context, builder, string_type, c) for c in column_names]
+        # create dataframe struct and store values
+        dataframe = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+
+        data_tup = context.make_tuple(builder, types.Tuple(data_typs), data_arrs)
+        column_tup = context.make_tuple(builder, types.UniTuple(string_type, n_cols), column_strs)
+
+        dataframe.data = data_tup
+        dataframe.index = index
+        dataframe.columns = column_tup
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, index_typ, index)
+            for var, typ in zip(data_arrs, data_typs):
+                context.nrt.incref(builder, typ, var)
+            for var in column_strs:
+                context.nrt.incref(builder, string_type, var)
+
+        return dataframe._getvalue()
+
+    ret_typ = DataFrameType(data_typs, index_typ, column_names)
+    sig = signature(ret_typ, types.Tuple(args))
+    return sig, codegen
