@@ -7,6 +7,7 @@ import hpat.hiframes.hiframes_untyped
 import hpat.hiframes.hiframes_typed
 from hpat.hiframes.hiframes_untyped import HiFrames
 from hpat.hiframes.hiframes_typed import HiFramesTyped
+from hpat.hiframes.dataframe_pass import DataFramePass
 import numba
 import numba.compiler
 from numba import ir_utils, ir, postproc
@@ -160,6 +161,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # hiframes typed pass should be before pre_parfor since variable types
         # need updating, and A.call to np.call transformation is invalid for
         # Series (e.g. S.var is not the same as np.var(S))
+        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
         pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:
@@ -237,6 +239,16 @@ class HPATPipeline(numba.compiler.BasePipeline):
                                 self.type_annotation.calltypes)
         df_pass.run()
 
+    def stage_dataframe_pass(self):
+        """
+        Convert DataFrames after typing
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        df_pass = DataFramePass(self.func_ir, self.typingctx,
+                                self.type_annotation.typemap,
+                                self.type_annotation.calltypes)
+        df_pass.run()
 
 class HPATPipelineSeq(HPATPipeline):
     """HPAT pipeline without the distributed pass (used in rolling kernels)
@@ -251,6 +263,8 @@ class HPATPipelineSeq(HPATPipeline):
         pm.add_stage(self.stage_df_pass, "convert DataFrames")
         pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
         self.add_typing_stage(pm)
+        # TODO: dataframe pass needed?
+        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
         pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:
