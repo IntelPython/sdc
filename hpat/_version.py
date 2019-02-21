@@ -137,6 +137,9 @@ def git_get_keywords(versionfile_abs):
     # so we do it with a regexp instead. This function is not used from
     # _version.py.
     keywords = {}
+    # Don't open symlinks for security reasons.
+    if os.path.islink(versionfile_abs):
+        return keywords
     try:
         f = open(versionfile_abs, "r")
         for line in f.readlines():
