@@ -149,3 +149,16 @@ def init_dataframe(typingctx, *args):
     ret_typ = DataFrameType(data_typs, index_typ, column_names)
     sig = signature(ret_typ, types.Tuple(args))
     return sig, codegen
+
+
+# TODO: alias analysis
+# this function should be used for getting df._data for alias analysis to work
+# no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
+@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
+def get_dataframe_data(df, i):
+    return lambda df, i: df._data[i]
+
+# TODO: use separate index type instead of just storing array
+@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
+def get_dataframe_index(df):
+    return lambda df: df._index

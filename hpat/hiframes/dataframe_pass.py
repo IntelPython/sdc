@@ -252,17 +252,22 @@ class DataFramePass(object):
         if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
             return var_def.args[ind]
 
+        loc = df_var.loc
+        ind_var = ir.Var(df_var.scope, mk_unique_var('col_ind'), loc)
+        self.typemap[ind_var.name] = types.intp
+        nodes.append(ir.Assign(ir.Const(ind, loc), ind_var, loc))
         # XXX use get_series_data() for getting data instead of S._data
         # to enable alias analysis
         f_block = compile_to_numba_ir(
-            lambda S: hpat.hiframes.pd_dataframe_ext.get_dataframe_data(S, ind),
-            {'hpat': hpat, 'ind': ind},
+            lambda df, c_ind: hpat.hiframes.pd_dataframe_ext.get_dataframe_data(
+                df, c_ind),
+            {'hpat': hpat},
             self.typingctx,
-            (df_typ,),
+            (df_typ, types.intp),
             self.typemap,
             self.calltypes
         ).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [df_var])
+        replace_arg_nodes(f_block, [df_var, ind_var])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
