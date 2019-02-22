@@ -313,9 +313,6 @@ class HiFrames(object):
         if fdef == ('Series', 'pandas'):
             return self._handle_pd_Series(assign, lhs, rhs)
 
-        if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
-            return self._df_len(lhs, rhs.args[0])
-
         if fdef == ('read_table', 'pyarrow.parquet'):
             return self._handle_pq_read_table(assign, lhs, rhs)
 
@@ -918,19 +915,6 @@ class HiFrames(object):
         return self._replace_func(
             lambda arr: hpat.hiframes.api.to_numeric(arr, dtype),
             [arg], extra_globals={'dtype': dtype})
-
-    def _df_len(self, lhs, df_var):
-        # run len on one of the columns
-        # FIXME: it could potentially avoid remove dead for the column if
-        # array analysis doesn't replace len() with it's size
-        df_arrs = list(self.df_vars[df_var.name].values())
-        # empty dataframe has 0 len
-        if len(df_arrs) == 0:
-            return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
-        arr = df_arrs[0]
-        def f(df_arr):  # pragma: no cover
-            return len(df_arr)
-        return self._replace_func(f, [arr])
 
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
