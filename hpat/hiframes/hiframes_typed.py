@@ -2216,16 +2216,11 @@ class HiFramesTyped(object):
             # be updated for lowering to work
             # XXX: new_sig could be None for things like np.int32()
             if call in self.calltypes and new_sig is not None:
-                # for box_df, don't change return type so that information
-                # such as Categorical dtype is preserved
-                if isinstance(sig.return_type, hpat.hiframes.api.PandasDataFrameType):
-                    new_sig.return_type = sig.return_type
-                else:
-                    old_sig = self.calltypes[call]
-                    # fix types with undefined dtypes in empty_inferred, etc.
-                    return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
-                    args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
-                    new_sig = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
+                old_sig = self.calltypes[call]
+                # fix types with undefined dtypes in empty_inferred, etc.
+                return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
+                args = tuple(_fix_typ_undefs(a, b) for a,b  in zip(new_sig.args, old_sig.args))
+                new_sig = Signature(return_type, args, new_sig.recvr, new_sig.pysig)
 
         if new_sig is not None:
             # XXX sometimes new_sig is None for some reason

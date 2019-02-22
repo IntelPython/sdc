@@ -674,7 +674,7 @@ class DistributedPass(object):
             return [assign]
 
         if (fdef == ('get_series_data', 'hpat.hiframes.api')
-                or fdef == ('unbox_df_column', 'hpat.hiframes.boxing')):
+                or fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext')):
             out = [assign]
             arr = assign.target
             # gen len() using 1D_Var reduce approach.
