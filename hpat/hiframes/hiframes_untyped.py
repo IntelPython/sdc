@@ -25,7 +25,7 @@ from hpat import utils, pio, parquet_pio, config
 from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
     inline_new_blocks, ReplaceFunc, is_call)
-from hpat.hiframes.api import PandasDataFrameType
+import hpat.hiframes.api
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat import csv_ext
@@ -66,7 +66,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['dist_return', 'distributed_api', hpat]:
         return True
-    if call_list == ['unbox_df_column', 'boxing', 'hiframes', hpat]:
+    if call_list == ['init_dataframe', 'pd_dataframe_ext', 'hiframes', hpat]:
         return True
     if call_list == ['agg_typer', 'api', 'hiframes', hpat]:
         return True
@@ -1861,37 +1861,6 @@ class HiFrames(object):
 
         # TODO: handle datetime.date() series
 
-        # input dataframe arg
-        if isinstance(self.args[arg_ind], PandasDataFrameType):
-            df_typ = self.args[arg_ind]
-            df_items = {}
-            for i, col in enumerate(df_typ.col_names):
-                col_dtype = df_typ.col_types[i]
-                if col_dtype == string_type:
-                    alloc_dt = 11  # dummy string value
-                elif col_dtype == types.List(string_type):
-                    alloc_dt = 13  # dummy list(str) value
-                elif col_dtype == types.boolean:
-                    alloc_dt = "np.bool_"
-                elif col_dtype == types.NPDatetime('ns'):
-                    alloc_dt = 12  # XXX const code for dt64 since we can't init dt64 dtype
-                else:
-                    alloc_dt = "np.{}".format(col_dtype)
-
-                func_text = "def f(_df):\n"
-                func_text += "  _col_input_{} = hpat.hiframes.api.init_series(hpat.hiframes.boxing.unbox_df_column(_df, {}, {}))\n".format(col, i, alloc_dt)
-                loc_vars = {}
-                exec(func_text, {}, loc_vars)
-                f = loc_vars['f']
-                f_block = compile_to_numba_ir(f,
-                            {'hpat': hpat, 'np': np}).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [arg_var])
-                nodes += f_block.body[:-3]
-                df_items[col] = nodes[-1].target
-
-            self._create_df(arg_var.name, df_items, label)
-            return nodes
-
         return nodes
 
     def _handle_metadata(self):
@@ -1943,28 +1912,6 @@ class HiFrames(object):
 
         return
 
-    def _box_return_df(self, df_map):
-        #
-        arrs = list(df_map.values())
-        names = list(df_map.keys())
-        n_cols = len(arrs)
-
-        arg_names = ", ".join(['in_{}'.format(i) for i in range(n_cols)])
-        col_names = ", ".join(['"{}"'.format(cname) for cname in names])
-
-        func_text = "def f({}):\n".format(arg_names)
-        func_text += "  _dt_arr = hpat.hiframes.boxing.box_df({}, {})\n".format(col_names, arg_names)
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        f_block = compile_to_numba_ir(
-            f, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, arrs)
-        nodes = f_block.body[:-3]  # remove none return
-        return nodes
-
-
     def _add_node_defs(self, nodes):
         # TODO: add node defs for all new nodes
         loc = ir.Loc("", -1)
@@ -1984,30 +1931,8 @@ class HiFrames(object):
         loc = cast.loc
         # XXX: using split('.') since the variable might be renamed (e.g. A.2)
         ret_name = cast.value.name.split('.')[0]
-        # if boxing df is required
-        if self._is_df_var(cast.value):
-            col_map = self.df_vars[cast.value.name]
-            nodes = []
-            # dist return arrays first
-            if ret_name in flagged_vars:
-                new_col_map = {}
-                flag = ('distributed' if ret_name in self.metadata['distributed']
-                        else 'threaded')
-                for cname, var in col_map.items():
-                    nodes += self._gen_replace_dist_return(var, flag)
-                    new_col_map[cname] = nodes[-1].target
-                col_map = new_col_map
 
-            nodes += self._box_return_df(col_map)
-            new_arr = nodes[-1].target
-            new_cast = ir.Expr.cast(new_arr, loc)
-            new_out = ir.Var(scope, mk_unique_var("df_return"), loc)
-            nodes.append(ir.Assign(new_cast, new_out, loc))
-            ret_node.value = new_out
-            nodes.append(ret_node)
-            return nodes
-
-        elif ret_name in flagged_vars:
+        if ret_name in flagged_vars:
             flag = ('distributed' if ret_name in self.metadata['distributed']
                         else 'threaded')
             nodes = self._gen_replace_dist_return(cast.value, flag)

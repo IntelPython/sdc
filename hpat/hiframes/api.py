@@ -733,13 +733,6 @@ class ToNumeric(AbstractTemplate):
         dtype = args[1].dtype
         return signature(SeriesType(dtype), *unliteral_all(args))
 
-class PandasDataFrameType(types.Type):
-    def __init__(self, col_names, col_types):
-        self.col_names = col_names
-        self.col_types = col_types
-        super(PandasDataFrameType, self).__init__(
-            name='PandasDataFrameType({}, {})'.format(col_names, col_types))
-
 
 def set_df_col(df, cname, arr):
     df[cname] = arr
@@ -753,7 +746,7 @@ class SetDfColInfer(AbstractTemplate):
         return signature(types.none, *args)
 
 
-@lower_builtin(set_df_col, PandasDataFrameType, types.Literal, types.Array)
+#@lower_builtin(set_df_col, DataFrameType, types.Literal, types.Array)
 def set_df_col_lower(context, builder, sig, args):
     #
     col_name = sig.args[1].literal_value

@@ -344,10 +344,6 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('unbox_df_column', 'hpat.hiframes.boxing'):
-            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
-            return
-
         if fdef == ('init_series', 'hpat.hiframes.api'):
             # lhs, in_arr, and index should have the same distribution
             new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)

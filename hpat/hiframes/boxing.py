@@ -14,7 +14,6 @@ from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
 import hpat
-from hpat.hiframes.api import PandasDataFrameType
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
     unbox_datetime_date_array, box_datetime_date_array)
@@ -39,8 +38,6 @@ def typeof_pd_dataframe(val, c):
     col_types = get_hiframes_dtypes(val)
     return DataFrameType(col_types, None, col_names)
 
-register_model(PandasDataFrameType)(models.OpaqueModel)
-
 
 # register series types for import
 @typeof_impl.register(pd.Series)
@@ -64,15 +61,6 @@ def typeof_pd_index(val, c):
         return SeriesType(datetime_date_type)
     else:
         raise NotImplementedError("unsupported pd.Index type")
-
-
-@unbox(PandasDataFrameType)
-def unbox_df(typ, val, c):
-    """unbox dataframe to an Opaque pointer
-    columns will be extracted later if necessary.
-    """
-    # XXX: refcount?
-    return NativeValue(val)
 
 
 @unbox(DataFrameType)
@@ -152,68 +140,6 @@ def _infer_series_list_type(S, cname):
     raise ValueError(
             "data type for column {} not supported".format(cname))
 
-def box_df(names, arrs):
-    return pd.DataFrame()
-
-@infer_global(box_df)
-class BoxDfTyper(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) % 2 == 0, "name and column pairs expected"
-        col_names = [a.literal_value for a in args[:len(args)//2]]
-        col_types =  [a.dtype for a in args[len(args)//2:]]
-        df_typ = PandasDataFrameType(col_names, col_types)
-        return signature(df_typ, *args)
-
-
-@lower_builtin(box_df, types.Literal, types.VarArg(types.Any))
-def lower_box_df(context, builder, sig, args):
-    assert len(sig.args) % 2 == 0, "name and column pairs expected"
-    n_cols = len(sig.args)//2
-    col_names = [a.literal_value for a in sig.args[:n_cols]]
-    col_arrs = [a for a in args[n_cols:]]
-    arr_typs = [a for a in sig.args[n_cols:]]
-    # use dtypes from return type since it contains Categorical dtype
-    dtypes = sig.return_type.col_types
-
-    pyapi = context.get_python_api(builder)
-    env_manager = context.get_env_manager(builder)
-    c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
-    gil_state = pyapi.gil_ensure()  # acquire GIL
-
-    mod_name = context.insert_const_string(c.builder.module, "pandas")
-    class_obj = pyapi.import_module_noblock(mod_name)
-    res = pyapi.call_method(class_obj, "DataFrame", ())
-    for cname, arr, arr_typ, dtype in zip(col_names, col_arrs, arr_typs, dtypes):
-        # df['cname'] = boxed_arr
-        # TODO: datetime.date, DatetimeIndex?
-        if dtype == string_type:
-            arr_obj = box_str_arr(arr_typ, arr, c)
-        elif isinstance(dtype, PDCategoricalDtype):
-            arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
-            context.nrt.incref(builder, arr_typ, arr)
-        elif dtype == types.List(string_type):
-            arr_obj = box_list(list_string_array_type, arr, c)
-            context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-            # pyapi.print_object(arr_obj)
-        else:
-            arr_obj = box_array(arr_typ, arr, c)
-            # TODO: is incref required?
-            context.nrt.incref(builder, arr_typ, arr)
-        name_str = context.insert_const_string(c.builder.module, cname)
-        cname_obj = pyapi.string_from_string(name_str)
-        pyapi.object_setitem(res, cname_obj, arr_obj)
-        # pyapi.decref(arr_obj)
-        pyapi.decref(cname_obj)
-
-    pyapi.decref(class_obj)
-    pyapi.gil_release(gil_state)    # release GIL
-    return res
-
-@box(PandasDataFrameType)
-def box_df_dummy(typ, val, c):
-    return val
-
 
 @box(DataFrameType)
 def box_dataframe(typ, val, c):
@@ -262,58 +188,6 @@ def box_dataframe(typ, val, c):
     #pyapi.gil_release(gil_state)    # release GIL
     return res
 
-
-def unbox_df_column(df, col_name, dtype):
-    return df[col_name]
-
-@infer_global(unbox_df_column)
-class UnBoxDfCol(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 3
-        df_typ, col_ind_const, dtype_typ = args[0], args[1], args[2]
-        if isinstance(dtype_typ, types.Literal):
-            if dtype_typ.literal_value == 12:  # FIXME dtype for dt64
-                out_typ = types.Array(types.NPDatetime('ns'), 1, 'C')
-            elif dtype_typ.literal_value == 11:  # FIXME dtype for str
-                out_typ = string_array_type
-            elif dtype_typ.literal_value == 13:  # FIXME dtype for list(str)
-                out_typ = list_string_array_type
-            else:
-                raise ValueError("invalid input dataframe dtype {}".format(dtype_typ.literal_value))
-        else:
-            out_typ = types.Array(dtype_typ.dtype, 1, 'C')
-        # FIXME: last arg should be types.DType?
-        return signature(out_typ, *args)
-
-
-@lower_builtin(unbox_df_column, PandasDataFrameType, types.Literal, types.Any)
-def lower_unbox_df_column(context, builder, sig, args):
-    # FIXME: last arg should be types.DType?
-    pyapi = context.get_python_api(builder)
-    c = numba.pythonapi._UnboxContext(context, builder, pyapi)
-
-    # TODO: refcounts?
-    col_ind = sig.args[1].literal_value
-    col_name = sig.args[0].col_names[col_ind]
-    series_obj = c.pyapi.object_getattr_string(args[0], col_name)
-    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-
-    if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 11:  # FIXME: str code
-        native_val = unbox_str_series(string_array_type, arr_obj, c)
-    elif isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 13:  # FIXME: list(str) code
-        native_val = _unbox_array_list_str(arr_obj, c)
-    else:
-        if isinstance(sig.args[2], types.Literal) and sig.args[2].literal_value == 12:  # FIXME: dt64 code
-            dtype = types.NPDatetime('ns')
-        else:
-            dtype = sig.args[2].dtype
-        # TODO: error handling like Numba callwrappers.py
-        native_val = unbox_array(types.Array(dtype=dtype, ndim=1, layout='C'), arr_obj, c)
-
-    c.pyapi.decref(series_obj)
-    c.pyapi.decref(arr_obj)
-    return native_val.value
 
 @intrinsic
 def unbox_dataframe_column(typingctx, df, i=None):
