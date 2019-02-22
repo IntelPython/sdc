@@ -193,7 +193,12 @@ static void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op_enum, int type_
 
         // format: value + int (input format is int64+value)
         char *in_val_rank = (char*) malloc(value_size+sizeof(int));
+        if (in_val_rank == NULL) return;
         char *out_val_rank = (char*) malloc(value_size+sizeof(int));
+        if (out_val_rank == NULL) {
+            free(in_val_rank);
+            return;
+        }
 
         char *in_val_ptr = in_ptr + sizeof(int64_t);
         memcpy(in_val_rank, in_val_ptr, value_size);

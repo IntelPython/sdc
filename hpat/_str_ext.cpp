@@ -497,10 +497,17 @@ bool is_na(const uint8_t* null_bitmap, int64_t i)
 /// @param[in]  obj Python Sequence object, intended to be a pandas series of string
 void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table, char ** buffer, uint8_t **null_bitmap)
 {
-#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return;}
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); if(offsets != NULL) { delete [] offsets; } return;}
+
+    uint32_t * offsets = NULL;
 
     auto gilstate = PyGILState_Ensure();
 
+    if (no_strings == NULL || offset_table == NULL || buffer == NULL) {
+        PyGILState_Release(gilstate);
+        return;
+    }
+ 
     *no_strings = -1;
     *offset_table = NULL;
     *buffer = NULL;
@@ -532,7 +539,7 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         obj = PyObject_GetAttrString(obj, "values");
     }
 
-    uint32_t * offsets = new uint32_t[n+1];
+    offsets = new uint32_t[n+1];
     std::vector<const char *> tmp_store(n);
     size_t len = 0;
     for(Py_ssize_t i = 0; i < n; ++i) {
@@ -638,10 +645,12 @@ void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num
     {
         if (ret==GLOB_NOMATCH)
         {
+            globfree(&globBuf);
             return;
         }
         // TODO: match errors, e.g. GLOB_ABORTED GLOB_NOMATCH GLOB_NOSPACE
         std::cerr << "glob error" << '\n';
+        globfree(&globBuf);
         return;
     }
 
@@ -676,6 +685,7 @@ void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num
     #endif
 
     // std::cout << "glob done" << std::endl;
+    globfree(&globBuf);
     return;
 }
 

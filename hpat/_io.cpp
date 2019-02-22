@@ -367,6 +367,7 @@ void h5_close_file_objects(hid_t file_id, unsigned types)
     // get object id list
     size_t count = H5Fget_obj_count(file_id, types);
     hid_t* obj_list = (hid_t*)malloc(sizeof(hid_t)*count);
+    if (obj_list == NULL) return;
     H5Fget_obj_ids(file_id, types, count, obj_list);
     // TODO: check file_id of objects like h5py/files.py:close
     // for(size_t i=0; i<count; i++)
@@ -380,7 +381,7 @@ void h5_close_file_objects(hid_t file_id, unsigned types)
         if (obj_id != -1)
             h5_close_object(obj_id);
     }
-    delete[] obj_list;
+    free(obj_list);
 }
 
 int hpat_h5_close(hid_t file_id)
@@ -473,11 +474,12 @@ void* h5g_get_objname_by_idx(hid_t file_id, int64_t ind)
     int size = H5Lget_name_by_idx(file_id, ".", H5_INDEX_NAME, H5_ITER_NATIVE,
         (hsize_t)ind, NULL, 0, H5P_DEFAULT);
     char* name = (char*) malloc(size+1);
+    if (name == NULL) return NULL;
     err = H5Lget_name_by_idx(file_id, ".", H5_INDEX_NAME, H5_ITER_NATIVE,
         (hsize_t)ind, name, size+1, H5P_DEFAULT);
     // printf("g name:%s\n", name);
     std::string *outstr = new std::string(name);
-    delete name;
+    free(name);
     // std::cout<<"out: "<<*outstr<<std::endl;
     return outstr;
 }
@@ -511,6 +513,7 @@ uint64_t get_file_size(char* file_name)
 void file_read(char* file_name, void* buff, int64_t size)
 {
     FILE* fp = fopen(file_name, "rb");
+    if (fp == NULL) return;
     size_t ret_code = fread(buff, 1, (size_t)size, fp);
     if (ret_code != (size_t)size)
     {
@@ -523,6 +526,7 @@ void file_read(char* file_name, void* buff, int64_t size)
 void file_write(char* file_name, void* buff, int64_t size)
 {
     FILE* fp = fopen(file_name, "wb");
+    if (fp == NULL) return;
     size_t ret_code = fwrite(buff, 1, (size_t)size, fp);
     if (ret_code != (size_t)size)
     {

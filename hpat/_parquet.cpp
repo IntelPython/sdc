@@ -102,7 +102,6 @@ PyObject* str_list_to_vec(PyObject* self, PyObject* str_list)
     PyObject *l_str;
 
     if (iterator == NULL) {
-        Py_DECREF(iterator);
         return PyLong_FromVoidPtr((void*) strs_vec);
     }
 
@@ -147,7 +146,6 @@ std::vector<std::string> get_pq_pieces(char* file_name)
     if (iterator == NULL) {
         // printf("empty\n");
         PyGILState_Release(gilstate);
-        Py_DECREF(iterator);
         return paths;
     }
 
