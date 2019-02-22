@@ -572,6 +572,13 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
+        if (fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext')
+                and self._is_1D_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         if fdef == ('isna', 'hpat.hiframes.api') and self._is_1D_arr(rhs.args[0].name):
             # fix index in call to isna
             arr = rhs.args[0]
@@ -1531,7 +1538,7 @@ class DistributedPass(object):
         # TODO: comprehensive support for Series vars
         from hpat.hiframes.pd_series_ext import SeriesType
         if isinstance(typ, (SeriesType,
-                hpat.hiframes.api.PandasDataFrameType)):
+                hpat.hiframes.pd_dataframe_ext.DataFrameType)):
             return None
 
         # gen len() using 1D_Var reduce approach.

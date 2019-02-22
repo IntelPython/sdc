@@ -86,16 +86,15 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip("pending df distributed support")
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
             return df
 
-        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        hpat_func = hpat.jit(distributed={'df'})(test_impl)
         n = 11
         hres, res = hpat_func(n), test_impl(n)
-        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 2)
         dist_sum = hpat.jit(
             lambda a: hpat.distributed_api.dist_reduce(
