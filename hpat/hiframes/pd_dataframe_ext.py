@@ -197,13 +197,22 @@ def get_dataframe_data(df, i):
 
     return _impl
 
+
 # TODO: use separate index type instead of just storing array
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_dataframe_index(df):
     return lambda df: df._index
+
 
 @overload(len)  # TODO: avoid lowering?
 def df_len_overload(df):
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
     return lambda df: len(df._data[0])
+
+
+@overload(operator.getitem)  # TODO: avoid lowering?
+def df_getitem_overload(df, ind):
+    if isinstance(ind, types.StringLiteral):
+        index = df.columns.index(ind.literal_value)
+        return lambda df, ind: hpat.hiframes.api.init_series(df._data[index])

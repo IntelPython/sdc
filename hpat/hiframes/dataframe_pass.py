@@ -112,9 +112,9 @@ class DataFramePass(object):
             # if rhs.op == 'unary':
             #     return self._run_unary(assign, rhs)
 
-            # # replace getitems on Series.iat
-            # if rhs.op in ('getitem', 'static_getitem'):
-            #     return self._run_getitem(assign, rhs)
+            # replace getitems on dataframe
+            if rhs.op in ('getitem', 'static_getitem'):
+                return self._run_getitem(assign, rhs)
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)
@@ -123,6 +123,18 @@ class DataFramePass(object):
 
     def _run_getitem(self, assign, rhs):
         nodes = []
+        # A = df['column']
+        if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
+            df_var = rhs.value
+            df_typ = self.typemap[df_var.name]
+            if rhs.index not in df_typ.columns:
+                raise ValueError("dataframe {} does not include column {}".format(df_var.name, rhs.index))
+
+            arr = self._get_dataframe_data(df_var, rhs.index, nodes)
+            # TODO: index
+            return  self._replace_func(
+                lambda A: hpat.hiframes.api.init_series(A),
+                [arr], pre_nodes=nodes)
 
         nodes.append(assign)
         return nodes

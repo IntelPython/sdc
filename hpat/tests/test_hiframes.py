@@ -23,18 +23,6 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
             "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 
 class TestHiFrames(unittest.TestCase):
-    def test_basics(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df['A'].values
-            return Ac.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_column_list_select1(self):
         def test_impl(df):
