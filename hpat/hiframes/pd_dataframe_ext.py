@@ -201,3 +201,9 @@ def get_dataframe_data(df, i):
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_dataframe_index(df):
     return lambda df: df._index
+
+@overload(len)  # TODO: avoid lowering?
+def df_len_overload(df):
+    if len(df.columns) == 0:  # empty df
+        return lambda df: 0
+    return lambda df: len(df._data[0])

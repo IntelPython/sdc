@@ -116,8 +116,8 @@ class DataFramePass(object):
             # if rhs.op in ('getitem', 'static_getitem'):
             #     return self._run_getitem(assign, rhs)
 
-            # if rhs.op == 'call':
-            #     return self._run_call(assign, lhs, rhs)
+            if rhs.op == 'call':
+                return self._run_call(assign, lhs, rhs)
 
         return [assign]
 
@@ -223,10 +223,29 @@ class DataFramePass(object):
         else:
             func_name, func_mod = fdef
 
+        if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
+            return self._run_call_len(lhs, rhs.args[0])
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, series_var, func_name):
         pass
+
+    def _run_call_len(self, lhs, df_var):
+        df_typ = self.typemap[df_var.name]
+
+        # empty dataframe has 0 len
+        if len(df_typ.columns) == 0:
+            return [ir.Assign(ir.Const(0, lhs.loc), lhs, lhs.loc)]
+
+        # run len on one of the columns
+        # FIXME: it could potentially avoid remove dead for the column if
+        # array analysis doesn't replace len() with it's size
+        nodes = []
+        arr = self._get_dataframe_data(df_var, df_typ.columns[0], nodes)
+        def f(df_arr):  # pragma: no cover
+            return len(df_arr)
+        return self._replace_func(f, [arr], pre_nodes=nodes)
 
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
@@ -332,6 +351,9 @@ class DataFramePass(object):
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
         return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
+
+    def _is_df_var(self, var):
+        return isinstance(self.typemap[var.name], DataFrameType)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]

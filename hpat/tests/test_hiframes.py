@@ -191,17 +191,6 @@ class TestHiFrames(unittest.TestCase):
         df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
 
-    def test_len_df(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
-            return len(df)
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
     def test_set_column_reflect(self):
         def test_impl(df, arr):
             df['C'] = arr
