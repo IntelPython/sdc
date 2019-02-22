@@ -59,5 +59,51 @@ class TestDataFrame(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(df.copy(), False), test_impl(df.copy(), False))
 
 
+    def test_box1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_box2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1,2,3], 'B': ['a', 'bb', 'ccc']})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skip("pending df filter support")
+    def test_box3(self):
+        def test_impl(df):
+            df = df[df.A != 'dd']
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @unittest.skip("pending df distributed support")
+    def test_box_dist_return(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
+        n = 11
+        hres, res = hpat_func(n), test_impl(n)
+        self.assertEqual(count_array_OneDs(), 2)
+        self.assertEqual(count_parfor_OneDs(), 2)
+        dist_sum = hpat.jit(
+            lambda a: hpat.distributed_api.dist_reduce(
+                a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
+        dist_sum(1)  # run to compile
+        np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
+        np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -215,6 +215,54 @@ def box_df_dummy(typ, val, c):
     return val
 
 
+@box(DataFrameType)
+def box_dataframe(typ, val, c):
+    context = c.context
+    builder = c.builder
+
+    n_cols = len(typ.columns)
+    col_names = typ.columns
+    arr_typs = typ.data
+    dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
+
+    dataframe = cgutils.create_struct_proxy(typ)(
+        context, builder, value=val)
+    col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
+
+    pyapi = c.pyapi
+    #gil_state = pyapi.gil_ensure()  # acquire GIL
+
+    mod_name = context.insert_const_string(c.builder.module, "pandas")
+    class_obj = pyapi.import_module_noblock(mod_name)
+    res = pyapi.call_method(class_obj, "DataFrame", ())
+
+    for cname, arr, arr_typ, dtype in zip(col_names, col_arrs, arr_typs, dtypes):
+        # df['cname'] = boxed_arr
+        # TODO: datetime.date, DatetimeIndex?
+        if dtype == string_type:
+            arr_obj = box_str_arr(arr_typ, arr, c)
+        elif isinstance(dtype, PDCategoricalDtype):
+            arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
+            context.nrt.incref(builder, arr_typ, arr)
+        elif dtype == types.List(string_type):
+            arr_obj = box_list(list_string_array_type, arr, c)
+            context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+            # pyapi.print_object(arr_obj)
+        else:
+            arr_obj = box_array(arr_typ, arr, c)
+            # TODO: is incref required?
+            context.nrt.incref(builder, arr_typ, arr)
+        name_str = context.insert_const_string(c.builder.module, cname)
+        cname_obj = pyapi.string_from_string(name_str)
+        pyapi.object_setitem(res, cname_obj, arr_obj)
+        # pyapi.decref(arr_obj)
+        pyapi.decref(cname_obj)
+
+    pyapi.decref(class_obj)
+    #pyapi.gil_release(gil_state)    # release GIL
+    return res
+
+
 def unbox_df_column(df, col_name, dtype):
     return df[col_name]
 
