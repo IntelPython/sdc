@@ -4,7 +4,7 @@ import numpy as np
 import datetime
 import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
-    NativeValue, box)
+    NativeValue, box, intrinsic)
 from numba import numpy_support, types, cgutils
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
@@ -15,6 +15,7 @@ from numba.targets import listobj
 
 import hpat
 from hpat.hiframes.api import PandasDataFrameType
+from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
     unbox_datetime_date_array, box_datetime_date_array)
 from hpat.str_ext import string_type, list_string_array_type
@@ -33,10 +34,10 @@ ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
 @typeof_impl.register(pd.DataFrame)
 def typeof_pd_dataframe(val, c):
-    col_names = val.columns.tolist()
+    col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
-    return PandasDataFrameType(col_names, col_types)
+    return DataFrameType(col_types, None, col_names)
 
 register_model(PandasDataFrameType)(models.OpaqueModel)
 
@@ -64,6 +65,7 @@ def typeof_pd_index(val, c):
     else:
         raise NotImplementedError("unsupported pd.Index type")
 
+
 @unbox(PandasDataFrameType)
 def unbox_df(typ, val, c):
     """unbox dataframe to an Opaque pointer
@@ -71,6 +73,40 @@ def unbox_df(typ, val, c):
     """
     # XXX: refcount?
     return NativeValue(val)
+
+
+@unbox(DataFrameType)
+def unbox_dataframe(typ, val, c):
+    """unbox dataframe to an empty DataFrame struct
+    columns will be extracted later if necessary.
+    """
+    n_cols = len(typ.columns)
+    column_strs = [numba.unicode.make_string_from_constant(
+                c.context, c.builder, string_type, a) for a in typ.columns]
+    # create dataframe struct and store values
+    dataframe = cgutils.create_struct_proxy(
+        typ)(c.context, c.builder)
+
+    column_tup = c.context.make_tuple(
+        c.builder, types.UniTuple(string_type, n_cols), column_strs)
+    zero = c.context.get_constant(types.int8, 0)
+    unboxed_tup = c.context.make_tuple(
+        c.builder, types.UniTuple(types.int8, n_cols+1), [zero]*(n_cols+1))
+
+    # TODO: support unboxing index
+    dataframe.index = c.context.get_constant(types.none, None)
+    dataframe.columns = column_tup
+    dataframe.unboxed = unboxed_tup
+    dataframe.parent = val
+
+    # increase refcount of stored values
+    if c.context.enable_nrt:
+        # TODO: other objects?
+        for var in column_strs:
+            c.context.nrt.incref(c.builder, string_type, var)
+
+    return NativeValue(dataframe._getvalue())
+
 
 def get_hiframes_dtypes(df):
     """get hiframe data types for a pandas dataframe
@@ -87,17 +123,17 @@ def get_hiframes_dtypes(df):
                 hi_typs.append(typ)
                 continue
             if isinstance(first_val, str):
-                hi_typs.append(string_type)
+                hi_typs.append(string_array_type)
                 continue
             else:
                 raise ValueError("data type for column {} not supported".format(cname))
         try:
             t = numpy_support.from_dtype(typ)
-            hi_typs.append(t)
+            hi_typs.append(types.Array(t, 1, 'C'))
         except NotImplementedError:
             raise ValueError("data type for column {} not supported".format(cname))
 
-    return hi_typs
+    return tuple(hi_typs)
 
 
 def _infer_series_list_type(S, cname):
@@ -109,7 +145,7 @@ def _infer_series_list_type(S, cname):
         if len(first_val) > 0:
             # TODO: support more types
             if isinstance(first_val[0], str):
-                return types.List(string_type)
+                return list_string_array_type
             else:
                 raise ValueError(
                     "data type for column {} not supported".format(cname))
@@ -230,6 +266,45 @@ def lower_unbox_df_column(context, builder, sig, args):
     c.pyapi.decref(series_obj)
     c.pyapi.decref(arr_obj)
     return native_val.value
+
+@intrinsic
+def unbox_dataframe_column(typingctx, df, i=None):
+
+    def codegen(context, builder, sig, args):
+        pyapi = context.get_python_api(builder)
+        c = numba.pythonapi._UnboxContext(context, builder, pyapi)
+
+        df_typ = sig.args[0]
+        col_ind = sig.args[1].literal_value
+        data_typ = df_typ.data[col_ind]
+        col_name = df_typ.columns[col_ind]
+        # TODO: refcounts?
+
+        dataframe = cgutils.create_struct_proxy(
+            sig.args[0])(context, builder, value=args[0])
+        series_obj = c.pyapi.object_getattr_string(dataframe.parent, col_name)
+        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+
+        if data_typ == string_array_type:
+            native_val = unbox_str_series(string_array_type, arr_obj, c)
+        elif data_typ == list_string_array_type:
+            native_val = _unbox_array_list_str(arr_obj, c)
+        else:
+            dtype = data_typ.dtype
+            # TODO: error handling like Numba callwrappers.py
+            native_val = unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c)
+
+        c.pyapi.decref(series_obj)
+        c.pyapi.decref(arr_obj)
+
+        # assign array and set unboxed flag
+        dataframe.data = builder.insert_value(
+            dataframe.data, native_val.value, col_ind)
+        dataframe.unboxed = builder.insert_value(
+            dataframe.unboxed, context.get_constant(types.int8, 1), col_ind)
+        return dataframe._getvalue()
+
+    return signature(df, df, i), codegen
 
 
 @unbox(SeriesType)

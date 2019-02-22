@@ -254,7 +254,7 @@ class DataFramePass(object):
 
         loc = df_var.loc
         ind_var = ir.Var(df_var.scope, mk_unique_var('col_ind'), loc)
-        self.typemap[ind_var.name] = types.intp
+        self.typemap[ind_var.name] = types.IntegerLiteral(ind)
         nodes.append(ir.Assign(ir.Const(ind, loc), ind_var, loc))
         # XXX use get_series_data() for getting data instead of S._data
         # to enable alias analysis
@@ -263,7 +263,7 @@ class DataFramePass(object):
                 df, c_ind),
             {'hpat': hpat},
             self.typingctx,
-            (df_typ, types.intp),
+            (df_typ, self.typemap[ind_var.name]),
             self.typemap,
             self.calltypes
         ).blocks.popitem()[1]
