@@ -15,10 +15,11 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
+from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
                         is_np_array, find_build_tuple, debug_prints)
-
+from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from enum import Enum
 
 
@@ -102,7 +103,7 @@ class DistributedAnalysis(object):
                 self._set_REP(inst.list_vars(), array_dists)
 
     def _analyze_assign(self, inst, array_dists, parfor_dists):
-        from hpat.hiframes.api import SeriesType, PandasDataFrameType
+        from hpat.hiframes.pd_dataframe_ext import DataFrameType
         lhs = inst.target.name
         rhs = inst.value
         # treat return casts like assignments
@@ -110,7 +111,7 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
-                or isinstance(self.typemap[lhs], (SeriesType, PandasDataFrameType))
+                or isinstance(self.typemap[lhs], (SeriesType, DataFrameType))
                                      or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
@@ -353,6 +354,19 @@ class DistributedAnalysis(object):
             if len(rhs.args) > 1 and self.typemap[rhs.args[1].name] != types.none:
                 new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
                 array_dists[rhs.args[0].name] = new_dist
+            return
+
+        if fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
+            # lhs, data arrays, and index should have the same distribution
+            df_typ = self.typemap[lhs]
+            n_cols = len(df_typ.columns)
+            for i in range(n_cols):
+                new_dist = self._meet_array_dists(lhs, rhs.args[i].name, array_dists)
+            # handle index
+            if len(rhs.args) > n_cols and self.typemap[rhs.args[n_cols].name] != types.none:
+                new_dist = self._meet_array_dists(lhs, rhs.args[n_cols].name, array_dists, new_dist)
+            for i in range(n_cols):
+                array_dists[rhs.args[i].name] = new_dist
             return
 
         # np.fromfile()
@@ -664,11 +678,13 @@ class DistributedAnalysis(object):
     def _analyze_call_set_REP(self, lhs, args, array_dists, fdef=None):
         for v in args:
             if (is_array(self.typemap, v.name)
-                    or is_array_container(self.typemap, v.name)):
+                    or is_array_container(self.typemap, v.name)
+                    or isinstance(self.typemap[v.name], DataFrameType)):
                 dprint("dist setting call arg REP {} in {}".format(v.name, fdef))
                 array_dists[v.name] = Distribution.REP
         if (is_array(self.typemap, lhs)
-                or is_array_container(self.typemap, lhs)):
+                or is_array_container(self.typemap, lhs)
+                or isinstance(self.typemap[lhs], DataFrameType)):
             dprint("dist setting call out REP {} in {}".format(lhs, fdef))
             array_dists[lhs] = Distribution.REP
 
@@ -782,14 +798,15 @@ class DistributedAnalysis(object):
         return new_dist
 
     def _set_REP(self, var_list, array_dists):
-        from hpat.hiframes.api import SeriesType, PandasDataFrameType
+        from hpat.hiframes.pd_dataframe_ext import DataFrameType
         for var in var_list:
             varname = var.name
             # Handle SeriesType since it comes from Arg node and it could
             # have user-defined distribution
             if (is_array(self.typemap, varname)
                     or is_array_container(self.typemap, varname)
-                    or isinstance(self.typemap[varname], (SeriesType, PandasDataFrameType))):
+                    or isinstance(
+                        self.typemap[varname], (SeriesType, DataFrameType))):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
