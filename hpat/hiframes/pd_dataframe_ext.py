@@ -80,19 +80,35 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
     def is_precise(self):
         return all(a.is_precise() for a in self.data) and self.index.is_precise()
 
+
+# TODO: encapsulate in meminfo since dataframe is mutible, for example:
+# df = pd.DataFrame({'A': A})
+# df2 = df
+# if cond:
+#    df['A'] = B
+# df2.A
+# TODO: meminfo for reference counting of dataframes
 @register_model(DataFrameType)
 class DataFrameModel(models.StructModel):
     def __init__(self, dmm, fe_type):
+        n_cols = len(fe_type.columns)
         members = [
             ('data', types.Tuple(fe_type.data)),
             ('index', fe_type.index),
-            ('columns', types.UniTuple(string_type, len(fe_type.columns))),
+            ('columns', types.UniTuple(string_type, n_cols)),
+            # for lazy unboxing of df coming from Python (usually argument)
+            # list of flags noting which columns and index are unboxed
+            # index flag is last
+            ('unboxed', types.UniTuple(types.int8, n_cols + 1)),
+            ('parent', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)
 
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 make_attribute_wrapper(DataFrameType, 'index', '_index')
 make_attribute_wrapper(DataFrameType, 'columns', '_columns')
+make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
+make_attribute_wrapper(DataFrameType, 'parent', '_parent')
 
 
 @infer_getattr
@@ -129,12 +145,19 @@ def init_dataframe(typingctx, *args):
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
 
-        data_tup = context.make_tuple(builder, types.Tuple(data_typs), data_arrs)
-        column_tup = context.make_tuple(builder, types.UniTuple(string_type, n_cols), column_strs)
+        data_tup = context.make_tuple(
+            builder, types.Tuple(data_typs), data_arrs)
+        column_tup = context.make_tuple(
+            builder, types.UniTuple(string_type, n_cols), column_strs)
+        zero = context.get_constant(types.int8, 0)
+        unboxed_tup = context.make_tuple(
+            builder, types.UniTuple(types.int8, n_cols+1), [zero]*(n_cols+1))
 
         dataframe.data = data_tup
         dataframe.index = index
         dataframe.columns = column_tup
+        dataframe.unboxed = unboxed_tup
+        dataframe.parent = context.get_constant_null(types.pyobject)
 
         # increase refcount of stored values
         if context.enable_nrt:
@@ -151,12 +174,28 @@ def init_dataframe(typingctx, *args):
     return sig, codegen
 
 
+@intrinsic
+def has_parent(typingctx, df=None):
+    def codegen(context, builder, sig, args):
+        dataframe = cgutils.create_struct_proxy(
+            sig.args[0])(context, builder, value=args[0])
+        return cgutils.is_not_null(builder, dataframe.parent)
+    return signature(types.bool_, df), codegen
+
+
 # TODO: alias analysis
 # this function should be used for getting df._data for alias analysis to work
 # no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_dataframe_data(df, i):
-    return lambda df, i: df._data[i]
+
+    def _impl(df, i):
+        if has_parent(df) and df._unboxed[i] == 0:
+            # TODO: make df refcounted to avoid repeated unboxing
+            df = hpat.hiframes.boxing.unbox_dataframe_column(df, i)
+        return df._data[i]
+
+    return _impl
 
 # TODO: use separate index type instead of just storing array
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
