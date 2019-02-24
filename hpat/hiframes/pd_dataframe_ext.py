@@ -4,9 +4,11 @@ import numpy as np
 import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload, make_attribute_wrapper, intrinsic)
+    type_callable, infer, overload, make_attribute_wrapper, intrinsic,
+    lower_builtin)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
     ArrayAttribute, SetItemBuffer)
 from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
@@ -213,6 +215,64 @@ def df_len_overload(df):
 
 @overload(operator.getitem)  # TODO: avoid lowering?
 def df_getitem_overload(df, ind):
-    if isinstance(ind, types.StringLiteral):
+    if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
         index = df.columns.index(ind.literal_value)
         return lambda df, ind: hpat.hiframes.api.init_series(df._data[index])
+
+
+@infer
+class StaticGetItemDataFrame(AbstractTemplate):
+    key = "static_getitem"
+
+    def generic(self, args, kws):
+        df, idx = args
+        if (isinstance(df, DataFrameType) and isinstance(idx, list)
+                and all(isinstance(c, str) for c in idx)):
+            data_typs = tuple(df.data[df.columns.index(c)] for c in idx)
+            columns = tuple(idx)
+            ret_typ = DataFrameType(data_typs, df.index, columns)
+            return signature(ret_typ, *args)
+
+
+# handle getitem for Tuples because sometimes df._data[i] in
+# get_dataframe_data() doesn't translate to 'static_getitem' which causes
+# Numba to fail. See TestDataFrame.test_unbox1, TODO: find root cause in Numba
+# adapted from typing/builtins.py
+@infer_global(operator.getitem)
+class GetItemTuple(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        tup, idx = args
+        if (not isinstance(tup, types.BaseTuple) or
+                not isinstance(idx, types.IntegerLiteral)):
+            return
+        idx_val = idx.literal_value
+        if isinstance(idx_val, int):
+            ret = tup.types[idx_val]
+        elif isinstance(idx_val, slice):
+            ret = types.BaseTuple.from_types(tup.types[idx_val])
+
+        return signature(ret, *args)
+
+
+# adapted from targets/tupleobj.py
+@lower_builtin(operator.getitem, types.BaseTuple, types.IntegerLiteral)
+@lower_builtin(operator.getitem, types.BaseTuple, types.SliceLiteral)
+def getitem_tuple_lower(context, builder, sig, args):
+    tupty, idx = sig.args
+    idx = idx.literal_value
+    tup, _ = args
+    if isinstance(idx, int):
+        if idx < 0:
+            idx += len(tupty)
+        if not 0 <= idx < len(tupty):
+            raise IndexError("cannot index at %d in %s" % (idx, tupty))
+        res = builder.extract_value(tup, idx)
+    elif isinstance(idx, slice):
+        items = cgutils.unpack_tuple(builder, tup)[idx]
+        res = context.make_tuple(builder, sig.return_type, items)
+    else:
+        raise NotImplementedError("unexpected index %r for %s"
+                                  % (idx, sig.args[0]))
+    return impl_ret_borrowed(context, builder, sig.return_type, res)

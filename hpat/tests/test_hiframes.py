@@ -24,16 +24,6 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
 
 class TestHiFrames(unittest.TestCase):
 
-    def test_column_list_select1(self):
-        def test_impl(df):
-            return df[['A', 'C']]
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        df = pd.DataFrame(
-            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
     def test_column_list_select2(self):
         # make sure HPAT copies the columns like Pandas does
         def test_impl(df):
