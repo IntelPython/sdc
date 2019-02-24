@@ -41,7 +41,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.random.ranf(n)})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @unittest.skip("needs properly refcounted dataframes")
@@ -126,6 +126,16 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
+
+    def test_column_list_getitem1(self):
+        def test_impl(df):
+            return df[['A', 'C']]
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
 
 if __name__ == "__main__":

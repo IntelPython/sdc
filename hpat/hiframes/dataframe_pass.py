@@ -123,18 +123,45 @@ class DataFramePass(object):
 
     def _run_getitem(self, assign, rhs):
         nodes = []
-        # A = df['column']
+        # A = df['column'] or df[['C1', 'C2']]
         if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
             df_var = rhs.value
             df_typ = self.typemap[df_var.name]
-            if rhs.index not in df_typ.columns:
-                raise ValueError("dataframe {} does not include column {}".format(df_var.name, rhs.index))
+            index = rhs.index
 
-            arr = self._get_dataframe_data(df_var, rhs.index, nodes)
-            # TODO: index
-            return  self._replace_func(
-                lambda A: hpat.hiframes.api.init_series(A),
-                [arr], pre_nodes=nodes)
+            # A = df['column']
+            if isinstance(index, str):
+                if index not in df_typ.columns:
+                    raise ValueError(
+                        "dataframe {} does not include column {}".format(
+                            df_var.name, index))
+
+                arr = self._get_dataframe_data(df_var, index, nodes)
+                # TODO: index
+                return  self._replace_func(
+                    lambda A: hpat.hiframes.api.init_series(A),
+                    [arr], pre_nodes=nodes)
+
+            # df[['C1', 'C2']]
+            if isinstance(index, list) and all(isinstance(c, str)
+                                                               for c in index):
+                nodes = []
+                in_arrs = [self._get_dataframe_data(df_var, c, nodes)
+                            for c in index]
+                out_arrs = [self._gen_arr_copy(A, nodes) for A in in_arrs]
+                #
+                n_cols = len(index)
+                data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+                col_args = ", ".join("'{}'".format(c) for c in index)
+                func_text = "def _init_df({}):\n".format(data_args)
+                func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+                    data_args, col_args)
+                loc_vars = {}
+                exec(func_text, {}, loc_vars)
+                _init_df = loc_vars['_init_df']
+                return self._replace_func(_init_df, out_arrs, pre_nodes=nodes)
+                # raise ValueError("unsupported dataframe access {}[{}]".format(
+                #                  rhs.value.name, index))
 
         nodes.append(assign)
         return nodes
@@ -397,3 +424,12 @@ class DataFramePass(object):
                 err_msg = "{} requires '{}' argument".format(f_name, arg_name)
             raise ValueError(err_msg)
         return arg
+
+    def _gen_arr_copy(self, in_arr, nodes):
+        f_block = compile_to_numba_ir(
+            lambda A: A.copy(), {}, self.typingctx,
+            (self.typemap[in_arr.name],), self.typemap, self.calltypes
+            ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [in_arr])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
