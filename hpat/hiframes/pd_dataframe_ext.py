@@ -358,6 +358,21 @@ class GetItemDataFrameIat(AbstractTemplate):
                 data_typ = df.df_type.data[col_no]
                 return signature(data_typ.dtype, *args)
 
+@infer_global(operator.setitem)
+class SetItemDataFrameIat(AbstractTemplate):
+    key = operator.setitem
+
+    def generic(self, args, kws):
+        df, idx, val = args
+        # TODO: handle df.at[]
+        if isinstance(df, DataFrameIatType):
+            # df.iat[n,1] = 3
+            if (isinstance(idx, types.Tuple) and len(idx) == 2
+                    and isinstance(idx.types[1], types.IntegerLiteral)):
+                col_no = idx.types[1].literal_value
+                data_typ = df.df_type.data[col_no]
+                return signature(types.none, data_typ, idx.types[0], val)
+
 
 @infer_global(operator.getitem)
 class GetItemDataFrameLoc(AbstractTemplate):

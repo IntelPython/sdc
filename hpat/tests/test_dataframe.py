@@ -246,11 +246,22 @@ class TestDataFrame(unittest.TestCase):
     def test_iat_set1(self):
         def test_impl(df, n):
             df.iat[n-1, 1] = n**2
-            return df
+            return df.A  # return the column to check column aliasing
         hpat_func = hpat.jit(test_impl)
         n = 11
         df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
-        pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df, n))
+        df2 = df.copy()
+        pd.testing.assert_series_equal(hpat_func(df, n), test_impl(df2, n))
+
+    def test_iat_set2(self):
+        def test_impl(df, n):
+            df.iat[n-1, 1] = n**2
+            return df  # check df aliasing/boxing
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        df2 = df.copy()
+        pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df2, n))
 
 
 if __name__ == "__main__":

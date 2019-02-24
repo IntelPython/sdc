@@ -276,7 +276,26 @@ class DataFramePass(object):
 
     def _run_setitem(self, inst):
         target_typ = self.typemap[inst.target.name]
+        nodes = []
+        index_var = (inst.index_var if isinstance(inst, ir.StaticSetItem)
+                                    else inst.index)
+        index_typ = self.typemap[index_var.name]
 
+        if self._is_df_iat_var(inst.target):
+            df_var = guard(get_definition, self.func_ir, inst.target).value
+            df_typ = self.typemap[df_var.name]
+            val = inst.value
+            # df.iat[n,1] = 3
+            if isinstance(index_typ, types.Tuple) and len(index_typ) == 2:
+                ind_def = guard(get_definition, self.func_ir, index_var)
+                col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                col_name = df_typ.columns[col_ind]
+                in_arr = self._get_dataframe_data(df_var, col_name, nodes)
+                row_ind = ind_def.items[0]
+                def _impl(A, row_ind, val):
+                    A[row_ind] = val
+                return self._replace_func(_impl,
+                    [in_arr, row_ind, val], pre_nodes=nodes)
         return [inst]
 
     def _run_getattr(self, assign, rhs):
