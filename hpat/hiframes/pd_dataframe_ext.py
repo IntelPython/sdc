@@ -335,11 +335,26 @@ class StaticGetItemDataFrameIat(AbstractTemplate):
         df, idx = args
         # TODO: handle df.at[]
         if isinstance(df, DataFrameIatType):
-            # df.iat[3, 1]
+            # df.iat[3,1]
             if (isinstance(idx, tuple) and len(idx) == 2
                     and isinstance(idx[0], int)
                     and isinstance(idx[1], int)):
                 col_no = idx[1]
+                data_typ = df.df_type.data[col_no]
+                return signature(data_typ.dtype, *args)
+
+@infer_global(operator.getitem)
+class GetItemDataFrameIat(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        df, idx = args
+        # TODO: handle df.at[]
+        if isinstance(df, DataFrameIatType):
+            # df.iat[n,1]
+            if (isinstance(idx, types.Tuple) and len(idx) == 2
+                    and isinstance(idx.types[1], types.IntegerLiteral)):
+                col_no = idx.types[1].literal_value
                 data_typ = df.df_type.data[col_no]
                 return signature(data_typ.dtype, *args)
 
