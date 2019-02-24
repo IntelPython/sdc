@@ -117,6 +117,15 @@ make_attribute_wrapper(DataFrameType, 'parent', '_parent')
 class DataFrameAttribute(AttributeTemplate):
     key = DataFrameType
 
+    def resolve_iat(self, ary):
+        return DataFrameIatType(ary)
+
+    def resolve_iloc(self, ary):
+        return DataFrameILocType(ary)
+
+    def resolve_loc(self, ary):
+        return DataFrameLocType(ary)
+
     def generic_resolve(self, df, attr):
         ind = df.columns.index(attr)
         arr_typ = df.data[ind]
@@ -289,3 +298,52 @@ def getitem_tuple_lower(context, builder, sig, args):
         raise NotImplementedError("unexpected index %r for %s"
                                   % (idx, sig.args[0]))
     return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
+# TODO: handle dataframe pass
+# df.ia[] type
+class DataFrameIatType(types.Type):
+    def __init__(self, df_type):
+        self.df_type = df_type
+        name = "DataFrameIatType({})".format(df_type)
+        super(DataFrameIatType, self).__init__(name)
+
+# df.iloc[] type
+class DataFrameILocType(types.Type):
+    def __init__(self, df_type):
+        self.df_type = df_type
+        name = "DataFrameILocType({})".format(df_type)
+        super(DataFrameILocType, self).__init__(name)
+
+# df.loc[] type
+class DataFrameLocType(types.Type):
+    def __init__(self, df_type):
+        self.df_type = df_type
+        name = "DataFrameLocType({})".format(df_type)
+        super(DataFrameLocType, self).__init__(name)
+
+
+@infer_global(operator.getitem)
+class GetItemDataFrameLoc(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        df, idx = args
+        # df1 = df.loc[df.A > .5]
+        if (isinstance(df, DataFrameLocType)
+                and isinstance(idx, (SeriesType, types.Array))
+                and idx.dtype == types.bool_):
+            return signature(df.df_type, *args)
+
+
+@infer_global(operator.getitem)
+class GetItemDataFrameILoc(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        df, idx = args
+        # df1 = df.iloc[df.A > .5]
+        if (isinstance(df, DataFrameILocType)
+                and isinstance(idx, (SeriesType, types.Array))
+                and idx.dtype == types.bool_):
+            return signature(df.df_type, *args)
