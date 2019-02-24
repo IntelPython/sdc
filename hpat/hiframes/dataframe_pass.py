@@ -128,6 +128,7 @@ class DataFramePass(object):
         nodes = []
         index_var = (rhs.index_var if rhs.op == 'static_getitem'
                                     else rhs.index)
+        index_typ = self.typemap[index_var.name]
 
         # A = df['column'] or df[['C1', 'C2']]
         if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
@@ -169,44 +170,50 @@ class DataFramePass(object):
                 # raise ValueError("unsupported dataframe access {}[{}]".format(
                 #                  rhs.value.name, index))
 
-        # df1 = df[df.A > .5], df.loc[df.A > .5], df.iloc[df.A > .5]
-        if self.is_bool_arr(index_var.name) and (self._is_df_var(rhs.value)
-                                                or self._is_df_loc_var(rhs.value)
-                                                or self._is_df_iloc_var(rhs.value)):
+        # df1 = df[df.A > .5]
+        if self.is_bool_arr(index_var.name) and self._is_df_var(rhs.value):
+            df_var = rhs.value
+            return self._gen_df_filter(df_var, index_var, lhs)
 
-            if self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value):
-                # TODO: check for errors
-                df_var = guard(get_definition, self.func_ir, rhs.value).value
-            else:
-                df_var = rhs.value
-
-            df_typ = self.typemap[df_var.name]
-            in_vars = {}
-            out_vars = {}
-            for col in df_typ.columns:
-                in_arr = self._get_dataframe_data(df_var, col, nodes)
-                out_arr = ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                self.typemap[out_arr.name] = self.typemap[in_arr.name]
-                in_vars[col] = in_arr
-                out_vars[col] = out_arr
-
-            nodes.append(hiframes.filter.Filter(
-                lhs.name, df_var.name, index_var, out_vars, in_vars, rhs.loc))
-
-            n_cols = len(df_typ.columns)
-            data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-            col_args = ", ".join("'{}'".format(c) for c in df_typ.columns)
-            func_text = "def _init_df({}):\n".format(data_args)
-            func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-                data_args, col_args)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            _init_df = loc_vars['_init_df']
-            return self._replace_func(
-                _init_df, list(out_vars.values()), pre_nodes=nodes)
+        # df.loc[df.A > .5], df.iloc[df.A > .5]
+        # df.iloc[1:n], df.iloc[np.array([1,2,3])], ...
+        if (self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value)
+                and (self.is_bool_arr(index_var.name)
+                or self.is_int_list_or_arr(index_var.name)
+                or isinstance(index_typ, types.SliceType))):
+            # TODO: check for errors
+            df_var = guard(get_definition, self.func_ir, rhs.value).value
+            return self._gen_df_filter(df_var, index_var, lhs)
 
         nodes.append(assign)
         return nodes
+
+    def _gen_df_filter(self, df_var, index_var, lhs):
+        nodes = []
+        df_typ = self.typemap[df_var.name]
+        in_vars = {}
+        out_vars = {}
+        for col in df_typ.columns:
+            in_arr = self._get_dataframe_data(df_var, col, nodes)
+            out_arr = ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+            self.typemap[out_arr.name] = self.typemap[in_arr.name]
+            in_vars[col] = in_arr
+            out_vars[col] = out_arr
+
+        nodes.append(hiframes.filter.Filter(
+            lhs.name, df_var.name, index_var, out_vars, in_vars, lhs.loc))
+
+        n_cols = len(df_typ.columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+        col_args = ", ".join("'{}'".format(c) for c in df_typ.columns)
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, col_args)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+        return self._replace_func(
+            _init_df, list(out_vars.values()), pre_nodes=nodes)
 
     def _run_setitem(self, inst):
         target_typ = self.typemap[inst.target.name]
@@ -449,6 +456,11 @@ class DataFramePass(object):
         typ = self.typemap[varname]
         return (isinstance(typ, (SeriesType, types.Array))
             and typ.dtype == types.bool_)
+
+    def is_int_list_or_arr(self, varname):
+        typ = self.typemap[varname]
+        return (isinstance(typ, (SeriesType, types.Array, types.List))
+            and isinstance(typ.dtype, types.Integer))
 
     def _is_const_none(self, var):
         var_def = guard(get_definition, self.func_ir, var)

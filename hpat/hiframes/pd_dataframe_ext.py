@@ -68,16 +68,20 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
             return DataFrameType(data, new_index, self.columns)
 
     def can_convert_to(self, typingctx, other):
-        if (isinstance(other, DataFrameType)
-                and len(other.data) == len(self.data)
-                and other.columns == self.columns):
-            data_convert = max(a.can_convert_to(b)
-                                for a,b in zip(self.data, other.data))
-            if self.index == types.none and other.index == types.none:
-                return data_convert
-            if self.index != types.none and other.index != types.none:
-                return max(data_convert,
-                    self.index.can_convert_to(typingctx, other.index))
+        return
+        # overload resolution tries to convert for even get_dataframe_data()
+        # TODO: find valid conversion possibilities
+        # if (isinstance(other, DataFrameType)
+        #         and len(other.data) == len(self.data)
+        #         and other.columns == self.columns):
+        #     import pdb; pdb.set_trace()
+        #     data_convert = max(a.can_convert_to(typingctx, b)
+        #                         for a,b in zip(self.data, other.data))
+        #     if self.index == types.none and other.index == types.none:
+        #         return data_convert
+        #     if self.index != types.none and other.index != types.none:
+        #         return max(data_convert,
+        #             self.index.can_convert_to(typingctx, other.index))
 
     def is_precise(self):
         return all(a.is_precise() for a in self.data) and self.index.is_precise()
@@ -329,11 +333,17 @@ class GetItemDataFrameLoc(AbstractTemplate):
 
     def generic(self, args, kws):
         df, idx = args
-        # df1 = df.loc[df.A > .5]
-        if (isinstance(df, DataFrameLocType)
-                and isinstance(idx, (SeriesType, types.Array))
-                and idx.dtype == types.bool_):
-            return signature(df.df_type, *args)
+        # handling df.loc similar to df.iloc as temporary hack
+        # TODO: handle proper labeled indexes
+        if isinstance(df, DataFrameLocType):
+            # df1 = df.loc[df.A > .5], df1 = df.loc[np.array([1,2,3])]
+            if (isinstance(idx, (SeriesType, types.Array, types.List))
+                    and (idx.dtype == types.bool_
+                        or isinstance(idx.dtype, types.Integer))):
+                return signature(df.df_type, *args)
+            # df.loc[1:n]
+            if isinstance(idx, types.SliceType):
+                return signature(df.df_type, *args)
 
 
 @infer_global(operator.getitem)
@@ -342,8 +352,12 @@ class GetItemDataFrameILoc(AbstractTemplate):
 
     def generic(self, args, kws):
         df, idx = args
-        # df1 = df.iloc[df.A > .5]
-        if (isinstance(df, DataFrameILocType)
-                and isinstance(idx, (SeriesType, types.Array))
-                and idx.dtype == types.bool_):
-            return signature(df.df_type, *args)
+        if isinstance(df, DataFrameILocType):
+            # df1 = df.iloc[df.A > .5], df1 = df.iloc[np.array([1,2,3])]
+            if (isinstance(idx, (SeriesType, types.Array, types.List))
+                    and (idx.dtype == types.bool_
+                        or isinstance(idx.dtype, types.Integer))):
+                return signature(df.df_type, *args)
+            # df.iloc[1:n]
+            if isinstance(idx, types.SliceType):
+                return signature(df.df_type, *args)
