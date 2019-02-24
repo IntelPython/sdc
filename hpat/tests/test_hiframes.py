@@ -730,33 +730,6 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
-    def test_iloc1(self):
-        def test_impl(df, n):
-            return df.iloc[1:n].B.values
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
-
-    def test_iloc2(self):
-        def test_impl(df, n):
-            return df.iloc[np.array([1,4,9])].B.values
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
-
-    def test_iloc3(self):
-        def test_impl(df):
-            return df.iloc[:,1].values
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-
     def test_isin_df1(self):
         def test_impl(df, df2):
             return df.isin(df2)
