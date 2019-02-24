@@ -202,52 +202,6 @@ class HiFrames(object):
                 if h5_nodes is not None:
                     return h5_nodes
 
-            # df1 = df[df.A > .5], df.iloc[1:n], df.iloc[[1,2,3]], ...
-            if rhs.op in ('getitem', 'static_getitem') and (
-                    self._is_df_var(rhs.value)
-                    or self._is_iloc_loc(rhs.value)):
-                # XXX handling getitem, iloc, and loc the same way
-                # TODO: support their differences
-                # XXX: integer index not supported
-                # TODO: check index for non-integer
-                # TODO: support constant integer (return namedtuple)
-                df = (rhs.value if self._is_df_var(rhs.value)
-                    else guard(get_definition, self.func_ir, rhs.value).value)
-                index_var = (rhs.index_var if rhs.op == 'static_getitem'
-                             else rhs.index)
-                # output df1 has same columns as df, create new vars
-                scope = assign.target.scope
-                loc = assign.target.loc
-                in_df_col_names = self._get_df_col_names(df)
-                df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
-                                for col in in_df_col_names}
-
-                # column selection like df.iloc[:,0]
-                if (rhs.op == 'static_getitem' and isinstance(rhs.index, tuple)
-                        and len(rhs.index) == 2
-                        and isinstance(rhs.index[1], int)
-                        and rhs.index[0] == slice(None)):
-                    col_no = rhs.index[1]
-                    col_var = self._get_df_colvar(df, in_df_col_names[col_no])
-                    assign.value = col_var
-                    return [assign]
-
-                self._create_df(lhs, df_col_map, label)
-                in_df = self._get_renamed_df(df)
-                return [filter.Filter(lhs, in_df.name, index_var,
-                                               self.df_vars, rhs.loc)]
-
-            # d = df.column
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and self._is_df_colname(rhs.value, rhs.attr)):
-                df = rhs.value.name
-                col_var = self._get_df_colvar(rhs.value, rhs.attr)
-                assign.value = col_var
-                # need to remove the lhs definition so that find_callname can
-                # match column function calls (i.e. A.f instead of df.A.f)
-                assert self.func_ir._definitions[lhs] == [rhs], "invalid def"
-                self.func_ir._definitions[lhs] = [None]
-
             # A = df.values
             if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
                     and rhs.attr == 'values'):
@@ -623,13 +577,6 @@ class HiFrames(object):
                       for c in in_df_map.keys() if c not in columns}
         self._create_df(lhs.name, out_df_map, label)
         return nodes
-
-    def _is_iloc_loc(self, var):
-        val_def = guard(get_definition, self.func_ir, var)
-        # check for df.at[] pattern
-        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
-                and val_def.attr in ('iloc', 'loc')
-                and self._is_df_var(val_def.value))
 
     def _is_iat(self, var):
         val_def = guard(get_definition, self.func_ir, var)
