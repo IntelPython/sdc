@@ -868,6 +868,8 @@ if hasattr(numba.ir_utils, 'alias_func_extensions'):
     numba.ir_utils.alias_func_extensions[('init_datetime_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_index_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext')] = alias_ext_dummy_func
+    # TODO: init_dataframe
     numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('to_date_series_type', 'hpat.hiframes.api')] = alias_ext_dummy_func
