@@ -25,7 +25,8 @@ from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
-from hpat.hiframes.pd_dataframe_ext import DataFrameType
+from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
+    DataFrameILocType, DataFrameIatType)
 from hpat.hiframes.pd_series_ext import SeriesType
 
 
@@ -168,8 +169,17 @@ class DataFramePass(object):
                 # raise ValueError("unsupported dataframe access {}[{}]".format(
                 #                  rhs.value.name, index))
 
-        if self._is_df_var(rhs.value) and self.is_bool_arr(index_var.name):
-            df_var = rhs.value
+        # df1 = df[df.A > .5], df.loc[df.A > .5], df.iloc[df.A > .5]
+        if self.is_bool_arr(index_var.name) and (self._is_df_var(rhs.value)
+                                                or self._is_df_loc_var(rhs.value)
+                                                or self._is_df_iloc_var(rhs.value)):
+
+            if self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value):
+                # TODO: check for errors
+                df_var = guard(get_definition, self.func_ir, rhs.value).value
+            else:
+                df_var = rhs.value
+
             df_typ = self.typemap[df_var.name]
             in_vars = {}
             out_vars = {}
@@ -425,6 +435,15 @@ class DataFramePass(object):
 
     def _is_df_var(self, var):
         return isinstance(self.typemap[var.name], DataFrameType)
+
+    def _is_df_loc_var(self, var):
+        return isinstance(self.typemap[var.name], DataFrameLocType)
+
+    def _is_df_iloc_var(self, var):
+        return isinstance(self.typemap[var.name], DataFrameILocType)
+
+    def _is_df_iat_var(self, var):
+        return isinstance(self.typemap[var.name], DataFrameIatType)
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
