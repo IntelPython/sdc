@@ -177,13 +177,48 @@ class DataFramePass(object):
 
         # df.loc[df.A > .5], df.iloc[df.A > .5]
         # df.iloc[1:n], df.iloc[np.array([1,2,3])], ...
-        if (self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value)
+        if ((self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value))
                 and (self.is_bool_arr(index_var.name)
                 or self.is_int_list_or_arr(index_var.name)
                 or isinstance(index_typ, types.SliceType))):
             # TODO: check for errors
             df_var = guard(get_definition, self.func_ir, rhs.value).value
             return self._gen_df_filter(df_var, index_var, lhs)
+
+        # df.iloc[1:n,0], df.loc[1:n,'A']
+        if ((self._is_df_loc_var(rhs.value) or self._is_df_iloc_var(rhs.value))
+                and isinstance(index_typ, types.Tuple)
+                and len(index_typ) == 2):
+            #
+            df_var = guard(get_definition, self.func_ir, rhs.value).value
+            df_typ = self.typemap[df_var.name]
+            ind_def = guard(get_definition, self.func_ir, index_var)
+            # TODO check and report errors
+            assert isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple'
+
+            if self._is_df_iloc_var(rhs.value):
+                col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                col_name = df_typ.columns[col_ind]
+            else:  # df.loc
+                col_name = guard(find_const, self.func_ir, ind_def.items[1])
+
+            col_filter_var = ind_def.items[0]
+            name_var = ir.Var(lhs.scope, mk_unique_var('df_col_name'), lhs.loc)
+            self.typemap[name_var.name] = types.StringLiteral(col_name)
+            nodes.append(
+                ir.Assign(ir.Const(col_name, lhs.loc), name_var, lhs.loc))
+            in_arr = self._get_dataframe_data(df_var, col_name, nodes)
+
+            if guard(is_whole_slice, self.typemap, self.func_ir, col_filter_var):
+                func = lambda A, ind, name: hpat.hiframes.api.init_series(
+                    A, None, name)
+            else:
+                # TODO: test this case
+                func = lambda A, ind, name: hpat.hiframes.api.init_series(
+                    A[ind], None, name)
+
+            return self._replace_func(func,
+                [in_arr, col_filter_var, name_var], pre_nodes=nodes)
 
         nodes.append(assign)
         return nodes

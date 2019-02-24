@@ -344,6 +344,15 @@ class GetItemDataFrameLoc(AbstractTemplate):
             # df.loc[1:n]
             if isinstance(idx, types.SliceType):
                 return signature(df.df_type, *args)
+            # df.loc[1:n,'A']
+            if (isinstance(idx, types.Tuple) and len(idx) == 2
+                    and isinstance(idx.types[1], types.StringLiteral)):
+                col_name = idx.types[1].literal_value
+                col_no = df.df_type.columns.index(col_name)
+                data_typ = df.df_type.data[col_no]
+                # TODO: index
+                ret_typ = SeriesType(data_typ.dtype, None, True)
+                return signature(ret_typ, *args)
 
 
 @infer_global(operator.getitem)
@@ -361,3 +370,11 @@ class GetItemDataFrameILoc(AbstractTemplate):
             # df.iloc[1:n]
             if isinstance(idx, types.SliceType):
                 return signature(df.df_type, *args)
+            # df.iloc[1:n,0]
+            if (isinstance(idx, types.Tuple) and len(idx) == 2
+                    and isinstance(idx.types[1], types.IntegerLiteral)):
+                col_no = idx.types[1].literal_value
+                data_typ = df.df_type.data[col_no]
+                # TODO: index
+                ret_typ = SeriesType(data_typ.dtype, None, True)
+                return signature(ret_typ, *args)
