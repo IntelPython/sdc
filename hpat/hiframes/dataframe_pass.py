@@ -220,6 +220,19 @@ class DataFramePass(object):
             return self._replace_func(func,
                 [in_arr, col_filter_var, name_var], pre_nodes=nodes)
 
+        if self._is_df_iat_var(rhs.value):
+            df_var = guard(get_definition, self.func_ir, rhs.value).value
+            df_typ = self.typemap[df_var.name]
+            if (rhs.op == 'static_getitem' and isinstance(rhs.index, tuple)
+                    and len(rhs.index) == 2 and isinstance(rhs.index[0], int)
+                    and isinstance(rhs.index[1], int)):
+                col_ind = rhs.index[1]
+                row_ind = rhs.index[0]
+                col_name = df_typ.columns[col_ind]
+                in_arr = self._get_dataframe_data(df_var, col_name, nodes)
+                return self._replace_func(lambda A: A[row_ind], [in_arr],
+                    extra_globals={'row_ind': row_ind}, pre_nodes=nodes)
+
         nodes.append(assign)
         return nodes
 

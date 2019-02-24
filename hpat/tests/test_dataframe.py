@@ -219,6 +219,39 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    def test_iat1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+            return df.iat[3, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    def test_iat2(self):
+        def test_impl(df):
+            return df.iat[3, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_iat3(self):
+        def test_impl(df, n):
+            return df.iat[n-1, 1]
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        self.assertEqual(hpat_func(df, n), test_impl(df, n))
+
+    def test_iat_set1(self):
+        def test_impl(df, n):
+            df.iat[n-1, 1] = n**2
+            return df
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df, n))
+
 
 if __name__ == "__main__":
     unittest.main()
