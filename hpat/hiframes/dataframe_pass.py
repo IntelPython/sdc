@@ -26,6 +26,7 @@ from hpat.str_arr_ext import (string_array_type, StringArrayType,
 from hpat.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
+from hpat.hiframes.pd_series_ext import SeriesType
 
 
 
@@ -122,7 +123,11 @@ class DataFramePass(object):
         return [assign]
 
     def _run_getitem(self, assign, rhs):
+        lhs = assign.target
         nodes = []
+        index_var = (rhs.index_var if rhs.op == 'static_getitem'
+                                    else rhs.index)
+
         # A = df['column'] or df[['C1', 'C2']]
         if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
             df_var = rhs.value
@@ -162,6 +167,33 @@ class DataFramePass(object):
                 return self._replace_func(_init_df, out_arrs, pre_nodes=nodes)
                 # raise ValueError("unsupported dataframe access {}[{}]".format(
                 #                  rhs.value.name, index))
+
+        if self._is_df_var(rhs.value) and self.is_bool_arr(index_var.name):
+            df_var = rhs.value
+            df_typ = self.typemap[df_var.name]
+            in_vars = {}
+            out_vars = {}
+            for col in df_typ.columns:
+                in_arr = self._get_dataframe_data(df_var, col, nodes)
+                out_arr = ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                self.typemap[out_arr.name] = self.typemap[in_arr.name]
+                in_vars[col] = in_arr
+                out_vars[col] = out_arr
+
+            nodes.append(hiframes.filter.Filter(
+                lhs.name, df_var.name, index_var, out_vars, in_vars, rhs.loc))
+
+            n_cols = len(df_typ.columns)
+            data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+            col_args = ", ".join("'{}'".format(c) for c in df_typ.columns)
+            func_text = "def _init_df({}):\n".format(data_args)
+            func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+                data_args, col_args)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            _init_df = loc_vars['_init_df']
+            return self._replace_func(
+                _init_df, list(out_vars.values()), pre_nodes=nodes)
 
         nodes.append(assign)
         return nodes
@@ -396,7 +428,7 @@ class DataFramePass(object):
 
     def is_bool_arr(self, varname):
         typ = self.typemap[varname]
-        return (isinstance(if_series_to_array_type(typ), types.Array)
+        return (isinstance(typ, (SeriesType, types.Array))
             and typ.dtype == types.bool_)
 
     def _is_const_none(self, var):

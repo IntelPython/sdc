@@ -220,6 +220,19 @@ def df_getitem_overload(df, ind):
         return lambda df, ind: hpat.hiframes.api.init_series(df._data[index])
 
 
+@infer_global(operator.getitem)
+class GetItemDataFrame(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        df, idx = args
+        # df1 = df[df.A > .5]
+        if (isinstance(df, DataFrameType)
+                and isinstance(idx, (SeriesType, types.Array))
+                and idx.dtype == types.bool_):
+            return signature(df, *args)
+
+
 @infer
 class StaticGetItemDataFrame(AbstractTemplate):
     key = "static_getitem"

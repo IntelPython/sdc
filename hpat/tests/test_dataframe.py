@@ -137,6 +137,42 @@ class TestDataFrame(unittest.TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_filter1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df1 = df[df.A > .5]
+            return df1.B.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_filter2(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df1 = df.loc[df.A > .5]
+            return np.sum(df1.B)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_filter3(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df1 = df.iloc[(df.A > .5).values]
+            return np.sum(df1.B)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

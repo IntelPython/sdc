@@ -12,11 +12,11 @@ from hpat.str_arr_ext import string_array_type
 
 
 class Filter(ir.Stmt):
-    def __init__(self, df_out, df_in, bool_arr, df_vars, loc):
+    def __init__(self, df_out, df_in, bool_arr, out_vars, in_vars, loc):
         self.df_out = df_out
         self.df_in = df_in
-        self.df_out_vars = df_vars[self.df_out].copy()
-        self.df_in_vars = df_vars[self.df_in].copy()
+        self.df_out_vars = out_vars
+        self.df_in_vars = in_vars
         self.bool_arr = bool_arr
         self.loc = loc
 
