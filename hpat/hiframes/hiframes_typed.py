@@ -2287,7 +2287,8 @@ class HiFramesTyped(object):
                                                             apply_copies_func):
         #
         out_nodes = []
-        varmap = {v.name: self._get_series_data(v, out_nodes) for v in use_vars}
+        varmap = {v.name: self._get_series_data(v, out_nodes) for v in use_vars
+                               if isinstance(self.typemap[v.name], SeriesType)}
         apply_copies_func(inst, varmap, None, None, None, None)
         out_nodes.append(inst)
 
@@ -2295,6 +2296,8 @@ class HiFramesTyped(object):
             self.func_ir._definitions[v.name].remove(inst)
         varmap = {}
         for v in def_vars:
+            if not isinstance(self.typemap[v.name], SeriesType):
+                continue
             data_var = ir.Var(
                 v.scope, mk_unique_var(v.name + 'data'), v.loc)
             self.typemap[data_var.name] = series_to_array_type(self.typemap[v.name])
