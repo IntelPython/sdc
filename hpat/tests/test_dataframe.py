@@ -191,7 +191,6 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
 
-    @unittest.skip
     def test_iloc3(self):
         def test_impl(df):
             return df.iloc[:,1].values
@@ -210,6 +209,15 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
+
+    def test_loc1(self):
+        def test_impl(df):
+            return df.loc[:,'B'].values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
 
 if __name__ == "__main__":
