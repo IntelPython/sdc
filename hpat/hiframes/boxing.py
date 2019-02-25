@@ -26,6 +26,7 @@ from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
 import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
+import llvmlite.llvmpy.core as lc
 from llvmlite.llvmpy.core import Type as LLType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
@@ -154,39 +155,53 @@ def box_dataframe(typ, val, c):
     dataframe = cgutils.create_struct_proxy(typ)(
         context, builder, value=val)
     col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
+    # df unboxed from Python
+    has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
     pyapi = c.pyapi
     #gil_state = pyapi.gil_ensure()  # acquire GIL
 
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
-    res = pyapi.call_method(class_obj, "DataFrame", ())
+    df_obj = pyapi.call_method(class_obj, "DataFrame", ())
 
-    for cname, arr, arr_typ, dtype in zip(col_names, col_arrs, arr_typs, dtypes):
+    for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
         # df['cname'] = boxed_arr
         # TODO: datetime.date, DatetimeIndex?
-        if dtype == string_type:
-            arr_obj = box_str_arr(arr_typ, arr, c)
-        elif isinstance(dtype, PDCategoricalDtype):
-            arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
-            context.nrt.incref(builder, arr_typ, arr)
-        elif dtype == types.List(string_type):
-            arr_obj = box_list(list_string_array_type, arr, c)
-            context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-            # pyapi.print_object(arr_obj)
-        else:
-            arr_obj = box_array(arr_typ, arr, c)
-            # TODO: is incref required?
-            context.nrt.incref(builder, arr_typ, arr)
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
-        pyapi.object_setitem(res, cname_obj, arr_obj)
+        # if column not unboxed, just used the boxed version from parent
+        unboxed_val = builder.extract_value(dataframe.unboxed, i)
+        not_unboxed = builder.icmp(lc.ICMP_EQ, unboxed_val, context.get_constant(types.int8, 0))
+        use_parent = builder.and_(has_parent, not_unboxed)
+
+        with builder.if_else(use_parent) as (then, orelse):
+            with then:
+                arr_obj = pyapi.object_getattr_string(dataframe.parent, cname)
+                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+
+            with orelse:
+                if dtype == string_type:
+                    arr_obj = box_str_arr(arr_typ, arr, c)
+                elif isinstance(dtype, PDCategoricalDtype):
+                    arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
+                    context.nrt.incref(builder, arr_typ, arr)
+                elif dtype == types.List(string_type):
+                    arr_obj = box_list(list_string_array_type, arr, c)
+                    context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+                    # pyapi.print_object(arr_obj)
+                else:
+                    arr_obj = box_array(arr_typ, arr, c)
+                    # TODO: is incref required?
+                    context.nrt.incref(builder, arr_typ, arr)
+                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+
         # pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
 
     pyapi.decref(class_obj)
     #pyapi.gil_release(gil_state)    # release GIL
-    return res
+    return df_obj
 
 
 @intrinsic
