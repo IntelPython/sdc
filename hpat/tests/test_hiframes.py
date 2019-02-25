@@ -89,45 +89,6 @@ class TestHiFrames(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    def test_set_column1(self):
-        # set existing column
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
-            df['A'] = np.arange(n)
-            return df.A.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
-
-    def test_set_column2(self):
-        # create new column
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            df['C'] = np.arange(n)
-            return df.C.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
-
-    def test_set_column_bool1(self):
-        def test_impl(df):
-            df['C'] = df['A'][df['B']]
-
-        hpat_func = hpat.jit(test_impl)
-        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
-        df2 = df.copy()
-        test_impl(df2)
-        hpat_func(df)
-        pd.testing.assert_series_equal(df.C, df2.C)
-
     def test_getitem_bool_series(self):
         def test_impl(df):
             return df['A'][df['B']].values
@@ -135,19 +96,6 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
-
-    def test_set_column_reflect(self):
-        def test_impl(df, arr):
-            df['C'] = arr
-            return
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        arr = np.random.ranf(n)
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-        hpat_func(df, arr)
-        self.assertIn('C', df)
-        np.testing.assert_almost_equal(df.C, arr)
 
     def test_fillna(self):
         def test_impl():

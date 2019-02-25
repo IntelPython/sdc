@@ -95,7 +95,7 @@ class DataFramePass(object):
         return
 
     def _run_assign(self, assign):
-        lhs = assign.target.name
+        lhs = assign.target
         rhs = assign.value
 
 
@@ -392,10 +392,52 @@ class DataFramePass(object):
         if fdef == ('len', 'builtins') and self._is_df_var(rhs.args[0]):
             return self._run_call_len(lhs, rhs.args[0])
 
+        if fdef == ('set_df_col', 'hpat.hiframes.api'):
+            return self._run_call_set_df_column(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, series_var, func_name):
         pass
+
+    def _run_call_set_df_column(self, assign, lhs, rhs):
+        # replace with regular setitem if target is not dataframe
+        # TODO: test non-df case
+        if not self._is_df_var(rhs.args[0]):
+            def _impl(target, index, val):
+                target[index] = val
+                return target
+            return self._replace_func(_impl, rhs.args)
+
+        df_var = rhs.args[0]
+        cname = guard(find_const, self.func_ir, rhs.args[1])
+        new_arr = rhs.args[2]
+        df_typ = self.typemap[df_var.name]
+        nodes = []
+
+        n_cols = len(df_typ.columns)
+        in_arrs = [self._get_dataframe_data(df_var, c, nodes)
+                    for c in df_typ.columns]
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+        col_args = ", ".join("'{}'".format(c) for c in df_typ.columns)
+
+        # if column is being added
+        if cname not in df_typ.columns:
+            data_args += ", new_arr"
+            col_args += ", '{}'".format(cname)
+            in_arrs.append(new_arr)
+        else:  # updating existing column
+            col_ind = df_typ.columns.index(cname)
+            in_arrs[col_ind] = new_arr
+
+        # TODO: fix list, Series data
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, col_args)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+        return self._replace_func(_init_df, in_arrs, pre_nodes=nodes)
 
     def _run_call_len(self, lhs, df_var):
         df_typ = self.typemap[df_var.name]
