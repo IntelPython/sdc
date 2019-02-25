@@ -131,43 +131,47 @@ class HiFrames(object):
             self._working_body = new_body
             for i, inst in enumerate(block.body):
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+                out_nodes = [inst]
 
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
-                        and self._is_df_var(inst.target)):
+                        and isinstance(inst.index, str)):
                     # cfg needed for set df column
                     cfg = compute_cfg_from_blocks(blocks)
-                    new_body += self._run_df_set_column(inst, label, cfg)
+                    out_nodes = self._run_df_set_column(inst, label, cfg)
+                # if (isinstance(inst, ir.StaticSetItem)
+                #         and self._is_df_var(inst.target)):
+                #     # cfg needed for set df column
+                #     cfg = compute_cfg_from_blocks(blocks)
+                #     new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, label)
-                    if isinstance(out_nodes, list):
-                        # TODO: fix scope/loc
-                        new_body.extend(out_nodes)
-                    if isinstance(out_nodes, ReplaceFunc):
-                        rp_func = out_nodes
-                        if rp_func.pre_nodes is not None:
-                            new_body.extend(rp_func.pre_nodes)
-                        # replace inst.value to a call with target args
-                        # as expected by inline_closure_call
-                        inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
-                        block.body = new_body + block.body[i:]
-                        inline_closure_call(self.func_ir, rp_func.glbls,
-                            block, len(new_body), rp_func.func, work_list=work_list)
-                        replaced = True
-                        break
-                    if isinstance(out_nodes, dict):
-                        block.body = new_body + block.body[i:]
-                        # TODO: insert new blocks in current spot of work_list
-                        # instead of append?
-                        # TODO: rename variables, fix scope/loc
-                        inline_new_blocks(self.func_ir, block, len(new_body), out_nodes, work_list)
-                        replaced = True
-                        break
                 elif isinstance(inst, ir.Return):
-                    nodes = self._run_return(inst)
-                    new_body += nodes
-                else:
-                    new_body.append(inst)
+                    out_nodes = self._run_return(inst)
+
+                if isinstance(out_nodes, list):
+                    # TODO: fix scope/loc
+                    new_body.extend(out_nodes)
+                if isinstance(out_nodes, ReplaceFunc):
+                    rp_func = out_nodes
+                    if rp_func.pre_nodes is not None:
+                        new_body.extend(rp_func.pre_nodes)
+                    # replace inst.value to a call with target args
+                    # as expected by inline_closure_call
+                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    block.body = new_body + block.body[i:]
+                    inline_closure_call(self.func_ir, rp_func.glbls,
+                        block, len(new_body), rp_func.func, work_list=work_list)
+                    replaced = True
+                    break
+                if isinstance(out_nodes, dict):
+                    block.body = new_body + block.body[i:]
+                    # TODO: insert new blocks in current spot of work_list
+                    # instead of append?
+                    # TODO: rename variables, fix scope/loc
+                    inline_new_blocks(self.func_ir, block, len(new_body), out_nodes, work_list)
+                    replaced = True
+                    break
             if not replaced:
                 blocks[label].body = new_body
 
@@ -1835,42 +1839,54 @@ class HiFrames(object):
         return f_block.body[:-3]  # remove none return
 
     def _run_df_set_column(self, inst, label, cfg):
-        """handle setitem: df['col_name'] = arr
+        """replace setitem of string index with a call to handle possible
+        dataframe case where schema is changed:
+        df['new_col'] = arr  ->  df2 = set_df_col(df, 'new_col', arr)
+        dataframe_pass will replace set_df_col() with regular setitem if target
+        is not dataframe
         """
-        # TODO: generalize to more cases
-        # TODO: rename the dataframe variable to keep schema static
-        df_label = self.df_labels[inst.target.name]
         # setting column possible only when it dominates the df creation to
         # keep schema consistent
-        if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
-            raise ValueError("setting dataframe columns inside conditionals and"
-                             " loops not supported yet")
-        if not isinstance(inst.index, str):
-            raise ValueError("dataframe column name should be a string constant")
+        # invalid case:
+        # df = pd.DataFrame({'A': A})
+        # if cond:
+        #     df['B'] = B
+        # return df
+        # TODO: add this check back in
+        # if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
+        #     raise ValueError("setting dataframe columns inside conditionals and"
+        #                      " loops not supported yet")
 
-        df_name = inst.target.name
-        # TODO: handle case where type has to be converted due to int64 NaNs
-        self.df_vars[df_name][inst.index] = inst.value
+        # TODO: generalize to more cases
+        # for example:
+        # df = pd.DataFrame({'A': A})
+        # if cond:
+        #     df['B'] = B
+        # else:
+        #     df['B'] = C
+        # return df
+        # TODO: check for references to df
+        # for example:
+        # df = pd.DataFrame({'A': A})
+        # df2 = df
+        # df['B'] = C
+        # return df2
+        df_var = inst.target
+        # create var for string index
+        cname_var = ir.Var(inst.value.scope, mk_unique_var("$cname_const"), inst.loc)
+        nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
 
-        # set dataframe column if it is input and needs to be reflected
-        df_def = guard(get_definition, self.func_ir, df_name)
-        if isinstance(df_def, ir.Arg):
-            # assign column name to variable
-            cname_var = ir.Var(inst.value.scope, mk_unique_var("$cname_const"), inst.loc)
-            nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
-            series_arr = inst.value
+        func = lambda df, cname, arr: hpat.hiframes.api.set_df_col(df, cname, arr)
+        f_block = compile_to_numba_ir(func, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [df_var, cname_var, inst.value])
+        nodes += f_block.body[:-2]
 
-            def f(_df, _cname, _arr):  # pragma: no cover
-                s = hpat.hiframes.api.set_df_col(_df, _cname, _arr)
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [inst.target, cname_var, series_arr])
-            # copy propagate to enable string Const in typing and lowering
-            simple_block_copy_propagate(f_block)
-            nodes += f_block.body[:-3]  # remove none return
-            return nodes
-
-        return []
+        # rename the dataframe variable to keep schema static
+        new_df_var = ir.Var(df_var.scope, mk_unique_var(df_var.name), df_var.loc)
+        nodes[-1].target = new_df_var
+        self.replace_var_dict[df_var.name] = new_df_var
+        self._add_node_defs(nodes)
+        return nodes
 
     def _handle_df_values(self, lhs, df):
         col_vars = self._get_df_col_vars(df)

@@ -740,10 +740,21 @@ def set_df_col(df, cname, arr):
 @infer_global(set_df_col)
 class SetDfColInfer(AbstractTemplate):
     def generic(self, args, kws):
+        from hpat.hiframes.pd_dataframe_ext import DataFrameType
         assert not kws
         assert len(args) == 3
         assert isinstance(args[1], types.Literal)
-        return signature(types.none, *args)
+        target = args[0]
+        ind = args[1].literal_value
+        val = args[2]
+        ret = target
+
+        if isinstance(target, DataFrameType):
+            new_cols = target.columns + (ind,)
+            new_typs = target.data + (val,)
+            ret = DataFrameType(new_typs, target.index, new_cols)
+
+        return signature(ret, *args)
 
 
 #@lower_builtin(set_df_col, DataFrameType, types.Literal, types.Array)
