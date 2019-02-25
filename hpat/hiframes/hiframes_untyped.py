@@ -131,12 +131,9 @@ class HiFrames(object):
             self._working_body = new_body
             for i, inst in enumerate(block.body):
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
-                if (isinstance(inst, (ir.StaticSetItem, ir.SetItem)) and self._is_iat(inst.target)):
-                    ind = inst.index if isinstance(inst, ir.SetItem) else inst.index_var
-                    out_nodes = self._handle_iat_setitem(inst.target, ind, inst.value, inst.loc)
-                    new_body.extend(out_nodes)
+
                 # df['col'] = arr
-                elif (isinstance(inst, ir.StaticSetItem)
+                if (isinstance(inst, ir.StaticSetItem)
                         and self._is_df_var(inst.target)):
                     # cfg needed for set df column
                     cfg = compute_cfg_from_blocks(blocks)
@@ -195,8 +192,6 @@ class HiFrames(object):
 
             # fix type for f['A'][:] dset reads
             if rhs.op in ('getitem', 'static_getitem'):
-                if self._is_iat(rhs.value):
-                    return self._handle_iat_getitem(assign, lhs, rhs)
                 h5_nodes = self.h5_handler.handle_possible_h5_read(
                     assign, lhs, rhs)
                 if h5_nodes is not None:
@@ -585,74 +580,6 @@ class HiFrames(object):
                       for c in in_df_map.keys() if c not in columns}
         self._create_df(lhs.name, out_df_map, label)
         return nodes
-
-    def _is_iat(self, var):
-        val_def = guard(get_definition, self.func_ir, var)
-        # check for df.at[] pattern
-        return (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
-                and val_def.attr == 'iat' and self._is_df_var(val_def.value))
-
-    def _handle_iat_getitem(self, assign, lhs, rhs):
-        if rhs.op == 'static_getitem':
-            index_var = rhs.index_var
-        else:
-            index_var = rhs.index
-
-        val_def = guard(get_definition, self.func_ir, rhs.value)
-        df = val_def.value  # check already done in _is_iat
-        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
-        getitem_node = ir.Expr.getitem(col_var, row_ind, rhs.loc)
-        assign.value = getitem_node
-        nodes.append(assign)
-        return nodes
-
-    def _handle_iat_setitem(self, target, index_var, val, loc):
-        val_def = guard(get_definition, self.func_ir, target)
-        df = val_def.value  # check already done in _is_iat
-        col_var, row_ind, nodes = self._get_iat_col_ind(df, index_var)
-        setitem_node = ir.SetItem(col_var, row_ind, val, loc)
-        nodes.append(setitem_node)
-        return nodes
-
-    def _get_iat_col_ind(self, df, index_var):
-        nodes = []
-        scope = index_var.scope
-        loc = index_var.loc
-        # find column/row indices
-        col_ind = None
-        row_ind = None
-        ind_def = guard(get_definition, self.func_ir, index_var)
-
-        # index is constant tuple
-        if isinstance(ind_def, ir.Const):
-            val = ind_def.value
-            if not isinstance(val, tuple) or not len(val) == 2:
-                raise ValueError("invalid index {} for df.iat[]".format(val))
-            row_ind, col_ind = val
-            r_var = ir.Var(scope, mk_unique_var(index_var.name), loc)
-            nodes.append(ir.Assign(ir.Const(row_ind, loc), r_var, loc))
-            row_ind = r_var
-
-        # index is variable tuple
-        elif isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple':
-            if len(ind_def.items) != 2:
-                raise ValueError("invalid index length for df.iat[], "
-                                 "[row, column] expected")
-            row_ind = ind_def.items[0]
-            col_ind = guard(find_const, self.func_ir, ind_def.items[1])
-            if col_ind is None:
-                raise ValueError("column index in iat[] should be constant")
-        else:
-            raise ValueError("invalid index in iat[]")
-
-        # XXX assuming the order of the dictionary is the same as Pandas
-        # TODO: check dictionary order
-        col_var_list = list(self._get_df_cols(df).values())
-        if not col_ind < len(col_var_list):
-            raise ValueError("invalid column index in iat[]")
-        col_var = col_var_list[col_ind]
-
-        return col_var, row_ind, nodes
 
     def _get_reverse_copies(self, body):
         for inst in body:
