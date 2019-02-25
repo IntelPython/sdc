@@ -2085,15 +2085,14 @@ class HiFramesTyped(object):
         return nodes[-1].target
 
     def _get_series_data(self, series_var, nodes):
-        # optimization: return data var directly if index is None
+        # optimization: return data var directly if series has a single
+        # definition by init_series()
         # e.g. S = init_series(A, None)
-        # XXX assuming init_series is the only call to create a series
+        # XXX assuming init_series() is the only call to create a series
         # and series._data is never overwritten
         var_def = guard(get_definition, self.func_ir, series_var)
         call_def = guard(find_callname, self.func_ir, var_def)
-        if (call_def == ('init_series', 'hpat.hiframes.api')
-                and (len(var_def.args) < 2
-                    or self._is_const_none(var_def.args[1]))):
+        if call_def == ('init_series', 'hpat.hiframes.api'):
             return var_def.args[0]
 
         # XXX use get_series_data() for getting data instead of S._data
