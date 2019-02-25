@@ -207,6 +207,14 @@ class HiFrames(object):
                     and rhs.attr == 'values'):
                 return self._handle_df_values(assign.target, rhs.value)
 
+            # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
+            # TODO: remove when dictionaries are implemented and typing works
+            if rhs.op == 'getattr' and rhs.attr == 'DataFrame':
+                return []
+
+            if rhs.op == 'build_map':
+                return []
+
         if isinstance(rhs, ir.Arg):
             return self._run_arg(assign, label)
 
