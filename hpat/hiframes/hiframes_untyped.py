@@ -133,17 +133,13 @@ class HiFrames(object):
                 ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
                 out_nodes = [inst]
 
+                # handle potential dataframe set column here
                 # df['col'] = arr
                 if (isinstance(inst, ir.StaticSetItem)
                         and isinstance(inst.index, str)):
                     # cfg needed for set df column
                     cfg = compute_cfg_from_blocks(blocks)
                     out_nodes = self._run_df_set_column(inst, label, cfg)
-                # if (isinstance(inst, ir.StaticSetItem)
-                #         and self._is_df_var(inst.target)):
-                #     # cfg needed for set df column
-                #     cfg = compute_cfg_from_blocks(blocks)
-                #     new_body += self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     out_nodes = self._run_assign(inst, label)
                 elif isinstance(inst, ir.Return):
@@ -209,9 +205,6 @@ class HiFrames(object):
             if rhs.op == 'build_map':
                 return []
 
-        if isinstance(rhs, ir.Arg):
-            return self._run_arg(assign, label)
-
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
@@ -241,12 +234,14 @@ class HiFrames(object):
         else:
             func_name, func_mod = fdef
 
+        # handling pd.DataFrame() here since input can be constant dictionary
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
         if fdef == ('read_csv', 'pandas'):
             return self._handle_pd_read_csv(assign, lhs, rhs, label)
 
+        # match flatmap pd.Series(list(itertools.chain(*A))) and flatten
         if fdef == ('Series', 'pandas'):
             return self._handle_pd_Series(assign, lhs, rhs)
 
@@ -1695,19 +1690,6 @@ class HiFrames(object):
         nodes = f_block.body[:-3]  # remove none return
         new_col_var = nodes[-1].target
         return new_col_var, nodes
-
-    def _run_arg(self, arg_assign, label):
-        nodes = [arg_assign]
-        arg_name = arg_assign.value.name
-        arg_ind = arg_assign.value.index
-        arg_var = arg_assign.target
-        arg_typ = self.args[arg_ind]
-        scope = arg_var.scope
-        loc = arg_var.loc
-
-        # TODO: handle datetime.date() series
-
-        return nodes
 
     def _handle_metadata(self):
         """remove distributed input annotation from locals and add to metadata
