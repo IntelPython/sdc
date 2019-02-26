@@ -13,18 +13,15 @@ from hpat.str_arr_ext import (string_array_type, StringArrayType,
 
 
 # float columns can have regular np.nan
-def _column_filter_impl_float(df, cname, B, ind):  # pragma: no cover
+def _column_filter_impl(B, ind):  # pragma: no cover
     dtype = hpat.hiframes.api.shift_dtype(B.dtype)
     A = np.empty(len(B), dtype)
     for i in numba.parfor.internal_prange(len(A)):
-        s = 0
         if ind[i]:
-            s = B[i]
+            A[i] = B[i]
         else:
-            s = np.nan
-        A[i] = s
-    hpat.hiframes.api.set_df_col(df, cname, A)
-    return
+            hpat.hiframes.join.setitem_arr_nan(A, i)
+    return hpat.hiframes.api.init_series(A)
 
 
 def _column_count_impl(A):  # pragma: no cover
