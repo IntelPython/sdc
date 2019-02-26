@@ -51,35 +51,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    def test_df_values1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.values
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
-
-    def test_df_values2(self):
-        def test_impl(df):
-            return df.values
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
-
-    def test_df_values_parallel1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.values.sum()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
     def test_df_head1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
