@@ -37,7 +37,7 @@ def typeof_pd_dataframe(val, c):
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
-    return DataFrameType(col_types, None, col_names)
+    return DataFrameType(col_types, None, col_names, True)
 
 
 # register series types for import

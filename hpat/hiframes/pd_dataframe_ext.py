@@ -28,7 +28,7 @@ import datetime
 class DataFrameType(types.Type):  # TODO: IterableType over column names
     """Temporary type class for DataFrame objects.
     """
-    def __init__(self, data=None, index=None, columns=None):
+    def __init__(self, data=None, index=None, columns=None, has_parent=False):
         # data is tuple of Array types
         # index is Array type (TODO: Index obj)
         # columns is tuple of strings
@@ -38,24 +38,29 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
             index = types.none
         self.index = index
         self.columns = columns
+        # keeping whether it is unboxed from Python to enable reflection of new
+        # columns
+        self.has_parent = has_parent
         super(DataFrameType, self).__init__(
-            name="dataframe({}, {}, {})".format(data, index, columns))
+            name="dataframe({}, {}, {}, {})".format(
+                data, index, columns, has_parent))
 
     def copy(self):
         # XXX is copy necessary?
         index = types.none if self.index == types.none else self.index.copy()
         data = tuple(a.copy() for a in self.data)
-        return DataFrameType(data, index, self.columns)
+        return DataFrameType(data, index, self.columns, self.has_parent)
 
     @property
     def key(self):
         # needed?
-        return self.data, self.index, self.columns
+        return self.data, self.index, self.columns, self.has_parent
 
     def unify(self, typingctx, other):
         if (isinstance(other, DataFrameType)
                 and len(other.data) == len(self.data)
-                and other.columns == self.columns):
+                and other.columns == self.columns
+                and other.has_parent == self.has_parent):
             new_index = types.none
             if self.index != types.none and other.index != types.none:
                 new_index = self.index.unify(typingctx, other.index)
@@ -65,7 +70,8 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
                 new_index = self.index
 
             data = tuple(a.unify(typingctx, b) for a,b in zip(self.data, other.data))
-            return DataFrameType(data, new_index, self.columns)
+            return DataFrameType(
+                data, new_index, self.columns, self.has_parent)
 
     def can_convert_to(self, typingctx, other):
         return
@@ -217,6 +223,106 @@ def get_dataframe_data(df, i):
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_dataframe_index(df):
     return lambda df: df._index
+
+
+@intrinsic
+def set_df_column_with_reflect(typingctx, df, cname, arr):
+    """Set df column and reflect to parent Python object
+    return a new df.
+    """
+
+    col_name = cname.literal_value
+    n_cols = len(df.columns)
+    new_n_cols = n_cols
+    data_typs = df.data
+    column_names = df.columns
+    index_typ = df.index
+    is_new_col = col_name not in df.columns
+    col_ind = n_cols
+    if is_new_col:
+        data_typs += (arr,)
+        column_names += (col_name,)
+        new_n_cols += 1
+    else:
+        col_ind = df.columns.index(col_name)
+        data_typs = tuple((arr if i == col_ind else data_typs[i])
+                          for i in range(n_cols))
+
+    def codegen(context, builder, signature, args):
+        df_arg, _, arr_arg = args
+
+        in_dataframe = cgutils.create_struct_proxy(df)(
+            context, builder, value=df_arg)
+
+        data_arrs = [builder.extract_value(in_dataframe.data, i)
+                    if i != col_ind else arr_arg for i in range(n_cols)]
+        if is_new_col:
+            data_arrs.append(arr_arg)
+
+        column_strs = [numba.unicode.make_string_from_constant(
+                    context, builder, string_type, c) for c in column_names]
+
+        unboxed_vals = [builder.extract_value(in_dataframe.unboxed, i)
+                        if i != col_ind else arr_arg for i in range(n_cols)]
+        zero = context.get_constant(types.int8, 0)
+        one = context.get_constant(types.int8, 1)
+        if unboxed_vals:
+            unboxed_vals.append(one)  # for new data array
+        unboxed_vals.append(zero)  # for index
+
+        index = in_dataframe.index
+        # create dataframe struct and store values
+        out_dataframe = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+
+        data_tup = context.make_tuple(
+            builder, types.Tuple(data_typs), data_arrs)
+        column_tup = context.make_tuple(
+            builder, types.UniTuple(string_type, new_n_cols), column_strs)
+        unboxed_tup = context.make_tuple(
+            builder, types.UniTuple(types.int8, new_n_cols+1), unboxed_vals)
+
+        out_dataframe.data = data_tup
+        out_dataframe.index = index
+        out_dataframe.columns = column_tup
+        out_dataframe.unboxed = unboxed_tup
+        out_dataframe.parent = in_dataframe.parent  # TODO: refcount of parent?
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, index_typ, index)
+            for var, typ in zip(data_arrs, data_typs):
+                context.nrt.incref(builder, typ, var)
+            for var in column_strs:
+                context.nrt.incref(builder, string_type, var)
+
+        # set column of parent
+        # get boxed array
+        pyapi = context.get_python_api(builder)
+        gil_state = pyapi.gil_ensure()  # acquire GIL
+        env_manager = context.get_env_manager(builder)
+
+        if context.enable_nrt:
+            context.nrt.incref(builder, arr, arr_arg)
+        py_arr = pyapi.from_native_value(arr, arr_arg, env_manager)    # calls boxing
+
+        # get column as string obj
+        cstr = context.insert_const_string(builder.module, col_name)
+        cstr_obj = pyapi.string_from_string(cstr)
+
+        # set column array
+        pyapi.object_setitem(in_dataframe.parent, cstr_obj, py_arr)
+
+        pyapi.decref(py_arr)
+        pyapi.decref(cstr_obj)
+
+        pyapi.gil_release(gil_state)    # release GIL
+
+        return out_dataframe._getvalue()
+
+    ret_typ = DataFrameType(data_typs, index_typ, column_names, True)
+    sig = signature(ret_typ, df, cname, arr)
+    return sig, codegen
 
 
 @overload(len)  # TODO: avoid lowering?
