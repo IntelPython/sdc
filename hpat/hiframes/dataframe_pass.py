@@ -27,7 +27,7 @@ from hpat.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
     DataFrameILocType, DataFrameIatType)
-from hpat.hiframes.pd_series_ext import SeriesType
+from hpat.hiframes.pd_series_ext import SeriesType, is_series_type
 
 
 
@@ -414,10 +414,34 @@ class DataFramePass(object):
         new_arr = rhs.args[2]
         df_typ = self.typemap[df_var.name]
         nodes = []
+
+        # find df['col2'] = df['col1'][arr]
+        # since columns should have the same size, output is filled with NaNs
+        # TODO: make sure col1 and col2 are in the same df
+        arr_def = guard(get_definition, self.func_ir, new_arr)
+        if (isinstance(arr_def, ir.Expr)  and arr_def.op == 'getitem'
+                and is_array(self.typemap, arr_def.value.name)
+                and self.is_bool_arr(arr_def.index.name)):
+            orig_arr = arr_def.value
+            bool_arr = arr_def.index
+            f_block = compile_to_numba_ir(
+                lambda arr, bool_arr: hpat.hiframes.api.series_filter_bool(arr, bool_arr),
+                {'hpat': hpat},
+                self.typingctx,
+                (self.typemap[orig_arr.name], self.typemap[bool_arr.name]),
+                self.typemap,
+                self.calltypes
+            ).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [orig_arr, bool_arr])
+            nodes += f_block.body[:-2]
+            new_arr = nodes[-1].target
+
+
+        # set unboxed df column with reflection
         if df_typ.has_parent:
             return self._replace_func(
                 lambda df, cname, arr: hpat.hiframes.pd_dataframe_ext.set_df_column_with_reflect(
-                    df, cname, arr), rhs.args)
+                    df, cname, hpat.hiframes.api.fix_df_array(arr)), [df_var, rhs.args[1], new_arr], pre_nodes=nodes)
 
         n_cols = len(df_typ.columns)
         in_arrs = [self._get_dataframe_data(df_var, c, nodes)
@@ -430,12 +454,15 @@ class DataFramePass(object):
             data_args += ", new_arr"
             col_args += ", '{}'".format(cname)
             in_arrs.append(new_arr)
+            new_arr_arg = 'new_arr'
         else:  # updating existing column
             col_ind = df_typ.columns.index(cname)
             in_arrs[col_ind] = new_arr
+            new_arr_arg = 'data{}'.format(col_ind)
 
         # TODO: fix list, Series data
         func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  {} = hpat.hiframes.api.fix_df_array({})\n".format(new_arr_arg, new_arr_arg)
         func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             data_args, col_args)
         loc_vars = {}

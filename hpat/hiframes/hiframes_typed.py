@@ -571,6 +571,15 @@ class HiFramesTyped(object):
                 assign.value = var_def.args[0]
                 return [assign]
 
+        if func_name == 'get_series_data':
+            # fix_df_array() calls get_series_data() (e.g. for dataframes)
+            # but it can be removed sometimes
+            var_def = guard(get_definition, self.func_ir, rhs.args[0])
+            call_def = guard(find_callname, self.func_ir, var_def)
+            if call_def == ('init_series', 'hpat.hiframes.api'):
+                assign.value = var_def.args[0]
+                return [assign]
+
         if func_name in ('str_contains_regex', 'str_contains_noregex'):
             return self._handle_str_contains(assign, lhs, rhs, func_name)
 
@@ -598,7 +607,7 @@ class HiFramesTyped(object):
                 nodes[-1].target = assign.target
                 return nodes
 
-        if func_name == 'set_df_col':
+        if func_name == 'series_filter_bool':
             return self._handle_df_col_filter(assign, lhs, rhs)
 
         if func_name == 'to_const_tuple':
@@ -1889,29 +1898,16 @@ class HiFramesTyped(object):
 
     def _handle_df_col_filter(self, assign, lhs, rhs):
         nodes = []
-        if is_series_type(self.typemap[rhs.args[2].name]):
-            rhs.args[2] = self._get_series_data(rhs.args[2], nodes)
-            self._convert_series_calltype(rhs)
-        arr_def = guard(get_definition, self.func_ir, rhs.args[2])
+        in_arr = rhs.args[0]
+        bool_arr = rhs.args[1]
+        if is_series_type(self.typemap[in_arr.name]):
+            in_arr = self._get_series_data(in_arr, nodes)
+        if is_series_type(self.typemap[bool_arr.name]):
+            bool_arr = self._get_series_data(bool_arr, nodes)
 
-        # find df['col2'] = df['col1'][arr]
-        # since columns should have the same size, output is filled with NaNs
-        # TODO: check for float, make sure col1 and col2 are in the same df
-        if (isinstance(arr_def, ir.Expr)  and arr_def.op == 'getitem'
-                and is_array(self.typemap, arr_def.value.name)
-                and self.is_bool_arr(arr_def.index.name)):
-            bool_arr = arr_def.index
-            if is_series_type(self.typemap[bool_arr.name]):
-                bool_arr = self._get_series_data(bool_arr, nodes)
-            # TODO: handle filter str arr, etc.
-            # XXX: can't handle int64 to float64 nans properly since df column
-            # bookkeeping is before typing
-            return self._replace_func(series_kernels._column_filter_impl_float,
-                [rhs.args[0], rhs.args[1], arr_def.value, bool_arr], True,
+        return self._replace_func(series_kernels._column_filter_impl,
+                [in_arr, bool_arr],
                 pre_nodes=nodes)
-
-        nodes.append(assign)
-        return nodes
 
     def _handle_df_col_calls(self, assign, lhs, rhs, func_name):
 

@@ -302,10 +302,10 @@ class TestDataFrame(unittest.TestCase):
         hpat_func(df)
         pd.testing.assert_series_equal(df.C, df2.C)
 
-    def test_set_column_reflect(self):
+    def test_set_column_reflect1(self):
         def test_impl(df, arr):
             df['C'] = arr
-            return
+            return df.C.sum()
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -313,7 +313,19 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
         hpat_func(df, arr)
         self.assertIn('C', df)
-        np.testing.assert_almost_equal(df.C, arr)
+        np.testing.assert_almost_equal(df.C.values, arr)
+
+    def test_set_column_reflect2(self):
+        def test_impl(df, arr):
+            df['C'] = arr
+            return df.C.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        arr = np.random.ranf(n)
+        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+        df2 = df.copy()
+        self.assertEqual(hpat_func(df, arr), test_impl(df2, arr))
 
 
 if __name__ == "__main__":

@@ -733,6 +733,19 @@ class ToNumeric(AbstractTemplate):
         dtype = args[1].dtype
         return signature(SeriesType(dtype), *unliteral_all(args))
 
+def series_filter_bool(arr, bool_arr):
+    return arr[bool_arr]
+
+@infer_global(series_filter_bool)
+class SeriesFilterBoolInfer(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        ret = args[0]
+        if isinstance(ret.dtype, types.Integer):
+            ret = SeriesType(types.float64)
+        return signature(ret, *args)
+
 
 def set_df_col(df, cname, arr):
     df[cname] = arr
@@ -949,6 +962,8 @@ class FixDfArrayType(AbstractTemplate):
             ret_typ = string_array_type
         if isinstance(column, DatetimeIndexType):
             ret_typ = hpat.hiframes.pd_index_ext._dt_index_data_typ
+        if isinstance(column, SeriesType):
+            ret_typ = column.data
         # TODO: add other types
         return signature(ret_typ, column)
 
@@ -976,6 +991,9 @@ def fix_df_array_overload(column):
 
     if isinstance(column, DatetimeIndexType):
         return lambda column: hpat.hiframes.api.get_index_data(column)
+
+    if isinstance(column, SeriesType):
+        return lambda column: hpat.hiframes.api.get_series_data(column)
 
     # column is array if not list
     assert isinstance(column, (types.Array, StringArrayType, SeriesType))
