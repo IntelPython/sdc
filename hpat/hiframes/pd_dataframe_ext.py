@@ -136,6 +136,12 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_loc(self, ary):
         return DataFrameLocType(ary)
 
+    def resolve_values(self, ary):
+        # using np.stack(data, 1) for both typing and implementation
+        stack_sig = self.context.resolve_function_type(
+            np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
+        return stack_sig.return_type
+
     def generic_resolve(self, df, attr):
         ind = df.columns.index(attr)
         arr_typ = df.data[ind]

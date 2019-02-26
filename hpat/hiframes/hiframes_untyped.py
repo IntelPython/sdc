@@ -201,11 +201,6 @@ class HiFrames(object):
                 if h5_nodes is not None:
                     return h5_nodes
 
-            # A = df.values
-            if (rhs.op == 'getattr' and self._is_df_var(rhs.value)
-                    and rhs.attr == 'values'):
-                return self._handle_df_values(assign.target, rhs.value)
-
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
             if rhs.op == 'getattr' and rhs.attr == 'DataFrame':
@@ -1887,20 +1882,6 @@ class HiFrames(object):
         self.replace_var_dict[df_var.name] = new_df_var
         self._add_node_defs(nodes)
         return nodes
-
-    def _handle_df_values(self, lhs, df):
-        col_vars = self._get_df_col_vars(df)
-        n_cols = len(col_vars)
-        arg_names = ["C{}".format(i) for i in range(n_cols)]
-        func_text = "def f({}):\n".format(", ".join(arg_names))
-        func_text += "    return np.stack(({}), 1)\n".format(
-            ",".join([s+".values" for s in arg_names]))
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        return self._replace_func(f, col_vars)
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,
                       pre_nodes=None, extra_globals=None):
