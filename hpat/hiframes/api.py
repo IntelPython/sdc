@@ -752,7 +752,8 @@ class SetDfColInfer(AbstractTemplate):
         if isinstance(target, DataFrameType):
             new_cols = target.columns + (ind,)
             new_typs = target.data + (val,)
-            ret = DataFrameType(new_typs, target.index, new_cols)
+            ret = DataFrameType(
+                new_typs, target.index, new_cols, target.has_parent)
 
         return signature(ret, *args)
 

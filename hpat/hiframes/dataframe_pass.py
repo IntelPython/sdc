@@ -414,6 +414,10 @@ class DataFramePass(object):
         new_arr = rhs.args[2]
         df_typ = self.typemap[df_var.name]
         nodes = []
+        if df_typ.has_parent:
+            return self._replace_func(
+                lambda df, cname, arr: hpat.hiframes.pd_dataframe_ext.set_df_column_with_reflect(
+                    df, cname, arr), rhs.args)
 
         n_cols = len(df_typ.columns)
         in_arrs = [self._get_dataframe_data(df_var, c, nodes)
