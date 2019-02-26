@@ -199,8 +199,11 @@ class HiFrames(object):
 
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
-            if rhs.op == 'getattr' and rhs.attr == 'DataFrame':
-                return []
+            if rhs.op == 'getattr':
+                val_def = guard(get_definition, self.func_ir, rhs.value)
+                if (isinstance(val_def, ir.Global) and val_def.value == pd
+                        and rhs.attr in ('DataFrame', 'read_csv')):
+                    return []
 
             if rhs.op == 'build_map':
                 return []
@@ -238,6 +241,8 @@ class HiFrames(object):
         if fdef == ('DataFrame', 'pandas'):
             return self._handle_pd_DataFrame(assign, lhs, rhs, label)
 
+        # handling pd.read_csv() here since input can have constants
+        # like dictionaries for typing
         if fdef == ('read_csv', 'pandas'):
             return self._handle_pd_read_csv(assign, lhs, rhs, label)
 
@@ -682,28 +687,51 @@ class HiFrames(object):
                     raise ValueError("pd.read_csv() parse_dates expects constant column numbers")
                 date_cols.append(col_val)
 
-        col_map = {}
+        columns = []
+        data_arrs = []
         out_types = []
         for i, (name_var, dtype_var) in enumerate(dtype_map.items):
+            # find constant column name
             col_name = guard(find_const, self.func_ir, name_var)
             if col_name is None:  # pragma: no cover
                 raise ValueError("dtype column names should be constant")
+            columns.append(col_name)
+            # get array dtype
             typ = self._get_const_dtype(dtype_var)
             if i in date_cols:
-                typ = SeriesType(types.NPDatetime('ns'))
+                typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
-            col_map[col_name] = ir.Var(
-                lhs.scope, mk_unique_var(col_name), lhs.loc)
+            # output array variable
+            data_arrs.append(
+                ir.Var(lhs.scope, mk_unique_var(col_name), lhs.loc))
 
-        self._create_df(lhs.name, col_map, label)
-        return [csv_ext.CsvReader(
-            fname, lhs.name, sep, list(col_map.keys()), list(col_map.values()), out_types, usecols, lhs.loc)]
+
+        nodes = [csv_ext.CsvReader(
+            fname, lhs.name, sep, columns, data_arrs, out_types, usecols, lhs.loc)]
+
+        n_cols = len(dtype_map.items)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        f_block = compile_to_numba_ir(
+            _init_df, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, data_arrs)
+        nodes += f_block.body[:-2]
+        nodes[-1].target = lhs
+        return nodes
+
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
         # str case
         if isinstance(dtype_def, ir.Global) and dtype_def.value == str:
-            return string_series_type  # string_array_type
+            return string_array_type
         # categorical case
         if isinstance(dtype_def, ir.Expr) and dtype_def.op == 'call':
             if (not guard(find_callname, self.func_ir, dtype_def)
@@ -715,7 +743,7 @@ class HiFrames(object):
             err_msg = "categories should be constant list"
             cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
             typ = PDCategoricalDtype(cats)
-            return SeriesType(typ)
+            return types.Array(typ, 1, 'C')
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
         glob_def = guard(get_definition, self.func_ir, dtype_def.value)
@@ -726,7 +754,7 @@ class HiFrames(object):
         typ_name = 'int64' if typ_name == 'int' else typ_name
         typ_name = 'float64' if typ_name == 'float' else typ_name
         typ = getattr(types, typ_name)
-        typ = SeriesType(typ)
+        typ = types.Array(typ, 1, 'C')
         return typ
 
     def _handle_pd_Series(self, assign, lhs, rhs):
