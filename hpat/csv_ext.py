@@ -272,9 +272,9 @@ def _get_dtype_str(t):
     if isinstance(dtype, PDCategoricalDtype):
         dtype = str(get_categories_int_type(dtype))
 
-    if t == dt_index_series_type:
+    if dtype == types.NPDatetime('ns'):
         dtype = 'NPDatetime("ns")'
-    if t == string_series_type:
+    if t == string_array_type:
         # HACK: add string_array_type to numba.types
         # FIXME: fix after Numba #3372 is resolved
         types.string_array_type = string_array_type
@@ -285,9 +285,9 @@ def _get_pd_dtype_str(t):
     dtype = t.dtype
     if isinstance(dtype, PDCategoricalDtype):
         return 'pd.api.types.CategoricalDtype({})'.format(dtype.categories)
-    if t == dt_index_series_type:
+    if dtype == types.NPDatetime('ns'):
         dtype = 'str'
-    if t == string_series_type:
+    if t == string_array_type:
         return 'str'
     return 'np.{}'.format(dtype)
 
@@ -300,7 +300,7 @@ compiled_funcs = []
 def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
-                           if t == dt_index_series_type)
+                           if t.dtype == types.NPDatetime('ns'))
     typ_strs = ", ".join(["{}='{}'".format(cname, _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t))
