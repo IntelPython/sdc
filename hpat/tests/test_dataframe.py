@@ -325,7 +325,7 @@ class TestDataFrame(unittest.TestCase):
         arr = np.random.ranf(n)
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
         df2 = df.copy()
-        self.assertEqual(hpat_func(df, arr), test_impl(df2, arr))
+        np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
     def test_df_values1(self):
         def test_impl(n):
