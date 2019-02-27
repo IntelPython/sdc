@@ -73,3 +73,9 @@ def _get_cat_obj_items(categories, c):
 
     dtype = numba.typeof(val)
     return [c.box(dtype, c.context.get_constant(dtype, item)) for item in categories]
+
+# HACK: dummy overload for CategoricalDtype to avoid type inference errors
+# TODO: implement dtype properly
+@overload(pd.api.types.CategoricalDtype)
+def cat_overload_dummy(val_list):
+    return lambda val_list: 1
