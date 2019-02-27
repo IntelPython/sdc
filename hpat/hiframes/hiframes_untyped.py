@@ -202,10 +202,21 @@ class HiFrames(object):
             if rhs.op == 'getattr':
                 val_def = guard(get_definition, self.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == pd
-                        and rhs.attr in ('DataFrame', 'read_csv')):
+                        and rhs.attr in ('DataFrame', 'read_csv', 'read_parquet')):
                     return []
 
             if rhs.op == 'build_map':
+                return []
+
+            # HACK: delete pyarrow.parquet.read_table() to avoid typing errors
+            if rhs.op == 'getattr' and rhs.attr == 'read_table':
+                import pyarrow.parquet as pq
+                val_def = guard(get_definition, self.func_ir, rhs.value)
+                if isinstance(val_def, ir.Global) and val_def.value == pq:
+                    return []
+
+            if (rhs.op == 'getattr' and rhs.value.name in self.arrow_tables
+                    and rhs.attr == 'to_pandas'):
                 return []
 
         # handle copies lhs = f
@@ -215,6 +226,7 @@ class HiFrames(object):
             self.df_labels[lhs] = self.df_labels[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
+            return []
         return [assign]
 
     def _run_call(self, assign, label):
@@ -811,12 +823,19 @@ class HiFrames(object):
         return self._gen_parquet_read(self.arrow_tables[t_var.name], lhs, label)
 
     def _gen_parquet_read(self, fname, lhs, label):
-        col_items, col_types, nodes = self.pq_handler.gen_parquet_read(
+        columns, data_arrs, nodes = self.pq_handler.gen_parquet_read(
             fname, lhs)
-        df_nodes, col_map = self._process_df_build_map(col_items)
-        nodes += df_nodes
-        self._create_df(lhs.name, col_map, label)
-        return nodes
+        n_cols = len(columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        return self._replace_func(_init_df, data_arrs, pre_nodes=nodes)
 
     def _handle_pd_read_parquet(self, assign, lhs, rhs, label):
         fname = rhs.args[0]

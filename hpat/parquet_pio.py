@@ -115,7 +115,7 @@ class ParquetHandler(object):
         out_nodes += f_block.body[:-3]
         arrow_readers_var = out_nodes[-1].target
 
-        col_items = []
+        col_arrs = []
         for i, cname in enumerate(col_names):
             # get column type from schema
             c_type = col_types[i]
@@ -126,7 +126,7 @@ class ParquetHandler(object):
             varname = mk_unique_var(cname)
             #self.locals[varname] = c_type
             cvar = ir.Var(scope, varname, loc)
-            col_items.append((cname, cvar))
+            col_arrs.append(cvar)
 
             out_nodes += get_column_read_nodes(c_type, cvar, arrow_readers_var, i)
 
@@ -139,7 +139,7 @@ class ParquetHandler(object):
                                      }).blocks.popitem()[1]
         replace_arg_nodes(f_block, [arrow_readers_var])
         out_nodes += f_block.body[:-3]
-        return col_items, col_types, out_nodes
+        return col_names, col_arrs, out_nodes
 
 
 def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
