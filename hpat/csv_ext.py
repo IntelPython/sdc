@@ -21,7 +21,8 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
-from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
+from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
+    CategoricalArray)
 from hpat.hiframes.pd_series_ext import dt_index_series_type, string_series_type
 
 
@@ -270,7 +271,12 @@ csv_file_chunk_reader = types.ExternalFunction(
 def _get_dtype_str(t):
     dtype = t.dtype
     if isinstance(dtype, PDCategoricalDtype):
-        dtype = str(get_categories_int_type(dtype))
+        cat_arr = CategoricalArray(dtype)
+        # HACK: add cat type to numba.types
+        # FIXME: fix after Numba #3372 is resolved
+        cat_arr_name = 'CategoricalArray' + str(ir_utils.next_label())
+        setattr(types, cat_arr_name, cat_arr)
+        return cat_arr_name
 
     if dtype == types.NPDatetime('ns'):
         dtype = 'NPDatetime("ns")'
@@ -314,10 +320,8 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     func_text += "       parse_dates=[{}],\n".format(date_inds)
     func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
     func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
-    for i, cname in enumerate(col_names):
-        extra = (".codes" if isinstance(col_typs[i].dtype, PDCategoricalDtype)
-                else "")
-        func_text += "    {} = df.{}.values{}\n".format(cname, cname, extra)
+    for cname in col_names:
+        func_text += "    {} = df.{}.values\n".format(cname, cname)
         # func_text += "    print({})\n".format(cname)
     func_text += "  return ({},)\n".format(", ".join(col_names))
 
@@ -329,6 +333,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     exec(func_text, glbls, loc_vars)
     csv_reader_py = loc_vars['csv_reader_py']
 
+    # TODO: no_cpython_wrapper=True crashes for some reason
     jit_func = numba.njit(csv_reader_py)
     compiled_funcs.append(jit_func)
     return jit_func

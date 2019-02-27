@@ -20,7 +20,7 @@ from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-    box_categorical_series_dtype_fix)
+    box_categorical_array)
 from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
 
 import hstr_ext
@@ -184,7 +184,7 @@ def box_dataframe(typ, val, c):
                 if dtype == string_type:
                     arr_obj = box_str_arr(arr_typ, arr, c)
                 elif isinstance(dtype, PDCategoricalDtype):
-                    arr_obj = box_categorical_series_dtype_fix(dtype, arr, c, class_obj)
+                    arr_obj = box_categorical_array(arr_typ, arr, c)
                     # context.nrt.incref(builder, arr_typ, arr)
                 elif dtype == types.List(string_type):
                     arr_obj = box_list(list_string_array_type, arr, c)
@@ -274,14 +274,14 @@ def box_series(typ, val, c):
     series = cgutils.create_struct_proxy(
             typ)(c.context, c.builder, val)
 
-    arr = _box_series_data(dtype, typ.data, series.data, c, pd_class_obj)
+    arr = _box_series_data(dtype, typ.data, series.data, c)
 
     if typ.index is types.none:
         index = c.pyapi.make_none()
     else:
         # TODO: index-specific boxing like RangeIndex() etc.
         index = _box_series_data(
-            typ.index.dtype, typ.index, series.index, c, pd_class_obj)
+            typ.index.dtype, typ.index, series.index, c)
 
     if typ.is_named:
         name = c.pyapi.from_native_value(string_type, series.name)
@@ -296,7 +296,7 @@ def box_series(typ, val, c):
     return res
 
 
-def _box_series_data(dtype, data_typ, val, c, pd_class_obj):
+def _box_series_data(dtype, data_typ, val, c):
 
     if isinstance(dtype, types.BaseTuple):
         np_dtype = np.dtype(
@@ -308,7 +308,7 @@ def _box_series_data(dtype, data_typ, val, c, pd_class_obj):
     elif dtype == datetime_date_type:
         arr = box_datetime_date_array(data_typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
-        arr = box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj)
+        arr = box_categorical_array(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

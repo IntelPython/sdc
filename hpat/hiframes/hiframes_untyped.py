@@ -37,7 +37,7 @@ from hpat.parquet_pio import ParquetHandler
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.hiframes.pd_series_ext import SeriesType, string_series_type
-from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype
+from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, CategoricalArray
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs
 import hpat.hiframes.pd_dataframe_ext
@@ -743,7 +743,7 @@ class HiFrames(object):
             err_msg = "categories should be constant list"
             cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
             typ = PDCategoricalDtype(cats)
-            return types.Array(typ, 1, 'C')
+            return CategoricalArray(typ)
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
         glob_def = guard(get_definition, self.func_ir, dtype_def.value)
