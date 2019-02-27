@@ -17,7 +17,8 @@ from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
     str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
-from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
+from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
+    CategoricalArray)
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
 
@@ -109,7 +110,7 @@ def _get_series_array_type(dtype):
 
     # categorical
     if isinstance(dtype, PDCategoricalDtype):
-        dtype = get_categories_int_type(dtype)
+        return CategoricalArray(dtype)
 
     # use recarray data layout for series of tuples
     if isinstance(dtype, types.BaseTuple):

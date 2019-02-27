@@ -4,6 +4,7 @@ from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_untracked
+from numba.typing.templates import infer_global, AbstractTemplate
 from numba import types, typing, cgutils
 from numba.targets.boxing import box_array, unbox_array
 
@@ -18,6 +19,34 @@ class PDCategoricalDtype(types.Opaque):
         super(PDCategoricalDtype, self).__init__(name=name)
 
 
+# Array of categorical data (similar to Pandas Categorical array)
+# same as Array but knows how to box etc.
+# TODO: defer to Array for all operations
+class CategoricalArray(types.Array):
+    def __init__(self, dtype):
+        self.dtype = dtype
+        super(CategoricalArray, self).__init__(
+            dtype, 1, 'C', name='CategoricalArray({})'.format(dtype))
+
+
+@register_model(CategoricalArray)
+class CategoricalArrayModel(models.ArrayModel):
+    def __init__(self, dmm, fe_type):
+        int_dtype = get_categories_int_type(fe_type.dtype)
+        data_array = types.Array(int_dtype, 1, 'C')
+        super(CategoricalArrayModel, self).__init__(dmm, data_array)
+
+
+@unbox(CategoricalArray)
+def unbox_categorical_array(typ, val, c):
+    arr_obj = c.pyapi.object_getattr_string(val, "codes")
+    # c.pyapi.print_object(arr_obj)
+    dtype = get_categories_int_type(typ.dtype)
+    native_val = unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c)
+    c.pyapi.decref(arr_obj)
+    return native_val
+
+
 def get_categories_int_type(cat_dtype):
     dtype = types.int64
     n_cats = len(cat_dtype.categories)
@@ -30,8 +59,11 @@ def get_categories_int_type(cat_dtype):
     return dtype
 
 
-def box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj):
-    #
+@box(CategoricalArray)
+def box_categorical_array(typ, val, c):
+    dtype = typ.dtype
+    mod_name = c.context.insert_const_string(c.builder.module, "pandas")
+    pd_class_obj = c.pyapi.import_module_noblock(mod_name)
 
     # categories list e.g. ['A', 'B', 'C']
     item_objs = _get_cat_obj_items(dtype.categories, c)
@@ -62,6 +94,7 @@ def box_categorical_series_dtype_fix(dtype, val, c, pd_class_obj):
     for obj in item_objs:
         c.pyapi.decref(obj)
 
+    c.pyapi.decref(pd_class_obj)
     return cat_arr
 
 
