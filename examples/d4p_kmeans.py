@@ -1,8 +1,7 @@
 import daal4py
+import daal4py.hpat
 import hpat
 import numpy as np
-
-daal4py.daalinit()
 
 @hpat.jit(nopython=True)
 def kmeans(N, D, nClusters, maxit):
@@ -15,5 +14,3 @@ def kmeans(N, D, nClusters, maxit):
 print(kmeans(10000, 20, 2, 30))
 
 hpat.distribution_report()
-
-daal4py.daalfini()

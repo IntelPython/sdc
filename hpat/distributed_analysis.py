@@ -31,11 +31,6 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
-try:
-    from hpat.ml.d4p import algos as d4p_algos
-except:
-    d4p_algos = []
-
 _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
 
@@ -43,7 +38,14 @@ distributed_analysis_extensions = {}
 auto_rebalance = False
 
 class DistributedAnalysis(object):
-    """analyze program for to distributed transfromation"""
+    """Analyze program for distributed transformation"""
+
+    _extra_call = []
+
+    @classmethod
+    def add_call_analysis(cls, analysis_func):
+        'external modules/packages (like daal4py) can register their own call-analysis'
+        cls._extra_call.append(analysis_func)
 
     def __init__(self, func_ir, typemap, calltypes, typingctx, metadata):
         self.func_ir = func_ir
@@ -442,58 +444,18 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
-        if isinstance(func_mod, ir.Var) and self._analyze_call_d4p(lhs, func_name, self.typemap[func_mod.name], args, array_dists):
-            return
-
         # TODO: make sure assert_equiv is not generated unnecessarily
         # TODO: fix assert_equiv for np.stack from df.value
         if fdef == ('assert_equiv', 'numba.array_analysis'):
             return
 
+        # we perform call-analysis from external at the end
+        for af in DistributedAnalysis._extra_call:
+            if af(lhs, func_mod, func_name, self.typemap, args, array_dists):
+                return
+
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists, fdef)
-
-
-    def _analyze_call_d4p(self, lhs, func_name, mod_name, args, array_dists):
-        '''
-        Analyze distribution for calls to daal4py.
-        Return True of a call for daal4py was detected and handled.
-        We cannot simply "meet" distributions, the d4p algos accept a certain decomposition only.
-        The required distribution/decomposition is defined in the algorithms specs.
-        We raise an exception if the required distribution cannot be met.
-        '''
-        if func_name == 'compute':
-            # every d4p algo gets executed by invoking "compute".
-            # we need to find the algorithm that's currently called
-            for algo in d4p_algos:
-                if algo.all_nbtypes[algo.name] == mod_name:
-                    # handle all input arguments and set their distribution as given by the spec
-                    for i in range(len(args)):
-                        aname = args[i].name
-                        adist = algo.spec.input_types[i][2]
-                        if aname not in array_dists:
-                            array_dists[aname] = adist
-                        else:
-                            min_adist = Distribution.OneD_Var if adist == Distribution.OneD else adist
-                            assert array_dists[aname].value <= Distribution.OneD.value, "Cannot handle unknown distribution type"
-                            # bail out if there is a distribution conflict with some other use of the argument
-                            # FIXME: handle Distribution.Thread and Disribution.REP as equivalent
-                            assert array_dists[aname].value >= min_adist.value,\
-                                   'Distribution of argument {} ({}) to "daal4py.{}.compute" must be "{}". '\
-                                   'Some other use of it demands "{}", though.'\
-                                   .format(i+1, algo.spec.input_types[i][0], algo.name, adist, array_dists[aname])
-                    # handle distribution of the result
-                    if lhs not in array_dists:
-                        array_dists[lhs] = algo.spec.result_dist
-                    else:
-                        array_dists[lhs] = Distribution(min(array_dists[lhs].value, algo.spec.result_dist.value))
-                        min_rdist = Distribution.OneD_Var if algo.spec.result_dist == Distribution.OneD else algo.spec.result_dist
-                        assert array_dists[lhs].value >= min_rdist.value,\
-                            'Distribution ({}) to "daal4py.{}.compute" must be at least "{}". '\
-                            'Some other use of it demands "{}", though.'\
-                            .format(algo.name, min_rdist, array_dists[lhs])
-                    return True
-            return False
 
 
     def _analyze_call_np(self, lhs, func_name, args, array_dists):
