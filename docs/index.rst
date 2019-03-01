@@ -15,3 +15,4 @@ HPAT documentation
    source/supportedpandas
    source/notsupported
    source/install
+   source/development
