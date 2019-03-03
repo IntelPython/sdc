@@ -219,6 +219,34 @@ class HiFrames(object):
                     and rhs.attr == 'to_pandas'):
                 return []
 
+            if rhs.op in ('build_list', 'build_tuple'):
+                # if build_list items are constant, add the constant values
+                # to the returned list type as metadata. This enables type
+                # inference for calls like pd.merge() where the values
+                # determine output dataframe type
+                # TODO: add proper metadata to Numba types
+                # XXX: when constants are used, all the uses of the list object
+                # have to be checked since lists are mutable
+                try:
+                    vals = tuple(find_const(self.func_ir, v) for v in rhs.items)
+                    # a = ['A', 'B'] ->
+                    # tmp = ['A', 'B']
+                    # a = add_consts_to_type(tmp, 'A', 'B')
+                    vals_expr = ", ".join("'{}'".format(c) if isinstance(c, str) else "{}".format(c) for c in vals)
+                    func_text = "def _build_f(a):\n"
+                    func_text += "  return hpat.hiframes.api.add_consts_to_type(a, {})\n".format(vals_expr)
+                    loc_vars = {}
+                    exec(func_text, {'hpat': hpat}, loc_vars)
+                    _build_f = loc_vars['_build_f']
+                    target = assign.target
+                    tmp_target = ir.Var(
+                        target.scope, mk_unique_var(target.name), rhs.loc)
+                    tmp_assign = ir.Assign(rhs, tmp_target, rhs.loc)
+                    return self._replace_func(
+                        _build_f, (tmp_target,), pre_nodes=[tmp_assign])
+                except numba.ir_utils.GuardException:
+                    pass
+
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
             self.df_vars[lhs] = self.df_vars[rhs.name]
@@ -272,8 +300,8 @@ class HiFrames(object):
         if fdef == ('read_parquet', 'pandas'):
             return self._handle_pd_read_parquet(assign, lhs, rhs, label)
 
-        if fdef == ('merge', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs, False, label)
+        # if fdef == ('merge', 'pandas'):
+        #     return self._handle_merge(assign, lhs, rhs, False, label)
 
         if fdef == ('merge_asof', 'pandas'):
             return self._handle_merge(assign, lhs, rhs, True, label)

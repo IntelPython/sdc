@@ -29,15 +29,16 @@ from hpat.shuffle_utils import (getitem_arr_tup_single, val_to_tup, alltoallv,
 
 
 class Join(ir.Stmt):
-    def __init__(self, df_out, left_df, right_df, left_keys, right_keys, df_vars, how, loc):
+    def __init__(self, df_out, left_df, right_df, left_keys, right_keys,
+                 out_vars, left_vars, right_vars, how, loc):
         self.df_out = df_out
         self.left_df = left_df
         self.right_df = right_df
         self.left_keys = left_keys
         self.right_keys = right_keys
-        self.df_out_vars = df_vars[self.df_out].copy()
-        self.left_vars = df_vars[left_df].copy()
-        self.right_vars = df_vars[right_df].copy()
+        self.df_out_vars = out_vars
+        self.left_vars = left_vars
+        self.right_vars = right_vars
         self.how = how
         self.loc = loc
 

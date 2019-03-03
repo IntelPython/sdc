@@ -1200,6 +1200,58 @@ def np_array_array_overload(A):
             return arr
         return f
 
+
+
+# add constant metadata to list or tuple type, see hiframes.py
+def add_consts_to_type(a, *args):
+    return a
+
+
+@infer_global(add_consts_to_type)
+class AddConstsTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        ret_typ = args[0]
+        ret_typ.consts = tuple(v.literal_value for v in args[1:])
+        return signature(ret_typ, *args)
+
+@lower_builtin(add_consts_to_type, types.VarArg(types.Any))
+def lower_add_consts_to_type(context, builder, sig, args):
+    return args[0]
+
+
+# a dummy join function that will be replace in dataframe_pass
+def join_dummy(left_df, right_df, left_on, right_on, how):
+    return left_df
+
+
+@infer_global(join_dummy)
+class JoinTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        from hpat.hiframes.pd_dataframe_ext import DataFrameType
+        assert not kws
+        left_df, right_df, left_on, right_on, how = args
+
+        columns = list(left_df.columns)
+        data = list(left_df.data)
+        for i, c in enumerate(right_df.columns):
+            if c not in left_df.columns:
+                columns.append(c)
+                data.append(right_df.data[i])
+
+        out_df = DataFrameType(tuple(data), None, tuple(columns))
+        return signature(out_df, *args)
+
+
+# dummy lowering to avoid overload errors, remove after overload inline PR
+# is merged
+@lower_builtin(join_dummy, types.VarArg(types.Any))
+def lower_join_dummy(context, builder, sig, args):
+    dataframe = cgutils.create_struct_proxy(
+            sig.return_type)(context, builder)
+    return dataframe._getvalue()
+
+
 # taken from numba/typing/listdecl.py
 @infer_global(sorted)
 class SortedBuiltinLambda(CallableTemplate):

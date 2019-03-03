@@ -416,6 +416,18 @@ class DataFramePass(object):
         if fdef == ('set_df_col', 'hpat.hiframes.api'):
             return self._run_call_set_df_column(assign, lhs, rhs)
 
+        if fdef == ('merge', 'pandas'):
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.merge_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+
+        if fdef == ('join_dummy', 'hpat.hiframes.api'):
+            return self._run_call_join(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, series_var, func_name):
@@ -506,6 +518,44 @@ class DataFramePass(object):
         def f(df_arr):  # pragma: no cover
             return len(df_arr)
         return self._replace_func(f, [arr], pre_nodes=nodes)
+
+    def _run_call_join(self, assign, lhs, rhs):
+        left_var, right_var, left_on_var, right_on_var, how_var = rhs.args
+
+        left_on = self.typemap[left_on_var.name].type.consts
+        right_on = self.typemap[right_on_var.name].type.consts
+        how = guard(find_const, self.func_ir, how_var)
+        out_typ = self.typemap[lhs.name]
+
+        nodes = []
+        out_data_vars = {c: ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
+                        for c in out_typ.columns}
+        for v, t in zip(out_data_vars.values(), out_typ.data):
+            self.typemap[v.name] = t
+
+        left_arrs = {c: self._get_dataframe_data(left_var, c, nodes)
+                            for c in self.typemap[left_var.name].columns}
+
+        right_arrs = {c: self._get_dataframe_data(right_var, c, nodes)
+                            for c in self.typemap[right_var.name].columns}
+
+        nodes.append(hiframes.join.Join(lhs.name, left_var.name,
+                                   right_var.name,
+                                   left_on, right_on, out_data_vars, left_arrs,
+                                   right_arrs, how, lhs.loc))
+
+        n_cols = len(out_typ.columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        return self._replace_func(_init_df, list(out_data_vars.values()),
+            pre_nodes=nodes)
 
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
