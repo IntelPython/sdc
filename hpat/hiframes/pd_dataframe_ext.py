@@ -537,3 +537,20 @@ class GetItemDataFrameILoc(AbstractTemplate):
                 # TODO: index
                 ret_typ = SeriesType(data_typ.dtype, None, True)
                 return signature(ret_typ, *args)
+
+
+@overload(pd.merge)
+def merge_overload(left, right, how='inner', on=None, left_on=None,
+        right_on=None, left_index=False, right_index=False, sort=False,
+        suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
+
+    def _impl(left, right, how='inner', on=None, left_on=None,
+            right_on=None, left_index=False, right_index=False, sort=False,
+            suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
+        if on is not None:
+            left_on = right_on = on
+
+        return hpat.hiframes.api.join_dummy(
+            left, right, left_on, right_on, how)
+
+    return _impl
