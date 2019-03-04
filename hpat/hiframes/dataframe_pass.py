@@ -111,6 +111,16 @@ class DataFramePass(object):
                     for c_label in reversed(topo_order):
                         if c_label in callee_blocks:
                             c_block = callee_blocks[c_label]
+                            # include the new block created after callee used
+                            # to split the original block
+                            # find it using jumps out of callee (returns
+                            # originally) but include only once
+                            if isinstance(c_block.body[-1], ir.Jump):
+                                target_label = c_block.body[-1].target
+                                if (target_label not in callee_blocks
+                                        and target_label not in work_list):
+                                    work_list.append((target_label,
+                                        self.func_ir.blocks[target_label]))
                             work_list.append((c_label, c_block))
                     replaced = True
                     break
