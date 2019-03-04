@@ -300,12 +300,6 @@ class HiFrames(object):
         if fdef == ('read_parquet', 'pandas'):
             return self._handle_pd_read_parquet(assign, lhs, rhs, label)
 
-        # if fdef == ('merge', 'pandas'):
-        #     return self._handle_merge(assign, lhs, rhs, False, label)
-
-        # if fdef == ('merge_asof', 'pandas'):
-        #     return self._handle_merge(assign, lhs, rhs, True, label)
-
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
 
@@ -392,11 +386,6 @@ class HiFrames(object):
         # df.drop()
         if func_name == 'drop':
             return self._handle_df_drop(lhs, rhs, df_var, label)
-
-        # df.merge()
-        if func_name == 'merge':
-            rhs.args.insert(0, df_var)
-            return self._handle_merge(assign, lhs, rhs, False, label)
 
         # df.reset_index(drop=True)
         if func_name == 'reset_index':
@@ -868,66 +857,6 @@ class HiFrames(object):
     def _handle_pd_read_parquet(self, assign, lhs, rhs, label):
         fname = rhs.args[0]
         return self._gen_parquet_read(fname, lhs, label)
-
-    def _handle_merge(self, assign, lhs, rhs, is_asof, label):
-        """transform pd.merge() into a Join node
-
-        signature: pd.merge(left, right, how='inner', on=None, left_on=None,
-            right_on=None, left_index=False, right_index=False, sort=False,
-            suffixes=('_x', '_y'), copy=True, indicator=False, validate=None)
-        pd.merge_asof(left, right, on=None, left_on=None, right_on=None,
-        left_index=False, right_index=False, by=None, left_by=None,
-        right_by=None, suffixes=('_x', '_y'), tolerance=None,
-        allow_exact_matches=True, direction='backward')
-        """
-        kws = dict(rhs.kws)
-        left_df = self._get_arg('merge', rhs.args, kws, 0, 'left')
-        right_df = self._get_arg('merge', rhs.args, kws, 1, 'right')
-        on_argno = 3  # merge() has 'how' arg but merge_asof doesn't
-        if is_asof:
-            how = 'asof'
-            on_argno = 2
-        else:
-            how =  self._get_str_arg('merge', rhs.args, kws, 2, 'how', 'inner')
-
-        # find key columns
-        left_on = right_on = None
-        on_arg = self._get_arg('merge', rhs.args, kws, on_argno, 'on', '')
-        on = self._get_str_or_list(on_arg, default=[''])
-
-        if on != ['']:
-            left_on = on
-            right_on = left_on
-        else:  # pragma: no cover
-            err_msg = "merge 'on' or 'left_on'/'right_on' arguments required"
-            left_on_var = self._get_arg('merge', rhs.args, kws, on_argno+1,
-                                                    'left_on', err_msg=err_msg)
-            left_on = self._get_str_or_list(left_on_var, err_msg=err_msg)
-            right_on_var = self._get_arg('merge', rhs.args, kws, on_argno+2,
-                                                   'right_on', err_msg=err_msg)
-            right_on = self._get_str_or_list(right_on_var, err_msg=err_msg)
-
-        # convert right join to left join
-        if how == 'right':
-            how = 'left'
-            left_df, right_df = right_df, left_df
-            left_on, right_on = right_on, left_on
-
-        scope = lhs.scope
-        loc = lhs.loc
-        # add columns from left to output
-        left_colnames = self._get_df_col_names(left_df)
-        df_col_map = {col: ir.Var(scope, mk_unique_var(col), loc)
-                                for col in left_colnames}
-        # add columns from right to output
-        right_colnames = self._get_df_col_names(right_df)
-        df_col_map.update({col: ir.Var(scope, mk_unique_var(col), loc)
-                                for col in right_colnames})
-        self._create_df(lhs.name, df_col_map, label)
-        return [join.Join(lhs.name, self._get_renamed_df(left_df).name,
-                                   self._get_renamed_df(right_df).name,
-                                   left_on, right_on, self.df_vars, how,
-                                   lhs.loc)]
 
     def _handle_concat(self, assign, lhs, rhs, label):
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
