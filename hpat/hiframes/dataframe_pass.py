@@ -29,7 +29,7 @@ from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
     DataFrameILocType, DataFrameIatType)
 from hpat.hiframes.pd_series_ext import SeriesType, is_series_type
-
+import hpat.hiframes.pd_groupby_ext
 
 
 class DataFramePass(object):
