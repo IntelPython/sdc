@@ -5,7 +5,7 @@ import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
     type_callable, infer, overload, make_attribute_wrapper, intrinsic,
-    lower_builtin)
+    lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
@@ -143,9 +143,10 @@ class DataFrameAttribute(AttributeTemplate):
         return stack_sig.return_type
 
     def generic_resolve(self, df, attr):
-        ind = df.columns.index(attr)
-        arr_typ = df.data[ind]
-        return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
+        if attr in df.columns:
+            ind = df.columns.index(attr)
+            arr_typ = df.data[ind]
+            return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
 @intrinsic
@@ -539,6 +540,7 @@ class GetItemDataFrameILoc(AbstractTemplate):
                 return signature(ret_typ, *args)
 
 
+@overload_method(DataFrameType, 'merge')
 @overload(pd.merge)
 def merge_overload(left, right, how='inner', on=None, left_on=None,
         right_on=None, left_index=False, right_index=False, sort=False,
