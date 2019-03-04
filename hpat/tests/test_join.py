@@ -124,7 +124,7 @@ class TestJoin(unittest.TestCase):
         def test_impl(A1, B1, C1, A2, B2, D2):
             df1 = pd.DataFrame({'A': A1, 'B': B1, 'C': C1})
             df2 = pd.DataFrame({'A': A2, 'B': B2, 'D': D2})
-            df3 = df1.merge(df2, on=['A', 'B'])
+            df3 = df1.merge(df2, on=('A', 'B'))
             return df3.C.sum() + df3.D.sum()
 
         hpat_func = hpat.jit(locals={

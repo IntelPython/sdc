@@ -838,13 +838,16 @@ class DataFramePass(object):
                 if default is not None:
                     return default
                 raise ValueError(err_msg)
-            key_colnames = [by_arg_def]
+            if isinstance(var_typ, types.BaseTuple):
+                assert isinstance(by_arg_def, tuple)
+                return by_arg_def
+            key_colnames = (by_arg_def,)
         else:
             if list_only and by_arg_def[1] != 'build_list':
                 if default is not None:
                     return default
                 raise ValueError(err_msg)
-            key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
+            key_colnames = tuple(guard(find_const, self.func_ir, v) for v in by_arg_def[0])
             if any(not isinstance(v, typ) for v in key_colnames):
                 if default is not None:
                     return default
