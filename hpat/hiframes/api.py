@@ -1217,7 +1217,7 @@ class AddConstsTyper(AbstractTemplate):
 
 @lower_builtin(add_consts_to_type, types.VarArg(types.Any))
 def lower_add_consts_to_type(context, builder, sig, args):
-    return args[0]
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
 
 # a dummy join function that will be replace in dataframe_pass

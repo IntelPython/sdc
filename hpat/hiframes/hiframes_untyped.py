@@ -303,8 +303,8 @@ class HiFrames(object):
         # if fdef == ('merge', 'pandas'):
         #     return self._handle_merge(assign, lhs, rhs, False, label)
 
-        if fdef == ('merge_asof', 'pandas'):
-            return self._handle_merge(assign, lhs, rhs, True, label)
+        # if fdef == ('merge_asof', 'pandas'):
+        #     return self._handle_merge(assign, lhs, rhs, True, label)
 
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)

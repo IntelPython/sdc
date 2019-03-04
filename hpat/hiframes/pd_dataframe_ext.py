@@ -556,3 +556,21 @@ def merge_overload(left, right, how='inner', on=None, left_on=None,
             left, right, left_on, right_on, how)
 
     return _impl
+
+@overload(pd.merge_asof)
+def merge_asof_overload(left, right, on=None, left_on=None, right_on=None,
+        left_index=False, right_index=False, by=None, left_by=None,
+        right_by=None, suffixes=('_x', '_y'), tolerance=None,
+        allow_exact_matches=True, direction='backward'):
+
+    def _impl(left, right, on=None, left_on=None, right_on=None,
+            left_index=False, right_index=False, by=None, left_by=None,
+            right_by=None, suffixes=('_x', '_y'), tolerance=None,
+            allow_exact_matches=True, direction='backward'):
+        if on is not None:
+            left_on = right_on = on
+
+        return hpat.hiframes.api.join_dummy(
+            left, right, left_on, right_on, 'asof')
+
+    return _impl
