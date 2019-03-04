@@ -679,13 +679,14 @@ void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num
     *null_bitmap = new uint8_t[n_bytes];
     memset(*null_bitmap, -1, n_bytes);  // set all bits to one for non-null
 
+    // std::cout << "glob done" << std::endl;
+    globfree(&globBuf);
+
     #else
     // TODO: support glob on Windows
     std::cerr << "no glob support on windows yet" << '\n';
     #endif
 
-    // std::cout << "glob done" << std::endl;
-    globfree(&globBuf);
     return;
 }
 
