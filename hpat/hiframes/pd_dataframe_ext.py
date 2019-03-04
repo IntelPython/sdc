@@ -9,20 +9,9 @@ from numba.extending import (models, register_model, lower_cast, infer_getattr,
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
-    ArrayAttribute, SetItemBuffer)
-from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
-    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
-    NdConstructorLike)
 import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
-from hpat.str_ext import string_type, list_string_array_type
-from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
-    str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
-from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, get_categories_int_type
-from hpat.hiframes.rolling import supported_rolling_funcs
-import datetime
+from hpat.str_ext import string_type
 
 
 class DataFrameType(types.Type):  # TODO: IterableType over column names
