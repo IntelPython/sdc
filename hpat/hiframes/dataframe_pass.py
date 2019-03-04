@@ -11,7 +11,7 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem, mk_unique_var, dprint_func_ir,
                             build_definitions, find_build_sequence,
-                            GuardException)
+                            GuardException, compute_cfg_from_blocks)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
@@ -66,16 +66,18 @@ class DataFramePass(object):
                     jmp_label = branch.truebr if cond_val else branch.falsebr
                     jmp = ir.Jump(jmp_label, branch.loc)
                     block.body[-1] = jmp
-                    dead_labels.append(dead_label)
-                    # remove definitions in dead block so const variables can
-                    # be found later (pd.merge() example)
-                    # TODO: add this to dead_branch_prune pass
-                    for inst in self.func_ir.blocks[dead_label].body:
-                        if is_assign(inst):
-                            self.func_ir._definitions[inst.target.name].remove(
-                                inst.value)
+                    cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+                    if dead_label in cfg.dead_nodes():
+                        dead_labels.append(dead_label)
+                        # remove definitions in dead block so const variables can
+                        # be found later (pd.merge() example)
+                        # TODO: add this to dead_branch_prune pass
+                        for inst in self.func_ir.blocks[dead_label].body:
+                            if is_assign(inst):
+                                self.func_ir._definitions[inst.target.name].remove(
+                                    inst.value)
 
-                    del self.func_ir.blocks[dead_label]
+                        del self.func_ir.blocks[dead_label]
 
             new_body = []
             replaced = False
