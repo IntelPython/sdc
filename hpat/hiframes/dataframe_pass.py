@@ -494,6 +494,15 @@ class DataFramePass(object):
             return self._replace_func(impl, rhs.args,
                         pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
+        if fdef == ('merge_asof', 'pandas'):
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.merge_asof_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+
         if fdef == ('join_dummy', 'hpat.hiframes.api'):
             return self._run_call_join(assign, lhs, rhs)
 
