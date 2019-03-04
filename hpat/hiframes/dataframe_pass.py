@@ -608,12 +608,18 @@ class DataFramePass(object):
         return self._replace_func(f, [arr], pre_nodes=nodes)
 
     def _run_call_join(self, assign, lhs, rhs):
-        left_var, right_var, left_on_var, right_on_var, how_var = rhs.args
+        left_df, right_df, left_on_var, right_on_var, how_var = rhs.args
 
         left_on = self._get_const_or_list(left_on_var)
         right_on = self._get_const_or_list(right_on_var)
         how = guard(find_const, self.func_ir, how_var)
         out_typ = self.typemap[lhs.name]
+
+        # convert right join to left join
+        if how == 'right':
+            how = 'left'
+            left_df, right_df = right_df, left_df
+            left_on, right_on = right_on, left_on
 
         nodes = []
         out_data_vars = {c: ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
@@ -621,14 +627,14 @@ class DataFramePass(object):
         for v, t in zip(out_data_vars.values(), out_typ.data):
             self.typemap[v.name] = t
 
-        left_arrs = {c: self._get_dataframe_data(left_var, c, nodes)
-                            for c in self.typemap[left_var.name].columns}
+        left_arrs = {c: self._get_dataframe_data(left_df, c, nodes)
+                            for c in self.typemap[left_df.name].columns}
 
-        right_arrs = {c: self._get_dataframe_data(right_var, c, nodes)
-                            for c in self.typemap[right_var.name].columns}
+        right_arrs = {c: self._get_dataframe_data(right_df, c, nodes)
+                            for c in self.typemap[right_df.name].columns}
 
-        nodes.append(hiframes.join.Join(lhs.name, left_var.name,
-                                   right_var.name,
+        nodes.append(hiframes.join.Join(lhs.name, left_df.name,
+                                   right_df.name,
                                    left_on, right_on, out_data_vars, left_arrs,
                                    right_arrs, how, lhs.loc))
 
