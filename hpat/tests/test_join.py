@@ -29,19 +29,19 @@ class TestJoin(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
 
     def test_join1_seq(self):
-        def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+        def test_impl(df1, df2):
             df3 = df1.merge(df2, left_on='key1', right_on='key2')
-            return df3.B
+            return df3
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
-        self.assertEqual(count_array_OneDs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 0)
+        df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
+        df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+        pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
         n = 11111
-        self.assertEqual(hpat_func(n).sum(), test_impl(n).sum())
+        df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
+        df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+        pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
     def test_join1_seq_str(self):
         def test_impl():

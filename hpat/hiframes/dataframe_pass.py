@@ -10,7 +10,8 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem, mk_unique_var, dprint_func_ir,
-                            build_definitions, find_build_sequence)
+                            build_definitions, find_build_sequence,
+                            GuardException)
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
@@ -19,7 +20,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-    is_whole_slice, is_array)
+    is_whole_slice, is_array, is_assign)
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
@@ -46,8 +47,36 @@ class DataFramePass(object):
         # be performed in one pass
         topo_order = find_topo_order(blocks)
         work_list = list((l, blocks[l]) for l in reversed(topo_order))
+        dead_labels = []
         while work_list:
             label, block = work_list.pop()
+            if label in dead_labels:
+                continue
+
+            # find dead blocks based on constant condition expression
+            # for example, implementation of pd.merge() has comparison to None
+            # TODO: add dead_branch_prune pass to inline_closure_call
+            branch_or_jump = block.body[-1]
+            if isinstance(branch_or_jump, ir.Branch):
+                branch = branch_or_jump
+                cond_val = guard(_eval_const_var, self.func_ir, branch.cond)
+                if cond_val is not None:
+                    # replace branch with Jump
+                    dead_label = branch.falsebr if cond_val else branch.truebr
+                    jmp_label = branch.truebr if cond_val else branch.falsebr
+                    jmp = ir.Jump(jmp_label, branch.loc)
+                    block.body[-1] = jmp
+                    dead_labels.append(dead_label)
+                    # remove definitions in dead block so const variables can
+                    # be found later (pd.merge() example)
+                    # TODO: add this to dead_branch_prune pass
+                    for inst in self.func_ir.blocks[dead_label].body:
+                        if is_assign(inst):
+                            self.func_ir._definitions[inst.target.name].remove(
+                                inst.value)
+
+                    del self.func_ir.blocks[dead_label]
+
             new_body = []
             replaced = False
             for i, inst in enumerate(block.body):
@@ -71,10 +100,18 @@ class DataFramePass(object):
                     # as expected by inline_closure_call
                     inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    inline_closure_call(self.func_ir, rp_func.glbls,
+                    callee_blocks = inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
                         rp_func.arg_types,
-                        self.typemap, self.calltypes, work_list)
+                        self.typemap, self.calltypes)
+                    # add blocks in reversed topo order to enable dead branch
+                    # pruning (merge example)
+                    # TODO: fix inline_closure_call()
+                    topo_order = find_topo_order(self.func_ir.blocks)
+                    for c_label in reversed(topo_order):
+                        if c_label in callee_blocks:
+                            c_block = callee_blocks[c_label]
+                            work_list.append((c_label, c_block))
                     replaced = True
                     break
                 if isinstance(out_nodes, dict):
@@ -537,8 +574,8 @@ class DataFramePass(object):
     def _run_call_join(self, assign, lhs, rhs):
         left_var, right_var, left_on_var, right_on_var, how_var = rhs.args
 
-        left_on = self.typemap[left_on_var.name].type.consts
-        right_on = self.typemap[right_on_var.name].type.consts
+        left_on = self._get_const_or_list(left_on_var)
+        right_on = self._get_const_or_list(right_on_var)
         how = guard(find_const, self.func_ir, how_var)
         out_typ = self.typemap[lhs.name]
 
@@ -733,3 +770,46 @@ class DataFramePass(object):
         replace_arg_nodes(f_block, [in_arr])
         nodes += f_block.body[:-2]
         return nodes[-1].target
+
+    def _get_const_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
+        var_typ = self.typemap[by_arg.name]
+        if isinstance(var_typ, types.Optional):
+            var_typ = var_typ.type
+        if hasattr(var_typ, 'consts'):
+            return var_typ.consts
+
+        typ = str if typ is None else typ
+        by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+        if by_arg_def is None:
+            # try single key column
+            by_arg_def = guard(find_const, self.func_ir, by_arg)
+            if by_arg_def is None:
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+            key_colnames = [by_arg_def]
+        else:
+            if list_only and by_arg_def[1] != 'build_list':
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+            key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
+            if any(not isinstance(v, typ) for v in key_colnames):
+                if default is not None:
+                    return default
+                raise ValueError(err_msg)
+        return key_colnames
+
+
+def _eval_const_var(func_ir, var):
+    try:
+        return find_const(func_ir, var)
+    except GuardException:
+        pass
+    var_def = guard(get_definition, func_ir, var)
+    if isinstance(var_def, ir.Expr) and var_def.op == 'binop':
+        return var_def.fn(
+            _eval_const_var(func_ir, var_def.lhs),
+            _eval_const_var(func_ir, var_def.rhs))
+
+    raise GuardException
