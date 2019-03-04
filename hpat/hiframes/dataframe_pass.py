@@ -480,6 +480,10 @@ class DataFramePass(object):
             return self._run_call_dataframe(
                 assign, assign.target, rhs, func_mod, func_name)
 
+        if fdef == ('add_consts_to_type', 'hpat.hiframes.api'):
+            assign.value = rhs.args[0]
+            return [assign]
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
