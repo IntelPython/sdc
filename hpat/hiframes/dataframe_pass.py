@@ -428,10 +428,25 @@ class DataFramePass(object):
         if fdef == ('join_dummy', 'hpat.hiframes.api'):
             return self._run_call_join(assign, lhs, rhs)
 
+        if (isinstance(func_mod, ir.Var)
+                and isinstance(self.typemap[func_mod.name], DataFrameType)):
+            return self._run_call_dataframe(
+                assign, assign.target, rhs, func_mod, func_name)
+
         return [assign]
 
-    def _run_call_dataframe(self, assign, lhs, rhs, series_var, func_name):
-        pass
+    def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
+        if func_name == 'merge':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.merge_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(pd.merge),
+                        kws=dict(rhs.kws))
+        return [assign]
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe
