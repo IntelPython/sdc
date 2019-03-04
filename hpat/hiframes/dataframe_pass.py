@@ -78,6 +78,26 @@ class DataFramePass(object):
                                     inst.value)
 
                         del self.func_ir.blocks[dead_label]
+                    else:
+                        # the jmp block overrides some definitions of current
+                        # block so remove dead defs and update _definitions
+                        # example: test_join_left_seq1
+                        jmp_defs = set()
+                        for inst in self.func_ir.blocks[jmp_label].body:
+                            if is_assign(inst):
+                                jmp_defs.add(inst.target.name)
+                        used_vars = set()
+                        new_body = []
+                        for inst in reversed(block.body):
+                            if (is_assign(inst)
+                                    and inst.target.name not in used_vars
+                                    and inst.target.name in jmp_defs):
+                                self.func_ir._definitions[inst.target.name].remove(inst.value)
+                                continue
+                            used_vars.update(v.name for v in inst.list_vars())
+                            new_body.append(inst)
+                        new_body.reverse()
+                        block.body = new_body
 
             new_body = []
             replaced = False
