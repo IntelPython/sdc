@@ -210,7 +210,6 @@ class PivotTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         df, values, index, columns, aggfunc, _pivot_values = args
-        print(values, index, columns, aggfunc)
 
         if not (isinstance(values, types.StringLiteral)
                 and isinstance(index, types.StringLiteral)

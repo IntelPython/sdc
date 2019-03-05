@@ -522,6 +522,9 @@ class DataFramePass(object):
             return self._run_call_groupby(
                 assign, assign.target, rhs, func_mod, func_name)
 
+        if fdef == ('pivot_table_dummy', 'hpat.hiframes.pd_groupby_ext'):
+            return self._run_call_pivot_table(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -535,6 +538,21 @@ class DataFramePass(object):
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(pd.merge),
                         kws=dict(rhs.kws))
+
+        if func_name == 'pivot_table':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.pivot_table_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, values=None, index=None, columns=None, aggfunc='mean',
+                    fill_value=None, margins=False, dropna=True, margins_name='All',
+                    _pivot_values=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
         return [assign]
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
@@ -734,6 +752,52 @@ class DataFramePass(object):
                 out_vars.append(out_key_vars[ind])
             else:
                 out_vars.append(df_col_map[c])
+
+        return self._replace_func(_init_df, out_vars,
+            pre_nodes=nodes)
+
+    def _run_call_pivot_table(self, assign, lhs, rhs):
+        df_var, values, index, columns, aggfunc, _pivot_values = rhs.args
+        func_name = self.typemap[aggfunc.name].literal_value
+        values = self.typemap[values.name].literal_value
+        index = self.typemap[index.name].literal_value
+        columns = self.typemap[columns.name].literal_value
+        pivot_values = self.typemap[_pivot_values.name].meta
+        df_type = self.typemap[df_var.name]
+        out_typ = self.typemap[lhs.name]
+
+        nodes = []
+        in_vars = {values: self._get_dataframe_data(df_var, values, nodes)}
+
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        for v in df_col_map.values():
+            self.typemap[v.name] = out_typ.data[0]
+
+        pivot_arr = self._get_dataframe_data(df_var, columns, nodes)
+        index_arr = self._get_dataframe_data(df_var, index, nodes)
+        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+
+        agg_node = hiframes.aggregate.Aggregate(
+            lhs.name, df_var.name, [index], None, df_col_map,
+            in_vars, [index_arr],
+            agg_func, None, lhs.loc, pivot_arr, pivot_values)
+        nodes.append(agg_node)
+
+        n_cols = len(out_typ.columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        # XXX the order of output variables passed should match out_typ.columns
+        out_vars = []
+        for c in out_typ.columns:
+            out_vars.append(df_col_map[c])
 
         return self._replace_func(_init_df, out_vars,
             pre_nodes=nodes)
