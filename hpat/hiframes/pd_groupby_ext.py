@@ -10,7 +10,8 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
     AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import hpat
-from hpat.hiframes.pd_series_ext import SeriesType
+from hpat.hiframes.pd_series_ext import (SeriesType, _get_series_array_type,
+    arr_to_series_type, arr_to_series_type)
 from hpat.str_ext import string_type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 
@@ -108,3 +109,37 @@ class GetItemDataFrameGroupBy(AbstractTemplate):
             ret_grp = DataFrameGroupByType(
                 grpby.df_type, grpby.keys, selection, grpby.as_index, True)
             return signature(ret_grp, *args)
+
+@infer_getattr
+class DataframeGroupByAttribute(AttributeTemplate):
+    key = DataFrameGroupByType
+
+    @bound_function("groupby.agg")
+    def resolve_agg(self, grp, args, kws):
+        code = args[0].literal_value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        out_data = []
+        out_columns = []
+        # add key columns of not as_index
+        if not grp.as_index:
+            for k in grp.keys:
+                out_columns.append(k)
+                ind = grp.df_type.columns.index(k)
+                out_data.append(grp.df_type.data[ind])
+
+        # get output type for each selected column
+        for c in grp.selection:
+            out_columns.append(c)
+            ind = grp.df_type.columns.index(c)
+            data = grp.df_type.data[ind]
+            in_typ = arr_to_series_type(data)
+            _, out_dtype, _ = numba.compiler.type_inference_stage(
+                self.context, f_ir, (in_typ,), None)
+            out_arr = _get_series_array_type(out_dtype)
+            out_data.append(out_arr)
+
+        out_res = DataFrameType(tuple(out_data), None, tuple(out_columns))
+        # XXX output becomes series if single output and explicitly selected
+        if len(grp.selection) == 1 and grp.explicit_select and grp.as_index:
+            out_res = arr_to_series_type(out_data[0])
+        return signature(out_res, *args)

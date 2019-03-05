@@ -30,7 +30,8 @@ from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
     DataFrameILocType, DataFrameIatType)
 from hpat.hiframes.pd_series_ext import SeriesType, is_series_type
 import hpat.hiframes.pd_groupby_ext
-
+from hpat.hiframes.pd_groupby_ext import DataFrameGroupByType
+from hpat.hiframes.aggregate import get_agg_func
 
 class DataFramePass(object):
     """Analyze and transform dataframe calls after typing"""
@@ -515,6 +516,12 @@ class DataFramePass(object):
             assign.value = rhs.args[0]
             return [assign]
 
+        if (isinstance(func_mod, ir.Var)
+                and isinstance(self.typemap[func_mod.name],
+                DataFrameGroupByType)):
+            return self._run_call_groupby(
+                assign, assign.target, rhs, func_mod, func_name)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -659,6 +666,84 @@ class DataFramePass(object):
 
         return self._replace_func(_init_df, list(out_data_vars.values()),
             pre_nodes=nodes)
+
+    def _run_call_groupby(self, assign, lhs, rhs, grp_var, func_name):
+        grp_typ = self.typemap[grp_var.name]
+        df_var = self._get_df_obj_select(grp_var, 'groupby')
+        df_type = self.typemap[df_var.name]
+        out_typ = self.typemap[lhs.name]
+
+        nodes = []
+        in_vars = {c: self._get_dataframe_data(df_var, c, nodes)
+                            for c in grp_typ.selection}
+
+        in_key_arrs = [self._get_dataframe_data(df_var, c, nodes)
+                            for c in grp_typ.keys]
+
+        out_key_vars = None
+        if grp_typ.as_index is False:
+            out_key_vars = []
+            for k in grp_typ.keys:
+                out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
+                ind = df_type.columns.index(k)
+                self.typemap[out_key_var.name] = df_type.data[ind]
+                out_key_vars.append(out_key_var)
+
+        df_col_map = {}
+        for c in grp_typ.selection:
+            var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
+            ind = df_type.columns.index(c)
+            self.typemap[var.name] = df_type.data[ind]
+            df_col_map[c] = var
+
+        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+
+        agg_node = hiframes.aggregate.Aggregate(
+            lhs.name, df_var.name, grp_typ.keys, out_key_vars, df_col_map,
+            in_vars, in_key_arrs,
+            agg_func, None, lhs.loc)
+
+        nodes.append(agg_node)
+
+        # XXX output becomes series if single output and explicitly selected
+        if isinstance(out_typ, SeriesType):
+            assert (len(grp_typ.selection) == 1
+                and grp_typ.explicit_select
+                and grp_typ.as_index)
+            return self._replace_func(
+                    lambda A: hpat.hiframes.api.init_series(A),
+                    list(df_col_map.values()), pre_nodes=nodes)
+
+        n_cols = len(out_typ.columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        return self._replace_func(_init_df, list(df_col_map.values()),
+            pre_nodes=nodes)
+
+    def _get_df_obj_select(self, obj_var, obj_name):
+        """get df object for groupby() or rolling()
+        e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
+        """
+        select_def = guard(get_definition, self.func_ir, obj_var)
+        if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
+            obj_var = select_def.value
+
+        obj_call = guard(get_definition, self.func_ir, obj_var)
+        # find dataframe
+        call_def = guard(find_callname, self.func_ir, obj_call)
+        assert (call_def is not None and call_def[0] == obj_name
+                and isinstance(call_def[1], ir.Var)
+                and self._is_df_var(call_def[1]))
+        df_var = call_def[1]
+
+        return df_var
 
     def _get_const_tup(self, tup_var):
         tup_def = guard(get_definition, self.func_ir, tup_var)
