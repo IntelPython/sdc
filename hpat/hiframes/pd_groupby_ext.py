@@ -98,16 +98,21 @@ def lower_groupby_dummy(context, builder, sig, args):
     return context.get_constant_null(sig.return_type)
 
 
-@infer_global(operator.getitem)
-class GetItemDataFrameGroupBy(AbstractTemplate):
-    key = operator.getitem
+@infer
+class GetItemDataFrameGroupBy2(AbstractTemplate):
+    key = 'static_getitem'
 
     def generic(self, args, kws):
         grpby, idx = args
-        # df.groupby('A')['B']
+        # df.groupby('A')['B', 'C']
         if isinstance(grpby, DataFrameGroupByType):
-            if isinstance(idx, types.StringLiteral):
-                selection = (idx.literal_value,)
+            if isinstance(idx, tuple):
+                assert all(isinstance(c, str) for c in idx)
+                selection = idx
+            elif isinstance(idx, str):
+                selection = (idx,)
+            else:
+                raise ValueError("invalid groupby selection {}".format(idx))
             ret_grp = DataFrameGroupByType(
                 grpby.df_type, grpby.keys, selection, grpby.as_index, True)
             return signature(ret_grp, *args)
