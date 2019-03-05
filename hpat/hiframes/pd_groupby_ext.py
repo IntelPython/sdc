@@ -68,9 +68,10 @@ class GroupbyTyper(AbstractTemplate):
         assert not kws
         df, by, as_index = args
 
-        # TODO: multi key
         if isinstance(by, types.StringLiteral):
             keys = (by.literal_value,)
+        elif hasattr(by, 'consts'):
+            keys = by.consts
 
         selection = list(df.columns)
         for k in keys:
