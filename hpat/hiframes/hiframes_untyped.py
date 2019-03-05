@@ -141,23 +141,6 @@ class HiFrames(object):
                     cfg = compute_cfg_from_blocks(blocks)
                     out_nodes = self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
-                    # pass pivot values to df.pivot_table() calls using a meta
-                    # variable passed as argument. The meta variable's type
-                    # is set to MetaType with pivot values baked in.
-                    lhs = inst.target
-                    pivot_key = lhs.name + ":pivot"
-                    if pivot_key in self.locals:
-                        pivot_values = self.locals.pop(pivot_key)
-                        pivot_call = guard(get_definition, self.func_ir, lhs)
-                        assert pivot_call is not None
-                        meta_var = ir.Var(
-                            lhs.scope, mk_unique_var('pivot_meta'), lhs.loc)
-                        meta_assign = ir.Assign(
-                            ir.Const(0, lhs.loc), meta_var, lhs.loc)
-                        new_body.insert(0, meta_assign)
-                        pivot_call.kws.append(('_pivot_values', meta_var))
-                        self.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
-
                     out_nodes = self._run_assign(inst, label)
                 elif isinstance(inst, ir.Return):
                     out_nodes = self._run_return(inst)
@@ -263,6 +246,23 @@ class HiFrames(object):
                         _build_f, (tmp_target,), pre_nodes=[tmp_assign])
                 except numba.ir_utils.GuardException:
                     pass
+
+        # pass pivot values to df.pivot_table() calls using a meta
+        # variable passed as argument. The meta variable's type
+        # is set to MetaType with pivot values baked in.
+        pivot_key = lhs + ":pivot"
+        if pivot_key in self.locals:
+            pivot_values = self.locals.pop(pivot_key)
+            pivot_call = guard(get_definition, self.func_ir, lhs)
+            assert pivot_call is not None
+            meta_var = ir.Var(
+                assign.target.scope, mk_unique_var('pivot_meta'), rhs.loc)
+            meta_assign = ir.Assign(
+                ir.Const(0, rhs.loc), meta_var, rhs.loc)
+            self._working_body.insert(0, meta_assign)
+            pivot_call.kws.append(('_pivot_values', meta_var))
+            self.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
+
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
