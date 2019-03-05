@@ -685,15 +685,16 @@ class DataFramePass(object):
             out_key_vars = []
             for k in grp_typ.keys:
                 out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
-                ind = df_type.columns.index(k)
-                self.typemap[out_key_var.name] = df_type.data[ind]
+                ind = out_typ.columns.index(k)
+                self.typemap[out_key_var.name] = out_typ.data[ind]
                 out_key_vars.append(out_key_var)
 
         df_col_map = {}
         for c in grp_typ.selection:
             var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
-            ind = df_type.columns.index(c)
-            self.typemap[var.name] = df_type.data[ind]
+            self.typemap[var.name] = (out_typ.data
+                if isinstance(out_typ, SeriesType)
+                else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
 
         agg_func = get_agg_func(self.func_ir, func_name, rhs)
@@ -724,7 +725,17 @@ class DataFramePass(object):
         exec(func_text, {}, loc_vars)
         _init_df = loc_vars['_init_df']
 
-        return self._replace_func(_init_df, list(df_col_map.values()),
+        # XXX the order of output variables passed should match out_typ.columns
+        out_vars = []
+        for c in out_typ.columns:
+            if c in grp_typ.keys:
+                assert not grp_typ.as_index
+                ind = grp_typ.keys.index(c)
+                out_vars.append(out_key_vars[ind])
+            else:
+                out_vars.append(df_col_map[c])
+
+        return self._replace_func(_init_df, out_vars,
             pre_nodes=nodes)
 
     def _get_df_obj_select(self, obj_var, obj_name):
