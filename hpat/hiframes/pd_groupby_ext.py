@@ -11,7 +11,7 @@ from numba.typing.templates import (infer_global, AbstractTemplate, signature,
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import hpat
 from hpat.hiframes.pd_series_ext import (SeriesType, _get_series_array_type,
-    arr_to_series_type, arr_to_series_type)
+    arr_to_series_type)
 from hpat.str_ext import string_type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.aggregate import get_agg_func
@@ -138,9 +138,8 @@ class DataframeGroupByAttribute(AttributeTemplate):
             out_columns.append(c)
             ind = grp.df_type.columns.index(c)
             data = grp.df_type.data[ind]
-            in_typ = arr_to_series_type(data)
             _, out_dtype, _ = numba.compiler.type_inference_stage(
-                self.context, f_ir, (in_typ,), None)
+                self.context, f_ir, (data,), None)
             out_arr = _get_series_array_type(out_dtype)
             out_data.append(out_arr)
 
