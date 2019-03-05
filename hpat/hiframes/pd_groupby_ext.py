@@ -198,3 +198,49 @@ class DataframeGroupByAttribute(AttributeTemplate):
     def resolve_std(self, grp, args, kws):
         func = get_agg_func(None, 'std', None)
         return self._get_agg_typ(grp, args, func.__code__)
+
+
+# a dummy pivot_table function that will be replace in dataframe_pass
+def pivot_table_dummy(df, values, index, columns, aggfunc, _pivot_values):
+    return 0
+
+
+@infer_global(pivot_table_dummy)
+class PivotTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        df, values, index, columns, aggfunc, _pivot_values = args
+        print(values, index, columns, aggfunc)
+
+        if not (isinstance(values, types.StringLiteral)
+                and isinstance(index, types.StringLiteral)
+                and isinstance(columns, types.StringLiteral)):
+            raise ValueError("pivot_table() only support string constants for"
+                "'values', 'index' and 'columns' arguments")
+
+        values = values.literal_value
+        index = index.literal_value
+        columns = columns.literal_value
+
+        # get output data type
+        data = df.data[df.columns.index(values)]
+        func = get_agg_func(None, aggfunc.literal_value, None)
+        f_ir = numba.ir_utils.get_ir_of_code(
+            {'np': np, 'numba': numba, 'hpat': hpat}, func.__code__)
+        _, out_dtype, _ = numba.compiler.type_inference_stage(
+            self.context, f_ir, (data,), None)
+        out_arr_typ = _get_series_array_type(out_dtype)
+
+
+        pivot_vals = _pivot_values.meta
+        n_vals = len(pivot_vals)
+        out_df = DataFrameType((out_arr_typ,)*n_vals, None, tuple(pivot_vals))
+
+        return signature(out_df, *args)
+
+
+# dummy lowering to avoid overload errors, remove after overload inline PR
+# is merged
+@lower_builtin(pivot_table_dummy, types.VarArg(types.Any))
+def lower_pivot_table_dummy(context, builder, sig, args):
+    return context.get_constant_null(sig.return_type)

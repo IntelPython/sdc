@@ -1252,6 +1252,18 @@ def lower_join_dummy(context, builder, sig, args):
     return dataframe._getvalue()
 
 
+# type used to pass metadata to type inference functions
+# see hiframes.py and df.pivot_table()
+class MetaType(types.Type):
+    def __init__(self, meta):
+        self.meta = meta
+        super(MetaType, self).__init__("MetaType({})".format(meta))
+
+    def can_convert_from(self, typingctx, other):
+        return True
+
+register_model(MetaType)(models.OpaqueModel)
+
 # taken from numba/typing/listdecl.py
 @infer_global(sorted)
 class SortedBuiltinLambda(CallableTemplate):

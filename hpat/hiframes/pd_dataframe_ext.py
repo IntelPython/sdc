@@ -563,3 +563,17 @@ def merge_asof_overload(left, right, on=None, left_on=None, right_on=None,
             left, right, left_on, right_on, 'asof')
 
     return _impl
+
+@overload_method(DataFrameType, 'pivot_table')
+def pivot_table_overload(df, values=None, index=None, columns=None, aggfunc='mean',
+        fill_value=None, margins=False, dropna=True, margins_name='All',
+        _pivot_values=None):
+
+    def _impl(df, values=None, index=None, columns=None, aggfunc='mean',
+            fill_value=None, margins=False, dropna=True, margins_name='All',
+            _pivot_values=None):
+
+        return hpat.hiframes.pd_groupby_ext.pivot_table_dummy(
+            df, values, index, columns, aggfunc, _pivot_values)
+
+    return _impl
