@@ -9,6 +9,16 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                             get_start_end)
 
 
+_pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
+                    "bar", "bar", "bar", "bar"],
+            "B": ["one", "one", "one", "two", "two",
+                    "one", "one", "two", "two"],
+            "C": ["small", "large", "large", "small",
+                    "small", "large", "small", "small",
+                    "large"],
+            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+
+
 class TestGroupBy(unittest.TestCase):
     def test_agg_seq(self):
         def test_impl(df):
@@ -318,6 +328,50 @@ class TestGroupBy(unittest.TestCase):
                            'B': ['ccc','a','bb','aa','dd','ggg','rr']})
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
+    def test_pivot(self):
+        def test_impl(df):
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
+
+    def test_pivot_parallel(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_crosstab1(self):
+        def test_impl(df):
+            pt = pd.crosstab(df.A, df.C)
+            return (pt.small.values, pt.large.values)
+
+        hpat_func = hpat.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
+        self.assertEqual(
+            set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
+
+    def test_crosstab_parallel1(self):
+        def test_impl():
+            df = pd.read_parquet("pivot2.pq")
+            pt = pd.crosstab(df.A, df.C)
+            res = pt.small.values.sum()
+            return res
+
+        hpat_func = hpat.jit(
+            pivots={'pt': ['small', 'large']})(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":
