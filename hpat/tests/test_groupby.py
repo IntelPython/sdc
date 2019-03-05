@@ -110,6 +110,16 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    def test_agg_seq_multiselect(self):
+        def test_impl(df):
+            df2 = df.groupby('A')['B', 'C'].sum()
+            return df2.C.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7],
+                           'C': [3,5,6,5,4,4,3]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
     def test_agg_multikey_seq(self):
         def test_impl(df):
             A = df.groupby(['A', 'C'])['B'].sum()
