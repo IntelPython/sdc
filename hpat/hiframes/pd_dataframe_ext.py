@@ -577,3 +577,17 @@ def pivot_table_overload(df, values=None, index=None, columns=None, aggfunc='mea
             df, values, index, columns, aggfunc, _pivot_values)
 
     return _impl
+
+
+@overload(pd.crosstab)
+def crosstab_overload(index, columns, values=None, rownames=None, colnames=None,
+        aggfunc=None, margins=False, margins_name='All', dropna=True,
+        normalize=False, _pivot_values=None):
+    # TODO: hanlde multiple keys (index args)
+    # TODO: handle values and aggfunc options
+    def _impl(index, columns, values=None, rownames=None, colnames=None,
+            aggfunc=None, margins=False, margins_name='All', dropna=True,
+            normalize=False, _pivot_values=None):
+        return hpat.hiframes.pd_groupby_ext.crosstab_dummy(
+            index, columns, _pivot_values)
+    return _impl
