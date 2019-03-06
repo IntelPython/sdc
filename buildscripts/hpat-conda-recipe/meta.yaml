@@ -14,9 +14,9 @@ requirements:
     - {{ compiler('cxx') }}
 
   host:
-    - python >=3.6
+    - python >=3.7
     - setuptools
-    - numba 0.42.*
+    - numba 0.43.*
     - numpy >=1.14
     - pandas >=0.23
     - pyarrow >=0.9
@@ -27,13 +27,13 @@ requirements:
     - mpich # [not win]
 
   run:
-    - python >=3.6
+    - python >=3.7
     - numpy >=1.14
     - pandas >=0.23
     - pyarrow >=0.9
     - arrow-cpp
     - boost
-    - numba 0.42.*
+    - numba 0.43.*
     - hdf5
     - h5py
     - mpich # [not win]
