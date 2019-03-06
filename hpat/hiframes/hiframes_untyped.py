@@ -260,6 +260,7 @@ class HiFrames(object):
             meta_assign = ir.Assign(
                 ir.Const(0, rhs.loc), meta_var, rhs.loc)
             self._working_body.insert(0, meta_assign)
+            pivot_call.kws = list(pivot_call.kws)
             pivot_call.kws.append(('_pivot_values', meta_var))
             self.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
 
@@ -320,8 +321,8 @@ class HiFrames(object):
         if fdef == ('concat', 'pandas'):
             return self._handle_concat(assign, lhs, rhs, label)
 
-        if fdef == ('crosstab', 'pandas'):
-            return self._handle_crosstab(lhs, rhs, label)
+        # if fdef == ('crosstab', 'pandas'):
+        #     return self._handle_crosstab(lhs, rhs, label)
 
         if fdef == ('to_numeric', 'pandas'):
             return self._handle_pd_to_numeric(assign, lhs, rhs)

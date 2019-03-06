@@ -243,3 +243,31 @@ class PivotTyper(AbstractTemplate):
 @lower_builtin(pivot_table_dummy, types.VarArg(types.Any))
 def lower_pivot_table_dummy(context, builder, sig, args):
     return context.get_constant_null(sig.return_type)
+
+
+# a dummy crosstab function that will be replace in dataframe_pass
+def crosstab_dummy(index, columns, _pivot_values):
+    return 0
+
+
+@infer_global(crosstab_dummy)
+class CrossTabTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        index, columns, _pivot_values = args
+
+        # TODO: support agg func other than frequency
+        out_arr_typ = types.Array(types.int64, 1, 'C')
+
+        pivot_vals = _pivot_values.meta
+        n_vals = len(pivot_vals)
+        out_df = DataFrameType((out_arr_typ,)*n_vals, None, tuple(pivot_vals))
+
+        return signature(out_df, *args)
+
+
+# dummy lowering to avoid overload errors, remove after overload inline PR
+# is merged
+@lower_builtin(crosstab_dummy, types.VarArg(types.Any))
+def lower_crosstab_dummy(context, builder, sig, args):
+    return context.get_constant_null(sig.return_type)

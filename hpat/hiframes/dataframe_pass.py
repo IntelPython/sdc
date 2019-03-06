@@ -525,6 +525,18 @@ class DataFramePass(object):
         if fdef == ('pivot_table_dummy', 'hpat.hiframes.pd_groupby_ext'):
             return self._run_call_pivot_table(assign, lhs, rhs)
 
+        if fdef == ('crosstab', 'pandas'):
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.crosstab_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+
+        if fdef == ('crosstab_dummy', 'hpat.hiframes.pd_groupby_ext'):
+            return self._run_call_crosstab(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -783,6 +795,53 @@ class DataFramePass(object):
             in_vars, [index_arr],
             agg_func, None, lhs.loc, pivot_arr, pivot_values)
         nodes.append(agg_node)
+
+        n_cols = len(out_typ.columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        # XXX the order of output variables passed should match out_typ.columns
+        out_vars = []
+        for c in out_typ.columns:
+            out_vars.append(df_col_map[c])
+
+        return self._replace_func(_init_df, out_vars,
+            pre_nodes=nodes)
+
+    def _run_call_crosstab(self, assign, lhs, rhs):
+        index, columns, _pivot_values = rhs.args
+        pivot_values = self.typemap[_pivot_values.name].meta
+        out_typ = self.typemap[lhs.name]
+
+        in_vars = {}
+
+        df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
+                                for col in pivot_values})
+        for i, v in enumerate(df_col_map.values()):
+            self.typemap[v.name] = out_typ.data[i]
+
+        pivot_arr = columns
+
+        def _agg_len_impl(in_arr):  # pragma: no cover
+            numba.parfor.init_prange()
+            count = 0
+            for i in numba.parfor.internal_prange(len(in_arr)):
+                count += 1
+            return count
+
+        # TODO: make out_key_var an index column
+        # TODO: check Series vs. array for index/columns
+        agg_node = hpat.hiframes.aggregate.Aggregate(
+            lhs.name, 'crosstab', [index.name], None, df_col_map,
+            in_vars, [index],
+            _agg_len_impl, None, lhs.loc, pivot_arr, pivot_values, True)
+        nodes = [agg_node]
 
         n_cols = len(out_typ.columns)
         data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
