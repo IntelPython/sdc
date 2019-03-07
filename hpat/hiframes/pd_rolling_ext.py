@@ -121,10 +121,25 @@ class DataframeRollingAttribute(AttributeTemplate):
         template_key = 'rolling.' + attr
         # output is always float64
         out_arr = types.Array(types.float64, 1, 'C')
-        # TODO: handle 'on' case
+
         # TODO: handle Series case (explicit select)
-        n_out_cols = len(rolling.selection)
-        out_typ = DataFrameType((out_arr,)*n_out_cols, None, rolling.selection)
+        columns = rolling.selection
+
+        # handle 'on' case
+        if rolling.on is not None:
+            columns = columns + (rolling.on,)
+        # Pandas sorts the output column names _flex_binary_moment
+        # line: res_columns = arg1.columns.union(arg2.columns)
+        columns = tuple(sorted(columns))
+        n_out_cols = len(columns)
+        out_data = [out_arr] * n_out_cols
+        if rolling.on is not None:
+            # offset key's data type is preserved
+            out_ind = columns.index(rolling.on)
+            in_ind = rolling.df_type.columns.index(rolling.on)
+            out_data[out_ind] = rolling.df_type.data[in_ind]
+        out_typ = DataFrameType(tuple(out_data), None, columns)
+
         class MethodTemplate(AbstractTemplate):
             key = template_key
 
