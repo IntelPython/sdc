@@ -114,11 +114,11 @@ class GetItemDataFrameRolling2(AbstractTemplate):
 class DataframeRollingAttribute(AttributeTemplate):
     key = RollingType
 
-    def generic_resolve(self, rolling, attr):
-        if attr not in supported_rolling_funcs:
+    def generic_resolve(self, rolling, func_name):
+        if func_name not in supported_rolling_funcs:
             raise ValueError("only ({}) supported in rolling".format(
                                            ", ".join(supported_rolling_funcs)))
-        template_key = 'rolling.' + attr
+        template_key = 'rolling.' + func_name
         # output is always float64
         out_arr = types.Array(types.float64, 1, 'C')
 
@@ -144,6 +144,22 @@ class DataframeRollingAttribute(AttributeTemplate):
             key = template_key
 
             def generic(self, args, kws):
+                if func_name in ('cov', 'corr'):
+                    if len(args) != 1:
+                        raise ValueError("rolling {} requires one argument (other)".format(func_name))
+                    # XXX pandas only accepts variable window cov/corr
+                    # when both inputs have time index
+                    if rolling.on is not None:
+                        raise ValueError("variable window rolling {} not supported yet.".format(func_name))
+                    # TODO: support variable window rolling cov/corr which is only
+                    # possible in pandas with time index
+                    other = args[0]
+                    # df on df cov/corr returns common columns only (without
+                    # pairwise flag)
+                    # TODO: support pairwise arg
+                    out_cols = tuple(sorted(set(columns) | set(other.columns)))
+                    return signature(DataFrameType(
+                            (out_arr,)*len(out_cols), None, out_cols), *args)
                 return signature(out_typ, *args)
 
         return types.BoundFunction(MethodTemplate, rolling)
