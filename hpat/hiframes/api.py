@@ -1262,6 +1262,13 @@ class MetaType(types.Type):
     def can_convert_from(self, typingctx, other):
         return True
 
+    @property
+    def key(self):
+        # XXX this is needed for _TypeMetaclass._intern to return the proper
+        # cached instance in case meta is changed
+        # (e.g. TestGroupBy -k pivot -k cross)
+        return tuple(self.meta)
+
 register_model(MetaType)(models.OpaqueModel)
 
 # taken from numba/typing/listdecl.py
