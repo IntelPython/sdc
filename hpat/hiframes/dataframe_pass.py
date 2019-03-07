@@ -35,6 +35,7 @@ import hpat.hiframes.pd_rolling_ext
 from hpat.hiframes.pd_rolling_ext import RollingType
 from hpat.hiframes.aggregate import get_agg_func
 
+
 class DataFramePass(object):
     """Analyze and transform dataframe calls after typing"""
 
@@ -509,6 +510,11 @@ class DataFramePass(object):
             return self._run_call_groupby(
                 assign, assign.target, rhs, func_mod, func_name)
 
+        if (isinstance(func_mod, ir.Var)
+                and isinstance(self.typemap[func_mod.name], RollingType)):
+            return self._run_call_rolling(
+                assign, assign.target, rhs, func_mod, func_name)
+
         if fdef == ('pivot_table_dummy', 'hpat.hiframes.pd_groupby_ext'):
             return self._run_call_pivot_table(assign, lhs, rhs)
 
@@ -548,6 +554,19 @@ class DataFramePass(object):
             stub = (lambda df, values=None, index=None, columns=None, aggfunc='mean',
                     fill_value=None, margins=False, dropna=True, margins_name='All',
                     _pivot_values=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'rolling':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_rolling_ext.df_rolling_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, window, min_periods=None, center=False,
+                        win_type=None, on=None, axis=0, closed=None: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -815,6 +834,120 @@ class DataFramePass(object):
 
         return self._replace_func(_init_df, out_vars,
             pre_nodes=nodes)
+
+    def _run_call_rolling(self, assign, lhs, rhs, rolling_var, func_name):
+        rolling_typ = self.typemap[rolling_var.name]
+        dummy_call = guard(get_definition, self.func_ir, rolling_var)
+        df_var, window, center, on = dummy_call.args
+        df_type = self.typemap[df_var.name]
+        out_typ = self.typemap[lhs.name]
+
+        # TODO: check 'on' arg
+
+        nodes = []
+        in_vars = {c: self._get_dataframe_data(df_var, c, nodes)
+                            for c in rolling_typ.selection}
+
+        df_col_map = {}
+        for c in rolling_typ.selection:
+            var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
+            self.typemap[var.name] = (out_typ.data
+                if isinstance(out_typ, SeriesType)
+                else out_typ.data[out_typ.columns.index(c)])
+            df_col_map[c] = var
+
+        on_arr = None  # TODO
+        for cname, out_col_var in df_col_map.items():
+            if cname == on:
+                continue
+            in_col_var = in_vars[cname]
+            # if func_name in ('cov', 'corr'):
+            #     args[0] = self.df_vars[other.name][cname]
+            nodes += self._gen_rolling_call(
+                in_col_var, out_col_var, window, center, rhs.args, func_name,
+                on_arr)
+
+
+        # XXX output becomes series if single output and explicitly selected
+        if isinstance(out_typ, SeriesType):
+            assert (len(rolling_typ.selection) == 1
+                and rolling_typ.explicit_select
+                and rolling_typ.as_index)
+            return self._replace_func(
+                    lambda A: hpat.hiframes.api.init_series(A),
+                    list(df_col_map.values()), pre_nodes=nodes)
+
+        _init_df = _gen_init_df(out_typ.columns)
+
+        # XXX the order of output variables passed should match out_typ.columns
+        out_vars = []
+        for c in out_typ.columns:
+            out_vars.append(df_col_map[c])
+
+        return self._replace_func(_init_df, out_vars,
+            pre_nodes=nodes)
+
+    def _gen_rolling_call(self, in_col_var, out_col_var, window, center, args,
+                                                            func_name, on_arr):
+        nodes = []
+        if func_name in ('cov', 'corr'):
+            other = args[0]
+            if on_arr is not None:
+                if func_name == 'cov':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes.rolling.rolling_cov(
+                                arr, other, on_arr, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, on_arr, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes.rolling.rolling_corr(
+                                arr, other, on_arr, w, center)
+                args = [in_col_var, other, on_arr, window, center]
+            else:
+                if func_name == 'cov':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes.rolling.rolling_cov(
+                                arr, other, w, center)
+                if func_name == 'corr':
+                    def f(arr, other, w, center):  # pragma: no cover
+                        df_arr = hpat.hiframes.rolling.rolling_corr(
+                                arr, other, w, center)
+                args = [in_col_var, other, window, center]
+        # variable window case
+        elif on_arr is not None:
+            if func_name == 'apply':
+                def f(arr, on_arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes.rolling.rolling_variable(
+                            arr, on_arr, w, center, False, func)
+                args = [in_col_var, on_arr, window, center, args[0]]
+            else:
+                def f(arr, on_arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes.rolling.rolling_variable(
+                            arr, on_arr, w, center, False, _func_name)
+                args = [in_col_var, on_arr, window, center]
+        else:  # fixed window
+            # apply case takes the passed function instead of just name
+            if func_name == 'apply':
+                def f(arr, w, center, func):  # pragma: no cover
+                    df_arr = hpat.hiframes.rolling.rolling_fixed(
+                            arr, w, center, False, func)
+                args = [in_col_var, window, center, args[0]]
+            else:
+                def f(arr, w, center):  # pragma: no cover
+                    df_arr = hpat.hiframes.rolling.rolling_fixed(
+                            arr, w, center, False, _func_name)
+                args = [in_col_var, window, center]
+
+        arg_typs = tuple(self.typemap[v.name] for v in args)
+        f_block = compile_to_numba_ir(f,
+            {'hpat': hpat, '_func_name': func_name},
+            self.typingctx,
+            arg_typs,
+            self.typemap,
+            self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, args)
+        nodes += f_block.body[:-3]  # remove none return
+        nodes[-1].target = out_col_var
+        return nodes
 
     def _get_df_obj_select(self, obj_var, obj_name):
         """get df object for groupby() or rolling()
