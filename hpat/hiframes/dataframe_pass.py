@@ -31,6 +31,8 @@ from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
 from hpat.hiframes.pd_series_ext import SeriesType, is_series_type
 import hpat.hiframes.pd_groupby_ext
 from hpat.hiframes.pd_groupby_ext import DataFrameGroupByType
+import hpat.hiframes.pd_rolling_ext
+from hpat.hiframes.pd_rolling_ext import RollingType
 from hpat.hiframes.aggregate import get_agg_func
 
 class DataFramePass(object):
