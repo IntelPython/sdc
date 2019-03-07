@@ -882,16 +882,38 @@ class DataFramePass(object):
         if on is not None:
             df_col_map[on] = on_arr  # TODO: copy array?
 
+        other = None
+        if func_name in ('cov', 'corr'):
+            other = rhs.args[0]
+
         for cname, out_col_var in df_col_map.items():
             if cname == on:
                 continue
             in_col_var = in_vars[cname]
-            # if func_name in ('cov', 'corr'):
-            #     args[0] = self.df_vars[other.name][cname]
+            if func_name in ('cov', 'corr'):
+                # TODO: Series as other
+                if cname not in self.typemap[other.name].columns:
+                    continue  # nan column handled below
+                rhs.args[0] = self._get_dataframe_data(other, cname, nodes)
             nodes += self._gen_rolling_call(
                 in_col_var, out_col_var, window, center, rhs.args, func_name,
                 on_arr)
 
+        # in corr/cov case, Pandas makes non-common columns NaNs
+        nan_cols = list(set(self.typemap[other.name].columns) ^ set(df_type.columns))
+        len_arr = list(in_vars.values())[0]
+        for cname in nan_cols:
+            def f(arr):
+                nan_arr = np.full(len(arr), np.nan)
+            f_block = compile_to_numba_ir(f,
+                {'np': np},
+                self.typingctx,
+                (self.typemap[len_arr.name],),
+                self.typemap,
+                self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [len_arr])
+            nodes += f_block.body[:-3]  # remove none return
+            df_col_map[cname] = nodes[-1].target
 
         # XXX output becomes series if single output and explicitly selected
         if isinstance(out_typ, SeriesType):
