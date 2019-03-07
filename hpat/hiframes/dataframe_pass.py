@@ -227,15 +227,7 @@ class DataFramePass(object):
                             for c in index]
                 out_arrs = [self._gen_arr_copy(A, nodes) for A in in_arrs]
                 #
-                n_cols = len(index)
-                data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-                col_args = ", ".join("'{}'".format(c) for c in index)
-                func_text = "def _init_df({}):\n".format(data_args)
-                func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-                    data_args, col_args)
-                loc_vars = {}
-                exec(func_text, {}, loc_vars)
-                _init_df = loc_vars['_init_df']
+                _init_df = _gen_init_df(index)
                 return self._replace_func(_init_df, out_arrs, pre_nodes=nodes)
                 # raise ValueError("unsupported dataframe access {}[{}]".format(
                 #                  rhs.value.name, index))
@@ -332,15 +324,8 @@ class DataFramePass(object):
         nodes.append(hiframes.filter.Filter(
             lhs.name, df_var.name, index_var, out_vars, in_vars, lhs.loc))
 
-        n_cols = len(df_typ.columns)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-        col_args = ", ".join("'{}'".format(c) for c in df_typ.columns)
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, col_args)
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
+        _init_df = _gen_init_df(df_typ.columns)
+
         return self._replace_func(
             _init_df, list(out_vars.values()), pre_nodes=nodes)
 
@@ -684,15 +669,7 @@ class DataFramePass(object):
                                    left_on, right_on, out_data_vars, left_arrs,
                                    right_arrs, how, lhs.loc))
 
-        n_cols = len(out_typ.columns)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
+        _init_df = _gen_init_df(out_typ.columns)
 
         return self._replace_func(_init_df, list(out_data_vars.values()),
             pre_nodes=nodes)
@@ -745,15 +722,7 @@ class DataFramePass(object):
                     lambda A: hpat.hiframes.api.init_series(A),
                     list(df_col_map.values()), pre_nodes=nodes)
 
-        n_cols = len(out_typ.columns)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
+        _init_df = _gen_init_df(out_typ.columns)
 
         # XXX the order of output variables passed should match out_typ.columns
         out_vars = []
@@ -796,15 +765,7 @@ class DataFramePass(object):
             agg_func, None, lhs.loc, pivot_arr, pivot_values)
         nodes.append(agg_node)
 
-        n_cols = len(out_typ.columns)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
+        _init_df = _gen_init_df(out_typ.columns)
 
         # XXX the order of output variables passed should match out_typ.columns
         out_vars = []
@@ -843,15 +804,7 @@ class DataFramePass(object):
             _agg_len_impl, None, lhs.loc, pivot_arr, pivot_values, True)
         nodes = [agg_node]
 
-        n_cols = len(out_typ.columns)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, ", ".join("'{}'".format(c) for c in out_typ.columns))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
+        _init_df = _gen_init_df(out_typ.columns)
 
         # XXX the order of output variables passed should match out_typ.columns
         out_vars = []
@@ -1072,6 +1025,20 @@ class DataFramePass(object):
                     return default
                 raise ValueError(err_msg)
         return key_colnames
+
+
+def _gen_init_df(columns):
+    n_cols = len(columns)
+    data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+    func_text = "def _init_df({}):\n".format(data_args)
+    func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+        data_args, ", ".join("'{}'".format(c) for c in columns))
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    _init_df = loc_vars['_init_df']
+
+    return _init_df
 
 
 def _eval_const_var(func_ir, var):
