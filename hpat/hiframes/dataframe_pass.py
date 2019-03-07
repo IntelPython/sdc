@@ -842,11 +842,34 @@ class DataFramePass(object):
         df_type = self.typemap[df_var.name]
         out_typ = self.typemap[lhs.name]
 
-        # TODO: check 'on' arg
+        # handle 'on' arg
+        if self.typemap[on.name] == types.none:
+            on = None
+        else:
+            assert isinstance(self.typemap[on.name], types.StringLiteral)
+            on = self.typemap[on.name].literal_value
 
         nodes = []
+        # convert string offset window statically to nanos
+        # TODO: support dynamic conversion
+        # TODO: support other offsets types (time delta, etc.)
+        if on is not None:
+            window = guard(find_const, self.func_ir, window)
+            if not isinstance(window, str):
+                raise ValueError("window argument to rolling should be constant"
+                                    "string in the offset case (variable window)")
+            window = pd.tseries.frequencies.to_offset(window).nanos
+            window_var = ir.Var(lhs.scope, mk_unique_var("window"), lhs.loc)
+            self.typemap[window_var.name] = types.int64
+            nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
+            window = window_var
+
+
         in_vars = {c: self._get_dataframe_data(df_var, c, nodes)
                             for c in rolling_typ.selection}
+
+        on_arr = (self._get_dataframe_data(df_var, on, nodes)
+                  if on is not None else None)
 
         df_col_map = {}
         for c in rolling_typ.selection:
@@ -856,7 +879,9 @@ class DataFramePass(object):
                 else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
 
-        on_arr = None  # TODO
+        if on is not None:
+            df_col_map[on] = on_arr  # TODO: copy array?
+
         for cname, out_col_var in df_col_map.items():
             if cname == on:
                 continue
