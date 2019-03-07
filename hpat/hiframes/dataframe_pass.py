@@ -900,20 +900,21 @@ class DataFramePass(object):
                 on_arr)
 
         # in corr/cov case, Pandas makes non-common columns NaNs
-        nan_cols = list(set(self.typemap[other.name].columns) ^ set(df_type.columns))
-        len_arr = list(in_vars.values())[0]
-        for cname in nan_cols:
-            def f(arr):
-                nan_arr = np.full(len(arr), np.nan)
-            f_block = compile_to_numba_ir(f,
-                {'np': np},
-                self.typingctx,
-                (self.typemap[len_arr.name],),
-                self.typemap,
-                self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [len_arr])
-            nodes += f_block.body[:-3]  # remove none return
-            df_col_map[cname] = nodes[-1].target
+        if func_name in ('cov', 'corr'):
+            nan_cols = list(set(self.typemap[other.name].columns) ^ set(df_type.columns))
+            len_arr = list(in_vars.values())[0]
+            for cname in nan_cols:
+                def f(arr):
+                    nan_arr = np.full(len(arr), np.nan)
+                f_block = compile_to_numba_ir(f,
+                    {'np': np},
+                    self.typingctx,
+                    (self.typemap[len_arr.name],),
+                    self.typemap,
+                    self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [len_arr])
+                nodes += f_block.body[:-3]  # remove none return
+                df_col_map[cname] = nodes[-1].target
 
         # XXX output becomes series if single output and explicitly selected
         if isinstance(out_typ, SeriesType):
