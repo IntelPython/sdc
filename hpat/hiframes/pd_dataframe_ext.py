@@ -644,6 +644,16 @@ class ConcatDummyTyper(AbstractTemplate):
 
             ret_typ = DataFrameType(tuple(all_data), None, tuple(all_colnames))
             return signature(ret_typ, *args)
+        # series case
+        elif isinstance(objs.types[0], SeriesType):
+            assert all(isinstance(t, SeriesType) for t in objs.types)
+            arr_args = [S.data for S in objs.types]
+            concat_typ = hpat.hiframes.api.ConcatType(
+                    self.context).generic((types.Tuple(arr_args),), {})
+            ret_typ = SeriesType(concat_typ.return_type.dtype)
+            return signature(ret_typ, *args)
+        # TODO: handle other iterables like arrays, lists, ...
+
 
 # dummy lowering to avoid overload errors, remove after overload inline PR
 # is merged
