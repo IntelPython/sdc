@@ -204,7 +204,9 @@ class HiFrames(object):
             if rhs.op == 'getattr':
                 val_def = guard(get_definition, self.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == pd
-                        and rhs.attr in ('DataFrame', 'read_csv', 'read_parquet')):
+                        and rhs.attr in ('DataFrame', 'read_csv',
+                                        'read_parquet', 'to_numeric')):
+                    # TODO: implement to_numeric in typed pass?
                     return []
 
             if rhs.op == 'build_map':
