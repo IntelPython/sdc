@@ -591,3 +591,64 @@ def crosstab_overload(index, columns, values=None, rownames=None, colnames=None,
         return hpat.hiframes.pd_groupby_ext.crosstab_dummy(
             index, columns, _pivot_values)
     return _impl
+
+
+@overload(pd.concat)
+def concat_overload(objs, axis=0, join='outer', join_axes=None,
+        ignore_index=False, keys=None, levels=None, names=None,
+        verify_integrity=False, sort=None, copy=True):
+    # TODO: handle options
+    return (lambda objs, axis=0, join='outer', join_axes=None,
+            ignore_index=False, keys=None, levels=None, names=None,
+            verify_integrity=False, sort=None, copy=True:
+            hpat.hiframes.pd_dataframe_ext.concat_dummy(objs))
+
+def concat_dummy(objs):
+    return pd.concat(objs)
+
+@infer_global(concat_dummy)
+class ConcatDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        objs = args[0]
+        if not isinstance(objs, types.BaseTuple):
+            raise ValueError("Tuple argument for pd.concat expected")
+        assert len(objs.types) > 0
+
+        # dataframe case
+        if isinstance(objs.types[0], DataFrameType):
+            assert all(isinstance(t, DataFrameType) for t in objs.types)
+            # get output column names
+            all_colnames = []
+            for df in objs.types:
+                all_colnames.extend(df.columns)
+            # TODO: verify how Pandas sorts column names
+            all_colnames = sorted(set(all_colnames))
+
+            # get output data types
+            all_data = []
+            for cname in all_colnames:
+                # arguments to the generated function
+                arr_args = [df.data[df.columns.index(cname)]
+                            for df in objs.types if cname in df.columns]
+                # XXX we add arrays of float64 NaNs if a column is missing
+                # so add a dummy array of float64 for accurate typing
+                # e.g. int to float conversion
+                # TODO: fix NA column additions for other types
+                if len(arr_args) < len(objs.types):
+                    arr_args.append(types.Array(types.float64, 1, 'C'))
+                # use hpat.hiframes.api.concat() typer
+                concat_typ = hpat.hiframes.api.ConcatType(
+                    self.context).generic((types.Tuple(arr_args),), {})
+                all_data.append(concat_typ.return_type)
+
+            ret_typ = DataFrameType(tuple(all_data), None, tuple(all_colnames))
+            return signature(ret_typ, *args)
+
+# dummy lowering to avoid overload errors, remove after overload inline PR
+# is merged
+@lower_builtin(concat_dummy, types.VarArg(types.Any))
+def lower_concat_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()

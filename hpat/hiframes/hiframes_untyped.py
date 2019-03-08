@@ -881,6 +881,8 @@ class HiFrames(object):
         return self._gen_parquet_read(fname, lhs, label)
 
     def _handle_concat(self, assign, lhs, rhs, label):
+        # converting build_list to build_tuple before type inference to avoid
+        # errors
         if len(rhs.args) != 1 or len(rhs.kws) != 0:
             raise ValueError(
                 "only a list/tuple argument is supported in concat")
@@ -889,20 +891,16 @@ class HiFrames(object):
                                             in ['build_tuple', 'build_list']):
             raise ValueError("pd.concat input should be constant list or tuple")
 
+        # XXX convert build_list to build_tuple since Numba doesn't handle list of
+        # arrays for np.concatenate()
+        if df_list.op == 'build_list':
+            df_list.op = 'build_tuple'
+
         if len(df_list.items) == 0:
             # copied error from pandas
             raise ValueError("No objects to concatenate")
 
-        first_varname = df_list.items[0].name
-
-        if first_varname in self.df_vars:
-            return self._handle_concat_df(lhs, df_list.items, label)
-
-        # XXX convert build_list to build_tuple since Numba doesn't handle list of
-        # arrays
-        if df_list.op == 'build_list':
-            df_list.op = 'build_tuple'
-        return self._handle_concat_series(lhs, rhs)
+        return [assign]
 
     def _handle_concat_df(self, lhs, df_list, label):
         # TODO: handle non-numerical (e.g. string, datetime) columns

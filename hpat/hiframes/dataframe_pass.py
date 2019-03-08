@@ -530,6 +530,18 @@ class DataFramePass(object):
         if fdef == ('crosstab_dummy', 'hpat.hiframes.pd_groupby_ext'):
             return self._run_call_crosstab(assign, lhs, rhs)
 
+        if fdef == ('concat', 'pandas'):
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.concat_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+
+        if fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_concat(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -996,6 +1008,61 @@ class DataFramePass(object):
         nodes += f_block.body[:-3]  # remove none return
         nodes[-1].target = out_col_var
         return nodes
+
+    def _run_call_concat(self, assign, lhs, rhs):
+        # TODO: handle non-numerical (e.g. string, datetime) columns
+        nodes = []
+        out_typ = self.typemap[lhs.name]
+        df_list = guard(get_definition, self.func_ir, rhs.args[0]).items
+        # generate a concat call for each output column
+        # TODO: support non-numericals like string
+        gen_nan_func = lambda A: np.full(len(A), np.nan)
+        # gen concat function
+        arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
+        func_text = "def _concat_imp({}):\n".format(arg_names)
+        func_text += "    return hpat.hiframes.api.concat(({}))\n".format(
+            arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _concat_imp = loc_vars['_concat_imp']
+
+        out_vars = []
+        for cname in out_typ.columns:
+            # arguments to the generated function
+            args = []
+            # get input columns
+            for df in df_list:
+                df_typ = self.typemap[df.name]
+                # generate full NaN column
+                if cname not in df_typ.columns:
+                    f_block = compile_to_numba_ir(gen_nan_func,
+                            {'hpat': hpat, 'np': np},
+                            self.typingctx,
+                            (df_typ,),
+                            self.typemap,
+                            self.calltypes).blocks.popitem()[1]
+                    replace_arg_nodes(f_block, [df])
+                    nodes += f_block.body[:-2]
+                    args.append(nodes[-1].target)
+                else:
+                    arr = self._get_dataframe_data(df, cname, nodes)
+                    args.append(arr)
+
+            arg_typs = tuple(self.typemap[v.name] for v in args)
+            f_block = compile_to_numba_ir(_concat_imp,
+                        {'hpat': hpat, 'np': np},
+                        self.typingctx,
+                        arg_typs,
+                        self.typemap,
+                        self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            out_vars.append(nodes[-1].target)
+
+        _init_df = _gen_init_df(out_typ.columns)
+
+        return self._replace_func(_init_df, out_vars,
+            pre_nodes=nodes)
 
     def _get_df_obj_select(self, obj_var, obj_name):
         """get df object for groupby() or rolling()
