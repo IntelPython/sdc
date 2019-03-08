@@ -520,6 +520,10 @@ class HiFramesTyped(object):
             return self._run_call_dt_index(
                 assign, assign.target, rhs, func_mod, func_name)
 
+        if (fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext')
+                and isinstance(self.typemap[lhs], SeriesType)):
+            return self._run_call_concat(assign, lhs, rhs)
+
         # handle sorted() with key lambda input
         if fdef == ('sorted', 'builtins') and 'key' in dict(rhs.kws):
             return self._handle_sorted_by_key(rhs)
@@ -1997,6 +2001,18 @@ class HiFramesTyped(object):
         exec(func_text, {}, loc_vars)
         _dropna_impl = loc_vars['_dropna_impl']
         return self._replace_func(_dropna_impl, rhs.args)
+
+    def _run_call_concat(self, assign, lhs, rhs):
+        nodes = []
+        series_list = guard(get_definition, self.func_ir, rhs.args[0]).items
+        arrs = [self._get_series_data(v, nodes) for v in series_list]
+        arr_tup = ir.Var(rhs.args[0].scope, mk_unique_var('arr_tup'), rhs.args[0].loc)
+        self.typemap[arr_tup.name] = types.Tuple([self.typemap[a.name] for a in arrs])
+        tup_expr = ir.Expr.build_tuple(arrs, arr_tup.loc)
+        nodes.append(ir.Assign(tup_expr, arr_tup, arr_tup.loc))
+        return self._replace_func(
+            lambda arr_list: hpat.hiframes.api.init_series(hpat.hiframes.api.concat(arr_list)),
+            [arr_tup], pre_nodes=nodes)
 
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):

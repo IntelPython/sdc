@@ -539,7 +539,8 @@ class DataFramePass(object):
             return self._replace_func(impl, rhs.args,
                         pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
-        if fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+        if (fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext')
+                and isinstance(self.typemap[lhs.name], DataFrameType)):
             return self._run_call_concat(assign, lhs, rhs)
 
         return [assign]
