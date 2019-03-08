@@ -126,7 +126,9 @@ def _get_series_array_type(dtype):
     return types.Array(dtype, 1, 'C')
 
 
-string_series_type = SeriesType(string_type)
+def is_str_series_typ(t):
+    return isinstance(t, SeriesType) and t.dtype == string_type
+
 # TODO: create a separate DatetimeIndex type from Series
 dt_index_series_type = SeriesType(types.NPDatetime('ns'))
 timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'))
@@ -162,7 +164,7 @@ def arr_to_series_type(arr):
         series_type = SeriesType(arr.dtype, arr)
     elif arr == string_array_type:
         # StringArray is readonly
-        series_type = string_series_type
+        series_type = SeriesType(string_type)
     elif arr == list_string_array_type:
         series_type = SeriesType(types.List(string_type))
     return series_type
@@ -196,8 +198,9 @@ def if_arr_to_series_type(typ):
     return typ
 
 
-@lower_cast(string_series_type, string_array_type)
-@lower_cast(string_array_type, string_series_type)
+# TODO remove this cast?
+@lower_cast(SeriesType, string_array_type)
+@lower_cast(string_array_type, SeriesType)
 def cast_string_series(context, builder, fromty, toty, val):
     return val
 
@@ -245,7 +248,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: handle other types like datetime etc.
         dtype, = args
         if isinstance(dtype, types.Function) and dtype.typing_key == str:
-            ret_type = string_series_type
+            ret_type = SeriesType(string_type)
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_astype.__wrapped__
@@ -258,7 +261,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: copy other types like list(str)
         dtype = ary.dtype
         if dtype == string_type:
-            ret_type = string_series_type
+            ret_type = SeriesType(string_type)
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_copy.__wrapped__
@@ -655,7 +658,7 @@ class SeriesCompEqual(AbstractTemplate):
         assert not kws
         [va, vb] = args
         # if one of the inputs is string array
-        if va == string_series_type or vb == string_series_type:
+        if is_str_series_typ(va) or is_str_series_typ(vb):
             # inputs should be either string array or string
             assert is_str_arr_typ(va) or va == string_type
             assert is_str_arr_typ(vb) or vb == string_type

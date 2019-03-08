@@ -24,7 +24,7 @@ from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
-from hpat.hiframes.pd_series_ext import (SeriesType, string_series_type,
+from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
     series_to_array_type, dt_index_series_type,
     if_series_to_array_type, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
@@ -936,9 +936,9 @@ class HiFramesTyped(object):
             return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
-        if func_name == 'astype' and self.typemap[lhs.name] == string_series_type:
+        if func_name == 'astype' and is_str_series_typ(self.typemap[lhs.name]):
             # just return input if string
-            if self.typemap[series_var.name] == string_series_type:
+            if is_str_series_typ(self.typemap[series_var.name]):
                 return self._replace_func(lambda a: a, [series_var])
             func = series_replace_funcs['astype_str']
             nodes = []
@@ -1792,10 +1792,10 @@ class HiFramesTyped(object):
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             is_series = False
-            if self.typemap[arg1.name] == string_series_type:
+            if is_str_series_typ(self.typemap[arg1.name]):
                 arg1 = self._get_series_data(arg1, nodes)
                 is_series = True
-            if self.typemap[arg2.name] == string_series_type:
+            if is_str_series_typ(self.typemap[arg2.name]):
                 arg2 = self._get_series_data(arg2, nodes)
                 is_series = True
 
@@ -1960,7 +1960,7 @@ class HiFramesTyped(object):
         out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
                      for i in range(len(in_vars))]
         str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
-                                                    if t == string_series_type]
+                                                    if is_str_series_typ(t)]
         list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
                         if t == SeriesType(types.List(string_type))]
         isna_calls = ['hpat.hiframes.api.isna({}, i)'.format(v) for v in in_names]

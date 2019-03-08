@@ -36,7 +36,7 @@ import math
 from hpat.parquet_pio import ParquetHandler
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
-from hpat.hiframes.pd_series_ext import SeriesType, string_series_type
+from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, CategoricalArray
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
 from hpat.hiframes.aggregate import get_agg_func, supported_agg_funcs

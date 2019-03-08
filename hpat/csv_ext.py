@@ -23,7 +23,7 @@ import numpy as np
 
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     CategoricalArray)
-from hpat.hiframes.pd_series_ext import dt_index_series_type, string_series_type
+from hpat.hiframes.pd_series_ext import dt_index_series_type
 
 
 class CsvReader(ir.Stmt):
