@@ -484,8 +484,8 @@ class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
 
 def is_str_arr_typ(typ):
-    from hpat.hiframes.pd_series_ext import string_series_type
-    return typ == string_array_type or typ == string_series_type
+    from hpat.hiframes.pd_series_ext import is_str_series_typ
+    return typ == string_array_type or is_str_series_typ(typ)
 
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):

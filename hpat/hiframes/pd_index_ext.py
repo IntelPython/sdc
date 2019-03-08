@@ -12,7 +12,7 @@ from numba.targets.boxing import box_array
 import hpat
 from hpat.str_ext import string_type
 import hpat.hiframes
-from hpat.hiframes.pd_series_ext import (string_series_type, string_array_type,
+from hpat.hiframes.pd_series_ext import (is_str_series_typ, string_array_type,
     SeriesType)
 from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 from hpat.hiframes.datetime_date_ext import array_datetime_date
@@ -130,7 +130,7 @@ def pd_datetimeindex_overload(data=None, freq=None, start=None, end=None,
     if data is None:
         raise ValueError("data argument in pd.DatetimeIndex() expected")
 
-    if data not in (string_array_type, string_series_type):
+    if data != string_array_type and not is_str_series_typ(data):
         return (lambda data=None, freq=None, start=None, end=None,
         periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
         dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
