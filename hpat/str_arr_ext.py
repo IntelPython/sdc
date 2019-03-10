@@ -45,6 +45,8 @@ class StringArrayType(types.IterableType):
     def iterator_type(self):
         return StringArrayIterator()
 
+    def copy(self):
+        return StringArrayType()
 
 string_array_type = StringArrayType()
 
