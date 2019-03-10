@@ -365,9 +365,6 @@ class HiFrames(object):
         return [assign]
 
     def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
-        # df.apply(lambda a:..., axis=1)
-        if func_name == 'apply':
-            return self._handle_df_apply(assign, lhs, rhs, df_var)
 
         # df.describe()
         if func_name == 'describe':
@@ -1013,95 +1010,6 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
         return nodes, df_cols
-
-    def _handle_df_apply(self, assign, lhs, rhs, func_mod):
-        # check for axis=1
-        if not (len(rhs.kws) == 1 and rhs.kws[0][0] == 'axis'
-                and get_constant(self.func_ir, rhs.kws[0][1]) == 1):
-            raise ValueError("only apply() with axis=1 supported")
-
-        if len(rhs.args) != 1:
-            raise ValueError("lambda arg to apply() expected")
-
-        # get apply function
-        func = guard(get_definition, self.func_ir, rhs.args[0])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for apply not found")
-
-        _globals = self.func_ir.func_id.func.__globals__
-        col_names = self._get_df_col_names(func_mod)
-
-        # find columns that are actually used if possible
-        used_cols = []
-        lambda_ir = compile_to_numba_ir(func, _globals)
-        l_topo_order = find_topo_order(lambda_ir.blocks)
-        first_stmt = lambda_ir.blocks[l_topo_order[0]].body[0]
-        assert isinstance(first_stmt, ir.Assign) and isinstance(first_stmt.value, ir.Arg)
-        arg_var = first_stmt.target
-        use_all_cols = False
-        for bl in lambda_ir.blocks.values():
-            for stmt in bl.body:
-                vnames = [v.name for v in stmt.list_vars()]
-                if arg_var.name in vnames:
-                    if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Arg):
-                        continue
-                    if (isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr)
-                            and stmt.value.op == 'getattr'):
-                        assert stmt.value.attr in col_names
-                        used_cols.append(stmt.value.attr)
-                    else:
-                        # argument is used in some other form
-                        # be conservative and use all cols
-                        use_all_cols = True
-                        used_cols = col_names
-                        break
-
-            if use_all_cols:
-                break
-
-        # remove duplicates with set() since a column can be used multiple times
-        used_cols = set(used_cols)
-        Row = namedtuple(_sanitize_varname(func_mod.name), used_cols)
-        # TODO: handle non numpy alloc types
-        # prange func to inline
-        col_name_args = ', '.join(["c"+str(i) for i in range(len(used_cols))])
-        row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(used_cols))])
-
-        func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  numba.parfor.init_prange()\n"
-        func_text += "  n = len(c0)\n"
-        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
-        func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        func_text += "     row = Row({})\n".format(row_args)
-        func_text += "     S[i] = map_func(row)\n"
-        func_text += "  return S\n"
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'Row': Row})
-        # fix definitions to enable finding sentinel
-        f_ir._definitions = build_definitions(f_ir.blocks)
-        topo_order = find_topo_order(f_ir.blocks)
-
-        # find sentinel function and replace with user func
-        for l in topo_order:
-            block = f_ir.blocks[l]
-            for i, stmt in enumerate(block.body):
-                if (isinstance(stmt, ir.Assign)
-                        and isinstance(stmt.value, ir.Expr)
-                        and stmt.value.op == 'call'):
-                    fdef = guard(get_definition, f_ir, stmt.value.func)
-                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
-                        inline_closure_call(f_ir, _globals, block, i, func)
-                        break
-
-        df_col_map = self._get_df_cols(func_mod)
-        col_vars = [df_col_map[c] for c in used_cols]
-        replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
-        return f_ir.blocks
 
     def _handle_df_describe(self, assign, lhs, rhs, func_mod):
         """translate df.describe() call with no input or just include='all'

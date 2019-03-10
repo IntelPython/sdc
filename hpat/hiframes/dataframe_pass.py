@@ -20,7 +20,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-    is_whole_slice, is_array, is_assign)
+    is_whole_slice, is_array, is_assign, sanitize_varname)
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
@@ -584,7 +584,102 @@ class DataFramePass(object):
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
 
+        # df.apply(lambda a:..., axis=1)
+        if func_name == 'apply':
+            return self._run_call_dataframe_apply(assign, lhs, rhs, df_var)
+
         return [assign]
+
+    def _run_call_dataframe_apply(self, assign, lhs, rhs, df_var):
+        df_typ = self.typemap[df_var.name]
+        # get apply function
+        kws = dict(rhs.kws)
+        func_var = self._get_arg('apply', rhs.args, kws, 0, 'func')
+        func = guard(get_definition, self.func_ir, func_var)
+        # TODO: get globals directly from passed lambda if possible?
+        _globals = self.func_ir.func_id.func.__globals__
+        lambda_ir = compile_to_numba_ir(func, _globals)
+
+        # find columns that are actually used if possible
+        used_cols = []
+        l_topo_order = find_topo_order(lambda_ir.blocks)
+        first_stmt = lambda_ir.blocks[l_topo_order[0]].body[0]
+        assert isinstance(first_stmt, ir.Assign) and isinstance(first_stmt.value, ir.Arg)
+        arg_var = first_stmt.target
+        use_all_cols = False
+        for bl in lambda_ir.blocks.values():
+            for stmt in bl.body:
+                vnames = [v.name for v in stmt.list_vars()]
+                if arg_var.name in vnames:
+                    if isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Arg):
+                        continue
+                    if (isinstance(stmt, ir.Assign) and isinstance(stmt.value, ir.Expr)
+                            and stmt.value.op == 'getattr'):
+                        assert stmt.value.attr in df_typ.columns
+                        used_cols.append(stmt.value.attr)
+                    else:
+                        # argument is used in some other form
+                        # be conservative and use all cols
+                        use_all_cols = True
+                        used_cols = df_typ.columns
+                        break
+
+            if use_all_cols:
+                break
+
+        # remove duplicates with set() since a column can be used multiple times
+        used_cols = set(used_cols)
+        Row = namedtuple(sanitize_varname(df_var.name), used_cols)
+        # TODO: handle non numpy alloc types
+        # prange func to inline
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(used_cols))])
+        row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(used_cols))])
+
+        func_text = "def f({}):\n".format(col_name_args)
+        func_text += "  numba.parfor.init_prange()\n"
+        func_text += "  n = len(c0)\n"
+        func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
+        func_text += "  for i in numba.parfor.internal_prange(n):\n"
+        func_text += "     row = Row({})\n".format(row_args)
+        func_text += "     S[i] = map_func(row)\n"
+        func_text += "  return hpat.hiframes.api.init_series(S)\n"
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        f_ir = compile_to_numba_ir(
+            f, {'numba': numba, 'np': np, 'Row': Row, 'hpat': hpat})
+        # fix definitions to enable finding sentinel
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        topo_order = find_topo_order(f_ir.blocks)
+
+        # find sentinel function and replace with user func
+        for l in topo_order:
+            block = f_ir.blocks[l]
+            for i, stmt in enumerate(block.body):
+                if (isinstance(stmt, ir.Assign)
+                        and isinstance(stmt.value, ir.Expr)
+                        and stmt.value.op == 'call'):
+                    fdef = guard(get_definition, f_ir, stmt.value.func)
+                    if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        inline_closure_call(f_ir, _globals, block, i, func)
+                        # fix the global value to avoid typing errors
+                        fdef.value = 1
+                        fdef.name = 'A'
+                        break
+
+        arg_typs = tuple(df_typ.data[df_typ.columns.index(c)] for c in used_cols)
+        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+                    self.typingctx, f_ir, arg_typs, None)
+        self.typemap.update(f_typemap)
+        self.calltypes.update(f_calltypes)
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in used_cols]
+        replace_arg_nodes(f_ir.blocks[topo_order[0]], col_vars)
+        f_ir.blocks[topo_order[0]].body = nodes + f_ir.blocks[topo_order[0]].body
+        return f_ir.blocks
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe

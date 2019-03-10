@@ -1,4 +1,5 @@
 import operator
+from collections import namedtuple
 import pandas as pd
 import numpy as np
 import numba
@@ -130,6 +131,30 @@ class DataFrameAttribute(AttributeTemplate):
         stack_sig = self.context.resolve_function_type(
             np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
         return stack_sig.return_type
+
+    @bound_function("df.apply")
+    def resolve_apply(self, df, args, kws):
+        kws = dict(kws)
+        func = args[0] if len(args) > 0 else kws.get('func', None)
+        # check lambda
+        if not isinstance(func, types.MakeFunctionLiteral):
+            raise ValueError("df.apply(): lambda not found")
+
+        # check axis
+        axis = args[1] if len(args) > 1 else kws.get('axis', None)
+        if (axis is None or not isinstance(axis, types.IntegerLiteral)
+                or axis.literal_value != 1):
+            raise ValueError("only apply() with axis=1 supported")
+
+        # using NamedTuple instead of Series, TODO: pass Series
+        Row = namedtuple('R', df.columns)
+        dtype = types.NamedTuple([a.dtype for a in df.data], Row)
+        code = func.literal_value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        _, f_return_type, _ = numba.compiler.type_inference_stage(
+                self.context, f_ir, (dtype,), None)
+
+        return signature(SeriesType(f_return_type), *args)
 
     def generic_resolve(self, df, attr):
         if attr in df.columns:

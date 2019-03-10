@@ -451,6 +451,9 @@ def gen_getitem(out_var, in_var, ind, calltypes, nodes):
     calltypes[getitem] = None
     nodes.append(ir.Assign(getitem, out_var, loc))
 
+def sanitize_varname(varname):
+    return varname.replace('$', '_').replace('.', '_')
+
 def is_call_assign(stmt):
     return (isinstance(stmt, ir.Assign)
             and isinstance(stmt.value, ir.Expr)
