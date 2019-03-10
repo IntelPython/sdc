@@ -764,6 +764,8 @@ class SetDfColInfer(AbstractTemplate):
 
         if isinstance(target, DataFrameType):
             new_cols = target.columns + (ind,)
+            if isinstance(val, SeriesType):
+                val = val.data
             new_typs = target.data + (val,)
             ret = DataFrameType(
                 new_typs, target.index, new_cols, target.has_parent)

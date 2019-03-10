@@ -531,6 +531,27 @@ class HiFramesTyped(object):
         if fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
             return [assign]
 
+        # XXX sometimes init_dataframe() can't be resolved in dataframe_pass
+        # and there are get_dataframe_data() calls that could be optimized
+        # example: test_sort_parallel
+        if fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext'):
+            df_var = rhs.args[0]
+            df_typ = self.typemap[df_var.name]
+            ind = guard(find_const, self.func_ir, rhs.args[1])
+            var_def = guard(get_definition, self.func_ir, df_var)
+            call_def = guard(find_callname, self.func_ir, var_def)
+            if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
+                assign.value = var_def.args[ind]
+
+        if fdef == ('get_dataframe_index', 'hpat.hiframes.pd_dataframe_ext'):
+            df_var = rhs.args[0]
+            df_typ = self.typemap[df_var.name]
+            n_cols = len(df_typ.columns)
+            var_def = guard(get_definition, self.func_ir, df_var)
+            call_def = guard(find_callname, self.func_ir, var_def)
+            if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
+                assign.value = var_def.args[n_cols]
+
         # convert Series to Array for unhandled calls
         # TODO check all the functions that get here and handle if necessary
         nodes = []
