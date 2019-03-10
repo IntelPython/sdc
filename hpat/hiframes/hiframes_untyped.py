@@ -366,10 +366,6 @@ class HiFrames(object):
 
     def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
 
-        # df.describe()
-        if func_name == 'describe':
-            return self._handle_df_describe(assign, lhs, rhs, df_var)
-
         # df.sort_values()
         if func_name == 'sort_values':
             return self._handle_df_sort_values(assign, lhs, rhs, df_var, label)
@@ -1010,59 +1006,6 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
         return nodes, df_cols
-
-    def _handle_df_describe(self, assign, lhs, rhs, func_mod):
-        """translate df.describe() call with no input or just include='all'
-        """
-        # check for no arg or just include='all'
-        if not (len(rhs.args) == 0 and (len(rhs.kws) == 0 or (len(rhs.kws) == 1
-                and rhs.kws[0][0] == 'include'
-                and get_constant(self.func_ir, rhs.kws[0][1]) == 'all'))):
-            raise ValueError("only describe() with include='all' supported")
-
-        col_names = self._get_df_col_names(func_mod)
-        col_name_args = ["c"+str(i) for i in range(len(col_names))]
-        # TODO: pandas returns dataframe, maybe return namedtuple instread of
-        # string?
-
-        func_text = "def f({}):\n".format(', '.join(col_name_args))
-        # compute stat values
-        for c in col_name_args:
-            func_text += "  {}_count = np.float64({}.count())\n".format(c, c)
-            func_text += "  {}_min = {}.min()\n".format(c, c)
-            func_text += "  {}_max = {}.max()\n".format(c, c)
-            func_text += "  {}_mean = {}.mean()\n".format(c, c)
-            func_text += "  {}_std = {}.var()**0.5\n".format(c, c)
-            func_text += "  {}_q25 = {}.quantile(.25)\n".format(c, c)
-            func_text += "  {}_q50 = {}.quantile(.5)\n".format(c, c)
-            func_text += "  {}_q75 = {}.quantile(.75)\n".format(c, c)
-
-
-        col_header = "      ".join([c for c in col_names])
-        func_text += "  return '        {}\\n' + \\\n".format(col_header)
-        count_strs = "+ '   ' + ".join(["str({}_count)".format(c) for c in col_name_args])
-        func_text += "   'count   ' + {} + '\\n' + \\\n".format(count_strs)
-        mean_strs = "+ '   ' + ".join(["str({}_mean)".format(c) for c in col_name_args])
-        func_text += "   'mean    ' + {} + '\\n' + \\\n".format(mean_strs)
-        std_strs = "+ '   ' + ".join(["str({}_std)".format(c) for c in col_name_args])
-        func_text += "   'std     ' + {} + '\\n' + \\\n".format(std_strs)
-        min_strs = "+ '   ' + ".join(["str({}_min)".format(c) for c in col_name_args])
-        func_text += "   'min     ' + {} + '\\n' + \\\n".format(min_strs)
-        q25_strs = "+ '   ' + ".join(["str({}_q25)".format(c) for c in col_name_args])
-        func_text += "   '25%     ' + {} + '\\n' + \\\n".format(q25_strs)
-        q50_strs = "+ '   ' + ".join(["str({}_q50)".format(c) for c in col_name_args])
-        func_text += "   '50%     ' + {} + '\\n' + \\\n".format(q50_strs)
-        q75_strs = "+ '   ' + ".join(["str({}_q75)".format(c) for c in col_name_args])
-        func_text += "   '75%     ' + {} + '\\n' + \\\n".format(q75_strs)
-        max_strs = "+ '   ' + ".join(["str({}_max)".format(c) for c in col_name_args])
-        func_text += "   'max     ' + {}\n".format(max_strs)
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        col_vars = self._get_df_col_vars(func_mod)
-        return self._replace_func(f, col_vars)
 
     def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
         kws = dict(rhs.kws)

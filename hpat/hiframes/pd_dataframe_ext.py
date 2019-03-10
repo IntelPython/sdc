@@ -156,6 +156,12 @@ class DataFrameAttribute(AttributeTemplate):
 
         return signature(SeriesType(f_return_type), *args)
 
+    @bound_function("df.describe")
+    def resolve_describe(self, df, args, kws):
+        # TODO: use overload
+        # TODO: return proper series output
+        return signature(string_type, *args)
+
     def generic_resolve(self, df, attr):
         if attr in df.columns:
             ind = df.columns.index(attr)

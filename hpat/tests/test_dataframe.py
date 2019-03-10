@@ -376,6 +376,20 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    def test_df_describe(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
+                               'B': np.arange(n)})
+            #df.A[0:1] = np.nan
+            return df.describe()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        hpat_func(n)
+        # XXX: test actual output
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
