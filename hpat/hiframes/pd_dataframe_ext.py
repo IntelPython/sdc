@@ -693,3 +693,71 @@ def lower_concat_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'sort_values')
+def sort_values_overload(df, by, axis=0, ascending=True, inplace=False,
+        kind='quicksort', na_position='last'):
+
+    def _impl(df, by, axis=0, ascending=True, inplace=False, kind='quicksort',
+            na_position='last'):
+
+        return hpat.hiframes.pd_dataframe_ext.sort_values_dummy(
+            df, by, ascending, inplace)
+
+    return _impl
+
+
+def sort_values_dummy(df, by, ascending, inplace):
+    return df.sort_values(by, ascending=ascending, inplace=inplace)
+
+
+@infer_global(sort_values_dummy)
+class SortDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        df, by, ascending, inplace = args
+
+        # inplace value
+        if isinstance(inplace, hpat.utils.BooleanLiteral):
+            inplace = inplace.literal_value
+        else:
+            # XXX inplace type is just bool when value not passed. Therefore,
+            # we assume the default False value.
+            # TODO: more robust fix or just check
+            inplace = False
+
+        ret_typ = df.copy()
+        if inplace:
+            ret_typ = types.none
+        return signature(ret_typ, *args)
+
+
+# dummy lowering to avoid overload errors, remove after overload inline PR
+# is merged
+@lower_builtin(sort_values_dummy, types.VarArg(types.Any))
+def lower_sort_values_dummy(context, builder, sig, args):
+    if sig.return_type == types.none:
+        return
+
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
+
+
+# dummy function to change the df type to have set_parent=True
+# used in sort_values(inplace=True) hack
+def set_parent_dummy(df):
+    return df
+
+@infer_global(set_parent_dummy)
+class ParentDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        df, = args
+        ret = DataFrameType(df.data, df.index, df.columns, True)
+        return signature(ret, *args)
+
+@lower_builtin(set_parent_dummy, types.VarArg(types.Any))
+def lower_set_parent_dummy(context, builder, sig, args):
+    return impl_ret_borrowed(context, builder, sig.return_type, args[0])

@@ -543,6 +543,9 @@ class DataFramePass(object):
                 and isinstance(self.typemap[lhs.name], DataFrameType)):
             return self._run_call_concat(assign, lhs, rhs)
 
+        if fdef == ('sort_values_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_sort_values(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -591,6 +594,20 @@ class DataFramePass(object):
         # df.describe()
         if func_name == 'describe':
             return self._handle_df_describe(assign, lhs, rhs, df_var)
+
+        # df.sort_values()
+        if func_name == 'sort_values':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.sort_values_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, by, axis=0, ascending=True, inplace=False,
+                    kind='quicksort', na_position='last': None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
 
         return [assign]
 
@@ -739,6 +756,91 @@ class DataFramePass(object):
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
         return self._replace_func(f, col_vars, pre_nodes=nodes)
+
+
+    def _run_call_df_sort_values(self, assign, lhs, rhs):
+        df_var, by_var, ascending_var, inplace_var = rhs.args
+        df_typ = self.typemap[df_var.name]
+        ascending = guard(find_const, self.func_ir, ascending_var)
+        inplace = guard(find_const, self.func_ir, inplace_var)
+
+        # find key array for sort ('by' arg)
+        key_names = self._get_const_or_list(by_var)
+
+        if any(k not in df_typ.columns for k in key_names):
+            raise ValueError("invalid sort keys {}".format(key_names))
+
+        nodes = []
+        in_vars = {c: self._get_dataframe_data(df_var, c, nodes)
+                            for c in df_typ.columns}
+
+        # remove key from dfs (only data is kept)
+        in_key_arrs = [in_vars.pop(c) for c in key_names]
+
+        out_key_vars = in_key_arrs.copy()
+        out_vars = in_vars.copy()
+        if not inplace:
+            out_key_vars = []
+            out_vars = {}
+            for k in df_typ.columns:
+                out_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
+                ind = df_typ.columns.index(k)
+                self.typemap[out_var.name] = df_typ.data[ind]
+                out_vars[k] = out_var
+            for k in key_names:
+                out_key_vars.append(out_vars.pop(k))
+
+        nodes.append(hiframes.sort.Sort(df_var.name, lhs.name, in_key_arrs, out_key_vars,
+                                      in_vars, out_vars, inplace, lhs.loc, ascending))
+
+        _init_df = _gen_init_df(df_typ.columns)
+
+        # XXX the order of output variables passed should match out_typ.columns
+        out_arrs = []
+        for c in df_typ.columns:
+            if c in key_names:
+                ind = key_names.index(c)
+                out_arrs.append(out_key_vars[ind])
+            else:
+                out_arrs.append(out_vars[c])
+
+        if not inplace:
+            return self._replace_func(_init_df, out_arrs,
+                pre_nodes=nodes)
+        else:
+            # TODO: refcounted df data object is needed for proper inplace
+            # also, boxed dfs need to be updated
+            # HACK assign output df back to input df variables
+            # TODO CFG backbone?
+            arg_typs = tuple(self.typemap[v.name] for v in out_arrs)
+            f_block = compile_to_numba_ir(_init_df,
+                {'hpat': hpat},
+                self.typingctx,
+                arg_typs,
+                self.typemap,
+                self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, out_arrs)
+            nodes += f_block.body[:-2]
+            new_df = nodes[-1].target
+
+            if df_typ.has_parent:
+                # XXX fix the output type using dummy call to set_parent=True
+                f_block = compile_to_numba_ir(
+                    lambda df: hpat.hiframes.pd_dataframe_ext.set_parent_dummy(df),
+                    {'hpat': hpat},
+                    self.typingctx,
+                    (self.typemap[new_df.name],),
+                    self.typemap,
+                    self.calltypes).blocks.popitem()[1]
+                replace_arg_nodes(f_block, [new_df])
+                nodes += f_block.body[:-2]
+                new_df = nodes[-1].target
+
+            for other_df_var in self.func_ir._definitions[df_var.name]:
+                if isinstance(other_df_var, ir.Var):
+                    nodes.append(ir.Assign(new_df, other_df_var, lhs.loc))
+            ir.Assign(new_df, df_var, lhs.loc)
+            return nodes
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe

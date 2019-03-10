@@ -366,10 +366,6 @@ class HiFrames(object):
 
     def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
 
-        # df.sort_values()
-        if func_name == 'sort_values':
-            return self._handle_df_sort_values(assign, lhs, rhs, df_var, label)
-
         # df.itertuples()
         if func_name == 'itertuples':
             return self._handle_df_itertuples(assign, lhs, rhs, df_var)
@@ -1006,39 +1002,6 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
         return nodes, df_cols
-
-    def _handle_df_sort_values(self, assign, lhs, rhs, df, label):
-        kws = dict(rhs.kws)
-        # find key array for sort ('by' arg)
-        by_arg = self._get_arg('sort_values', rhs.args, kws, 0, 'by')
-        err_msg = ("'by' argument is required for sort_values() "
-                             "which should be a constant string")
-        key_names = self._get_str_or_list(by_arg, err_msg=err_msg)
-
-        inplace = False
-        if 'inplace' in kws and guard(find_const, self.func_ir, kws['inplace']) == True:
-            inplace = True
-
-        # TODO: support ascending=False
-
-        out = []
-        in_df = self._get_df_cols(df).copy()  # copy since it'll be modified
-        out_df = in_df.copy()
-        if not inplace:
-            out_df = {cname: ir.Var(lhs.scope, mk_unique_var(v.name), lhs.loc)
-                                                for cname, v in in_df.items()}
-            self._create_df(lhs.name, out_df.copy(), label)
-
-        if any(k not in in_df for k in key_names):
-            raise ValueError("invalid sort keys {}".format(key_names))
-
-        # remove key from dfs (only data is kept)
-        key_vars = [in_df.pop(k) for k in key_names]
-        out_key_vars = [out_df.pop(k) for k in key_names]
-
-        out.append(sort.Sort(df.name, lhs.name, key_vars, out_key_vars,
-                                      in_df, out_df, inplace, lhs.loc))
-        return out
 
     def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
         """pass df column names and variables to get_itertuples() to be able

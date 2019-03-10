@@ -1,4 +1,6 @@
 import unittest
+import random
+import string
 import pandas as pd
 import numpy as np
 
@@ -389,6 +391,116 @@ class TestDataFrame(unittest.TestCase):
         # XXX: test actual output
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_sort_values(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.B.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_values_copy(self):
+        def test_impl(df):
+            df2 = df.sort_values('A')
+            return df2.B.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_values_single_col(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.A.values
+
+        n = 1211
+        np.random.seed(2)
+        df = pd.DataFrame({'A': np.random.ranf(n)})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
+
+    def test_sort_values_single_col_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.A.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+        df = pd.DataFrame({'A': str_vals})
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df.copy()) == test_impl(df)).all())
+
+    def test_sort_values_str(self):
+        def test_impl(df):
+            df.sort_values('A', inplace=True)
+            return df.B.values
+
+        n = 1211
+        random.seed(2)
+        str_vals = []
+        str_vals2 = []
+
+        for i in range(n):
+            k = random.randint(1, 30)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals.append(val)
+            val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
+            str_vals2.append(val)
+
+        df = pd.DataFrame({'A': str_vals, 'B': str_vals2})
+        # use mergesort for stability, in str generation equal keys are more probable
+        sorted_df = df.sort_values('A', inplace=False, kind='mergesort')
+        hpat_func = hpat.jit(test_impl)
+        self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
+
+    def test_sort_parallel_single_col(self):
+        # TODO: better parallel sort test
+        def test_impl():
+            df = pd.read_parquet('kde.parquet')
+            df.sort_values('points', inplace=True)
+            res = df.points.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
+
+        save_min_samples = hpat.hiframes.sort.MIN_SAMPLES
+        try:
+            hpat.hiframes.sort.MIN_SAMPLES = 10
+            res = hpat_func()
+            self.assertTrue((np.diff(res)>=0).all())
+        finally:
+            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
+
+    def test_sort_parallel(self):
+        # TODO: better parallel sort test
+        def test_impl():
+            df = pd.read_parquet('kde.parquet')
+            df['A'] = df.points.astype(np.float64)
+            df.sort_values('points', inplace=True)
+            res = df.A.values
+            return res
+
+        hpat_func = hpat.jit(locals={'res:return': 'distributed'})(test_impl)
+
+        save_min_samples = hpat.hiframes.sort.MIN_SAMPLES
+        try:
+            hpat.hiframes.sort.MIN_SAMPLES = 10
+            res = hpat_func()
+            self.assertTrue((np.diff(res)>=0).all())
+        finally:
+            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
 
 
 if __name__ == "__main__":
