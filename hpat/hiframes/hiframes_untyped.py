@@ -384,10 +384,6 @@ class HiFrames(object):
         if func_name == 'fillna':
             return self._handle_df_fillna(lhs, rhs, df_var, label)
 
-        # df.dropna()
-        if func_name == 'dropna':
-            return self._handle_df_dropna(lhs, rhs, df_var, label)
-
         # df.drop()
         if func_name == 'drop':
             return self._handle_df_drop(lhs, rhs, df_var, label)

@@ -555,6 +555,9 @@ class DataFramePass(object):
         if fdef == ('fillna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_fillna(assign, lhs, rhs)
 
+        if fdef == ('dropna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_dropna(assign, lhs, rhs)
+
         if fdef == ('reset_index_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_reset_index(assign, lhs, rhs)
 
@@ -654,6 +657,19 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, value=None, method=None, axis=None,
                     inplace=False, limit=None, downcast=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'dropna':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.dropna_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, axis=0, how='any', thresh=None, subset=None,
+                    inplace=False: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -955,6 +971,50 @@ class DataFramePass(object):
         else:
             return self._set_df_inplace(
                 _fillna_impl, args, df_var, lhs.loc, nodes)
+
+    def _run_call_df_dropna(self, assign, lhs, rhs):
+        df_var = rhs.args[0]
+        inplace_var = rhs.args[1]
+        inplace = guard(find_const, self.func_ir, inplace_var)
+        df_typ = self.typemap[df_var.name]
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+
+        n_cols = len(df_typ.columns)
+        arg_names = ", ".join('data'+str(i) for i in range(n_cols))
+        out_names = ", ".join('out'+str(i) for i in range(n_cols))
+
+        func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
+        func_text += "  ({},) = hpat.hiframes.api.dropna(({},), inplace)\n".format(
+            out_names, arg_names)
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _dropna_imp = loc_vars['_dropna_imp']
+
+        f_block = compile_to_numba_ir(_dropna_imp,
+            {'hpat': hpat},
+            self.typingctx,
+            df_typ.data + (self.typemap[inplace_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, col_vars + [inplace_var])
+        nodes += f_block.body[:-3]
+
+
+        # extract column vars from output
+        out_cols = []
+        for i in range(n_cols):
+            out_cols.append(nodes[-n_cols+i].target)
+
+        _init_df = _gen_init_df(df_typ.columns)
+
+        if not inplace:
+            return self._replace_func(_init_df, out_cols, pre_nodes=nodes)
+        else:
+            return self._set_df_inplace(
+                _init_df, out_cols, df_var, lhs.loc, nodes)
 
     def _run_call_reset_index(self, assign, lhs, rhs):
         # TODO: reflection, drop=False semantics
