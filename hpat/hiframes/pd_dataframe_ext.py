@@ -793,3 +793,30 @@ def lower_itertuples_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'head')
+def head_overload(df, n=5):
+
+    # TODO: avoid dummy and generate func here when inlining is possible
+    def _impl(df, n=5):
+        return hpat.hiframes.pd_dataframe_ext.head_dummy(df, n)
+
+    return _impl
+
+def head_dummy(df, n):
+    return df
+
+@infer_global(head_dummy)
+class HeadDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df = args[0]
+        # copy type to sethas_parent False, TODO: data always copied?
+        out_df = DataFrameType(df.data, df.index, df.columns)
+        return signature(out_df, *args)
+
+@lower_builtin(head_dummy, types.VarArg(types.Any))
+def lower_head_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()

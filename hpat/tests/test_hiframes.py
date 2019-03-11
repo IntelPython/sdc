@@ -43,15 +43,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    def test_df_head1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.head(3)
-
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
-
     def test_getitem_bool_series(self):
         def test_impl(df):
             return df['A'][df['B']].values
