@@ -552,6 +552,9 @@ class DataFramePass(object):
         if fdef == ('head_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_head(assign, lhs, rhs)
 
+        if fdef == ('fillna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_fillna(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -635,6 +638,19 @@ class DataFramePass(object):
             impl = hpat.hiframes.pd_dataframe_ext.head_overload(
                 *arg_typs, **kw_typs)
             stub = (lambda df, n=5: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'fillna':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.fillna_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, value=None, method=None, axis=None,
+                    inplace=False, limit=None, downcast=None: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -838,39 +854,7 @@ class DataFramePass(object):
             return self._replace_func(_init_df, out_arrs,
                 pre_nodes=nodes)
         else:
-            # TODO: refcounted df data object is needed for proper inplace
-            # also, boxed dfs need to be updated
-            # HACK assign output df back to input df variables
-            # TODO CFG backbone?
-            arg_typs = tuple(self.typemap[v.name] for v in out_arrs)
-            f_block = compile_to_numba_ir(_init_df,
-                {'hpat': hpat},
-                self.typingctx,
-                arg_typs,
-                self.typemap,
-                self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, out_arrs)
-            nodes += f_block.body[:-2]
-            new_df = nodes[-1].target
-
-            if df_typ.has_parent:
-                # XXX fix the output type using dummy call to set_parent=True
-                f_block = compile_to_numba_ir(
-                    lambda df: hpat.hiframes.pd_dataframe_ext.set_parent_dummy(df),
-                    {'hpat': hpat},
-                    self.typingctx,
-                    (self.typemap[new_df.name],),
-                    self.typemap,
-                    self.calltypes).blocks.popitem()[1]
-                replace_arg_nodes(f_block, [new_df])
-                nodes += f_block.body[:-2]
-                new_df = nodes[-1].target
-
-            for other_df_var in self.func_ir._definitions[df_var.name]:
-                if isinstance(other_df_var, ir.Var):
-                    nodes.append(ir.Assign(new_df, other_df_var, lhs.loc))
-            ir.Assign(new_df, df_var, lhs.loc)
-            return nodes
+            return self._set_df_inplace(_init_df, out_arrs, df_var, lhs.loc, nodes)
 
     def _run_call_df_itertuples(self, assign, lhs, rhs):
         """pass df column names and variables to get_itertuples() to be able
@@ -919,6 +903,42 @@ class DataFramePass(object):
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
         return self._replace_func(_head_impl, col_vars + [n], pre_nodes=nodes)
+
+    def _run_call_df_fillna(self, assign, lhs, rhs):
+        df_var = rhs.args[0]
+        value = rhs.args[1]
+        inplace_var = rhs.args[2]
+        inplace = guard(find_const, self.func_ir, inplace_var)
+        df_typ = self.typemap[df_var.name]
+
+        # impl: for each column, convert data to series, call S.fillna(), get
+        # output data and create a new dataframe
+        n_cols = len(df_typ.columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _fillna_impl({}, val):\n".format(", ".join(data_args))
+        for d in data_args:
+            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(d+'_S', d)
+            if not inplace:
+                func_text += "  {} = {}.fillna(val)\n".format(d+'_S', d+'_S')
+            else:
+                func_text += "  {}.fillna(val, inplace=True)\n".format(d+'_S')
+            func_text += "  {} = hpat.hiframes.api.get_series_data({})\n".format(d+'_O', d+'_S')
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            ", ".join(d+'_O' for d in data_args),
+            ", ".join("'{}'".format(c) for c in df_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _fillna_impl = loc_vars['_fillna_impl']
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        args = col_vars + [value]
+        if not inplace:
+            return self._replace_func(_fillna_impl, args, pre_nodes=nodes)
+        else:
+            return self._set_df_inplace(
+                _fillna_impl, args, df_var, lhs.loc, nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe
@@ -1426,6 +1446,42 @@ class DataFramePass(object):
             if tup_def.op in ('build_tuple', 'build_list'):
                 return tup_def.items
         raise ValueError("constant tuple expected")
+
+    def _set_df_inplace(self, _init_df, out_arrs, df_var, loc, nodes):
+        # TODO: refcounted df data object is needed for proper inplace
+        # also, boxed dfs need to be updated
+        # HACK assign output df back to input df variables
+        # TODO CFG backbone?
+        df_typ = self.typemap[df_var.name]
+        arg_typs = tuple(self.typemap[v.name] for v in out_arrs)
+        f_block = compile_to_numba_ir(_init_df,
+            {'hpat': hpat},
+            self.typingctx,
+            arg_typs,
+            self.typemap,
+            self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, out_arrs)
+        nodes += f_block.body[:-2]
+        new_df = nodes[-1].target
+
+        if df_typ.has_parent:
+            # XXX fix the output type using dummy call to set_parent=True
+            f_block = compile_to_numba_ir(
+                lambda df: hpat.hiframes.pd_dataframe_ext.set_parent_dummy(df),
+                {'hpat': hpat},
+                self.typingctx,
+                (self.typemap[new_df.name],),
+                self.typemap,
+                self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, [new_df])
+            nodes += f_block.body[:-2]
+            new_df = nodes[-1].target
+
+        for other_df_var in self.func_ir._definitions[df_var.name]:
+            if isinstance(other_df_var, ir.Var):
+                nodes.append(ir.Assign(new_df, other_df_var, loc))
+        ir.Assign(new_df, df_var, loc)
+        return nodes
 
     def _get_dataframe_data(self, df_var, col_name, nodes):
         # optimization: return data var directly if not ambiguous

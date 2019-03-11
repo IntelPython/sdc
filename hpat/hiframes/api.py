@@ -1214,7 +1214,9 @@ class AddConstsTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         ret_typ = args[0]
-        ret_typ.consts = tuple(v.literal_value for v in args[1:])
+        # TODO: FloatLiteral e.g. test_fillna
+        if all(isinstance(v, types.Literal) for v in args[1:]):
+            ret_typ.consts = tuple(v.literal_value for v in args[1:])
         return signature(ret_typ, *args)
 
 @lower_builtin(add_consts_to_type, types.VarArg(types.Any))

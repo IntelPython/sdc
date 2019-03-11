@@ -73,32 +73,6 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    def test_df_fillna1(self):
-        def test_impl(df):
-            return df.fillna(5.0)
-
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
-        hpat_func = hpat.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_df_fillna_str1(self):
-        def test_impl(df):
-            return df.fillna("dd")
-
-        df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
-        hpat_func = hpat.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_df_fillna_inplace1(self):
-        def test_impl(A):
-            A.fillna(11.0, inplace=True)
-            return A
-
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
-        df2 = df.copy()
-        hpat_func = hpat.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
-
     def test_df_dropna1(self):
         def test_impl(df):
             return df.dropna()

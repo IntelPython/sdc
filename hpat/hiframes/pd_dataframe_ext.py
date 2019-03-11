@@ -820,3 +820,45 @@ def lower_head_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'fillna')
+def fillna_overload(df, value=None, method=None, axis=None, inplace=False,
+        limit=None, downcast=None):
+    # TODO: handle possible **kwargs options?
+
+    # TODO: avoid dummy and generate func here when inlining is possible
+    # TODO: inplace of df with parent that has a string column (reflection)
+    def _impl(df, value=None, method=None, axis=None, inplace=False,
+            limit=None, downcast=None):
+        return hpat.hiframes.pd_dataframe_ext.fillna_dummy(df, value, inplace)
+
+    return _impl
+
+def fillna_dummy(df, n):
+    return df
+
+@infer_global(fillna_dummy)
+class FillnaDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df, value, inplace = args
+        # inplace value
+        if isinstance(inplace, hpat.utils.BooleanLiteral):
+            inplace = inplace.literal_value
+        else:
+            # XXX inplace type is just bool when value not passed. Therefore,
+            # we assume the default False value.
+            # TODO: more robust fix or just check
+            inplace = False
+
+        if not inplace:
+            # copy type to sethas_parent False, TODO: data always copied?
+            out_df = DataFrameType(df.data, df.index, df.columns)
+            return signature(out_df, *args)
+        return signature(types.none, *args)
+
+@lower_builtin(fillna_dummy, types.VarArg(types.Any))
+def lower_fillna_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
