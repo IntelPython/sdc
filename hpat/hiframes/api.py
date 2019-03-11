@@ -1354,6 +1354,13 @@ class DataFrameTupleIteratorModel(models.StructModel):
             + [('array{}'.format(i), arr) for i, arr in enumerate(fe_type.array_types[1:])])
         super(DataFrameTupleIteratorModel, self).__init__(dmm, fe_type, members)
 
+    def from_return(self, builder, value):
+        # dummy to avoid lowering error for itertuples_overload
+        # TODO: remove when overload_method can avoid lowering or avoid cpython
+        # wrapper
+        return value
+
+
 @lower_builtin(get_itertuples, types.VarArg(types.Any))
 def get_itertuples_impl(context, builder, sig, args):
     arrays = args[len(args)//2:]

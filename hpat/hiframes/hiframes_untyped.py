@@ -368,10 +368,6 @@ class HiFrames(object):
 
     def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
 
-        # df.itertuples()
-        if func_name == 'itertuples':
-            return self._handle_df_itertuples(assign, lhs, rhs, df_var)
-
         # df.pivot_table()
         if func_name == 'pivot_table':
             return self._handle_df_pivot_table(lhs, rhs, df_var, label)
@@ -1004,27 +1000,6 @@ class HiFrames(object):
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
         return nodes, df_cols
-
-    def _handle_df_itertuples(self, assign, lhs, rhs, df_var):
-        """pass df column names and variables to get_itertuples() to be able
-        to create the iterator.
-        e.g. get_itertuples("A", "B", A_arr, B_arr)
-        """
-        col_names = self._get_df_col_names(df_var)
-
-        col_name_args = ', '.join(["c"+str(i) for i in range(len(col_names))])
-        name_consts = ', '.join(["'{}'".format(c) for c in col_names])
-
-        func_text = "def f({}):\n".format(col_name_args)
-        func_text += "  return hpat.hiframes.api.get_itertuples({}, {})\n"\
-                                            .format(name_consts, col_name_args)
-
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        f = loc_vars['f']
-
-        col_vars = self._get_df_col_vars(df_var)
-        return self._replace_func(f, col_vars)
 
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference

@@ -761,3 +761,35 @@ class ParentDummyTyper(AbstractTemplate):
 @lower_builtin(set_parent_dummy, types.VarArg(types.Any))
 def lower_set_parent_dummy(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+
+# TODO: jitoptions for overload_method and infer_global
+# (no_cpython_wrapper to avoid error for iterator object)
+@overload_method(DataFrameType, 'itertuples')
+def itertuples_overload(df, index=True, name='Pandas'):
+
+    def _impl(df, index=True, name='Pandas'):
+        return hpat.hiframes.pd_dataframe_ext.itertuples_dummy(df)
+
+    return _impl
+
+def itertuples_dummy(df):
+    return df
+
+@infer_global(itertuples_dummy)
+class ItertuplesDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        df, = args
+        # XXX index handling, assuming implicit index
+        assert "Index" not in df.columns
+        columns = ('Index',) + df.columns
+        arr_types = (types.Array(types.int64, 1, 'C'),) + df.data
+        iter_typ = hpat.hiframes.api.DataFrameTupleIterator(columns, arr_types)
+        return signature(iter_typ, *args)
+
+@lower_builtin(itertuples_dummy, types.VarArg(types.Any))
+def lower_itertuples_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
