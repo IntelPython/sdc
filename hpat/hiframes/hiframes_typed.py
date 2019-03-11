@@ -21,7 +21,8 @@ import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
     is_whole_slice, is_array)
-from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
+from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
+    list_string_array_type)
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
@@ -1985,13 +1986,13 @@ class HiFramesTyped(object):
         out_names = [mk_unique_var(in_vars[i].name).replace('.', '_')
                      for i in range(len(in_vars))]
         str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
-                                                    if is_str_series_typ(t)]
+                                                    if is_str_arr_typ(t)]
         list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
-                        if t == SeriesType(types.List(string_type))]
+                        if t == list_string_array_type]
         isna_calls = ['hpat.hiframes.api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
-        func_text += "  ({},) = hpat.hiframes.api.series_tup_to_arr_tup(arr_tup)\n".format(", ".join(in_names))
+        func_text += "  ({},) = arr_tup\n".format(", ".join(in_names))
         func_text += "  old_len = len({})\n".format(in_names[0])
         func_text += "  new_len = 0\n"
         for c in str_colnames:
@@ -2014,8 +2015,6 @@ class HiFramesTyped(object):
         for v, out in zip(in_names, out_names):
             func_text += "      {}[curr_ind] = {}[i]\n".format(out, v)
         func_text += "      curr_ind += 1\n"
-        for out in out_names:
-            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(out, out)
         func_text += "  return ({},)\n".format(", ".join(out_names))
 
         loc_vars = {}
