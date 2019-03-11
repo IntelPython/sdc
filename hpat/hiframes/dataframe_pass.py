@@ -555,6 +555,9 @@ class DataFramePass(object):
         if fdef == ('fillna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_fillna(assign, lhs, rhs)
 
+        if fdef == ('reset_index_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_reset_index(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -651,6 +654,19 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, value=None, method=None, axis=None,
                     inplace=False, limit=None, downcast=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'reset_index':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.reset_index_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, level=None, drop=False, inplace=False,
+                    col_level=0, col_fill='': None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -939,6 +955,38 @@ class DataFramePass(object):
         else:
             return self._set_df_inplace(
                 _fillna_impl, args, df_var, lhs.loc, nodes)
+
+    def _run_call_reset_index(self, assign, lhs, rhs):
+        # TODO: reflection, drop=False semantics
+        # TODO: drop actual index, fix inplace
+        df_var = rhs.args[0]
+        inplace_var = rhs.args[1]
+        inplace = guard(find_const, self.func_ir, inplace_var)
+        df_typ = self.typemap[df_var.name]
+
+        # impl: for each column, copy data and create a new dataframe
+        n_cols = len(df_typ.columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _reset_index_impl({}):\n".format(", ".join(data_args))
+        for d in data_args:
+            if not inplace:
+                func_text += "  {} = {}.copy()\n".format(d, d)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            ", ".join(data_args),
+            ", ".join("'{}'".format(c) for c in df_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _reset_index_impl = loc_vars['_reset_index_impl']
+
+        nodes = []
+        args = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+
+        if not inplace:
+            return self._replace_func(_reset_index_impl, args, pre_nodes=nodes)
+        else:
+            return self._set_df_inplace(
+                _reset_index_impl, args, df_var, lhs.loc, nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe

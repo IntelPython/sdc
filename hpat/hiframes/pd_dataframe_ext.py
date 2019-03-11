@@ -862,3 +862,43 @@ def lower_fillna_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'reset_index')
+def reset_index_overload(df, level=None, drop=False, inplace=False,
+        col_level=0, col_fill=''):
+
+    # TODO: avoid dummy and generate func here when inlining is possible
+    # TODO: inplace of df with parent (reflection)
+    def _impl(df, level=None, drop=False, inplace=False,
+            col_level=0, col_fill=''):
+        return hpat.hiframes.pd_dataframe_ext.reset_index_dummy(df, inplace)
+
+    return _impl
+
+def reset_index_dummy(df, n):
+    return df
+
+@infer_global(reset_index_dummy)
+class ResetIndexDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df, inplace = args
+        # inplace value
+        if isinstance(inplace, hpat.utils.BooleanLiteral):
+            inplace = inplace.literal_value
+        else:
+            # XXX inplace type is just bool when value not passed. Therefore,
+            # we assume the default False value.
+            # TODO: more robust fix or just check
+            inplace = False
+
+        if not inplace:
+            out_df = DataFrameType(df.data, None, df.columns)
+            return signature(out_df, *args)
+        return signature(types.none, *args)
+
+@lower_builtin(reset_index_dummy, types.VarArg(types.Any))
+def lower_reset_index_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
