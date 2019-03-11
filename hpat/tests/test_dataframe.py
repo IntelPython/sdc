@@ -555,6 +555,15 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_df_head1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
 
 if __name__ == "__main__":
     unittest.main()

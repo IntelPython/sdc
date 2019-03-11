@@ -549,6 +549,9 @@ class DataFramePass(object):
         if fdef == ('itertuples_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_itertuples(assign, lhs, rhs)
 
+        if fdef == ('head_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_head(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -620,6 +623,18 @@ class DataFramePass(object):
             impl = hpat.hiframes.pd_dataframe_ext.itertuples_overload(
                 *arg_typs, **kw_typs)
             stub = (lambda df, index=True, name='Pandas': None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'head':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.head_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, n=5: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -879,6 +894,31 @@ class DataFramePass(object):
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
         return self._replace_func(f, col_vars, pre_nodes=nodes)
+
+    def _run_call_df_head(self, assign, lhs, rhs):
+        df_var = rhs.args[0]
+        n = rhs.args[1]
+        df_typ = self.typemap[df_var.name]
+
+        # impl: for each column, convert data to series, call S.head(n), get
+        # output data and create a new dataframe
+        n_cols = len(df_typ.columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _head_impl({}, n):\n".format(", ".join(data_args))
+        for d in data_args:
+            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(d+'_S', d)
+            func_text += "  {} = hpat.hiframes.api.get_series_data({}.head(n))\n".format(d+'_O', d+'_S')
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            ", ".join(d+'_O' for d in data_args),
+            ", ".join("'{}'".format(c) for c in df_typ.columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _head_impl = loc_vars['_head_impl']
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        return self._replace_func(_head_impl, col_vars + [n], pre_nodes=nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe
