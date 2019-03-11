@@ -502,6 +502,59 @@ class TestDataFrame(unittest.TestCase):
         finally:
             hpat.hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
 
+    def test_itertuples(self):
+        def test_impl(df):
+            res = 0.0
+            for r in df.itertuples():
+                res += r[1]
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.ones(n, np.int64)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_itertuples_str(self):
+        def test_impl(df):
+            res = ""
+            for r in df.itertuples():
+                res += r[1]
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 3
+        df = pd.DataFrame({'A': ['aa', 'bb', 'cc'], 'B': np.ones(n, np.int64)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_itertuples_order(self):
+        def test_impl(n):
+            res = 0.0
+            df = pd.DataFrame({'B': np.arange(n), 'A': np.ones(n, np.int64)})
+            for r in df.itertuples():
+                res += r[1]
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    def test_itertuples_analysis(self):
+        """tests array analysis handling of generated tuples, shapes going
+        through blocks and getting used in an array dimension
+        """
+        def test_impl(n):
+            res = 0
+            df = pd.DataFrame({'B': np.arange(n), 'A': np.ones(n, np.int64)})
+            for r in df.itertuples():
+                if r[1] == 2:
+                    A = np.ones(r[1])
+                    res += len(A)
+            return res
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
 
 if __name__ == "__main__":
     unittest.main()

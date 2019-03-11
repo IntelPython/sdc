@@ -546,6 +546,9 @@ class DataFramePass(object):
         if fdef == ('sort_values_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_sort_values(assign, lhs, rhs)
 
+        if fdef == ('itertuples_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_itertuples(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -605,6 +608,18 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, by, axis=0, ascending=True, inplace=False,
                     kind='quicksort', na_position='last': None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'itertuples':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.itertuples_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, index=True, name='Pandas': None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -841,6 +856,29 @@ class DataFramePass(object):
                     nodes.append(ir.Assign(new_df, other_df_var, lhs.loc))
             ir.Assign(new_df, df_var, lhs.loc)
             return nodes
+
+    def _run_call_df_itertuples(self, assign, lhs, rhs):
+        """pass df column names and variables to get_itertuples() to be able
+        to create the iterator.
+        e.g. get_itertuples("A", "B", A_arr, B_arr)
+        """
+        df_var = rhs.args[0]
+        df_typ = self.typemap[df_var.name]
+
+        col_name_args = ', '.join(["c"+str(i) for i in range(len(df_typ.columns))])
+        name_consts = ', '.join(["'{}'".format(c) for c in df_typ.columns])
+
+        func_text = "def f({}):\n".format(col_name_args)
+        func_text += "  return hpat.hiframes.api.get_itertuples({}, {})\n"\
+                                            .format(name_consts, col_name_args)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        f = loc_vars['f']
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        return self._replace_func(f, col_vars, pre_nodes=nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe
