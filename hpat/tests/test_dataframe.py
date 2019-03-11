@@ -590,6 +590,23 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
+    def test_df_reset_index1(self):
+        def test_impl(df):
+            return df.reset_index(drop=True)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_inplace1(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+            df.reset_index(drop=True, inplace=True)
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
