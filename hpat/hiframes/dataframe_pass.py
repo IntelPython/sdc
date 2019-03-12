@@ -561,6 +561,18 @@ class DataFramePass(object):
         if fdef == ('reset_index_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_reset_index(assign, lhs, rhs)
 
+        if fdef == ('drop_inplace', 'hpat.hiframes.api'):
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.api.drop_inplace_overload(
+                *arg_typs, **kw_typs)
+            return self._replace_func(impl, rhs.args,
+                        pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+
+        if fdef == ('drop_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_drop(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -683,6 +695,19 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, level=None, drop=False, inplace=False,
                     col_level=0, col_fill='': None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'drop':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.drop_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, labels=None, axis=0, index=None, columns=None,
+                level=None, inplace=False, errors='raise': None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -1047,6 +1072,21 @@ class DataFramePass(object):
         else:
             return self._set_df_inplace(
                 _reset_index_impl, args, df_var, lhs.loc, nodes)
+
+    def _run_call_drop(self, assign, lhs, rhs):
+        df_var, labels_var, axis_var, columns_var, inplace_var = rhs.args
+        inplace = guard(find_const, self.func_ir, inplace_var)
+        df_typ = self.typemap[df_var.name]
+        out_typ = self.typemap[lhs.name]
+        # TODO: reflection for drop inplace
+
+        nodes = []
+        data = [self._get_dataframe_data(df_var, c, nodes) for c in out_typ.columns]
+        # data is copied if not inplace
+        if not inplace:
+            data = [self._gen_arr_copy(v, nodes) for v in data]
+        _init_df = _gen_init_df(out_typ.columns)
+        return self._replace_func(_init_df, data, pre_nodes=nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe

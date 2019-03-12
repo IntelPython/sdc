@@ -997,9 +997,10 @@ class DropDummyTyper(AbstractTemplate):
             # TODO: more robust fix or just check
             inplace = False
 
-        has_parent = df.has_parent
-        if not inplace:
-            has_parent = False  # data is copied
+        # TODO: reflection
+        has_parent = False # df.has_parent
+        # if not inplace:
+        #     has_parent = False  # data is copied
 
         out_df = DataFrameType(new_data, df.index, new_cols, has_parent)
         return signature(out_df, *args)
