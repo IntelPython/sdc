@@ -150,11 +150,21 @@ class DataFrameAttribute(AttributeTemplate):
 
         # using NamedTuple instead of Series, TODO: pass Series
         Row = namedtuple('R', df.columns)
-        dtype = types.NamedTuple([a.dtype for a in df.data], Row)
+
+        # the data elements come from getitem of Series to perform conversion
+        # e.g. dt64 to timestamp in TestDate.test_ts_map_date2
+        dtypes = []
+        for arr_typ in df.data:
+            series_typ = SeriesType(arr_typ.dtype, arr_typ, df.index, True)
+            el_typ = self.context.resolve_function_type(
+                operator.getitem, (series_typ, types.int64), {}).return_type
+            dtypes.append(el_typ)
+
+        row_typ = types.NamedTuple(dtypes, Row)
         code = func.literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         _, f_return_type, _ = numba.compiler.type_inference_stage(
-                self.context, f_ir, (dtype,), None)
+                self.context, f_ir, (row_typ,), None)
 
         return signature(SeriesType(f_return_type), *args)
 

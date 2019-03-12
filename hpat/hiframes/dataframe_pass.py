@@ -789,6 +789,9 @@ class DataFramePass(object):
         row_args = ', '.join(["c"+str(i)+"[i]" for i in range(len(used_cols))])
 
         func_text = "def f({}):\n".format(col_name_args)
+        # make series to enable getitem of dt64 to timestamp for example
+        for i in range(len(used_cols)):
+            func_text += "  c{} = hpat.hiframes.api.init_series(c{})\n".format(i, i)
         func_text += "  numba.parfor.init_prange()\n"
         func_text += "  n = len(c0)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
