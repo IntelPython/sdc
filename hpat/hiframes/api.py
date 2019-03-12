@@ -370,7 +370,7 @@ class DropNAType(AbstractTemplate):
         assert not kws
         assert len(args) in (1, 2)
         # args: in_arr
-        return signature(args[0], *args)
+        return signature(if_arr_to_series_type(args[0]), *args)
 
 @infer_global(column_sum)
 class SumType(AbstractTemplate):
