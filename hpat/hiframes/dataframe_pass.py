@@ -573,6 +573,9 @@ class DataFramePass(object):
         if fdef == ('drop_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_drop(assign, lhs, rhs)
 
+        if fdef == ('isin_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_isin(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -708,6 +711,18 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, labels=None, axis=0, index=None, columns=None,
                 level=None, inplace=False, errors='raise': None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'isin':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.isin_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, values: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -1087,6 +1102,59 @@ class DataFramePass(object):
             data = [self._gen_arr_copy(v, nodes) for v in data]
         _init_df = _gen_init_df(out_typ.columns)
         return self._replace_func(_init_df, data, pre_nodes=nodes)
+
+    def _run_call_isin(self, assign, lhs, rhs):
+        df_var, values = rhs.args
+        df_typ = self.typemap[df_var.name]
+        values_typ = self.typemap[values.name]
+
+        nodes = []
+        other_colmap = {}
+        df_case = False
+        # dataframe case
+        if isinstance(values_typ, DataFrameType):
+            df_case = True
+            other_colmap = {c: self._get_dataframe_data(values, c, nodes)
+                            for c in df_typ.columns if c in values_typ.columns}
+        else:
+            # general iterable (e.g. list, set) case
+            # TODO: dictionary
+            # TODO: handle passed in dict case (pass colname to func?)
+            other_colmap = {c: values for c in df_typ.columns}
+
+        out_vars = []
+        data = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        isin_func = lambda A, B: hpat.hiframes.api.df_isin(A, B)
+        isin_vals_func = lambda A, B: hpat.hiframes.api.df_isin_vals(A, B)
+        # create array of False values used when other col not available
+        bool_arr_func = lambda A: np.zeros(len(A), np.bool_)
+        # use the first array of df to get len. TODO: check for empty df
+        false_arr_args = [data[0]]
+
+        for cname, in_var in zip(df_typ.columns, data):
+            if cname in other_colmap:
+                if df_case:
+                    func = isin_func
+                else:
+                    func = isin_vals_func
+                other_col_var = other_colmap[cname]
+                args = [in_var, other_col_var]
+            else:
+                func = bool_arr_func
+                args = false_arr_args
+            f_block = compile_to_numba_ir(
+                func,
+                {'hpat': hpat, 'np': np},
+                self.typingctx,
+                tuple(self.typemap[v.name] for v in args),
+                self.typemap,
+                self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            out_vars.append(nodes[-1].target)
+
+        _init_df = _gen_init_df(df_typ.columns)
+        return self._replace_func(_init_df, out_vars, pre_nodes=nodes)
 
     def _run_call_set_df_column(self, assign, lhs, rhs):
         # replace with regular setitem if target is not dataframe

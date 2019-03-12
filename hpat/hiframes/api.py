@@ -704,7 +704,7 @@ class DfIsinCol(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 2
-        return signature(SeriesType(types.bool_), *unliteral_all(args))
+        return signature(types.Array(types.bool_, 1, 'C'), *unliteral_all(args))
 
 
 def flatten_to_series(A):  # pragma: no cover
