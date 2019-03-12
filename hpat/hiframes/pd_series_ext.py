@@ -129,10 +129,15 @@ def _get_series_array_type(dtype):
 def is_str_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == string_type
 
-# TODO: create a separate DatetimeIndex type from Series
-dt_index_series_type = SeriesType(types.NPDatetime('ns'))
-timedelta_index_series_type = SeriesType(types.NPTimedelta('ns'))
-date_series_type = SeriesType(datetime_date_type)
+def is_dt64_series_typ(t):
+    return isinstance(t, SeriesType) and t.dtype == types.NPDatetime('ns')
+
+def is_timedelta64_series_typ(t):
+    return isinstance(t, SeriesType) and t.dtype == types.NPTimedelta('ns')
+
+def is_datetime_date_series_typ(t):
+    return isinstance(t, SeriesType) and t.dtype == datetime_date_type
+
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
@@ -578,7 +583,7 @@ class SeriesDtMethodAttribute(AttributeTemplate):
     key = SeriesDtMethodType
 
     def resolve_date(self, ary):
-        return date_series_type
+        return SeriesType(datetime_date_type)  # TODO: name, index
 
 
 # all date fields return int64 same as Timestamp fields
@@ -664,8 +669,8 @@ class SeriesCompEqual(AbstractTemplate):
             assert is_str_arr_typ(vb) or vb == string_type
             return signature(SeriesType(types.boolean), va, vb)
 
-        if ((va == dt_index_series_type and vb == string_type)
-                or (vb == dt_index_series_type and va == string_type)):
+        if ((is_dt64_series_typ(va) and vb == string_type)
+                or (is_dt64_series_typ(vb) and va == string_type)):
             return signature(SeriesType(types.boolean), va, vb)
 
 @infer
@@ -942,8 +947,8 @@ class LenSeriesType(AbstractTemplate):
 # TODO: handle all timedelta args
 def type_sub(context):
     def typer(val1, val2):
-        if val1 == dt_index_series_type and val2 == pandas_timestamp_type:
-            return timedelta_index_series_type
+        if is_dt64_series_typ(val1) and val2 == pandas_timestamp_type:
+            return SeriesType(types.NPTimedelta('ns'))
 
         from hpat.hiframes.pd_index_ext import DatetimeIndexType
         if isinstance(val1, DatetimeIndexType) and val2 == pandas_timestamp_type:
