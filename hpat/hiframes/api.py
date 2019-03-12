@@ -1275,6 +1275,26 @@ class MetaType(types.Type):
 
 register_model(MetaType)(models.OpaqueModel)
 
+
+def drop_inplace(df):
+    res = None
+    return df, res
+
+@overload(drop_inplace)
+def drop_inplace_overload(df, labels=None, axis=0, index=None, columns=None,
+        level=None, inplace=False, errors='raise'):
+
+    from hpat.hiframes.pd_dataframe_ext import DataFrameType
+    assert isinstance(df, DataFrameType)
+    # TODO: support recovery when object is not df
+    def _impl(df, labels=None, axis=0, index=None, columns=None,
+            level=None, inplace=False, errors='raise'):
+        new_df = hpat.hiframes.pd_dataframe_ext.drop_dummy(
+            df, labels, axis, columns, inplace)
+        return new_df, None
+
+    return _impl
+
 # taken from numba/typing/listdecl.py
 @infer_global(sorted)
 class SortedBuiltinLambda(CallableTemplate):
