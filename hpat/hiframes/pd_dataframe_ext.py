@@ -1010,3 +1010,31 @@ def lower_drop_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'isin')
+def isin_overload(df, values):
+
+    def _impl(df, values):
+        return hpat.hiframes.pd_dataframe_ext.isin_dummy(df, values)
+
+    return _impl
+
+def isin_dummy(df, labels, axis, columns, inplace):
+    return df
+
+@infer_global(isin_dummy)
+class IsinDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df, values = args
+
+        bool_arr = types.Array(types.bool_, 1, 'C')
+        n_cols = len(df.columns)
+        out_df = DataFrameType((bool_arr,)*n_cols, df.index, df.columns)
+        return signature(out_df, *args)
+
+@lower_builtin(isin_dummy, types.VarArg(types.Any))
+def lower_isin_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
