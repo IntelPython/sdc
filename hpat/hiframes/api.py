@@ -879,6 +879,9 @@ def get_series_data(S):
 def get_series_index(S):
     return lambda S: S._index
 
+@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
+def get_series_name(S):
+    return lambda S: S._name
 
 @numba.generated_jit(nopython=True)
 def get_index_data(S):
