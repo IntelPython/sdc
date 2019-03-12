@@ -27,8 +27,7 @@ from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type,
     datetime_date_type, set_df_datetime_date_lower)
 from hpat.hiframes.pd_series_ext import (SeriesType,
     is_str_series_typ, if_arr_to_series_type,
-    series_to_array_type, if_series_to_array_type, dt_index_series_type,
-    date_series_type)
+    series_to_array_type, if_series_to_array_type, is_dt64_series_typ)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType, TimedeltaIndexType
 from hpat.hiframes.sort import (
       alltoallv,
@@ -1052,10 +1051,10 @@ class TsSeriesToArrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         assert len(args) == 1
-        assert args[0] == dt_index_series_type or args[0] == types.Array(types.int64, 1, 'C')
+        assert is_dt64_series_typ(args[0]) or args[0] == types.Array(types.int64, 1, 'C')
         return signature(types.Array(types.NPDatetime('ns'), 1, 'C'), *args)
 
-@lower_builtin(ts_series_to_arr_typ, dt_index_series_type)
+@lower_builtin(ts_series_to_arr_typ, SeriesType)
 @lower_builtin(ts_series_to_arr_typ, types.Array(types.int64, 1, 'C'))
 def lower_ts_series_to_arr_typ(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])

@@ -26,7 +26,7 @@ from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
-    series_to_array_type, dt_index_series_type,
+    series_to_array_type, is_dt64_series_typ,
     if_series_to_array_type, is_series_type,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
     explicit_binop_funcs, series_dt_methods_type)
@@ -201,7 +201,7 @@ class HiFramesTyped(object):
             rhs.value = series_var
 
         # replace getitems on dt_index/dt64 series with Timestamp function
-        if self.typemap[rhs.value.name] == dt_index_series_type:
+        if is_dt64_series_typ(self.typemap[rhs.value.name]):
             if rhs.op == 'getitem':
                 ind_var = rhs.index
             else:
@@ -1736,8 +1736,8 @@ class HiFramesTyped(object):
 
         arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
         # one of them is dt_index but not both
-        if ((arg1 == dt_index_series_type or arg2 == dt_index_series_type)
-                and not (arg1 == dt_index_series_type and arg2 == dt_index_series_type)):
+        if ((is_dt64_series_typ(arg1) or is_dt64_series_typ(arg2))
+                and not (is_dt64_series_typ(arg1) and is_dt64_series_typ(arg2))):
             return True
 
         if ((isinstance(arg1, DatetimeIndexType) or isinstance(arg2, DatetimeIndexType))
@@ -1748,10 +1748,12 @@ class HiFramesTyped(object):
 
     def _handle_dt_index_binop(self, assign, rhs):
         arg1, arg2 = rhs.lhs, rhs.rhs
-        allowed_types = (dt_index_series_type, string_type)
+
+        def _is_allowed_type(t):
+            return is_dt64_series_typ(t) or t == string_type
 
         # TODO: this has to be more generic to support all combinations.
-        if (self.typemap[arg1.name] == dt_index_series_type and
+        if (is_dt64_series_typ(self.typemap[arg1.name]) and
             self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type and
             rhs.fn in ('-', operator.sub)):
             return self._replace_func(
@@ -1767,8 +1769,8 @@ class HiFramesTyped(object):
                 series_kernels._column_sub_impl_datetimeindex_timestamp,
                 [arg1, arg2], pre_nodes=nodes)
 
-        if (types.unliteral(self.typemap[arg1.name]) not in allowed_types
-                or types.unliteral(self.typemap[arg2.name]) not in allowed_types):
+        if (not _is_allowed_type(types.unliteral(self.typemap[arg1.name]))
+                or not _is_allowed_type(types.unliteral(self.typemap[arg2.name]))):
             raise ValueError("DatetimeIndex operation not supported")
 
         # string comparison with DatetimeIndex
@@ -1779,8 +1781,8 @@ class HiFramesTyped(object):
         is_out_series = False
 
         func_text = 'def f(arg1, arg2):\n'
-        if typ1 == dt_index_series_type or isinstance(typ1, DatetimeIndexType):
-            if typ1 == dt_index_series_type:
+        if is_dt64_series_typ(typ1) or isinstance(typ1, DatetimeIndexType):
+            if is_dt64_series_typ(typ1):
                 is_out_series = True
                 arg1 = self._get_series_data(arg1, nodes)
             else:
@@ -1788,7 +1790,7 @@ class HiFramesTyped(object):
             func_text += '  dt_index, _str = arg1, arg2\n'
             comp = 'dt_index[i] {} other'.format(op_str)
         else:
-            if typ2 == dt_index_series_type:
+            if is_dt64_series_typ(typ2):
                 is_out_series = True
                 arg2 = self._get_series_data(arg2, nodes)
             else:

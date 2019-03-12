@@ -333,7 +333,11 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
 
         if context.enable_nrt:
             context.nrt.incref(builder, arr, arr_arg)
-        py_arr = pyapi.from_native_value(arr, arr_arg, env_manager)    # calls boxing
+
+        # call boxing for array data
+        # TODO: check complex data types possible for Series for dataframes set column here 
+        c = numba.pythonapi._BoxContext(context, builder, pyapi, env_manager)
+        py_arr = hpat.hiframes.boxing._box_series_data(arr.dtype, arr, arr_arg, c)
 
         # get column as string obj
         cstr = context.insert_const_string(builder.module, col_name)
