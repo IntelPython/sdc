@@ -877,15 +877,16 @@ class HiFramesTyped(object):
             # TODO: kws
             nodes = []
             data = self._get_series_data(series_var, nodes)
+            name = self._get_series_name(series_var, nodes)
             if len(rhs.args) == 0 and not rhs.kws:
                 return self._replace_func(
-                    series_replace_funcs[func_name + '_default'], [data],
+                    series_replace_funcs[func_name + '_default'], [data, name],
                                     extra_globals={'gt_f': series_kernels.gt_f,
                                                   'lt_f': series_kernels.lt_f},
                                     pre_nodes=nodes)
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [data, n_arg],
+            return self._replace_func(func, [data, n_arg, name],
                                     extra_globals={'gt_f': series_kernels.gt_f,
                                                   'lt_f': series_kernels.lt_f},
                                     pre_nodes=nodes)
@@ -894,13 +895,14 @@ class HiFramesTyped(object):
             # TODO: kws
             nodes = []
             data = self._get_series_data(series_var, nodes)
+            name = self._get_series_name(series_var, nodes)
             if len(rhs.args) == 0 and not rhs.kws:
                 return self._replace_func(
-                    series_replace_funcs['head_default'], [data],
+                    series_replace_funcs['head_default'], [data, name],
                     pre_nodes=nodes)
             n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [data, n_arg], pre_nodes=nodes)
+            return self._replace_func(func, [data, n_arg, name], pre_nodes=nodes)
 
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
@@ -2154,6 +2156,25 @@ class HiFramesTyped(object):
         # to enable alias analysis
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_series_index(S),
+            {'hpat': hpat},
+            self.typingctx,
+            (self.typemap[series_var.name],),
+            self.typemap,
+            self.calltypes
+        ).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
+
+    def _get_series_name(self, series_var, nodes):
+        var_def = guard(get_definition, self.func_ir, series_var)
+        call_def = guard(find_callname, self.func_ir, var_def)
+        if (call_def == ('init_series', 'hpat.hiframes.api')
+                and len(var_def.args) == 3):
+            return var_def.args[2]
+
+        f_block = compile_to_numba_ir(
+            lambda S: hpat.hiframes.api.get_series_name(S),
             {'hpat': hpat},
             self.typingctx,
             (self.typemap[series_var.name],),
