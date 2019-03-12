@@ -340,6 +340,11 @@ class HiFrames(object):
             return self._run_call_df(
                 assign, lhs, rhs, func_mod, func_name, label)
 
+        if func_name == 'drop' and isinstance(func_mod, ir.Var):
+            # handle potential df.drop(inplace=True) here since it needs
+            # variable replacement
+            return self._handle_df_drop(assign, lhs, rhs, func_mod)
+
         # groupby aggregate
         # e.g. df.groupby('A')['B'].agg(lambda x: x.max()-x.min())
         if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'groupby'):
@@ -383,10 +388,6 @@ class HiFrames(object):
         # df.fillna()
         if func_name == 'fillna':
             return self._handle_df_fillna(lhs, rhs, df_var, label)
-
-        # df.drop()
-        if func_name == 'drop':
-            return self._handle_df_drop(lhs, rhs, df_var, label)
 
         if func_name not in ('groupby', 'rolling'):
             raise NotImplementedError(
@@ -524,10 +525,47 @@ class HiFrames(object):
                 nodes.append(ir.Assign(dropped_var, c_var, lhs.loc))
         return nodes
 
-    def _handle_df_drop(self, lhs, rhs, df_var, label):
+    def _handle_df_drop(self, assign, lhs, rhs, df_var):
+        """handle possible df.drop(inplace=True)
+        lhs = A.drop(inplace=True) -> A1, lhs = drop_inplace(...)
+        replace A with A1
+        """
+        kws = dict(rhs.kws)
+        inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
+        inplace = guard(find_const, self.func_ir, inplace_var)
+        if inplace is not None and inplace == True:
+            # TODO: make sure call post dominates df_var definition or df_var
+            # is not used in other code paths
+            # replace func variable with drop_inplace
+            f_block = compile_to_numba_ir(
+                lambda: hpat.hiframes.api.drop_inplace,
+                {'hpat': hpat}).blocks.popitem()[1]
+            nodes = f_block.body[:-2]
+            new_func_var = nodes[-1].target
+            rhs.func = new_func_var
+            rhs.args.insert(0, df_var)
+            # new tuple return
+            ret_tup = ir.Var(lhs.scope, mk_unique_var('drop_ret'), lhs.loc)
+            assign.target = ret_tup
+            nodes.append(assign)
+            new_df_var = ir.Var(df_var.scope, mk_unique_var(df_var.name), df_var.loc)
+            zero_var = ir.Var(df_var.scope, mk_unique_var('zero'), df_var.loc)
+            one_var = ir.Var(df_var.scope, mk_unique_var('one'), df_var.loc)
+            nodes.append(ir.Assign(ir.Const(0, lhs.loc), zero_var, lhs.loc))
+            nodes.append(ir.Assign(ir.Const(1, lhs.loc), one_var, lhs.loc))
+            getitem0 = ir.Expr.static_getitem(ret_tup, 0, zero_var, lhs.loc)
+            nodes.append(ir.Assign(getitem0, new_df_var, lhs.loc))
+            getitem1 = ir.Expr.static_getitem(ret_tup, 1, one_var, lhs.loc)
+            nodes.append(ir.Assign(getitem1, lhs, lhs.loc))
+            # replace old variable with new one
+            self.replace_var_dict[df_var.name] = new_df_var
+            self._add_node_defs(nodes)
+            return nodes
+
+        return [assign]
+
         # df.drop(labels=None, axis=0, index=None, columns=None, level=None,
         #         inplace=False, errors='raise')
-        kws = dict(rhs.kws)
         labels_var = self._get_arg('drop', rhs.args, kws, 0, 'labels', '')
         axis_var = self._get_arg('drop', rhs.args, kws, 1, 'axis', '')
         labels = self._get_str_or_list(labels_var, default='')

@@ -942,3 +942,70 @@ def lower_dropna_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+@overload_method(DataFrameType, 'drop')
+def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+        level=None, inplace=False, errors='raise'):
+
+    # TODO: avoid dummy and generate func here when inlining is possible
+    # TODO: inplace of df with parent (reflection)
+    def _impl(df, labels=None, axis=0, index=None, columns=None,
+            level=None, inplace=False, errors='raise'):
+        return hpat.hiframes.pd_dataframe_ext.drop_dummy(
+            df, labels, axis, columns, inplace)
+
+    return _impl
+
+def drop_dummy(df, labels, axis, columns, inplace):
+    return df
+
+@infer_global(drop_dummy)
+class DropDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df, labels, axis, columns, inplace = args
+
+        if labels != types.none:
+            if not isinstance(axis, types.IntegerLiteral) or not axis.literal_value == 1:
+                raise ValueError("only axis=1 supported for df.drop()")
+            if isinstance(labels, types.StringLiteral):
+                drop_cols = (labels.literal_value,)
+            elif hasattr(labels, 'consts'):
+                drop_cols = labels.consts
+            else:
+                raise ValueError(
+                    "constant list of columns expected for labels in df.drop()")
+        else:
+            assert columns != types.none
+            if isinstance(columns, types.StringLiteral):
+                drop_cols = (columns.literal_value,)
+            elif hasattr(columns, 'consts'):
+                drop_cols = columns.consts
+            else:
+                raise ValueError(
+                    "constant list of columns expected for labels in df.drop()")
+
+        assert all(c in df.columns for c in drop_cols)
+        new_cols = tuple(c for c in df.columns if c not in drop_cols)
+        new_data = tuple(df.data[df.columns.index(c)] for c in new_cols)
+
+        # inplace value
+        if isinstance(inplace, hpat.utils.BooleanLiteral):
+            inplace = inplace.literal_value
+        else:
+            # XXX inplace type is just bool when value not passed. Therefore,
+            # we assume the default False value.
+            # TODO: more robust fix or just check
+            inplace = False
+
+        has_parent = df.has_parent
+        if not inplace:
+            has_parent = False  # data is copied
+
+        out_df = DataFrameType(new_data, df.index, new_cols, has_parent)
+        return signature(out_df, *args)
+
+@lower_builtin(drop_dummy, types.VarArg(types.Any))
+def lower_drop_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
