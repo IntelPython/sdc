@@ -700,6 +700,29 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_append1(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2.A[n//2:] = n
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    def test_append2(self):
+        def test_impl(df, df2, df3):
+            return df.append([df2, df3], ignore_index=True)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        df2.A[n//2:] = n
+        df3 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        pd.testing.assert_frame_equal(
+            hpat_func(df, df2, df3), test_impl(df, df2, df3))
 
 if __name__ == "__main__":
     unittest.main()

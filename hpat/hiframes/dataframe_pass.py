@@ -115,6 +115,7 @@ class DataFramePass(object):
                     out_nodes = self._run_setitem(inst)
 
                 if isinstance(out_nodes, list):
+                    # TODO: process these nodes
                     new_body.extend(out_nodes)
                     self._update_definitions(out_nodes)
                 if isinstance(out_nodes, ReplaceFunc):
@@ -723,6 +724,19 @@ class DataFramePass(object):
             impl = hpat.hiframes.pd_dataframe_ext.isin_overload(
                 *arg_typs, **kw_typs)
             stub = (lambda df, values: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'append':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.append_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, other, ignore_index=False,
+                    verify_integrity=False, sort=None: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -1584,7 +1598,7 @@ class DataFramePass(object):
         # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
         out_typ = self.typemap[lhs.name]
-        df_list = guard(get_definition, self.func_ir, rhs.args[0]).items
+        df_list = self._get_const_tup(rhs.args[0])
         # generate a concat call for each output column
         # TODO: support non-numericals like string
         gen_nan_func = lambda A: np.full(len(A), np.nan)
@@ -1609,10 +1623,11 @@ class DataFramePass(object):
                     f_block = compile_to_numba_ir(gen_nan_func,
                             {'hpat': hpat, 'np': np},
                             self.typingctx,
-                            (df_typ,),
+                            (df_typ.data[0],),
                             self.typemap,
                             self.calltypes).blocks.popitem()[1]
-                    replace_arg_nodes(f_block, [df])
+                    arr = self._get_dataframe_data(df, df_typ.columns[0], nodes)
+                    replace_arg_nodes(f_block, [arr])
                     nodes += f_block.body[:-2]
                     args.append(nodes[-1].target)
                 else:
@@ -1756,7 +1771,7 @@ class DataFramePass(object):
 
     def _replace_func(self, func, args, const=False,
                       pre_nodes=None, extra_globals=None, pysig=None, kws=None):
-        glbls = {'numba': numba, 'np': np, 'hpat': hpat}
+        glbls = {'numba': numba, 'np': np, 'hpat': hpat, 'pd': pd}
         if extra_globals is not None:
             glbls.update(extra_globals)
 

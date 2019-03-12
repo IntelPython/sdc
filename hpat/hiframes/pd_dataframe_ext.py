@@ -35,11 +35,13 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
             name="dataframe({}, {}, {}, {})".format(
                 data, index, columns, has_parent))
 
-    def copy(self):
+    def copy(self, has_parent=None):
         # XXX is copy necessary?
         index = types.none if self.index == types.none else self.index.copy()
         data = tuple(a.copy() for a in self.data)
-        return DataFrameType(data, index, self.columns, self.has_parent)
+        if has_parent is None:
+            has_parent = self.has_parent
+        return DataFrameType(data, index, self.columns, has_parent)
 
     @property
     def key(self):
@@ -642,6 +644,14 @@ class ConcatDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         objs = args[0]
+
+        if isinstance(objs, types.List):
+            assert isinstance(objs.dtype, (SeriesType, DataFrameType))
+            ret_typ = objs.dtype.copy()
+            if isinstance(ret_typ, DataFrameType):
+                ret_typ = ret_typ.copy(has_parent=False)
+            return signature(ret_typ, *args)
+
         if not isinstance(objs, types.BaseTuple):
             raise ValueError("Tuple argument for pd.concat expected")
         assert len(objs.types) > 0
@@ -675,6 +685,7 @@ class ConcatDummyTyper(AbstractTemplate):
 
             ret_typ = DataFrameType(tuple(all_data), None, tuple(all_colnames))
             return signature(ret_typ, *args)
+
         # series case
         elif isinstance(objs.types[0], SeriesType):
             assert all(isinstance(t, SeriesType) for t in objs.types)
@@ -1038,3 +1049,20 @@ def lower_isin_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'append')
+def append_overload(df, other, ignore_index=False, verify_integrity=False,
+                                                                    sort=None):
+    if isinstance(other, DataFrameType):
+        return (lambda df, other, ignore_index=False, verify_integrity=False,
+            sort=None: pd.concat((df, other)))
+
+    # TODO: tuple case
+    # TODO: non-homogenous build_list case
+    if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
+        return (lambda df, other, ignore_index=False, verify_integrity=False,
+            sort=None: pd.concat([df] + other))
+
+    raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
