@@ -800,6 +800,7 @@ class HiFrames(object):
             if (is_call(arg_def) and guard(find_callname, self.func_ir,
                     arg_def) == ('chain', 'itertools')):
                 in_data = arg_def.vararg
+                arg_def.vararg = None  # avoid typing error
                 return self._replace_func(
                     lambda l: hpat.hiframes.api.flatten_to_series(l),
                     [in_data]
