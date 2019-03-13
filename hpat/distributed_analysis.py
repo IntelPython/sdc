@@ -15,7 +15,6 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
                         is_np_array, find_build_tuple, debug_prints)
@@ -103,7 +102,7 @@ class DistributedAnalysis(object):
                 self._set_REP(inst.list_vars(), array_dists)
 
     def _analyze_assign(self, inst, array_dists, parfor_dists):
-        from hpat.hiframes.api import PandasDataFrameType
+        from hpat.hiframes.api import SeriesType, PandasDataFrameType
         lhs = inst.target.name
         rhs = inst.value
         # treat return casts like assignments
@@ -783,7 +782,7 @@ class DistributedAnalysis(object):
         return new_dist
 
     def _set_REP(self, var_list, array_dists):
-        from hpat.hiframes.api import PandasDataFrameType
+        from hpat.hiframes.api import SeriesType, PandasDataFrameType
         for var in var_list:
             varname = var.name
             # Handle SeriesType since it comes from Arg node and it could

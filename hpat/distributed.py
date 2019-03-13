@@ -31,7 +31,6 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis)
-from hpat.hiframes.pd_series_ext import SeriesType
 
 # from mpi4py import MPI
 import hpat.utils
@@ -1530,6 +1529,7 @@ class DistributedPass(object):
             return None
 
         # TODO: comprehensive support for Series vars
+        from hpat.hiframes.pd_series_ext import SeriesType
         if isinstance(typ, (SeriesType,
                 hpat.hiframes.api.PandasDataFrameType)):
             return None
