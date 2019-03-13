@@ -723,14 +723,8 @@ class HiFrames(object):
 
         date_cols = []
         if 'parse_dates' in kws:
-            date_list = guard(get_definition, self.func_ir, kws['parse_dates'])
-            if not isinstance(date_list, ir.Expr) or date_list.op != 'build_list':
-                raise ValueError("pd.read_csv() parse_dates should be constant list")
-            for v in date_list.items:
-                col_val = guard(find_const, self.func_ir, v)
-                if col_val is None:
-                    raise ValueError("pd.read_csv() parse_dates expects constant column numbers")
-                date_cols.append(col_val)
+            err_msg = "pd.read_csv() parse_dates should be constant list"
+            date_cols = self._get_str_or_list(kws['parse_dates'], err_msg=err_msg, typ=int)
 
         columns = []
         data_arrs = []
