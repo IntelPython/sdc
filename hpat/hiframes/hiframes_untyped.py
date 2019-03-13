@@ -225,6 +225,14 @@ class HiFrames(object):
                     self.func_ir._definitions[lhs].append(rhs)
                     return []
 
+            if rhs.op == 'getattr':
+                val_def = guard(get_definition, self.func_ir, rhs.value)
+                if (isinstance(val_def, ir.Global) and val_def.value == np
+                        and rhs.attr == 'fromfile'):
+                    # put back the definition removed earlier but remove node
+                    self.func_ir._definitions[lhs].append(rhs)
+                    return []
+
             if rhs.op == 'build_map':
                 # put back the definition removed earlier but remove node
                 self.func_ir._definitions[lhs].append(rhs)
