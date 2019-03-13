@@ -365,6 +365,10 @@ class DistributedAnalysis(object):
                 array_dists[rhs.args[i].name] = new_dist
             return
 
+        if fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io'):
             return

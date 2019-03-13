@@ -68,6 +68,10 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if call_list == ['init_dataframe', 'pd_dataframe_ext', 'hiframes', hpat]:
         return True
+    if call_list == ['get_dataframe_data', 'pd_dataframe_ext', 'hiframes', hpat]:
+        return True
+    if call_list == ['get_dataframe_index', 'pd_dataframe_ext', 'hiframes', hpat]:
+        return True
     # if call_list == ['set_parent_dummy', 'pd_dataframe_ext', 'hiframes', hpat]:
     #     return True
     if call_list == ['rolling_dummy', 'pd_rolling_ext', 'hiframes', hpat]:
