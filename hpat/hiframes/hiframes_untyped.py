@@ -24,7 +24,7 @@ import hpat
 from hpat import utils, pio, parquet_pio, config
 from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
-    inline_new_blocks, ReplaceFunc, is_call)
+    inline_new_blocks, ReplaceFunc, is_call, is_assign)
 import hpat.hiframes.api
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
@@ -128,6 +128,9 @@ class HiFrames(object):
         dprint_func_ir(self.func_ir, "starting hiframes")
         self._handle_metadata()
         blocks = self.func_ir.blocks
+        # call build definition since rewrite pass doesn't update definitions
+        # e.g. getitem to static_getitem in test_column_list_select2
+        self.func_ir._definitions = build_definitions(blocks)
         # topo_order necessary since df vars need to be found before use
         topo_order = find_topo_order(blocks)
         work_list = list((l, blocks[l]) for l in reversed(topo_order))
@@ -149,6 +152,7 @@ class HiFrames(object):
                     cfg = compute_cfg_from_blocks(blocks)
                     out_nodes = self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
+                    self.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst, label)
                 elif isinstance(inst, ir.Return):
                     out_nodes = self._run_return(inst)
@@ -156,12 +160,15 @@ class HiFrames(object):
                 if isinstance(out_nodes, list):
                     # TODO: fix scope/loc
                     new_body.extend(out_nodes)
+                    self._update_definitions(out_nodes)
                 if isinstance(out_nodes, ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
+                        self._update_definitions(rp_func.pre_nodes)
                     # replace inst.value to a call with target args
                     # as expected by inline_closure_call
+                    # TODO: inst other than Assign?
                     inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     inline_closure_call(self.func_ir, rp_func.glbls,
@@ -179,7 +186,7 @@ class HiFrames(object):
             if not replaced:
                 blocks[label].body = new_body
 
-        self.func_ir._definitions = build_definitions(blocks)
+        # self.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
         # while remove_dead(blocks, self.func_ir.arg_names, self.func_ir):
@@ -213,9 +220,14 @@ class HiFrames(object):
                         and rhs.attr in ('DataFrame', 'read_csv',
                                         'read_parquet', 'to_numeric')):
                     # TODO: implement to_numeric in typed pass?
+                    # put back the definition removed earlier but remove node
+                    # enables function matching without node in IR
+                    self.func_ir._definitions[lhs].append(rhs)
                     return []
 
             if rhs.op == 'build_map':
+                # put back the definition removed earlier but remove node
+                self.func_ir._definitions[lhs].append(rhs)
                 return []
 
             # HACK: delete pyarrow.parquet.read_table() to avoid typing errors
@@ -223,10 +235,14 @@ class HiFrames(object):
                 import pyarrow.parquet as pq
                 val_def = guard(get_definition, self.func_ir, rhs.value)
                 if isinstance(val_def, ir.Global) and val_def.value == pq:
+                    # put back the definition removed earlier but remove node
+                    self.func_ir._definitions[lhs].append(rhs)
                     return []
 
             if (rhs.op == 'getattr' and rhs.value.name in self.arrow_tables
                     and rhs.attr == 'to_pandas'):
+                # put back the definition removed earlier but remove node
+                self.func_ir._definitions[lhs].append(rhs)
                 return []
 
             if rhs.op in ('build_list', 'build_tuple'):
@@ -834,6 +850,8 @@ class HiFrames(object):
     def _handle_pq_read_table(self, assign, lhs, rhs):
         if len(rhs.args) != 1:  # pragma: no cover
             raise ValueError("Invalid read_table() arguments")
+        # put back the definition removed earlier but remove node
+        self.func_ir._definitions[lhs.name].append(rhs)
         self.arrow_tables[lhs.name] = rhs.args[0]
         return []
 
@@ -1289,6 +1307,13 @@ class HiFrames(object):
     def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
         typ = str if typ is None else typ
         by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+
+        if by_arg_def is None:
+            # try add_consts_to_type
+            by_arg_call = guard(get_definition, self.func_ir, by_arg)
+            if guard(find_callname, self.func_ir, by_arg_call) == ('add_consts_to_type', 'hpat.hiframes.api'):
+                by_arg_def = guard(find_build_sequence, self.func_ir, by_arg_call.args[0])
+
         if by_arg_def is None:
             # try single key column
             by_arg_def = guard(find_const, self.func_ir, by_arg)
@@ -1723,6 +1748,12 @@ class HiFrames(object):
         # XXX placeholder for df variable renaming
         assert isinstance(df_var, ir.Var)
         return df_var
+
+    def _update_definitions(self, node_list):
+        dumm_block = ir.Block(None, None)
+        dumm_block.body = node_list
+        build_definitions({0: dumm_block}, self.func_ir._definitions)
+        return
 
 
 def _gen_arr_copy(in_arr, nodes):
