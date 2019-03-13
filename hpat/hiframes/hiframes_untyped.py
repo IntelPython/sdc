@@ -287,6 +287,8 @@ class HiFrames(object):
         pivot_key = lhs + ":pivot"
         if pivot_key in self.locals:
             pivot_values = self.locals.pop(pivot_key)
+            # put back the definition removed earlier
+            self.func_ir._definitions[lhs].append(rhs)
             pivot_call = guard(get_definition, self.func_ir, lhs)
             assert pivot_call is not None
             meta_var = ir.Var(
