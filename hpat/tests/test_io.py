@@ -347,9 +347,10 @@ class TestIO(unittest.TestCase):
     def test_csv_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
+            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
             df = pd.read_csv("csv_data_cat1.csv",
                 names=['C1', 'C2', 'C3'],
-                dtype={'C1':np.int, 'C2': ct_dtype, 'C3':str},
+                dtype=dtypes,
             )
             return df.C2
         hpat_func = hpat.jit(test_impl)

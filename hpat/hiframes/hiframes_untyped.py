@@ -233,11 +233,6 @@ class HiFrames(object):
                     self.func_ir._definitions[lhs].append(rhs)
                     return []
 
-            if rhs.op == 'build_map':
-                # put back the definition removed earlier but remove node
-                self.func_ir._definitions[lhs].append(rhs)
-                return []
-
             # HACK: delete pyarrow.parquet.read_table() to avoid typing errors
             if rhs.op == 'getattr' and rhs.attr == 'read_table':
                 import pyarrow.parquet as pq
@@ -450,6 +445,9 @@ class HiFrames(object):
                     if not isinstance(cname, str):
                         raise ValueError("dictionary argument to isin() should have constant keys")
                     other_colmap[cname] = v
+                    # HACK replace build_map to avoid inference errors
+                    other_def.op = 'build_list'
+                    other_def.items = [v[0] for v in other_def.items]
             else:
                 # general iterable (e.g. list, set) case
                 # TODO: handle passed in dict case (pass colname to func?)
@@ -664,6 +662,9 @@ class HiFrames(object):
             raise ValueError(
                 "Invalid DataFrame() arguments (constant dict of columns expected)")
         nodes, items = self._fix_df_arrays(arg_def.items)
+        # HACK replace build_map to avoid inference errors
+        arg_def.op = 'build_list'
+        arg_def.items = [v[0] for v in arg_def.items]
 
         n_cols = len(items)
         data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
@@ -756,6 +757,9 @@ class HiFrames(object):
             data_arrs.append(
                 ir.Var(lhs.scope, mk_unique_var(col_name), lhs.loc))
 
+        # HACK replace build_map to avoid inference errors
+        dtype_map.op = 'build_list'
+        dtype_map.items = [v[0] for v in dtype_map.items]
 
         nodes = [csv_ext.CsvReader(
             fname, lhs.name, sep, columns, data_arrs, out_types, usecols, lhs.loc)]
