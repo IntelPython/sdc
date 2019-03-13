@@ -298,6 +298,8 @@ class HiFrames(object):
             self.df_labels[lhs] = self.df_labels[rhs.name]
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
+            # enables function matching without node in IR
+            self.func_ir._definitions[lhs].append(rhs)
             return []
         return [assign]
 
