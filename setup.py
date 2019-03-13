@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 import platform, os
 
 # Note we don't import Numpy at the toplevel, since setup.py
@@ -290,7 +290,7 @@ setup(name='hpat',
       keywords='data analytics cluster',
       url='https://github.com/IntelLabs/hpat',
       author='Intel',
-      packages=['hpat'],
+      packages=find_packages(),
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
       cmdclass=versioneer.get_cmdclass(),

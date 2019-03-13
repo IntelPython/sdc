@@ -1,9 +1,12 @@
 from __future__ import print_function, division, absolute_import
 
 # from .pio import PIO
-from .distributed import DistributedPass
-from .hiframes.hiframes import HiFrames
-from .hiframes.hiframes_typed import HiFramesTyped
+import hpat
+import hpat.hiframes
+import hpat.hiframes.hiframes_untyped
+import hpat.hiframes.hiframes_typed
+from hpat.hiframes.hiframes_untyped import HiFrames
+from hpat.hiframes.hiframes_typed import HiFramesTyped
 import numba
 import numba.compiler
 from numba import ir_utils, ir, postproc
@@ -215,6 +218,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         """
         # Ensure we have an IR and type information.
         assert self.func_ir
+        from hpat.distributed import DistributedPass
         dist_pass = DistributedPass(
             self.func_ir, self.typingctx, self.targetctx,
             self.type_annotation.typemap, self.type_annotation.calltypes,
