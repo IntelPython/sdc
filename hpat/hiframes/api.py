@@ -1229,6 +1229,12 @@ class AddConstsTyper(AbstractTemplate):
 def lower_add_consts_to_type(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
+# dummy empty itertools implementation to avoid typing errors for series str
+# flatten case
+import itertools
+@overload(itertools.chain)
+def chain_overload():
+    return lambda: [0]
 
 # a dummy join function that will be replace in dataframe_pass
 def join_dummy(left_df, right_df, left_on, right_on, how):
