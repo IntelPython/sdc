@@ -10,6 +10,12 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
 
+@hpat.jit
+def inner_get_column(df):
+    # df2 = df[['A', 'C']]
+    # df2['D'] = np.ones(3)
+    return df.A
+
 class TestDataFrame(unittest.TestCase):
     def test_create1(self):
         def test_impl(n):
@@ -723,6 +729,20 @@ class TestDataFrame(unittest.TestCase):
         df3 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
+
+    def test_var_rename(self):
+        # tests df variable replacement in hiframes_untyped where inlining
+        # can cause extra assignments and definition handling errors
+        # TODO: inline freevar
+        def test_impl():
+            df = pd.DataFrame({'A': [1,2,3], 'B': [2,3,4]})
+            # TODO: df['C'] = [5,6,7]
+            df['C'] = np.ones(3)
+            return inner_get_column(df)
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
+
 
 if __name__ == "__main__":
     unittest.main()

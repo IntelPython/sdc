@@ -141,7 +141,8 @@ class HiFrames(object):
             replaced = False
             self._working_body = new_body
             for i, inst in enumerate(block.body):
-                ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+                self._replace_vars(inst)
+                # ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
                 out_nodes = [inst]
 
                 # handle potential dataframe set column here
@@ -196,6 +197,21 @@ class HiFrames(object):
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
         return
+
+    def _replace_vars(self, inst):
+        # variable replacement can affect definitions so handling assignment
+        # values specifically
+        if is_assign(inst):
+            lhs = inst.target.name
+            self.func_ir._definitions[lhs].remove(inst.value)
+
+        ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+
+        if is_assign(inst):
+            self.func_ir._definitions[lhs].append(inst.value)
+            # if lhs changed, TODO: test
+            if inst.target.name != lhs:
+                self.func_ir._definitions[inst.target.name] = self.func_ir._definitions[lhs]
 
     def _run_assign(self, assign, label):
         lhs = assign.target.name
