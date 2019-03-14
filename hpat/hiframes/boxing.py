@@ -20,7 +20,7 @@ from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-    box_categorical_array)
+    box_categorical_array, unbox_categorical_array)
 from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
 
 import hstr_ext
@@ -228,8 +228,11 @@ def unbox_dataframe_column(typingctx, df, i=None):
             native_val = _unbox_array_list_str(arr_obj, c)
         else:
             dtype = data_typ.dtype
-            # TODO: error handling like Numba callwrappers.py
-            native_val = unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c)
+            if isinstance(dtype, PDCategoricalDtype):
+                native_val = unbox_categorical_array(data_typ, arr_obj, c)
+            else:
+                # TODO: error handling like Numba callwrappers.py
+                native_val = unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c)
 
         c.pyapi.decref(series_obj)
         c.pyapi.decref(arr_obj)
