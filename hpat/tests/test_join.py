@@ -251,6 +251,20 @@ class TestJoin(unittest.TestCase):
         self.assertEqual(
             set(h_res.A.dropna().values), set(res.A.dropna().values))
 
+    def test_join1_seq_key_change1(self):
+        # make sure const list typing doesn't replace const key values
+        def test_impl(df1, df2, df3, df4):
+            o1 = df1.merge(df2, on=['A'])
+            o2 = df3.merge(df4, on=['B'])
+            return o1, o2
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df1 = pd.DataFrame({'A': np.arange(n)+3, 'AA': np.arange(n)+1.0})
+        df2 = pd.DataFrame({'A': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+        df3 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BB': n+np.arange(n)+1.0})
+        df4 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BBB': n+np.arange(n)+1.0})
+        pd.testing.assert_frame_equal(hpat_func(df1, df2, df3, df4)[1], test_impl(df1, df2, df3, df4)[1])
 
 
 if __name__ == "__main__":
