@@ -274,30 +274,50 @@ class TestDataFrame(unittest.TestCase):
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
             df['A'] = np.arange(n)
-            return df.A.sum()
+            return df
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_set_column_reflect4(self):
+        # set existing column
+        def test_impl(df, n):
+            df['A'] = np.arange(n)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
+        df2 = df1.copy()
+        hpat_func(df1, n)
+        test_impl(df2, n)
+        pd.testing.assert_frame_equal(df1, df2)
 
     def test_set_column2(self):
         # create new column
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)+1.0})
             df['C'] = np.arange(n)
-            return df.C.sum()
+            return df
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_set_column_reflect3(self):
+        # create new column
+        def test_impl(df, n):
+            df['C'] = np.arange(n)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
+        df2 = df1.copy()
+        hpat_func(df1, n)
+        test_impl(df2, n)
+        pd.testing.assert_frame_equal(df1, df2)
 
     def test_set_column_bool1(self):
         def test_impl(df):
