@@ -765,7 +765,7 @@ class SetDfColInfer(AbstractTemplate):
         val = args[2]
         ret = target
 
-        if isinstance(target, DataFrameType):
+        if isinstance(target, DataFrameType) and ind not in target.columns:
             new_cols = target.columns + (ind,)
             if isinstance(val, SeriesType):
                 val = val.data

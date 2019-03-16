@@ -301,11 +301,12 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
         column_strs = [numba.unicode.make_string_from_constant(
                     context, builder, string_type, c) for c in column_names]
 
-        unboxed_vals = [builder.extract_value(in_dataframe.unboxed, i)
-                        if i != col_ind else arr_arg for i in range(n_cols)]
         zero = context.get_constant(types.int8, 0)
         one = context.get_constant(types.int8, 1)
-        if unboxed_vals:
+        unboxed_vals = [builder.extract_value(in_dataframe.unboxed, i)
+                        if i != col_ind else one for i in range(n_cols)]
+
+        if is_new_col:
             unboxed_vals.append(one)  # for new data array
         unboxed_vals.append(zero)  # for index
 
