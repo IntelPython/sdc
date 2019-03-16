@@ -265,7 +265,8 @@ class HiFrames(object):
                 self.func_ir._definitions[lhs].append(rhs)
                 return []
 
-            if rhs.op in ('build_list', 'build_tuple'):
+            #if rhs.op in ('build_list', 'build_tuple'): TODO: test tuple
+            if rhs.op == 'build_list':
                 # if build_list items are constant, add the constant values
                 # to the returned list type as metadata. This enables type
                 # inference for calls like pd.merge() where the values
