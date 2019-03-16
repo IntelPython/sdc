@@ -187,6 +187,7 @@ class HiFrames(object):
             if not replaced:
                 blocks[label].body = new_body
 
+        self.func_ir.blocks = ir_utils.simplify_CFG(self.func_ir.blocks)
         # self.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
