@@ -4,6 +4,7 @@ import numpy as np
 import random
 import string
 import pyarrow.parquet as pq
+from pandas.api.types import CategoricalDtype
 import numba
 import hpat
 from hpat.str_arr_ext import StringArray
@@ -265,6 +266,22 @@ class TestJoin(unittest.TestCase):
         df3 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BB': n+np.arange(n)+1.0})
         df4 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BBB': n+np.arange(n)+1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2, df3, df4)[1], test_impl(df1, df2, df3, df4)[1])
+
+    def test_join_cat1(self):
+        def test_impl():
+            ct_dtype = CategoricalDtype(['A', 'B', 'C'])
+            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
+            df1 = pd.read_csv("csv_data_cat1.csv",
+                names=['C1', 'C2', 'C3'],
+                dtype=dtypes,
+            )
+            n = len(df1)
+            df2 = pd.DataFrame({'C1': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+            df3 = df1.merge(df2, on='C1')
+            return df3
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":

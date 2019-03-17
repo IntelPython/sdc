@@ -327,6 +327,9 @@ def empty_like_type(n, arr):
 
 @overload(empty_like_type)
 def empty_like_type_overload(n, arr):
+    if isinstance(arr, hpat.hiframes.pd_categorical_ext.CategoricalArray):
+        from hpat.hiframes.pd_categorical_ext import fix_cat_array_type
+        return lambda n, arr: fix_cat_array_type(np.empty(n, arr.dtype))
     if isinstance(arr, types.Array):
         return lambda n, arr: np.empty(n, arr.dtype)
     if isinstance(arr, types.List) and arr.dtype == string_type:
