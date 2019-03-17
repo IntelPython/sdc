@@ -2,8 +2,8 @@ import operator
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
-                             type_callable, overload_method)
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_untracked
+                             type_callable, overload_method, intrinsic)
+from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba import types, typing, cgutils
 from numba.targets.boxing import box_array, unbox_array
@@ -17,6 +17,13 @@ class PDCategoricalDtype(types.Opaque):
         self.categories = _categories
         name = 'PDCategoricalDtype({})'.format(self.categories)
         super(PDCategoricalDtype, self).__init__(name=name)
+
+
+@register_model(PDCategoricalDtype)
+class CategoricalDtypeModel(models.IntegerModel):
+    def __init__(self, dmm, fe_type):
+        int_dtype = get_categories_int_type(fe_type)
+        super(CategoricalDtypeModel, self).__init__(dmm, int_dtype)
 
 
 # Array of categorical data (similar to Pandas Categorical array)
@@ -112,3 +119,15 @@ def _get_cat_obj_items(categories, c):
 @overload(pd.api.types.CategoricalDtype)
 def cat_overload_dummy(val_list):
     return lambda val_list: 1
+
+
+@intrinsic
+def fix_cat_array_type(typingctx, arr=None):
+    fixed_arr = arr
+    if isinstance(arr.dtype, PDCategoricalDtype):
+        fixed_arr = CategoricalArray(arr.dtype)
+
+    def codegen(context, builder, sig, args):
+        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+    return fixed_arr(arr), codegen

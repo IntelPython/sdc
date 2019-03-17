@@ -688,7 +688,8 @@ def ensure_capacity(arr, new_size):
     curr_len = len(arr)
     if curr_len < new_size:
         new_len = 2 * curr_len
-        new_arr = np.empty(new_len, arr.dtype)
+        new_arr = hpat.hiframes.pd_categorical_ext.fix_cat_array_type(
+            np.empty(new_len, arr.dtype))
         new_arr[:curr_len] = arr
     return new_arr
 
@@ -800,7 +801,7 @@ def copy_elem_buff_tup_overload(data, ind, val):
     return cp_impl
 
 def trim_arr(arr, size):  # pragma: no cover
-    return arr[:size]
+    return hpat.hiframes.pd_categorical_ext.fix_cat_array_type(arr[:size])
 
 @overload(trim_arr)
 def trim_arr_overload(arr, size):
@@ -934,7 +935,7 @@ def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=F
 
     return out_left_key, out_right_key, out_data_left, out_data_right
 
-@generated_jit(nopython=True, cache=True)
+@generated_jit(nopython=True, cache=True, no_cpython_wrapper=True)
 def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
                                                                is_right=False):
     return local_hash_join_impl
