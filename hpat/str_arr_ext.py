@@ -11,7 +11,8 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
 from hpat.str_ext import string_type
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+    iternext_impl, RefType)
 import llvmlite.llvmpy.core as lc
 from glob import glob
 
@@ -135,7 +136,7 @@ class StrArrayIteratorModel(models.StructModel):
 lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
 
 @lower_builtin('iternext', StringArrayIterator)
-@iternext_impl
+@iternext_impl(RefType.NEW)
 def iternext_str_array(context, builder, sig, args, result):
     [iterty] = sig.args
     [iter_arg] = args

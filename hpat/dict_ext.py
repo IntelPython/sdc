@@ -7,7 +7,8 @@ from numba.extending import typeof_impl, lower_cast
 from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
 from numba.extending import lower_builtin, overload_method, overload
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+    iternext_impl, RefType)
 from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
 from numba import cgutils
 from llvmlite import ir as lir
@@ -197,7 +198,7 @@ def iterator_getiter(context, builder, sig, args):
     return it
 
 @lower_builtin('iternext', MultiMapRangeIteratorType)
-@iternext_impl
+@iternext_impl(RefType.UNTRACKED)
 def iternext_listiter(context, builder, sig, args, result):
     ll_bool = context.get_value_type(types.bool_)  # lir.IntType(1)?
 

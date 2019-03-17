@@ -12,7 +12,8 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+    iternext_impl, RefType)
 from numba.targets.arrayobj import _getitem_array1d
 from numba.extending import register_model, models
 
@@ -1462,8 +1463,9 @@ def getiter_itertuples(context, builder, sig, args):
 
 # similar to iternext of ArrayIterator
 @lower_builtin('iternext', DataFrameTupleIterator)
-@iternext_impl
+@iternext_impl(RefType.UNTRACKED)
 def iternext_itertuples(context, builder, sig, args, result):
+    # TODO: refcount issues?
     iterty, = sig.args
     it, = args
 

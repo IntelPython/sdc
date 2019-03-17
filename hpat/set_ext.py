@@ -5,7 +5,7 @@ from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
 from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
-                                    iternext_impl, impl_ret_untracked)
+                                    iternext_impl, impl_ret_untracked, RefType)
 from numba import cgutils
 from numba.typing.templates import signature, AbstractTemplate, infer, infer_global
 
@@ -226,7 +226,7 @@ def getiter_set(context, builder, sig, args):
 
 
 @lower_builtin('iternext', SetIterType)
-@iternext_impl
+@iternext_impl(RefType.NEW)
 def iternext_setiter(context, builder, sig, args, result):
     iterty, = sig.args
     it, = args
