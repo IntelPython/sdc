@@ -590,6 +590,15 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
+    def test_pct_change1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            return df.pct_change(3)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
     def test_df_fillna1(self):
         def test_impl(df):
             return df.fillna(5.0)

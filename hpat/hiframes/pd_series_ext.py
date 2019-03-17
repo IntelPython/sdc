@@ -347,7 +347,7 @@ class SeriesAttribute(AttributeTemplate):
         out = ary
         # integers are converted to float64 to store NaN
         if isinstance(ary.dtype, types.Integer):
-            out.dtype = types.float64
+            out = out.copy(dtype=types.float64)
         return signature(out, *args)
 
     @bound_function("series.pct_change")
@@ -356,7 +356,7 @@ class SeriesAttribute(AttributeTemplate):
         out = ary
         # integers are converted to float64 to store NaN
         if isinstance(ary.dtype, types.Integer):
-            out.dtype = types.float64
+            out = out.copy(dtype=types.float64)
         return signature(out, *args)
 
     def _resolve_map_func(self, ary, args, kws):

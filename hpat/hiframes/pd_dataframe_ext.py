@@ -1081,3 +1081,32 @@ def append_overload(df, other, ignore_index=False, verify_integrity=False,
 
     raise ValueError("invalid df.append() input. Only dataframe and list"
                          " of dataframes supported")
+
+
+@overload_method(DataFrameType, 'pct_change')
+def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
+    # TODO: kwargs
+    # TODO: avoid dummy and generate func here when inlining is possible
+    def _impl(df, periods=1, fill_method='pad', limit=None, freq=None):
+        return hpat.hiframes.pd_dataframe_ext.pct_change_dummy(df, periods)
+
+    return _impl
+
+def pct_change_dummy(df, n):
+    return df
+
+@infer_global(pct_change_dummy)
+class PctChangeDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df = args[0]
+        float_arr = types.Array(types.float64, 1, 'C')
+        data = tuple(float_arr if isinstance(ary.dtype, types.Integer) else ary
+                    for ary in df.data)
+        out_df = DataFrameType(data, df.index, df.columns)
+        return signature(out_df, *args)
+
+@lower_builtin(pct_change_dummy, types.VarArg(types.Any))
+def lower_pct_change_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
