@@ -144,13 +144,13 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
         func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys
                       else "  arr = data[{}]\n".format(i - n_keys))
         if isinstance(typ, types.Array):
-            func_text += "  out_arr_{} = np.empty(n_out, arr.dtype)\n".format(i)
+            func_text += "  out_arr_{} = fix_cat_array_type(np.empty(n_out, arr.dtype))\n".format(i)
             func_text += "  send_buff_{} = arr\n".format(i)
             func_text += "  if not is_contig:\n"
             if i >= n_keys and init_vals != ():
-                func_text += "    send_buff_{} = np.full(n_send, init_vals[{}], arr.dtype)\n".format(i, i - n_keys)
+                func_text += "    send_buff_{} = fix_cat_array_type(np.full(n_send, init_vals[{}], arr.dtype))\n".format(i, i - n_keys)
             else:
-                func_text += "    send_buff_{} = np.empty(n_send, arr.dtype)\n".format(i)
+                func_text += "    send_buff_{} = fix_cat_array_type(np.empty(n_send, arr.dtype))\n".format(i)
         else:
             assert typ == string_array_type
             # send_buff is None for strings
@@ -213,7 +213,9 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
          'num_total_chars': num_total_chars,
          'get_data_ptr': get_data_ptr,
          'ShuffleMeta': ShuffleMeta,
-         'get_ctypes_ptr': get_ctypes_ptr}, loc_vars)
+         'get_ctypes_ptr': get_ctypes_ptr,
+         'fix_cat_array_type':
+         hpat.hiframes.pd_categorical_ext.fix_cat_array_type}, loc_vars)
     finalize_impl = loc_vars['f']
     return finalize_impl
 

@@ -45,7 +45,11 @@ def get_type_enum(arr):
 
 @overload(get_type_enum)
 def get_type_enum_overload(arr):
-    typ_val = _numba_to_c_type_map[arr.dtype]
+    dtype = arr.dtype
+    if isinstance(dtype, hpat.hiframes.pd_categorical_ext.PDCategoricalDtype):
+        dtype = hpat.hiframes.pd_categorical_ext.get_categories_int_type(dtype)
+
+    typ_val = _numba_to_c_type_map[dtype]
     return lambda arr: np.int32(typ_val)
 
 INT_MAX = np.iinfo(np.int32).max
