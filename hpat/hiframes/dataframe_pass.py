@@ -581,6 +581,9 @@ class DataFramePass(object):
         if fdef == ('pct_change_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_pct_change(assign, lhs, rhs)
 
+        if fdef == ('mean_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_mean(assign, lhs, rhs)
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -754,6 +757,19 @@ class DataFramePass(object):
                 *arg_typs, **kw_typs)
             stub = (lambda df, periods=1, fill_method='pad', limit=None,
                     freq=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'mean':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.mean_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, axis=None, skipna=None, level=None,
+                    numeric_only=None: None)
             return self._replace_func(impl, rhs.args,
                         pysig=numba.utils.pysignature(stub),
                         kws=dict(rhs.kws))
@@ -1035,6 +1051,33 @@ class DataFramePass(object):
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
         return self._replace_func(_pct_change_impl, col_vars + [periods], pre_nodes=nodes)
+
+    def _run_call_mean(self, assign, lhs, rhs):
+        # TODO: refactor
+        df_var = rhs.args[0]
+        df_typ = self.typemap[df_var.name]
+
+        # impl: for each column, convert data to series, call S.mean(), get
+        # output data and create a new indexed Series
+        n_cols = len(df_typ.columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _mean_impl({}):\n".format(", ".join(data_args))
+        for d in data_args:
+            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(d+'_S', d)
+            func_text += "  {} = {}.mean()\n".format(d+'_O', d+'_S')
+        func_text += "  data = np.array(({},))\n".format(
+            ", ".join(d+'_O' for d in data_args))
+        func_text += "  index = hpat.str_arr_ext.StringArray(({},))\n".format(
+            ", ".join("'{}'".format(c) for c in df_typ.columns))
+        func_text += "  return hpat.hiframes.api.init_series(data, index)\n"
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _mean_impl = loc_vars['_mean_impl']
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        return self._replace_func(_mean_impl, col_vars, pre_nodes=nodes)
 
     def _run_call_df_fillna(self, assign, lhs, rhs):
         df_var = rhs.args[0]

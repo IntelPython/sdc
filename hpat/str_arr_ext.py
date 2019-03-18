@@ -657,7 +657,11 @@ def construct_string_array(context, builder):
 # used in pd.DataFrame() and pd.Series() to convert list of strings
 @lower_builtin(StringArray)
 @lower_builtin(StringArray, types.List)
+@lower_builtin(StringArray, types.UniTuple)
 def impl_string_array_single(context, builder, sig, args):
+    if isinstance(args[0], types.UniTuple):
+        assert args[0].dtype == string_type
+
     if not sig.args:  # return empty string array if no args
         res = context.compile_internal(
             builder, lambda: pre_alloc_string_array(0, 0), sig, args)
