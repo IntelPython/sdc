@@ -66,6 +66,16 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': [-8,2,3,1,5,6,7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @unittest.skip("pending numba #3881")
+    def test_agg_seq_min_date(self):
+        def test_impl(df):
+            df2 = df.groupby('A', as_index=False).min()
+            return df2
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2,1,1,1,2,2,1], 'B': pd.date_range('2019-1-3', '2019-1-9')})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
     def test_agg_seq_max(self):
         def test_impl(df):
             A = df.groupby('A')['B'].max()
