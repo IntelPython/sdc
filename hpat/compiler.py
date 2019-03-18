@@ -1,5 +1,3 @@
-from __future__ import print_function, division, absolute_import
-
 # from .pio import PIO
 import hpat
 import hpat.hiframes
@@ -17,6 +15,10 @@ from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
 from hpat import config
 if config._has_h5py:
     from hpat import pio
+
+# workaround for Numba #3876 issue with large labels in mortgage benchmark
+from llvmlite import binding
+binding.set_option("tmp", "-non-global-value-max-name-size=2048")
 
 # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
 # def stage_io_pass(pipeline):
