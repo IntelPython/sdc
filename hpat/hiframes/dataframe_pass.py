@@ -590,6 +590,9 @@ class DataFramePass(object):
         if fdef == ('max_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_col_reduce(assign, lhs, rhs, 'max')
 
+        if fdef == ('min_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_col_reduce(assign, lhs, rhs, 'min')
+
         return [assign]
 
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
@@ -799,6 +802,19 @@ class DataFramePass(object):
             kw_typs = {name:self.typemap[v.name]
                     for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.max_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, axis=None, skipna=None, level=None,
+                    numeric_only=None: None)
+            return self._replace_func(impl, rhs.args,
+                        pysig=numba.utils.pysignature(stub),
+                        kws=dict(rhs.kws))
+
+        if func_name == 'min':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name:self.typemap[v.name]
+                    for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.min_overload(
                 *arg_typs, **kw_typs)
             stub = (lambda df, axis=None, skipna=None, level=None,
                     numeric_only=None: None)
