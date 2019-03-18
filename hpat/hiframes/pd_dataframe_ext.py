@@ -1334,3 +1334,28 @@ def lower_prod_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'count')
+def count_overload(df, axis=0, level=None, numeric_only=False):
+    # TODO: avoid dummy and generate func here when inlining is possible
+    def _impl(df, axis=0, level=None, numeric_only=False):
+        return hpat.hiframes.pd_dataframe_ext.count_dummy(df)
+
+    return _impl
+
+def count_dummy(df, n):
+    return df
+
+@infer_global(count_dummy)
+class CountDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        dtype = types.intp
+        out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
+        return signature(out, *args)
+
+@lower_builtin(count_dummy, types.VarArg(types.Any))
+def lower_count_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
