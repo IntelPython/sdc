@@ -16,3 +16,4 @@ HPAT documentation
    source/notsupported
    source/install
    source/development
+   source/aws
