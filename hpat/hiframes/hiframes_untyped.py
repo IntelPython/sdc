@@ -747,15 +747,43 @@ class HiFrames(object):
         # TODO: support other args
         dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype')
 
-        dtype_map = guard(get_definition, self.func_ir, dtype_var)
-        if (not isinstance(dtype_map, ir.Expr)
-                 or dtype_map.op != 'build_map'):  # pragma: no cover
-            raise ValueError("pd.read_csv() dtype should be constant dictionary")
-
         date_cols = []
         if 'parse_dates' in kws:
             err_msg = "pd.read_csv() parse_dates should be constant list"
             date_cols = self._get_str_or_list(kws['parse_dates'], err_msg=err_msg, typ=int)
+
+        columns, data_arrs, out_types = self._get_csv_col_info(
+            dtype_var, date_cols, col_names, lhs)
+
+        nodes = [csv_ext.CsvReader(
+            fname, lhs.name, sep, columns, data_arrs, out_types, usecols, lhs.loc)]
+
+        n_cols = len(columns)
+        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
+
+        func_text = "def _init_df({}):\n".format(data_args)
+        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            data_args, ", ".join("'{}'".format(c) for c in columns))
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _init_df = loc_vars['_init_df']
+
+        f_block = compile_to_numba_ir(
+            _init_df, {'hpat': hpat}).blocks.popitem()[1]
+        replace_arg_nodes(f_block, data_arrs)
+        nodes += f_block.body[:-2]
+        nodes[-1].target = lhs
+        return nodes
+
+    def _get_csv_col_info(self, dtype_var, date_cols, col_names, lhs):
+        dtype_map = guard(get_definition, self.func_ir, dtype_var)
+        if (not isinstance(dtype_map, ir.Expr)
+                 or dtype_map.op != 'build_map'):  # pragma: no cover
+            # try single type for all columns case
+            typ = self._get_const_dtype(dtype_var)
+            data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
+                        for cname in col_names]
+            return col_names, data_arrs, [typ]*len(col_names)
 
         columns = []
         data_arrs = []
@@ -779,26 +807,7 @@ class HiFrames(object):
         dtype_map.op = 'build_list'
         dtype_map.items = [v[0] for v in dtype_map.items]
 
-        nodes = [csv_ext.CsvReader(
-            fname, lhs.name, sep, columns, data_arrs, out_types, usecols, lhs.loc)]
-
-        n_cols = len(dtype_map.items)
-        data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
-
-        func_text = "def _init_df({}):\n".format(data_args)
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            data_args, ", ".join("'{}'".format(c) for c in columns))
-        loc_vars = {}
-        exec(func_text, {}, loc_vars)
-        _init_df = loc_vars['_init_df']
-
-        f_block = compile_to_numba_ir(
-            _init_df, {'hpat': hpat}).blocks.popitem()[1]
-        replace_arg_nodes(f_block, data_arrs)
-        nodes += f_block.body[:-2]
-        nodes[-1].target = lhs
-        return nodes
-
+        return columns, data_arrs, out_types
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)

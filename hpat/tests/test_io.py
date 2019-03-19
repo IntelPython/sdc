@@ -31,6 +31,15 @@ class TestIO(unittest.TestCase):
             with open("csv_data_cat1.csv", "w") as f:
                 f.write(data)
 
+            # test_csv_single_dtype1
+            data = ("2,4.1\n"
+                    "3,3.4\n"
+                    "4,1.3\n"
+                    "5,1.1\n")
+
+            with open("csv_data_dtype1.csv", "w") as f:
+                f.write(data)
+
             # test_np_io1
             n = 111
             A = np.random.ranf(n)
@@ -363,6 +372,16 @@ class TestIO(unittest.TestCase):
             df = pd.read_csv("csv_data_cat1.csv",
                 names=['C1', 'C2', 'C3'],
                 dtype={'C1':np.int, 'C2': ct_dtype, 'C3':str},
+            )
+            return df
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_csv_single_dtype1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_dtype1.csv",
+                names=['C1', 'C2'],
+                dtype=np.float64,
             )
             return df
         hpat_func = hpat.jit(test_impl)
