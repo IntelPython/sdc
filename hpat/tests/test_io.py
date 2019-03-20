@@ -387,6 +387,38 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_write_csv1(self):
+        def test_impl(df, fname):
+            df.to_csv(fname)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        df = pd.DataFrame({'A': np.arange(n)})
+        hp_fname = 'test_write_csv1_hpat.csv'
+        pd_fname = 'test_write_csv1_pd.csv'
+        hpat_func(df, hp_fname)
+        test_impl(df, pd_fname)
+        # TODO: delete files
+        pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
+
+    def test_write_csv_parallel1(self):
+        def test_impl(n, fname):
+            df = pd.DataFrame({'A': np.arange(n)})
+            df.to_csv(fname)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        hp_fname = 'test_write_csv1_hpat_par.csv'
+        pd_fname = 'test_write_csv1_pd_par.csv'
+        hpat_func(n, hp_fname)
+        test_impl(n, pd_fname)
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        # TODO: delete files
+        if get_rank() == 0:
+            pd.testing.assert_frame_equal(
+                pd.read_csv(hp_fname), pd.read_csv(pd_fname))
+
     def test_np_io1(self):
         def test_impl():
             A = np.fromfile("np_file1.dat", np.float64)

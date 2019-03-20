@@ -103,7 +103,6 @@ class DistributedAnalysis(object):
                 self._set_REP(inst.list_vars(), array_dists)
 
     def _analyze_assign(self, inst, array_dists, parfor_dists):
-        from hpat.hiframes.pd_dataframe_ext import DataFrameType
         lhs = inst.target.name
         rhs = inst.value
         # treat return casts like assignments
@@ -139,6 +138,10 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, arr, array_dists)
             # keep lhs in table for dot() handling
             self._T_arrs.add(lhs)
+            return
+        elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
+                and isinstance(self.typemap[rhs.value.name], DataFrameType)
+                and rhs.attr == 'to_csv'):
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
@@ -261,6 +264,12 @@ class DistributedAnalysis(object):
         # handle array.func calls
         if isinstance(func_mod, ir.Var) and is_array(self.typemap, func_mod.name):
             self._analyze_call_array(lhs, func_mod, func_name, args, array_dists)
+            return
+
+        # handle df.func calls
+        if isinstance(func_mod, ir.Var) and isinstance(
+                self.typemap[func_mod.name], DataFrameType):
+            self._analyze_call_df(lhs, func_mod, func_name, args, array_dists)
             return
 
         # hpat.distributed_api functions
@@ -566,6 +575,13 @@ class DistributedAnalysis(object):
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
 
+    def _analyze_call_df(self, lhs, arr, func_name, args, array_dists):
+        # to_csv() can be parallelized
+        if func_name == 'to_csv':
+            return
+
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, args, array_dists, 'df.' + func_name)
 
     def _analyze_call_hpat_dist(self, lhs, func_name, args, array_dists):
         """analyze distributions of hpat distributed functions
@@ -801,7 +817,6 @@ class DistributedAnalysis(object):
         return new_dist
 
     def _set_REP(self, var_list, array_dists):
-        from hpat.hiframes.pd_dataframe_ext import DataFrameType
         for var in var_list:
             varname = var.name
             # Handle SeriesType since it comes from Arg node and it could

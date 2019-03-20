@@ -1359,3 +1359,44 @@ def lower_count_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
+
+
+@overload_method(DataFrameType, 'to_csv')
+def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
+        columns=None, header=True, index=True, index_label=None, mode='w',
+        encoding=None, compression='infer', quoting=None, quotechar='"',
+        line_terminator=None, chunksize=None, tupleize_cols=None,
+        date_format=None, doublequote=True, escapechar=None, decimal='.'):
+
+    # TODO: refactor when objmode() can understand global string constant
+    # String output case
+    if path_or_buf is None or path_or_buf == types.none:
+        def _impl(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
+                columns=None, header=True, index=True, index_label=None,
+                mode='w', encoding=None, compression='infer', quoting=None,
+                quotechar='"', line_terminator=None, chunksize=None,
+                tupleize_cols=None, date_format=None, doublequote=True,
+                escapechar=None, decimal='.'):
+            with numba.objmode(D='unicode_type'):
+                D = df.to_csv(path_or_buf, sep, na_rep, float_format,
+                    columns, header, index, index_label, mode,
+                    encoding, compression, quoting, quotechar,
+                    line_terminator, chunksize, tupleize_cols,
+                    date_format, doublequote, escapechar, decimal)
+            return D
+
+        return _impl
+
+    def _impl(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
+            columns=None, header=True, index=True, index_label=None, mode='w',
+            encoding=None, compression='infer', quoting=None, quotechar='"',
+            line_terminator=None, chunksize=None, tupleize_cols=None,
+            date_format=None, doublequote=True, escapechar=None, decimal='.'):
+        with numba.objmode:
+            df.to_csv(path_or_buf, sep, na_rep, float_format,
+                columns, header, index, index_label, mode,
+                encoding, compression, quoting, quotechar,
+                line_terminator, chunksize, tupleize_cols,
+                date_format, doublequote, escapechar, decimal)
+
+    return _impl

@@ -38,6 +38,7 @@ from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
                         debug_prints, ReplaceFunc, gen_getitem)
 from hpat.distributed_api import Reduce_Type
+from hpat.hiframes.pd_dataframe_ext import DataFrameType
 
 distributed_run_extensions = {}
 
@@ -401,6 +402,10 @@ class DistributedPass(object):
         # array.func calls
         if isinstance(func_mod, ir.Var) and is_np_array(self.typemap, func_mod.name):
             return self._run_call_array(lhs, func_mod, func_name, assign, rhs.args)
+
+        # df.func calls
+        if isinstance(func_mod, ir.Var) and isinstance(self.typemap[func_mod.name], DataFrameType):
+            return self._run_call_df(lhs, func_mod, func_name, assign, rhs.args)
 
         # string_array.func_calls
         if (self._is_1D_arr(lhs) and isinstance(func_mod, ir.Var)
@@ -880,6 +885,55 @@ class DistributedPass(object):
 
         return out
 
+    def _run_call_df(self, lhs, df, func_name, assign, args):
+        if func_name == 'to_csv' and self._is_1D_arr(df.name):
+            # df.to_csv(fname) ->
+            # str_out = df.to_csv(None)
+            # hpat.io._file_write_parallel(fname, str_out)
+
+            fname = args[0]
+
+            # fix to_csv() type to have None as 1st arg
+            rhs = assign.value
+            call_type = self.calltypes.pop(rhs)
+            self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
+                self.typingctx, (types.none,)+call_type.args[1:], {})
+            # self.calltypes[rhs] = numba.typing.Signature(
+            #    string_type, (types.none,)+call_type.args[1:], call_type.recvr,
+            #    call_type.pysig)
+
+            # None as 1st arg
+            none_var = ir.Var(assign.target.scope, mk_unique_var('none'), rhs.loc)
+            self.typemap[none_var.name] = types.none
+            none_assign = ir.Assign(ir.Const(None, rhs.loc), none_var, rhs.loc)
+            rhs.args[0] = none_var
+
+            # str_out = df.to_csv(None)
+            str_out = ir.Var(assign.target.scope, mk_unique_var('write_csv'), rhs.loc)
+            self.typemap[str_out.name] = string_type
+            new_assign = ir.Assign(rhs, str_out, rhs.loc)
+
+            # print_node = ir.Print([str_out], None, rhs.loc)
+            # self.calltypes[print_node] = signature(types.none, string_type)
+            # assign.value = ir.Const(None, rhs.loc)
+            # return [assign, none_assign, new_assign, print_node]
+
+            # TODO: fix lazy IO load
+            import hio
+            import llvmlite.binding as ll
+            ll.add_symbol('file_write_parallel', hio.file_write_parallel)
+
+
+            def f(fname, str_out):  # pragma: no cover
+                count = len(str_out)
+                start = hpat.distributed_api.dist_exscan(count)
+                hpat.io._file_write_parallel(
+                    fname._data, str_out._data, start, count, 1)
+
+            return self._replace_func(
+                f, [fname, str_out], pre_nodes=[none_assign, new_assign])
+
+        return [assign]
 
     def _run_permutation_int(self, assign, args):
         lhs = assign.target
