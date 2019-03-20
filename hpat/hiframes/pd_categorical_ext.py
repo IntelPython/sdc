@@ -123,6 +123,8 @@ def cat_overload_dummy(val_list):
 
 @intrinsic
 def fix_cat_array_type(typingctx, arr=None):
+    # fix array type from Array(CatDtype) to CategoricalArray(CatDtype)
+    # no-op for other arrays
     fixed_arr = arr
     if isinstance(arr.dtype, PDCategoricalDtype):
         fixed_arr = CategoricalArray(arr.dtype)
@@ -131,3 +133,17 @@ def fix_cat_array_type(typingctx, arr=None):
         return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
     return fixed_arr(arr), codegen
+
+@intrinsic
+def cat_array_to_int(typingctx, arr=None):
+    # TODO: fix aliasing
+    # get the underlying integer array for a CategoricalArray
+    out_arr = arr
+    if isinstance(arr.dtype, PDCategoricalDtype):
+        int_dtype = get_categories_int_type(arr.dtype)
+        out_arr = types.Array(int_dtype, 1, 'C')
+
+    def codegen(context, builder, sig, args):
+        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+    return out_arr(arr), codegen

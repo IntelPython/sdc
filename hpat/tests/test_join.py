@@ -283,6 +283,25 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_join_cat2(self):
+        # test setting NaN in categorical array
+        def test_impl():
+            ct_dtype = CategoricalDtype(['A', 'B', 'C'])
+            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
+            df1 = pd.read_csv("csv_data_cat1.csv",
+                names=['C1', 'C2', 'C3'],
+                dtype=dtypes,
+            )
+            n = len(df1)
+            df2 = pd.DataFrame({'C1': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+            df3 = df1.merge(df2, on='C1', how='right')
+            return df3
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(
+            hpat_func().sort_values('C1').reset_index(drop=True),
+            test_impl().sort_values('C1').reset_index(drop=True))
+
     def test_join_cat_parallel1(self):
         # TODO: cat as keys
         def test_impl():

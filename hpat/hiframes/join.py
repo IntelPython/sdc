@@ -26,6 +26,7 @@ from hpat.shuffle_utils import (getitem_arr_tup_single, val_to_tup, alltoallv,
     alltoallv_tup, finalize_shuffle_meta,
     update_shuffle_meta,  alloc_pre_shuffle_metadata,
     _get_keys_tup, _get_data_tup)
+from hpat.hiframes.pd_categorical_ext import CategoricalArray
 
 
 class Join(ir.Stmt):
@@ -1106,9 +1107,15 @@ def setitem_arr_nan_overload(arr, ind):
         def b_set(arr, ind):
             arr[ind] = False
         return b_set
-    # XXX set integer NA to 0 to avoid unexpected errors (e.g. categorical)
+
+    if isinstance(arr, CategoricalArray):
+        def setitem_arr_nan_cat(arr, ind):
+            int_arr = hpat.hiframes.pd_categorical_ext.cat_array_to_int(arr)
+            int_arr[ind] = -1
+        return setitem_arr_nan_cat
+
+    # XXX set integer NA to 0 to avoid unexpected errors
     # TODO: convert integer to float if nan
-    # TODO: handle categorical
     if isinstance(arr.dtype, types.Integer):
         def setitem_arr_nan_int(arr, ind):
             arr[ind] = 0
