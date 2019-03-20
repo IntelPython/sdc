@@ -553,6 +553,9 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, in_arr_name, array_dists)
             # TODO: support 1D_Var reshape
             if func_name == 'reshape' and array_dists[lhs] == Distribution.OneD_Var:
+                # HACK support A.reshape(n, 1) for 1D_Var
+                if len(args) == 2 and guard(find_const, self.func_ir, args[1]) == 1:
+                    return
                 self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
             return
 

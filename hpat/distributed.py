@@ -826,6 +826,19 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[arr.name]
             self._array_sizes[lhs] = self._array_sizes[arr.name]
 
+        # HACK support A.reshape(n, 1) for 1D_Var
+        if func_name == 'reshape' and self._is_1D_Var_arr(arr.name):
+            assert len(args) == 2 and guard(find_const, self.func_ir, args[1]) == 1
+            assert args[0].name in self.oneDVar_len_vars
+            size_var = args[0]
+            out, new_size_var = self._fix_1D_Var_alloc(
+                size_var, lhs, assign.target.scope, assign.loc)
+            # empty_inferred is tuple for some reason
+            assign.value.args = list(args)
+            assign.value.args[0] = new_size_var
+            out.append(assign)
+            return out
+
         if func_name == 'reshape' and self._is_1D_arr(arr.name):
             return self._run_reshape(assign, arr, args)
 
