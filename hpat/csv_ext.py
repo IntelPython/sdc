@@ -26,7 +26,7 @@ from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc, skip_first=False):
+    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc, skiprows=0):
         self.file_name = file_name
         self.df_out = df_out
         self.sep = sep
@@ -35,7 +35,7 @@ class CsvReader(ir.Stmt):
         self.out_types = out_types
         self.usecols = usecols
         self.loc = loc
-        self.skip_first = skip_first
+        self.skiprows = skiprows
 
     def __repr__(self):  # pragma: no cover
         # TODO
@@ -218,7 +218,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
 
     csv_reader_py = _gen_csv_reader_py(
         csv_node.df_colnames, csv_node.out_types, csv_node.usecols,
-        csv_node.sep, typingctx, targetctx, parallel, csv_node.skip_first)
+        csv_node.sep, typingctx, targetctx, parallel, csv_node.skiprows)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -304,7 +304,7 @@ def _get_pd_dtype_str(t):
 # (numba/lowering.py:self.context.add_dynamic_addr ...)
 compiled_funcs = []
 
-def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skip_first):
+def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skiprows):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t.dtype == types.NPDatetime('ns'))
@@ -314,9 +314,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
                           for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
-    func_text += "  skiprows = 0\n"
-    func_text += "  if {}:\n".format(skip_first)
-    func_text += "      skiprows = 1\n"
+    func_text += "  skiprows = {}\n".format(skiprows)
     func_text += "  f_reader = csv_file_chunk_reader(fname._data, {}, skiprows, -1)\n".format(
                                                                       parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)

@@ -738,8 +738,8 @@ class HiFrames(object):
         # TODO: header arg
         names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names', '')
         dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype', '')
+        skiprows = self._get_str_arg('read_csv', rhs.args, kws, 16, 'skiprows', 0)
 
-        skip_first = False
         col_names = self._get_str_or_list(names_var, default=0)
         if dtype_var is '':
             # infer column names and types from constant filename
@@ -748,7 +748,7 @@ class HiFrames(object):
                 raise ValueError("pd.read_csv() requires explicit type"
                     "annotation using 'dtype' if filename is not constant")
             rows_to_read = 100  # TODO: tune this
-            df = pd.read_csv(fname_const, nrows=rows_to_read)
+            df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
             # TODO: string_array, categorical, etc.
             dtypes = [types.Array(numba.typeof(d).dtype, 1, 'C')
                       for d in df.dtypes.values]
@@ -756,9 +756,11 @@ class HiFrames(object):
             # overwrite column names like Pandas if explicitly provided
             if col_names != 0:
                 cols[-len(col_names):] = col_names
+            else:
+                # a row is used for names if not provided
+                skiprows += 1
             col_names = cols
             dtype_map = {c:d for c,d in zip(col_names, dtypes)}
-            skip_first = True
         else:
             dtype_map = guard(get_definition, self.func_ir, dtype_var)
             if (not isinstance(dtype_map, ir.Expr)
@@ -799,7 +801,7 @@ class HiFrames(object):
 
         nodes = [csv_ext.CsvReader(
             fname, lhs.name, sep, columns, data_arrs, out_types, usecols,
-            lhs.loc, skip_first)]
+            lhs.loc, skiprows)]
 
         n_cols = len(columns)
         data_args = ", ".join('data{}'.format(i) for i in range(n_cols))

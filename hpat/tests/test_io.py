@@ -313,6 +313,32 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_csv_skip1(self):
+        def test_impl():
+            return pd.read_csv("csv_data1.csv",
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int},
+                skiprows=2,
+            )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_csv_infer_skip1(self):
+        def test_impl():
+            return pd.read_csv("csv_data_infer1.csv", skiprows=2)
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_csv_infer_skip_parallel1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_infer1.csv", skiprows=2,
+                names=['A', 'B', 'C', 'D'])
+            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_csv_rm_dead1(self):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
