@@ -158,6 +158,39 @@ class TestJoin(unittest.TestCase):
         self.assertEqual(h_res, p_res)
         self.assertEqual(count_array_OneDs(), 3)
 
+    def test_join_datetime_seq1(self):
+        def test_impl(df1, df2):
+            return pd.merge(df1, df2, on='time')
+
+        hpat_func = hpat.jit(test_impl)
+        df1 = pd.DataFrame(
+            {'time': pd.DatetimeIndex(
+                ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
+        df2 = pd.DataFrame(
+            {'time': pd.DatetimeIndex(
+                ['2017-01-01', '2017-01-06', '2017-01-03']), 'A': [7, 8, 9]})
+        pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
+
+    def test_join_datetime_parallel1(self):
+        def test_impl(df1, df2):
+            df3 = pd.merge(df1, df2, on='time')
+            return (df3.A.sum(), df3.time.max(), df3.B.sum())
+
+        hpat_func = hpat.jit(distributed=['df1', 'df2'])(test_impl)
+        df1 = pd.DataFrame(
+            {'time': pd.DatetimeIndex(
+                ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
+        df2 = pd.DataFrame(
+            {'time': pd.DatetimeIndex(
+                ['2017-01-01', '2017-01-06', '2017-01-03']), 'A': [7, 8, 9]})
+        start1, end1 = get_start_end(len(df1))
+        start2, end2 = get_start_end(len(df2))
+        self.assertEqual(
+            hpat_func(df1.iloc[start1:end1], df2.iloc[start2:end2]),
+            test_impl(df1, df2))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_merge_asof_seq1(self):
         def test_impl(df1, df2):
             return pd.merge_asof(df1, df2, on='time')

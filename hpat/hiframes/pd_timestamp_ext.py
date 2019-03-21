@@ -780,6 +780,12 @@ def type_dt64_to_int(context):
 def impl_dt64_to_int(context, builder, sig, args):
     return args[0]
 
+# TODO: fix in Numba
+@overload_method(types.NPDatetime, '__hash__')
+def dt64_hash(val):
+    return lambda val: hash(dt64_to_integer(val))
+
+
 #-----------------------------------------------------------
 def timedelta64_to_integer(val):
     return int(val)
