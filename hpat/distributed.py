@@ -913,12 +913,31 @@ class DistributedPass(object):
             nodes.append(ir.Assign(new_to_csv, new_func, new_df.loc))
             rhs.func = new_func
 
+            # # header = header and is_root
+            kws = dict(rhs.kws)
+            true_var = ir.Var(assign.target.scope, mk_unique_var('true'), rhs.loc)
+            self.typemap[true_var.name] = types.bool_
+            nodes.append(
+                ir.Assign(ir.Const(True, new_df.loc), true_var, new_df.loc))
+            header_var = self._get_arg(
+                'to_csv', rhs.args, kws, 5, 'header', true_var)
+            nodes += self._gen_is_root_and_cond(header_var)
+            header_var = nodes[-1].target
+            if len(rhs.args) > 5:
+                rhs.args[5] = header_var
+            else:
+                kws['header'] = header_var
+                rhs.kws = kws
+
             # fix to_csv() type to have None as 1st arg
             call_type = self.calltypes.pop(rhs)
+            arg_typs = list((types.none,)+call_type.args[1:])
+            arg_typs[5] = types.bool_
+            arg_typs = tuple(arg_typs)
             # self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
-            #      self.typingctx, (types.none,)+call_type.args[1:], {})
+            #      self.typingctx, arg_typs, {})
             self.calltypes[rhs] = numba.typing.Signature(
-               string_type, (types.none,) + call_type.args[1:], new_df_typ,
+               string_type, arg_typs, new_df_typ,
                call_type.pysig)
 
             # None as 1st arg
@@ -955,6 +974,18 @@ class DistributedPass(object):
                 f, [fname, str_out], pre_nodes=nodes)
 
         return [assign]
+
+    def _gen_is_root_and_cond(self, cond_var):
+        def f(cond):
+            return cond & hpat.distributed_api.get_rank() == 0
+        f_block = compile_to_numba_ir(f, {'hpat': hpat},
+                                    self.typingctx,
+                                    (self.typemap[cond_var.name],),
+                                    self.typemap,
+                                    self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [cond_var])
+        nodes = f_block.body[:-2]
+        return nodes
 
     def _fix_parallel_df_index(self, df):
         def f(df):  # pragma: no cover
