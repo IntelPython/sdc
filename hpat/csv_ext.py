@@ -266,7 +266,8 @@ def box_stream_reader(typ, val, c):
     return val
 
 csv_file_chunk_reader = types.ExternalFunction(
-    "csv_file_chunk_reader", stream_reader_type(types.voidptr, types.bool_))
+    "csv_file_chunk_reader", stream_reader_type(
+        types.voidptr, types.bool_, types.int64, types.int64))
 
 def _get_dtype_str(t):
     dtype = t.dtype
@@ -313,20 +314,16 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
                           for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
-    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {})\n".format(
-                                                                      parallel)
-    # skip first row if skip_first set and on rank 0 or not parallel
-    # TODO: rebalance if set
-    func_text += "  is_root = (hpat.distributed_api.get_rank() == 0) | (not {})\n".format(parallel)
     func_text += "  skiprows = 0\n"
-    func_text += "  if is_root and {}:\n".format(skip_first)
+    func_text += "  if {}:\n".format(skip_first)
     func_text += "      skiprows = 1\n"
+    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {}, skiprows, -1)\n".format(
+                                                                      parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
     func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
-    func_text += "       usecols={}, sep='{}',\n".format(usecols, sep)
-    func_text += "       skiprows=skiprows)\n"
+    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
     for cname in col_names:
         func_text += "    {} = df['{}'].values\n".format(_sanitize_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)

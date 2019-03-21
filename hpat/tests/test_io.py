@@ -305,6 +305,14 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_csv_infer_parallel1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_infer1.csv")
+            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_csv_rm_dead1(self):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
