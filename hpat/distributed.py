@@ -955,13 +955,15 @@ class DistributedPass(object):
 
             # print_node = ir.Print([str_out], None, rhs.loc)
             # self.calltypes[print_node] = signature(types.none, string_type)
-            # assign.value = ir.Const(None, rhs.loc)
-            # return [assign, none_assign, new_assign, print_node]
+            # nodes.append(print_node)
 
             # TODO: fix lazy IO load
             import hio
             import llvmlite.binding as ll
             ll.add_symbol('file_write_parallel', hio.file_write_parallel)
+            # HACK use the string in a dummy function to avoid refcount issues
+            # TODO: fix string data reference count
+            dummy_use = numba.njit(lambda a: None)
 
 
             def f(fname, str_out):  # pragma: no cover
@@ -969,6 +971,7 @@ class DistributedPass(object):
                 start = hpat.distributed_api.dist_exscan(count)
                 hpat.io._file_write_parallel(
                     fname._data, str_out._data, start, count, 1)
+                dummy_use(str_out)
 
             return self._replace_func(
                 f, [fname, str_out], pre_nodes=nodes)
@@ -977,7 +980,7 @@ class DistributedPass(object):
 
     def _gen_is_root_and_cond(self, cond_var):
         def f(cond):
-            return cond & hpat.distributed_api.get_rank() == 0
+            return cond & (hpat.distributed_api.get_rank() == 0)
         f_block = compile_to_numba_ir(f, {'hpat': hpat},
                                     self.typingctx,
                                     (self.typemap[cond_var.name],),
