@@ -736,16 +736,58 @@ class HiFrames(object):
         sep = self._get_str_arg('read_csv', rhs.args, kws, 1, 'sep', ',')
         sep = self._get_str_arg('read_csv', rhs.args, kws, 2, 'delimiter', sep)
         # TODO: header arg
-        names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names')
-        err_msg = "pd.read_csv() names should be constant list"
-        col_names = self._get_str_or_list(names_var, err_msg=err_msg)
+        names_var = self._get_arg('read_csv', rhs.args, kws, 4, 'names', '')
+        dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype', '')
+
+        skip_first = False
+        col_names = self._get_str_or_list(names_var, default=0)
+        if dtype_var is '':
+            # infer column names and types from constant filename
+            fname_const = guard(find_const, self.func_ir, fname)
+            if fname_const is None:
+                raise ValueError("pd.read_csv() requires explicit type"
+                    "annotation using 'dtype' if filename is not constant")
+            rows_to_read = 100  # TODO: tune this
+            df = pd.read_csv(fname_const, nrows=rows_to_read)
+            # TODO: string_array, categorical, etc.
+            dtypes = [types.Array(numba.typeof(d).dtype, 1, 'C')
+                      for d in df.dtypes.values]
+            cols = df.columns.to_list()
+            # overwrite column names like Pandas if explicitly provided
+            if col_names != 0:
+                cols[-len(col_names):] = col_names
+            col_names = cols
+            dtype_map = {c:d for c,d in zip(col_names, dtypes)}
+            skip_first = True
+        else:
+            dtype_map = guard(get_definition, self.func_ir, dtype_var)
+            if (not isinstance(dtype_map, ir.Expr)
+                    or dtype_map.op != 'build_map'):  # pragma: no cover
+                # try single type for all columns case
+                dtype_map = self._get_const_dtype(dtype_var)
+            else:
+                new_dtype_map = {}
+                for n_var, t_var in dtype_map.items:
+                    # find constant column name
+                    c = guard(find_const, self.func_ir, n_var)
+                    if c is None:  # pragma: no cover
+                        raise ValueError("dtype column names should be constant")
+                    new_dtype_map[c] = self._get_const_dtype(t_var)
+
+                # HACK replace build_map to avoid inference errors
+                dtype_map.op = 'build_list'
+                dtype_map.items = [v[0] for v in dtype_map.items]
+                dtype_map = new_dtype_map
+
+        if col_names == 0:
+            raise ValueError("pd.read_csv() names should be constant list")
+
         usecols_var = self._get_arg('read_csv', rhs.args, kws, 6, 'usecols', '')
         usecols = list(range(len(col_names)))
         if usecols_var != '':
             err_msg = "pd.read_csv() usecols should be constant list of ints"
             usecols = self._get_str_or_list(usecols_var, err_msg=err_msg, typ=int)
         # TODO: support other args
-        dtype_var = self._get_arg('read_csv', rhs.args, kws, 10, 'dtype')
 
         date_cols = []
         if 'parse_dates' in kws:
@@ -753,10 +795,11 @@ class HiFrames(object):
             date_cols = self._get_str_or_list(kws['parse_dates'], err_msg=err_msg, typ=int)
 
         columns, data_arrs, out_types = self._get_csv_col_info(
-            dtype_var, date_cols, col_names, lhs)
+            dtype_map, date_cols, col_names, lhs)
 
         nodes = [csv_ext.CsvReader(
-            fname, lhs.name, sep, columns, data_arrs, out_types, usecols, lhs.loc)]
+            fname, lhs.name, sep, columns, data_arrs, out_types, usecols,
+            lhs.loc, skip_first)]
 
         n_cols = len(columns)
         data_args = ", ".join('data{}'.format(i) for i in range(n_cols))
@@ -775,12 +818,9 @@ class HiFrames(object):
         nodes[-1].target = lhs
         return nodes
 
-    def _get_csv_col_info(self, dtype_var, date_cols, col_names, lhs):
-        dtype_map = guard(get_definition, self.func_ir, dtype_var)
-        if (not isinstance(dtype_map, ir.Expr)
-                 or dtype_map.op != 'build_map'):  # pragma: no cover
-            # try single type for all columns case
-            typ = self._get_const_dtype(dtype_var)
+    def _get_csv_col_info(self, dtype_map, date_cols, col_names, lhs):
+        if isinstance(dtype_map, types.Type):
+            typ = dtype_map
             data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
                         for cname in col_names]
             return col_names, data_arrs, [typ]*len(col_names)
@@ -788,24 +828,15 @@ class HiFrames(object):
         columns = []
         data_arrs = []
         out_types = []
-        for i, (name_var, dtype_var) in enumerate(dtype_map.items):
-            # find constant column name
-            col_name = guard(find_const, self.func_ir, name_var)
-            if col_name is None:  # pragma: no cover
-                raise ValueError("dtype column names should be constant")
+        for i, (col_name, typ) in enumerate(dtype_map.items()):
             columns.append(col_name)
             # get array dtype
-            typ = self._get_const_dtype(dtype_var)
             if i in date_cols:
                 typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
             # output array variable
             data_arrs.append(
                 ir.Var(lhs.scope, mk_unique_var(col_name), lhs.loc))
-
-        # HACK replace build_map to avoid inference errors
-        dtype_map.op = 'build_list'
-        dtype_map.items = [v[0] for v in dtype_map.items]
 
         return columns, data_arrs, out_types
 

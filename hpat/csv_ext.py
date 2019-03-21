@@ -26,7 +26,7 @@ from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
 
 
 class CsvReader(ir.Stmt):
-    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc):
+    def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc, skip_first=False):
         self.file_name = file_name
         self.df_out = df_out
         self.sep = sep
@@ -35,6 +35,7 @@ class CsvReader(ir.Stmt):
         self.out_types = out_types
         self.usecols = usecols
         self.loc = loc
+        self.skip_first = skip_first
 
     def __repr__(self):  # pragma: no cover
         # TODO
@@ -217,7 +218,7 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
 
     csv_reader_py = _gen_csv_reader_py(
         csv_node.df_colnames, csv_node.out_types, csv_node.usecols,
-        csv_node.sep, typingctx, targetctx, parallel)
+        csv_node.sep, typingctx, targetctx, parallel, csv_node.skip_first)
 
     f_block = compile_to_numba_ir(csv_impl,
                                   {'_csv_reader_py': csv_reader_py},
@@ -302,11 +303,11 @@ def _get_pd_dtype_str(t):
 # (numba/lowering.py:self.context.add_dynamic_addr ...)
 compiled_funcs = []
 
-def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel):
+def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skip_first):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
                            if t.dtype == types.NPDatetime('ns'))
-    typ_strs = ", ".join(["{}='{}'".format(cname, _get_dtype_str(t))
+    typ_strs = ", ".join(["{}='{}'".format(_sanitize_varname(cname), _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
@@ -314,15 +315,22 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     func_text = "def csv_reader_py(fname):\n"
     func_text += "  f_reader = csv_file_chunk_reader(fname._data, {})\n".format(
                                                                       parallel)
+    # skip first row if skip_first set and on rank 0 or not parallel
+    # TODO: rebalance if set
+    func_text += "  is_root = (hpat.distributed_api.get_rank() == 0) | (not {})\n".format(parallel)
+    func_text += "  skiprows = 0\n"
+    func_text += "  if is_root and {}:\n".format(skip_first)
+    func_text += "      skiprows = 1\n"
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
     func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
-    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
+    func_text += "       usecols={}, sep='{}',\n".format(usecols, sep)
+    func_text += "       skiprows=skiprows)\n"
     for cname in col_names:
-        func_text += "    {} = df.{}.values\n".format(cname, cname)
+        func_text += "    {} = df['{}'].values\n".format(_sanitize_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)
-    func_text += "  return ({},)\n".format(", ".join(col_names))
+    func_text += "  return ({},)\n".format(", ".join(_sanitize_varname(c) for c in col_names))
 
     # print(func_text)
     glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
@@ -336,3 +344,9 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     jit_func = numba.njit(csv_reader_py)
     compiled_funcs.append(jit_func)
     return jit_func
+
+def _sanitize_varname(varname):
+    new_name = varname.replace('$', '_').replace('.', '_')
+    if not new_name[0].isalpha():
+        new_name = '_' + new_name
+    return new_name

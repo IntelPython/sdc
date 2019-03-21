@@ -83,6 +83,10 @@ data = ("0,2.3,4.6,47736\n"
 with open("csv_data1.csv", "w") as f:
     f.write(data)
 
+
+with open("csv_data_infer1.csv", "w") as f:
+    f.write('A,B,C,D\n'+data)
+
 data = ("0,2.3,2015-01-03,47736\n"
         "1,2.3,1966-11-13,47736\n"
         "2,2.3,1998-05-21,47736\n"
