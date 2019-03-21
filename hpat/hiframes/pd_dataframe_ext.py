@@ -36,9 +36,10 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
             name="dataframe({}, {}, {}, {})".format(
                 data, index, columns, has_parent))
 
-    def copy(self, has_parent=None):
+    def copy(self, index=None, has_parent=None):
         # XXX is copy necessary?
-        index = types.none if self.index == types.none else self.index.copy()
+        if index is None:
+            index = types.none if self.index == types.none else self.index.copy()
         data = tuple(a.copy() for a in self.data)
         if has_parent is None:
             has_parent = self.has_parent
@@ -264,6 +265,43 @@ def get_dataframe_data(df, i):
 def get_dataframe_index(df):
     return lambda df: df._index
 
+@intrinsic
+def set_df_index(typingctx, df_t, index_t=None):
+    """used in very limited cases like distributed to_csv() to create a new
+    dataframe with index
+    """
+    # TODO: make inplace when dfs are full objects
+
+    def codegen(context, builder, signature, args):
+        in_df_arg = args[0]
+        index = args[1]
+        in_df = cgutils.create_struct_proxy(
+            signature.args[0])(context, builder, value=in_df_arg)
+        # create dataframe struct and store values
+        dataframe = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+
+        dataframe.data = in_df.data
+        dataframe.index = index
+        dataframe.columns = in_df.columns
+        dataframe.unboxed = in_df.unboxed
+        dataframe.parent = in_df.parent
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, index_t, index)
+            # TODO: refcount
+            context.nrt.incref(builder, types.Tuple(df_t.data), dataframe.data)
+            context.nrt.incref(
+                builder, types.UniTuple(string_type, len(df_t.columns)),
+                dataframe.columns)
+
+        return dataframe._getvalue()
+
+    ret_typ = DataFrameType(df_t.data, index_t, df_t.columns)
+    sig = signature(ret_typ, df_t, index_t)
+    return sig, codegen
+
 
 @intrinsic
 def set_df_column_with_reflect(typingctx, df, cname, arr):
@@ -372,6 +410,9 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
 
 @overload(len)  # TODO: avoid lowering?
 def df_len_overload(df):
+    if not isinstance(df, DataFrameType):
+        return
+
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
     return lambda df: len(df._data[0])
@@ -1360,7 +1401,7 @@ def lower_count_dummy(context, builder, sig, args):
         sig.return_type)(context, builder)
     return out_obj._getvalue()
 
-
+# TODO: other Pandas versions (0.24 defaults are different than 0.23)
 @overload_method(DataFrameType, 'to_csv')
 def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
         columns=None, header=True, index=True, index_label=None, mode='w',

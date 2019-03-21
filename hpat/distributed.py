@@ -887,31 +887,52 @@ class DistributedPass(object):
 
     def _run_call_df(self, lhs, df, func_name, assign, args):
         if func_name == 'to_csv' and self._is_1D_arr(df.name):
+            # set index to proper range if None
+            # avoid header for non-zero ranks
+            # write to string then parallel file write
             # df.to_csv(fname) ->
-            # str_out = df.to_csv(None)
+            # l = len(df)
+            # index_start = dist_exscan(l)
+            # df2 = df(index=range(index_start, index_start+l))
+            # header = header and is_root  # only first line has header
+            # str_out = df2.to_csv(None, header=header)
             # hpat.io._file_write_parallel(fname, str_out)
 
+            df_typ = self.typemap[df.name]
+            rhs = assign.value
             fname = args[0]
 
+            # update df index and get to_csv from new df
+            nodes = self._fix_parallel_df_index(df)
+            new_df = nodes[-1].target
+            new_df_typ = self.typemap[new_df.name]
+            new_to_csv = ir.Expr.getattr(new_df, 'to_csv', new_df.loc)
+            new_func = ir.Var(new_df.scope, mk_unique_var('func'), new_df)
+            self.typemap[new_func.name] = self.typingctx.resolve_getattr(
+                new_df_typ, 'to_csv')
+            nodes.append(ir.Assign(new_to_csv, new_func, new_df.loc))
+            rhs.func = new_func
+
             # fix to_csv() type to have None as 1st arg
-            rhs = assign.value
             call_type = self.calltypes.pop(rhs)
-            self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
-                self.typingctx, (types.none,)+call_type.args[1:], {})
-            # self.calltypes[rhs] = numba.typing.Signature(
-            #    string_type, (types.none,)+call_type.args[1:], call_type.recvr,
-            #    call_type.pysig)
+            # self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
+            #      self.typingctx, (types.none,)+call_type.args[1:], {})
+            self.calltypes[rhs] = numba.typing.Signature(
+               string_type, (types.none,) + call_type.args[1:], new_df_typ,
+               call_type.pysig)
 
             # None as 1st arg
             none_var = ir.Var(assign.target.scope, mk_unique_var('none'), rhs.loc)
             self.typemap[none_var.name] = types.none
             none_assign = ir.Assign(ir.Const(None, rhs.loc), none_var, rhs.loc)
+            nodes.append(none_assign)
             rhs.args[0] = none_var
 
             # str_out = df.to_csv(None)
             str_out = ir.Var(assign.target.scope, mk_unique_var('write_csv'), rhs.loc)
             self.typemap[str_out.name] = string_type
             new_assign = ir.Assign(rhs, str_out, rhs.loc)
+            nodes.append(new_assign)
 
             # print_node = ir.Print([str_out], None, rhs.loc)
             # self.calltypes[print_node] = signature(types.none, string_type)
@@ -931,9 +952,26 @@ class DistributedPass(object):
                     fname._data, str_out._data, start, count, 1)
 
             return self._replace_func(
-                f, [fname, str_out], pre_nodes=[none_assign, new_assign])
+                f, [fname, str_out], pre_nodes=nodes)
 
         return [assign]
+
+    def _fix_parallel_df_index(self, df):
+        def f(df):  # pragma: no cover
+            l = len(df)
+            start = hpat.distributed_api.dist_exscan(l)
+            ind = np.arange(start, start+l)
+            df2 = hpat.hiframes.pd_dataframe_ext.set_df_index(df, ind)
+            return df2
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np},
+                                    self.typingctx,
+                                    (self.typemap[df.name],),
+                                    self.typemap,
+                                    self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [df])
+        nodes = f_block.body[:-2]
+        return nodes
 
     def _run_permutation_int(self, assign, args):
         lhs = assign.target
@@ -1965,6 +2003,22 @@ class DistributedPass(object):
                 vals_list.append(stmt.target)
         out += nodes
         return vals_list
+
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = args[arg_no]
+        elif arg_name in kws:
+            arg = kws[arg_name]
+
+        if arg is None:
+            if default is not None:
+                return default
+            if err_msg is None:
+                err_msg = "{} requires '{}' argument".format(f_name, arg_name)
+            raise ValueError(err_msg)
+        return arg
 
     def _replace_func(self, func, args, const=False,
                       pre_nodes=None, extra_globals=None):

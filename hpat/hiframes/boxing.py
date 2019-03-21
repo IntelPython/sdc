@@ -83,7 +83,8 @@ def unbox_dataframe(typ, val, c):
         c.builder, types.UniTuple(types.int8, n_cols+1), [zero]*(n_cols+1))
 
     # TODO: support unboxing index
-    dataframe.index = c.context.get_constant(types.none, None)
+    if typ.index == types.none:
+        dataframe.index = c.context.get_constant(types.none, None)
     dataframe.columns = column_tup
     dataframe.unboxed = unboxed_tup
     dataframe.parent = val
@@ -198,6 +199,11 @@ def box_dataframe(typ, val, c):
 
         # pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
+
+    # set df.index if necessary
+    if typ.index != types.none:
+        arr_obj = box_array(typ.index, dataframe.index, c)
+        pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)
     #pyapi.gil_release(gil_state)    # release GIL
