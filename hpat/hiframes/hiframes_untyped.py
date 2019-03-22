@@ -1385,6 +1385,23 @@ class HiFrames(object):
                 by_arg_def = guard(find_build_sequence, self.func_ir, by_arg_call.args[0])
 
         if by_arg_def is None:
+            # try dict.keys()
+            by_arg_call = guard(get_definition, self.func_ir, by_arg)
+            call_name = guard(find_callname, self.func_ir, by_arg_call)
+            if (call_name is not None and len(call_name) == 2
+                    and call_name[0] == 'keys'
+                    and isinstance(call_name[1], ir.Var)):
+                var_def = guard(get_definition, self.func_ir, call_name[1])
+                if isinstance(var_def, ir.Expr) and var_def.op == 'build_map':
+                    by_arg_def = [v[0] for v in var_def.items], 'build_map'
+                    # HACK replace dict.keys getattr to avoid typing errors
+                    keys_getattr = guard(
+                        get_definition, self.func_ir, by_arg_call.func)
+                    assert isinstance(
+                        keys_getattr, ir.Expr) and keys_getattr.attr == 'keys'
+                    keys_getattr.attr = 'copy'
+
+        if by_arg_def is None:
             # try single key column
             by_arg_def = guard(find_const, self.func_ir, by_arg)
             if by_arg_def is None:

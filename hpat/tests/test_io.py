@@ -298,6 +298,16 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def test_csv_keys1(self):
+        def test_impl():
+            dtype = {'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int}
+            return pd.read_csv("csv_data1.csv",
+                names=dtype.keys(),
+                dtype=dtype,
+            )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
     def test_csv_infer1(self):
         def test_impl():
             return pd.read_csv("csv_data_infer1.csv")
