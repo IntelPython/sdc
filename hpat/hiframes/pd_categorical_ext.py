@@ -147,3 +147,16 @@ def cat_array_to_int(typingctx, arr=None):
         return impl_ret_borrowed(context, builder, sig.return_type, args[0])
 
     return out_arr(arr), codegen
+
+@overload_method(CategoricalArray, 'copy')
+def cat_arr_copy_overload(arr):
+    return lambda arr: set_cat_dtype(cat_array_to_int(arr).copy(), arr)
+
+@intrinsic
+def set_cat_dtype(typingctx, arr, cat_arr=None):
+    # set dtype of integer array to categorical from categorical array
+
+    def codegen(context, builder, sig, args):
+        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
+
+    return cat_arr(arr, cat_arr), codegen
