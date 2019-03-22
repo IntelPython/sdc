@@ -103,8 +103,10 @@ if not is_win:
     hdf5_libs += ['boost_filesystem', 'boost_system']
 
 ext_io = Extension(name="hio",
-                   sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
-                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h", "hpat/_import_py.h", "hpat/_csv.h", "hpat/_datetime_ext.h"],
+                   sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
+                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
+                            "hpat/_import_py.h", "hpat/io/_csv.h",
+                            "hpat/_datetime_ext.h"],
                    libraries = hdf5_libs,
                    include_dirs = ([HDF5_DIR+'/include',] + ind
                      + np_compile_args['include_dirs']),
@@ -211,7 +213,7 @@ if not is_win:
 pq_libs += ['arrow', 'parquet']
 
 ext_parquet = Extension(name="parquet_cpp",
-                        sources=["hpat/_parquet.cpp"],
+                        sources=["hpat/io/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
                         define_macros = [('BUILTIN_PARQUET_READER', None)],
@@ -249,7 +251,7 @@ ext_cv_wrapper = Extension(name="cv_wrapper",
 )
 
 ext_xenon_wrapper = Extension(name="hxe_ext",
-                              sources=["hpat/_xe_wrapper.cpp"],
+                              sources=["hpat/io/_xe_wrapper.cpp"],
                               #include_dirs = ['/usr/include'],
                               include_dirs = ['.'] + ind,
                               library_dirs = ['.'] + lid,

@@ -15,6 +15,7 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
+import hpat.io.np_io
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
@@ -281,11 +282,11 @@ class DistributedAnalysis(object):
         if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name in ('h5read', 'h5write', 'h5read_filter')):
             return
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name == 'get_filter_read_indices'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
@@ -379,16 +380,16 @@ class DistributedAnalysis(object):
             return
 
         # np.fromfile()
-        if fdef == ('file_read', 'hpat.io'):
+        if fdef == ('file_read', 'hpat.io.np_io'):
             return
 
         if hpat.config._has_ros and fdef == ('read_ros_images_inner', 'hpat.ros'):
             return
 
-        if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.parquet_pio'):
+        if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.io.parquet_pio'):
             return
 
-        if hpat.config._has_pyarrow and fdef == ('read_parquet_str', 'hpat.parquet_pio'):
+        if hpat.config._has_pyarrow and fdef == ('read_parquet_str', 'hpat.io.parquet_pio'):
             # string read creates array in output
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD

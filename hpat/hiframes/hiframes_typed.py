@@ -31,7 +31,7 @@ from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
     series_str_methods_type, SeriesRollingType, SeriesIatType,
     explicit_binop_funcs, series_dt_methods_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType
-from hpat.pio_api import h5dataset_type
+from hpat.io.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.aggregate import Aggregate
 from hpat.hiframes import series_kernels
@@ -109,7 +109,7 @@ class HiFramesTyped(object):
                 else:
                     if isinstance(inst, (Aggregate, hiframes.sort.Sort,
                             hiframes.join.Join, hiframes.filter.Filter,
-                            hpat.csv_ext.CsvReader)):
+                            hpat.io.csv_ext.CsvReader)):
                         out_nodes = self._handle_hiframes_nodes(inst)
 
 
@@ -451,7 +451,7 @@ class HiFramesTyped(object):
                 lambda d: numba.targets.builtins.get_type_max_value(
                             d), rhs.args)
 
-        if fdef == ('h5_read_dummy', 'hpat.pio_api'):
+        if fdef == ('h5_read_dummy', 'hpat.io.pio_api'):
             ndim = guard(find_const, self.func_ir, rhs.args[1])
             dtype_str = guard(find_const, self.func_ir, rhs.args[2])
             index_var = rhs.args[3]
@@ -459,24 +459,24 @@ class HiFramesTyped(object):
 
             func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
             if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
-                func_text += "  size_0 = hpat.pio_api.h5size(dset_id, np.int32(0))\n"
+                func_text += "  size_0 = hpat.io.pio_api.h5size(dset_id, np.int32(0))\n"
             else:
                 # TODO: check index format for this case
                 filter_read = True
                 assert isinstance(self.typemap[index_var.name], types.BaseTuple)
-                func_text += "  read_indices = hpat.pio_api.get_filter_read_indices(index[0])\n"
+                func_text += "  read_indices = hpat.io.pio_api.get_filter_read_indices(index[0])\n"
                 func_text += "  size_0 = len(read_indices)\n"
             for i in range(1, ndim):
-                func_text += "  size_{} = hpat.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
+                func_text += "  size_{} = hpat.io.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
             func_text += "  arr_shape = ({},)\n".format(
                 ", ".join(["size_{}".format(i) for i in range(ndim)]))
             func_text += "  zero_tup = ({},)\n".format(", ".join(["0"]*ndim))
             func_text += "  A = np.empty(arr_shape, np.{})\n".format(
                 dtype_str)
             if filter_read:
-                func_text += "  err = hpat.pio_api.h5read_filter(dset_id, np.int32({}), zero_tup, arr_shape, 0, A, read_indices)\n".format(ndim)
+                func_text += "  err = hpat.io.pio_api.h5read_filter(dset_id, np.int32({}), zero_tup, arr_shape, 0, A, read_indices)\n".format(ndim)
             else:
-                func_text += "  err = hpat.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
+                func_text += "  err = hpat.io.pio_api.h5read(dset_id, np.int32({}), zero_tup, arr_shape, 0, A)\n".format(ndim)
             func_text += "  return A\n"
 
             loc_vars = {}
@@ -2049,7 +2049,7 @@ class HiFramesTyped(object):
         # TODO: remove after support arr.shape in parallel
         func_text += "  arr_shape = ({},)\n".format(
             ", ".join(["arr.shape[{}]".format(i) for i in range(ndim)]))
-        func_text += "  err = hpat.pio_api.h5write(dset_id, np.int32({}), zero_tup, arr_shape, 0, arr)\n".format(ndim)
+        func_text += "  err = hpat.io.pio_api.h5write(dset_id, np.int32({}), zero_tup, arr_shape, 0, arr)\n".format(ndim)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
@@ -2314,10 +2314,10 @@ class HiFramesTyped(object):
             use_vars = list(inst.right_vars.values()) + list(inst.left_vars.values())
             def_vars = list(inst.df_out_vars.values())
             apply_copies_func = hiframes.join.apply_copies_join
-        elif isinstance(inst, hpat.csv_ext.CsvReader):
+        elif isinstance(inst, hpat.io.csv_ext.CsvReader):
             use_vars = []
             def_vars = inst.out_vars
-            apply_copies_func = hpat.csv_ext.apply_copies_csv
+            apply_copies_func = hpat.io.csv_ext.apply_copies_csv
         else:
             assert isinstance(inst, hiframes.filter.Filter)
             use_vars = list(inst.df_in_vars.values())

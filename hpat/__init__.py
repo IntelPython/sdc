@@ -19,6 +19,7 @@ from numba.types import List
 from hpat.utils import cprint, distribution_report
 import hpat.compiler
 import hpat.io
+import hpat.io.np_io
 import hpat.hiframes.pd_timestamp_ext
 import hpat.hiframes.boxing
 import hpat.config
@@ -26,7 +27,7 @@ import hpat.timsort
 from hpat.decorators import jit
 
 if hpat.config._has_xenon:
-    from hpat.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
+    from hpat.io.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
 
 multithread_mode = False
 

@@ -24,7 +24,7 @@ from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
 import hpat
-from hpat.pio_api import h5file_type, h5group_type
+from hpat.io.pio_api import h5file_type, h5group_type
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
 from hpat.str_ext import string_type
@@ -432,7 +432,7 @@ class DistributedPass(object):
             out[-1].target = assign.target
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
-        if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if (hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name in ('h5read', 'h5write', 'h5read_filter'))
                 and self._is_1D_arr(rhs.args[5].name)):
             # TODO: make create_dataset/create_group collective
@@ -458,7 +458,7 @@ class DistributedPass(object):
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name == 'get_filter_read_indices'):
             #
             out += self._gen_1D_Var_len(assign.target)
@@ -472,7 +472,7 @@ class DistributedPass(object):
             out += g_out
 
         if (hpat.config._has_pyarrow
-                and fdef == ('read_parquet', 'hpat.parquet_pio')
+                and fdef == ('read_parquet', 'hpat.io.parquet_pio')
                 and self._is_1D_arr(rhs.args[2].name)):
             arr = rhs.args[2].name
             assert len(self._array_starts[arr]) == 1, "only 1D arrs in parquet"
@@ -481,13 +481,13 @@ class DistributedPass(object):
             rhs.args += [start_var, count_var]
 
             def f(fname, cindex, arr, out_dtype, start, count):  # pragma: no cover
-                return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
+                return hpat.io.parquet_pio.read_parquet_parallel(fname, cindex,
                                                               arr, out_dtype, start, count)
 
             return self._replace_func(f, rhs.args)
 
         if (hpat.config._has_pyarrow
-                and fdef == ('read_parquet_str', 'hpat.parquet_pio')
+                and fdef == ('read_parquet_str', 'hpat.io.parquet_pio')
                 and self._is_1D_arr(lhs)):
             arr = lhs
             size_var = rhs.args[2]
@@ -501,7 +501,7 @@ class DistributedPass(object):
             rhs.args.append(count_var)
 
             def f(fname, cindex, start, count):  # pragma: no cover
-                return hpat.parquet_pio.read_parquet_str_parallel(fname, cindex,
+                return hpat.io.parquet_pio.read_parquet_str_parallel(fname, cindex,
                                                                   start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
@@ -522,7 +522,7 @@ class DistributedPass(object):
             rhs.args += [start_var, count_var]
 
             def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
-                return hpat.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
+                return hpat.io.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
 
             return self._replace_func(f, rhs.args)
 
@@ -541,11 +541,11 @@ class DistributedPass(object):
             rhs.args.append(count_var)
 
             def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
-                return hpat.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
+                return hpat.io.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
 
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (hpat.xenon_ext.xe_connect_type, hpat.xenon_ext.xe_dset_type, types.intp,
+                                          (hpat.io.xenon_ext.xe_connect_type, hpat.io.xenon_ext.xe_dset_type, types.intp,
                                            self.typemap[rhs.args[3].name], types.intp, types.intp),
                                           self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
@@ -723,14 +723,14 @@ class DistributedPass(object):
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
-        if fdef == ('file_read', 'hpat.io') and rhs.args[1].name in self._array_starts:
+        if fdef == ('file_read', 'hpat.io.np_io') and rhs.args[1].name in self._array_starts:
             _fname = rhs.args[0]
             _data_ptr = rhs.args[1]
             _start = self._array_starts[_data_ptr.name][0]
             _count = self._array_counts[_data_ptr.name][0]
 
             def f(fname, data_ptr, start, count):  # pragma: no cover
-                return hpat.io.file_read_parallel(fname, data_ptr, start, count)
+                return hpat.io.np_io.file_read_parallel(fname, data_ptr, start, count)
             return self._replace_func(f, [_fname, _data_ptr, _start, _count])
 
         return out
@@ -869,7 +869,7 @@ class DistributedPass(object):
                 _count = self._array_counts[arr.name][0]
 
                 def f(fname, arr, start, count):  # pragma: no cover
-                    return hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.np_io.file_write_parallel(fname, arr, start, count)
 
                 return self._replace_func(f, [_fname, arr, _start, _count])
 
@@ -879,7 +879,7 @@ class DistributedPass(object):
                 def f(fname, arr):  # pragma: no cover
                     count = len(arr)
                     start = hpat.distributed_api.dist_exscan(count)
-                    return hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.np_io.file_write_parallel(fname, arr, start, count)
 
                 return self._replace_func(f, [_fname, arr])
 
@@ -896,7 +896,7 @@ class DistributedPass(object):
             # df2 = df(index=range(index_start, index_start+l))
             # header = header and is_root  # only first line has header
             # str_out = df2.to_csv(None, header=header)
-            # hpat.io._file_write_parallel(fname, str_out)
+            # hpat.io.np_io._file_write_parallel(fname, str_out)
 
             df_typ = self.typemap[df.name]
             rhs = assign.value
@@ -969,7 +969,7 @@ class DistributedPass(object):
             def f(fname, str_out):  # pragma: no cover
                 count = len(str_out)
                 start = hpat.distributed_api.dist_exscan(count)
-                hpat.io._file_write_parallel(
+                hpat.io.np_io._file_write_parallel(
                     fname._data, str_out._data, start, count, 1)
                 dummy_use(str_out)
 

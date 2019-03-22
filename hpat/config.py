@@ -33,4 +33,4 @@ except ImportError:
     _has_xenon = False
 else:
     _has_xenon = True
-    import hpat.xenon_ext
+    import hpat.io.xenon_ext

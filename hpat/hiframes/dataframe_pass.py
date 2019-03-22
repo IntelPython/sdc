@@ -24,7 +24,7 @@ from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
-from hpat.pio_api import h5dataset_type
+from hpat.io.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
     DataFrameILocType, DataFrameIatType)

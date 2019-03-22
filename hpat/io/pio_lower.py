@@ -2,9 +2,10 @@ import operator
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
-from hpat import pio_api
+import hpat.io
+from hpat.io import pio_api
 from hpat.utils import _numba_to_c_type_map
-from hpat.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type,
+from hpat.io.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type,
                           h5group_type)
 from hpat.str_ext import string_type, gen_get_unicode_chars, gen_std_str_to_unicode
 import h5py

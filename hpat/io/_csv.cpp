@@ -19,8 +19,8 @@
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#include "_datetime_ext.h"
-#include "_distributed.h"
+#include "../_datetime_ext.h"
+#include "../_distributed.h"
 #include "_csv.h"
 
 #include <Python.h>

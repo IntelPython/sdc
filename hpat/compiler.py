@@ -13,8 +13,9 @@ from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
 from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
 from hpat import config
+import hpat.io
 if config._has_h5py:
-    from hpat import pio
+    from hpat.io import pio
 
 # workaround for Numba #3876 issue with large labels in mortgage benchmark
 from llvmlite import binding

@@ -21,19 +21,23 @@ from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
 
 import hpat
-from hpat import utils, pio, parquet_pio, config
+from hpat import utils, config
+import hpat.io
+from hpat.io import pio, parquet_pio
 from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
     inline_new_blocks, ReplaceFunc, is_call, is_assign)
 import hpat.hiframes.api
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
-from hpat import csv_ext
+import hpat.io
+from hpat.io import csv_ext
 
 import pandas as pd
 import numpy as np
 import math
-from hpat.parquet_pio import ParquetHandler
+import hpat.io
+from hpat.io.parquet_pio import ParquetHandler
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
                                     datetime_date_to_int, int_to_datetime_date)
 from hpat.hiframes.pd_series_ext import SeriesType
@@ -405,7 +409,7 @@ class HiFrames(object):
             return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
         if fdef == ('fromfile', 'numpy'):
-            return hpat.io._handle_np_fromfile(assign, lhs, rhs)
+            return hpat.io.np_io._handle_np_fromfile(assign, lhs, rhs)
 
         if fdef == ('read_xenon', 'hpat.xenon_ext'):
             col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.func_ir)
