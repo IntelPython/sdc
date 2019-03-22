@@ -306,6 +306,17 @@ class TestDataFrame(unittest.TestCase):
         test_impl(df2, n)
         pd.testing.assert_frame_equal(df1, df2)
 
+    def test_set_column_new_type1(self):
+        # set existing column with a new type
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)+3.0})
+            df['A'] = np.arange(n)
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
     def test_set_column2(self):
         # create new column
         def test_impl(n):

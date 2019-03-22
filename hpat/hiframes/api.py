@@ -766,11 +766,20 @@ class SetDfColInfer(AbstractTemplate):
         val = args[2]
         ret = target
 
-        if isinstance(target, DataFrameType) and ind not in target.columns:
-            new_cols = target.columns + (ind,)
+        if isinstance(target, DataFrameType):
             if isinstance(val, SeriesType):
                 val = val.data
-            new_typs = target.data + (val,)
+            if ind in target.columns:
+                # set existing column, with possibly a new array type
+                new_cols = target.columns
+                col_id = target.columns.index(ind)
+                new_typs = list(target.data)
+                new_typs[col_id] = val
+                new_typs = tuple(new_typs)
+            else:
+                # set a new column
+                new_cols = target.columns + (ind,)
+                new_typs = target.data + (val,)
             ret = DataFrameType(
                 new_typs, target.index, new_cols, target.has_parent)
 
