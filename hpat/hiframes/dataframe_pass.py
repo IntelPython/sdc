@@ -375,6 +375,12 @@ class DataFramePass(object):
                 lambda arr, index, name: hpat.hiframes.api.init_series(
                     arr, index, name), [arr, index, name], pre_nodes=nodes)
 
+        # df.shape
+        if isinstance(rhs_type, DataFrameType) and rhs.attr == 'shape':
+            n_cols = len(rhs_type.columns)
+            return self._replace_func(
+                lambda df: (len(df), n_cols), [rhs.value])
+
         # A = df.values
         if isinstance(rhs_type, DataFrameType) and rhs.attr == 'values':
             return self._handle_df_values(assign.target, rhs.value)

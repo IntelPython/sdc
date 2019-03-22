@@ -122,6 +122,17 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_shape1(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
+            return df.shape
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
     def test_column_getitem1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})

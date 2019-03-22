@@ -121,6 +121,9 @@ make_attribute_wrapper(DataFrameType, 'parent', '_parent')
 class DataFrameAttribute(AttributeTemplate):
     key = DataFrameType
 
+    def resolve_shape(self, ary):
+        return types.UniTuple(types.intp, 2)
+
     def resolve_iat(self, ary):
         return DataFrameIatType(ary)
 
