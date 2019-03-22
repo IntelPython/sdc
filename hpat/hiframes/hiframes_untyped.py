@@ -607,7 +607,6 @@ class HiFrames(object):
             nodes.append(ir.Assign(getitem1, lhs, lhs.loc))
             # replace old variable with new one
             self.replace_var_dict[df_var.name] = new_df_var
-            self._add_node_defs(nodes)
             return nodes
 
         return [assign]
@@ -1659,13 +1658,6 @@ class HiFrames(object):
 
         return
 
-    def _add_node_defs(self, nodes):
-        # TODO: add node defs for all new nodes
-        loc = ir.Loc("", -1)
-        dummy_block = ir.Block(ir.Scope(None, loc), loc)
-        dummy_block.body = nodes
-        build_definitions({0: dummy_block}, self.func_ir._definitions)
-
     def _run_return(self, ret_node):
         # TODO: handle distributed analysis, requires handling variable name
         # change in simplify() and replace_var_names()
@@ -1781,7 +1773,6 @@ class HiFrames(object):
         new_df_var = ir.Var(df_var.scope, mk_unique_var(df_var.name), df_var.loc)
         nodes[-1].target = new_df_var
         self.replace_var_dict[df_var.name] = new_df_var
-        self._add_node_defs(nodes)
         return nodes
 
     def _replace_func(self, func, args, const=False, array_typ_convert=True,

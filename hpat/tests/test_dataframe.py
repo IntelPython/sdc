@@ -784,6 +784,18 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_drop_inplace2(self):
+        # test droping after setting the column
+        def test_impl(df):
+            df2 = df[['A', 'B']]
+            df2['D'] = np.ones(3)
+            df2.drop(columns=['D'], inplace=True)
+            return df2
+
+        df = pd.DataFrame({'A': [1,2,3], 'B': [2,3,4]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     def test_df_drop_inplace1(self):
         def test_impl(df):
             df.drop('A', axis=1, inplace=True)
