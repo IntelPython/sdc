@@ -107,7 +107,7 @@ ext_io = Extension(name="hio",
                    depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
                             "hpat/_import_py.h", "hpat/io/_csv.h",
                             "hpat/_datetime_ext.h"],
-                   libraries = hdf5_libs,
+                   libraries = [],
                    include_dirs = ([HDF5_DIR+'/include',] + ind
                      + np_compile_args['include_dirs']),
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
