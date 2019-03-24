@@ -10,21 +10,22 @@ from hpat.io.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_typ
 from hpat.str_ext import string_type, gen_get_unicode_chars, gen_std_str_to_unicode
 import h5py
 from llvmlite import ir as lir
-import hpat.io
-from hpat.io import _hdf5
 import llvmlite.binding as ll
-ll.add_symbol('hpat_h5_open', _hdf5.hpat_h5_open)
-ll.add_symbol('hpat_h5_open_dset_or_group_obj', _hdf5.hpat_h5_open_dset_or_group_obj)
-ll.add_symbol('hpat_h5_size', _hdf5.hpat_h5_size)
-ll.add_symbol('hpat_h5_read', _hdf5.hpat_h5_read)
-ll.add_symbol('hpat_h5_get_type_enum', _hdf5.hpat_h5_get_type_enum)
-ll.add_symbol('hpat_h5_create_dset', _hdf5.hpat_h5_create_dset)
-ll.add_symbol('hpat_h5_create_group', _hdf5.hpat_h5_create_group)
-ll.add_symbol('hpat_h5_write', _hdf5.hpat_h5_write)
-ll.add_symbol('hpat_h5_close', _hdf5.hpat_h5_close)
-ll.add_symbol('h5g_get_num_objs', _hdf5.h5g_get_num_objs)
-ll.add_symbol('h5g_get_objname_by_idx', _hdf5.h5g_get_objname_by_idx)
-ll.add_symbol('h5g_close', _hdf5.hpat_h5g_close)
+import hpat.io
+if hpat.config._has_h5py:
+    from hpat.io import _hdf5
+    ll.add_symbol('hpat_h5_open', _hdf5.hpat_h5_open)
+    ll.add_symbol('hpat_h5_open_dset_or_group_obj', _hdf5.hpat_h5_open_dset_or_group_obj)
+    ll.add_symbol('hpat_h5_size', _hdf5.hpat_h5_size)
+    ll.add_symbol('hpat_h5_read', _hdf5.hpat_h5_read)
+    ll.add_symbol('hpat_h5_get_type_enum', _hdf5.hpat_h5_get_type_enum)
+    ll.add_symbol('hpat_h5_create_dset', _hdf5.hpat_h5_create_dset)
+    ll.add_symbol('hpat_h5_create_group', _hdf5.hpat_h5_create_group)
+    ll.add_symbol('hpat_h5_write', _hdf5.hpat_h5_write)
+    ll.add_symbol('hpat_h5_close', _hdf5.hpat_h5_close)
+    ll.add_symbol('h5g_get_num_objs', _hdf5.h5g_get_num_objs)
+    ll.add_symbol('h5g_get_objname_by_idx', _hdf5.h5g_get_objname_by_idx)
+    ll.add_symbol('h5g_close', _hdf5.hpat_h5g_close)
 
 h5file_lir_type = lir.IntType(64)
 

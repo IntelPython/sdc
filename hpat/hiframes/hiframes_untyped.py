@@ -227,7 +227,7 @@ class HiFrames(object):
                 return self._run_call(assign, label)
 
             # fix type for f['A'][:] dset reads
-            if rhs.op in ('getitem', 'static_getitem'):
+            if config._has_h5py and rhs.op in ('getitem', 'static_getitem'):
                 h5_nodes = self.h5_handler.handle_possible_h5_read(
                     assign, lhs, rhs)
                 if h5_nodes is not None:
@@ -405,7 +405,7 @@ class HiFrames(object):
             return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
 
 
-        if fdef == ('File', 'h5py'):
+        if config._has_h5py and fdef == ('File', 'h5py'):
             return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
         if fdef == ('fromfile', 'numpy'):
