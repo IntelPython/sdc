@@ -16,7 +16,7 @@ from hpat import utils
 import hpat.io
 from hpat.io import pio_api, pio_lower
 from hpat.utils import find_str_const, debug_prints
-import h5py
+
 
 
 def remove_h5(rhs, lives, call_list):

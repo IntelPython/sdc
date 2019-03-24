@@ -8,11 +8,12 @@ from hpat.utils import _numba_to_c_type_map
 from hpat.io.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type,
                           h5group_type)
 from hpat.str_ext import string_type, gen_get_unicode_chars, gen_std_str_to_unicode
-import h5py
+
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 import hpat.io
 if hpat.config._has_h5py:
+    import h5py
     from hpat.io import _hdf5
     ll.add_symbol('hpat_h5_open', _hdf5.hpat_h5_open)
     ll.add_symbol('hpat_h5_open_dset_or_group_obj', _hdf5.hpat_h5_open_dset_or_group_obj)
@@ -29,11 +30,12 @@ if hpat.config._has_h5py:
 
 h5file_lir_type = lir.IntType(64)
 
-# hid_t is 32bit in 1.8 but 64bit in 1.10
-if h5py.version.hdf5_version_tuple[1] == 8:
-    h5file_lir_type = lir.IntType(32)
-else:
-    assert h5py.version.hdf5_version_tuple[1] == 10
+if hpat.config._has_h5py:
+    # hid_t is 32bit in 1.8 but 64bit in 1.10
+    if h5py.version.hdf5_version_tuple[1] == 8:
+        h5file_lir_type = lir.IntType(32)
+    else:
+        assert h5py.version.hdf5_version_tuple[1] == 10
 
 h5g_close = types.ExternalFunction("h5g_close", types.none(h5group_type))
 
@@ -48,19 +50,20 @@ def h5_open_dset_lower(context, builder, sig, args):
     return builder.call(fn, [fg_id, dset_name])
 
 
-@lower_builtin(h5py.File, string_type, string_type)
-@lower_builtin(h5py.File, string_type, string_type, types.int64)
-def h5_open(context, builder, sig, args):
-    fname = args[0]
-    mode = args[1]
-    fname = gen_get_unicode_chars(context, builder, fname)
-    mode = gen_get_unicode_chars(context, builder, mode)
+if hpat.config._has_h5py:
+    @lower_builtin(h5py.File, string_type, string_type)
+    @lower_builtin(h5py.File, string_type, string_type, types.int64)
+    def h5_open(context, builder, sig, args):
+        fname = args[0]
+        mode = args[1]
+        fname = gen_get_unicode_chars(context, builder, fname)
+        mode = gen_get_unicode_chars(context, builder, mode)
 
-    is_parallel = context.get_constant(types.int64, 0) if len(args) < 3 else args[2]
-    fnty = lir.FunctionType(h5file_lir_type, [lir.IntType(
-        8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
-    return builder.call(fn, [fname, mode, is_parallel])
+        is_parallel = context.get_constant(types.int64, 0) if len(args) < 3 else args[2]
+        fnty = lir.FunctionType(h5file_lir_type, [lir.IntType(
+            8).as_pointer(), lir.IntType(8).as_pointer(), lir.IntType(64)])
+        fn = builder.module.get_or_insert_function(fnty, name="hpat_h5_open")
+        return builder.call(fn, [fname, mode, is_parallel])
 
 
 @lower_builtin(pio_api.h5size, h5dataset_or_group_type, types.int32)

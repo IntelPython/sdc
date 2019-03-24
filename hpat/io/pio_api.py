@@ -5,7 +5,6 @@ from numba import types, cgutils
 from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
 from llvmlite import ir as lir
-import h5py
 from numba.extending import register_model, models, infer_getattr, infer, intrinsic
 from hpat.str_ext import string_type
 import hpat
@@ -13,6 +12,7 @@ from hpat.utils import unliteral_all
 import hpat.io
 
 if hpat.config._has_h5py:
+    import h5py
     from hpat.io import _hdf5
     import llvmlite.binding as ll
     ll.add_symbol('hpat_h5_read_filter', _hdf5.hpat_h5_read_filter)
@@ -49,11 +49,12 @@ h5dataset_or_group_type = H5DatasetOrGroupType()
 
 h5file_data_type = types.int64
 
-# hid_t is 32bit in 1.8 but 64bit in 1.10
-if h5py.version.hdf5_version_tuple[1] == 8:
-    h5file_data_type = types.int32
-else:
-    assert h5py.version.hdf5_version_tuple[1] == 10
+if hpat.config._has_h5py:
+    # hid_t is 32bit in 1.8 but 64bit in 1.10
+    if h5py.version.hdf5_version_tuple[1] == 8:
+        h5file_data_type = types.int32
+    else:
+        assert h5py.version.hdf5_version_tuple[1] == 10
 
 
 @register_model(H5FileType)
@@ -192,11 +193,12 @@ class H5ReadType(AbstractTemplate):
         return signature(ret_typ, *args)
 
 
-@infer_global(h5py.File)
-class H5File(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        return signature(h5file_type, *unliteral_all(args))
+if hpat.config._has_h5py:
+    @infer_global(h5py.File)
+    class H5File(AbstractTemplate):
+        def generic(self, args, kws):
+            assert not kws
+            return signature(h5file_type, *unliteral_all(args))
 
 
 @infer_global(h5size)
