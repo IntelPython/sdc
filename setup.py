@@ -99,18 +99,18 @@ if is_win:
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
 hdf5_libs = MPI_LIBS + ['hdf5']
+io_libs = MPI_LIBS
 if not is_win:
-    hdf5_libs += ['boost_filesystem', 'boost_system']
+    io_libs += ['boost_filesystem', 'boost_system']
 
 ext_io = Extension(name="hio",
                    sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
                    depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
                             "hpat/_import_py.h", "hpat/io/_csv.h",
                             "hpat/_datetime_ext.h"],
-                   libraries = [],
-                   include_dirs = ([HDF5_DIR+'/include',] + ind
-                     + np_compile_args['include_dirs']),
-                   library_dirs = [HDF5_DIR+'/lib',] + lid,
+                   libraries = io_libs,
+                   include_dirs = ind + np_compile_args['include_dirs'],
+                   library_dirs = lid,
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
                    extra_link_args = ela,
