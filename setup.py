@@ -117,6 +117,18 @@ ext_io = Extension(name="hio",
                    language="c++"
 )
 
+ext_hdf5 = Extension(name="hpat.io._hdf5",
+                   sources=["hpat/io/_hdf5.cpp"],
+                   depends=[],
+                   libraries = hdf5_libs,
+                   include_dirs = [HDF5_DIR+'/include',] + ind,
+                   library_dirs = [HDF5_DIR+'/lib',] + lid,
+                   define_macros = H5_CPP_FLAGS,
+                   extra_compile_args = eca,
+                   extra_link_args = ela,
+                   language="c++"
+)
+
 ext_hdist = Extension(name="hdist",
                       sources=["hpat/_distributed.cpp"],
                       depends=["hpat/_hpat_common.h"],
@@ -260,10 +272,10 @@ ext_xenon_wrapper = Extension(name="hxe_ext",
                               extra_link_args = ela,
 )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt, ext_io]
 
 if _has_h5py:
-    _ext_mods.append(ext_io)
+    _ext_mods.append(ext_hdf5)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
 #if _has_daal:

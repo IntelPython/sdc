@@ -10,9 +10,10 @@ from numba.extending import register_model, models, infer_getattr, infer, intrin
 from hpat.str_ext import string_type
 import hpat
 from hpat.utils import unliteral_all
-import hio
+import hpat.io
+from hpat.io import _hdf5
 import llvmlite.binding as ll
-ll.add_symbol('hpat_h5_read_filter', hio.hpat_h5_read_filter)
+ll.add_symbol('hpat_h5_read_filter', _hdf5.hpat_h5_read_filter)
 
 ################## Types #######################
 

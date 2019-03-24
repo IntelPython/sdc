@@ -1,5 +1,6 @@
 try:
-    import hio
+    import hpat.io
+    import hpat.io._hdf5
 except ImportError:
     _has_h5py = False
 else:
