@@ -264,7 +264,12 @@ class DataFramePass(object):
             assert isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple'
 
             if self._is_df_iloc_var(rhs.value):
-                col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                # find_const doesn't support globals so use static value
+                # TODO: fix find_const()
+                if rhs.op == 'static_getitem':
+                    col_ind = rhs.index[1]
+                else:
+                    col_ind = guard(find_const, self.func_ir, ind_def.items[1])
                 col_name = df_typ.columns[col_ind]
             else:  # df.loc
                 col_name = guard(find_const, self.func_ir, ind_def.items[1])

@@ -16,6 +16,8 @@ def inner_get_column(df):
     # df2['D'] = np.ones(3)
     return df.A
 
+COL_IND = 0
+
 class TestDataFrame(unittest.TestCase):
     def test_create1(self):
         def test_impl(n):
@@ -228,6 +230,16 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
+
+    def test_iloc5(self):
+        # test iloc with global value
+        def test_impl(df):
+            return df.iloc[:,COL_IND].values
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
     def test_loc1(self):
         def test_impl(df):
