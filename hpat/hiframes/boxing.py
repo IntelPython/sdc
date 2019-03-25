@@ -23,7 +23,7 @@ from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     box_categorical_array, unbox_categorical_array)
 from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
 
-import hstr_ext
+from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 import llvmlite.llvmpy.core as lc

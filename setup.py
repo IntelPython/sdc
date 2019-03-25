@@ -103,7 +103,7 @@ io_libs = MPI_LIBS
 if not is_win:
     io_libs += ['boost_filesystem', 'boost_system']
 
-ext_io = Extension(name="hio",
+ext_io = Extension(name="hpat.hio",
                    sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
                    depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
                             "hpat/_import_py.h", "hpat/io/_csv.h",
@@ -129,7 +129,7 @@ ext_hdf5 = Extension(name="hpat.io._hdf5",
                    language="c++"
 )
 
-ext_hdist = Extension(name="hdist",
+ext_hdist = Extension(name="hpat.hdist",
                       sources=["hpat/_distributed.cpp"],
                       depends=["hpat/_hpat_common.h"],
                       libraries = MPI_LIBS,
@@ -139,7 +139,7 @@ ext_hdist = Extension(name="hdist",
                       library_dirs = lid,
 )
 
-ext_chiframes = Extension(name="chiframes",
+ext_chiframes = Extension(name="hpat.chiframes",
                           sources=["hpat/_hiframes.cpp"],
                           libraries = MPI_LIBS,
                           depends=["hpat/_hpat_sort.h"],
@@ -150,7 +150,7 @@ ext_chiframes = Extension(name="chiframes",
 )
 
 
-ext_dict = Extension(name="hdict_ext",
+ext_dict = Extension(name="hpat.hdict_ext",
                      sources=["hpat/_dict_ext.cpp"],
                      extra_compile_args = eca,
                      extra_link_args = ela,
@@ -158,7 +158,7 @@ ext_dict = Extension(name="hdict_ext",
                      library_dirs = lid,
 )
 
-ext_set = Extension(name="hset_ext",
+ext_set = Extension(name="hpat.hset_ext",
                      sources=["hpat/_set_ext.cpp"],
                      extra_compile_args = eca,
                      extra_link_args = ela,
@@ -171,7 +171,7 @@ str_libs = np_compile_args['libraries']
 if not is_win:
     str_libs += ['boost_regex']
 
-ext_str = Extension(name="hstr_ext",
+ext_str = Extension(name="hpat.hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=str_libs,
                     define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
@@ -186,7 +186,7 @@ ext_str = Extension(name="hstr_ext",
 #dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
 #dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
-ext_dt = Extension(name="hdatetime_ext",
+ext_dt = Extension(name="hpat.hdatetime_ext",
                    sources=["hpat/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
                    define_macros = np_compile_args['define_macros'],
@@ -197,7 +197,7 @@ ext_dt = Extension(name="hdatetime_ext",
                    language="c++"
 )
 
-ext_quantile = Extension(name="quantile_alg",
+ext_quantile = Extension(name="hpat.quantile_alg",
                          sources=["hpat/_quantile_alg.cpp"],
                          depends=["hpat/_hpat_common.h"],
                          libraries = MPI_LIBS,
@@ -224,7 +224,7 @@ if not is_win:
 
 pq_libs += ['arrow', 'parquet']
 
-ext_parquet = Extension(name="parquet_cpp",
+ext_parquet = Extension(name="hpat.parquet_cpp",
                         sources=["hpat/io/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
@@ -234,13 +234,13 @@ ext_parquet = Extension(name="parquet_cpp",
                         library_dirs = lid,
 )
 
-#ext_daal_wrapper = Extension(name="daal_wrapper",
+#ext_daal_wrapper = Extension(name="hpat.daal_wrapper",
 #                             include_dirs = [DAALROOT+'/include'],
 #                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
 #                             sources=["hpat/_daal.cpp"]
 #                             )
 
-ext_ros = Extension(name="ros_cpp",
+ext_ros = Extension(name="hpat.ros_cpp",
                     sources=["hpat/_ros.cpp"],
                     include_dirs = ['/opt/ros/lunar/include', '/opt/ros/lunar/include/xmlrpcpp', PREFIX_DIR+'/include/', './ros_include'],
                     extra_compile_args = eca,
@@ -253,7 +253,7 @@ cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui'
 if is_win:
     cv_libs = [l+'331' for l in cv_libs]
 
-ext_cv_wrapper = Extension(name="cv_wrapper",
+ext_cv_wrapper = Extension(name="hpat.cv_wrapper",
                            sources=["hpat/_cv.cpp"],
                            include_dirs = [OPENCV_DIR+'/include'] + ind,
                            library_dirs = [os.path.join(OPENCV_DIR,'lib')] + lid,
@@ -262,7 +262,7 @@ ext_cv_wrapper = Extension(name="cv_wrapper",
                            language="c++",
 )
 
-ext_xenon_wrapper = Extension(name="hxe_ext",
+ext_xenon_wrapper = Extension(name="hpat.hxe_ext",
                               sources=["hpat/io/_xe_wrapper.cpp"],
                               #include_dirs = ['/usr/include'],
                               include_dirs = ['.'] + ind,

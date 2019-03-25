@@ -13,7 +13,7 @@ from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_uni
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hdict_ext
+from . import hdict_ext
 from hpat.utils import unliteral_all
 
 ll_voidp = lir.IntType(8).as_pointer()

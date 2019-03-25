@@ -17,7 +17,8 @@ import hpat
 def unliteral_all(args):
     return tuple(types.unliteral(a) for a in args)
 
-import hstr_ext
+# relative import seems required for C extensions
+from . import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
 ll.add_symbol('del_str', hstr_ext.del_str)

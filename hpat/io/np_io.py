@@ -30,7 +30,7 @@ _file_write_parallel = types.ExternalFunction("file_write_parallel",
 #         raise("np.fromfile() invalid dtype")
 #
 #     # FIXME: import here since hio has hdf5 which might not be available
-#     import hio
+#     from .. import hio
 #     import llvmlite.binding as ll
 #     ll.add_symbol('get_file_size', hio.get_file_size)
 #     ll.add_symbol('file_read', hio.file_read)
@@ -53,7 +53,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
             "np.fromfile(): file name and dtype expected")
 
     # FIXME: import here since hio has hdf5 which might not be available
-    import hio
+    from .. import hio
     import llvmlite.binding as ll
     ll.add_symbol('get_file_size', hio.get_file_size)
     ll.add_symbol('file_read', hio.file_read)
@@ -88,7 +88,7 @@ def get_dtype_size(typingctx, dtype=None):
 @overload_method(types.Array, 'tofile')
 def tofile_overload(arr_ty, fname_ty):
     # FIXME: import here since hio has hdf5 which might not be available
-    import hio
+    from .. import hio
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
     ll.add_symbol('file_write_parallel', hio.file_write_parallel)

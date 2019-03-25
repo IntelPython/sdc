@@ -13,7 +13,7 @@ import numpy as np
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import cv_wrapper
+from . import cv_wrapper
 ll.add_symbol('cv_imread', cv_wrapper.cv_imread)
 ll.add_symbol('cv_resize', cv_wrapper.cv_resize)
 ll.add_symbol('cv_imdecode', cv_wrapper.cv_imdecode)

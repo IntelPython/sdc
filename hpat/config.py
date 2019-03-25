@@ -1,6 +1,5 @@
 try:
-    import hpat.io
-    import hpat.io._hdf5
+    from .io import _hdf5
 except ImportError:
     _has_h5py = False
 else:
@@ -14,14 +13,14 @@ else:
     _has_pyarrow = True
 
 try:
-    import ros_cpp
+    from . import ros_cpp
 except ImportError:
     _has_ros = False
 else:
     _has_ros = True
 
 try:
-    import cv_wrapper
+    from . import cv_wrapper
 except ImportError:
     _has_opencv = False
 else:
@@ -29,7 +28,7 @@ else:
     import hpat.cv_ext
 
 try:
-    import hxe_ext
+    from . import hxe_ext
 except ImportError:
     _has_xenon = False
 else:

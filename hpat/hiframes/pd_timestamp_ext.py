@@ -28,7 +28,7 @@ import pandas as pd
 #     pandas_present = False
 
 import datetime
-import hdatetime_ext
+from .. import hdatetime_ext
 import llvmlite.binding as ll
 ll.add_symbol('parse_iso_8601_datetime', hdatetime_ext.parse_iso_8601_datetime)
 ll.add_symbol('convert_datetimestruct_to_datetime', hdatetime_ext.convert_datetimestruct_to_datetime)
@@ -881,7 +881,7 @@ def parse_datetime_str(str):
 # from numba.targets.listobj import ListInstance
 # from llvmlite import ir as lir
 # import llvmlite.binding as ll
-# #import hdatetime_ext
+# #from .. import hdatetime_ext
 # #ll.add_symbol('dt_to_timestamp', hdatetime_ext.dt_to_timestamp)
 #
 # @lower_builtin(operator.getitem, TimestampSeriesType, types.Integer)

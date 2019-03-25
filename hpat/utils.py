@@ -204,7 +204,7 @@ typ_to_format = {
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hstr_ext
+from . import hstr_ext
 ll.add_symbol('print_str', hstr_ext.print_str)
 ll.add_symbol('print_char', hstr_ext.print_char)
 

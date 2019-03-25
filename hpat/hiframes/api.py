@@ -44,7 +44,7 @@ enable_hiframes_remove_dead = True
 # quantile imports?
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
-import quantile_alg
+from .. import quantile_alg
 import llvmlite.binding as ll
 ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
 ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)

@@ -581,7 +581,7 @@ def str_arr_len_overload(str_arr):
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hstr_ext
+from . import hstr_ext
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
@@ -596,7 +596,7 @@ ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
 
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 
-import hstr_ext
+from . import hstr_ext
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)
 

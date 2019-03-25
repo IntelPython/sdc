@@ -192,7 +192,7 @@ def build_csv_definitions(csv_node, definitions=None):
 
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 
-import hio
+from .. import hio
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)

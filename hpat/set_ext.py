@@ -11,7 +11,7 @@ from numba.typing.templates import signature, AbstractTemplate, infer, infer_glo
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hset_ext
+from . import hset_ext
 ll.add_symbol('init_set_string', hset_ext.init_set_string)
 ll.add_symbol('insert_set_string', hset_ext.insert_set_string)
 ll.add_symbol('len_set_string', hset_ext.len_set_string)

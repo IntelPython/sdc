@@ -46,7 +46,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
         raise ValueError("Xenon support not available")
 
     # TODO: init only once
-    import hxe_ext
+    from .. import hxe_ext
     ll.add_symbol('get_column_size_xenon', hxe_ext.get_column_size_xenon)
     ll.add_symbol('c_read_xenon', hxe_ext.read_xenon_col)
     ll.add_symbol('c_read_xenon_parallel', hxe_ext.read_xenon_col_parallel)
@@ -132,7 +132,7 @@ def gen_xe_init_from_uri(func_ir, dset_name_var):
     if dset_name.count("/") != 1:
         raise ValueError("invalid Xenon address {}".format(dset_name))
     address, dset_name = dset_name.split("/")
-    import hxe_ext
+    from .. import hxe_ext
     schema = hxe_ext.get_schema(address, dset_name)
     col_names, col_types = parse_xe_schema(schema)
 
