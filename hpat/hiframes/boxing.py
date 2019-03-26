@@ -22,6 +22,8 @@ from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     box_categorical_array, unbox_categorical_array)
 from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
+from hpat.hiframes.split_impl import (string_array_split_view_type,
+    box_str_arr_split_view)
 
 from .. import hstr_ext
 import llvmlite.binding as ll
@@ -318,6 +320,8 @@ def _box_series_data(dtype, data_typ, val, c):
         arr = box_datetime_date_array(data_typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
         arr = box_categorical_array(data_typ, val, c)
+    elif data_typ == string_array_split_view_type:
+        arr = box_str_arr_split_view(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

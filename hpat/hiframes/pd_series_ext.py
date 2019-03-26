@@ -21,7 +21,7 @@ from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     CategoricalArray)
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
-
+from hpat.hiframes.split_impl import string_array_split_view_type
 
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
@@ -562,7 +562,11 @@ class SeriesStrMethodAttribute(AttributeTemplate):
 
     @bound_function("strmethod.split")
     def resolve_split(self, ary, args, kws):
-        return signature(SeriesType(types.List(string_type)), *args)
+        out = SeriesType(types.List(string_type))
+        if (len(args) == 1 and isinstance(args[0], types.StringLiteral)
+                and len(args[0].literal_value) == 1):
+            out = SeriesType(types.List(string_type), string_array_split_view_type)
+        return signature(out, *args)
 
     @bound_function("strmethod.get")
     def resolve_get(self, ary, args, kws):

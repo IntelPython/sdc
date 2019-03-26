@@ -368,7 +368,7 @@ class TestHiFrames(unittest.TestCase):
         def test_impl(df):
             return df.A.str.split(',')
 
-        df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
+        df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)

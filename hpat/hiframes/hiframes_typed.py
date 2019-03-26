@@ -34,7 +34,7 @@ from hpat.hiframes.pd_index_ext import DatetimeIndexType
 from hpat.io.pio_api import h5dataset_type
 from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.aggregate import Aggregate
-from hpat.hiframes import series_kernels
+from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.series_kernels import series_replace_funcs
 
 
@@ -1687,6 +1687,7 @@ class HiFramesTyped(object):
 
     def _run_series_str_split(self, assign, lhs, arr, rhs, nodes):
         sep = rhs.args[0]  # TODO: support default whitespace separator
+        sep_typ = self.typemap[sep.name]
 
         def _str_split_impl(str_arr, sep):
             numba.parfor.init_prange()
@@ -1697,6 +1698,13 @@ class HiFramesTyped(object):
                 out_arr[i] = in_str.split(sep)
 
             return hpat.hiframes.api.init_series(out_arr)
+
+
+        if isinstance(sep_typ, types.StringLiteral) and len(sep_typ.literal_value) == 1:
+            def _str_split_impl(str_arr, sep):
+                out_arr = hpat.hiframes.split_impl.compute_split_view(
+                    str_arr, sep)
+                return hpat.hiframes.api.init_series(out_arr)
 
         return self._replace_func(_str_split_impl, [arr, sep], pre_nodes=nodes)
 

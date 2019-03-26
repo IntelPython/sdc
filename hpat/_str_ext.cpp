@@ -29,6 +29,13 @@ struct str_arr_payload {
     uint8_t* null_bitmap;
 };
 
+// XXX: equivalent to payload data model in split_impl.py
+struct str_arr_split_view_payload {
+    uint32_t *index_offsets;
+    uint32_t *data_offsets;
+    // uint8_t* null_bitmap;
+};
+
 // taken from Arrow bin-util.h
 static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
@@ -36,6 +43,8 @@ void* init_string(char*, int64_t);
 void* init_string_const(char* in_str);
 void dtor_string(std::string** in_str, int64_t size, void* in);
 void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
+void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t size, void* in);
+void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_strs, uint32_t* offsets, char* data, char sep);
 const char* get_c_str(std::string* s);
 const char* get_char_ptr(char c);
 void* str_concat(std::string* s1, std::string* s2);
@@ -103,6 +112,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dtor_string)));
     PyObject_SetAttrString(m, "dtor_string_array",
                             PyLong_FromVoidPtr((void*)(&dtor_string_array)));
+    PyObject_SetAttrString(m, "dtor_str_arr_split_view",
+                            PyLong_FromVoidPtr((void*)(&dtor_str_arr_split_view)));
+    PyObject_SetAttrString(m, "str_arr_split_view_impl",
+                            PyLong_FromVoidPtr((void*)(&str_arr_split_view_impl)));
     PyObject_SetAttrString(m, "get_c_str",
                             PyLong_FromVoidPtr((void*)(&get_c_str)));
     PyObject_SetAttrString(m, "get_char_ptr",
@@ -222,6 +235,65 @@ void dtor_string_array(str_arr_payload* in_str_arr, int64_t size, void* in)
     delete[] in_str_arr->data;
     if (in_str_arr->null_bitmap != nullptr)
         delete[] in_str_arr->null_bitmap;
+    return;
+}
+
+void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t size, void* in)
+{
+    // printf("str arr dtor size: %lld\n", in_str_arr->size);
+    // printf("num chars: %d\n", in_str_arr->offsets[in_str_arr->size]);
+    delete[] in_str_arr->index_offsets;
+    delete[] in_str_arr->data_offsets;
+    // if (in_str_arr->null_bitmap != nullptr)
+    //     delete[] in_str_arr->null_bitmap;
+    return;
+}
+
+void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_strs, uint32_t* offsets, char* data, char sep)
+{
+    uint32_t total_chars = offsets[n_strs];
+    printf("n_strs %d sep %c total chars:%d\n", n_strs, sep, total_chars);
+    //return;
+    uint32_t* index_offsets = new uint32_t[n_strs+1];
+    std::vector<uint32_t> data_offs;
+
+    data_offs.push_back(-1);
+    index_offsets[0] = 0;
+    // uint32_t curr_data_off = 0;
+
+    int data_ind = offsets[0];
+    int str_ind = 0;
+    // while there are chars to consume, equal since the first if will consume it
+    while (data_ind <= total_chars)
+    {
+        // string has finished
+        if (data_ind == offsets[str_ind+1])
+        {
+            data_offs.push_back(data_ind);
+            index_offsets[str_ind+1] = data_offs.size();
+            str_ind++;
+            if (str_ind == n_strs) break;  // all finished
+            continue;  // stay on same data_ind for start of next string
+        }
+        if (data[data_ind] == sep)
+        {
+            data_offs.push_back(data_ind);
+        }
+        data_ind++;
+    }
+    out_view->index_offsets = index_offsets;
+    out_view->data_offsets = new uint32_t[data_offs.size()];
+    // TODO: avoid copy
+    std::copy(data_offs.cbegin(), data_offs.cend(), out_view->data_offsets);
+
+    printf("index_offsets: ");
+    for (int i=0; i<=n_strs; i++)
+        printf("%d ", index_offsets[i]);
+    printf("\n");
+    printf("data_offsets: ");
+    for (int i=0; i<data_offs.size(); i++)
+        printf("%d ", data_offs[i]);
+    printf("\n");
     return;
 }
 
@@ -507,7 +579,7 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         PyGILState_Release(gilstate);
         return;
     }
- 
+
     *no_strings = -1;
     *offset_table = NULL;
     *buffer = NULL;
