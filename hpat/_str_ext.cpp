@@ -92,6 +92,8 @@ int64_t hash_str(std::string* in_str);
 void c_glob(uint32_t **offsets, char **data, uint8_t **null_bitmap, int64_t* num_strings, char* path);
 npy_intp array_size(PyArrayObject* arr);
 void* array_getptr1(PyArrayObject* arr, npy_intp ind);
+void array_setitem(PyArrayObject* arr, char* p, PyObject *s);
+
 
 PyMODINIT_FUNC PyInit_hstr_ext(void) {
     PyObject *m;
@@ -192,6 +194,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&array_size)));
     PyObject_SetAttrString(m, "array_getptr1",
                             PyLong_FromVoidPtr((void*)(&array_getptr1)));
+    PyObject_SetAttrString(m, "array_setitem",
+                            PyLong_FromVoidPtr((void*)(&array_setitem)));
     return m;
 }
 
@@ -249,11 +253,14 @@ void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t siz
     return;
 }
 
+// example: ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']
+// offsets [0, 5, 12, 13, 13, 14, 17]
+// data_offsets [-1, 2, 5,   4, 6, 10, 12,  11, 13,   12, 13,   12, 14, 16]
+// index_offsets [0, 3, 7, 9, 11, 14]
 void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_strs, uint32_t* offsets, char* data, char sep)
 {
     uint32_t total_chars = offsets[n_strs];
-    printf("n_strs %d sep %c total chars:%d\n", n_strs, sep, total_chars);
-    //return;
+    // printf("n_strs %d sep %c total chars:%d\n", n_strs, sep, total_chars);
     uint32_t* index_offsets = new uint32_t[n_strs+1];
     std::vector<uint32_t> data_offs;
 
@@ -273,6 +280,8 @@ void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_str
             index_offsets[str_ind+1] = data_offs.size();
             str_ind++;
             if (str_ind == n_strs) break;  // all finished
+            // start new string
+            data_offs.push_back(data_ind-1);
             continue;  // stay on same data_ind for start of next string
         }
         if (data[data_ind] == sep)
@@ -286,14 +295,14 @@ void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_str
     // TODO: avoid copy
     std::copy(data_offs.cbegin(), data_offs.cend(), out_view->data_offsets);
 
-    printf("index_offsets: ");
-    for (int i=0; i<=n_strs; i++)
-        printf("%d ", index_offsets[i]);
-    printf("\n");
-    printf("data_offsets: ");
-    for (int i=0; i<data_offs.size(); i++)
-        printf("%d ", data_offs[i]);
-    printf("\n");
+    // printf("index_offsets: ");
+    // for (int i=0; i<=n_strs; i++)
+    //     printf("%d ", index_offsets[i]);
+    // printf("\n");
+    // printf("data_offsets: ");
+    // for (int i=0; i<data_offs.size(); i++)
+    //     printf("%d ", data_offs[i]);
+    // printf("\n");
     return;
 }
 
@@ -702,6 +711,16 @@ void* array_getptr1(PyArrayObject* arr, npy_intp ind)
 {
     // std::cout << "get array ptr " << ind << '\n';
     return PyArray_GETPTR1(arr, ind);
+}
+
+void array_setitem(PyArrayObject* arr, char* p, PyObject *s)
+{
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
+    // std::cout << "get array ptr " << ind << '\n';
+    int err = PyArray_SETITEM(arr, p, s);
+    CHECK(err==0, "setting item in numpy array failed");
+    return;
+#undef CHECK
 }
 
 // glob support

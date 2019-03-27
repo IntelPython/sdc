@@ -19,6 +19,10 @@ from hpat.str_arr_ext import (string_array_type, get_data_ptr,
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+from llvmlite.llvmpy.core import Type as LLType
+from .. import hstr_ext
+ll.add_symbol('array_setitem', hstr_ext.array_setitem)
+ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
 from .. import hstr_ext
 ll.add_symbol('dtor_str_arr_split_view', hstr_ext.dtor_str_arr_split_view)
@@ -187,6 +191,15 @@ def box_str_arr_split_view(typ, val, c):
     out_arr = c.pyapi.call_method(
         np_class_obj, "ndarray", (num_items_obj, dtype))
 
+    # Array setitem call
+    arr_get_fnty = LLType.function(
+        lir.IntType(8).as_pointer(), [c.pyapi.pyobj, c.pyapi.py_ssize_t])
+    arr_get_fn = c.pyapi._get_function(arr_get_fnty, name="array_getptr1")
+    arr_setitem_fnty = LLType.function(
+        lir.VoidType(),
+        [c.pyapi.pyobj, lir.IntType(8).as_pointer(), c.pyapi.pyobj])
+    arr_setitem_fn = c.pyapi._get_function(
+        arr_setitem_fnty, name="array_setitem")
 
     # for each string
     with cgutils.for_range(builder, sp_view.num_items) as loop:
@@ -200,7 +213,8 @@ def box_str_arr_split_view(typ, val, c):
 
         # Build a new Python list
         nitems = builder.sub(list_end_offset, list_start_offset)
-        cgutils.printf(builder, "str %lld n %lld\n", str_ind, nitems)
+        nitems = builder.sub(nitems, nitems.type(1))
+        # cgutils.printf(builder, "str %lld n %lld\n", str_ind, nitems)
         list_obj = c.pyapi.list_new(nitems)
         with c.builder.if_then(cgutils.is_not_null(c.builder, list_obj),
                                likely=True):
@@ -211,10 +225,14 @@ def box_str_arr_split_view(typ, val, c):
                 # add 1 since starts from -1
                 data_start = builder.add(data_start, data_start.type(1))
                 data_end = builder.load(builder.gep(sp_view.data_offsets, [builder.add(start_index, start_index.type(1))]))
-                cgutils.printf(builder, "ind %lld %lld\n", data_start, data_end)
-                #itemobj =
-                #c.pyapi.list_setitem(obj, loop.index, itemobj)
+                # cgutils.printf(builder, "ind %lld %lld\n", data_start, data_end)
+                data_ptr = builder.gep(builder.extract_value(sp_view.data, 0), [data_start])
+                str_size = builder.sext(builder.sub(data_end, data_start), lir.IntType(64))
+                str_obj = c.pyapi.string_from_string_and_size(data_ptr, str_size)
+                c.pyapi.list_setitem(list_obj, loop.index, str_obj)
 
+        arr_ptr = builder.call(arr_get_fn, [out_arr, str_ind])
+        builder.call(arr_setitem_fn, [out_arr, arr_ptr, list_obj])
 
 
     c.pyapi.decref(np_class_obj)
