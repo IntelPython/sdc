@@ -381,7 +381,8 @@ class TestHiFrames(unittest.TestCase):
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
         hpat_func = hpat.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+        pd.testing.assert_frame_equal(
+            hpat_func(df), test_impl(df).reset_index(drop=True))
 
     def test_str_split_box_df(self):
         def test_impl(df):
