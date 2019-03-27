@@ -9,6 +9,7 @@ from hpat import distributed, distributed_analysis
 from hpat.distributed_analysis import Distribution
 from hpat.utils import debug_prints
 from hpat.str_arr_ext import string_array_type
+from hpat.hiframes.split_impl import string_array_split_view_type
 
 
 class Filter(ir.Stmt):
@@ -49,7 +50,8 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     for _, col_var in filter_node.df_in_vars.items():
         typ = typemap[col_var.name]
         # TODO handle list_string_array_type in other nodes
-        if typ in (string_array_type, list_string_array_type):
+        if typ in (string_array_type, list_string_array_type,
+                    string_array_split_view_type):
             continue
         col_shape = equiv_set.get_shape(col_var)
         all_shapes.append(col_shape[0])
@@ -63,7 +65,8 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     all_shapes = []
     for _, col_var in filter_node.df_out_vars.items():
         typ = typemap[col_var.name]
-        if typ in (string_array_type, list_string_array_type):
+        if typ in (string_array_type, list_string_array_type,
+                    string_array_split_view_type):
             continue
         (shape, c_post) = array_analysis._gen_shape_call(
             equiv_set, col_var, typ.ndim, None)

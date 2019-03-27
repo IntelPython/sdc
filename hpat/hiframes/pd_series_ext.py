@@ -173,6 +173,9 @@ def arr_to_series_type(arr):
         series_type = SeriesType(string_type)
     elif arr == list_string_array_type:
         series_type = SeriesType(types.List(string_type))
+    elif arr == string_array_split_view_type:
+        series_type = SeriesType(types.List(string_type),
+                        string_array_split_view_type)
     return series_type
 
 
@@ -781,6 +784,7 @@ class GetItemSeries(AbstractTemplate):
             else:
                 sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
         elif in_arr == list_string_array_type:
+            # TODO: split view
             # mimic array indexing for list
             if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
                     and isinstance(

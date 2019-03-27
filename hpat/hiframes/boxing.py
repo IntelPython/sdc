@@ -234,6 +234,10 @@ def unbox_dataframe_column(typingctx, df, i=None):
 
         if data_typ == string_array_type:
             native_val = unbox_str_series(string_array_type, arr_obj, c)
+        elif data_typ == string_array_split_view_type:
+            # XXX dummy unboxing to avoid errors in _get_dataframe_data()
+            out_view = context.make_helper(builder, string_array_split_view_type)
+            native_val = NativeValue(out_view._getvalue())
         elif data_typ == list_string_array_type:
             native_val = _unbox_array_list_str(arr_obj, c)
         else:

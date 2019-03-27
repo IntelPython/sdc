@@ -2003,6 +2003,8 @@ class HiFramesTyped(object):
                                                     if is_str_arr_typ(t)]
         list_str_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
                         if t == list_string_array_type]
+        split_view_colnames = [in_names[i] for i, t in enumerate(in_typ.types)
+                        if t == string_array_split_view_type]
         isna_calls = ['hpat.hiframes.api.isna({}, i)'.format(v) for v in in_names]
 
         func_text = "def _dropna_impl(arr_tup, inplace):\n"
@@ -2021,12 +2023,17 @@ class HiFramesTyped(object):
                 func_text += "  {} = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars_{})\n".format(out, v)
             elif v in list_str_colnames:
                 func_text += "  {} = hpat.str_ext.alloc_list_list_str(new_len)\n".format(out)
+            elif v in split_view_colnames:
+                # TODO support dropna() for split view
+                func_text += "  {} = {}\n".format(out, v)
             else:
                 func_text += "  {} = np.empty(new_len, {}.dtype)\n".format(out, v)
         func_text += "  curr_ind = 0\n"
         func_text += "  for i in numba.parfor.internal_prange(old_len):\n"
         func_text += "    if not ({}):\n".format(' or '.join(isna_calls))
         for v, out in zip(in_names, out_names):
+            if v in split_view_colnames:
+                continue
             func_text += "      {}[curr_ind] = {}[i]\n".format(out, v)
         func_text += "      curr_ind += 1\n"
         func_text += "  return ({},)\n".format(", ".join(out_names))
