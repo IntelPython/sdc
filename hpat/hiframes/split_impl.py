@@ -14,7 +14,7 @@ from hpat.str_ext import string_type
 from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
     iternext_impl, RefType)
 from hpat.str_arr_ext import (string_array_type, get_data_ptr,
-    is_str_arr_typ, pre_alloc_string_array)
+    is_str_arr_typ, pre_alloc_string_array, _memcpy)
 
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
@@ -97,6 +97,12 @@ class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
 
         models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
+
+
+make_attribute_wrapper(StringArraySplitViewType, 'num_items', '_num_items')
+make_attribute_wrapper(StringArraySplitViewType, 'index_offsets', '_index_offsets')
+make_attribute_wrapper(StringArraySplitViewType, 'data_offsets', '_data_offsets')
+make_attribute_wrapper(StringArraySplitViewType, 'data', '_data')
 
 
 def construct_str_arr_split_view(context, builder):
@@ -238,3 +244,65 @@ def box_str_arr_split_view(typ, val, c):
     c.pyapi.decref(np_class_obj)
     return out_arr
 
+
+@intrinsic
+def getitem_c_arr(typingctx, c_arr, ind_t=None):
+    def codegen(context, builder, sig, args):
+        in_arr, ind = args
+        return builder.load(builder.gep(in_arr, [ind]))
+
+    return c_arr.dtype(c_arr, ind_t), codegen
+
+
+@intrinsic
+def get_array_ctypes_ptr(typingctx, arr_ctypes_t, ind_t=None):
+    def codegen(context, builder, sig, args):
+        in_arr_ctypes, ind = args
+
+        arr_ctypes = context.make_helper(
+            builder, arr_ctypes_t, in_arr_ctypes)
+
+        out = context.make_helper(builder, arr_ctypes_t)
+        out.data = builder.gep(arr_ctypes.data, [ind])
+        out.meminfo = arr_ctypes.meminfo
+        res = out._getvalue()
+        return impl_ret_borrowed(context, builder, arr_ctypes_t, res)
+
+    return arr_ctypes_t(arr_ctypes_t, ind_t), codegen
+
+
+@overload(len)
+def str_arr_split_view_len_overload(arr):
+    if arr == string_array_split_view_type:
+        return lambda arr: arr._num_items
+
+
+@overload(operator.getitem)
+def str_arr_split_view_getitem_overload(A, ind):
+    if A == string_array_split_view_type and isinstance(ind, types.Integer):
+        kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+        def _impl(A, ind):
+            start_index = getitem_c_arr(A._index_offsets, ind)
+            end_index = getitem_c_arr(A._index_offsets, ind+1)
+            n = end_index - start_index - 1
+
+
+            str_list = hpat.str_ext.alloc_str_list(n)
+            for i in range(n):
+                data_start = getitem_c_arr(
+                    A._data_offsets, start_index + i)
+                data_start += 1
+                # get around -1 storage in uint32 problem
+                if start_index + i == 0:
+                    data_start = 0
+                data_end = getitem_c_arr(
+                    A._data_offsets, start_index + i + 1)
+                length = data_end - data_start
+                _str = numba.unicode._empty_string(kind, length)
+                ptr = get_array_ctypes_ptr(A._data, data_start)
+                _memcpy(_str._data, ptr, length, 1)
+                str_list[i] = _str
+
+            return str_list
+
+        return _impl

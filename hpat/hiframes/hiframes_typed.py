@@ -36,7 +36,7 @@ from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.aggregate import Aggregate
 from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.series_kernels import series_replace_funcs
-
+from hpat.hiframes.split_impl import string_array_split_view_type
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -1709,9 +1709,10 @@ class HiFramesTyped(object):
         return self._replace_func(_str_split_impl, [arr, sep], pre_nodes=nodes)
 
     def _run_series_str_get(self, assign, lhs, arr, rhs, nodes):
-        # XXX only supports get for list(list(str)) input
-        assert (self.typemap[arr.name]
-                    == types.List(types.List(string_type)))
+        arr_typ = self.typemap[arr.name]
+        # XXX only supports get for list(list(str)) input and split view
+        assert (arr_typ == types.List(types.List(string_type))
+            or arr_typ == string_array_split_view_type)
         ind_var = rhs.args[0]
 
         def _str_get_impl(str_arr, ind):
