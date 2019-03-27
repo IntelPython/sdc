@@ -289,7 +289,8 @@ def get_slice_step(typemap, func_ir, var):
 def is_array(typemap, varname):
     return (varname in typemap
         and (is_np_array(typemap, varname)
-        or typemap[varname] in (string_array_type, list_string_array_type)
+        or typemap[varname] in (string_array_type, list_string_array_type,
+            hpat.hiframes.split_impl.string_array_split_view_type)
         or isinstance(typemap[varname], hpat.hiframes.pd_series_ext.SeriesType)))
 
 def is_np_array(typemap, varname):

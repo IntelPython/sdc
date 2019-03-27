@@ -157,7 +157,8 @@ make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
 def series_to_array_type(typ, replace_boxed=False):
-    return _get_series_array_type(typ.dtype)
+    return typ.data
+    # return _get_series_array_type(typ.dtype)
 
 
 def is_series_type(typ):

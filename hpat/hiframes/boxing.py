@@ -189,6 +189,8 @@ def box_dataframe(typ, val, c):
                 elif isinstance(dtype, PDCategoricalDtype):
                     arr_obj = box_categorical_array(arr_typ, arr, c)
                     # context.nrt.incref(builder, arr_typ, arr)
+                elif arr_typ == string_array_split_view_type:
+                    arr_obj = box_str_arr_split_view(arr_typ, arr, c)
                 elif dtype == types.List(string_type):
                     arr_obj = box_list(list_string_array_type, arr, c)
                     # context.nrt.incref(builder, arr_typ, arr)  # TODO required?

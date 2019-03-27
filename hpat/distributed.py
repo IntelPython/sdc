@@ -584,6 +584,13 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
+        if (fdef == ('compute_split_view', 'hpat.hiframes.split_impl')
+                and self._is_1D_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
         if fdef == ('isna', 'hpat.hiframes.api') and self._is_1D_arr(rhs.args[0].name):
             # fix index in call to isna
             arr = rhs.args[0]

@@ -36,6 +36,7 @@ from hpat.hiframes.sort import (
     update_shuffle_meta,  alloc_pre_shuffle_metadata,
     )
 from hpat.hiframes.join import write_send_buff
+from hpat.hiframes.split_impl import string_array_split_view_type
 
 # XXX: used in agg func output to avoid mutating filter, agg, join, etc.
 # TODO: fix type inferrer and remove this
@@ -445,6 +446,8 @@ def isna_overload(arr, i):
         return lambda arr, i: hpat.str_arr_ext.str_arr_is_na(arr, i)
     # TODO: support NaN in list(list(str))
     if arr == list_string_array_type:
+        return lambda arr, i: False
+    if arr == string_array_split_view_type:
         return lambda arr, i: False
     # TODO: extend to other types
     assert isinstance(arr, types.Array)

@@ -36,7 +36,8 @@ from hpat.hiframes.rolling import get_rolling_setup_args
 from hpat.hiframes.aggregate import Aggregate
 from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.series_kernels import series_replace_funcs
-from hpat.hiframes.split_impl import string_array_split_view_type
+from hpat.hiframes.split_impl import (string_array_split_view_type,
+    StringArraySplitViewType)
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -2399,7 +2400,7 @@ class HiFramesTyped(object):
 def _fix_typ_undefs(new_typ, old_typ):
     if isinstance(old_typ, (types.Array, SeriesType)):
         assert isinstance(new_typ, (types.Array, SeriesType, StringArrayType,
-            types.List))
+            types.List, StringArraySplitViewType))
         if new_typ.dtype == types.undefined:
             return new_typ.copy(old_typ.dtype)
     if isinstance(old_typ, (types.Tuple, types.UniTuple)):

@@ -379,6 +379,10 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
+        if fdef == ('compute_split_view', 'hpat.hiframes.split_impl'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io.np_io'):
             return
