@@ -373,6 +373,16 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    def test_str_split_filter(self):
+        def test_impl(df):
+            B = df.A.str.split(',')
+            df2 = pd.DataFrame({'B': B})
+            return df2[df2.B.str.len()>1]
+
+        df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     def test_str_split_box_df(self):
         def test_impl(df):
             return pd.DataFrame({'B': df.A.str.split(',')})

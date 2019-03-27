@@ -44,6 +44,7 @@ void* init_string_const(char* in_str);
 void dtor_string(std::string** in_str, int64_t size, void* in);
 void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t size, void* in);
+void str_arr_split_view_alloc(str_arr_split_view_payload* out_view, int64_t num_items, int64_t num_offsets);
 void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_strs, uint32_t* offsets, char* data, char sep);
 const char* get_c_str(std::string* s);
 const char* get_char_ptr(char c);
@@ -116,6 +117,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&dtor_string_array)));
     PyObject_SetAttrString(m, "dtor_str_arr_split_view",
                             PyLong_FromVoidPtr((void*)(&dtor_str_arr_split_view)));
+    PyObject_SetAttrString(m, "str_arr_split_view_alloc",
+                            PyLong_FromVoidPtr((void*)(&str_arr_split_view_alloc)));
     PyObject_SetAttrString(m, "str_arr_split_view_impl",
                             PyLong_FromVoidPtr((void*)(&str_arr_split_view_impl)));
     PyObject_SetAttrString(m, "get_c_str",
@@ -250,6 +253,13 @@ void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t siz
     delete[] in_str_arr->data_offsets;
     // if (in_str_arr->null_bitmap != nullptr)
     //     delete[] in_str_arr->null_bitmap;
+    return;
+}
+
+void str_arr_split_view_alloc(str_arr_split_view_payload* out_view, int64_t num_items, int64_t num_offsets)
+{
+    out_view->index_offsets = new uint32_t[num_items+1];
+    out_view->data_offsets = new uint32_t[num_offsets];
     return;
 }
 

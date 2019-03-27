@@ -27,6 +27,7 @@ ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 from .. import hstr_ext
 ll.add_symbol('dtor_str_arr_split_view', hstr_ext.dtor_str_arr_split_view)
 ll.add_symbol('str_arr_split_view_impl', hstr_ext.str_arr_split_view_impl)
+ll.add_symbol('str_arr_split_view_alloc', hstr_ext.str_arr_split_view_alloc)
 
 char_typ = types.uint8
 offset_typ = types.uint32
@@ -167,6 +168,7 @@ def compute_split_view(typingctx, str_arr_typ, sep_typ=None):
         out_view.num_items = in_str_arr.num_items
         out_view.index_offsets = view_payload.index_offsets
         out_view.data_offsets = view_payload.data_offsets
+        # TODO: incref?
         out_view.data = context.compile_internal(
             builder, lambda S: get_data_ptr(S),
             data_ctypes_type(string_array_type), [str_arr])
@@ -246,12 +248,74 @@ def box_str_arr_split_view(typ, val, c):
 
 
 @intrinsic
+def pre_alloc_str_arr_view(typingctx, num_items_t, num_offsets_t, data_t=None):
+    assert num_items_t == types.intp and num_offsets_t == types.intp
+    def codegen(context, builder, sig, args):
+        num_items, num_offsets, data_ptr = args
+        meminfo, meminfo_data_ptr = construct_str_arr_split_view(
+            context, builder)
+
+        # (str_arr_split_view_payload* out_view, int64_t num_items,
+        #  int64_t num_offsets)
+        fnty = lir.FunctionType(
+            lir.VoidType(),
+            [meminfo_data_ptr.type, lir.IntType(64), lir.IntType(64)])
+
+        fn_impl = builder.module.get_or_insert_function(
+            fnty, name="str_arr_split_view_alloc")
+
+        builder.call(fn_impl,
+            [meminfo_data_ptr, num_items, num_offsets])
+
+
+        view_payload = cgutils.create_struct_proxy(
+            str_arr_split_view_payload_type)(
+            context, builder, value=builder.load(meminfo_data_ptr))
+
+        out_view = context.make_helper(builder, string_array_split_view_type)
+        out_view.num_items = num_items
+        out_view.index_offsets = view_payload.index_offsets
+        out_view.data_offsets = view_payload.data_offsets
+        # TODO: incref?
+        out_view.data = data_ptr
+        # out_view.null_bitmap = view_payload.null_bitmap
+        out_view.meminfo = meminfo
+        ret = out_view._getvalue()
+
+        return impl_ret_new_ref(
+            context, builder, string_array_split_view_type, ret)
+
+    return string_array_split_view_type(
+        types.intp, types.intp, data_t), codegen
+
+
+@intrinsic
+def get_c_arr_ptr(typingctx, c_arr, ind_t=None):
+    def codegen(context, builder, sig, args):
+        in_arr, ind = args
+        return builder.bitcast(
+            builder.gep(in_arr, [ind]), lir.IntType(8).as_pointer())
+
+    return types.voidptr(c_arr, ind_t), codegen
+
+
+@intrinsic
 def getitem_c_arr(typingctx, c_arr, ind_t=None):
     def codegen(context, builder, sig, args):
         in_arr, ind = args
         return builder.load(builder.gep(in_arr, [ind]))
 
     return c_arr.dtype(c_arr, ind_t), codegen
+
+
+@intrinsic
+def setitem_c_arr(typingctx, c_arr, ind_t, item_t=None):
+    def codegen(context, builder, sig, args):
+        in_arr, ind, item = args
+        ptr = builder.gep(in_arr, [ind])
+        builder.store(item, ptr)
+
+    return types.void(c_arr, ind_t, c_arr.dtype), codegen
 
 
 @intrinsic
@@ -286,7 +350,6 @@ def str_arr_split_view_getitem_overload(A, ind):
             end_index = getitem_c_arr(A._index_offsets, ind+1)
             n = end_index - start_index - 1
 
-
             str_list = hpat.str_ext.alloc_str_list(n)
             for i in range(n):
                 data_start = getitem_c_arr(
@@ -304,5 +367,43 @@ def str_arr_split_view_getitem_overload(A, ind):
                 str_list[i] = _str
 
             return str_list
+
+        return _impl
+
+    if A == string_array_split_view_type and ind == types.Array(types.bool_, 1, 'C'):
+        def _impl(A, ind):
+            n = len(A)
+            if n != len(ind):
+                raise IndexError("boolean index did not match indexed array"
+                                 " along dimension 0")
+
+            num_items = 0
+            num_offsets = 0
+            for i in range(n):
+                if ind[i]:
+                    num_items += 1
+                    start_index = getitem_c_arr(A._index_offsets, i)
+                    end_index = getitem_c_arr(A._index_offsets, i+1)
+                    num_offsets += end_index - start_index
+
+            out_arr = pre_alloc_str_arr_view(num_items, num_offsets, A._data)
+            item_ind = 0
+            offset_ind = 0
+            for i in range(n):
+                if ind[i]:
+                    start_index = getitem_c_arr(A._index_offsets, i)
+                    end_index = getitem_c_arr(A._index_offsets, i+1)
+                    n_offsets = end_index - start_index
+
+                    setitem_c_arr(out_arr._index_offsets, item_ind, offset_ind)
+                    ptr = get_c_arr_ptr(A._data_offsets, start_index)
+                    out_ptr = get_c_arr_ptr(out_arr._data_offsets, offset_ind)
+                    _memcpy(out_ptr, ptr, n_offsets, 4)
+                    item_ind += 1
+                    offset_ind += n_offsets
+
+            # last item
+            setitem_c_arr(out_arr._index_offsets, item_ind, offset_ind)
+            return out_arr
 
         return _impl
