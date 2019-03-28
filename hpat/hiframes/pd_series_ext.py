@@ -99,10 +99,11 @@ class SeriesType(types.IterableType):
 
 
 def _get_series_array_type(dtype):
-    """get underlying array type of series based on its dtype
+    """get underlying default array type of series based on its dtype
     """
     # list(list(str))
     if dtype == types.List(string_type):
+        # default data layout is list but split view is used if possible
         return list_string_array_type
     # string array
     elif dtype == string_type:

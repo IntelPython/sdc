@@ -46,17 +46,7 @@ def typeof_pd_dataframe(val, c):
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    # TODO: handle NA as 1st value
-    if len(val) > 0 and isinstance(val.values[0], str):  # and isinstance(val[-1], str):
-        arr_typ = string_array_type
-    elif len(val) > 0 and isinstance(val.values[0], datetime.date):
-        # XXX: using .values to check date type since DatetimeIndex returns
-        # Timestamp which is subtype of datetime.date
-        return SeriesType(datetime_date_type)
-    else:
-        arr_typ = numba.typing.typeof._typeof_ndarray(val.values, c)
-
-    return arr_to_series_type(arr_typ)
+    return SeriesType(_infer_series_dtype(val))
 
 
 @typeof_impl.register(pd.Index)
@@ -113,11 +103,16 @@ def get_hiframes_dtypes(df):
 def _infer_series_dtype(S):
     if S.dtype == np.dtype('O'):
         # XXX assuming the whole column is strings if 1st val is string
+        # TODO: handle NA as 1st value
         first_val = S.iloc[0]
         if isinstance(first_val, list):
             return _infer_series_list_dtype(S)
         elif isinstance(first_val, str):
             return string_type
+        elif isinstance(S.values[0], datetime.date):
+            # XXX: using .values to check date type since DatetimeIndex returns
+            # Timestamp which is subtype of datetime.date
+            return datetime_date_type
         else:
             raise ValueError(
                 "data type for column {} not supported".format(S.name))
