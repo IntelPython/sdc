@@ -593,6 +593,8 @@ ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
 ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
 ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
+ll.add_symbol('str_arr_to_int64', hstr_ext.str_arr_to_int64)
+ll.add_symbol('str_arr_to_float64', hstr_ext.str_arr_to_float64)
 
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 
@@ -1083,6 +1085,56 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
         return out_arr
     res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
     return res
+
+@intrinsic
+def str_arr_item_to_int64(typingctx, out_ptr_t, str_arr_t, ind_t=None):
+    assert str_arr_t == string_array_type
+    assert ind_t == types.int64
+
+    def codegen(context, builder, sig, args):
+        out_ptr, arr, ind = args
+        out_ptr = builder.bitcast(out_ptr, lir.IntType(64).as_pointer())
+        string_array = context.make_helper(builder, string_array_type, arr)
+        fnty = lir.FunctionType(
+            lir.IntType(32),
+            [lir.IntType(64).as_pointer(),
+             lir.IntType(32).as_pointer(),
+             lir.IntType(8).as_pointer(),
+             lir.IntType(64)])
+        fn_setitem = builder.module.get_or_insert_function(
+            fnty, name="str_arr_to_int64")
+        return builder.call(
+            fn_setitem,
+            [out_ptr, string_array.offsets, string_array.data, ind])
+
+    return types.int32(
+        out_ptr_t, string_array_type, types.int64), codegen
+
+
+@intrinsic
+def str_arr_item_to_float64(typingctx, out_ptr_t, str_arr_t, ind_t=None):
+    assert str_arr_t == string_array_type
+    assert ind_t == types.int64
+
+    def codegen(context, builder, sig, args):
+        out_ptr, arr, ind = args
+        out_ptr = builder.bitcast(out_ptr, lir.DoubleType().as_pointer())
+        string_array = context.make_helper(builder, string_array_type, arr)
+        fnty = lir.FunctionType(
+            lir.IntType(32),
+            [lir.DoubleType().as_pointer(),
+             lir.IntType(32).as_pointer(),
+             lir.IntType(8).as_pointer(),
+             lir.IntType(64)])
+        fn_setitem = builder.module.get_or_insert_function(
+            fnty, name="str_arr_to_float64")
+        return builder.call(
+            fn_setitem,
+            [out_ptr, string_array.offsets, string_array.data, ind])
+
+    return types.int32(
+        out_ptr_t, string_array_type, types.int64), codegen
+
 
 
 # TODO: support array of strings

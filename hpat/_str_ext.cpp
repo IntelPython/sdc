@@ -16,6 +16,8 @@ using std::regex;
 using std::regex_search;
 #endif
 
+#include <boost/lexical_cast.hpp>
+
 #ifndef _WIN32
 #include <glob.h>
 #endif
@@ -76,6 +78,8 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index);
 void print_str(std::string* str);
 void print_char(char c);
 void print_int(int64_t val);
+int str_arr_to_int64(int64_t* out, uint32_t *offsets, char *data, int64_t index);
+int str_arr_to_float64(double* out, uint32_t *offsets, char *data, int64_t index);
 void* compile_regex(std::string* pat);
 bool str_contains_regex(std::string* str, regex* e);
 bool str_contains_noregex(std::string* str, std::string* pat);
@@ -167,6 +171,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&print_char)));
     PyObject_SetAttrString(m, "print_int",
                             PyLong_FromVoidPtr((void*)(&print_int)));
+    PyObject_SetAttrString(m, "str_arr_to_int64",
+                            PyLong_FromVoidPtr((void*)(&str_arr_to_int64)));
+    PyObject_SetAttrString(m, "str_arr_to_float64",
+                            PyLong_FromVoidPtr((void*)(&str_arr_to_float64)));
     PyObject_SetAttrString(m, "compile_regex",
                             PyLong_FromVoidPtr((void*)(&compile_regex)));
     PyObject_SetAttrString(m, "str_contains_noregex",
@@ -492,6 +500,42 @@ void* getitem_string_array_std(uint32_t *offsets, char *data, int64_t index)
     uint32_t start = offsets[index];
     return new std::string(&data[start], size);
 }
+
+
+int str_arr_to_int64(int64_t* out, uint32_t *offsets, char *data, int64_t index)
+{
+    uint32_t size = offsets[index+1]-offsets[index];
+    uint32_t start = offsets[index];
+    try
+    {
+        *out = boost::lexical_cast<int64_t>(data+start, (std::size_t)size);
+        return 0;
+    }
+    catch(const boost::bad_lexical_cast &)
+    {
+        *out = 0;
+        return -1;
+    }
+    return -1;
+}
+
+int str_arr_to_float64(double* out, uint32_t *offsets, char *data, int64_t index)
+{
+    uint32_t size = offsets[index+1]-offsets[index];
+    uint32_t start = offsets[index];
+    try
+    {
+        *out = boost::lexical_cast<double>(data+start, (std::size_t)size);
+        return 0;
+    }
+    catch(const boost::bad_lexical_cast &)
+    {
+        *out = std::nan("");  // TODO: numpy NaN
+        return -1;
+    }
+    return -1;
+}
+
 
 void* compile_regex(std::string* pat)
 {

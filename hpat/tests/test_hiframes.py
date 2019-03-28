@@ -453,6 +453,17 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def test_str_get_to_numeric(self):
+        def test_impl(df):
+            B = df.A.str.split(',')
+            C = pd.to_numeric(B.str.get(1), errors='coerce')
+            return C
+
+        df = pd.DataFrame({'A': ['AB,12', 'C,321,D']})
+        hpat_func = hpat.jit(locals={'C': hpat.int64[:]})(test_impl)
+        pd.testing.assert_series_equal(
+            hpat_func(df), test_impl(df), check_names=False)
+
     def test_str_flatten(self):
         def test_impl(df):
             A = df.A.str.split(',')

@@ -293,8 +293,12 @@ def pre_alloc_str_arr_view(typingctx, num_items_t, num_offsets_t, data_t=None):
 
 @intrinsic
 def get_c_arr_ptr(typingctx, c_arr, ind_t=None):
+    assert isinstance(c_arr, (types.CPointer, types.ArrayCTypes))
     def codegen(context, builder, sig, args):
         in_arr, ind = args
+        if isinstance(sig.args[0], types.ArrayCTypes):
+            in_arr = builder.extract_value(in_arr, 0)
+
         return builder.bitcast(
             builder.gep(in_arr, [ind]), lir.IntType(8).as_pointer())
 

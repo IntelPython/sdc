@@ -762,20 +762,21 @@ class HiFramesTyped(object):
 
         if func_name == 'to_numeric':
             out_dtype = self.typemap[lhs.name].dtype
-            conv_func = int
+            conv_func = hpat.str_arr_ext.str_arr_item_to_int64
             if out_dtype == types.float64:
-                conv_func = float
+                conv_func = hpat.str_arr_ext.str_arr_item_to_float64
             else:
                 assert out_dtype == types.int64
 
             # TODO: handle non-Series input
 
             def _to_numeric_impl(A):
+                # TODO: fix distributed
                 numba.parfor.init_prange()
                 n = len(A)
                 B = np.empty(n, out_dtype)
                 for i in numba.parfor.internal_prange(n):
-                    B[i] = conv_func(A[i])
+                    conv_func(get_c_arr_ptr(B.ctypes, i), A, i)
 
                 return hpat.hiframes.api.init_series(B)
 
@@ -783,7 +784,8 @@ class HiFramesTyped(object):
             data = self._get_series_data(rhs.args[0], nodes)
             return self._replace_func(_to_numeric_impl, [data],
                 pre_nodes=nodes,
-                extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func})
+                extra_globals={'out_dtype': out_dtype, 'conv_func': conv_func,
+                    'get_c_arr_ptr': hpat.hiframes.split_impl.get_c_arr_ptr})
 
         if func_name == 'parse_datetimes_from_strings':
             nodes = []
