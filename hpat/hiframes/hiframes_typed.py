@@ -37,7 +37,7 @@ from hpat.hiframes.aggregate import Aggregate
 from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.series_kernels import series_replace_funcs
 from hpat.hiframes.split_impl import (string_array_split_view_type,
-    StringArraySplitViewType)
+    StringArraySplitViewType, getitem_c_arr, get_array_ctypes_ptr)
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -1734,9 +1734,50 @@ class HiFramesTyped(object):
                 out_arr[i] = _str
             return hpat.hiframes.api.init_series(out_arr)
 
+        if arr_typ == string_array_split_view_type:
+            # TODO: refactor and enable distributed
+            def _str_get_impl(arr, ind):
+                numba.parfor.init_prange()
+                n = len(arr)
+                n_total_chars = 0
+                for i in numba.parfor.internal_prange(n):
+                    start_index = getitem_c_arr(arr._index_offsets, i)
+                    # TODO: check num strings and support NAN
+                    # end_index = getitem_c_arr(arr._index_offsets, i+1)
+                    data_start = getitem_c_arr(
+                        arr._data_offsets, start_index + ind)
+                    data_start += 1
+                    # get around -1 storage in uint32 problem
+                    if start_index + ind == 0:
+                        data_start = 0
+                    data_end = getitem_c_arr(
+                        arr._data_offsets, start_index + ind + 1)
+                    length = data_end - data_start
+                    n_total_chars += length
+                numba.parfor.init_prange()
+                out_arr = pre_alloc_string_array(n, n_total_chars)
+                for i in numba.parfor.internal_prange(n):
+                    start_index = getitem_c_arr(arr._index_offsets, i)
+                    # TODO: check num strings and support NAN
+                    # end_index = getitem_c_arr(arr._index_offsets, i+1)
+                    data_start = getitem_c_arr(
+                        arr._data_offsets, start_index + ind)
+                    data_start += 1
+                    # get around -1 storage in uint32 problem
+                    if start_index + ind == 0:
+                        data_start = 0
+                    data_end = getitem_c_arr(
+                        arr._data_offsets, start_index + ind + 1)
+                    length = data_end - data_start
+                    ptr = get_array_ctypes_ptr(arr._data, data_start)
+                    hpat.str_arr_ext.setitem_str_arr_ptr(out_arr, i, ptr, length)
+                return hpat.hiframes.api.init_series(out_arr)
+
         return self._replace_func(_str_get_impl, [arr, ind_var],
             pre_nodes=nodes,
-            extra_globals={'pre_alloc_string_array': pre_alloc_string_array})
+            extra_globals={'pre_alloc_string_array': pre_alloc_string_array,
+                'get_array_ctypes_ptr': get_array_ctypes_ptr,
+                'getitem_c_arr': getitem_c_arr})
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':

@@ -935,6 +935,25 @@ def setitem_str_arr(context, builder, sig, args):
                                   uni_str.data, uni_str.length, ind])
     return context.get_dummy_value()
 
+@intrinsic
+def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
+    def codegen(context, builder, sig, args):
+        arr, ind, ptr, length = args
+        string_array = context.make_helper(builder, string_array_type, arr)
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(32).as_pointer(),
+                                lir.IntType(8).as_pointer(),
+                                lir.IntType(8).as_pointer(),
+                                lir.IntType(64),
+                                lir.IntType(64)])
+        fn_setitem = builder.module.get_or_insert_function(
+            fnty, name="setitem_string_array")
+        builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                                builder.extract_value(ptr, 0), length, ind])
+        return context.get_dummy_value()
+
+    return types.void(str_arr_t, ind_t, ptr_t, len_t), codegen
+
 def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(),
