@@ -229,21 +229,9 @@ def unbox_dataframe_column(typingctx, df, i=None):
         series_obj = c.pyapi.object_getattr_string(dataframe.parent, col_name)
         arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
 
-        if data_typ == string_array_type:
-            native_val = unbox_str_series(string_array_type, arr_obj, c)
-        elif data_typ == string_array_split_view_type:
-            # XXX dummy unboxing to avoid errors in _get_dataframe_data()
-            out_view = context.make_helper(builder, string_array_split_view_type)
-            native_val = NativeValue(out_view._getvalue())
-        elif data_typ == list_string_array_type:
-            native_val = _unbox_array_list_str(arr_obj, c)
-        else:
-            dtype = data_typ.dtype
-            if isinstance(dtype, PDCategoricalDtype):
-                native_val = unbox_categorical_array(data_typ, arr_obj, c)
-            else:
-                # TODO: error handling like Numba callwrappers.py
-                native_val = unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c)
+        # TODO: support column of tuples?
+        native_val = _unbox_series_data(
+            data_typ.dtype, data_typ, arr_obj, c)
 
         c.pyapi.decref(series_obj)
         c.pyapi.decref(arr_obj)
@@ -262,19 +250,28 @@ def unbox_dataframe_column(typingctx, df, i=None):
 def unbox_series(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "values")
     series = cgutils.create_struct_proxy(typ)(c.context, c.builder)
-    series.data = _unbox_series_data(typ.dtype, typ.data, val, c, arr_obj)
+    series.data = _unbox_series_data(typ.dtype, typ.data, arr_obj, c).value
     # TODO: handle index and name
     c.pyapi.decref(arr_obj)
     return NativeValue(series._getvalue())
 
-def _unbox_series_data(dtype, data_typ, val, c, arr_obj):
-    if dtype == string_type:
-        return unbox_str_series(string_array_type, arr_obj, c).value
+
+def _unbox_series_data(dtype, data_typ, arr_obj, c):
+    if data_typ == string_array_type:
+        return unbox_str_series(string_array_type, arr_obj, c)
     elif dtype == datetime_date_type:
-        return unbox_datetime_date_array(data_typ, val, c).value
+        return unbox_datetime_date_array(data_typ, arr_obj, c)
+    elif data_typ == list_string_array_type:
+        return _unbox_array_list_str(arr_obj, c)
+    elif data_typ == string_array_split_view_type:
+        # XXX dummy unboxing to avoid errors in _get_dataframe_data()
+        out_view = c.context.make_helper(c.builder, string_array_split_view_type)
+        return NativeValue(out_view._getvalue())
+    elif isinstance(dtype, PDCategoricalDtype):
+        return unbox_categorical_array(data_typ, arr_obj, c)
 
     # TODO: error handling like Numba callwrappers.py
-    return unbox_array(types.Array(dtype, 1, 'C'), arr_obj, c).value
+    return unbox_array(data_typ, arr_obj, c)
 
 
 @box(SeriesType)
