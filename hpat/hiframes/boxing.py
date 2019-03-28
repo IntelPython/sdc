@@ -21,7 +21,8 @@ from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     box_categorical_array, unbox_categorical_array)
-from hpat.hiframes.pd_series_ext import SeriesType, arr_to_series_type
+from hpat.hiframes.pd_series_ext import (SeriesType, arr_to_series_type,
+    _get_series_array_type)
 from hpat.hiframes.split_impl import (string_array_split_view_type,
     box_str_arr_split_view)
 
@@ -103,46 +104,47 @@ def unbox_dataframe(typ, val, c):
 def get_hiframes_dtypes(df):
     """get hiframe data types for a pandas dataframe
     """
-    pd_typ_list = df.dtypes.tolist()
     col_names = df.columns.tolist()
-    hi_typs = []
-    for cname, typ in zip(col_names, pd_typ_list):
-        if typ == np.dtype('O'):
-            # XXX assuming the whole column is strings if 1st val is string
-            first_val = df[cname].iloc[0]
-            if isinstance(first_val, list):
-                typ = _infer_series_list_type(df[cname], cname)
-                hi_typs.append(typ)
-                continue
-            if isinstance(first_val, str):
-                hi_typs.append(string_array_type)
-                continue
-            else:
-                raise ValueError("data type for column {} not supported".format(cname))
-        try:
-            t = numpy_support.from_dtype(typ)
-            hi_typs.append(types.Array(t, 1, 'C'))
-        except NotImplementedError:
-            raise ValueError("data type for column {} not supported".format(cname))
-
+    hi_typs = [_get_series_array_type(_infer_series_dtype(df[cname]))
+                for cname in col_names]
     return tuple(hi_typs)
 
 
-def _infer_series_list_type(S, cname):
+def _infer_series_dtype(S):
+    if S.dtype == np.dtype('O'):
+        # XXX assuming the whole column is strings if 1st val is string
+        first_val = S.iloc[0]
+        if isinstance(first_val, list):
+            return _infer_series_list_dtype(S)
+        elif isinstance(first_val, str):
+            return string_type
+        else:
+            raise ValueError(
+                "data type for column {} not supported".format(S.name))
+
+    # regular numpy types
+    try:
+        return numpy_support.from_dtype(S.dtype)
+    except NotImplementedError:
+        raise ValueError("data type for column {} not supported".format(S.name))
+
+
+
+def _infer_series_list_dtype(S):
     for i in range(len(S)):
         first_val = S.iloc[i]
         if not isinstance(first_val, list):
             raise ValueError(
-                "data type for column {} not supported".format(cname))
+                "data type for column {} not supported".format(S.name))
         if len(first_val) > 0:
             # TODO: support more types
             if isinstance(first_val[0], str):
-                return list_string_array_type
+                return types.List(string_type)
             else:
                 raise ValueError(
-                    "data type for column {} not supported".format(cname))
+                    "data type for column {} not supported".format(S.name))
     raise ValueError(
-            "data type for column {} not supported".format(cname))
+            "data type for column {} not supported".format(S.name))
 
 
 @box(DataFrameType)
