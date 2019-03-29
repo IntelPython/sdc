@@ -494,6 +494,17 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    def test_series_list_str_unbox1(self):
+        def test_impl(A):
+            return A.iloc[0]
+
+        S = pd.Series([['aa', 'b'], ['ccc'], ['']])
+        # TODO: empty list item
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        # call twice to test potential refcount errors
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_np_typ_call_replace(self):
         # calltype replacement is tricky for np.typ() calls since variable
         # type can't provide calltype

@@ -413,8 +413,8 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
                         with c.builder.if_then(native.is_error, likely=False):
                             c.builder.store(cgutils.true_bit, errorptr)
                             loop.do_break()
-                        # The reference is borrowed so incref=False
-                        list.setitem(loop.index, native.value, incref=False)
+                        # The object (e.g. string) is stored so incref=True
+                        list.setitem(loop.index, native.value, incref=True)
                     c.pyapi.decref(expected_typobj)
             if typ.reflected:
                 list.parent = obj
