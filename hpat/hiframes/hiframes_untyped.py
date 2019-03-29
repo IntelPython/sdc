@@ -298,6 +298,10 @@ class HiFrames(object):
                 except numba.ir_utils.GuardException:
                     pass
 
+            if rhs.op == 'make_function':
+                # HACK make globals availabe for typing in series.map()
+                rhs.globals = self.func_ir.func_id.func.__globals__
+
         # pass pivot values to df.pivot_table() calls using a meta
         # variable passed as argument. The meta variable's type
         # is set to MetaType with pivot values baked in.

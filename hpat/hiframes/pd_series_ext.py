@@ -372,7 +372,13 @@ class SeriesAttribute(AttributeTemplate):
         if dtype == types.NPDatetime('ns'):
             dtype = pandas_timestamp_type
         code = args[0].literal_value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        _globals = {'np': np}
+        # XXX hack in hiframes_typed to make globals available
+        if hasattr(args[0].literal_value, 'globals'):
+            # TODO: use code.co_names to find globals actually used?
+            _globals = args[0].literal_value.globals
+
+        f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
                 self.context, f_ir, (dtype,), None)
 

@@ -32,6 +32,10 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     ),
 ]]
 
+
+GLOBAL_VAL = 2
+
+
 class TestSeries(unittest.TestCase):
     def test_create1(self):
         def test_impl():
@@ -768,6 +772,14 @@ class TestSeries(unittest.TestCase):
     def test_series_map1(self):
         def test_impl(S):
             return S.map(lambda a: 2*a)
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_map_global1(self):
+        def test_impl(S):
+            return S.map(lambda a: a + GLOBAL_VAL)
 
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([1.0, 2., 3., 4., 5.])
