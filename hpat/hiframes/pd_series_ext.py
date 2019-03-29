@@ -21,7 +21,9 @@ from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
     CategoricalArray)
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
-from hpat.hiframes.split_impl import string_array_split_view_type
+from hpat.hiframes.split_impl import (string_array_split_view_type,
+    GetItemStringArraySplitView)
+
 
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
@@ -196,7 +198,7 @@ def if_series_to_array_type(typ, replace_boxed=False):
 
 def if_arr_to_series_type(typ):
     if isinstance(typ, types.Array) or typ in (string_array_type,
-                                                    list_string_array_type):
+            list_string_array_type, string_array_split_view_type):
         return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
@@ -794,6 +796,9 @@ class GetItemSeries(AbstractTemplate):
             else:
                 sig = numba.typing.collections.GetItemSequence.generic(
                     self, (in_arr, in_idx), kws)
+        elif in_arr == string_array_split_view_type:
+            sig = GetItemStringArraySplitView.generic(
+                self, (in_arr, in_idx), kws)
         else:
             out = get_array_index_type(in_arr, in_idx)
             sig = signature(out.result, in_arr, out.index)

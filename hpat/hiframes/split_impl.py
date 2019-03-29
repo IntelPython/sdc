@@ -347,6 +347,25 @@ def str_arr_split_view_len_overload(arr):
         return lambda arr: arr._num_items
 
 
+# @infer_global(operator.getitem)
+class GetItemStringArraySplitView(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        assert not kws
+        [ary, idx] = args
+        if ary == string_array_split_view_type:
+            if isinstance(idx, types.SliceType):
+                return signature(string_array_split_view_type, *args)
+            elif isinstance(idx, types.Integer):
+                return signature(types.List(string_type), *args)
+            elif idx == types.Array(types.bool_, 1, 'C'):
+                return signature(string_array_split_view_type, *args)
+            elif idx == types.Array(types.intp, 1, 'C'):
+                return signature(string_array_split_view_type, *args)
+
+
+
 @overload(operator.getitem)
 def str_arr_split_view_getitem_overload(A, ind):
     if A == string_array_split_view_type and isinstance(ind, types.Integer):
