@@ -383,6 +383,18 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
+        if fdef == ('get_split_view_index', 'hpat.hiframes.split_impl'):
+            # just used in str.get() implementation for now so we know it is
+            # parallel
+            # TODO: handle index similar to getitem to support more cases
+            return
+
+        if fdef == ('get_split_view_data_ptr', 'hpat.hiframes.split_impl'):
+            return
+
+        if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
+            return
+
         # np.fromfile()
         if fdef == ('file_read', 'hpat.io.np_io'):
             return

@@ -341,6 +341,27 @@ def get_array_ctypes_ptr(typingctx, arr_ctypes_t, ind_t=None):
     return arr_ctypes_t(arr_ctypes_t, ind_t), codegen
 
 
+@numba.njit(no_cpython_wrapper=True)
+def get_split_view_index(arr, item_ind, str_ind):
+    start_index = getitem_c_arr(arr._index_offsets, item_ind)
+    # TODO: check num strings and support NAN
+    # end_index = getitem_c_arr(arr._index_offsets, item_ind+1)
+    data_start = getitem_c_arr(
+        arr._data_offsets, start_index + str_ind)
+    data_start += 1
+    # get around -1 storage in uint32 problem
+    if start_index + str_ind == 0:
+        data_start = 0
+    data_end = getitem_c_arr(
+        arr._data_offsets, start_index + str_ind + 1)
+    return data_start, (data_end - data_start)
+
+
+@numba.njit(no_cpython_wrapper=True)
+def get_split_view_data_ptr(arr, data_start):
+    return get_array_ctypes_ptr(arr._data, data_start)
+
+
 @overload(len)
 def str_arr_split_view_len_overload(arr):
     if arr == string_array_split_view_type:
