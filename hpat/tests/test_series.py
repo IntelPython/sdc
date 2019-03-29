@@ -498,8 +498,7 @@ class TestSeries(unittest.TestCase):
         def test_impl(A):
             return A.iloc[0]
 
-        S = pd.Series([['aa', 'b'], ['ccc'], ['']])
-        # TODO: empty list item
+        S = pd.Series([['aa', 'b'], ['ccc'], []])
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
         # call twice to test potential refcount errors

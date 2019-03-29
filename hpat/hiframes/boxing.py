@@ -398,14 +398,16 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
                 # Traverse Python list and unbox objects into native list
                 with _NumbaTypeHelper(c) as nth:
                     # Note: *expected_typobj* can't be NULL
-                    expected_typobj = nth.typeof(c.builder.load(
-                                    c.builder.call(arr_get_fn, [obj, zero])))
+                    # TODO: enable type checking when emty list item in
+                    # list(list(str)) case can be handled
+                    # expected_typobj = nth.typeof(c.builder.load(
+                    #                 c.builder.call(arr_get_fn, [obj, zero])))
                     with cgutils.for_range(c.builder, size) as loop:
                         itemobj = c.builder.call(arr_get_fn, [obj, loop.index])
                         # extra load since we have ptr to object
                         itemobj = c.builder.load(itemobj)
                         #c.pyapi.print_object(itemobj)
-                        check_element_type(nth, itemobj, expected_typobj)
+                        # check_element_type(nth, itemobj, expected_typobj)
                         # XXX we don't call native cleanup for each
                         # list element, since that would require keeping
                         # of which unboxings have been successful.
@@ -415,7 +417,7 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
                             loop.do_break()
                         # The object (e.g. string) is stored so incref=True
                         list.setitem(loop.index, native.value, incref=True)
-                    c.pyapi.decref(expected_typobj)
+                    # c.pyapi.decref(expected_typobj)
             if typ.reflected:
                 list.parent = obj
             # Stuff meminfo pointer into the Python object for
