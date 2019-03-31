@@ -187,7 +187,8 @@ class DistributedAnalysis(object):
             out_dist = Distribution.REP
 
         parfor_arrs = set()  # arrays this parfor accesses in parallel
-        array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
+        array_accesses = _get_array_accesses(
+            parfor.loop_body, self.func_ir, self.typemap)
         par_index_var = parfor.loop_nests[0].index_variable.name
         #stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
         for (arr, index) in array_accesses:
@@ -869,7 +870,8 @@ class DistributedAnalysis(object):
                 # TODO: handle hiframes filter etc.
                 if (isinstance(inst, Parfor)
                         and parfor_dists[inst.id] == Distribution.OneD_Var):
-                    array_accesses = ir_utils.get_array_accesses(inst.loop_body)
+                    array_accesses = _get_array_accesses(
+                        inst.loop_body, self.func_ir, self.typemap)
                     onedv_arrs = set(arr for (arr, ind) in array_accesses
                                  if arr in array_dists and array_dists[arr] == Distribution.OneD_Var)
                     if (label in loop_bodies
@@ -985,6 +987,59 @@ def _arrays_written(arrs, blocks):
 #             if invar.name == var2.name or vars_dependent(defs, invar, var2):
 #                 return True
 #     return False
+
+
+
+# array access code is copied from ir_utils to be able to handle specialized
+# array access calls such as get_split_view_index()
+# TODO: implement extendable version in ir_utils
+def get_parfor_array_accesses(parfor, func_ir, typemap, accesses=None):
+    if accesses is None:
+        accesses = set()
+    blocks = wrap_parfor_blocks(parfor)
+    accesses = _get_array_accesses(blocks, func_ir, typemap, accesses)
+    unwrap_parfor_blocks(parfor)
+    return accesses
+
+
+array_accesses_extensions = {}
+array_accesses_extensions[Parfor] = get_parfor_array_accesses
+
+
+def _get_array_accesses(blocks, func_ir, typemap, accesses=None):
+    """returns a set of arrays accessed and their indices.
+    """
+    if accesses is None:
+        accesses = set()
+
+    for block in blocks.values():
+        for inst in block.body:
+            if isinstance(inst, ir.SetItem):
+                accesses.add((inst.target.name, inst.index.name))
+            if isinstance(inst, ir.StaticSetItem):
+                accesses.add((inst.target.name, inst.index_var.name))
+            if isinstance(inst, ir.Assign):
+                lhs = inst.target.name
+                rhs = inst.value
+                if isinstance(rhs, ir.Expr) and rhs.op == 'getitem':
+                    accesses.add((rhs.value.name, rhs.index.name))
+                if isinstance(rhs, ir.Expr) and rhs.op == 'static_getitem':
+                    index = rhs.index
+                    # slice is unhashable, so just keep the variable
+                    if index is None or ir_utils.is_slice_index(index):
+                        index = rhs.index_var.name
+                    accesses.add((rhs.value.name, index))
+                if isinstance(rhs, ir.Expr) and rhs.op == 'call':
+                    fdef = guard(find_callname, func_ir, rhs, typemap)
+                    if fdef is not None:
+                        if fdef == ('get_split_view_index', 'hpat.hiframes.split_impl'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+                        if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+            for T, f in array_accesses_extensions.items():
+                if isinstance(inst, T):
+                    f(inst, func_ir, typemap, accesses)
+    return accesses
 
 
 def dprint(*s):
