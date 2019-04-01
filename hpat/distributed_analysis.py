@@ -198,6 +198,12 @@ class DistributedAnalysis(object):
         par_index_var = parfor.loop_nests[0].index_variable.name
         #stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
         for (arr, index) in array_accesses:
+            # XXX sometimes copy propagation doesn't work for parfor indices
+            # so see if the index has a single variable definition and use it
+            # e.g. test_to_numeric
+            ind_def = self.func_ir._definitions[index]
+            if len(ind_def) == 1 and isinstance(ind_def[0], ir.Var):
+                index = ind_def[0].name
             if index == par_index_var: #or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr, index))
@@ -400,6 +406,12 @@ class DistributedAnalysis(object):
             return
 
         if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
+            return
+
+        if fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext'):
+            out_arrname = rhs.args[0].name
+            in_arrname = rhs.args[2].name
+            self._meet_array_dists(out_arrname, in_arrname, array_dists)
             return
 
         # np.fromfile()
@@ -1004,6 +1016,9 @@ def _get_array_accesses(blocks, func_ir, typemap, accesses=None):
                             accesses.add((rhs.args[0].name, rhs.args[1].name))
                         if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
                             accesses.add((rhs.args[0].name, rhs.args[1].name))
+                        if fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+                            accesses.add((rhs.args[2].name, rhs.args[3].name))
             for T, f in array_accesses_extensions.items():
                 if isinstance(inst, T):
                     f(inst, func_ir, typemap, accesses)

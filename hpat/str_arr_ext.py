@@ -1086,55 +1086,41 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
     res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
     return res
 
+
+@numba.njit(no_cpython_wrapper=True)
+def str_arr_item_to_numeric(out_arr, out_ind, str_arr, ind):
+    return _str_arr_item_to_numeric(hpat.hiframes.split_impl.get_c_arr_ptr(
+        out_arr.ctypes, out_ind), str_arr, ind, out_arr.dtype)
+
+
 @intrinsic
-def str_arr_item_to_int64(typingctx, out_ptr_t, str_arr_t, ind_t=None):
+def _str_arr_item_to_numeric(typingctx, out_ptr_t, str_arr_t, ind_t,
+                                                             out_dtype_t=None):
     assert str_arr_t == string_array_type
     assert ind_t == types.int64
 
     def codegen(context, builder, sig, args):
-        out_ptr, arr, ind = args
-        out_ptr = builder.bitcast(out_ptr, lir.IntType(64).as_pointer())
+        # TODO: return tuple with value and error and avoid array arg?
+        out_ptr, arr, ind, _dtype = args
         string_array = context.make_helper(builder, string_array_type, arr)
         fnty = lir.FunctionType(
             lir.IntType(32),
-            [lir.IntType(64).as_pointer(),
+            [out_ptr.type,
              lir.IntType(32).as_pointer(),
              lir.IntType(8).as_pointer(),
              lir.IntType(64)])
-        fn_setitem = builder.module.get_or_insert_function(
-            fnty, name="str_arr_to_int64")
+        fname = 'str_arr_to_int64'
+        if sig.args[3].dtype == types.float64:
+            fname = 'str_arr_to_float64'
+        else:
+            assert sig.args[3].dtype == types.int64
+        fn_to_numeric = builder.module.get_or_insert_function(fnty, fname)
         return builder.call(
-            fn_setitem,
+            fn_to_numeric,
             [out_ptr, string_array.offsets, string_array.data, ind])
 
     return types.int32(
-        out_ptr_t, string_array_type, types.int64), codegen
-
-
-@intrinsic
-def str_arr_item_to_float64(typingctx, out_ptr_t, str_arr_t, ind_t=None):
-    assert str_arr_t == string_array_type
-    assert ind_t == types.int64
-
-    def codegen(context, builder, sig, args):
-        out_ptr, arr, ind = args
-        out_ptr = builder.bitcast(out_ptr, lir.DoubleType().as_pointer())
-        string_array = context.make_helper(builder, string_array_type, arr)
-        fnty = lir.FunctionType(
-            lir.IntType(32),
-            [lir.DoubleType().as_pointer(),
-             lir.IntType(32).as_pointer(),
-             lir.IntType(8).as_pointer(),
-             lir.IntType(64)])
-        fn_setitem = builder.module.get_or_insert_function(
-            fnty, name="str_arr_to_float64")
-        return builder.call(
-            fn_setitem,
-            [out_ptr, string_array.offsets, string_array.data, ind])
-
-    return types.int32(
-        out_ptr_t, string_array_type, types.int64), codegen
-
+        out_ptr_t,  string_array_type, types.int64, out_dtype_t), codegen
 
 
 # TODO: support array of strings

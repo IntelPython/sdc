@@ -613,6 +613,25 @@ class DistributedPass(object):
             out.append(assign)
             return out
 
+        if (fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext')
+                and self._is_1D_arr(rhs.args[0].name)):
+            # TODO: test parallel
+            arr = rhs.args[0]
+            index_var = rhs.args[1]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out = sub_nodes
+            rhs.args[1] = sub_nodes[-1].target
+            # input string array
+            arr = rhs.args[2]
+            index_var = rhs.args[3]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out += sub_nodes
+            rhs.args[3] = sub_nodes[-1].target
+            out.append(assign)
+            return out
+
         if fdef == ('isna', 'hpat.hiframes.api') and self._is_1D_arr(rhs.args[0].name):
             # fix index in call to isna
             arr = rhs.args[0]

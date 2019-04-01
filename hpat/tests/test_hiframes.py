@@ -495,8 +495,8 @@ class TestHiFrames(unittest.TestCase):
             B = pd.to_numeric(df.A, errors='coerce')
             return B
 
-        df = pd.DataFrame({'A': ['123', '331']})
-        hpat_func = hpat.jit(locals={'B': hpat.int64[:]})(test_impl)
+        df = pd.DataFrame({'A': ['123.1', '331.2']})
+        hpat_func = hpat.jit(locals={'B': hpat.float64[:]})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
