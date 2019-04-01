@@ -1,8 +1,7 @@
 import daal4py
+import daal4py.hpat
 import hpat
 import numpy as np
-
-daal4py.daalinit(spmd=True)
 
 @hpat.jit
 def lr_predict(N, D, model):
@@ -21,5 +20,3 @@ p_res = lr_predict(1000, 10, t_res.model)
 print(p_res.prediction[0], t_res.model.NumberOfBetas)
 
 hpat.distribution_report()
-
-daal4py.daalfini()
