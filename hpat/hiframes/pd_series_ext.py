@@ -535,6 +535,14 @@ class SeriesAttribute(AttributeTemplate):
             types.int64, types.Array(types.int64, 1, 'C'), ary.data)
         return signature(out, *args)
 
+    @bound_function("series.rename")
+    def resolve_rename(self, ary, args, kws):
+        # TODO: support index rename, kws
+        assert len(args) == 1 and isinstance(
+            args[0], (types.UnicodeType, types.StringLiteral))
+        out = SeriesType(ary.dtype, ary.data, ary.index, True)
+        return signature(out, *args)
+
 
 # TODO: use ops logic from pandas/core/ops.py
 # # called from numba/numpy_support.py:resolve_output_type

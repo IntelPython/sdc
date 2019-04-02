@@ -859,6 +859,16 @@ class HiFramesTyped(object):
         if func_name == 'dropna':
             return self._run_call_series_dropna(assign, lhs, rhs, series_var)
 
+        if func_name == 'rename':
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            index = self._get_series_index(series_var, nodes)
+            name = rhs.args[0]
+            return self._replace_func(
+                lambda data, index, name: hpat.hiframes.api.init_series(
+                    data, index, name),
+                [data, index, name], pre_nodes=nodes)
+
         if func_name in ('shift', 'pct_change'):
             nodes = []
             data = self._get_series_data(series_var, nodes)
