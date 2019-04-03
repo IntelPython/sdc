@@ -235,6 +235,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
+    def resolve_shape(self, ary):
+        return types.Tuple((types.int64,))
+
     def resolve_str(self, ary):
         assert ary.dtype in (string_type, types.List(string_type))
         # TODO: add dtype to series_str_methods_type

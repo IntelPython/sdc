@@ -312,6 +312,12 @@ class HiFramesTyped(object):
             nodes.append(assign)
             return nodes
 
+        if isinstance(rhs_type, SeriesType) and rhs.attr == 'shape':
+            nodes = []
+            data = self._get_series_data(rhs.value, nodes)
+            return self._replace_func(
+                lambda A: (len(A),), [data], pre_nodes=nodes)
+
         if isinstance(rhs_type, DatetimeIndexType) and rhs.attr == 'values':
             # simply return the data array
             nodes = []
