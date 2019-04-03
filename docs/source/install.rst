@@ -65,16 +65,18 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and 
 * Start 'Anaconda prompt'
 * Setup the Conda environment in Anaconda Prompt::
 
-    conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge python=3.6 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
+    conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge python=3.7 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
     activate HPAT
+    conda install vc vs2015_runtime vs2015_win-64
     git clone https://github.com/IntelLabs/hpat.git
     cd hpat
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-    "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
     "%I_MPI_ROOT%"\intel64\bin\mpivars.bat
     set HDF5_DIR=%CONDA_PREFIX%\Library
-    python setup.py install
+    python setup.py develop
+
+.. "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
 
 Troubleshooting Windows Build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
