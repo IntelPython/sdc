@@ -330,7 +330,7 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
         // check nrows argument
         if (nrows != -1 && (nrows < 0 || nrows > tot_no_lines))
         {
-            std::cerr << "Invalid nrows argument: " << nrows << ' for total number of lines: '<< tot_no_lines << std::endl;
+            std::cerr << "Invalid nrows argument: " << nrows << " for total number of lines: "<< tot_no_lines << std::endl;
             return NULL;
         }
 
