@@ -304,6 +304,32 @@ class TestSeries(unittest.TestCase):
         test_impl(A2, 0)
         np.testing.assert_array_equal(A1, A2)
 
+    def test_setitem_series_bool1(self):
+        def test_impl(A):
+            A[A>3] = 100
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1)
+        test_impl(A2)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
+    def test_setitem_series_bool2(self):
+        def test_impl(A, B):
+            A[A>3] = B[A>3]
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, df.B)
+        test_impl(A2, df.B)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[0]

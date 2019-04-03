@@ -251,6 +251,16 @@ class HiFramesTyped(object):
 
     def _run_setitem(self, inst):
         target_typ = self.typemap[inst.target.name]
+        # Series as index
+        # TODO: handle all possible cases
+        nodes = []
+        if (isinstance(inst, ir.SetItem)
+                and isinstance(self.typemap[inst.index.name], SeriesType)):
+            inst.index = self._get_series_data(inst.index, nodes)
+
+        if (isinstance(inst, ir.SetItem)
+                and isinstance(self.typemap[inst.value.name], SeriesType)):
+            inst.value = self._get_series_data(inst.value, nodes)
 
         if target_typ == h5dataset_type:
             return self._handle_h5_write(inst.target, inst.index, inst.value)
@@ -265,14 +275,14 @@ class HiFramesTyped(object):
 
         if isinstance(target_typ, SeriesType):
             # TODO: handle index
-            nodes = []
             data = self._get_series_data(inst.target, nodes)
             inst.target = data
             nodes.append(inst)
             self._convert_series_calltype(inst)
             return nodes
 
-        return [inst]
+        nodes.append(inst)
+        return nodes
 
     def _run_getattr(self, assign, rhs):
         rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
