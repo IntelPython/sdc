@@ -694,7 +694,7 @@ def concat_overload(objs, axis=0, join='outer', join_axes=None,
     return (lambda objs, axis=0, join='outer', join_axes=None,
             ignore_index=False, keys=None, levels=None, names=None,
             verify_integrity=False, sort=None, copy=True:
-            hpat.hiframes.pd_dataframe_ext.concat_dummy(objs))
+            hpat.hiframes.pd_dataframe_ext.concat_dummy(objs, axis))
 
 def concat_dummy(objs):
     return pd.concat(objs)
@@ -704,8 +704,10 @@ class ConcatDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         objs = args[0]
+        axis = args[1].literal_value
 
         if isinstance(objs, types.List):
+            assert axis == 0
             assert isinstance(objs.dtype, (SeriesType, DataFrameType))
             ret_typ = objs.dtype.copy()
             if isinstance(ret_typ, DataFrameType):
@@ -715,6 +717,25 @@ class ConcatDummyTyper(AbstractTemplate):
         if not isinstance(objs, types.BaseTuple):
             raise ValueError("Tuple argument for pd.concat expected")
         assert len(objs.types) > 0
+
+        if axis == 1:
+            data = []
+            names = []
+            col_no = 0
+            for obj in objs.types:
+                assert isinstance(obj, (SeriesType, DataFrameType))
+                if isinstance(obj, SeriesType):
+                    # TODO: handle names of SeriesTypes
+                    data.append(obj.data)
+                    names.append(str(col_no))
+                    col_no += 1
+                else:  # DataFrameType
+                    # TODO: test
+                    data.extend(obj.data)
+                    names.extend(obj.columns)
+
+            ret_typ = DataFrameType(tuple(data), None, tuple(names))
+            return signature(ret_typ, *args)
 
         # dataframe case
         if isinstance(objs.types[0], DataFrameType):

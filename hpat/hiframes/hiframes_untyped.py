@@ -957,10 +957,10 @@ class HiFrames(object):
     def _handle_concat(self, assign, lhs, rhs, label):
         # converting build_list to build_tuple before type inference to avoid
         # errors
-        if len(rhs.args) != 1 or len(rhs.kws) != 0:
-            raise ValueError(
-                "only a list/tuple argument is supported in concat")
-        df_list = guard(get_definition, self.func_ir, rhs.args[0])
+        kws = dict(rhs.kws)
+        objs_arg = self._get_arg('concat', rhs.args, kws, 0, 'objs')
+
+        df_list = guard(get_definition, self.func_ir, objs_arg)
         if not isinstance(df_list, ir.Expr) or not (df_list.op
                                             in ['build_tuple', 'build_list']):
             raise ValueError("pd.concat input should be constant list or tuple")

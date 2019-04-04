@@ -885,6 +885,18 @@ class TestDataFrame(unittest.TestCase):
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
 
+    def test_concat_columns1(self):
+        def test_impl(S1, S2):
+            return pd.concat([S1, S2], axis=1)
+
+        hpat_func = hpat.jit(test_impl)
+        S1 = pd.Series([4, 5])
+        S2 = pd.Series([6., 7.])
+        # TODO: support int as column name
+        pd.testing.assert_frame_equal(
+            hpat_func(S1, S2),
+            test_impl(S1, S2).rename(columns={0:'0', 1:'1'}))
+
     def test_var_rename(self):
         # tests df variable replacement in hiframes_untyped where inlining
         # can cause extra assignments and definition handling errors

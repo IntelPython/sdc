@@ -1812,6 +1812,10 @@ class DataFramePass(object):
         nodes = []
         out_typ = self.typemap[lhs.name]
         df_list = self._get_const_tup(rhs.args[0])
+        axis = guard(find_const, self.func_ir, rhs.args[1])
+        if axis == 1:
+            return self._run_call_concat_columns(df_list, out_typ)
+
         # generate a concat call for each output column
         # TODO: support non-numericals like string
         gen_nan_func = lambda A: np.full(len(A), np.nan)
@@ -1855,6 +1859,26 @@ class DataFramePass(object):
                         self.typemap,
                         self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, args)
+            nodes += f_block.body[:-2]
+            out_vars.append(nodes[-1].target)
+
+        _init_df = _gen_init_df(out_typ.columns)
+
+        return self._replace_func(_init_df, out_vars,
+            pre_nodes=nodes)
+
+    def _run_call_concat_columns(self, objs, out_typ):
+        nodes = []
+        out_vars = []
+        for obj in objs:
+            f_block = compile_to_numba_ir(
+                        lambda S: hpat.hiframes.api.get_series_data(S),
+                        {'hpat': hpat},
+                        self.typingctx,
+                        (self.typemap[obj.name],),
+                        self.typemap,
+                        self.calltypes).blocks.popitem()[1]
+            replace_arg_nodes(f_block, (obj,))
             nodes += f_block.body[:-2]
             out_vars.append(nodes[-1].target)
 
