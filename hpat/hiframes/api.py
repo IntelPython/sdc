@@ -966,6 +966,45 @@ def lower_convert_impl(context, builder, sig, args):
     return impl_ret_new_ref(context, builder, sig.return_type, res)
 
 
+def convert_rec_to_tup(val):
+    return val
+
+@infer_global(convert_rec_to_tup)
+class ConvertRecTupType(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        in_dtype = args[0]
+        out_dtype = in_dtype
+
+        if isinstance(in_dtype, types.Record):
+            out_dtype = types.Tuple([m[1] for m in in_dtype.members])
+
+        return signature(out_dtype, in_dtype)
+
+@lower_builtin(convert_rec_to_tup, types.Any)
+def lower_convert_rec_tup_impl(context, builder, sig, args):
+    val, = args
+    rec_typ = sig.args[0]
+    tup_typ = sig.return_type
+
+    if not isinstance(rec_typ, types.Record):
+        return impl_ret_borrowed(context, builder, sig.return_type, val)
+
+    n_fields = len(rec_typ.members)
+
+    func_text = "def _rec_to_tup(r):\n"
+    func_text += "  return ({},)\n".format(
+        ", ".join("r.f{}".format(i) for i in range(n_fields)))
+
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    _rec_to_tup = loc_vars['_rec_to_tup']
+
+    res = context.compile_internal(builder, _rec_to_tup, tup_typ(rec_typ), [val])
+    return impl_ret_borrowed(context, builder, sig.return_type, res)
+
+
 # XXX: use infer_global instead of overload, since overload fails if the same
 # user function is compiled twice
 @infer_global(fix_df_array)

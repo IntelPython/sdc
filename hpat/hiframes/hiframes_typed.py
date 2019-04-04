@@ -1205,6 +1205,8 @@ class HiFramesTyped(object):
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
         if dtype == types.NPDatetime('ns'):
             func_text += "    t = hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(np.int64(A[i]))\n"
+        elif isinstance(dtype, types.BaseTuple):
+            func_text += "    t = hpat.hiframes.api.convert_rec_to_tup(A[i])\n"
         else:
             func_text += "    t = A[i]\n"
         func_text += "    v = map_func(t)\n"

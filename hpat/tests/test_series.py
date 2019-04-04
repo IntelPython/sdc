@@ -836,6 +836,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_map_tup_map1(self):
+        def test_impl(S):
+            A = S.map(lambda a: (a, 2*a))
+            return A.map(lambda a: a[1])
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_combine(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2*a + b)
