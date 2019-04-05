@@ -131,6 +131,9 @@ class DataFramePass(object):
                         block, len(new_body), rp_func.func, self.typingctx,
                         rp_func.arg_types,
                         self.typemap, self.calltypes)
+                    # TODO: remove after Numba #3946 is merged
+                    if isinstance(callee_blocks, tuple):
+                        callee_blocks = callee_blocks[0]
                     # add blocks in reversed topo order to enable dead branch
                     # pruning (merge example)
                     # TODO: fix inline_closure_call()
