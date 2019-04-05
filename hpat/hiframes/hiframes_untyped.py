@@ -911,7 +911,7 @@ class HiFrames(object):
         has to be specified in locals and applied
         """
         kws = dict(rhs.kws)
-        if 'errors' not in kws and guard(find_const, self.func_ir, kws['errors']) != 'coerce':
+        if 'errors' not in kws or guard(find_const, self.func_ir, kws['errors']) != 'coerce':
             raise ValueError("pd.to_numeric() only supports errors='coerce'")
 
         if lhs.name not in self.reverse_copies or (self.reverse_copies[lhs.name]) not in self.locals:
