@@ -62,7 +62,8 @@ def remove_hiframes(rhs, lives, call_list):
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
             'concat', 'count', 'mean', 'quantile', 'var',
             'str_contains_regex', 'str_contains_noregex', 'column_sum',
-            'nunique', 'init_series', 'init_datetime_index']):
+            'nunique', 'init_series', 'init_datetime_index',
+            'convert_tup_to_rec', 'convert_rec_to_tup']):
         return True
     if (len(call_list) == 4 and call_list[1:] == ['series_kernels', 'hiframes', hpat] and
             call_list[0]

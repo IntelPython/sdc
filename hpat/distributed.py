@@ -36,7 +36,7 @@ from hpat.distributed_analysis import (Distribution,
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints, ReplaceFunc, gen_getitem)
+                        debug_prints, ReplaceFunc, gen_getitem, is_call)
 from hpat.distributed_api import Reduce_Type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 
@@ -717,6 +717,16 @@ class DistributedPass(object):
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             f = lambda arr: hpat.hiframes.api.median(arr, True)
             return self._replace_func(f, rhs.args)
+
+        if fdef == ('convert_rec_to_tup', 'hpat.hiframes.api'):
+            # optimize Series back to back map pattern with tuples
+            # TODO: create another optimization pass?
+            arg_def = guard(get_definition, self.func_ir, rhs.args[0])
+            if (is_call(arg_def) and
+                    guard(find_callname, self.func_ir, arg_def)
+                    == ('convert_tup_to_rec', 'hpat.hiframes.api')):
+                assign.value = arg_def.args[0]
+            return out
 
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
