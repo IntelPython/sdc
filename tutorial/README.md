@@ -1,16 +1,24 @@
 # HPAT_tutorial
 
-To get the full experience you need to setup your python envorinment as follows:
-* conda create -n hpatidp -c intel python=3.6 tbb-devel numpy pandas scipy cython jinja2 daal daal-include impi-devel
-* conda activate hpatidp # or source activate idp
-* conda install jupyter notebook matplotlib boost cmake pyarrow gcc_linux-64 gxx_linux-64 gfortran_linux-64
-* conda install -c numba/label/dev -c intel llvmlite
-* git clone https://github.com/numba/numba
-* pushd numba && python setup.py install && popd
-* git clone https://github.com/IntelLabs/hpat
-* pushd hpat && python setup.py install && popd
-* git clone https://github.com/IntelPython/daal4py hpat
-* pushd daal4py && python setup.py install && popd
+## Setting up your environment
+This HPAT tutorial makes use of hpat (latest), numpy, pandas, daal4py (latest) and their dependences.
 
-Now  you can use the notebook!
-* jupyter notbook
+The easiest and most reliable way is to create a python environment is through using the provided environment configuration:
+
+`conda env create -f environment.yml`
+
+Then activate the environment
+
+`conda activate hpattut`
+
+and you are ready to start the tutorial!
+
+## The Tutorial
+
+The main material is provided as juypter notebooks. To get started simply type
+
+`jupyter notebook`
+
+The main HPAT tutorial is in the notebook `hpat.ipynb`.
+An example of an advanced analytics code is provided in `intraday_mean.py`.
+A more complete notebook about using daal4py with HPAT can be found in `	daal4py_data_science.ipynb`.
