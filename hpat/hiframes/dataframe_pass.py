@@ -203,7 +203,15 @@ class DataFramePass(object):
         nodes = []
         index_var = (rhs.index_var if rhs.op == 'static_getitem'
                                     else rhs.index)
-        index_typ = self.typemap[index_var.name]
+        # sometimes index_var is None, so fix it
+        # TODO: get rid of static_getitem
+        if index_var is None:
+            assert rhs.op == 'static_getitem'
+            index_typ = numba.typeof(rhs.index)
+            index_var = ir.Var(lhs.scope, mk_unique_var('dummy_index'), lhs.loc)
+            self.typemap[index_var.name] = index_typ
+        else:
+            index_typ = self.typemap[index_var.name]
 
         # A = df['column'] or df[['C1', 'C2']]
         if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
