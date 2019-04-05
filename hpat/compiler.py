@@ -114,7 +114,7 @@ binding.set_option("tmp", "-non-global-value-max-name-size=2048")
 #     pipeline_manager.pipeline_stages['nopython'] = new_pp
 
 
-def inline_calls(func_ir):
+def inline_calls(func_ir, _locals):
     work_list = list(func_ir.blocks.items())
     while work_list:
         label, block = work_list.pop()
@@ -127,9 +127,18 @@ def inline_calls(func_ir):
                     if (isinstance(func_def, (ir.Global, ir.FreeVar))
                             and isinstance(func_def.value, CPUDispatcher)):
                         py_func = func_def.value.py_func
-                        new_blocks = inline_closure_call(
+                        inline_out = inline_closure_call(
                             func_ir, py_func.__globals__, block, i, py_func,
                             work_list=work_list)
+
+                        # TODO remove if when inline_closure_call() output fix
+                        # is merged in Numba
+                        if isinstance(inline_out, tuple):
+                            var_dict = inline_out[1]
+                            # TODO: update '##distributed' and '##threaded' in _locals
+                            _locals.update((var_dict[k].name, v)
+                                        for k,v in func_def.value.locals.items()
+                                        if k in var_dict)
                         # for block in new_blocks:
                         #     work_list.append(block)
                         # current block is modified, skip the rest
@@ -184,7 +193,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         """
         # Ensure we have an IR and type information.
         assert self.func_ir
-        inline_calls(self.func_ir)
+        inline_calls(self.func_ir, self.locals)
 
 
     def stage_df_pass(self):

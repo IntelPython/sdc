@@ -180,6 +180,19 @@ class TestBasic(BaseTest):
         hpat_f = hpat.jit(f)
         hpat_f()
 
+    @unittest.skip("pending Numba #3946")
+    def test_inline_locals(self):
+        # make sure locals in inlined function works
+        @hpat.jit(locals={'B': hpat.float64[:]})
+        def g(S):
+            B = pd.to_numeric(S, errors='coerce')
+            return B
+
+        def f():
+            return g(pd.Series(['1.2']))
+
+        pd.testing.assert_series_equal(hpat.jit(f)(), f())
+
     def test_reduce(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
