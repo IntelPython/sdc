@@ -17,7 +17,7 @@ dependencies:
   - certifi=2019.3.9=py36_0
   - cycler=0.10.0=py36_7
   - daal=2019.3=intel_199
-  - daal4py=0.2019.2=py36hf484d3e_1
+  - daal4py=0.2019.4.dev0=py36hf484d3e_1
   - dbus=1.13.6=h746ee38_0
   - decorator=4.4.0=py36_1
   - defusedxml=0.5.0=py36_1
