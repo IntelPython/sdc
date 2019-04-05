@@ -704,7 +704,10 @@ class ConcatDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         objs = args[0]
-        axis = args[1].literal_value
+        axis = 0
+
+        if isinstance(args[1], types.IntegerLiteral):
+            axis = args[1].literal_value
 
         if isinstance(objs, types.List):
             assert axis == 0
@@ -737,6 +740,7 @@ class ConcatDummyTyper(AbstractTemplate):
             ret_typ = DataFrameType(tuple(data), None, tuple(names))
             return signature(ret_typ, *args)
 
+        assert axis == 0
         # dataframe case
         if isinstance(objs.types[0], DataFrameType):
             assert all(isinstance(t, DataFrameType) for t in objs.types)
