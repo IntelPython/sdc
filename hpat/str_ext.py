@@ -230,16 +230,25 @@ class StringAttribute(AttributeTemplate):
 #             return signature(types.intp, *args)
 
 
-@infer_global(int)
-class StrToInt(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [arg] = args
-        if isinstance(arg, StringType):
-            return signature(types.intp, arg)
-        # TODO: implement int(str) in Numba
-        if arg == string_type:
-            return signature(types.intp, arg)
+@overload(int)
+def int_str_overload(in_str):
+    if in_str == string_type:
+        def _str_to_int_impl(in_str):
+            return _str_to_int64(in_str._data, in_str._length)
+
+        return _str_to_int_impl
+
+
+# @infer_global(int)
+# class StrToInt(AbstractTemplate):
+#     def generic(self, args, kws):
+#         assert not kws
+#         [arg] = args
+#         if isinstance(arg, StringType):
+#             return signature(types.intp, arg)
+#         # TODO: implement int(str) in Numba
+#         if arg == string_type:
+#             return signature(types.intp, arg)
 
 
 @infer_global(float)
@@ -310,6 +319,7 @@ ll.add_symbol('str_equal_cstr', hstr_ext.str_equal_cstr)
 ll.add_symbol('str_split', hstr_ext.str_split)
 ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
+ll.add_symbol('std_str_to_int64', hstr_ext.std_str_to_int64)
 ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('compile_regex', hstr_ext.compile_regex)
@@ -326,6 +336,9 @@ get_std_str_len = types.ExternalFunction(
     "get_str_len", signature(types.intp, std_str_type))
 init_string_from_chars = types.ExternalFunction(
     "init_string_const", std_str_type(types.voidptr))
+
+_str_to_int64 = types.ExternalFunction(
+    "str_to_int64", signature(types.intp, types.voidptr, types.intp))
 
 str_replace_regex = types.ExternalFunction(
     "str_replace_regex", std_str_type(std_str_type, regex_type, std_str_type))
@@ -633,14 +646,14 @@ def string_split_impl(context, builder, sig, args):
 @lower_cast(StringType, types.int64)
 def cast_str_to_int64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_to_int64")
+    fn = builder.module.get_or_insert_function(fnty, name="std_str_to_int64")
     return builder.call(fn, (val,))
 
-# XXX handle unicode until Numba supports int(str)
-@lower_cast(string_type, types.int64)
-def cast_unicode_str_to_int64(context, builder, fromty, toty, val):
-    std_str = gen_unicode_to_std_str(context, builder, val)
-    return cast_str_to_int64(context, builder, std_str_type, toty, std_str)
+# # XXX handle unicode until Numba supports int(str)
+# @lower_cast(string_type, types.int64)
+# def cast_unicode_str_to_int64(context, builder, fromty, toty, val):
+#     std_str = gen_unicode_to_std_str(context, builder, val)
+#     return cast_str_to_int64(context, builder, std_str_type, toty, std_str)
 
 @lower_cast(StringType, types.float64)
 def cast_str_to_float64(context, builder, fromty, toty, val):

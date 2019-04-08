@@ -56,7 +56,8 @@ bool str_equal(std::string* s1, std::string* s2);
 bool str_equal_cstr(std::string* s1, char* s2);
 void* str_split(std::string* str, std::string* sep, int64_t *size);
 void* str_substr_int(std::string* str, int64_t index);
-int64_t str_to_int64(std::string* str);
+int64_t str_to_int64(char *data, int64_t length);
+int64_t std_str_to_int64(std::string* str);
 double str_to_float64(std::string* str);
 int64_t get_str_len(std::string* str);
 void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t ** offset_table,
@@ -143,6 +144,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&str_substr_int)));
     PyObject_SetAttrString(m, "get_char_from_string",
                             PyLong_FromVoidPtr((void*)(&get_char_from_string)));
+    PyObject_SetAttrString(m, "std_str_to_int64",
+                            PyLong_FromVoidPtr((void*)(&std_str_to_int64)));
     PyObject_SetAttrString(m, "str_to_int64",
                             PyLong_FromVoidPtr((void*)(&str_to_int64)));
     PyObject_SetAttrString(m, "str_to_float64",
@@ -397,7 +400,7 @@ char get_char_from_string(std::string* str, int64_t index)
     return str->at(index);
 }
 
-int64_t str_to_int64(std::string* str)
+int64_t std_str_to_int64(std::string* str)
 {
     return std::stoll(*str);
 }
@@ -531,6 +534,20 @@ int str_arr_to_float64(double* out, uint32_t *offsets, char *data, int64_t index
     catch(const boost::bad_lexical_cast &)
     {
         *out = std::nan("");  // TODO: numpy NaN
+        return -1;
+    }
+    return -1;
+}
+
+int64_t str_to_int64(char *data, int64_t length)
+{
+    try
+    {
+        return boost::lexical_cast<int64_t>(data, (std::size_t)length);
+    }
+    catch(const boost::bad_lexical_cast &)
+    {
+        std::cerr << "invalid string to int conversion" << std::endl;
         return -1;
     }
     return -1;
