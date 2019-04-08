@@ -5,7 +5,8 @@ This HPAT tutorial makes use of hpat (latest), numpy, pandas, daal4py (latest) a
 
 The easiest and most reliable way is to create a python environment using conda:
 
-`conda create -n hpattut -c ehsantn -c numba/label/dev -c defaults -c intel -c conda-forge hpat daal4py pandas blas=*=mkl jupyter notebook`
+* Linux: `conda create -n hpattut -c ehsantn -c numba/label/dev -c defaults -c intel -c conda-forge hpat daal4py pandas=0.23 blas=*=mkl jupyter notebook`
+* Windows: `conda create -n hpattut -c ehsantn -c numba/label/dev -c defaults -c intel hpat daal4py pandas=0.23 blas=*=mkl jupyter notebook`
 
 Then activate the environment
 
