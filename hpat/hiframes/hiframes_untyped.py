@@ -175,7 +175,9 @@ class HiFrames(object):
                     # replace inst.value to a call with target args
                     # as expected by inline_closure_call
                     # TODO: inst other than Assign?
-                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    inst.value = ir.Expr.call(
+                        ir.Var(block.scope, "dummy", inst.loc),
+                        rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, work_list=work_list)
@@ -1837,7 +1839,8 @@ class HiFrames(object):
         return df_var
 
     def _update_definitions(self, node_list):
-        dumm_block = ir.Block(None, None)
+        loc = ir.Loc("", 0)
+        dumm_block = ir.Block(ir.Scope(None, loc), loc)
         dumm_block.body = node_list
         build_definitions({0: dumm_block}, self.func_ir._definitions)
         return

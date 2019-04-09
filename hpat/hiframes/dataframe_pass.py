@@ -125,7 +125,9 @@ class DataFramePass(object):
                         self._update_definitions(rp_func.pre_nodes)
                     # replace inst.value to a call with target args
                     # as expected by inline_closure_call
-                    inst.value = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    inst.value = ir.Expr.call(
+                        ir.Var(block.scope, "dummy", inst.loc),
+                        rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     callee_blocks = inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
@@ -2084,7 +2086,8 @@ class DataFramePass(object):
         return isinstance(var_def, ir.Const) and var_def.value is None
 
     def _update_definitions(self, node_list):
-        dumm_block = ir.Block(None, None)
+        loc = ir.Loc("", 0)
+        dumm_block = ir.Block(ir.Scope(None, loc), loc)
         dumm_block.body = node_list
         build_definitions({0: dumm_block}, self.func_ir._definitions)
         return

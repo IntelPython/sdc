@@ -1640,7 +1640,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
             if (is_call_assign(stmt) and guard(find_callname, pm.func_ir, stmt.value)
                     == ('isna', 'hpat.hiframes.api')
                     and stmt.value.args[0].name == arr_var.name):
-                stmt.value = ir.Const(False, stmt.target.scope)
+                stmt.value = ir.Const(False, stmt.target.loc)
             # store reduction variables
             if is_assign(stmt) and stmt.target.name in redvars:
                 ind = redvars.index(stmt.target.name)

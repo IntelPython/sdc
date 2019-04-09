@@ -173,7 +173,9 @@ class DistributedPass(object):
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
                     # inline_closure_call expects a call assignment
-                    dummy_call = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    dummy_call = ir.Expr.call(
+                        ir.Var(block.scope, "dummy", inst.loc),
+                        rp_func.args, (), inst.loc)
                     if isinstance(inst, ir.Assign):
                         # replace inst.value to a call with target args
                         # as expected by inline_closure_call
@@ -965,7 +967,7 @@ class DistributedPass(object):
             new_df = nodes[-1].target
             new_df_typ = self.typemap[new_df.name]
             new_to_csv = ir.Expr.getattr(new_df, 'to_csv', new_df.loc)
-            new_func = ir.Var(new_df.scope, mk_unique_var('func'), new_df)
+            new_func = ir.Var(new_df.scope, mk_unique_var('func'), new_df.loc)
             self.typemap[new_func.name] = self.typingctx.resolve_getattr(
                 new_df_typ, 'to_csv')
             nodes.append(ir.Assign(new_to_csv, new_func, new_df.loc))
