@@ -81,11 +81,11 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     int num_pes;
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     // TODO: enable MPIO after fixing address overflow issues
-    if(false && is_parallel && num_pes>1)
-    {
-        ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
-        CHECK(ret != -1, "h5 open MPI driver set error");
-    }
+    // if(false && is_parallel && num_pes>1)
+    // {
+    //     ret = H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+    //     CHECK(ret != -1, "h5 open MPI driver set error");
+    // }
 
     // TODO: handle 'a' mode
     if(strcmp(mode, "r")==0)
@@ -181,11 +181,11 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
-    if(false && is_parallel && num_pes>1)
-    {
-        xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
-        H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
-    }
+    // if(false && is_parallel && num_pes>1)
+    // {
+    //     xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
+    //     H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
+    // }
 
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, (hsize_t*)counts, NULL);
     CHECK (mem_dataspace != -1, "h5 read create_simple error");
@@ -257,11 +257,11 @@ int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
-    if(false && is_parallel && num_pes>1)
-    {
-        xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
-        H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
-    }
+    // if(false && is_parallel && num_pes>1)
+    // {
+    //     xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
+    //     H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
+    // }
 
     hid_t mem_dataspace = H5Screate_simple((hsize_t)ndims, (hsize_t*)counts, NULL);
     CHECK (mem_dataspace != -1, "h5 read create_simple error");
@@ -416,11 +416,11 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
-    if(false && is_parallel && num_pes>1)
-    {
-        xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
-        H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
-    }
+    // if(false && is_parallel && num_pes>1)
+    // {
+    //     xfer_plist_id = H5Pcreate(H5P_DATASET_XFER);
+    //     H5Pset_dxpl_mpio(xfer_plist_id, H5FD_MPIO_COLLECTIVE);
+    // }
 
     ret = H5Sselect_hyperslab(space_id, H5S_SELECT_SET, HDF5_start, NULL, HDF5_count, NULL);
     CHECK(ret != -1, "h5 write select_hyperslab error");
