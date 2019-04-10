@@ -37,6 +37,10 @@ requirements:
     - mpich # [not win]
 
 test:
+  requires:
+    - h5py
+    - pyspark
+    - scipy
   imports:
     - hpat
 
