@@ -28,6 +28,19 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_str2str(self):
+        str2str_methods = ['capitalize', 'casefold', 'lower', 'lstrip',
+            'rstrip', 'strip', 'swapcase', 'title', 'upper']
+        for method in str2str_methods:
+            func_text = "def test_impl(_str):\n"
+            func_text += "  return _str.{}()\n".format(method)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            arg = ' \tbbCD\t '
+            self.assertEqual(hpat_func(arg), test_impl(arg))
+
     def test_equality(self):
         def test_impl(_str):
             return (_str=='test_str')

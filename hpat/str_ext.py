@@ -49,6 +49,25 @@ numba.targets.hashing._Py_HashSecret_siphash_k0 = 0
 numba.targets.hashing._Py_HashSecret_siphash_k1 = 0
 
 
+## use objmode for string methods for now
+
+# string methods that just return another string
+str2str_methods = ('capitalize', 'casefold', 'lower', 'lstrip', 'rstrip',
+    'strip', 'swapcase', 'title', 'upper')
+
+for method in str2str_methods:
+    func_text = "def str_overload(in_str):\n"
+    func_text += "  def _str_impl(in_str):\n"
+    func_text += "    with numba.objmode(out='unicode_type'):\n"
+    func_text += "      out = in_str.{}()\n".format(method)
+    func_text += "    return out\n"
+    func_text += "  return _str_impl\n"
+    loc_vars = {}
+    exec(func_text, {'numba': numba}, loc_vars)
+    str_overload = loc_vars['str_overload']
+    overload_method(types.UnicodeType, method)(str_overload)
+
+
 #######################  type for std string pointer  ########################
 
 
