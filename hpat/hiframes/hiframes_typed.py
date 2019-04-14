@@ -1654,12 +1654,32 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
-        if func_name not in ('len', 'replace', 'split', 'get', 'contains'):
+        supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods 
+            + ('len', 'replace', 'split', 'get', 'contains'))
+        if func_name not in supported_methods:
             raise NotImplementedError(
                 "Series.str.{} not supported yet".format(func_name))
 
         nodes = []
         arr = self._get_series_data(series_var, nodes)
+
+        # string 2 string methods
+        if func_name in hpat.hiframes.pd_series_ext.str2str_methods:
+            func_text = 'def f(str_arr):\n'
+            func_text += '    numba.parfor.init_prange()\n'
+            func_text += '    n = len(str_arr)\n'
+            func_text += '    num_chars = 0\n'
+            func_text += '    for i in numba.parfor.internal_prange(n):\n'
+            func_text += '        num_chars += len(str_arr[i].{}())\n'.format(func_name)
+            func_text += '    S = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)\n'
+            func_text += '    for i in numba.parfor.internal_prange(n):\n'
+            func_text += '        S[i] = str_arr[i].{}()\n'.format(func_name)
+            func_text += '    return hpat.hiframes.api.init_series(S)\n'
+            loc_vars = {}
+            # print(func_text)
+            exec(func_text, {}, loc_vars)
+            f = loc_vars['f']
+            return self._replace_func(f, [arr], pre_nodes=nodes)
 
         if func_name == 'contains':
             return self._run_series_str_contains(rhs, arr, nodes)

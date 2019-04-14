@@ -981,6 +981,19 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_str2str(self):
+        str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
+            'strip', 'swapcase', 'title', 'upper')
+        for method in str2str_methods:
+            func_text = "def test_impl(S):\n"
+            func_text += "  return S.str.{}()\n".format(method)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_append1(self):
         def test_impl(S, other):
             return S.append(other).values

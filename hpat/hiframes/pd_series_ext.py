@@ -560,6 +560,10 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
+str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
+            'strip', 'swapcase', 'title', 'upper')
+
+
 class SeriesStrMethodType(types.Type):
     def __init__(self):
         name = "SeriesStrMethodType"
@@ -596,6 +600,22 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_get(self, ary, args, kws):
         # XXX only list(list(str)) supported
         return signature(SeriesType(string_type), *args)
+
+    def generic_resolve(self, s_str, func_name):
+        if func_name not in str2str_methods:
+            raise ValueError("Series.str.{} is not supported yet".format(
+                func_name))
+
+        template_key = 'strmethod.' + func_name
+        out_typ = SeriesType(string_type)
+
+        class MethodTemplate(AbstractTemplate):
+            key = template_key
+
+            def generic(self, args, kws):
+                return signature(out_typ, *args)
+
+        return types.BoundFunction(MethodTemplate, s_str)
 
 
 class SeriesDtMethodType(types.Type):
