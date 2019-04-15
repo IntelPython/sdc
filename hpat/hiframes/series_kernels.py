@@ -450,7 +450,6 @@ series_replace_funcs = {
     'nsmallest': lambda A, k, name: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, False, lt_f), None, name),
     'nsmallest_default': lambda A, name: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, False, lt_f), None, name),
     'head': lambda A, k, name: hpat.hiframes.api.init_series(A[:k], None, name),
-    'head_default': lambda A, name: hpat.hiframes.api.init_series(A[:5], None, name),
     'median': lambda A: hpat.hiframes.api.median(A),
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),

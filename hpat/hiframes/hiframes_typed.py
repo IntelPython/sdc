@@ -920,15 +920,18 @@ class HiFramesTyped(object):
                                     pre_nodes=nodes)
 
         if func_name == 'head':
-            # TODO: kws
             nodes = []
+            n_arg = self._get_arg('Series.head', rhs.args, dict(rhs.kws), 0,
+                'n', default=False)  # TODO: proper default handling
+            if n_arg is False:
+                n_arg = ir.Var(lhs.scope, mk_unique_var('head_n'), lhs.loc)
+                # default is 5
+                self.typemap[n_arg.name] = types.IntegerLiteral(5)
+                nodes.append(ir.Assign(
+                    ir.Const(5, lhs.loc), n_arg, lhs.loc))
+
             data = self._get_series_data(series_var, nodes)
             name = self._get_series_name(series_var, nodes)
-            if len(rhs.args) == 0 and not rhs.kws:
-                return self._replace_func(
-                    series_replace_funcs['head_default'], [data, name],
-                    pre_nodes=nodes)
-            n_arg = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [data, n_arg, name], pre_nodes=nodes)
 
