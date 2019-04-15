@@ -1740,8 +1740,16 @@ class HiFramesTyped(object):
 
 
     def _run_series_str_split(self, assign, lhs, arr, rhs, nodes):
-        sep = rhs.args[0]  # TODO: support default whitespace separator
-        sep_typ = self.typemap[sep.name]
+        sep = self._get_arg('str.split', rhs.args, dict(rhs.kws), 0, 'pat',
+                default=False)  # TODO: proper default handling
+        if sep is False:
+            sep = ir.Var(lhs.scope, mk_unique_var('split_sep'), lhs.loc)
+            sep_typ = types.none
+            self.typemap[sep.name] = types.none
+            nodes.append(ir.Assign(
+                ir.Const(None, lhs.loc), sep, lhs.loc))
+        else:
+            sep_typ = self.typemap[sep.name]
 
         def _str_split_impl(str_arr, sep):
             numba.parfor.init_prange()
