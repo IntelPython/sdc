@@ -1144,6 +1144,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
+    def test_series_head_index1(self):
+        def test_impl():
+            S = pd.Series([6,9,2,3,6,4,5], [8,1,6,0,9,1,3])
+            return S.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
     def test_series_median1(self):
         def test_impl(S):
             return S.median()

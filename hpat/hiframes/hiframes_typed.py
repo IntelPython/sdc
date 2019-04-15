@@ -931,9 +931,13 @@ class HiFramesTyped(object):
                     ir.Const(5, lhs.loc), n_arg, lhs.loc))
 
             data = self._get_series_data(series_var, nodes)
+            index = self._get_series_index(series_var, nodes)
             name = self._get_series_name(series_var, nodes)
             func = series_replace_funcs[func_name]
-            return self._replace_func(func, [data, n_arg, name], pre_nodes=nodes)
+            if self.typemap[index.name] != types.none:
+                func = series_replace_funcs['head_index']
+            return self._replace_func(
+                func, (data, index, n_arg, name), pre_nodes=nodes)
 
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]
