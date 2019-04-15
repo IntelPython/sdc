@@ -1087,6 +1087,38 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
     return res
 
 
+@lower_builtin(operator.getitem, StringArrayType, types.SliceType)
+def lower_string_arr_getitem_slice(context, builder, sig, args):
+    def str_arr_slice_impl(str_arr, idx):
+        n = len(str_arr)
+        slice_idx = numba.unicode._normalize_slice(idx, n)
+        span = numba.unicode._slice_span(slice_idx)
+
+        if slice_idx.step == 1:
+            start_offset = getitem_str_offset(str_arr, slice_idx.start)
+            end_offset = getitem_str_offset(str_arr, slice_idx.stop)
+            n_chars = end_offset - start_offset
+            new_arr = pre_alloc_string_array(span, np.int64(n_chars))
+            # TODO: more efficient copy
+            for i in range(span):
+                new_arr[i] = str_arr[slice_idx.start+i]
+            return new_arr
+        else:  # TODO: test
+            # get number of chars
+            n_chars = 0
+            for i in range(slice_idx.start, slice_idx.stop, slice_idx.step):
+                _str = str_arr[i]
+                n_chars += len(_str)
+            new_arr = pre_alloc_string_array(span, np.int64(n_chars))
+            # TODO: more efficient copy
+            for i in range(span):
+                new_arr[i] = str_arr[slice_idx.start+i*slice_idx.step]
+            return new_arr
+
+    res = context.compile_internal(builder, str_arr_slice_impl, sig, args)
+    return res
+
+
 @numba.njit(no_cpython_wrapper=True)
 def str_arr_item_to_numeric(out_arr, out_ind, str_arr, ind):
     return _str_arr_item_to_numeric(hpat.hiframes.split_impl.get_c_arr_ptr(
