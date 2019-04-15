@@ -854,6 +854,16 @@ class HiFrames(object):
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.func_ir, dtype_var)
+        if isinstance(dtype_def, ir.Const) and isinstance(dtype_def.value, str):
+            typ_name = dtype_def.value
+            if typ_name == 'str':
+                return string_array_type
+            typ_name = 'int64' if typ_name == 'int' else typ_name
+            typ_name = 'float64' if typ_name == 'float' else typ_name
+            typ = getattr(types, typ_name)
+            typ = types.Array(typ, 1, 'C')
+            return typ
+
         # str case
         if isinstance(dtype_def, ir.Global) and dtype_def.value == str:
             return string_array_type
