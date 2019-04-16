@@ -634,11 +634,6 @@ bool is_na(const uint8_t* null_bitmap, int64_t i)
     return (null_bitmap[i / 8] & kBitmask[i % 8]) == 0;
 }
 
-#if PY_VERSION_HEX >= 0x03000000
-#define PyString_Check(name) PyUnicode_Check(name)
-#define PyString_AsString(str) PyUnicode_AsUTF8(str)
-#define PyString_FromStringAndSize(str, sz) PyUnicode_FromStringAndSize(str, sz)
-#endif
 
 /// @brief create a concatenated string and offset table from a pandas series of strings
 /// @note strings in returned buffer will not be 0-terminated.
@@ -708,10 +703,13 @@ void string_array_from_sequence(PyObject * obj, int64_t * no_strings, uint32_t *
         {
             // set null bit to 1 (Arrow bin-util.h)
             (*null_bitmap)[i / 8] |= kBitmask[i % 8];
-            CHECK(PyString_Check(s), "expecting a string");
-            tmp_store[i] = PyString_AsString(s);
+            // check string
+            CHECK(PyUnicode_Check(s), "expecting a string");
+            // convert to UTF-8 and get size
+            Py_ssize_t size;
+            tmp_store[i] = PyUnicode_AsUTF8AndSize(s, &size);
             CHECK(tmp_store[i], "string conversion failed");
-            len += strlen(tmp_store[i]);
+            len += size;
         }
         Py_DECREF(s);
     }
@@ -752,7 +750,7 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
     CHECK(nan_obj, "getting np.nan failed");
 
     for(int64_t i = 0; i < no_strings; ++i) {
-        PyObject * s = PyString_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
+        PyObject * s = PyUnicode_FromStringAndSize(buffer+offset_table[i], offset_table[i+1]-offset_table[i]);
         CHECK(s, "creating Python string/unicode object failed");
         auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
         CHECK(p, "getting offset in numpy array failed");
