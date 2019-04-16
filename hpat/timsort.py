@@ -429,7 +429,7 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
     base1 += k
     len1 -= k
     if len1 == 0:
-        return
+        return stackSize, tmpLength, tmp, tmp_data, minGallop
 
 
     # Find where the last element of run1 goes in run2. Subsequent elements
@@ -439,7 +439,7 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
                                                                 len2, len2 - 1)
     assert len2 >= 0
     if len2 == 0:
-        return
+        return stackSize, tmpLength, tmp, tmp_data, minGallop
 
     # Merge remaining runs, using tmp array with min(len1, len2) elements
     if len1 <= len2:
@@ -643,14 +643,14 @@ def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
         copyRange_tup(tmp, cursor1, arr, dest, len1)
         copyRange_tup(tmp_data, cursor1, arr_data, dest, len1)
         #arr[dest:dest+len1] = tmp[cursor1:cursor1+len1]
-        return
+        return minGallop
 
     if len1 == 1:
         copyRange_tup(arr, cursor2, arr, dest, len2)
         copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
         copyElement_tup(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
         copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
-        return
+        return minGallop
 
 
     # XXX *************** refactored nested break into func
@@ -807,7 +807,7 @@ def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     if len1 == 0:
         copyRange_tup(tmp, 0, arr, dest - (len2 - 1), len2)
         copyRange_tup(tmp_data, 0, arr_data, dest - (len2 - 1), len2)
-        return
+        return minGallop
 
     if len2 == 1:
         dest -= len1
@@ -816,7 +816,7 @@ def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
         copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
         copyElement_tup(tmp, cursor2, arr, dest)
         copyElement_tup(tmp_data, cursor2, arr_data, dest)
-        return
+        return minGallop
 
     # XXX *************** refactored nested break into func
     len1, len2, tmp, cursor1, cursor2, dest, minGallop = mergeHi_inner(
