@@ -65,6 +65,108 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
     assert(writer->kind <= PyUnicode_1BYTE_KIND);
 }
 
+#ifdef MS_WINDOWS
+   /* On Windows, overallocate by 50% is the best factor */
+#  define OVERALLOCATE_FACTOR 2
+#else
+   /* On Linux, overallocate by 25% is the best factor */
+#  define OVERALLOCATE_FACTOR 4
+#endif
+
+/* Maximum code point of Unicode 6.0: 0x10ffff (1,114,111) */
+#define MAX_UNICODE 0x10ffff
+
+/* Prepare the buffer to write 'length' characters
+   with the specified maximum character.
+
+   Return 0 on success, raise an exception and return -1 on error. */
+#define _C_UnicodeWriter_Prepare(WRITER, LENGTH, MAXCHAR)             \
+    (((MAXCHAR) <= (WRITER)->maxchar                                  \
+      && (LENGTH) <= (WRITER)->size - (WRITER)->pos)                  \
+     ? 0                                                              \
+     : (((LENGTH) == 0)                                               \
+        ? 0                                                           \
+        : _C_UnicodeWriter_PrepareInternal((WRITER), (LENGTH), (MAXCHAR))))
+
+
+int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter *writer,
+                                 Py_ssize_t length, Py_UCS4 maxchar)
+{
+    Py_ssize_t newlen;
+    PyObject *newbuffer;
+
+    assert(maxchar <= MAX_UNICODE);
+
+    /* ensure that the _C_UnicodeWriter_Prepare macro was used */
+    assert((maxchar > writer->maxchar && length >= 0)
+           || length > 0);
+
+    if (length > PY_SSIZE_T_MAX - writer->pos) {
+        // TODO: proper memory error
+        std::cerr << "memory error" << std::endl;
+        return -1;
+    }
+    newlen = writer->pos + length;
+
+    maxchar = Py_MAX(maxchar, writer->min_char);
+
+    if (writer->buffer == NULL) {
+        assert(!writer->readonly);
+        if (writer->overallocate
+            && newlen <= (PY_SSIZE_T_MAX - newlen / OVERALLOCATE_FACTOR)) {
+            /* overallocate to limit the number of realloc() */
+            newlen += newlen / OVERALLOCATE_FACTOR;
+        }
+        if (newlen < writer->min_length)
+            newlen = writer->min_length;
+
+        writer->buffer = PyUnicode_New(newlen, maxchar);
+        if (writer->buffer == NULL)
+            return -1;
+    }
+    else if (newlen > writer->size) {
+        if (writer->overallocate
+            && newlen <= (PY_SSIZE_T_MAX - newlen / OVERALLOCATE_FACTOR)) {
+            /* overallocate to limit the number of realloc() */
+            newlen += newlen / OVERALLOCATE_FACTOR;
+        }
+        if (newlen < writer->min_length)
+            newlen = writer->min_length;
+
+        if (maxchar > writer->maxchar || writer->readonly) {
+            /* resize + widen */
+            maxchar = Py_MAX(maxchar, writer->maxchar);
+            newbuffer = PyUnicode_New(newlen, maxchar);
+            if (newbuffer == NULL)
+                return -1;
+            _PyUnicode_FastCopyCharacters(newbuffer, 0,
+                                          writer->buffer, 0, writer->pos);
+            Py_DECREF(writer->buffer);
+            writer->readonly = 0;
+        }
+        else {
+            newbuffer = resize_compact(writer->buffer, newlen);
+            if (newbuffer == NULL)
+                return -1;
+        }
+        writer->buffer = newbuffer;
+    }
+    else if (maxchar > writer->maxchar) {
+        assert(!writer->readonly);
+        newbuffer = PyUnicode_New(writer->size, maxchar);
+        if (newbuffer == NULL)
+            return -1;
+        _PyUnicode_FastCopyCharacters(newbuffer, 0,
+                                      writer->buffer, 0, writer->pos);
+        Py_SETREF(writer->buffer, newbuffer);
+    }
+    _C_UnicodeWriter_Update(writer);
+    return 0;
+
+#undef OVERALLOCATE_FACTOR
+}
+
+
 /* Mask to quickly check whether a C 'long' contains a
    non-ASCII, UTF8-encoded char. */
 #if (SIZEOF_LONG == 8)
