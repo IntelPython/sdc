@@ -181,6 +181,21 @@ class TestString(unittest.TestCase):
         # instead of nan for some reason
         np.testing.assert_array_equal(hpat_func().isna(), test_impl().isna())
 
+    # test utf8 decode
+    def test_decode_empty1(self):
+        def test_impl(S):
+            return S[0]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([''])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_decode_single1(self):
+        def test_impl(S):
+            return S[0]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['A'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     @unittest.skip("TODO: explore np array of strings")
     def test_box_np_arr_string(self):
         def test_impl(A):

@@ -6,6 +6,8 @@
 #include <vector>
 #include <boost/algorithm/string/replace.hpp>
 
+#include "_str_decode.cpp"
+
 #ifdef USE_BOOST_REGEX
 #include <boost/regex.hpp>
 using boost::regex;
@@ -210,6 +212,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&array_getptr1)));
     PyObject_SetAttrString(m, "array_setitem",
                             PyLong_FromVoidPtr((void*)(&array_setitem)));
+    PyObject_SetAttrString(m, "init_memsys",
+                            PyLong_FromVoidPtr((void*)(&init_memsys)));
+    PyObject_SetAttrString(m, "decode_utf8",
+                            PyLong_FromVoidPtr((void*)(&decode_utf8)));
     return m;
 }
 
