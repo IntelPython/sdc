@@ -97,6 +97,19 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
         (0x10ffffU)))
 
 
+#include "stringlib/ucs1lib.h"
+#include "stringlib/codecs.h"
+#include "stringlib/undef.h"
+
+#include "stringlib/ucs2lib.h"
+#include "stringlib/codecs.h"
+#include "stringlib/undef.h"
+
+#include "stringlib/ucs4lib.h"
+#include "stringlib/codecs.h"
+#include "stringlib/undef.h"
+
+static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter *writer, Py_UCS4 ch);
 static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
                  NRT_MemInfo *from, Py_ssize_t from_start,
                  Py_ssize_t how_many, unsigned int from_kind, unsigned int to_kind);
@@ -241,20 +254,6 @@ int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter *writer,
 #endif
 
 
-/* Below "a" is a power of 2. */
-/* Round down size "n" to be a multiple of "a". */
-#define _Py_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
-/* Round up size "n" to be a multiple of "a". */
-#define _Py_SIZE_ROUND_UP(n, a) (((size_t)(n) + \
-        (size_t)((a) - 1)) & ~(size_t)((a) - 1))
-/* Round pointer "p" down to the closest "a"-aligned address <= "p". */
-#define _Py_ALIGN_DOWN(p, a) ((void *)((uintptr_t)(p) & ~(uintptr_t)((a) - 1)))
-/* Round pointer "p" up to the closest "a"-aligned address >= "p". */
-#define _Py_ALIGN_UP(p, a) ((void *)(((uintptr_t)(p) + \
-        (uintptr_t)((a) - 1)) & ~(uintptr_t)((a) - 1)))
-/* Check if pointer "p" is aligned to "a"-bytes boundary. */
-#define _Py_IS_ALIGNED(p, a) (!((uintptr_t)(p) & (uintptr_t)((a) - 1)))
-
 static Py_ssize_t
 ascii_decode(const char *start, const char *end, Py_UCS1 *dest)
 {
@@ -352,15 +351,13 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
         int kind = writer.kind;
 
         if (kind == PyUnicode_1BYTE_KIND) {
-            if (PyUnicode_IS_ASCII(writer.buffer))
-                ch = asciilib_utf8_decode(&s, end, writer.data, &writer.pos);
-            else
-                ch = ucs1lib_utf8_decode(&s, end, writer.data, &writer.pos);
+            // TODO: anything needed for ASCII?
+            ch = ucs1lib_utf8_decode(&s, end, (Py_UCS1*)writer.data, &writer.pos);
         } else if (kind == PyUnicode_2BYTE_KIND) {
-            ch = ucs2lib_utf8_decode(&s, end, writer.data, &writer.pos);
+            ch = ucs2lib_utf8_decode(&s, end, (Py_UCS2*)writer.data, &writer.pos);
         } else {
             assert(kind == PyUnicode_4BYTE_KIND);
-            ch = ucs4lib_utf8_decode(&s, end, writer.data, &writer.pos);
+            ch = ucs4lib_utf8_decode(&s, end, (Py_UCS4*)writer.data, &writer.pos);
         }
 
         switch (ch) {
@@ -401,6 +398,7 @@ End:
     (*meminfo) = writer.buffer;
     *kind = writer.kind;
     *length = writer.pos;
+    // TODO: set null?
     return;
 
 onError:
@@ -529,3 +527,13 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
     return 0;
 }
 
+
+static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter *writer, Py_UCS4 ch)
+{
+    assert(ch <= MAX_UNICODE);
+    if (_C_UnicodeWriter_Prepare(writer, 1, ch) < 0)
+        return -1;
+    PyUnicode_WRITE(writer->kind, writer->data, writer->pos, ch);
+    writer->pos++;
+    return 0;
+}
