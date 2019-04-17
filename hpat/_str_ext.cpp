@@ -44,7 +44,7 @@ struct str_arr_split_view_payload {
 static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
 void* init_string(char*, int64_t);
-void* init_string_const(char* in_str);
+void* init_string_const(char* in_str, int64_t size);
 void dtor_string(std::string** in_str, int64_t size, void* in);
 void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t size, void* in);
@@ -225,10 +225,10 @@ void* init_string(char* in_str, int64_t size)
     return new std::string(in_str, size);
 }
 
-void* init_string_const(char* in_str)
+void* init_string_const(char* in_str, int64_t size)
 {
     // std::cout<<"init str: "<<in_str<<" "<<size<<std::endl;
-    return new std::string(in_str);
+    return new std::string(in_str, size);
 }
 
 void dtor_string(std::string** in_str, int64_t size, void* info)
