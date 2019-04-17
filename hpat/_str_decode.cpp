@@ -402,7 +402,7 @@ End:
     return;
 
 onError:
-    std::cerr << errmsg << std::endl;
+    std::cerr << "utf8 decode error:" << errmsg << std::endl;
     NRT_MemInfo_call_dtor(writer.buffer);
     return;
 }
