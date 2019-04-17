@@ -97,6 +97,10 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
         (0x10ffffU)))
 
 
+static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
+                 NRT_MemInfo *from, Py_ssize_t from_start,
+                 Py_ssize_t how_many, unsigned int from_kind, unsigned int to_kind);
+
 NRT_MemInfo *alloc_writer(_C_UnicodeWriter *writer, Py_ssize_t newlen, Py_UCS4 maxchar)
 {
     enum PyUnicode_Kind kind;
@@ -341,7 +345,7 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
     if (_C_UnicodeWriter_Prepare(&writer, writer.min_length, 127) == -1)
         goto onError;
 
-    writer.pos = ascii_decode(s, end, writer.data);
+    writer.pos = ascii_decode(s, end, (Py_UCS1*)writer.data);
     s += writer.pos;
     while (s < end) {
         Py_UCS4 ch;
@@ -394,7 +398,10 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
     }
 
 End:
-    return _C_UnicodeWriter_Finish(&writer);
+    (*meminfo) = writer.buffer;
+    *kind = writer.kind;
+    *length = writer.pos;
+    return;
 
 onError:
     std::cerr << errmsg << std::endl;
@@ -522,34 +529,3 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
     return 0;
 }
 
-PyObject *
-_PyUnicodeWriter_Finish(_PyUnicodeWriter *writer)
-{
-    PyObject *str;
-
-    if (writer->pos == 0) {
-        Py_CLEAR(writer->buffer);
-        _Py_RETURN_UNICODE_EMPTY();
-    }
-
-    str = writer->buffer;
-    writer->buffer = NULL;
-
-    if (writer->readonly) {
-        assert(PyUnicode_GET_LENGTH(str) == writer->pos);
-        return str;
-    }
-
-    if (PyUnicode_GET_LENGTH(str) != writer->pos) {
-        PyObject *str2;
-        str2 = resize_compact(str, writer->pos);
-        if (str2 == NULL) {
-            Py_DECREF(str);
-            return NULL;
-        }
-        str = str2;
-    }
-
-    assert(_PyUnicode_CheckConsistency(str, 1));
-    return unicode_result_ready(str);
-}
