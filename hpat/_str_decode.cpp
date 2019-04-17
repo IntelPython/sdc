@@ -236,6 +236,13 @@ int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter *writer,
 # error C 'long' size should be either 4 or 8!
 #endif
 
+
+/* Below "a" is a power of 2. */
+/* Round down size "n" to be a multiple of "a". */
+#define _Py_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
+/* Round up size "n" to be a multiple of "a". */
+#define _Py_SIZE_ROUND_UP(n, a) (((size_t)(n) + \
+        (size_t)((a) - 1)) & ~(size_t)((a) - 1))
 /* Round pointer "p" down to the closest "a"-aligned address <= "p". */
 #define _Py_ALIGN_DOWN(p, a) ((void *)((uintptr_t)(p) & ~(uintptr_t)((a) - 1)))
 /* Round pointer "p" up to the closest "a"-aligned address >= "p". */
@@ -396,6 +403,30 @@ onError:
 }
 
 
+/* Generic helper macro to convert characters of different types.
+   from_type and to_type have to be valid type names, begin and end
+   are pointers to the source characters which should be of type
+   "from_type *".  to is a pointer of type "to_type *" and points to the
+   buffer where the result characters are written to. */
+#define _PyUnicode_CONVERT_BYTES(from_type, to_type, begin, end, to) \
+    do {                                                \
+        to_type *_to = (to_type *)(to);                \
+        const from_type *_iter = (from_type *)(begin);  \
+        const from_type *_end = (from_type *)(end);     \
+        Py_ssize_t n = (_end) - (_iter);                \
+        const from_type *_unrolled_end =                \
+            _iter + _Py_SIZE_ROUND_DOWN(n, 4);          \
+        while (_iter < (_unrolled_end)) {               \
+            _to[0] = (to_type) _iter[0];                \
+            _to[1] = (to_type) _iter[1];                \
+            _to[2] = (to_type) _iter[2];                \
+            _to[3] = (to_type) _iter[3];                \
+            _iter += 4; _to += 4;                       \
+        }                                               \
+        while (_iter < (_end))                          \
+            *_to++ = (to_type) *_iter++;                \
+    } while (0)
+
 
 
 static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
@@ -425,9 +456,9 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
     {
         _PyUnicode_CONVERT_BYTES(
             Py_UCS1, Py_UCS2,
-            PyUnicode_1BYTE_DATA(from) + from_start,
-            PyUnicode_1BYTE_DATA(from) + from_start + how_many,
-            PyUnicode_2BYTE_DATA(to) + to_start
+            ((Py_UCS1*)(from_data)) + from_start,
+            ((Py_UCS1*)(from_data)) + from_start + how_many,
+            ((Py_UCS2*)(to_data)) + to_start
             );
     }
     else if (from_kind == PyUnicode_1BYTE_KIND
@@ -435,9 +466,9 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
     {
         _PyUnicode_CONVERT_BYTES(
             Py_UCS1, Py_UCS4,
-            PyUnicode_1BYTE_DATA(from) + from_start,
-            PyUnicode_1BYTE_DATA(from) + from_start + how_many,
-            PyUnicode_4BYTE_DATA(to) + to_start
+            ((Py_UCS1*)(from_data)) + from_start,
+            ((Py_UCS1*)(from_data)) + from_start + how_many,
+            ((Py_UCS4*)(to_data)) + to_start
             );
     }
     else if (from_kind == PyUnicode_2BYTE_KIND
@@ -445,13 +476,12 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
     {
         _PyUnicode_CONVERT_BYTES(
             Py_UCS2, Py_UCS4,
-            PyUnicode_2BYTE_DATA(from) + from_start,
-            PyUnicode_2BYTE_DATA(from) + from_start + how_many,
-            PyUnicode_4BYTE_DATA(to) + to_start
+            ((Py_UCS2*)(from_data)) + from_start,
+            ((Py_UCS2*)(from_data)) + from_start + how_many,
+            ((Py_UCS4*)(to_data)) + to_start
             );
     }
     else {
-        assert (PyUnicode_MAX_CHAR_VALUE(from) > PyUnicode_MAX_CHAR_VALUE(to));
 
         if (1) {
             if (from_kind == PyUnicode_2BYTE_KIND
@@ -459,9 +489,9 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
             {
                 _PyUnicode_CONVERT_BYTES(
                     Py_UCS2, Py_UCS1,
-                    PyUnicode_2BYTE_DATA(from) + from_start,
-                    PyUnicode_2BYTE_DATA(from) + from_start + how_many,
-                    PyUnicode_1BYTE_DATA(to) + to_start
+                    ((Py_UCS2*)(from_data)) + from_start,
+                    ((Py_UCS2*)(from_data)) + from_start + how_many,
+                    ((Py_UCS1*)(to_data)) + to_start
                     );
             }
             else if (from_kind == PyUnicode_4BYTE_KIND
@@ -469,9 +499,9 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
             {
                 _PyUnicode_CONVERT_BYTES(
                     Py_UCS4, Py_UCS1,
-                    PyUnicode_4BYTE_DATA(from) + from_start,
-                    PyUnicode_4BYTE_DATA(from) + from_start + how_many,
-                    PyUnicode_1BYTE_DATA(to) + to_start
+                    ((Py_UCS4*)(from_data)) + from_start,
+                    ((Py_UCS4*)(from_data)) + from_start + how_many,
+                    ((Py_UCS1*)(to_data)) + to_start
                     );
             }
             else if (from_kind == PyUnicode_4BYTE_KIND
@@ -479,13 +509,13 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
             {
                 _PyUnicode_CONVERT_BYTES(
                     Py_UCS4, Py_UCS2,
-                    PyUnicode_4BYTE_DATA(from) + from_start,
-                    PyUnicode_4BYTE_DATA(from) + from_start + how_many,
-                    PyUnicode_2BYTE_DATA(to) + to_start
+                    ((Py_UCS4*)(from_data)) + from_start,
+                    ((Py_UCS4*)(from_data)) + from_start + how_many,
+                    ((Py_UCS2*)(to_data)) + to_start
                     );
             }
             else {
-                Py_UNREACHABLE();
+                abort();
             }
         }
     }
