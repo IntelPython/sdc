@@ -6,6 +6,8 @@
 #include <vector>
 #include <boost/algorithm/string/replace.hpp>
 
+#include "_str_decode.cpp"
+
 #ifdef USE_BOOST_REGEX
 #include <boost/regex.hpp>
 using boost::regex;
@@ -42,7 +44,7 @@ struct str_arr_split_view_payload {
 static constexpr uint8_t kBitmask[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
 void* init_string(char*, int64_t);
-void* init_string_const(char* in_str);
+void* init_string_const(char* in_str, int64_t size);
 void dtor_string(std::string** in_str, int64_t size, void* in);
 void dtor_string_array(str_arr_payload* in_str, int64_t size, void* in);
 void dtor_str_arr_split_view(str_arr_split_view_payload* in_str_arr, int64_t size, void* in);
@@ -210,6 +212,10 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&array_getptr1)));
     PyObject_SetAttrString(m, "array_setitem",
                             PyLong_FromVoidPtr((void*)(&array_setitem)));
+    PyObject_SetAttrString(m, "init_memsys",
+                            PyLong_FromVoidPtr((void*)(&init_memsys)));
+    PyObject_SetAttrString(m, "decode_utf8",
+                            PyLong_FromVoidPtr((void*)(&decode_utf8)));
     return m;
 }
 
@@ -219,10 +225,10 @@ void* init_string(char* in_str, int64_t size)
     return new std::string(in_str, size);
 }
 
-void* init_string_const(char* in_str)
+void* init_string_const(char* in_str, int64_t size)
 {
     // std::cout<<"init str: "<<in_str<<" "<<size<<std::endl;
-    return new std::string(in_str);
+    return new std::string(in_str, size);
 }
 
 void dtor_string(std::string** in_str, int64_t size, void* info)

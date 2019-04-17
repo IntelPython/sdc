@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import unittest
 import hpat
 import numpy as np
@@ -180,6 +182,43 @@ class TestString(unittest.TestCase):
         # XXX just checking isna() since Pandas uses None in this case
         # instead of nan for some reason
         np.testing.assert_array_equal(hpat_func().isna(), test_impl().isna())
+
+    # test utf8 decode
+    def test_decode_empty1(self):
+        def test_impl(S):
+            return S[0]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([''])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_decode_single_ascii_char1(self):
+        def test_impl(S):
+            return S[0]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['A'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_decode_ascii1(self):
+        def test_impl(S):
+            return S[0]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['Abc12', 'bcd', '345'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_decode_unicode1(self):
+        def test_impl(S):
+            return S[0], S[1], S[2]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['¡Y tú quién te crees?', '🐍⚡', '大处着眼，小处着手。',])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_decode_unicode2(self):
+        # test strings that start with ascii
+        def test_impl(S):
+            return S[0], S[1], S[2]
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['abc¡Y tú quién te crees?', 'dd2🐍⚡', '22 大处着眼，小处着手。',])
+        self.assertEqual(hpat_func(S), test_impl(S))
 
     @unittest.skip("TODO: explore np array of strings")
     def test_box_np_arr_string(self):

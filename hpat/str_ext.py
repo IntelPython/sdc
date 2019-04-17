@@ -354,7 +354,7 @@ ll.add_symbol('str_from_float64', hstr_ext.str_from_float64)
 get_std_str_len = types.ExternalFunction(
     "get_str_len", signature(types.intp, std_str_type))
 init_string_from_chars = types.ExternalFunction(
-    "init_string_const", std_str_type(types.voidptr))
+    "init_string_const", std_str_type(types.voidptr, types.intp))
 
 _str_to_int64 = types.ExternalFunction(
     "str_to_int64", signature(types.intp, types.voidptr, types.intp))
@@ -370,9 +370,9 @@ def gen_unicode_to_std_str(context, builder, unicode_val):
     uni_str = cgutils.create_struct_proxy(string_type)(
         context, builder, value=unicode_val)
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
-    return builder.call(fn, [uni_str.data])
+    return builder.call(fn, [uni_str.data, uni_str.length])
 
 def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
@@ -520,21 +520,23 @@ def string_type_to_const(context, builder, fromty, toty, val):
 @lower_constant(StringType)
 def const_string(context, builder, ty, pyval):
     cstr = context.insert_const_string(builder.module, pyval)
+    length = context.get_constant(types.intp, len(pyval))
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
-    ret = builder.call(fn, [cstr])
+    ret = builder.call(fn, [cstr, length])
     return ret
 
 @lower_cast(types.StringLiteral, StringType)
 def const_to_string_type(context, builder, fromty, toty, val):
     cstr = context.insert_const_string(builder.module, fromty.literal_value)
+    length = context.get_constant(types.intp, len(fromty.literal_value))
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
-    ret = builder.call(fn, [cstr])
+    ret = builder.call(fn, [cstr, length])
     return ret
 
 @lower_builtin(str, types.Any)
