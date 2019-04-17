@@ -398,7 +398,17 @@ End:
     (*meminfo) = writer.buffer;
     *kind = writer.kind;
     *length = writer.pos;
-    // TODO: set null?
+    // set null
+    if (writer.kind == PyUnicode_1BYTE_KIND) {
+        ((char*)writer.data)[writer.pos] = 0;
+    }
+    else if (writer.kind == PyUnicode_2BYTE_KIND) {
+        ((Py_UCS2*)writer.data)[writer.pos] = 0;
+    }
+    else {
+        assert(writer.kind == PyUnicode_4BYTE_KIND);
+        ((Py_UCS4*)writer.data)[writer.pos] = 0;
+    }
     return;
 
 onError:
