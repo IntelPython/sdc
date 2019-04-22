@@ -440,16 +440,19 @@ void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitma
     return;
 }
 
-void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index)
+void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index, int kind)
 {
     // std::cout << "setitem str: " << *str << " " << index << std::endl;
     if (index==0)
         offsets[index] = 0;
     uint32_t start = offsets[index];
     // std::cout << "start " << start << " len " << len << std::endl;
-    memcpy(&data[start], str, len);
-    assert(len < std::numeric_limits<uint32_t>::max());
-    offsets[index+1] = start+ (uint32_t)len;
+
+    int64_t utf8_len = unicode_to_utf8(&data[start], str, len, kind);
+
+    // memcpy(&data[start], str, len);
+    assert(utf8_len < std::numeric_limits<uint32_t>::max());
+    offsets[index+1] = start+ (uint32_t)utf8_len;
     return;
 }
 

@@ -254,11 +254,10 @@ InvalidContinuation3:
 /* UTF-8 encoder specialized for a Unicode kind to avoid the slow
    PyUnicode_READ() macro. Delete some parts of the code depending on the kind:
    UCS-1 strings don't need to handle surrogates for example. */
-Py_LOCAL_INLINE(PyObject *)
-STRINGLIB(utf8_encoder)(PyObject *unicode,
+int64_t
+STRINGLIB(utf8_encoder)(char* out_data,
                         STRINGLIB_CHAR *data,
-                        Py_ssize_t size,
-                        const char *errors)
+                        Py_ssize_t size)
 {
     Py_ssize_t i;                /* index into data of next input character */
     char *p;                     /* next free byte in output buffer */
