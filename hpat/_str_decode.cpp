@@ -547,3 +547,26 @@ static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter *writer, Py_
     writer->pos++;
     return 0;
 }
+
+PyObject *
+_PyUnicode_AsUTF8String(PyObject *unicode, const char *errors)
+{
+    enum PyUnicode_Kind kind;
+    void *data;
+    Py_ssize_t size;
+
+    kind = PyUnicode_KIND(unicode);
+    data = PyUnicode_DATA(unicode);
+    size = PyUnicode_GET_LENGTH(unicode);
+
+    switch (kind) {
+    default:
+        Py_UNREACHABLE();
+    case PyUnicode_1BYTE_KIND:
+        return ucs1lib_utf8_encoder(unicode, data, size, errors);
+    case PyUnicode_2BYTE_KIND:
+        return ucs2lib_utf8_encoder(unicode, data, size, errors);
+    case PyUnicode_4BYTE_KIND:
+        return ucs4lib_utf8_encoder(unicode, data, size, errors);
+    }
+}
