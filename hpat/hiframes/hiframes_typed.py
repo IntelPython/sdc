@@ -1681,7 +1681,7 @@ class HiFramesTyped(object):
             else:
                 func_text += '    num_chars = 0\n'
                 func_text += '    for i in numba.parfor.internal_prange(n):\n'
-                func_text += '        num_chars += len(str_arr[i].{}())\n'.format(func_name)
+                func_text += '        num_chars += get_utf8_size(str_arr[i].{}())\n'.format(func_name)
             func_text += '    S = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)\n'
             func_text += '    for i in numba.parfor.internal_prange(n):\n'
             func_text += '        S[i] = str_arr[i].{}()\n'.format(func_name)
@@ -1691,7 +1691,10 @@ class HiFramesTyped(object):
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
             return self._replace_func(f, [arr], pre_nodes=nodes,
-                extra_globals={'num_total_chars': hpat.str_arr_ext.num_total_chars})
+                extra_globals={
+                    'num_total_chars': hpat.str_arr_ext.num_total_chars,
+                    'get_utf8_size': hpat.str_arr_ext.get_utf8_size,
+                })
 
         if func_name == 'contains':
             return self._run_series_str_contains(rhs, arr, nodes)

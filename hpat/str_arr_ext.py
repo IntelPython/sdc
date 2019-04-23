@@ -605,7 +605,11 @@ convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", 
 
 
 setitem_string_array = types.ExternalFunction("setitem_string_array",
-            types.void(types.voidptr, types.voidptr, string_type, types.intp))
+            types.void(types.voidptr, types.voidptr, types.intp, string_type,
+            types.intp))
+_get_utf8_size = types.ExternalFunction("get_utf8_size",
+            types.intp(types.voidptr, types.intp, types.int32))
+
 
 def construct_string_array(context, builder):
     """Creates meminfo and sets dtor.
@@ -677,7 +681,7 @@ def impl_string_array_single(context, builder, sig, args):
         # TODO: use vector to avoid two passes?
         # get total number of chars
         for s in in_list:
-            total_chars += len(s)
+            total_chars += get_utf8_size(s)
 
         A = pre_alloc_string_array(n_strs, total_chars)
         for i in range(n_strs):
@@ -930,6 +934,7 @@ def setitem_str_arr(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer(),
                              lir.IntType(8).as_pointer(),
+                             lir.IntType(64),
                              lir.IntType(8).as_pointer(),
                              lir.IntType(64),
                              lir.IntType(32),
@@ -937,8 +942,15 @@ def setitem_str_arr(context, builder, sig, args):
     fn_setitem = builder.module.get_or_insert_function(
         fnty, name="setitem_string_array")
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                              string_array.num_total_chars,
                               uni_str.data, uni_str.length, uni_str.kind, ind])
     return context.get_dummy_value()
+
+
+@numba.njit(no_cpython_wrapper=True)
+def get_utf8_size(s):
+    return _get_utf8_size(s._data, s._length, s._kind)
+
 
 @intrinsic
 def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
@@ -948,6 +960,7 @@ def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(32).as_pointer(),
                                 lir.IntType(8).as_pointer(),
+                                lir.IntType(64),
                                 lir.IntType(8).as_pointer(),
                                 lir.IntType(64),
                                 lir.IntType(32),
@@ -955,6 +968,7 @@ def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
         fn_setitem = builder.module.get_or_insert_function(
             fnty, name="setitem_string_array")
         builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                    string_array.num_total_chars,
                     builder.extract_value(ptr, 0), length, uni_str.kind, ind])
         return context.get_dummy_value()
 

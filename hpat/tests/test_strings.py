@@ -220,6 +220,12 @@ class TestString(unittest.TestCase):
         S = pd.Series(['abc¡Y tú quién te crees?', 'dd2🐍⚡', '22 大处着眼，小处着手。',])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_encode_unicode1(self):
+        def test_impl():
+            return pd.Series(['¡Y tú quién te crees?', '🐍⚡', '大处着眼，小处着手。',])
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
     @unittest.skip("TODO: explore np array of strings")
     def test_box_np_arr_string(self):
         def test_impl(A):

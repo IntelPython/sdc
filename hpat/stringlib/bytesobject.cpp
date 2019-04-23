@@ -190,10 +190,12 @@ int64_t _C_BytesWriter_Finish(char *out_data, _C_BytesWriter *writer, void *str)
             delete[] writer->buffer;
     }
     else if (writer->use_small_buffer) {
-        memcpy(out_data, writer->small_buffer, size);
+        if (out_data != NULL)
+            memcpy(out_data, writer->small_buffer, size);
     }
     else {
-        memcpy(out_data, writer->buffer, size);
+        if (out_data != NULL)
+            memcpy(out_data, writer->buffer, size);
         delete[] writer->buffer;
     }
     return size;
