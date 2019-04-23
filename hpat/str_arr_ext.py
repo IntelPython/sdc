@@ -932,11 +932,12 @@ def setitem_str_arr(context, builder, sig, args):
                              lir.IntType(8).as_pointer(),
                              lir.IntType(8).as_pointer(),
                              lir.IntType(64),
+                             lir.IntType(32),
                              lir.IntType(64)])
     fn_setitem = builder.module.get_or_insert_function(
         fnty, name="setitem_string_array")
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                                  uni_str.data, uni_str.length, ind])
+                              uni_str.data, uni_str.length, uni_str.kind, ind])
     return context.get_dummy_value()
 
 @intrinsic
@@ -949,11 +950,12 @@ def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
                                 lir.IntType(8).as_pointer(),
                                 lir.IntType(8).as_pointer(),
                                 lir.IntType(64),
+                                lir.IntType(32),
                                 lir.IntType(64)])
         fn_setitem = builder.module.get_or_insert_function(
             fnty, name="setitem_string_array")
         builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                                builder.extract_value(ptr, 0), length, ind])
+                    builder.extract_value(ptr, 0), length, uni_str.kind, ind])
         return context.get_dummy_value()
 
     return types.void(str_arr_t, ind_t, ptr_t, len_t), codegen
