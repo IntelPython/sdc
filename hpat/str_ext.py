@@ -68,6 +68,18 @@ for method in str2str_methods:
     overload_method(types.UnicodeType, method)(str_overload)
 
 
+@overload_method(types.UnicodeType, 'replace')
+def str_replace_overload(in_str, old, new, count=-1):
+
+    def _str_replace_impl(in_str, old, new, count=-1):
+        with numba.objmode(out='unicode_type'):
+            out = in_str.replace(old, new, count)
+        return out
+
+    return _str_replace_impl
+
+
+
 #######################  type for std string pointer  ########################
 
 

@@ -68,6 +68,13 @@ class TestString(unittest.TestCase):
         arg = 'aa/bb/cc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
 
+    def test_replace(self):
+        def test_impl(_str):
+            return _str.replace('/', ';')
+        hpat_func = hpat.jit(test_impl)
+        arg = 'aa/bb/cc'
+        self.assertEqual(hpat_func(arg), test_impl(arg))
+
     def test_getitem_int(self):
         def test_impl(_str):
             return _str[3]
@@ -99,7 +106,7 @@ class TestString(unittest.TestCase):
             # XXX: use startswith since hpat output can have extra characters
             self.assertTrue(h_res.startswith(py_res))
 
-    def test_regex(self):
+    def test_regex_std(self):
         def test_impl(_str, _pat):
             return hpat.str_ext.contains_regex(_str, hpat.str_ext.compile_regex(_pat))
         hpat_func = hpat.jit(test_impl)
@@ -107,7 +114,7 @@ class TestString(unittest.TestCase):
         self.assertEqual(hpat_func('What does the fox say', r'[kz]u*'), False)
 
 
-    def test_replace_regex(self):
+    def test_replace_regex_std(self):
         def test_impl(_str, pat, val):
             s = unicode_to_std_str(_str)
             e = hpat.str_ext.compile_regex(unicode_to_std_str(pat))
@@ -122,7 +129,7 @@ class TestString(unittest.TestCase):
         self.assertEqual(hpat_func(_str, pat, val),
             _str.replace(re.compile(pat).search(_str).group(), val))
 
-    def test_replace_noregex(self):
+    def test_replace_noregex_std(self):
         def test_impl(_str, pat, val):
             s = unicode_to_std_str(_str)
             e = unicode_to_std_str(pat)

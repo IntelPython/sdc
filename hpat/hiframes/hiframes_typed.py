@@ -1661,7 +1661,7 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
-        supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods 
+        supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods
             + ('len', 'replace', 'split', 'get', 'contains'))
         if func_name not in supported_methods:
             raise NotImplementedError(
@@ -1745,7 +1745,8 @@ class HiFramesTyped(object):
             [arr, rhs.args[0], rhs.args[1]], pre_nodes=nodes,
             extra_globals={'unicode_to_std_str': unicode_to_std_str,
                             'std_str_to_unicode': std_str_to_unicode,
-                            'pre_alloc_string_array': pre_alloc_string_array}
+                            'pre_alloc_string_array': pre_alloc_string_array,
+                            'get_utf8_size': get_utf8_size}
         )
 
 

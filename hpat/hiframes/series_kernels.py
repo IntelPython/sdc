@@ -9,7 +9,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
-    is_str_arr_typ, pre_alloc_string_array)
+    is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
 
 
 # float columns can have regular np.nan
@@ -363,7 +363,6 @@ def _series_astype_str_impl(arr):
     return hpat.hiframes.api.init_series(A)
 
 
-# TODO: refactor regex and noregex
 def _str_replace_regex_impl(str_arr, pat, val):
     numba.parfor.init_prange()
     e = hpat.str_ext.compile_regex(unicode_to_std_str(pat))
@@ -386,20 +385,39 @@ def _str_replace_regex_impl(str_arr, pat, val):
     return hpat.hiframes.api.init_series(out_arr)
 
 
+# TODO: refactor regex and noregex
+# implementation using std::string
+# def _str_replace_noregex_impl(str_arr, pat, val):
+#     numba.parfor.init_prange()
+#     e = unicode_to_std_str(pat)
+#     val = unicode_to_std_str(val)
+#     n = len(str_arr)
+#     n_total_chars = 0
+#     str_list = hpat.str_ext.alloc_str_list(n)
+#     for i in numba.parfor.internal_prange(n):
+#         # TODO: support unicode
+#         in_str = unicode_to_std_str(str_arr[i])
+#         out_str = std_str_to_unicode(
+#             hpat.str_ext.str_replace_noregex(in_str, e, val))
+#         str_list[i] = out_str
+#         n_total_chars += len(out_str)
+#     numba.parfor.init_prange()
+#     out_arr = pre_alloc_string_array(n, n_total_chars)
+#     for i in numba.parfor.internal_prange(n):
+#         _str = str_list[i]
+#         out_arr[i] = _str
+#     return hpat.hiframes.api.init_series(out_arr)
+
+
 def _str_replace_noregex_impl(str_arr, pat, val):
     numba.parfor.init_prange()
-    e = unicode_to_std_str(pat)
-    val = unicode_to_std_str(val)
     n = len(str_arr)
     n_total_chars = 0
     str_list = hpat.str_ext.alloc_str_list(n)
     for i in numba.parfor.internal_prange(n):
-        # TODO: support unicode
-        in_str = unicode_to_std_str(str_arr[i])
-        out_str = std_str_to_unicode(
-            hpat.str_ext.str_replace_noregex(in_str, e, val))
+        out_str = str_arr[i].replace(pat, val)
         str_list[i] = out_str
-        n_total_chars += len(out_str)
+        n_total_chars += get_utf8_size(out_str)
     numba.parfor.init_prange()
     out_arr = pre_alloc_string_array(n, n_total_chars)
     for i in numba.parfor.internal_prange(n):
