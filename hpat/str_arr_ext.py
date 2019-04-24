@@ -1001,7 +1001,6 @@ def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
 @overload(operator.getitem)
 def str_arr_getitem_int(A, i):
     if A == string_array_type and isinstance(i, types.Integer):
-        kind = numba.unicode.PY_UNICODE_1BYTE_KIND
         def str_arr_getitem_impl(A, i):
             start_offset = getitem_str_offset(A, i)
             end_offset = getitem_str_offset(A, i + 1)

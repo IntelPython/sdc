@@ -401,7 +401,8 @@ def to_string_list_typ(typ):
     return typ
 
 
-@numba.njit(no_cpython_wrapper=True, cache=True)
+# TODO: fix cache issue
+@numba.njit(no_cpython_wrapper=True, cache=False)
 def local_sort(key_arrs, data, ascending=True):
     # convert StringArray to list(string) to enable swapping in sort
     l_key_arrs = to_string_list(key_arrs)

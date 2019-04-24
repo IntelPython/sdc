@@ -494,7 +494,7 @@ class TestDataFrame(unittest.TestCase):
         random.seed(2)
         str_vals = []
 
-        for i in range(n):
+        for _ in range(n):
             k = random.randint(1, 30)
             val = ''.join(random.choices(string.ascii_uppercase + string.digits, k=k))
             str_vals.append(val)
