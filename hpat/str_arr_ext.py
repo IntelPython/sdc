@@ -408,7 +408,7 @@ def str_list_to_array_overload(str_list):
             n_char = 0
             for i in range(n):
                 _str = str_list[i]
-                n_char += len(_str)
+                n_char += get_utf8_size(_str)
             str_arr = pre_alloc_string_array(n, n_char)
             for i in range(n):
                 _str = str_list[i]
@@ -1106,9 +1106,9 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
         for i in range(n):
             if bool_arr[i] == True:
                 # TODO: use get_cstr_and_len instead of getitem
-                str = str_arr[i]
+                _str = str_arr[i]
                 n_strs += 1
-                n_chars += len(str)
+                n_chars += get_utf8_size(_str)
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
         for i in range(n):
@@ -1132,7 +1132,7 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
             # TODO: use get_cstr_and_len instead of getitem
             _str = str_arr[ind_arr[i]]
             n_strs += 1
-            n_chars += len(_str)
+            n_chars += get_utf8_size(_str)
 
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
@@ -1166,7 +1166,7 @@ def lower_string_arr_getitem_slice(context, builder, sig, args):
             n_chars = 0
             for i in range(slice_idx.start, slice_idx.stop, slice_idx.step):
                 _str = str_arr[i]
-                n_chars += len(_str)
+                n_chars += get_utf8_size(_str)
             new_arr = pre_alloc_string_array(span, np.int64(n_chars))
             # TODO: more efficient copy
             for i in range(span):

@@ -24,7 +24,7 @@ from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
     list_string_array_type)
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
-    is_str_arr_typ, pre_alloc_string_array)
+    is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
     series_to_array_type, is_dt64_series_typ,
     if_series_to_array_type, is_series_type,
@@ -1797,7 +1797,7 @@ class HiFramesTyped(object):
                 in_list_str = str_arr[i]
                 out_str = in_list_str[ind]
                 str_list[i] = out_str
-                n_total_chars += len(out_str)
+                n_total_chars += get_utf8_size(out_str)
             numba.parfor.init_prange()
             out_arr = pre_alloc_string_array(n, n_total_chars)
             for i in numba.parfor.internal_prange(n):
@@ -1828,7 +1828,8 @@ class HiFramesTyped(object):
                 'get_array_ctypes_ptr': get_array_ctypes_ptr,
                 'getitem_c_arr': getitem_c_arr,
                 'get_split_view_index': get_split_view_index,
-                'get_split_view_data_ptr': get_split_view_data_ptr})
+                'get_split_view_data_ptr': get_split_view_data_ptr,
+                'get_utf8_size': get_utf8_size})
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':

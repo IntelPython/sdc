@@ -372,6 +372,7 @@ def _str_replace_regex_impl(str_arr, pat, val):
     n_total_chars = 0
     str_list = hpat.str_ext.alloc_str_list(n)
     for i in numba.parfor.internal_prange(n):
+        # TODO: support unicode
         in_str = unicode_to_std_str(str_arr[i])
         out_str = std_str_to_unicode(
             hpat.str_ext.str_replace_regex(in_str, e, val))
@@ -393,6 +394,7 @@ def _str_replace_noregex_impl(str_arr, pat, val):
     n_total_chars = 0
     str_list = hpat.str_ext.alloc_str_list(n)
     for i in numba.parfor.internal_prange(n):
+        # TODO: support unicode
         in_str = unicode_to_std_str(str_arr[i])
         out_str = std_str_to_unicode(
             hpat.str_ext.str_replace_noregex(in_str, e, val))
