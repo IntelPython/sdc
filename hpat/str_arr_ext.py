@@ -600,6 +600,7 @@ ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)
 ll.add_symbol('init_memsys', hstr_ext.init_memsys)
 ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
+ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
 
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 

@@ -70,6 +70,7 @@ void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitma
     int64_t num_strings, int64_t total_size);
 
 void setitem_string_array(uint32_t *offsets, char *data, int64_t n_bytes, char* str, int64_t len, int kind, int64_t index);
+int64_t get_utf8_size(char* str, int64_t len, int kind);
 
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
                             uint32_t *in_offsets, char *in_data,
@@ -216,6 +217,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&init_memsys)));
     PyObject_SetAttrString(m, "decode_utf8",
                             PyLong_FromVoidPtr((void*)(&decode_utf8)));
+    PyObject_SetAttrString(m, "get_utf8_size",
+                            PyLong_FromVoidPtr((void*)(&get_utf8_size)));
     return m;
 }
 
