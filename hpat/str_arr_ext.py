@@ -598,7 +598,6 @@ ll.add_symbol('str_arr_to_int64', hstr_ext.str_arr_to_int64)
 ll.add_symbol('str_arr_to_float64', hstr_ext.str_arr_to_float64)
 ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)
-ll.add_symbol('init_memsys', hstr_ext.init_memsys)
 ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
 ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
 
@@ -1027,17 +1026,6 @@ def str_arr_getitem_int(A, i):
 def decode_utf8(typingctx, ptr_t, len_t=None):
     def codegen(context, builder, sig, args):
         ptr, length = args
-
-        # initialize alloc/dealloc from Numba's runtime pointers
-        allocator = context.get_constant(types.intp,
-            numba.runtime._nrt_python.c_helpers['MemInfo_alloc_safe'])
-        deallocator = context.get_constant(types.intp,
-            numba.runtime._nrt_python.c_helpers['MemInfo_call_dtor'])
-        fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(64),
-            lir.IntType(64)])
-        fn_init_memsys = builder.module.get_or_insert_function(
-            fnty, name="init_memsys")
-        builder.call(fn_init_memsys, [allocator, deallocator])
 
         # create str and call decode with internal pointers
         uni_str = cgutils.create_struct_proxy(string_type)(context, builder)

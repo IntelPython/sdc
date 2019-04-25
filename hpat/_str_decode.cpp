@@ -1,29 +1,6 @@
 #include <Python.h>
 #include <iostream>
-
-// ******** copied from Numba
-// TODO: make Numba C library
-typedef void (*NRT_dtor_function)(void *ptr, size_t size, void *info);
-struct MemInfo {
-    size_t            refct;
-    NRT_dtor_function dtor;
-    void              *dtor_info;
-    void              *data;
-    size_t            size;    /* only used for NRT allocated memory */
-};
-
-typedef struct MemInfo NRT_MemInfo;
-
-
-NRT_MemInfo* (*NRT_MemInfo_alloc_safe)(size_t);
-void (*NRT_MemInfo_call_dtor)(NRT_MemInfo*);
-
-// initialize allocator/deallocator from Numba pointers. need to be set before calling decode
-void init_memsys(NRT_MemInfo* (*_NRT_MemInfo_alloc_safe)(size_t), void (*_NRT_MemInfo_call_dtor)(NRT_MemInfo*))
-{
-    NRT_MemInfo_alloc_safe = _NRT_MemInfo_alloc_safe;
-    NRT_MemInfo_call_dtor = _NRT_MemInfo_call_dtor;
-}
+#include "_meminfo.h"
 
 
 // ******** ported from CPython 31e8d69bfe7cf5d4ffe0967cb225d2a8a229cc97
