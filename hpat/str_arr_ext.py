@@ -943,17 +943,17 @@ def setitem_str_arr(context, builder, sig, args):
                              lir.IntType(64)])
     fn_setitem = builder.module.get_or_insert_function(
         fnty, name="setitem_string_array")
-    # TODO: use ascii from unicode type when available
-    is_ascii = context.get_constant(types.int32, 0)
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
                               string_array.num_total_chars,
                               uni_str.data, uni_str.length, uni_str.kind,
-                              is_ascii, ind])
+                              uni_str.is_ascii, ind])
     return context.get_dummy_value()
 
 
 @numba.njit(no_cpython_wrapper=True)
 def get_utf8_size(s):
+    if s._is_ascii == 1:
+        return len(s)
     return _get_utf8_size(s._data, s._length, s._kind)
 
 
