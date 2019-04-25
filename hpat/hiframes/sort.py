@@ -46,6 +46,10 @@ class Sort(ir.Stmt):
         self.df_in_vars = df_in_vars
         self.df_out_vars = df_out_vars
         self.inplace = inplace
+        # HACK make sure ascending is boolean (seen error for none in CI)
+        # TODO: fix source of issue
+        if not isinstance(ascending, bool):
+            ascending = True
         self.ascending = ascending
         self.loc = loc
 
