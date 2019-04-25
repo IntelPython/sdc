@@ -106,6 +106,15 @@ class TestString(unittest.TestCase):
             # XXX: use startswith since hpat output can have extra characters
             self.assertTrue(h_res.startswith(py_res))
 
+    @unittest.skip("pending numba #4020")
+    def test_re_sub(self):
+        def test_impl(_str):
+            p = re.compile('ab*')
+            return p.sub('ff', _str)
+        hpat_func = hpat.jit(test_impl)
+        arg = 'aabbcc'
+        self.assertEqual(hpat_func(arg), test_impl(arg))
+
     def test_regex_std(self):
         def test_impl(_str, _pat):
             return hpat.str_ext.contains_regex(_str, hpat.str_ext.compile_regex(_pat))
