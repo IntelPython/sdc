@@ -96,6 +96,7 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
         (0xffffU) :                                                     \
         (0x10ffffU)))
 
+#include "stringlib/bytesobject.cpp"
 
 #include "stringlib/ucs1lib.h"
 #include "stringlib/codecs.h"
@@ -546,4 +547,20 @@ static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter *writer, Py_
     PyUnicode_WRITE(writer->kind, writer->data, writer->pos, ch);
     writer->pos++;
     return 0;
+}
+
+
+int64_t unicode_to_utf8(char* out_data, char* data, int64_t size, int kind)
+{
+    //
+    switch (kind) {
+    default:
+        Py_UNREACHABLE();
+    case PyUnicode_1BYTE_KIND:
+        return ucs1lib_utf8_encoder(out_data, (Py_UCS1 *)data, size);
+    case PyUnicode_2BYTE_KIND:
+        return ucs2lib_utf8_encoder(out_data, (Py_UCS2 *)data, size);
+    case PyUnicode_4BYTE_KIND:
+        return ucs4lib_utf8_encoder(out_data, (Py_UCS4 *)data, size);
+    }
 }

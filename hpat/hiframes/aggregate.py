@@ -885,6 +885,7 @@ def alloc_agg_output_overload(n_uniq_keys, out_dummy_tup, key_set,
         # string special case
         # TODO: handle strings in multi-key case
         if key_types == [string_type]:
+            # TODO: handle unicode length
             func_text += "  num_total_chars = num_total_chars_set_string(key_set)\n"
             func_text += "  out_key_0 = pre_alloc_string_array(n_uniq_keys, num_total_chars)\n"
         else:

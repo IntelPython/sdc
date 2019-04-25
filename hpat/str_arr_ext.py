@@ -408,7 +408,7 @@ def str_list_to_array_overload(str_list):
             n_char = 0
             for i in range(n):
                 _str = str_list[i]
-                n_char += len(_str)
+                n_char += get_utf8_size(_str)
             str_arr = pre_alloc_string_array(n, n_char)
             for i in range(n):
                 _str = str_list[i]
@@ -600,12 +600,17 @@ ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
 ll.add_symbol('c_glob', hstr_ext.c_glob)
 ll.add_symbol('init_memsys', hstr_ext.init_memsys)
 ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
+ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
 
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 
 
 setitem_string_array = types.ExternalFunction("setitem_string_array",
-            types.void(types.voidptr, types.voidptr, string_type, types.intp))
+            types.void(types.voidptr, types.voidptr, types.intp, string_type,
+            types.intp))
+_get_utf8_size = types.ExternalFunction("get_utf8_size",
+            types.intp(types.voidptr, types.intp, types.int32))
+
 
 def construct_string_array(context, builder):
     """Creates meminfo and sets dtor.
@@ -677,7 +682,7 @@ def impl_string_array_single(context, builder, sig, args):
         # TODO: use vector to avoid two passes?
         # get total number of chars
         for s in in_list:
-            total_chars += len(s)
+            total_chars += get_utf8_size(s)
 
         A = pre_alloc_string_array(n_strs, total_chars)
         for i in range(n_strs):
@@ -930,14 +935,27 @@ def setitem_str_arr(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer(),
                              lir.IntType(8).as_pointer(),
+                             lir.IntType(64),
                              lir.IntType(8).as_pointer(),
                              lir.IntType(64),
+                             lir.IntType(32),
+                             lir.IntType(32),
                              lir.IntType(64)])
     fn_setitem = builder.module.get_or_insert_function(
         fnty, name="setitem_string_array")
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                                  uni_str.data, uni_str.length, ind])
+                              string_array.num_total_chars,
+                              uni_str.data, uni_str.length, uni_str.kind,
+                              uni_str.is_ascii, ind])
     return context.get_dummy_value()
+
+
+@numba.njit(no_cpython_wrapper=True)
+def get_utf8_size(s):
+    if s._is_ascii == 1:
+        return len(s)
+    return _get_utf8_size(s._data, s._length, s._kind)
+
 
 @intrinsic
 def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
@@ -947,13 +965,21 @@ def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(32).as_pointer(),
                                 lir.IntType(8).as_pointer(),
+                                lir.IntType(64),
                                 lir.IntType(8).as_pointer(),
                                 lir.IntType(64),
+                                lir.IntType(32),
+                                lir.IntType(32),
                                 lir.IntType(64)])
         fn_setitem = builder.module.get_or_insert_function(
             fnty, name="setitem_string_array")
+        # kind doesn't matter since input is ASCII
+        kind = context.get_constant(types.int32, -1)
+        is_ascii = context.get_constant(types.int32, 1)
         builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                                builder.extract_value(ptr, 0), length, ind])
+                    string_array.num_total_chars,
+                    builder.extract_value(ptr, 0), length, kind, is_ascii, ind
+                    ])
         return context.get_dummy_value()
 
     return types.void(str_arr_t, ind_t, ptr_t, len_t), codegen
@@ -984,7 +1010,6 @@ def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
 @overload(operator.getitem)
 def str_arr_getitem_int(A, i):
     if A == string_array_type and isinstance(i, types.Integer):
-        kind = numba.unicode.PY_UNICODE_1BYTE_KIND
         def str_arr_getitem_impl(A, i):
             start_offset = getitem_str_offset(A, i)
             end_offset = getitem_str_offset(A, i + 1)
@@ -1090,9 +1115,9 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
         for i in range(n):
             if bool_arr[i] == True:
                 # TODO: use get_cstr_and_len instead of getitem
-                str = str_arr[i]
+                _str = str_arr[i]
                 n_strs += 1
-                n_chars += len(str)
+                n_chars += get_utf8_size(_str)
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
         for i in range(n):
@@ -1116,7 +1141,7 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
             # TODO: use get_cstr_and_len instead of getitem
             _str = str_arr[ind_arr[i]]
             n_strs += 1
-            n_chars += len(_str)
+            n_chars += get_utf8_size(_str)
 
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
@@ -1150,7 +1175,7 @@ def lower_string_arr_getitem_slice(context, builder, sig, args):
             n_chars = 0
             for i in range(slice_idx.start, slice_idx.stop, slice_idx.step):
                 _str = str_arr[i]
-                n_chars += len(_str)
+                n_chars += get_utf8_size(_str)
             new_arr = pre_alloc_string_array(span, np.int64(n_chars))
             # TODO: more efficient copy
             for i in range(span):

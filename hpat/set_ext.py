@@ -170,6 +170,7 @@ def to_array_overload(A):
     if A == set_string_type:
         #
         def set_string_to_array(A):
+            # TODO: support unicode
             num_total_chars = num_total_chars_set_string(A)
             num_strs = len(A)
             str_arr = pre_alloc_string_array(num_strs, num_total_chars)

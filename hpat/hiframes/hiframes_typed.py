@@ -24,7 +24,7 @@ from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
     list_string_array_type)
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
-    is_str_arr_typ, pre_alloc_string_array)
+    is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
     series_to_array_type, is_dt64_series_typ,
     if_series_to_array_type, is_series_type,
@@ -1661,7 +1661,7 @@ class HiFramesTyped(object):
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
-        supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods 
+        supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods
             + ('len', 'replace', 'split', 'get', 'contains'))
         if func_name not in supported_methods:
             raise NotImplementedError(
@@ -1681,7 +1681,7 @@ class HiFramesTyped(object):
             else:
                 func_text += '    num_chars = 0\n'
                 func_text += '    for i in numba.parfor.internal_prange(n):\n'
-                func_text += '        num_chars += len(str_arr[i].{}())\n'.format(func_name)
+                func_text += '        num_chars += get_utf8_size(str_arr[i].{}())\n'.format(func_name)
             func_text += '    S = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)\n'
             func_text += '    for i in numba.parfor.internal_prange(n):\n'
             func_text += '        S[i] = str_arr[i].{}()\n'.format(func_name)
@@ -1691,7 +1691,10 @@ class HiFramesTyped(object):
             exec(func_text, {}, loc_vars)
             f = loc_vars['f']
             return self._replace_func(f, [arr], pre_nodes=nodes,
-                extra_globals={'num_total_chars': hpat.str_arr_ext.num_total_chars})
+                extra_globals={
+                    'num_total_chars': hpat.str_arr_ext.num_total_chars,
+                    'get_utf8_size': hpat.str_arr_ext.get_utf8_size,
+                })
 
         if func_name == 'contains':
             return self._run_series_str_contains(rhs, arr, nodes)
@@ -1742,7 +1745,8 @@ class HiFramesTyped(object):
             [arr, rhs.args[0], rhs.args[1]], pre_nodes=nodes,
             extra_globals={'unicode_to_std_str': unicode_to_std_str,
                             'std_str_to_unicode': std_str_to_unicode,
-                            'pre_alloc_string_array': pre_alloc_string_array}
+                            'pre_alloc_string_array': pre_alloc_string_array,
+                            'get_utf8_size': get_utf8_size}
         )
 
 
@@ -1794,7 +1798,7 @@ class HiFramesTyped(object):
                 in_list_str = str_arr[i]
                 out_str = in_list_str[ind]
                 str_list[i] = out_str
-                n_total_chars += len(out_str)
+                n_total_chars += get_utf8_size(out_str)
             numba.parfor.init_prange()
             out_arr = pre_alloc_string_array(n, n_total_chars)
             for i in numba.parfor.internal_prange(n):
@@ -1825,7 +1829,8 @@ class HiFramesTyped(object):
                 'get_array_ctypes_ptr': get_array_ctypes_ptr,
                 'getitem_c_arr': getitem_c_arr,
                 'get_split_view_index': get_split_view_index,
-                'get_split_view_data_ptr': get_split_view_data_ptr})
+                'get_split_view_data_ptr': get_split_view_data_ptr,
+                'get_utf8_size': get_utf8_size})
 
     def _is_dt_index_binop(self, rhs):
         if rhs.op != 'binop':

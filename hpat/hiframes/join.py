@@ -18,7 +18,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice,
-                              str_copy_ptr,
+                              str_copy_ptr, get_utf8_size,
                               setitem_str_offset, str_arr_set_na)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
@@ -582,7 +582,7 @@ def write_data_buff_overload(meta, node_id, i, val, data):
         if not typ in (string_type, string_array_type):
             func_text += "  meta.send_buff_tup[{}][w_ind] = val_{}\n".format(i, i)
         else:
-            func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
+            func_text += "  n_chars_{} = get_utf8_size(val_{})\n".format(i, i)
             func_text += "  meta.send_arr_lens_tup[{}][w_ind] = n_chars_{}\n".format(n_str, i)
             func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id] + meta.tmp_offset_char_tup[{}][node_id]\n".format(i, n_str, n_str)
             func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}._data, n_chars_{})\n".format(n_str, i, i, i)
@@ -594,7 +594,8 @@ def write_data_buff_overload(meta, node_id, i, val, data):
     # print(func_text)
 
     loc_vars = {}
-    exec(func_text, {'str_copy_ptr': str_copy_ptr}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr,
+        'get_utf8_size': get_utf8_size}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
 
@@ -644,7 +645,7 @@ def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
         else:
             # TODO: fix
             assert typ == string_array_type
-            func_text += "  n_chars_{} = len(val_{})\n".format(i, i)
+            func_text += "  n_chars_{} = get_utf8_size(val_{})\n".format(i, i)
             func_text += "  meta_tup[{}].send_arr_lens[ind_{}] = n_chars_{}\n".format(i, i, i)
             func_text += "  indc_{} = meta_tup[{}].send_disp_char[node_id] + meta_tup[{}].tmp_offset_char[node_id]\n".format(i, i, i)
             func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{}, val_{}._data, n_chars_{})\n".format(i, i, i, i)
@@ -652,7 +653,8 @@ def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
 
     func_text += "  return\n"
     loc_vars = {}
-    exec(func_text, {'str_copy_ptr': str_copy_ptr}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr,
+        'get_utf8_size': get_utf8_size}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
 

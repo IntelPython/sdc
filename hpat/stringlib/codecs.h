@@ -250,3 +250,107 @@ InvalidContinuation3:
 }
 
 #undef ASCII_CHAR_MASK
+
+/* UTF-8 encoder specialized for a Unicode kind to avoid the slow
+   PyUnicode_READ() macro. Delete some parts of the code depending on the kind:
+   UCS-1 strings don't need to handle surrogates for example. */
+int64_t
+STRINGLIB(utf8_encoder)(char* out_data,
+                        STRINGLIB_CHAR *data,
+                        Py_ssize_t size)
+{
+    Py_ssize_t i;                /* index into data of next input character */
+    char *p;                     /* next free byte in output buffer */
+
+#if STRINGLIB_SIZEOF_CHAR == 1
+    const Py_ssize_t max_char_size = 2;
+#elif STRINGLIB_SIZEOF_CHAR == 2
+    const Py_ssize_t max_char_size = 3;
+#else /*  STRINGLIB_SIZEOF_CHAR == 4 */
+    const Py_ssize_t max_char_size = 4;
+#endif
+    _C_BytesWriter writer;
+
+    assert(size >= 0);
+    _C_BytesWriter_Init(&writer);
+
+    if (size > PY_SSIZE_T_MAX / max_char_size) {
+        /* integer overflow */
+        // TODO: proper memory error
+        std::cerr << "memory error in utf8 encoder" << std::endl;
+        return 0;
+    }
+
+    p = (char*)_C_BytesWriter_Alloc(&writer, size * max_char_size);
+    if (p == NULL)
+        return NULL;
+
+    for (i = 0; i < size;) {
+        Py_UCS4 ch = data[i++];
+
+        if (ch < 0x80) {
+            /* Encode ASCII */
+            *p++ = (char) ch;
+
+        }
+        else
+#if STRINGLIB_SIZEOF_CHAR > 1
+        if (ch < 0x0800)
+#endif
+        {
+            /* Encode Latin-1 */
+            *p++ = (char)(0xc0 | (ch >> 6));
+            *p++ = (char)(0x80 | (ch & 0x3f));
+        }
+#if STRINGLIB_SIZEOF_CHAR > 1
+        else if (Py_UNICODE_IS_SURROGATE(ch)) {
+            Py_ssize_t startpos, endpos, newpos;
+            Py_ssize_t k;
+
+            startpos = i-1;
+            endpos = startpos+1;
+
+            while ((endpos < size) && Py_UNICODE_IS_SURROGATE(data[endpos]))
+                endpos++;
+
+            /* Only overallocate the buffer if it's not the last write */
+            writer.overallocate = (endpos < size);
+
+            // TODO: error handlers
+            goto error;
+
+            /* If overallocation was disabled, ensure that it was the last
+               write. Otherwise, we missed an optimization */
+            assert(writer.overallocate || i == size);
+        }
+        else
+#if STRINGLIB_SIZEOF_CHAR > 2
+        if (ch < 0x10000)
+#endif
+        {
+            *p++ = (char)(0xe0 | (ch >> 12));
+            *p++ = (char)(0x80 | ((ch >> 6) & 0x3f));
+            *p++ = (char)(0x80 | (ch & 0x3f));
+        }
+#if STRINGLIB_SIZEOF_CHAR > 2
+        else /* ch >= 0x10000 */
+        {
+            assert(ch <= MAX_UNICODE);
+            /* Encode UCS4 Unicode ordinals */
+            *p++ = (char)(0xf0 | (ch >> 18));
+            *p++ = (char)(0x80 | ((ch >> 12) & 0x3f));
+            *p++ = (char)(0x80 | ((ch >> 6) & 0x3f));
+            *p++ = (char)(0x80 | (ch & 0x3f));
+        }
+#endif /* STRINGLIB_SIZEOF_CHAR > 2 */
+#endif /* STRINGLIB_SIZEOF_CHAR > 1 */
+    }
+
+    return _C_BytesWriter_Finish(out_data, &writer, p);
+
+#if STRINGLIB_SIZEOF_CHAR > 1
+ error:
+    _C_BytesWriter_Dealloc(&writer);
+    return 0;
+#endif
+}

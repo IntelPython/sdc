@@ -1,4 +1,5 @@
 import operator
+import re
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
@@ -66,6 +67,60 @@ for method in str2str_methods:
     exec(func_text, {'numba': numba}, loc_vars)
     str_overload = loc_vars['str_overload']
     overload_method(types.UnicodeType, method)(str_overload)
+
+
+@overload_method(types.UnicodeType, 'replace')
+def str_replace_overload(in_str, old, new, count=-1):
+
+    def _str_replace_impl(in_str, old, new, count=-1):
+        with numba.objmode(out='unicode_type'):
+            out = in_str.replace(old, new, count)
+        return out
+
+    return _str_replace_impl
+
+
+#####################  re support  ###################
+
+class RePatternType(types.Opaque):
+    def __init__(self):
+        super(RePatternType, self).__init__(name='RePatternType')
+
+
+re_pattern_type = RePatternType()
+types.re_pattern_type = re_pattern_type
+
+register_model(RePatternType)(models.OpaqueModel)
+
+@box(RePatternType)
+def box_re_pattern(typ, val, c):
+    # TODO: fix
+    c.pyapi.incref(val)
+    return val
+
+
+@unbox(RePatternType)
+def unbox_re_pattern(typ, obj, c):
+    # TODO: fix
+    c.pyapi.incref(obj)
+    return NativeValue(obj)
+
+@overload(re.compile)
+def re_compile_overload(pattern, flags=0):
+    def _re_compile_impl(pattern, flags=0):
+        with numba.objmode(pat='re_pattern_type'):
+            pat = re.compile(pattern, flags)
+        return pat
+    return _re_compile_impl
+
+
+@overload_method(RePatternType, 'sub')
+def re_sub_overload(p, repl, string, count=0):
+    def _re_sub_impl(p, repl, string, count=0):
+        with numba.objmode(out='unicode_type'):
+            out = p.sub(repl, string, count)
+        return out
+    return _re_sub_impl
 
 
 #######################  type for std string pointer  ########################

@@ -69,7 +69,8 @@ void* np_array_from_string_array(int64_t no_strings, const uint32_t * offset_tab
 void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitmap,
     int64_t num_strings, int64_t total_size);
 
-void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index);
+void setitem_string_array(uint32_t *offsets, char *data, int64_t n_bytes, char* str, int64_t len, int kind, int is_ascii, int64_t index);
+int64_t get_utf8_size(char* str, int64_t len, int kind);
 
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
                             uint32_t *in_offsets, char *in_data,
@@ -216,6 +217,8 @@ PyMODINIT_FUNC PyInit_hstr_ext(void) {
                             PyLong_FromVoidPtr((void*)(&init_memsys)));
     PyObject_SetAttrString(m, "decode_utf8",
                             PyLong_FromVoidPtr((void*)(&decode_utf8)));
+    PyObject_SetAttrString(m, "get_utf8_size",
+                            PyLong_FromVoidPtr((void*)(&get_utf8_size)));
     return m;
 }
 
@@ -440,17 +443,34 @@ void allocate_string_array(uint32_t **offsets, char **data, uint8_t **null_bitma
     return;
 }
 
-void setitem_string_array(uint32_t *offsets, char *data, char* str, int64_t len, int64_t index)
+void setitem_string_array(uint32_t *offsets, char *data, int64_t n_bytes, char* str, int64_t len, int kind, int is_ascii, int64_t index)
 {
+#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; return;}
     // std::cout << "setitem str: " << *str << " " << index << std::endl;
     if (index==0)
         offsets[index] = 0;
     uint32_t start = offsets[index];
+    int64_t utf8_len = -1;
     // std::cout << "start " << start << " len " << len << std::endl;
-    memcpy(&data[start], str, len);
-    assert(len < std::numeric_limits<uint32_t>::max());
-    offsets[index+1] = start+ (uint32_t)len;
+
+    if (is_ascii==1) {
+        memcpy(&data[start], str, len);
+        utf8_len = len;
+    }
+    else {
+        utf8_len = unicode_to_utf8(&data[start], str, len, kind);
+    }
+
+    CHECK(utf8_len < std::numeric_limits<uint32_t>::max(), "string array too large");
+    CHECK(start+utf8_len <= n_bytes, "out of bounds string array setitem");
+    offsets[index+1] = start+ (uint32_t)utf8_len;
     return;
+#undef CHECK
+}
+
+int64_t get_utf8_size(char* str, int64_t len, int kind)
+{
+    return unicode_to_utf8(NULL, str, len, kind);
 }
 
 void set_string_array_range(uint32_t *out_offsets, char *out_data,
