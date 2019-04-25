@@ -1044,12 +1044,14 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
         fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
             lir.IntType(64),
             lir.IntType(32).as_pointer(),
+            lir.IntType(32).as_pointer(),
             lir.IntType(64).as_pointer(),
             uni_str.meminfo.type.as_pointer()])
         fn_decode = builder.module.get_or_insert_function(
             fnty, name="decode_utf8")
         builder.call(fn_decode, [ptr, length,
                                 uni_str._get_ptr_by_name('kind'),
+                                uni_str._get_ptr_by_name('is_ascii'),
                                 uni_str._get_ptr_by_name('length'),
                                 uni_str._get_ptr_by_name('meminfo')])
         uni_str.hash = context.get_constant(_Py_hash_t, -1)

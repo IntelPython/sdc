@@ -32,6 +32,7 @@ typedef struct {
     NRT_MemInfo *buffer;
     void *data;
     enum PyUnicode_Kind kind;
+    int is_ascii;
     Py_UCS4 maxchar;
     Py_ssize_t size;
     Py_ssize_t pos;
@@ -62,6 +63,7 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
     /* use a value smaller than PyUnicode_1BYTE_KIND() so
        _C_UnicodeWriter_PrepareKind() will copy the buffer. */
     writer->kind = PyUnicode_WCHAR_KIND;
+    writer->is_ascii = 0;
     assert(writer->kind <= PyUnicode_1BYTE_KIND);
 }
 
@@ -98,6 +100,10 @@ _C_UnicodeWriter_Init(_C_UnicodeWriter *writer)
 
 #include "stringlib/bytesobject.cpp"
 
+#include "stringlib/asciilib.h"
+#include "stringlib/codecs.h"
+#include "stringlib/undef.h"
+
 #include "stringlib/ucs1lib.h"
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
@@ -115,14 +121,17 @@ static int _copy_characters(NRT_MemInfo *to, Py_ssize_t to_start,
                  NRT_MemInfo *from, Py_ssize_t from_start,
                  Py_ssize_t how_many, unsigned int from_kind, unsigned int to_kind);
 
+
+// similar to PyUnicode_New()
 NRT_MemInfo *alloc_writer(_C_UnicodeWriter *writer, Py_ssize_t newlen, Py_UCS4 maxchar)
 {
     enum PyUnicode_Kind kind;
+    int is_ascii = 0;
     Py_ssize_t char_size;
 
     if (maxchar < 128) {
-        // TODO: anything needed for ASCII?
         kind = PyUnicode_1BYTE_KIND;
+        is_ascii = 1;
         char_size = 1;
     }
     else if (maxchar < 256) {
@@ -156,6 +165,7 @@ NRT_MemInfo *alloc_writer(_C_UnicodeWriter *writer, Py_ssize_t newlen, Py_UCS4 m
 
     if (!writer->readonly) {
         writer->kind = kind;
+        writer->is_ascii = is_ascii;
         writer->size = newlen;
     }
     else {
@@ -163,6 +173,7 @@ NRT_MemInfo *alloc_writer(_C_UnicodeWriter *writer, Py_ssize_t newlen, Py_UCS4 m
            _PyUnicodeWriter_PrepareKind() will copy the buffer. */
         writer->kind = PyUnicode_WCHAR_KIND;
         assert(writer->kind <= PyUnicode_1BYTE_KIND);
+        writer->is_ascii = 0;
 
         /* Copy-on-write mode: set buffer size to 0 so
          * _PyUnicodeWriter_Prepare() will copy (and enlarge) the buffer on
@@ -311,7 +322,7 @@ ascii_decode(const char *start, const char *end, Py_UCS1 *dest)
 }
 
 // ported from CPython PyUnicode_DecodeUTF8Stateful: https://github.com/python/cpython/blob/31e8d69bfe7cf5d4ffe0967cb225d2a8a229cc97/Objects/unicodeobject.c#L4813
-void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_MemInfo** meminfo)
+void decode_utf8(const char *s, Py_ssize_t size, int* kind, int *is_ascii, int* length, NRT_MemInfo** meminfo)
 {
     _C_UnicodeWriter writer;
     const char *starts = s;
@@ -320,11 +331,13 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
     Py_ssize_t startinpos;
     Py_ssize_t endinpos;
     const char *errmsg = "";
+    *is_ascii = 0;
 
     if (size == 0) {
         (*meminfo) = NRT_MemInfo_alloc_safe(1);
         ((char*)((*meminfo)->data))[0] = 0;
         *kind = PyUnicode_1BYTE_KIND;
+        *is_ascii = 1;
         *length = 0;
         return;
     }
@@ -336,6 +349,7 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
         ((char*)((*meminfo)->data))[0] = s[0];
         ((char*)((*meminfo)->data))[1] = 0;
         *kind = PyUnicode_1BYTE_KIND;
+        *is_ascii = 1;
         *length = 1;
         return;
     }
@@ -352,8 +366,10 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
         int kind = writer.kind;
 
         if (kind == PyUnicode_1BYTE_KIND) {
-            // TODO: anything needed for ASCII?
-            ch = ucs1lib_utf8_decode(&s, end, (Py_UCS1*)writer.data, &writer.pos);
+            if (writer.is_ascii == 1)
+                ch = asciilib_utf8_decode(&s, end, (Py_UCS1*)writer.data, &writer.pos);
+            else
+                ch = ucs1lib_utf8_decode(&s, end, (Py_UCS1*)writer.data, &writer.pos);
         } else if (kind == PyUnicode_2BYTE_KIND) {
             ch = ucs2lib_utf8_decode(&s, end, (Py_UCS2*)writer.data, &writer.pos);
         } else {
@@ -398,6 +414,7 @@ void decode_utf8(const char *s, Py_ssize_t size, int* kind, int* length, NRT_Mem
 End:
     (*meminfo) = writer.buffer;
     *kind = writer.kind;
+    *is_ascii = writer.is_ascii;
     *length = writer.pos;
     // set null
     if (writer.kind == PyUnicode_1BYTE_KIND) {
