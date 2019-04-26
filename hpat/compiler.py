@@ -221,7 +221,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
     def stage_repeat_inline_closure(self):
         assert self.func_ir
         inline_pass = InlineClosureCallPass(
-            self.func_ir, self.flags.auto_parallel)
+            self.func_ir, self.flags.auto_parallel, typed=True)
         inline_pass.run()
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
