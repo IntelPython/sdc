@@ -21,7 +21,7 @@ import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
     is_whole_slice, is_array, is_assign, sanitize_varname)
-from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
+from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
     is_str_arr_typ, pre_alloc_string_array)
 from hpat.io.pio_api import h5dataset_type
