@@ -1,5 +1,6 @@
 import operator
 from collections import defaultdict, namedtuple
+import re
 import numpy as np
 import pandas as pd
 import warnings
@@ -1746,7 +1747,8 @@ class HiFramesTyped(object):
             extra_globals={'unicode_to_std_str': unicode_to_std_str,
                             'std_str_to_unicode': std_str_to_unicode,
                             'pre_alloc_string_array': pre_alloc_string_array,
-                            'get_utf8_size': get_utf8_size}
+                            'get_utf8_size': get_utf8_size,
+                            're': re}
         )
 
 

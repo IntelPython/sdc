@@ -105,7 +105,9 @@ def unbox_re_pattern(typ, obj, c):
     c.pyapi.incref(obj)
     return NativeValue(obj)
 
-@overload(re.compile)
+
+# jitoptions until numba #4020 is resolved
+@overload(re.compile, jit_options={'no_cpython_wrapper': False})
 def re_compile_overload(pattern, flags=0):
     def _re_compile_impl(pattern, flags=0):
         with numba.objmode(pat='re_pattern_type'):

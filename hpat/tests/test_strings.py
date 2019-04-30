@@ -106,7 +106,6 @@ class TestString(unittest.TestCase):
             # XXX: use startswith since hpat output can have extra characters
             self.assertTrue(h_res.startswith(py_res))
 
-    @unittest.skip("pending numba #4020")
     def test_re_sub(self):
         def test_impl(_str):
             p = re.compile('ab*')
