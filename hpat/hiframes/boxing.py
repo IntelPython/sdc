@@ -46,7 +46,10 @@ def typeof_pd_dataframe(val, c):
 # register series types for import
 @typeof_impl.register(pd.Series)
 def typeof_pd_str_series(val, c):
-    return SeriesType(_infer_series_dtype(val))
+    index_type = _infer_index_type(val.index)
+    is_named = val.name is not None
+    return SeriesType(
+        _infer_series_dtype(val), index=index_type, is_named=is_named)
 
 
 @typeof_impl.register(pd.Index)
@@ -124,7 +127,6 @@ def _infer_series_dtype(S):
         raise ValueError("data type for column {} not supported".format(S.name))
 
 
-
 def _infer_series_list_dtype(S):
     for i in range(len(S)):
         first_val = S.iloc[i]
@@ -140,6 +142,15 @@ def _infer_series_list_dtype(S):
                     "data type for column {} not supported".format(S.name))
     raise ValueError(
             "data type for column {} not supported".format(S.name))
+
+
+def _infer_index_type(index):
+    # TODO: support proper inference
+    if index.dtype == np.dtype('O') and len(index) > 0:
+        first_val = index[0]
+        if isinstance(first_val, str):
+            return string_array_type
+    return types.none
 
 
 @box(DataFrameType)
@@ -251,6 +262,14 @@ def unbox_series(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "values")
     series = cgutils.create_struct_proxy(typ)(c.context, c.builder)
     series.data = _unbox_series_data(typ.dtype, typ.data, arr_obj, c).value
+    # TODO: other indices
+    if typ.index == string_array_type:
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        series.index = unbox_str_series(string_array_type, index_obj, c).value
+    if typ.is_named:
+        name_obj = c.pyapi.object_getattr_string(val, "name")
+        series.name = numba.unicode.unbox_unicode_str(
+            string_type, name_obj, c).value
     # TODO: handle index and name
     c.pyapi.decref(arr_obj)
     return NativeValue(series._getvalue())

@@ -149,6 +149,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_pass_series_index1(self):
+        def test_impl(A):
+            return A
+
+        S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_attr1(self):
         def test_impl(A):
             return A.size
