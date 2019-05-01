@@ -907,8 +907,16 @@ def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
     numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
 
+
+def alias_ext_init_series(lhs_name, args, alias_map, arg_aliases):
+    assert len(args) >= 1
+    numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
+    if len(args) > 1:  # has index
+        numba.ir_utils._add_alias(lhs_name, args[1].name, alias_map, arg_aliases)
+
+
 if hasattr(numba.ir_utils, 'alias_func_extensions'):
-    numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_dummy_func
+    numba.ir_utils.alias_func_extensions[('init_series', 'hpat.hiframes.api')] = alias_ext_init_series
     numba.ir_utils.alias_func_extensions[('get_series_data', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('get_series_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
     numba.ir_utils.alias_func_extensions[('init_datetime_index', 'hpat.hiframes.api')] = alias_ext_dummy_func
