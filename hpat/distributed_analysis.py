@@ -413,6 +413,16 @@ class DistributedAnalysis(object):
         if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
             return
 
+        if fdef == ('num_total_chars', 'hpat.str_arr_ext'):
+            return
+
+        if (fdef == ('copy_non_null_offsets', 'hpat.str_arr_ext')
+                or fdef == ('copy_data', 'hpat.str_arr_ext')):
+            out_arrname = rhs.args[0].name
+            in_arrname = rhs.args[1].name
+            self._meet_array_dists(out_arrname, in_arrname, array_dists)
+            return
+
         if fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext'):
             out_arrname = rhs.args[0].name
             in_arrname = rhs.args[2].name
