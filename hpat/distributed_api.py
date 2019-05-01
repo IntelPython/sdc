@@ -334,6 +334,10 @@ def const_slice_getitem_overload(arr, slice_index, start, count):
     return getitem_impl
 
 
+@numba.njit
+def local_len(A):
+    return len(A)
+
 # send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,
     types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))

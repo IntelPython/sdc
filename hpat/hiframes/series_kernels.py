@@ -71,7 +71,10 @@ def _series_dropna_float_impl(S):  # pragma: no cover
     return hpat.hiframes.api.init_series(A)
 
 def _series_dropna_str_alloc_impl(B):  # pragma: no cover
-    old_len = len(B)
+    # local_len to enable 1D_Var dist
+    # TODO: test
+    # TODO: generalize
+    old_len = hpat.distributed_api.local_len(B)
     # TODO: more efficient null counting
     new_len = old_len - hpat.hiframes.api.init_series(B).isna().sum()
     num_chars = hpat.str_arr_ext.num_total_chars(B)

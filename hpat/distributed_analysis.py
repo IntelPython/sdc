@@ -600,6 +600,8 @@ class DistributedAnalysis(object):
         """analyze distributions of hpat distributed functions
         (hpat.distributed_api.func_name)
         """
+        if func_name == 'local_len':
+            return
         if func_name == 'parallel_print':
             return
 
