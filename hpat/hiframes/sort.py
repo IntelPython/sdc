@@ -339,25 +339,28 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
             gen_getitem(var, data_tup_var, i, calltypes, nodes)
         return nodes
 
-    ascending = sort_node.ascending
+    ascending_var = ir.Var(scope, mk_unique_var('ascending'), loc)
+    typemap[ascending_var.name] = types.bool_
+    nodes.append(
+        ir.Assign(ir.Const(sort_node.ascending, loc), ascending_var, loc))
+
     # parallel case
-    def par_sort_impl(key_arrs, data):
+    def par_sort_impl(key_arrs, data, ascending):
         out_key, out_data = parallel_sort(key_arrs, data, ascending)
         # TODO: use k-way merge instead of sort
         # sort output
-        hpat.hiframes.sort.local_sort(out_key, out_data)
+        hpat.hiframes.sort.local_sort(out_key, out_data, ascending)
         return out_key, out_data
 
     f_block = compile_to_numba_ir(par_sort_impl,
                                     {'hpat': hpat,
                                     'parallel_sort': parallel_sort,
                                     'to_string_list': to_string_list,
-                                    'cp_str_list_to_array': cp_str_list_to_array,
-                                    'ascending': ascending},
+                                    'cp_str_list_to_array': cp_str_list_to_array},
                                     typingctx,
-                                    (key_typ, data_tup_typ),
+                                    (key_typ, data_tup_typ, types.bool_),
                                     typemap, calltypes).blocks.popitem()[1]
-    replace_arg_nodes(f_block, [key_arrs_tup_var, data_tup_var])
+    replace_arg_nodes(f_block, [key_arrs_tup_var, data_tup_var, ascending_var])
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
     # get output key
