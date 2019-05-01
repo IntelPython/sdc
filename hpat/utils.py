@@ -192,7 +192,7 @@ def cprint(*s):
 class CprintInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        return signature(types.none, *args)
+        return signature(types.none, *unliteral_all(args))
 
 
 typ_to_format = {

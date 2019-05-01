@@ -174,15 +174,14 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
             func_text += "  send_arr_lens_{} = pre_shuffle_meta.send_arr_lens_tup[{}]\n".format(n_str, n_str)
             # send char arr
             # TODO: arr refcount if arr is not stored somewhere?
-            func_text += "  send_arr_chars_arr_{} = np.empty(1, np.uint8)\n".format(i)
-            func_text += "  send_arr_chars_{} = get_ctypes_ptr(get_data_ptr(arr))\n".format(i)
+            func_text += "  send_arr_chars_arr_{} = np.empty(1, np.uint8)\n".format(n_str)
+            func_text += "  send_arr_chars_{} = get_ctypes_ptr(get_data_ptr(arr))\n".format(n_str)
             func_text += "  if not is_contig:\n"
             func_text += "    send_arr_lens_{} = np.empty(n_send, np.uint32)\n".format(n_str)
             func_text += "    s_n_all_chars = send_counts_char_{}.sum()\n".format(n_str)
             func_text += "    send_arr_chars_arr_{} = np.empty(s_n_all_chars, np.uint8)\n".format(n_str)
             func_text += "    send_arr_chars_{} = get_ctypes_ptr(send_arr_chars_arr_{}.ctypes)\n".format(n_str, n_str)
             n_str += 1
-
 
     send_buffs = ", ".join("send_buff_{}".format(i) for i in range(n_all))
     out_arrs = ", ".join("out_arr_{}".format(i) for i in range(n_all))
