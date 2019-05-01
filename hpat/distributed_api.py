@@ -276,6 +276,64 @@ def prealloc_str_for_bcast_overload(arr):
 
     return lambda arr: arr
 
+
+# assuming start and step are None
+def const_slice_getitem(arr, slice_index, start, count):
+    return arr[slice_index]
+
+
+@overload(const_slice_getitem)
+def const_slice_getitem_overload(arr, slice_index, start, count):
+    if arr == string_array_type:
+        reduce_op = Reduce_Type.Sum.value
+        def getitem_str_impl(arr, slice_index, start, count):
+            rank = hpat.distributed_api.get_rank()
+            k = slice_index.stop
+            # get total characters for allocation
+            n_chars = np.uint64(0)
+            if k > count:
+                my_end = min(count, max(k-start, 0))
+                my_arr = arr[:my_end]
+                my_arr = hpat.distributed_api.gatherv(my_arr)
+                n_chars = hpat.distributed_api.dist_reduce(
+                    num_total_chars(my_arr), np.int32(reduce_op))
+                if rank == 0:
+                    out_arr = my_arr
+            else:
+                if rank == 0:
+                    my_arr = arr[:k]
+                    n_chars = num_total_chars(my_arr)
+                    out_arr = my_arr
+                n_chars = bcast_scalar(n_chars)
+            if rank != 0:
+                out_arr = pre_alloc_string_array(k, n_chars)
+
+            # actual communication
+            hpat.distributed_api.bcast(out_arr)
+            return out_arr
+
+        return getitem_str_impl
+
+    def getitem_impl(arr, slice_index, start, count):
+        rank = hpat.distributed_api.get_rank()
+        k = slice_index.stop
+        out_arr = np.empty(k, arr.dtype)
+        if k > count:
+            my_end = min(count, max(k-start, 0))
+            my_arr = arr[:my_end]
+            my_arr = hpat.distributed_api.gatherv(my_arr)
+            if rank == 0:
+                print(my_arr)
+                out_arr = my_arr
+        else:
+            if rank == 0:
+                out_arr = arr[:k]
+        hpat.distributed_api.bcast(out_arr)
+        return out_arr
+
+    return getitem_impl
+
+
 # send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,
     types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.voidptr, types.int32))

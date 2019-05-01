@@ -36,7 +36,8 @@ from hpat.distributed_analysis import (Distribution,
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints, ReplaceFunc, gen_getitem, is_call)
+                        debug_prints, ReplaceFunc, gen_getitem, is_call,
+                        is_const_slice)
 from hpat.distributed_api import Reduce_Type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 
@@ -739,6 +740,7 @@ class DistributedPass(object):
             return [assign]
 
         if (fdef == ('get_series_data', 'hpat.hiframes.api')
+                or fdef == ('get_series_index', 'hpat.hiframes.api')
                 or fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext')):
             out = [assign]
             arr = assign.target
@@ -1582,6 +1584,17 @@ class DistributedPass(object):
                 self._dist_analysis.array_dists[imb_arr.name] = Distribution.OneD_Var
                 out += self._run_call_rebalance_array(lhs.name, full_node, [imb_arr])
                 out[-1].target = lhs
+
+            elif self._is_REP(lhs.name) and guard(
+                    is_const_slice, self.typemap, self.func_ir, index_var):
+                # cases like S.head()
+                # bcast if all in rank 0, otherwise gatherv
+                in_arr = full_node.value.value
+                start = self._array_starts[in_arr.name][0]
+                count = self._array_counts[in_arr.name][0]
+                return self._replace_func(
+                    lambda arr, slice_index, start, count: hpat.distributed_api.const_slice_getitem(
+                        arr, slice_index, start, count), [in_arr, index_var, start, count])
 
         return out
 

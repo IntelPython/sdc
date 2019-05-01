@@ -3,7 +3,7 @@ import operator
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
-    add_offset_to_labels, find_topo_order)
+    add_offset_to_labels, find_topo_order, find_const)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -278,6 +278,23 @@ def is_whole_slice(typemap, func_ir, var, accept_stride=False):
     require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
     require(isinstance(arg1_def, ir.Const) and arg1_def.value == None)
     return True
+
+
+def is_const_slice(typemap, func_ir, var, accept_stride=False):
+    """ return True if var can be determined to be a constant size slice """
+    require(typemap[var.name] == types.slice2_type
+            or (accept_stride and typemap[var.name] == types.slice3_type))
+    call_expr = get_definition(func_ir, var)
+    require(isinstance(call_expr, ir.Expr) and call_expr.op == 'call')
+    assert (len(call_expr.args) == 2
+            or (accept_stride and len(call_expr.args) == 3))
+    assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
+    arg0_def = get_definition(func_ir, call_expr.args[0])
+    require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
+    size_const = find_const(func_ir, call_expr.args[1])
+    require(isinstance(size_const, int))
+    return True
+
 
 def get_slice_step(typemap, func_ir, var):
     require(typemap[var.name] == types.slice3_type)

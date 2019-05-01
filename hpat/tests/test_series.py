@@ -1168,6 +1168,16 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    def test_series_head_index_parallel1(self):
+        def test_impl(S):
+            return S.head(3)
+
+        S = pd.Series([6,9,2,3,6,4,5], ['a','ab','abc','c','f','hh',''])
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+        start, end = get_start_end(len(S))
+        pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
+        self.assertTrue(count_array_OneDs()>0)
+
     def test_series_median1(self):
         def test_impl(S):
             return S.median()

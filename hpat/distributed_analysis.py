@@ -19,7 +19,8 @@ import hpat.io.np_io
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
-                        is_np_array, find_build_tuple, debug_prints)
+                        is_np_array, find_build_tuple, debug_prints,
+                        is_const_slice)
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from enum import Enum
 
@@ -358,8 +359,12 @@ class DistributedAnalysis(object):
         if fdef == ('isna', 'hpat.hiframes.api'):
             return
 
+        if fdef == ('get_series_name', 'hpat.hiframes.api'):
+            return
+
         # dummy hiframes functions
         if func_mod == 'hpat.hiframes.api' and func_name in ('get_series_data',
+                'get_series_index',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type', 'dummy_unbox_series',
                 'parallel_fix_df_array'):
@@ -770,6 +775,12 @@ class DistributedAnalysis(object):
         if guard(is_whole_slice, self.typemap, self.func_ir, index_var,
                     accept_stride=True):
             self._meet_array_dists(lhs, rhs.value.name, array_dists)
+            return
+
+        # output of operations like S.head() is REP since it's a "small" slice
+        # input can remain 1D
+        if guard(is_const_slice, self.typemap, self.func_ir, index_var):
+            array_dists[lhs] = Distribution.REP
             return
 
         self._set_REP(inst.list_vars(), array_dists)
