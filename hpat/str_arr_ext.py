@@ -309,6 +309,10 @@ def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
                 builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
                 builder.store(builder.add(curr_offset, lir.Constant(context.get_data_type(offset_typ), 1)), curr_offset_ptr)
 
+        # set last offset
+        curr_offset = builder.load(curr_offset_ptr)
+        in_val = builder.load(builder.gep(in_string_array.offsets, [n]))
+        builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
         return context.get_dummy_value()
 
     return types.void(string_array_type, string_array_type), codegen

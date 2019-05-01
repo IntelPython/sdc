@@ -600,6 +600,9 @@ class DistributedAnalysis(object):
         """analyze distributions of hpat distributed functions
         (hpat.distributed_api.func_name)
         """
+        if func_name == 'parallel_print':
+            return
+
         if func_name == 'dist_return':
             arr_name = args[0].name
             assert arr_name in array_dists, "array distribution not found"

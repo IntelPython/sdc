@@ -459,6 +459,11 @@ class ThreadedRetTyper(AbstractTemplate):
         return signature(args[0], *args)
 
 
+@numba.njit
+def parallel_print(s):
+    print(s)
+
+
 def irecv():  # pragma: no cover
     return 0
 

@@ -652,6 +652,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
+    @unittest.skip("TODO: fix result")
+    def test_series_dropna_str_parallel1(self):
+        def test_impl(A):
+            B = A.dropna()
+            return (B == 'gg').sum()
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc', 'dd', 'gg'])
+        hpat_func = hpat.jit(distributed=['A'])(test_impl)
+        start, end = get_start_end(len(S1))
+        # TODO: gatherv
+        self.assertEqual(hpat_func(S1[start:end]), test_impl(S1))
+
     def test_series_dropna_float_inplace1(self):
         def test_impl(A):
             A.dropna(inplace=True)
