@@ -90,7 +90,8 @@ class ParquetHandler(object):
 
         if table_types is None:
             fname_def = guard(get_definition, self.func_ir, file_name)
-            if not isinstance(fname_def, ir.Const) or not isinstance(fname_def.value, str):
+            if (not isinstance(fname_def, (ir.Const, ir.Global, ir.FreeVar))
+                    or not isinstance(fname_def.value, str)):
                 raise ValueError("Parquet schema not available")
             file_name_str = fname_def.value
             col_names, col_types = parquet_file_schema(file_name_str)

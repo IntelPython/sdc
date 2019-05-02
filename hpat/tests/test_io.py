@@ -10,6 +10,9 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     get_start_end)
 
 
+kde_file = 'kde.parquet'
+
+
 class TestIO(unittest.TestCase):
 
     def setUp(self):
@@ -182,6 +185,29 @@ class TestIO(unittest.TestCase):
         def test_impl():
             t = pq.read_table('kde.parquet')
             df = t.to_pandas()
+            X = df['points']
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_pq_read_global_str1(self):
+        def test_impl():
+            df = pd.read_parquet(kde_file)
+            X = df['points']
+            return X.sum()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_pq_read_freevar_str1(self):
+        kde_file2 = 'kde.parquet'
+        def test_impl():
+            df = pd.read_parquet(kde_file2)
             X = df['points']
             return X.sum()
 
