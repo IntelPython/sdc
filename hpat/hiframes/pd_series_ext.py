@@ -147,10 +147,11 @@ def is_datetime_date_series_typ(t):
 @register_model(SeriesType)
 class SeriesModel(models.StructModel):
     def __init__(self, dmm, fe_type):
+        name_typ = string_type if fe_type.is_named else types.none
         members = [
             ('data', fe_type.data),
             ('index', fe_type.index),
-            ('name', string_type),
+            ('name', name_typ),
         ]
         super(SeriesModel, self).__init__(dmm, fe_type, members)
 

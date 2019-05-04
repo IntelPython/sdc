@@ -57,7 +57,7 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
     hpat.hiframes.api.fillna(A, B, fill)
     return hpat.hiframes.api.init_series(A)
 
-def _series_dropna_float_impl(S):  # pragma: no cover
+def _series_dropna_float_impl(S, name):  # pragma: no cover
     old_len = len(S)
     new_len = old_len - hpat.hiframes.api.init_series(S).isna().sum()
     A = np.empty(new_len, S.dtype)
@@ -68,9 +68,9 @@ def _series_dropna_float_impl(S):  # pragma: no cover
             A[curr_ind] = val
             curr_ind += 1
 
-    return hpat.hiframes.api.init_series(A)
+    return hpat.hiframes.api.init_series(A, None, name)
 
-def _series_dropna_str_alloc_impl(B):  # pragma: no cover
+def _series_dropna_str_alloc_impl(B, name):  # pragma: no cover
     # local_len to enable 1D_Var dist
     # TODO: test
     # TODO: generalize
@@ -81,7 +81,7 @@ def _series_dropna_str_alloc_impl(B):  # pragma: no cover
     A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
     hpat.str_arr_ext.copy_non_null_offsets(A, B)
     hpat.str_arr_ext.copy_data(A, B)
-    return hpat.hiframes.api.init_series(A)
+    return hpat.hiframes.api.init_series(A, None, name)
 
 # return the nan value for the type (handle dt64)
 def _get_nan(val):

@@ -103,6 +103,8 @@ class DistributedAnalysis(object):
                 self._analyze_parfor(inst, array_dists, parfor_dists)
             elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                 self._analyze_setitem(inst, array_dists)
+            # elif isinstance(inst, ir.Print):
+            #     continue
             elif type(inst) in distributed_analysis_extensions:
                 # let external calls handle stmt if type matches
                 f = distributed_analysis_extensions[type(inst)]

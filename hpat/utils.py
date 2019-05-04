@@ -197,7 +197,9 @@ class CprintInfer(AbstractTemplate):
 
 typ_to_format = {
     types.int32: 'd',
+    types.uint32: 'u',
     types.int64: 'lld',
+    types.uint64: 'llu',
     types.float32: 'f',
     types.float64: 'lf',
 }

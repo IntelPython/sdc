@@ -1168,18 +1168,19 @@ class HiFramesTyped(object):
 
         nodes = []
         data = self._get_series_data(series_var, nodes)
+        name = self._get_series_name(series_var, nodes)
 
         if inplace:
             # Since arrays can't resize inplace, we have to create a new
             # array and assign it back to the same Series variable
             # result back to the same variable
-            def dropna_impl(A):
+            def dropna_impl(A, name):
                 # not using A.dropna since definition list is not working
                 # for A to find callname
-                return hpat.hiframes.api.dropna(A)
+                return hpat.hiframes.api.dropna(A, name)
 
             assign.target = series_var  # replace output
-            return self._replace_func(dropna_impl, [data], pre_nodes=nodes)
+            return self._replace_func(dropna_impl, [data, name], pre_nodes=nodes)
         else:
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
@@ -1187,8 +1188,9 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['dropna_float']
             else:
                 # integer case, TODO: bool, date etc.
-                func = lambda A: hpat.hiframes.api.init_series(A)
-            return self._replace_func(func, [data], pre_nodes=nodes)
+                func = lambda A, name: hpat.hiframes.api.init_series(
+                    A, None, name)
+            return self._replace_func(func, [data, name], pre_nodes=nodes)
 
     def _handle_series_map(self, assign, lhs, rhs, series_var):
         """translate df.A.map(lambda a:...) to prange()
