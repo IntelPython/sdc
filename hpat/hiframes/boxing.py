@@ -107,7 +107,14 @@ def _infer_series_dtype(S):
     if S.dtype == np.dtype('O'):
         # XXX assuming the whole column is strings if 1st val is string
         # TODO: handle NA as 1st value
-        first_val = S.iloc[0]
+        i = 0
+        while i < len(S) and (S.iloc[i] is np.nan or S.iloc[i] is None):
+            i += 1
+        if i == len(S):
+            raise ValueError(
+                "object dtype infer out of bounds for {}".format(S.name))
+
+        first_val = S.iloc[i]
         if isinstance(first_val, list):
             return _infer_series_list_dtype(S)
         elif isinstance(first_val, str):
@@ -118,13 +125,13 @@ def _infer_series_dtype(S):
             return datetime_date_type
         else:
             raise ValueError(
-                "data type for column {} not supported".format(S.name))
+                "object dtype infer: data type for column {} not supported".format(S.name))
 
     # regular numpy types
     try:
         return numpy_support.from_dtype(S.dtype)
     except NotImplementedError:
-        raise ValueError("data type for column {} not supported".format(S.name))
+        raise ValueError("np dtype infer: data type for column {} not supported".format(S.name))
 
 
 def _infer_series_list_dtype(S):
