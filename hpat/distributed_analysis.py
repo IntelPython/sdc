@@ -418,6 +418,18 @@ class DistributedAnalysis(object):
         if fdef == ('num_total_chars', 'hpat.str_arr_ext'):
             return
 
+        if fdef == ('_series_dropna_str_alloc_impl_inner', 'hpat.hiframes.series_kernels'):
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+            in_dist = array_dists[rhs.args[0].name]
+            out_dist = array_dists[lhs]
+            out_dist = Distribution(min(out_dist.value, in_dist.value))
+            array_dists[lhs] = out_dist
+            # output can cause input REP
+            if out_dist != Distribution.OneD_Var:
+                array_dists[rhs.args[0].name] = out_dist
+            return
+
         if (fdef == ('copy_non_null_offsets', 'hpat.str_arr_ext')
                 or fdef == ('copy_data', 'hpat.str_arr_ext')):
             out_arrname = rhs.args[0].name

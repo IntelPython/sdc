@@ -70,18 +70,30 @@ def _series_dropna_float_impl(S, name):  # pragma: no cover
 
     return hpat.hiframes.api.init_series(A, None, name)
 
-def _series_dropna_str_alloc_impl(B, name):  # pragma: no cover
-    # local_len to enable 1D_Var dist
+
+# using njit since 1D_var is broken for alloc when there is calculation of len
+@numba.njit(no_cpython_wrapper=True)
+def _series_dropna_str_alloc_impl_inner(B):  # pragma: no cover
     # TODO: test
     # TODO: generalize
-    old_len = hpat.distributed_api.local_len(B)
+    old_len = len(B)
+    na_count = 0
+    for i in range(len(B)):
+        if hpat.str_arr_ext.str_arr_is_na(B, i):
+            na_count += 1
     # TODO: more efficient null counting
-    new_len = old_len - hpat.hiframes.api.init_series(B).isna().sum()
+    new_len = old_len - na_count
     num_chars = hpat.str_arr_ext.num_total_chars(B)
     A = hpat.str_arr_ext.pre_alloc_string_array(new_len, num_chars)
     hpat.str_arr_ext.copy_non_null_offsets(A, B)
     hpat.str_arr_ext.copy_data(A, B)
+    return A
+
+
+def _series_dropna_str_alloc_impl(B, name):  # pragma: no cover
+    A = hpat.hiframes.series_kernels._series_dropna_str_alloc_impl_inner(B)
     return hpat.hiframes.api.init_series(A, None, name)
+
 
 # return the nan value for the type (handle dt64)
 def _get_nan(val):
