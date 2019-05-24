@@ -2,7 +2,7 @@
 HPAT
 *****
 
-.. image:: https://travis-ci.com/IntelPython/daal4py.svg?branch=master
+.. image:: https://travis-ci.com/IntelPython/hpat.svg?branch=master
     :target: https://travis-ci.com/IntelPython/hpat
 
 .. image:: https://coveralls.io/repos/github/IntelPython/hpat/badge.svg?branch=master
