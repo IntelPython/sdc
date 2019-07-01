@@ -25,6 +25,8 @@ requirements:
     - hdf5
     - h5py
     - mpich # [not win]
+    - impi-devel # [win]
+    - impi_rt # [win]
 
   run:
     - python
@@ -35,6 +37,7 @@ requirements:
     - boost
     - numba 0.44.*
     - mpich # [not win]
+    - impi_rt # [win]
 
 test:
   requires:
@@ -46,7 +49,7 @@ test:
 
 
 about:
-  home: https://github.com/IntelLabs/hpat
+  home: https://github.com/IntelPython/hpat
   license: BSD
   license_file: LICENSE.md
   summary: A compiler-based big data framework in Python
