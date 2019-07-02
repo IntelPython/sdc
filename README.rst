@@ -31,16 +31,17 @@ environment easily (Linux/Mac/Windows)::
 .. used if master of Numba is needed for latest hpat package
 .. conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
 
-Windows installaton requires
-`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
-installed.
-
 Docker Container
 ----------------
 
 An HPAT docker image is also available for running containers. For example::
 
     docker run -it ehsantn/hpat bash
+
+Building HPAT from Source
+-------------------------
+
+To build HPAT from Source, please refer to the following `instrunction <docs/source/install.rst>`_
 
 Example
 #######

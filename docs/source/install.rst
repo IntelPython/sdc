@@ -11,10 +11,6 @@ easily. On Linux/Mac/Windows::
 .. used if master of Numba is needed for latest hpat package
 .. conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
 
-Windows installaton requires
-`Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_ to be
-installed.
-
 Building HPAT from Source
 -------------------------
 
@@ -26,17 +22,12 @@ such as Numba on Ubuntu Linux::
     chmod +x miniconda.sh
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
-    conda create -n HPAT -q -y numpy scipy pandas boost cmake
+    conda create -n HPAT python=<3.7 or 3.6>
     source activate HPAT
-    conda install -c numba/label/dev numba
-    conda install mpich mpi -c conda-forge
-    conda install pyarrow
-    conda install h5py -c ehsantn
-    conda install gcc_linux-64 gxx_linux-64 gfortran_linux-64
-    git clone https://github.com/IntelLabs/hpat
-    cd hpat
+    conda install conda-build
+    git clone https://github.com/IntelPython/hpat
     # build HPAT
-    HDF5_DIR=$CONDA_PREFIX python setup.py develop
+    conda build --python <3.6 or 3.7> -c numba -c conda-forge -c defaults hpat/buildscripts/hpat-conda-recipe/
 
 
 A command line for running the Pi example on 4 cores::
@@ -57,24 +48,18 @@ to check the channel of ``hdf5`` package.
 Building from Source on Windows
 -------------------------------
 
-Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0) and Intel MPI:
+Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0):
 
 * Install `Build Tools for Visual Studio 2017 (14.0) <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017>`_.
-* Install `Intel MPI <https://software.intel.com/en-us/intel-mpi-library>`_.
 * Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
 * Start 'Anaconda prompt'
 * Setup the Conda environment in Anaconda Prompt::
 
-    conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge python=3.7 pandas pyarrow h5py numba scipy boost libboost tbb-devel mkl-devel
+    conda create -n HPAT python=<3.7 or 3.6>
     activate HPAT
     conda install vc vs2015_runtime vs2015_win-64
-    git clone https://github.com/IntelLabs/hpat.git
-    cd hpat
-    set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
-    set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-    "%I_MPI_ROOT%"\intel64\bin\mpivars.bat
-    set HDF5_DIR=%CONDA_PREFIX%\Library
-    python setup.py develop
+    git clone https://github.com/IntelPython/hpat.git
+    conda build --python <3.6 or 3.7> -c numba -c conda-forge -c defaults -c intel hpat/buildscripts/hpat-conda-recipe/
 
 .. "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
 
