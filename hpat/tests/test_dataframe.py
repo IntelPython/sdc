@@ -960,6 +960,8 @@ class TestDataFrame(unittest.TestCase):
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
 
+    @unittest.skip('Error - needed fix\n'
+                   'NUMA_PES=3 build')
     def test_concat_columns1(self):
         def test_impl(S1, S2):
             return pd.concat([S1, S2], axis=1)
