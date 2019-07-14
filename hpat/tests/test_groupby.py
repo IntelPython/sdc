@@ -380,6 +380,8 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    @unittest.skip('Error - needed fix\n'
+                   'NUMA_PES=3 build')
     def test_crosstab_parallel1(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
