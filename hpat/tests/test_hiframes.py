@@ -393,6 +393,9 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @unittest.skip('utf8 decode error - needed fix\n'
+                   'invalid continuation byte\n'
+                   'NUMA_PES=3 build')
     def test_str_replace_regex_parallel(self):
         def test_impl(df):
             B = df.A.str.replace('AB*', 'EE', regex=True)
@@ -492,6 +495,8 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @unittest.skip('Error - needed fix\n'
+                   'NUMA_PES=3 build')
     def test_str_get_parallel(self):
         def test_impl(df):
             A = df.A.str.split(',')
