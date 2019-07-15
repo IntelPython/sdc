@@ -8,15 +8,9 @@
 
 #include "_str_decode.cpp"
 
-#ifdef USE_BOOST_REGEX
-#include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_search;
-#else
 #include <regex>
 using std::regex;
 using std::regex_search;
-#endif
 
 #include <boost/lexical_cast.hpp>
 
@@ -296,8 +290,8 @@ void str_arr_split_view_impl(str_arr_split_view_payload* out_view, int64_t n_str
     index_offsets[0] = 0;
     // uint32_t curr_data_off = 0;
 
-    int data_ind = offsets[0];
-    int str_ind = 0;
+    uint32_t data_ind = offsets[0];
+    int64_t str_ind = 0;
     // while there are chars to consume, equal since the first if will consume it
     while (data_ind <= total_chars)
     {

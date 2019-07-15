@@ -283,7 +283,7 @@ STRINGLIB(utf8_encoder)(char* out_data,
 
     p = (char*)_C_BytesWriter_Alloc(&writer, size * max_char_size);
     if (p == NULL)
-        return NULL;
+        return 0;
 
     for (i = 0; i < size;) {
         Py_UCS4 ch = data[i++];
@@ -304,8 +304,7 @@ STRINGLIB(utf8_encoder)(char* out_data,
         }
 #if STRINGLIB_SIZEOF_CHAR > 1
         else if (Py_UNICODE_IS_SURROGATE(ch)) {
-            Py_ssize_t startpos, endpos, newpos;
-            Py_ssize_t k;
+            Py_ssize_t startpos, endpos;
 
             startpos = i-1;
             endpos = startpos+1;

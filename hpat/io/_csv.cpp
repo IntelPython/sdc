@@ -309,14 +309,14 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
         std::vector<size_t> line_offset = count_lines(f, hpat_dist_get_node_portion(fsz, nranks, rank));
         size_t no_lines = line_offset.size();
         // get total number of lines using allreduce
-        size_t tot_no_lines(0);
+        int64_t tot_no_lines = 0;
 
         hpat_dist_reduce(reinterpret_cast<char *>(&no_lines), reinterpret_cast<char *>(&tot_no_lines), HPAT_ReduceOps::SUM, HPAT_CTypes::UINT64);
 
         // Now we need to communicate the distribution as we really want it
         // First determine which is our first line (which is the sum of previous lines)
-        size_t byte_first_line = hpat_dist_exscan_i8(no_lines);
-        size_t byte_last_line = byte_first_line + no_lines;
+        int64_t byte_first_line = hpat_dist_exscan_i8(no_lines);
+        int64_t byte_last_line = byte_first_line + no_lines;
 
         // We now determine the chunks of lines that begin and end in our byte-chunk
 
@@ -351,8 +351,8 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
 
         // We iterate through chunk boundaries (defined by line-numbers)
         // we start with boundary 1 as 0 is the beginning of file
-        for(int i=1; i<nranks; ++i) {
-            size_t i_bndry = skiprows + hpat_dist_get_start(n_lines_to_read, (int)nranks, i);
+        for(size_t i=1; i<nranks; ++i) {
+            int64_t i_bndry = skiprows + hpat_dist_get_start(n_lines_to_read, (int)nranks, i);
             // Note our line_offsets mark the end of each line!
             // we check if boundary is on our byte-chunk
             if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {

@@ -43,7 +43,7 @@ struct MemInfo {
 typedef struct MemInfo NRT_MemInfo;
 
 
-void nrt_debug_print(char *fmt, ...) {
+void nrt_debug_print(const char *fmt, ...) {
    va_list args;
 
    va_start(args, fmt);
