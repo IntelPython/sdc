@@ -38,7 +38,7 @@ GLOBAL_VAL = 2
 
 class TestSeries(unittest.TestCase):
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    '122 != 1\n'
                    'NUMA_PES=3 build')
     def test_create1(self):
@@ -49,7 +49,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    '122 != 1\n'
                    'NUMA_PES=3 build')
     def test_create2(self):
@@ -428,7 +428,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(df.A, 0), test_impl(df.A, 0),
             check_names=False)
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    'Attribute "dtype" are different\n'
                    '[left]:  int64\n'
                    '[right]: int32\n')
@@ -501,7 +501,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    'Attribute "dtype" are different\n'
                    '[left]:  int64\n'
                    '[right]: int32\n')
@@ -516,7 +516,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 1)
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    'Attribute "dtype" are different\n'
                    '[left]:  int64\n'
                    '[right]: int32\n')
@@ -611,7 +611,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @unittest.skip('numba.errors.LoweringError - needed fix\n'
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
                    'Failed in hpat mode pipeline '
                    '(step: nopython mode backend)\n'
                    'expecting {{i8*, i8*, i64, i64, double*, [1 x i64], '
@@ -627,7 +627,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
             check_names=False)
 
-    @unittest.skip('numba.errors.LoweringError - needed fix\n'
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
                    'Failed in hpat mode pipeline '
                    '(step: nopython mode backend)\n'
                    'expecting {{i64, i64, i32*, i8*, i8*, i8*}, i8*, '
@@ -716,7 +716,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('numba.errors.TypingError - needed fix\n'
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: convert to distributed)\n'
                    'Invalid use of Function(<built-in function len>)'
@@ -763,7 +763,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    '5 != 2\n'
                    'NUMA_PES=3 build')
     def test_series_count1(self):
@@ -818,7 +818,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['AA', 'BB', 'C', 'AA', 'C', 'AA'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    '61 != 110\n'
                    'NUMA_PES=3 build')
     def test_series_dist_input1(self):
@@ -1016,7 +1016,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, -2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    'Arrays are not almost equal to 7 decimals\n'
                    'ACTUAL: 4.166666666666667\n'
                    'DESIRED: 12.5\n'
@@ -1031,7 +1031,7 @@ class TestSeries(unittest.TestCase):
             np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
                                            err_msg='S1={}\nS2={}'.format(S1, S2))
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    'Arrays are not almost equal to 7 decimals\n'
                    'ACTUAL: 0.9539980920057239\n'
                    'DESIRED: 1.0\n'
@@ -1054,7 +1054,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('numba.errors.LoweringError - needed fix\n'
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: nopython mode backend)\n'
                    'str_overload() takes 1 positional argument '
@@ -1156,7 +1156,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: kde.parquet\n')
     def test_series_nlargest_parallel1(self):
@@ -1196,7 +1196,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: kde.parquet\n')
     def test_series_nsmallest_parallel1(self):
@@ -1208,7 +1208,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-    @unittest.skip('numba.errors.TypingError - needed fix\n'
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: convert to distributed)\n'
                    'Invalid use of Function(<built-in function len>)'
@@ -1223,7 +1223,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('numba.errors.TypingError - needed fix\n'
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: convert to distributed)\n'
                    'Invalid use of Function(<built-in function len>)'
@@ -1282,7 +1282,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: kde.parquet\n')
     def test_series_median_parallel1(self):
@@ -1294,7 +1294,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: kde.parquet\n')
     def test_series_argsort_parallel(self):
@@ -1350,7 +1350,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: kde.parquet\n')
     def test_series_sort_values_parallel1(self):

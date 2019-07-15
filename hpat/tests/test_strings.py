@@ -30,7 +30,7 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('numba.errors.LoweringError - needed fix\n'
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: nopython mode backend)\n'
                    'str_overload() takes 1 positional argument '
@@ -194,7 +194,7 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), True)
 
-    @unittest.skip('OSError - needed fix\n'
+    @unittest.skip('OSError - fix needed\n'
                    'Failed in hpat mode pipeline (step: convert DataFrames)\n'
                    'Passed non-file path: example.parquet\n')
     def test_string_NA_box(self):

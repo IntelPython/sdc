@@ -87,7 +87,7 @@ class TestRolling(unittest.TestCase):
             df = pd.DataFrame({'B': np.arange(n)})
             pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
@@ -108,7 +108,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_fixed_parallel_apply1(self):
         def test_impl(n, w, center):
@@ -225,7 +225,7 @@ class TestRolling(unittest.TestCase):
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_variable_parallel1(self):
         wins = ('2s',)
@@ -250,7 +250,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_variable_apply_parallel1(self):
         wins = ('2s',)
@@ -301,7 +301,7 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(S1, *args), apply_test_impl(S1, *args))
             pd.testing.assert_series_equal(hpat_func(S2, *args), apply_test_impl(S2, *args))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_series_cov1(self):
         # test series rolling functions
@@ -325,7 +325,7 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_df_cov1(self):
         # test series rolling functions

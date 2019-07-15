@@ -12,7 +12,7 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
 
 class TestML(unittest.TestCase):
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_logistic_regression(self):
         def test_impl(n, d):
@@ -32,7 +32,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 3)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
@@ -55,7 +55,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 4)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_linear_regression(self):
         def test_impl(N, D):
@@ -76,7 +76,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 5)
         self.assertEqual(count_parfor_OneDs(), 3)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_kde(self):
         def test_impl(n):

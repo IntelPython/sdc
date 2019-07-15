@@ -268,7 +268,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('AssertionError - needed fix\n'
+    @unittest.skip('AssertionError - fix needed\n'
                    '16 != 20\n')
     def test_agg_parallel_str(self):
         def test_impl():
@@ -305,7 +305,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_muti_hiframes_node_filter_agg(self):
         def test_impl(df, cond):
@@ -343,7 +343,7 @@ class TestGroupBy(unittest.TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_pivot(self):
         def test_impl(df):
@@ -356,7 +356,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_pivot_parallel(self):
         def test_impl():
@@ -380,7 +380,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
-    @unittest.skip('Error - needed fix\n'
+    @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_crosstab_parallel1(self):
         def test_impl():
