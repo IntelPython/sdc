@@ -94,7 +94,7 @@ if use_impi:
 
 if is_win:
     # use Intel MPI on Windows
-    MPI_LIBS = ['impi', 'impicxx']
+    MPI_LIBS = ['impi']
     # hdf5-parallel Windows build uses CMake which needs this flag
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
