@@ -5,6 +5,56 @@ import pyarrow as pa
 import pandas as pd
 
 
+class ParquetGenerator:
+    GEN_KDE_PQ_CALLED = False
+    GEN_PQ_TEST_CALLED = False
+
+    @classmethod
+    def gen_kde_pq(cls, file_name='kde.parquet', N=101):
+        if not cls.GEN_KDE_PQ_CALLED:
+            df = pd.DataFrame({'points': np.random.random(N)})
+            table = pa.Table.from_pandas(df)
+            row_group_size = 128
+            pq.write_table(table, file_name, row_group_size)
+            cls.GEN_KDE_PQ_CALLED = True
+
+    @classmethod
+    def gen_pq_test(cls):
+        if not cls.GEN_PQ_TEST_CALLED:
+            df = pd.DataFrame(
+                {
+                    'one': [-1, np.nan, 2.5, 3., 4., 6., 10.0],
+                    'two': ['foo', 'bar', 'baz', 'foo', 'bar', 'baz', 'foo'],
+                    'three': [True, False, True, True, True, False, False],
+                    # float without NA
+                    'four': [-1, 5.1, 2.5, 3., 4., 6., 11.0],
+                    # str with NA
+                    'five': ['foo', 'bar', 'baz', None, 'bar', 'baz', 'foo'],
+                }
+            )
+            table = pa.Table.from_pandas(df)
+            pq.write_table(table, 'example.parquet')
+            pq.write_table(table, 'example2.parquet', row_group_size=2)
+            cls.GEN_PQ_TEST_CALLED = True
+
+
+class SparkGenerator:
+
+    @staticmethod
+    def generate():
+        from pyspark.sql import SparkSession
+        from pyspark.sql.types import (
+            StructType, StructField, DateType, TimestampType)
+
+        spark = SparkSession.builder.appName("GenSparkData").getOrCreate()
+        schema = StructType([StructField('DT64', DateType(), True),
+                             StructField('DATE', TimestampType(), True)])
+        sdf = spark.createDataFrame(df, schema)
+        sdf.write.parquet('sdf_dt.pq', 'overwrite')
+
+        spark.stop()
+
+
 def gen_lr(file_name, N, D):
     points = np.random.random((N,D))
     responses = np.random.random(N)
@@ -15,22 +65,6 @@ def gen_lr(file_name, N, D):
     dset2[:] = responses
     f.close()
 
-def gen_kde_pq(file_name, N):
-    df = pd.DataFrame({'points': np.random.random(N)})
-    table = pa.Table.from_pandas(df)
-    row_group_size = 128
-    pq.write_table(table, file_name, row_group_size)
-
-def gen_pq_test(file_name):
-    df = pd.DataFrame({'one': [-1, np.nan, 2.5, 3., 4., 6., 10.0],
-                           'two': ['foo', 'bar', 'baz', 'foo', 'bar', 'baz', 'foo'],
-                           'three': [True, False, True, True, True, False, False],
-                           'four': [-1, 5.1, 2.5, 3., 4., 6., 11.0], # float without NA
-                           'five': ['foo', 'bar', 'baz', None, 'bar', 'baz', 'foo'], # str with NA
-                     })
-    table = pa.Table.from_pandas(df)
-    pq.write_table(table, 'example.parquet')
-    pq.write_table(table, 'example2.parquet', row_group_size=2)
 
 N = 101
 D = 10
@@ -42,9 +76,6 @@ g1 = f.create_group("G")
 dset1 = g1.create_dataset("data", (N,), dtype='i8')
 dset1[:] = arr
 f.close()
-
-gen_kde_pq('kde.parquet', N)
-gen_pq_test('example.parquet')
 
 df = pd.DataFrame({'A': ['bc']+["a"]*3+ ["bc"]*3+['a'], 'B': [-8,1,2,3,1,5,6,7]})
 df.to_parquet("groupby3.pq")
@@ -64,15 +95,6 @@ dt1 = pd.DatetimeIndex(['2017-03-03 03:23', '1990-10-23', '1993-07-02 10:33:01']
 df = pd.DataFrame({'DT64': dt1, 'DATE': dt1.copy()})
 df.to_parquet('pandas_dt.pq')
 
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, DateType, TimestampType
-
-spark = SparkSession.builder.appName("GenSparkData").getOrCreate()
-schema = StructType([StructField('DT64', DateType(), True), StructField('DATE', TimestampType(), True)])
-sdf = spark.createDataFrame(df, schema)
-sdf.write.parquet('sdf_dt.pq', 'overwrite')
-
-spark.stop()
 
 # CSV reader test
 data = ("0,2.3,4.6,47736\n"
@@ -104,3 +126,9 @@ df2 = pd.DataFrame({'time': pd.DatetimeIndex(
     '2017-02-25']), 'A': [2,3,7,8,9,10]})
 df1.to_parquet("asof1.pq")
 df2.to_parquet("asof2.pq")
+
+
+if __name__ == "__main__":
+    ParquetGenerator.gen_kde_pq(N=N)
+    ParquetGenerator.gen_pq_test()
+    SparkGenerator.generate()
