@@ -9,6 +9,8 @@ import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
+from .gen_test_data import ParquetGenerator
+
 
 @hpat.jit
 def inner_get_column(df):
@@ -579,10 +581,10 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
     def test_sort_parallel_single_col(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         # TODO: better parallel sort test
         def test_impl():
             df = pd.read_parquet('kde.parquet')
@@ -596,14 +598,15 @@ class TestDataFrame(unittest.TestCase):
         try:
             hpat.hiframes.sort.MIN_SAMPLES = 10
             res = hpat_func()
-            self.assertTrue((np.diff(res)>=0).all())
+            self.assertTrue((np.diff(res) >= 0).all())
         finally:
-            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
+            # restore global val
+            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
     def test_sort_parallel(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         # TODO: better parallel sort test
         def test_impl():
             df = pd.read_parquet('kde.parquet')
@@ -618,9 +621,10 @@ class TestDataFrame(unittest.TestCase):
         try:
             hpat.hiframes.sort.MIN_SAMPLES = 10
             res = hpat_func()
-            self.assertTrue((np.diff(res)>=0).all())
+            self.assertTrue((np.diff(res) >= 0).all())
         finally:
-            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples  # restore global val
+            # restore global val
+            hpat.hiframes.sort.MIN_SAMPLES = save_min_samples
 
     def test_itertuples(self):
         def test_impl(df):

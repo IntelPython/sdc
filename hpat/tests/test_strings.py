@@ -10,6 +10,7 @@ import re
 import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
 from hpat.str_ext import unicode_to_std_str, std_str_to_unicode
+from .gen_test_data import ParquetGenerator
 
 
 class TestString(unittest.TestCase):
@@ -194,14 +195,15 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), True)
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: example.parquet\n')
     def test_string_NA_box(self):
+        # create `example.parquet` file
+        ParquetGenerator.gen_pq_test()
+
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
             return df.five
         hpat_func = hpat.jit(test_impl)
+
         # XXX just checking isna() since Pandas uses None in this case
         # instead of nan for some reason
         np.testing.assert_array_equal(hpat_func().isna(), test_impl().isna())
