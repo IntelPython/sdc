@@ -43,7 +43,7 @@ def _column_fillna_impl(A, B, fill):  # pragma: no cover
             s = fill
         A[i] = s
 
-def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
+def _series_fillna_str_alloc_impl(B, fill, name):  # pragma: no cover
     n = len(B)
     num_chars = 0
     # get total chars in new array
@@ -55,7 +55,7 @@ def _series_fillna_str_alloc_impl(B, fill):  # pragma: no cover
             num_chars += len(s)
     A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
     hpat.hiframes.api.fillna(A, B, fill)
-    return hpat.hiframes.api.init_series(A)
+    return hpat.hiframes.api.init_series(A, None, name)
 
 def _series_dropna_float_impl(S, name):  # pragma: no cover
     old_len = len(S)
@@ -304,11 +304,11 @@ def _column_describe_impl(S):  # pragma: no cover
         "max      " + str(a_max) + "\n"
     return res
 
-def _column_fillna_alloc_impl(S, val):  # pragma: no cover
+def _column_fillna_alloc_impl(S, val, name):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
     hpat.hiframes.api.fillna(B, S, val)
-    return hpat.hiframes.api.init_series(B)
+    return hpat.hiframes.api.init_series(B, None, name)
 
 
 def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
