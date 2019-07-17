@@ -38,27 +38,24 @@ class ParquetGenerator:
             cls.GEN_PQ_TEST_CALLED = True
 
 
-class SparkGenerator:
+def generate_spark_data():
+    from pyspark.sql import SparkSession
+    from pyspark.sql.types import (
+        StructType, StructField, DateType, TimestampType)
 
-    @staticmethod
-    def generate():
-        from pyspark.sql import SparkSession
-        from pyspark.sql.types import (
-            StructType, StructField, DateType, TimestampType)
+    # test datetime64, spark dates
+    dt1 = pd.DatetimeIndex(['2017-03-03 03:23',
+                            '1990-10-23', '1993-07-02 10:33:01'])
+    df = pd.DataFrame({'DT64': dt1, 'DATE': dt1.copy()})
+    df.to_parquet('pandas_dt.pq')
 
-        # test datetime64, spark dates
-        dt1 = pd.DatetimeIndex(['2017-03-03 03:23',
-                                '1990-10-23', '1993-07-02 10:33:01'])
-        df = pd.DataFrame({'DT64': dt1, 'DATE': dt1.copy()})
-        df.to_parquet('pandas_dt.pq')
+    spark = SparkSession.builder.appName("GenSparkData").getOrCreate()
+    schema = StructType([StructField('DT64', DateType(), True),
+                         StructField('DATE', TimestampType(), True)])
+    sdf = spark.createDataFrame(df, schema)
+    sdf.write.parquet('sdf_dt.pq', 'overwrite')
 
-        spark = SparkSession.builder.appName("GenSparkData").getOrCreate()
-        schema = StructType([StructField('DT64', DateType(), True),
-                             StructField('DATE', TimestampType(), True)])
-        sdf = spark.createDataFrame(df, schema)
-        sdf.write.parquet('sdf_dt.pq', 'overwrite')
-
-        spark.stop()
+    spark.stop()
 
 
 def gen_lr(file_name, N, D):
@@ -132,5 +129,5 @@ if __name__ == "__main__":
     print('generation phase')
     ParquetGenerator.gen_kde_pq()
     ParquetGenerator.gen_pq_test()
-    SparkGenerator.generate()
+    generate_spark_data()
     generate_other_data()
