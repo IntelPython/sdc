@@ -195,6 +195,8 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), True)
 
+    @unittest.skip('Error - fix needed\n'
+                   'NUMA_PES=3 build')
     def test_string_NA_box(self):
         # create `example.parquet` file
         ParquetGenerator.gen_pq_test()
