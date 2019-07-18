@@ -80,11 +80,8 @@ PyMODINIT_FUNC PyInit_hdist(void) {
                             PyLong_FromVoidPtr((void*)(&oneD_reshape_shuffle)));
     PyObject_SetAttrString(m, "permutation_int",
                             PyLong_FromVoidPtr((void*)(&permutation_int)));
-    PyObject_SetAttrString(
-        m, "permutation_array_index",
-        PyLong_FromVoidPtr((void*)(&permutation_array_index)));
-    PyObject_SetAttrString(m, "fix_i_malloc",
-                            PyLong_FromVoidPtr((void*)(&fix_i_malloc)));
+    PyObject_SetAttrString(m, "permutation_array_index",
+                            PyLong_FromVoidPtr((void*)(&permutation_array_index)));
 
     // add actual int value to module
     PyObject_SetAttrString(m, "mpi_req_num_bytes",

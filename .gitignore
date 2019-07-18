@@ -4,6 +4,10 @@
 # Setuptools distribution folder.
 /dist
 
+# cache
+hpat/__pycache__
+hpat/hiframes/__pycache__
+
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
 /*.egg
@@ -12,6 +16,7 @@
 *.so
 
 build/
+docs/_build/
 docs/gh-pages/
 *.DS_Store
 

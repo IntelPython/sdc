@@ -11,7 +11,8 @@ RUN wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 RUN chmod +x miniconda.sh
 RUN ./miniconda.sh -b
 ENV PATH="/root/miniconda3/bin/:${PATH}"
-RUN conda create -n HPAT -c ehsantn -c numba -c anaconda -c conda-forge hpat
+#RUN conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
+RUN conda create -n HPAT -c ehsantn -c anaconda -c conda-forge hpat
 
 RUN echo "export PATH=/root/miniconda3/bin/:${PATH}" >> /root/.bashrc
 RUN echo "source activate HPAT" >> /root/.bashrc

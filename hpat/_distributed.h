@@ -81,7 +81,6 @@ static void permutation_int(int64_t* output, int n) __UNUSED__;
 static void permutation_array_index(unsigned char *lhs, int64_t len, int64_t elem_size,
                                     unsigned char *rhs, int64_t *p, int64_t p_len) __UNUSED__;
 static int hpat_finalize() __UNUSED__;
-static void fix_i_malloc() __UNUSED__;
 static int hpat_dummy_ptr[64] __UNUSED__;
 
 /* *********************************************************************
@@ -193,7 +192,12 @@ static void hpat_dist_reduce(char *in_ptr, char *out_ptr, int op_enum, int type_
 
         // format: value + int (input format is int64+value)
         char *in_val_rank = (char*) malloc(value_size+sizeof(int));
+        if (in_val_rank == NULL) return;
         char *out_val_rank = (char*) malloc(value_size+sizeof(int));
+        if (out_val_rank == NULL) {
+            free(in_val_rank);
+            return;
+        }
 
         char *in_val_ptr = in_ptr + sizeof(int64_t);
         memcpy(in_val_rank, in_val_ptr, value_size);
@@ -367,6 +371,11 @@ static MPI_Datatype get_MPI_typ(int typ_enum)
             return MPI_FLOAT;
         case HPAT_CTypes::FLOAT64:
             return MPI_DOUBLE;
+        case HPAT_CTypes::INT16:
+            // TODO: use MPI_INT16_T?
+            return MPI_SHORT;
+        case HPAT_CTypes::UINT16:
+            return MPI_UNSIGNED_SHORT;
         default:
             std::cerr << "Invalid MPI_Type" << "\n";
     }
@@ -815,20 +824,5 @@ static void oneD_reshape_shuffle(char* output,
     delete[] send_disp;
     delete[] recv_disp;
 }
-
-// fix for tensorflows MKL support that overwrites Intel mallocs,
-// which causes Intel MPI to crash.
-#ifdef I_MPI_VERSION
-#include "i_malloc.h"
-static void fix_i_malloc()
-{
-    i_malloc = malloc;
-    i_calloc = calloc;
-    i_realloc = realloc;
-    i_free = free;
-}
-#else
-static void fix_i_malloc() {}
-#endif
 
 #endif // _DISTRIBUTED_H_INCLUDED

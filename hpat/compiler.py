@@ -1,9 +1,11 @@
-from __future__ import print_function, division, absolute_import
-
 # from .pio import PIO
-from .distributed import DistributedPass
-from .hiframes import HiFrames
-from .hiframes_typed import HiFramesTyped
+import hpat
+import hpat.hiframes
+import hpat.hiframes.hiframes_untyped
+import hpat.hiframes.hiframes_typed
+from hpat.hiframes.hiframes_untyped import HiFrames
+from hpat.hiframes.hiframes_typed import HiFramesTyped
+from hpat.hiframes.dataframe_pass import DataFramePass
 import numba
 import numba.compiler
 from numba import ir_utils, ir, postproc
@@ -11,8 +13,13 @@ from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
 from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
 from hpat import config
+import hpat.io
 if config._has_h5py:
-    from hpat import pio
+    from hpat.io import pio
+
+# workaround for Numba #3876 issue with large labels in mortgage benchmark
+from llvmlite import binding
+binding.set_option("tmp", "-non-global-value-max-name-size=2048")
 
 # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
 # def stage_io_pass(pipeline):
@@ -107,7 +114,7 @@ if config._has_h5py:
 #     pipeline_manager.pipeline_stages['nopython'] = new_pp
 
 
-def inline_calls(func_ir):
+def inline_calls(func_ir, _locals):
     work_list = list(func_ir.blocks.items())
     while work_list:
         label, block = work_list.pop()
@@ -117,16 +124,31 @@ def inline_calls(func_ir):
                 expr = instr.value
                 if isinstance(expr, ir.Expr) and expr.op == 'call':
                     func_def = guard(get_definition, func_ir, expr.func)
-                    if isinstance(func_def, ir.Global) and isinstance(func_def.value, CPUDispatcher):
+                    if (isinstance(func_def, (ir.Global, ir.FreeVar))
+                            and isinstance(func_def.value, CPUDispatcher)):
                         py_func = func_def.value.py_func
-                        new_blocks = inline_closure_call(func_ir,
-                                                         func_ir.func_id.func.__globals__,
-                                                         block, i, py_func, work_list=work_list)
+                        inline_out = inline_closure_call(
+                            func_ir, py_func.__globals__, block, i, py_func,
+                            work_list=work_list)
+
+                        # TODO remove if when inline_closure_call() output fix
+                        # is merged in Numba
+                        if isinstance(inline_out, tuple):
+                            var_dict = inline_out[1]
+                            # TODO: update '##distributed' and '##threaded' in _locals
+                            _locals.update((var_dict[k].name, v)
+                                        for k,v in func_def.value.locals.items()
+                                        if k in var_dict)
                         # for block in new_blocks:
                         #     work_list.append(block)
                         # current block is modified, skip the rest
                         # (included in new blocks)
                         break
+
+    # sometimes type inference fails after inlining since blocks are inserted
+    # at the end and there are agg constraints (categorical_split case)
+    # CFG simplification fixes this case
+    func_ir.blocks = ir_utils.simplify_CFG(func_ir.blocks)
 
 
 class HPATPipeline(numba.compiler.BasePipeline):
@@ -152,6 +174,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # hiframes typed pass should be before pre_parfor since variable types
         # need updating, and A.call to np.call transformation is invalid for
         # Series (e.g. S.var is not the same as np.var(S))
+        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
         pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:
@@ -170,7 +193,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         """
         # Ensure we have an IR and type information.
         assert self.func_ir
-        inline_calls(self.func_ir)
+        inline_calls(self.func_ir, self.locals)
 
 
     def stage_df_pass(self):
@@ -180,7 +203,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         # Ensure we have an IR and type information.
         assert self.func_ir
         df_pass = HiFrames(self.func_ir, self.typingctx,
-                           self.args, self.locals)
+                           self.args, self.locals, self.metadata)
         df_pass.run()
 
 
@@ -198,7 +221,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
     def stage_repeat_inline_closure(self):
         assert self.func_ir
         inline_pass = InlineClosureCallPass(
-            self.func_ir, self.flags.auto_parallel)
+            self.func_ir, self.flags.auto_parallel, typed=True)
         inline_pass.run()
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
@@ -210,8 +233,11 @@ class HPATPipeline(numba.compiler.BasePipeline):
         """
         # Ensure we have an IR and type information.
         assert self.func_ir
-        dist_pass = DistributedPass(self.func_ir, self.typingctx, self.targetctx,
-                                    self.type_annotation.typemap, self.type_annotation.calltypes)
+        from hpat.distributed import DistributedPass
+        dist_pass = DistributedPass(
+            self.func_ir, self.typingctx, self.targetctx,
+            self.type_annotation.typemap, self.type_annotation.calltypes,
+            self.metadata)
         dist_pass.run()
 
 
@@ -223,13 +249,19 @@ class HPATPipeline(numba.compiler.BasePipeline):
         assert self.func_ir
         df_pass = HiFramesTyped(self.func_ir, self.typingctx,
                                 self.type_annotation.typemap,
-                                self.type_annotation.calltypes,
-                                self.return_type)
-        ret_typ = df_pass.run()
-        # XXX update return type since it can be replaced with UnBoxSeries
-        # to handle boxing
-        if ret_typ is not None:
-            self.return_type = ret_typ
+                                self.type_annotation.calltypes)
+        df_pass.run()
+
+    def stage_dataframe_pass(self):
+        """
+        Convert DataFrames after typing
+        """
+        # Ensure we have an IR and type information.
+        assert self.func_ir
+        df_pass = DataFramePass(self.func_ir, self.typingctx,
+                                self.type_annotation.typemap,
+                                self.type_annotation.calltypes)
+        df_pass.run()
 
 class HPATPipelineSeq(HPATPipeline):
     """HPAT pipeline without the distributed pass (used in rolling kernels)
@@ -244,6 +276,8 @@ class HPATPipelineSeq(HPATPipeline):
         pm.add_stage(self.stage_df_pass, "convert DataFrames")
         pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
         self.add_typing_stage(pm)
+        # TODO: dataframe pass needed?
+        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
         pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
         pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
         if not self.flags.no_rewrites:

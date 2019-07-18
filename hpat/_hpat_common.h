@@ -28,6 +28,8 @@ struct HPAT_CTypes {
         UINT64 = 7,
         FLOAT32 = 5,
         FLOAT64 = 6,
+        INT16 = 8,
+        UINT16 = 9,
     };
 };
 

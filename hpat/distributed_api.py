@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 import numba
 from numba import types
@@ -6,13 +7,13 @@ from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
 import hpat
 from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
-                              pre_alloc_string_array, del_str, get_offset_ptr,
+                              pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map,
     unliteral_all)
 import time
 from llvmlite import ir as lir
-import hdist
+from . import hdist
 import llvmlite.binding as ll
 ll.add_symbol('c_alltoall', hdist.c_alltoall)
 ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
@@ -24,7 +25,7 @@ ll.add_symbol('c_send', hdist.hpat_dist_send)
 from enum import Enum
 
 # get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
-import hdist
+from . import hdist
 mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.mpi_req_num_bytes))
 
 MPI_ROOT = 0
@@ -43,9 +44,13 @@ def get_type_enum(arr):
     return np.int32(-1)
 
 @overload(get_type_enum)
-def get_type_enum_overload(arr_typ):
-    typ_val = _numba_to_c_type_map[arr_typ.dtype]
-    return lambda a: np.int32(typ_val)
+def get_type_enum_overload(arr):
+    dtype = arr.dtype
+    if isinstance(dtype, hpat.hiframes.pd_categorical_ext.PDCategoricalDtype):
+        dtype = hpat.hiframes.pd_categorical_ext.get_categories_int_type(dtype)
+
+    typ_val = _numba_to_c_type_map[dtype]
+    return lambda arr: np.int32(typ_val)
 
 INT_MAX = np.iinfo(np.int32).max
 
@@ -86,10 +91,10 @@ c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voi
 
 # TODO: test
 @overload(gather_scalar)
-def gather_scalar_overload(data_t):
-    assert isinstance(data_t, (types.Integer, types.Float))
+def gather_scalar_overload(val):
+    assert isinstance(val, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _numba_to_c_type_map[data_t]
+    typ_val = _numba_to_c_type_map[val]
     func_text = (
     "def gather_scalar_impl(val):\n"
     "  n_pes = hpat.distributed_api.get_size()\n"
@@ -98,7 +103,7 @@ def gather_scalar_overload(data_t):
     "  res_size = n_pes if rank == {} else 0\n"
     "  res = np.empty(res_size, np.{})\n"
     "  c_gather_scalar(send.ctypes, res.ctypes, np.int32({}))\n"
-    "  return res\n").format(data_t, MPI_ROOT, data_t, typ_val)
+    "  return res\n").format(val, MPI_ROOT, val, typ_val)
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np, 'c_gather_scalar': c_gather_scalar}, loc_vars)
@@ -114,10 +119,10 @@ c_gatherv = types.ExternalFunction("c_gatherv",
     types.void(types.voidptr, types.int32, types.voidptr, types.voidptr, types.voidptr, types.int32))
 
 @overload(gatherv)
-def gatherv_overload(data_t):
-    if isinstance(data_t, types.Array):
+def gatherv_overload(data):
+    if isinstance(data, types.Array):
         # TODO: other types like boolean
-        typ_val = _numba_to_c_type_map[data_t.dtype]
+        typ_val = _numba_to_c_type_map[data.dtype]
 
         def gatherv_impl(data):
             rank = hpat.distributed_api.get_rank()
@@ -128,14 +133,14 @@ def gatherv_overload(data_t):
             # displacements
             displs = np.empty(1, np.int32)
             if rank == MPI_ROOT:
-                displs = hpat.hiframes_join.calc_disp(recv_counts)
+                displs = hpat.hiframes.join.calc_disp(recv_counts)
             #  print(rank, n_loc, n_total, recv_counts, displs)
             c_gatherv(data.ctypes, np.int32(n_loc), all_data.ctypes, recv_counts.ctypes, displs.ctypes, np.int32(typ_val))
             return all_data
 
         return gatherv_impl
 
-    if data_t == string_array_type:
+    if data == string_array_type:
         int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
         char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
@@ -151,7 +156,6 @@ def gatherv_overload(data_t):
             for i in range(n_loc):
                 _str = data[i]
                 send_arr_lens[i] = len(_str)
-                del_str(_str)
 
             recv_counts = gather_scalar(np.int32(n_loc))
             recv_counts_char = gather_scalar(np.int32(n_all_chars))
@@ -166,8 +170,8 @@ def gatherv_overload(data_t):
 
             if rank == MPI_ROOT:
                 all_data = pre_alloc_string_array(n_total, n_total_char)
-                displs = hpat.hiframes_join.calc_disp(recv_counts)
-                displs_char = hpat.hiframes_join.calc_disp(recv_counts_char)
+                displs = hpat.hiframes.join.calc_disp(recv_counts)
+                displs_char = hpat.hiframes.join.calc_disp(recv_counts_char)
 
             #  print(rank, n_loc, n_total, recv_counts, displs)
             offset_ptr = get_offset_ptr(all_data)
@@ -188,8 +192,8 @@ def bcast(data):  # pragma: no cover
     return
 
 @overload(bcast)
-def bcast_overload(data_t):
-    if isinstance(data_t, types.Array):
+def bcast_overload(data):
+    if isinstance(data, types.Array):
         def bcast_impl(data):
             typ_enum = get_type_enum(data)
             count = len(data)
@@ -198,7 +202,7 @@ def bcast_overload(data_t):
             return
         return bcast_impl
 
-    if data_t == string_array_type:
+    if data == string_array_type:
         int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
         char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
 
@@ -217,7 +221,6 @@ def bcast_overload(data_t):
                 for i in range(n_loc):
                     _str = data[i]
                     send_arr_lens[i] = len(_str)
-                    del_str(_str)
 
                 c_bcast(send_arr_lens.ctypes, np.int32(n_loc), int32_typ_enum)
             else:
@@ -238,16 +241,16 @@ def bcast_scalar(val):  # pragma: no cover
 
 # TODO: test
 @overload(bcast_scalar)
-def bcast_scalar_overload(data_t):
-    assert isinstance(data_t, (types.Integer, types.Float))
+def bcast_scalar_overload(val):
+    assert isinstance(val, (types.Integer, types.Float))
     # TODO: other types like boolean
-    typ_val = _numba_to_c_type_map[data_t]
+    typ_val = _numba_to_c_type_map[val]
     # TODO: fix np.full and refactor
     func_text = (
     "def bcast_scalar_impl(val):\n"
     "  send = np.full(1, val, np.{})\n"
     "  c_bcast(send.ctypes, np.int32(1), np.int32({}))\n"
-    "  return send[0]\n").format(data_t, typ_val)
+    "  return send[0]\n").format(val, typ_val)
 
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'np': np, 'c_bcast': c_bcast}, loc_vars)
@@ -259,8 +262,8 @@ def prealloc_str_for_bcast(arr):
     return arr
 
 @overload(prealloc_str_for_bcast)
-def prealloc_str_for_bcast_overload(arr_t):
-    if arr_t == string_array_type:
+def prealloc_str_for_bcast_overload(arr):
+    if arr == string_array_type:
         def prealloc_impl(arr):
             rank = hpat.distributed_api.get_rank()
             n_loc = bcast_scalar(len(arr))
@@ -271,7 +274,69 @@ def prealloc_str_for_bcast_overload(arr_t):
 
         return prealloc_impl
 
-    return lambda a: a
+    return lambda arr: arr
+
+
+# assuming start and step are None
+def const_slice_getitem(arr, slice_index, start, count):
+    return arr[slice_index]
+
+
+@overload(const_slice_getitem)
+def const_slice_getitem_overload(arr, slice_index, start, count):
+    if arr == string_array_type:
+        reduce_op = Reduce_Type.Sum.value
+        def getitem_str_impl(arr, slice_index, start, count):
+            rank = hpat.distributed_api.get_rank()
+            k = slice_index.stop
+            # get total characters for allocation
+            n_chars = np.uint64(0)
+            if k > count:
+                my_end = min(count, max(k-start, 0))
+                my_arr = arr[:my_end]
+                my_arr = hpat.distributed_api.gatherv(my_arr)
+                n_chars = hpat.distributed_api.dist_reduce(
+                    num_total_chars(my_arr), np.int32(reduce_op))
+                if rank == 0:
+                    out_arr = my_arr
+            else:
+                if rank == 0:
+                    my_arr = arr[:k]
+                    n_chars = num_total_chars(my_arr)
+                    out_arr = my_arr
+                n_chars = bcast_scalar(n_chars)
+            if rank != 0:
+                out_arr = pre_alloc_string_array(k, n_chars)
+
+            # actual communication
+            hpat.distributed_api.bcast(out_arr)
+            return out_arr
+
+        return getitem_str_impl
+
+    def getitem_impl(arr, slice_index, start, count):
+        rank = hpat.distributed_api.get_rank()
+        k = slice_index.stop
+        out_arr = np.empty(k, arr.dtype)
+        if k > count:
+            my_end = min(count, max(k-start, 0))
+            my_arr = arr[:my_end]
+            my_arr = hpat.distributed_api.gatherv(my_arr)
+            if rank == 0:
+                print(my_arr)
+                out_arr = my_arr
+        else:
+            if rank == 0:
+                out_arr = arr[:k]
+        hpat.distributed_api.bcast(out_arr)
+        return out_arr
+
+    return getitem_impl
+
+
+@numba.njit
+def local_len(A):
+    return len(A)
 
 # send_data, recv_data, send_counts, recv_counts, send_disp, recv_disp, typ_enum
 c_alltoallv = types.ExternalFunction("c_alltoallv", types.void(types.voidptr,
@@ -293,10 +358,10 @@ def alltoallv_tup(send_data, out_data, send_counts, recv_counts, send_disp, recv
     return
 
 @overload(alltoallv_tup)
-def alltoallv_tup_overload(send_data_typ, out_data_typ, send_counts_typ, recv_counts_typ, send_disp_typ, recv_disp_typ):
+def alltoallv_tup_overload(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):
 
-    count = send_data_typ.count
-    assert out_data_typ.count == count
+    count = send_data.count
+    assert out_data.count == count
 
     func_text = "def f(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):\n"
     for i in range(count):
@@ -374,12 +439,6 @@ def dist_time():  # pragma: no cover
 def dist_return(A):  # pragma: no cover
     return A
 
-def dist_input(A):  # pragma: no cover
-    return A
-
-def threaded_input(A):  # pragma: no cover
-    return A
-
 def threaded_return(A):  # pragma: no cover
     return A
 
@@ -391,12 +450,23 @@ def rebalance_array_parallel(A):
 
 
 @overload(rebalance_array)
-@overload(dist_return)
-@overload(dist_input)
-@overload(threaded_input)
-@overload(threaded_return)
-def dist_return_overload(column):
+def dist_return_overload(A):
     return dist_return
+
+# TODO: move other funcs to old API?
+@infer_global(threaded_return)
+@infer_global(dist_return)
+class ThreadedRetTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1  # array
+        return signature(args[0], *args)
+
+
+@numba.njit
+def parallel_print(s):
+    print(s)
+
 
 def irecv():  # pragma: no cover
     return 0
@@ -583,10 +653,8 @@ class DistCommReqDeAlloc(AbstractTemplate):
         assert len(args) == 1 and args[0] == req_array_type
         return signature(types.none, *unliteral_all(args))
 
-@infer
+@infer_global(operator.setitem)
 class SetItemReqArray(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         [ary, idx, val] = args

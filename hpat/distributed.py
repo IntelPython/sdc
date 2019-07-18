@@ -4,12 +4,13 @@ import operator
 import types as pytypes  # avoid confusion with numba.types
 import copy
 import warnings
+from collections import defaultdict
 import numba
 from numba import (ir, types, typing, config, numpy_support,
                    ir_utils, postproc)
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc,
-                            get_global_func_typ, find_op_typ, get_name_var_table,
+                            get_global_func_typ, get_name_var_table,
                             get_call_table, get_tuple_table, remove_dels,
                             compile_to_numba_ir, replace_arg_nodes,
                             guard, get_definition, require, GuardException,
@@ -23,19 +24,22 @@ from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
 import hpat
-from hpat.pio_api import h5file_type, h5group_type
+from hpat.io.pio_api import h5file_type, h5group_type
 from hpat import (distributed_api,
                   distributed_lower)  # import lower for module initialization
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 from hpat.distributed_analysis import (Distribution,
                                        DistributedAnalysis)
+
 # from mpi4py import MPI
 import hpat.utils
 from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
                         get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints, ReplaceFunc, gen_getitem)
+                        debug_prints, ReplaceFunc, gen_getitem, is_call,
+                        is_const_slice)
 from hpat.distributed_api import Reduce_Type
+from hpat.hiframes.pd_dataframe_ext import DataFrameType
 
 distributed_run_extensions = {}
 
@@ -47,12 +51,14 @@ fir_text = None
 class DistributedPass(object):
     """analyze program and transfrom to distributed"""
 
-    def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes):
+    def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes,
+                 metadata):
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.targetctx = targetctx
         self.typemap = typemap
         self.calltypes = calltypes
+        self.metadata = metadata
 
         self._dist_analysis = None
         self._T_arrs = None  # set of transposed arrays (taken from analysis)
@@ -78,8 +84,9 @@ class DistributedPass(object):
         remove_dels(self.func_ir.blocks)
         dprint_func_ir(self.func_ir, "starting distributed pass")
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        dist_analysis_pass = DistributedAnalysis(self.func_ir, self.typemap,
-                                                 self.calltypes, self.typingctx)
+        dist_analysis_pass = DistributedAnalysis(
+            self.func_ir, self.typemap, self.calltypes, self.typingctx,
+            self.metadata)
         self._dist_analysis = dist_analysis_pass.run()
         # dprint_func_ir(self.func_ir, "after analysis distributed")
 
@@ -100,7 +107,8 @@ class DistributedPass(object):
             # parfor params need to be updated for multithread_mode since some
             # new variables like alloc_start are introduced by distributed pass
             # and are used in later parfors
-            parfor_ids = get_parfor_params(self.func_ir.blocks, True)
+            parfor_ids = get_parfor_params(
+                self.func_ir.blocks, True, defaultdict(list))
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
 
@@ -145,6 +153,8 @@ class DistributedPass(object):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
+                    elif isinstance(rhs, ir.Arg):
+                        out_nodes = self._run_arg(inst)
                 elif isinstance(inst, (ir.StaticSetItem, ir.SetItem)):
                     if isinstance(inst, ir.SetItem):
                         index = inst.index
@@ -164,7 +174,9 @@ class DistributedPass(object):
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
                     # inline_closure_call expects a call assignment
-                    dummy_call = ir.Expr.call(None, rp_func.args, (), inst.loc)
+                    dummy_call = ir.Expr.call(
+                        ir.Var(block.scope, "dummy", inst.loc),
+                        rp_func.args, (), inst.loc)
                     if isinstance(inst, ir.Assign):
                         # replace inst.value to a call with target args
                         # as expected by inline_closure_call
@@ -177,6 +189,8 @@ class DistributedPass(object):
                             block.scope, mk_unique_var("r_dummy"), loc)
                         block.body[i] = ir.Assign(dummy_call, dummy_var, loc)
                     block.body = new_body + block.body[i:]
+                    # TODO: use Parfor loop blocks when replacing funcs in
+                    # parfor loop body
                     inline_closure_call(self.func_ir, rp_func.glbls,
                         block, len(new_body), rp_func.func, self.typingctx,
                         rp_func.arg_types,
@@ -217,6 +231,12 @@ class DistributedPass(object):
             if arr not in self._T_arrs and rhs.index == 0:
                 # return parallel size
                 if self._is_1D_arr(arr):
+                    # XXX hack for array container case, TODO: handle properly
+                    if arr not in self._array_sizes:
+                        arr_var = namevar_table[arr]
+                        nodes = self._gen_1D_Var_len(arr_var)
+                        nodes[-1].target = inst.target
+                        return nodes
                     inst.value = self._array_sizes[arr][rhs.index]
                 else:
                     assert self._is_1D_Var_arr(arr)
@@ -357,6 +377,8 @@ class DistributedPass(object):
         # divide 1D alloc
         # XXX allocs should be matched before going to _run_call_np
         if self._is_1D_arr(lhs) and is_alloc_callname(func_name, func_mod):
+            # XXX for pre_alloc_string_array(n, nc), we assume nc is local
+            # value (updated only in parfor like _str_replace_regex_impl)
             size_var = rhs.args[0]
             out, new_size_var = self._run_alloc(size_var, lhs, scope, loc)
             # empty_inferred is tuple for some reason
@@ -384,6 +406,10 @@ class DistributedPass(object):
         if isinstance(func_mod, ir.Var) and is_np_array(self.typemap, func_mod.name):
             return self._run_call_array(lhs, func_mod, func_name, assign, rhs.args)
 
+        # df.func calls
+        if isinstance(func_mod, ir.Var) and isinstance(self.typemap[func_mod.name], DataFrameType):
+            return self._run_call_df(lhs, func_mod, func_name, assign, rhs.args)
+
         # string_array.func_calls
         if (self._is_1D_arr(lhs) and isinstance(func_mod, ir.Var)
                 and self.typemap[func_mod.name] == string_array_type):
@@ -409,9 +435,10 @@ class DistributedPass(object):
             out[-1].target = assign.target
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
-        if (hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if (hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name in ('h5read', 'h5write', 'h5read_filter'))
                 and self._is_1D_arr(rhs.args[5].name)):
+            # TODO: make create_dataset/create_group collective
             arr = rhs.args[5].name
             ndims = len(self._array_starts[arr])
             starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
@@ -434,7 +461,7 @@ class DistributedPass(object):
             file_varname = rhs.args[0].name
             self._file_open_set_parallel(file_varname)
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name == 'get_filter_read_indices'):
             #
             out += self._gen_1D_Var_len(assign.target)
@@ -448,7 +475,7 @@ class DistributedPass(object):
             out += g_out
 
         if (hpat.config._has_pyarrow
-                and fdef == ('read_parquet', 'hpat.parquet_pio')
+                and fdef == ('read_parquet', 'hpat.io.parquet_pio')
                 and self._is_1D_arr(rhs.args[2].name)):
             arr = rhs.args[2].name
             assert len(self._array_starts[arr]) == 1, "only 1D arrs in parquet"
@@ -457,13 +484,13 @@ class DistributedPass(object):
             rhs.args += [start_var, count_var]
 
             def f(fname, cindex, arr, out_dtype, start, count):  # pragma: no cover
-                return hpat.parquet_pio.read_parquet_parallel(fname, cindex,
+                return hpat.io.parquet_pio.read_parquet_parallel(fname, cindex,
                                                               arr, out_dtype, start, count)
 
             return self._replace_func(f, rhs.args)
 
         if (hpat.config._has_pyarrow
-                and fdef == ('read_parquet_str', 'hpat.parquet_pio')
+                and fdef == ('read_parquet_str', 'hpat.io.parquet_pio')
                 and self._is_1D_arr(lhs)):
             arr = lhs
             size_var = rhs.args[2]
@@ -477,7 +504,7 @@ class DistributedPass(object):
             rhs.args.append(count_var)
 
             def f(fname, cindex, start, count):  # pragma: no cover
-                return hpat.parquet_pio.read_parquet_str_parallel(fname, cindex,
+                return hpat.io.parquet_pio.read_parquet_str_parallel(fname, cindex,
                                                                   start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
@@ -498,7 +525,7 @@ class DistributedPass(object):
             rhs.args += [start_var, count_var]
 
             def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
-                return hpat.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
+                return hpat.io.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
 
             return self._replace_func(f, rhs.args)
 
@@ -517,11 +544,11 @@ class DistributedPass(object):
             rhs.args.append(count_var)
 
             def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
-                return hpat.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
+                return hpat.io.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
 
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (hpat.xenon_ext.xe_connect_type, hpat.xenon_ext.xe_dset_type, types.intp,
+                                          (hpat.io.xenon_ext.xe_connect_type, hpat.io.xenon_ext.xe_dset_type, types.intp,
                                            self.typemap[rhs.args[3].name], types.intp, types.intp),
                                           self.typemap, self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
@@ -543,16 +570,72 @@ class DistributedPass(object):
 
             return self._replace_func(f, rhs.args)
 
-        if (func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+        if (func_mod == 'hpat.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
-                'to_date_series_type')
+                'to_date_series_type', 'init_series')
+                and self._is_1D_arr(rhs.args[0].name)):
+            # TODO: handle index
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
+        if (fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext')
                 and self._is_1D_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
             self._array_starts[lhs] = self._array_starts[in_arr]
             self._array_counts[lhs] = self._array_counts[in_arr]
             self._array_sizes[lhs] = self._array_sizes[in_arr]
 
-        if fdef == ('isna', 'hpat.hiframes_api') and self._is_1D_arr(rhs.args[0].name):
+        if (fdef == ('compute_split_view', 'hpat.hiframes.split_impl')
+                and self._is_1D_arr(rhs.args[0].name)):
+            in_arr = rhs.args[0].name
+            self._array_starts[lhs] = self._array_starts[in_arr]
+            self._array_counts[lhs] = self._array_counts[in_arr]
+            self._array_sizes[lhs] = self._array_sizes[in_arr]
+
+        if (fdef == ('get_split_view_index', 'hpat.hiframes.split_impl')
+                and self._is_1D_arr(rhs.args[0].name)):
+            arr = rhs.args[0]
+            index_var = rhs.args[1]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out = sub_nodes
+            rhs.args[1] = sub_nodes[-1].target
+            out.append(assign)
+            return out
+
+        if (fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext')
+                and self._is_1D_arr(rhs.args[0].name)):
+            arr = rhs.args[0]
+            index_var = rhs.args[1]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out = sub_nodes
+            rhs.args[1] = sub_nodes[-1].target
+            out.append(assign)
+            return out
+
+        if (fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext')
+                and self._is_1D_arr(rhs.args[0].name)):
+            # TODO: test parallel
+            arr = rhs.args[0]
+            index_var = rhs.args[1]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out = sub_nodes
+            rhs.args[1] = sub_nodes[-1].target
+            # input string array
+            arr = rhs.args[2]
+            index_var = rhs.args[3]
+            sub_nodes = self._get_ind_sub(
+                index_var, self._array_starts[arr.name][0])
+            out += sub_nodes
+            rhs.args[3] = sub_nodes[-1].target
+            out.append(assign)
+            return out
+
+        if fdef == ('isna', 'hpat.hiframes.api') and self._is_1D_arr(rhs.args[0].name):
             # fix index in call to isna
             arr = rhs.args[0]
             ind = rhs.args[1]
@@ -560,7 +643,7 @@ class DistributedPass(object):
             rhs.args[1] = out[-1].target
             out.append(assign)
 
-        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling') and (
+        if fdef == ('rolling_fixed', 'hpat.hiframes.rolling') and (
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
@@ -574,7 +657,7 @@ class DistributedPass(object):
             rhs.args[3] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if fdef == ('rolling_variable', 'hpat.hiframes_rolling') and (
+        if fdef == ('rolling_variable', 'hpat.hiframes.rolling') and (
                     self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
@@ -588,7 +671,7 @@ class DistributedPass(object):
             rhs.args[4] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if (func_mod == 'hpat.hiframes_rolling'
+        if (func_mod == 'hpat.hiframes.rolling'
                     and func_name in ('shift', 'pct_change')
                     and (self._is_1D_arr(rhs.args[0].name)
                     or self._is_1D_Var_arr(rhs.args[0].name))):
@@ -603,7 +686,7 @@ class DistributedPass(object):
             rhs.args[2] = true_var
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
-        if fdef == ('quantile', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('quantile', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
             if arr in self._array_sizes:
@@ -614,53 +697,57 @@ class DistributedPass(object):
                 size_var = self._set0_var
             rhs.args += [size_var]
 
-            f = lambda arr, q, size: hpat.hiframes_api.quantile_parallel(
+            f = lambda arr, q, size: hpat.hiframes.api.quantile_parallel(
                                                                   arr, q, size)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('nunique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('nunique', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.nunique_parallel(arr)
+            f = lambda arr: hpat.hiframes.api.nunique_parallel(arr)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('unique', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('unique', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.unique_parallel(arr)
+            f = lambda arr: hpat.hiframes.api.unique_parallel(arr)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('nlargest', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('nlargest', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr, k, i, f: hpat.hiframes_api.nlargest_parallel(arr, k, i, f)
+            f = lambda arr, k, i, f: hpat.hiframes.api.nlargest_parallel(arr, k, i, f)
             return self._replace_func(f, rhs.args)
 
-        if fdef == ('median', 'hpat.hiframes_api') and (self._is_1D_arr(rhs.args[0].name)
+        if fdef == ('median', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
                                                                 or self._is_1D_Var_arr(rhs.args[0].name)):
-            f = lambda arr: hpat.hiframes_api.median(arr, True)
+            f = lambda arr: hpat.hiframes.api.median(arr, True)
             return self._replace_func(f, rhs.args)
+
+        if fdef == ('convert_rec_to_tup', 'hpat.hiframes.api'):
+            # optimize Series back to back map pattern with tuples
+            # TODO: create another optimization pass?
+            arg_def = guard(get_definition, self.func_ir, rhs.args[0])
+            if (is_call(arg_def) and
+                    guard(find_callname, self.func_ir, arg_def)
+                    == ('convert_tup_to_rec', 'hpat.hiframes.api')):
+                assign.value = arg_def.args[0]
+            return out
 
         if fdef == ('dist_return', 'hpat.distributed_api'):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
             # TODO: rebalance strings?
-            return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
-            # assign.value = rhs.args[0]
-            # return [assign]
-
-        if fdef == ('threaded_return', 'hpat.distributed_api'):
+            #return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
             assign.value = rhs.args[0]
             return [assign]
 
-        if fdef == ('dist_input', 'hpat.distributed_api'):
+        if (fdef == ('get_series_data', 'hpat.hiframes.api')
+                or fdef == ('get_series_index', 'hpat.hiframes.api')
+                or fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext')):
             out = [assign]
-            arr = rhs.args[0]
-            if is_array_container(self.typemap, arr.name):
-                return out
-            # remove sentinel call
-            assign.value = arr
-
+            arr = assign.target
             # gen len() using 1D_Var reduce approach.
-            # TODO: refactor to avoid reduction
-            ndim = self.typemap[arr.name].ndim
+            # TODO: refactor to avoid reduction for 1D
+            # arr_typ = self.typemap[arr.name]
+            ndim = 1
             out += self._gen_1D_Var_len(arr)
             total_length = out[-1].target
             div_nodes, start_var, count_var = self._gen_1D_div(
@@ -678,7 +765,8 @@ class DistributedPass(object):
 
             return out
 
-        if fdef == ('threaded_input', 'hpat.distributed_api'):
+
+        if fdef == ('threaded_return', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
             return [assign]
 
@@ -697,14 +785,14 @@ class DistributedPass(object):
                 self._array_counts[lhs] = [self._array_counts[in_arr][0]]
                 self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
-        if fdef == ('file_read', 'hpat.io') and rhs.args[1].name in self._array_starts:
+        if fdef == ('file_read', 'hpat.io.np_io') and rhs.args[1].name in self._array_starts:
             _fname = rhs.args[0]
             _data_ptr = rhs.args[1]
             _start = self._array_starts[_data_ptr.name][0]
             _count = self._array_counts[_data_ptr.name][0]
 
             def f(fname, data_ptr, start, count):  # pragma: no cover
-                return hpat.io.file_read_parallel(fname, data_ptr, start, count)
+                return hpat.io.np_io.file_read_parallel(fname, data_ptr, start, count)
             return self._replace_func(f, [_fname, _data_ptr, _start, _count])
 
         return out
@@ -741,7 +829,7 @@ class DistributedPass(object):
         if (func_name in ['cumsum', 'cumprod', 'empty_like',
                                      'zeros_like', 'ones_like', 'full_like',
                                      'copy', 'ravel', 'ascontiguousarray']
-                and not self._is_REP(args[0].name)):
+                and self._is_1D_arr(args[0].name)):
             if func_name == 'ravel':
                 assert self.typemap[args[0].name].ndim == 1, "only 1D ravel supported"
             in_arr = args[0].name
@@ -805,6 +893,19 @@ class DistributedPass(object):
             self._array_counts[lhs] = self._array_counts[arr.name]
             self._array_sizes[lhs] = self._array_sizes[arr.name]
 
+        # HACK support A.reshape(n, 1) for 1D_Var
+        if func_name == 'reshape' and self._is_1D_Var_arr(arr.name):
+            assert len(args) == 2 and guard(find_const, self.func_ir, args[1]) == 1
+            assert args[0].name in self.oneDVar_len_vars
+            size_var = args[0]
+            out, new_size_var = self._fix_1D_Var_alloc(
+                size_var, lhs, assign.target.scope, assign.loc)
+            # empty_inferred is tuple for some reason
+            assign.value.args = list(args)
+            assign.value.args[0] = new_size_var
+            out.append(assign)
+            return out
+
         if func_name == 'reshape' and self._is_1D_arr(arr.name):
             return self._run_reshape(assign, arr, args)
 
@@ -830,7 +931,7 @@ class DistributedPass(object):
                 _count = self._array_counts[arr.name][0]
 
                 def f(fname, arr, start, count):  # pragma: no cover
-                    return hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.np_io.file_write_parallel(fname, arr, start, count)
 
                 return self._replace_func(f, [_fname, arr, _start, _count])
 
@@ -840,12 +941,133 @@ class DistributedPass(object):
                 def f(fname, arr):  # pragma: no cover
                     count = len(arr)
                     start = hpat.distributed_api.dist_exscan(count)
-                    return hpat.io.file_write_parallel(fname, arr, start, count)
+                    return hpat.io.np_io.file_write_parallel(fname, arr, start, count)
 
                 return self._replace_func(f, [_fname, arr])
 
         return out
 
+    def _run_call_df(self, lhs, df, func_name, assign, args):
+        if func_name == 'to_csv' and self._is_1D_arr(df.name):
+            # set index to proper range if None
+            # avoid header for non-zero ranks
+            # write to string then parallel file write
+            # df.to_csv(fname) ->
+            # l = len(df)
+            # index_start = dist_exscan(l)
+            # df2 = df(index=range(index_start, index_start+l))
+            # header = header and is_root  # only first line has header
+            # str_out = df2.to_csv(None, header=header)
+            # hpat.io.np_io._file_write_parallel(fname, str_out)
+
+            df_typ = self.typemap[df.name]
+            rhs = assign.value
+            fname = args[0]
+
+            # update df index and get to_csv from new df
+            nodes = self._fix_parallel_df_index(df)
+            new_df = nodes[-1].target
+            new_df_typ = self.typemap[new_df.name]
+            new_to_csv = ir.Expr.getattr(new_df, 'to_csv', new_df.loc)
+            new_func = ir.Var(new_df.scope, mk_unique_var('func'), new_df.loc)
+            self.typemap[new_func.name] = self.typingctx.resolve_getattr(
+                new_df_typ, 'to_csv')
+            nodes.append(ir.Assign(new_to_csv, new_func, new_df.loc))
+            rhs.func = new_func
+
+            # # header = header and is_root
+            kws = dict(rhs.kws)
+            true_var = ir.Var(assign.target.scope, mk_unique_var('true'), rhs.loc)
+            self.typemap[true_var.name] = types.bool_
+            nodes.append(
+                ir.Assign(ir.Const(True, new_df.loc), true_var, new_df.loc))
+            header_var = self._get_arg(
+                'to_csv', rhs.args, kws, 5, 'header', true_var)
+            nodes += self._gen_is_root_and_cond(header_var)
+            header_var = nodes[-1].target
+            if len(rhs.args) > 5:
+                rhs.args[5] = header_var
+            else:
+                kws['header'] = header_var
+                rhs.kws = kws
+
+            # fix to_csv() type to have None as 1st arg
+            call_type = self.calltypes.pop(rhs)
+            arg_typs = list((types.none,)+call_type.args[1:])
+            arg_typs[5] = types.bool_
+            arg_typs = tuple(arg_typs)
+            # self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
+            #      self.typingctx, arg_typs, {})
+            self.calltypes[rhs] = numba.typing.Signature(
+               string_type, arg_typs, new_df_typ,
+               call_type.pysig)
+
+            # None as 1st arg
+            none_var = ir.Var(assign.target.scope, mk_unique_var('none'), rhs.loc)
+            self.typemap[none_var.name] = types.none
+            none_assign = ir.Assign(ir.Const(None, rhs.loc), none_var, rhs.loc)
+            nodes.append(none_assign)
+            rhs.args[0] = none_var
+
+            # str_out = df.to_csv(None)
+            str_out = ir.Var(assign.target.scope, mk_unique_var('write_csv'), rhs.loc)
+            self.typemap[str_out.name] = string_type
+            new_assign = ir.Assign(rhs, str_out, rhs.loc)
+            nodes.append(new_assign)
+
+            # print_node = ir.Print([str_out], None, rhs.loc)
+            # self.calltypes[print_node] = signature(types.none, string_type)
+            # nodes.append(print_node)
+
+            # TODO: fix lazy IO load
+            from . import hio
+            import llvmlite.binding as ll
+            ll.add_symbol('file_write_parallel', hio.file_write_parallel)
+            # HACK use the string in a dummy function to avoid refcount issues
+            # TODO: fix string data reference count
+            dummy_use = numba.njit(lambda a: None)
+
+
+            def f(fname, str_out):  # pragma: no cover
+                count = len(str_out)
+                start = hpat.distributed_api.dist_exscan(count)
+                hpat.io.np_io._file_write_parallel(
+                    fname._data, str_out._data, start, count, 1)
+                dummy_use(str_out)
+
+            return self._replace_func(
+                f, [fname, str_out], pre_nodes=nodes)
+
+        return [assign]
+
+    def _gen_is_root_and_cond(self, cond_var):
+        def f(cond):
+            return cond & (hpat.distributed_api.get_rank() == 0)
+        f_block = compile_to_numba_ir(f, {'hpat': hpat},
+                                    self.typingctx,
+                                    (self.typemap[cond_var.name],),
+                                    self.typemap,
+                                    self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [cond_var])
+        nodes = f_block.body[:-2]
+        return nodes
+
+    def _fix_parallel_df_index(self, df):
+        def f(df):  # pragma: no cover
+            l = len(df)
+            start = hpat.distributed_api.dist_exscan(l)
+            ind = np.arange(start, start+l)
+            df2 = hpat.hiframes.pd_dataframe_ext.set_df_index(df, ind)
+            return df2
+
+        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np},
+                                    self.typingctx,
+                                    (self.typemap[df.name],),
+                                    self.typemap,
+                                    self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [df])
+        nodes = f_block.body[:-2]
+        return nodes
 
     def _run_permutation_int(self, assign, args):
         lhs = assign.target
@@ -1060,7 +1282,6 @@ class DistributedPass(object):
 
             # size should be either int or tuple of ints
             #assert size_var.name in self._tuple_table
-            #import pdb; pdb.set_trace()
             # self._tuple_table[size_var.name]
             size_list = self._get_tuple_varlist(size_var, out)
             size_list = [ir_utils.convert_size_to_var(s, self.typemap, scope, loc, out)
@@ -1364,6 +1585,17 @@ class DistributedPass(object):
                 out += self._run_call_rebalance_array(lhs.name, full_node, [imb_arr])
                 out[-1].target = lhs
 
+            elif self._is_REP(lhs.name) and guard(
+                    is_const_slice, self.typemap, self.func_ir, index_var):
+                # cases like S.head()
+                # bcast if all in rank 0, otherwise gatherv
+                in_arr = full_node.value.value
+                start = self._array_starts[in_arr.name][0]
+                count = self._array_counts[in_arr.name][0]
+                return self._replace_func(
+                    lambda arr, slice_index, start, count: hpat.distributed_api.const_slice_getitem(
+                        arr, slice_index, start, count), [in_arr, index_var, start, count])
+
         return out
 
     def _run_parfor(self, parfor, namevar_table):
@@ -1501,6 +1733,43 @@ class DistributedPass(object):
             parfor, namevar_table)
         parfor.init_block.body += init_reduce_nodes
         out = prepend + [parfor] + reduce_nodes
+        return out
+
+    def _run_arg(self, assign):
+        rhs = assign.value
+        out = [assign]
+
+        if rhs.name not in self.metadata['distributed']:
+            return None
+
+        arr = assign.target
+        typ = self.typemap[arr.name]
+        if is_array_container(self.typemap, arr.name):
+            return None
+
+        # TODO: comprehensive support for Series vars
+        from hpat.hiframes.pd_series_ext import SeriesType
+        if isinstance(typ, (SeriesType,
+                hpat.hiframes.pd_dataframe_ext.DataFrameType)):
+            return None
+
+        # gen len() using 1D_Var reduce approach.
+        # TODO: refactor to avoid reduction
+        ndim = self.typemap[arr.name].ndim
+        out += self._gen_1D_Var_len(arr)
+        total_length = out[-1].target
+        div_nodes, start_var, count_var = self._gen_1D_div(
+            total_length, arr.scope, arr.loc, "$input", "get_node_portion",
+            distributed_api.get_node_portion)
+        out += div_nodes
+
+        # XXX: get sizes in lower dimensions
+        self._array_starts[arr.name] = [-1]*ndim
+        self._array_counts[arr.name] = [-1]*ndim
+        self._array_sizes[arr.name] = [-1]*ndim
+        self._array_starts[arr.name][0] = start_var
+        self._array_counts[arr.name][0] = count_var
+        self._array_sizes[arr.name][0] = total_length
         return out
 
     def _index_has_par_index(self, index, other_index):
@@ -1650,7 +1919,9 @@ class DistributedPass(object):
                 self.typemap[rank_comp_var.name] = types.boolean
                 comp_expr = ir.Expr.binop(
                     operator.eq, self._rank_var, self._set0_var, loc)
-                expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
+                expr_typ = self.typingctx.resolve_function_type(
+                    operator.eq, (types.int32, types.int64), {})
+                #expr_typ = find_op_typ(operator.eq, [types.int32, types.int64])
                 self.calltypes[comp_expr] = expr_typ
                 comp_assign = ir.Assign(comp_expr, rank_comp_var, loc)
                 prev_block.body.append(comp_assign)
@@ -1839,6 +2110,22 @@ class DistributedPass(object):
                 vals_list.append(stmt.target)
         out += nodes
         return vals_list
+
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
+                                                                 err_msg=None):
+        arg = None
+        if len(args) > arg_no:
+            arg = args[arg_no]
+        elif arg_name in kws:
+            arg = kws[arg_name]
+
+        if arg is None:
+            if default is not None:
+                return default
+            if err_msg is None:
+                err_msg = "{} requires '{}' argument".format(f_name, arg_name)
+            raise ValueError(err_msg)
+        return arg
 
     def _replace_func(self, func, args, const=False,
                       pre_nodes=None, extra_globals=None):

@@ -1,5 +1,7 @@
 try:
-    import hio
+    from .io import _hdf5
+    import h5py
+    # TODO: make sure h5py/hdf5 supports parallel
 except ImportError:
     _has_h5py = False
 else:
@@ -13,14 +15,14 @@ else:
     _has_pyarrow = True
 
 try:
-    import ros_cpp
+    from . import ros_cpp
 except ImportError:
     _has_ros = False
 else:
     _has_ros = True
 
 try:
-    import cv_wrapper
+    from . import cv_wrapper
 except ImportError:
     _has_opencv = False
 else:
@@ -28,9 +30,9 @@ else:
     import hpat.cv_ext
 
 try:
-    import hxe_ext
+    from . import hxe_ext
 except ImportError:
     _has_xenon = False
 else:
     _has_xenon = True
-    import hpat.xenon_ext
+    import hpat.io.xenon_ext

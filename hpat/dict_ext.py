@@ -7,12 +7,16 @@ from numba.extending import typeof_impl, lower_cast
 from numba.extending import type_callable, box, unbox, NativeValue
 from numba.extending import models, register_model, infer_getattr
 from numba.extending import lower_builtin, overload_method, overload
-from hpat.str_ext import string_type
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+    iternext_impl, RefType)
+from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
 from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hdict_ext
+from . import hdict_ext
 from hpat.utils import unliteral_all
+
+ll_voidp = lir.IntType(8).as_pointer()
 
 class ByteVecType(types.Opaque):
     def __init__(self):
@@ -113,6 +117,118 @@ byte_vec_resize = types.ExternalFunction('byte_vec_resize', types.void(byte_vec_
 byte_vec_free = types.ExternalFunction('byte_vec_free', types.void(byte_vec_type))
 
 
+class MultiMapType(types.Opaque):
+    def __init__(self, key_typ, val_typ):
+        self.key_typ = key_typ
+        self.val_typ = val_typ
+        super(MultiMapType, self).__init__(
+            name='MultiMapType{}{}'.format(key_typ, val_typ))
+
+    @property
+    def key(self):
+        return self.key_typ, self.val_typ
+
+    def is_precise(self):
+        return self.key_typ.is_precise() and self.val_typ.is_precise()
+
+register_model(MultiMapType)(models.OpaqueModel)
+
+class MultiMapRangeIteratorType(types.SimpleIteratorType):
+    def __init__(self, key_typ, val_typ):
+        self.key_typ = key_typ
+        self.val_typ = val_typ
+        yield_type = val_typ
+        super(MultiMapRangeIteratorType, self).__init__(
+            'MultiMapRangeIteratorType{}{}'.format(key_typ, val_typ), yield_type)
+
+        @property
+        def iterator_type(self):
+            return self
+
+        @property
+        def key(self):
+            return self.key_typ, self.val_typ
+
+        def is_precise(self):
+            return self.key_typ.is_precise() and self.val_typ.is_precise()
+
+
+multimap_int64_range_iterator_type = MultiMapRangeIteratorType(types.intp, types.intp)
+
+register_model(MultiMapRangeIteratorType)(models.OpaqueModel)
+
+multimap_int64_type = MultiMapType(types.int64, types.int64)
+multimap_int64_init = types.ExternalFunction(
+    'multimap_int64_init', multimap_int64_type())
+multimap_int64_insert = types.ExternalFunction(
+    'multimap_int64_insert',
+    types.void(multimap_int64_type, types.int64, types.int64))
+multimap_int64_equal_range = types.ExternalFunction(
+    'multimap_int64_equal_range',
+    multimap_int64_range_iterator_type(multimap_int64_type, types.int64))
+
+
+# store the iterator pair type in same storage and avoid repeated alloc
+multimap_int64_equal_range_alloc = types.ExternalFunction(
+    'multimap_int64_equal_range_alloc', multimap_int64_range_iterator_type())
+
+multimap_int64_equal_range_dealloc = types.ExternalFunction(
+    'multimap_int64_equal_range_dealloc',
+    types.void(multimap_int64_range_iterator_type))
+
+multimap_int64_equal_range_inplace = types.ExternalFunction(
+    'multimap_int64_equal_range_inplace',
+    multimap_int64_range_iterator_type(multimap_int64_type, types.int64,
+    multimap_int64_range_iterator_type))
+
+ll.add_symbol('multimap_int64_init', hdict_ext.multimap_int64_init)
+ll.add_symbol('multimap_int64_insert', hdict_ext.multimap_int64_insert)
+ll.add_symbol('multimap_int64_equal_range', hdict_ext.multimap_int64_equal_range)
+ll.add_symbol('multimap_int64_equal_range_alloc', hdict_ext.multimap_int64_equal_range_alloc)
+ll.add_symbol('multimap_int64_equal_range_dealloc', hdict_ext.multimap_int64_equal_range_dealloc)
+ll.add_symbol('multimap_int64_equal_range_inplace', hdict_ext.multimap_int64_equal_range_inplace)
+ll.add_symbol('multimap_int64_it_is_valid', hdict_ext.multimap_int64_it_is_valid)
+ll.add_symbol('multimap_int64_it_get_value', hdict_ext.multimap_int64_it_get_value)
+ll.add_symbol('multimap_int64_it_inc', hdict_ext.multimap_int64_it_inc)
+
+@lower_builtin('getiter', MultiMapRangeIteratorType)
+def iterator_getiter(context, builder, sig, args):
+    it, = args
+    #return impl_ret_borrowed(context, builder, sig.return_type, it)
+    return it
+
+@lower_builtin('iternext', MultiMapRangeIteratorType)
+@iternext_impl(RefType.UNTRACKED)
+def iternext_listiter(context, builder, sig, args, result):
+    ll_bool = context.get_value_type(types.bool_)  # lir.IntType(1)?
+
+    # is valid
+    fnty = lir.FunctionType(ll_bool, [ll_voidp])
+    it_is_valid = builder.module.get_or_insert_function(fnty, name="multimap_int64_it_is_valid")
+
+    # get value
+    val_typ = context.get_value_type(sig.args[0].val_typ)
+    fnty = lir.FunctionType(val_typ, [ll_voidp])
+    get_value = builder.module.get_or_insert_function(fnty, name="multimap_int64_it_get_value")
+
+    # increment
+    fnty = lir.FunctionType(lir.VoidType(), [ll_voidp])
+    inc_it = builder.module.get_or_insert_function(fnty, name="multimap_int64_it_inc")
+
+    range_it, = args
+
+    # it != range.second
+    is_valid = builder.call(it_is_valid, [range_it])
+    result.set_valid(is_valid)
+
+    with builder.if_then(is_valid):
+        # it->second
+        val = builder.call(get_value, [range_it])
+        result.yield_(val)
+        builder.call(inc_it, [range_it])
+
+
+
 # XXX: needs Numba #3014 resolved
 # @overload("in")
 # def in_dict(key_typ, dict_typ):
@@ -121,7 +237,7 @@ byte_vec_free = types.ExternalFunction('byte_vec_free', types.void(byte_vec_type
 #     return f
 
 # XXX possible overload bug
-# @overload("setitem")
+# @overload(operator.setitem)
 # def setitem_dict(dict_typ, key_typ, val_typ):
 #     def f(k, dict_int):
 #         return dict_int_int_in(dict_int, k)
@@ -183,10 +299,8 @@ def type_dict_int32(context):
     return typer
 
 
-@infer
+@infer_global(operator.setitem)
 class SetItemDict(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         dict_t, _, _ = args
         if isinstance(dict_t, DictType):
@@ -281,16 +395,26 @@ def impl_dict_int_int(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-@lower_builtin('setitem', DictType, types.Any, types.Any)
+@lower_builtin(operator.setitem, DictType, types.Any, types.Any)
 def setitem_dict(context, builder, sig, args):
     _, key_typ, val_typ = sig.args
+    dct, key, val = args
     fname = "dict_{}_{}_setitem".format(key_typ, val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+    if val_typ == string_type:
+        val_typ = types.voidptr
+        val = gen_unicode_to_std_str(context, builder, val)
+
     fnty = lir.FunctionType(lir.VoidType(),
         [lir.IntType(8).as_pointer(),
         context.get_value_type(key_typ),
         context.get_value_type(val_typ)])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    return builder.call(fn, [dct, key, val])
 
 
 @lower_builtin("print_item", dict_int_int_type)
@@ -315,11 +439,27 @@ def lower_dict_get(context, builder, sig, args):
 @lower_builtin(operator.getitem, DictType, types.Any)
 def lower_dict_getitem(context, builder, sig, args):
     dict_typ, key_typ = sig.args
-    fnty = lir.FunctionType(context.get_value_type(dict_typ.val_typ),
+    dct, key = args
+    val_typ = dict_typ.val_typ
+
+    fname = "dict_{}_{}_getitem".format(key_typ, val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+    ll_val_typ = context.get_value_type(val_typ)
+    if val_typ == string_type:
+        ll_val_typ = context.get_value_type(types.voidptr)
+
+    fnty = lir.FunctionType(ll_val_typ,
         [lir.IntType(8).as_pointer(), context.get_value_type(key_typ)])
-    fname = "dict_{}_{}_getitem".format(key_typ, dict_typ.val_typ)
+
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    val = builder.call(fn, [dct, key])
+    if val_typ == string_type:
+        val = gen_std_str_to_unicode(context, builder, val)
+    return val
 
 @lower_builtin("dict.pop", DictType, types.intp)
 def lower_dict_pop(context, builder, sig, args):
@@ -353,20 +493,40 @@ def lower_dict_max(context, builder, sig, args):
 @lower_builtin("in", types.Any, DictType)
 def lower_dict_in(context, builder, sig, args):
     key_typ, dict_typ = sig.args
+    key, dct = args
+
     fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, [args[1], args[0]])
+    val = builder.call(fn, [dct, key])
+    if dict_typ.val_typ == string_type:
+        val = gen_std_str_to_unicode(context, builder, val)
+    return val
 
 @lower_builtin(operator.contains, DictType, types.Any)
 def lower_dict_in_op(context, builder, sig, args):
     dict_typ, key_typ = sig.args
+    dct, key = args
+
     fname = "dict_{}_{}_in".format(key_typ, dict_typ.val_typ)
+
+    if key_typ == string_type:
+        key_typ = types.voidptr
+        key = gen_unicode_to_std_str(context, builder, key)
+
+
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              context.get_value_type(key_typ),])
     fn = builder.module.get_or_insert_function(fnty, name=fname)
-    return builder.call(fn, args)
+    return builder.call(fn, [dct, key])
+
 
 @lower_cast(dict_int_int_type, types.boolean)
 def dict_empty(context, builder, fromty, toty, val):
@@ -385,7 +545,7 @@ def impl_dict_int32_int32(context, builder, sig, args):
     return builder.call(fn, [])
 
 
-# @lower_builtin('setitem', DictType, types.int32, types.int32)
+# @lower_builtin(operator.setitem, DictType, types.int32, types.int32)
 # def setitem_dict_int32(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(
 #         8).as_pointer(), lir.IntType(32), lir.IntType(32)])

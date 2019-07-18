@@ -14,10 +14,10 @@ requirements:
     - {{ compiler('cxx') }}
 
   host:
-    - python >=3.6
+    - python
     - setuptools
-    - numba 0.41.*
-    - numpy >=1.14
+    - numba 0.44.*
+    - numpy
     - pandas >=0.23
     - pyarrow >=0.9
     - arrow-cpp
@@ -25,26 +25,31 @@ requirements:
     - hdf5
     - h5py
     - mpich # [not win]
+    - impi-devel # [win]
+    - impi_rt # [win]
 
   run:
-    - python >=3.6
-    - numpy >=1.14
+    - python
+    - {{ pin_compatible('numpy') }}
     - pandas >=0.23
     - pyarrow >=0.9
     - arrow-cpp
     - boost
-    - numba 0.41.*
-    - hdf5
-    - h5py
+    - numba 0.44.*
     - mpich # [not win]
+    - impi_rt # [win]
 
 test:
+  requires:
+    - h5py
+    - pyspark
+    - scipy
   imports:
     - hpat
 
 
 about:
-  home: https://github.com/IntelLabs/hpat
+  home: https://github.com/IntelPython/hpat
   license: BSD
   license_file: LICENSE.md
   summary: A compiler-based big data framework in Python

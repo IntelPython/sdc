@@ -1,8 +1,9 @@
 import operator
+import re
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
-                             type_callable, overload_method)
+                             type_callable, overload_method, intrinsic)
 from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
 from numba import types, typing
 from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
@@ -17,22 +18,128 @@ import hpat
 def unliteral_all(args):
     return tuple(types.unliteral(a) for a in args)
 
-import hstr_ext
+# relative import seems required for C extensions
+from . import hstr_ext
 ll.add_symbol('get_char_from_string', hstr_ext.get_char_from_string)
 ll.add_symbol('get_char_ptr', hstr_ext.get_char_ptr)
 ll.add_symbol('del_str', hstr_ext.del_str)
 ll.add_symbol('_hash_str', hstr_ext.hash_str)
 
-class StringType(types.Opaque):
+
+string_type = types.unicode_type
+
+
+# XXX setting hash secret for hash(unicode_type) to be consistent across
+# processes. Other wise, shuffle operators like unique_str_parallel will fail.
+# TODO: use a seperate implementation?
+# TODO: make sure hash(str) is not already instantiated in overloads
+# def _rm_hash_str_overload():
+#     try:
+#         fn = numba.targets.registry.cpu_target.typing_context.resolve_value_type(hash)
+#         sig = signature(types.int64, types.unicode_type)
+#         key = fn.get_impl_key(sig)
+#         numba.targets.registry.cpu_target.target_context._defns[key]._cache.pop(sig.args)
+#     except:
+#         pass
+
+# _rm_hash_str_overload()
+
+import numba.targets.hashing
+numba.targets.hashing._Py_HashSecret_djbx33a_suffix = 0
+numba.targets.hashing._Py_HashSecret_siphash_k0 = 0
+numba.targets.hashing._Py_HashSecret_siphash_k1 = 0
+
+
+## use objmode for string methods for now
+
+# string methods that just return another string
+str2str_methods = ('capitalize', 'casefold', 'lower', 'lstrip', 'rstrip',
+    'strip', 'swapcase', 'title', 'upper')
+
+for method in str2str_methods:
+    func_text = "def str_overload(in_str):\n"
+    func_text += "  def _str_impl(in_str):\n"
+    func_text += "    with numba.objmode(out='unicode_type'):\n"
+    func_text += "      out = in_str.{}()\n".format(method)
+    func_text += "    return out\n"
+    func_text += "  return _str_impl\n"
+    loc_vars = {}
+    exec(func_text, {'numba': numba}, loc_vars)
+    str_overload = loc_vars['str_overload']
+    overload_method(types.UnicodeType, method)(str_overload)
+
+
+@overload_method(types.UnicodeType, 'replace')
+def str_replace_overload(in_str, old, new, count=-1):
+
+    def _str_replace_impl(in_str, old, new, count=-1):
+        with numba.objmode(out='unicode_type'):
+            out = in_str.replace(old, new, count)
+        return out
+
+    return _str_replace_impl
+
+
+#####################  re support  ###################
+
+class RePatternType(types.Opaque):
+    def __init__(self):
+        super(RePatternType, self).__init__(name='RePatternType')
+
+
+re_pattern_type = RePatternType()
+types.re_pattern_type = re_pattern_type
+
+register_model(RePatternType)(models.OpaqueModel)
+
+@box(RePatternType)
+def box_re_pattern(typ, val, c):
+    # TODO: fix
+    c.pyapi.incref(val)
+    return val
+
+
+@unbox(RePatternType)
+def unbox_re_pattern(typ, obj, c):
+    # TODO: fix
+    c.pyapi.incref(obj)
+    return NativeValue(obj)
+
+
+# jitoptions until numba #4020 is resolved
+@overload(re.compile, jit_options={'no_cpython_wrapper': False})
+def re_compile_overload(pattern, flags=0):
+    def _re_compile_impl(pattern, flags=0):
+        with numba.objmode(pat='re_pattern_type'):
+            pat = re.compile(pattern, flags)
+        return pat
+    return _re_compile_impl
+
+
+@overload_method(RePatternType, 'sub')
+def re_sub_overload(p, repl, string, count=0):
+    def _re_sub_impl(p, repl, string, count=0):
+        with numba.objmode(out='unicode_type'):
+            out = p.sub(repl, string, count)
+        return out
+    return _re_sub_impl
+
+
+#######################  type for std string pointer  ########################
+
+
+class StringType(types.Opaque, types.Hashable):
     def __init__(self):
         super(StringType, self).__init__(name='StringType')
 
-string_type = StringType()
+std_str_type = StringType()
 
+# XXX enabling this turns on old std::string implementation
+# string_type = StringType()
 
-@typeof_impl.register(str)
-def _typeof_str(val, c):
-    return string_type
+# @typeof_impl.register(str)
+# def _typeof_str(val, c):
+#     return string_type
 
 
 register_model(StringType)(models.OpaqueModel)
@@ -48,14 +155,14 @@ register_model(CharType)(models.IntegerModel)
 
 @overload(operator.getitem)
 def char_getitem_overload(_str, ind):
-    if _str == string_type and isinstance(ind, types.Integer):
+    if _str == std_str_type and isinstance(ind, types.Integer):
         sig = char_type(
-                    string_type,   # string
+                    std_str_type,   # string
                     types.intp,    # index
                     )
         get_char_from_string = types.ExternalFunction("get_char_from_string", sig)
-        def impl(s, i):
-            return get_char_from_string(s, i)
+        def impl(_str, ind):
+            return get_char_from_string(_str, ind)
 
         return impl
 
@@ -80,9 +187,9 @@ def box_char(typ, val, c):
     # TODO: delete ptr
     return pystr
 
-del_str = types.ExternalFunction("del_str", types.void(string_type))
-_hash_str = types.ExternalFunction("_hash_str", types.int64(string_type))
-get_c_str = types.ExternalFunction("get_c_str", types.voidptr(string_type))
+del_str = types.ExternalFunction("del_str", types.void(std_str_type))
+_hash_str = types.ExternalFunction("_hash_str", types.int64(std_str_type))
+get_c_str = types.ExternalFunction("get_c_str", types.voidptr(std_str_type))
 
 @overload_method(StringType, 'c_str')
 def str_c_str(str_typ):
@@ -102,17 +209,32 @@ def str_join(str_typ, iterable_typ):
         return res
     return str_join_impl
 
-@overload(hash)
-def hash_overload(str_typ):
-    if str_typ == string_type:
-        return lambda s: _hash_str(s)
+
+# TODO: using lower_builtin since overload fails for str tuple
+# TODO: constant hash like hash("ss",) fails
+# @overload(hash)
+# def hash_overload(str_typ):
+#     if str_typ == string_type:
+#         return lambda s: _hash_str(s)
+
+@lower_builtin(hash, std_str_type)
+def hash_str_lower(context, builder, sig, args):
+    return context.compile_internal(
+        builder, lambda s: _hash_str(s), sig, args)
+
+# XXX: use Numba's hash(str) when available
+@lower_builtin(hash, string_type)
+def hash_unicode_lower(context, builder, sig, args):
+    std_str = gen_unicode_to_std_str(context, builder, args[0])
+    return hash_str_lower(
+        context, builder, signature(sig.return_type, std_str_type), [std_str])
 
 @infer
 @infer_global(operator.add)
 @infer_global(operator.iadd)
 class StringAdd(ConcreteTemplate):
     key = "+"
-    cases = [signature(string_type, string_type, string_type)]
+    cases = [signature(std_str_type, std_str_type, std_str_type)]
 
 
 @infer
@@ -163,7 +285,7 @@ class StringAttribute(AttributeTemplate):
     def resolve_split(self, dict, args, kws):
         assert not kws
         assert len(args) == 1
-        return signature(types.List(string_type), types.unliteral(args[0]))
+        return signature(types.List(std_str_type), types.unliteral(args[0]))
 
 
 # @infer_global(operator.getitem)
@@ -177,20 +299,32 @@ class StringAttribute(AttributeTemplate):
 #             return signature(args[0], *args)
 
 
-@infer_global(len)
-class LenStringArray(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args) == 1 and args[0] == string_type:
-            return signature(types.intp, *args)
+# @infer_global(len)
+# class LenStringArray(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args) == 1 and args[0] == std_str_type:
+#             return signature(types.intp, *args)
 
 
-@infer_global(int)
-class StrToInt(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        [arg] = args
-        if isinstance(arg, StringType):
-            return signature(types.intp, arg)
+@overload(int)
+def int_str_overload(in_str):
+    if in_str == string_type:
+        def _str_to_int_impl(in_str):
+            return _str_to_int64(in_str._data, in_str._length)
+
+        return _str_to_int_impl
+
+
+# @infer_global(int)
+# class StrToInt(AbstractTemplate):
+#     def generic(self, args, kws):
+#         assert not kws
+#         [arg] = args
+#         if isinstance(arg, StringType):
+#             return signature(types.intp, arg)
+#         # TODO: implement int(str) in Numba
+#         if arg == string_type:
+#             return signature(types.intp, arg)
 
 
 @infer_global(float)
@@ -200,7 +334,9 @@ class StrToFloat(AbstractTemplate):
         [arg] = args
         if isinstance(arg, StringType):
             return signature(types.float64, arg)
-
+        # TODO: implement int(str) in Numba
+        if arg == string_type:
+            return signature(types.float64, arg)
 
 @infer_global(str)
 class StrConstInfer(AbstractTemplate):
@@ -259,15 +395,116 @@ ll.add_symbol('str_equal_cstr', hstr_ext.str_equal_cstr)
 ll.add_symbol('str_split', hstr_ext.str_split)
 ll.add_symbol('str_substr_int', hstr_ext.str_substr_int)
 ll.add_symbol('str_to_int64', hstr_ext.str_to_int64)
+ll.add_symbol('std_str_to_int64', hstr_ext.std_str_to_int64)
 ll.add_symbol('str_to_float64', hstr_ext.str_to_float64)
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('compile_regex', hstr_ext.compile_regex)
 ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
 ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
+ll.add_symbol('str_replace_regex', hstr_ext.str_replace_regex)
+ll.add_symbol('str_replace_noregex', hstr_ext.str_replace_noregex)
 ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
 ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
 ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
 ll.add_symbol('str_from_float64', hstr_ext.str_from_float64)
+
+get_std_str_len = types.ExternalFunction(
+    "get_str_len", signature(types.intp, std_str_type))
+init_string_from_chars = types.ExternalFunction(
+    "init_string_const", std_str_type(types.voidptr, types.intp))
+
+_str_to_int64 = types.ExternalFunction(
+    "str_to_int64", signature(types.intp, types.voidptr, types.intp))
+
+str_replace_regex = types.ExternalFunction(
+    "str_replace_regex", std_str_type(std_str_type, regex_type, std_str_type))
+
+str_replace_noregex = types.ExternalFunction(
+    "str_replace_noregex", std_str_type(std_str_type, std_str_type, std_str_type))
+
+def gen_unicode_to_std_str(context, builder, unicode_val):
+    #
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=unicode_val)
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    return builder.call(fn, [uni_str.data, uni_str.length])
+
+def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
+    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+    def _std_str_to_unicode(std_str):
+        length = hpat.str_ext.get_std_str_len(std_str)
+        ret = numba.unicode._empty_string(kind, length)
+        hpat.str_arr_ext._memcpy(
+            ret._data, hpat.str_ext.get_c_str(std_str), length, 1)
+        if del_str:
+            hpat.str_ext.del_str(std_str)
+        return ret
+    val = context.compile_internal(
+            builder,
+            _std_str_to_unicode,
+            string_type(hpat.str_ext.std_str_type),
+            [std_str_val])
+    return val
+
+
+def gen_get_unicode_chars(context, builder, unicode_val):
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=unicode_val)
+    return uni_str.data
+
+
+def unicode_to_char_ptr(in_str):
+    return in_str
+
+@overload(unicode_to_char_ptr)
+def unicode_to_char_ptr_overload(a):
+    # str._data is not safe since str might be literal
+    # overload resolves str literal to unicode_type
+    if a == string_type:
+        return lambda a: a._data
+
+
+@intrinsic
+def unicode_to_std_str(typingctx, unicode_t=None):
+    def codegen(context, builder, sig, args):
+        return gen_unicode_to_std_str(context, builder, args[0])
+    return std_str_type(string_type), codegen
+
+@intrinsic
+def std_str_to_unicode(typingctx, unicode_t=None):
+    def codegen(context, builder, sig, args):
+        return gen_std_str_to_unicode(context, builder, args[0], True)
+    return string_type(std_str_type), codegen
+
+
+@intrinsic
+def alloc_str_list(typingctx, n_t=None):
+    def codegen(context, builder, sig, args):
+        nitems = args[0]
+        list_type = types.List(string_type)
+        l = numba.targets.listobj.ListInstance.allocate(
+            context, builder, list_type, nitems)
+        l.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, l.value)
+    return types.List(string_type)(types.intp), codegen
+
+
+# XXX using list of list string instead of array of list string since Numba's
+# arrays can't store lists
+list_string_array_type = types.List(types.List(string_type))
+
+@intrinsic
+def alloc_list_list_str(typingctx, n_t=None):
+    def codegen(context, builder, sig, args):
+        nitems = args[0]
+        list_type = list_string_array_type
+        l = numba.targets.listobj.ListInstance.allocate(
+            context, builder, list_type, nitems)
+        l.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, l.value)
+    return list_string_array_type(types.intp), codegen
 
 
 @unbox(StringType)
@@ -340,21 +577,23 @@ def string_type_to_const(context, builder, fromty, toty, val):
 @lower_constant(StringType)
 def const_string(context, builder, ty, pyval):
     cstr = context.insert_const_string(builder.module, pyval)
+    length = context.get_constant(types.intp, len(pyval))
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
-    ret = builder.call(fn, [cstr])
+    ret = builder.call(fn, [cstr, length])
     return ret
 
 @lower_cast(types.StringLiteral, StringType)
 def const_to_string_type(context, builder, fromty, toty, val):
     cstr = context.insert_const_string(builder.module, fromty.literal_value)
+    length = context.get_constant(types.intp, len(fromty.literal_value))
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                            [lir.IntType(8).as_pointer(), lir.IntType(64)])
     fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
-    ret = builder.call(fn, [cstr])
+    ret = builder.call(fn, [cstr, length])
     return ret
 
 @lower_builtin(str, types.Any)
@@ -366,11 +605,12 @@ def string_from_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
     fn = builder.module.get_or_insert_function(
         fnty, name="str_from_" + str(in_typ))
-    return builder.call(fn, args)
+    std_str = builder.call(fn, args)
+    return gen_std_str_to_unicode(context, builder, std_str)
 
 
-@lower_builtin(operator.add, string_type, string_type)
-@lower_builtin("+", string_type, string_type)
+@lower_builtin(operator.add, std_str_type, std_str_type)
+@lower_builtin("+", std_str_type, std_str_type)
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -378,8 +618,8 @@ def impl_string_concat(context, builder, sig, args):
     return builder.call(fn, args)
 
 
-@lower_builtin(operator.eq, string_type, string_type)
-@lower_builtin('==', string_type, string_type)
+@lower_builtin(operator.eq, std_str_type, std_str_type)
+@lower_builtin('==', std_str_type, std_str_type)
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -396,16 +636,16 @@ def char_eq_impl(context, builder, sig, args):
     return res
 
 
-@lower_builtin(operator.ne, string_type, string_type)
-@lower_builtin('!=', string_type, string_type)
+@lower_builtin(operator.ne, std_str_type, std_str_type)
+@lower_builtin('!=', std_str_type, std_str_type)
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
 
-@lower_builtin(operator.ge, string_type, string_type)
-@lower_builtin('>=', string_type, string_type)
+@lower_builtin(operator.ge, std_str_type, std_str_type)
+@lower_builtin('>=', std_str_type, std_str_type)
 def string_ge_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -415,8 +655,8 @@ def string_ge_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
     return res
 
-@lower_builtin(operator.gt, string_type, string_type)
-@lower_builtin('>', string_type, string_type)
+@lower_builtin(operator.gt, std_str_type, std_str_type)
+@lower_builtin('>', std_str_type, std_str_type)
 def string_gt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -426,8 +666,8 @@ def string_gt_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
     return res
 
-@lower_builtin(operator.le, string_type, string_type)
-@lower_builtin('<=', string_type, string_type)
+@lower_builtin(operator.le, std_str_type, std_str_type)
+@lower_builtin('<=', std_str_type, std_str_type)
 def string_le_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -437,8 +677,8 @@ def string_le_impl(context, builder, sig, args):
     res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
     return res
 
-@lower_builtin(operator.lt, string_type, string_type)
-@lower_builtin('<', string_type, string_type)
+@lower_builtin(operator.lt, std_str_type, std_str_type)
+@lower_builtin('<', std_str_type, std_str_type)
 def string_lt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
@@ -449,7 +689,7 @@ def string_lt_impl(context, builder, sig, args):
     return res
 
 
-@lower_builtin("str.split", string_type, string_type)
+@lower_builtin("str.split", std_str_type, std_str_type)
 def string_split_impl(context, builder, sig, args):
     nitems = cgutils.alloca_once(builder, lir.IntType(64))
     # input str, sep, size pointer
@@ -484,9 +724,14 @@ def string_split_impl(context, builder, sig, args):
 @lower_cast(StringType, types.int64)
 def cast_str_to_int64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_to_int64")
+    fn = builder.module.get_or_insert_function(fnty, name="std_str_to_int64")
     return builder.call(fn, (val,))
 
+# # XXX handle unicode until Numba supports int(str)
+# @lower_cast(string_type, types.int64)
+# def cast_unicode_str_to_int64(context, builder, fromty, toty, val):
+#     std_str = gen_unicode_to_std_str(context, builder, val)
+#     return cast_str_to_int64(context, builder, std_str_type, toty, std_str)
 
 @lower_cast(StringType, types.float64)
 def cast_str_to_float64(context, builder, fromty, toty, val):
@@ -494,35 +739,60 @@ def cast_str_to_float64(context, builder, fromty, toty, val):
     fn = builder.module.get_or_insert_function(fnty, name="str_to_float64")
     return builder.call(fn, (val,))
 
+# XXX handle unicode until Numba supports float(str)
+@lower_cast(string_type, types.float64)
+def cast_unicode_str_to_float64(context, builder, fromty, toty, val):
+    std_str = gen_unicode_to_std_str(context, builder, val)
+    return cast_str_to_float64(context, builder, std_str_type, toty, std_str)
 
-@lower_builtin(len, StringType)
-def len_string(context, builder, sig, args):
-    fnty = lir.FunctionType(lir.IntType(64),
-                            [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
-    return (builder.call(fn, args))
+# @lower_builtin(len, StringType)
+# def len_string(context, builder, sig, args):
+#     fnty = lir.FunctionType(lir.IntType(64),
+#                             [lir.IntType(8).as_pointer()])
+#     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
+#     return (builder.call(fn, args))
 
 
-@lower_builtin(compile_regex, string_type)
+@lower_builtin(compile_regex, std_str_type)
 def lower_compile_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="compile_regex")
     return builder.call(fn, args)
 
+@lower_builtin(compile_regex, string_type)
+def lower_compile_regex_unicode(context, builder, sig, args):
+    val = args[0]
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    return lower_compile_regex(context, builder, sig, [std_val])
 
-@lower_builtin(contains_regex, string_type, regex_type)
+@lower_builtin(contains_regex, std_str_type, regex_type)
 def impl_string_contains_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
     return builder.call(fn, args)
 
+@lower_builtin(contains_regex, string_type, regex_type)
+def impl_unicode_string_contains_regex(context, builder, sig, args):
+    val, reg = args
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    return impl_string_contains_regex(
+        context, builder, sig, [std_val, reg])
 
-@lower_builtin(contains_noregex, string_type, string_type)
+
+@lower_builtin(contains_noregex, std_str_type, std_str_type)
 def impl_string_contains_noregex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(
         fnty, name="str_contains_noregex")
     return builder.call(fn, args)
+
+@lower_builtin(contains_noregex, string_type, string_type)
+def impl_unicode_string_contains_noregex(context, builder, sig, args):
+    val, pat = args
+    std_val = gen_unicode_to_std_str(context, builder, val)
+    std_pat = gen_unicode_to_std_str(context, builder, pat)
+    return impl_string_contains_noregex(
+        context, builder, sig, [std_val, std_pat])

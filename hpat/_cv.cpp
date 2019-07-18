@@ -5,7 +5,7 @@
 
 using namespace cv;
 
-void* cv_imread(int64_t *shapes, uint8_t **data, std::string* file_name);
+void* cv_imread(int64_t *shapes, uint8_t **data, char* file_name);
 void cv_resize(int64_t new_rows, int64_t new_cols, uint8_t *data,
                 uint8_t *in_data, int64_t rows, int64_t cols);
 void cv_mat_release(cv::Mat *img);
@@ -34,11 +34,11 @@ PyMODINIT_FUNC PyInit_cv_wrapper(void) {
 }
 
 
-void* cv_imread(int64_t *shapes, uint8_t **data, std::string* file_name)
+void* cv_imread(int64_t *shapes, uint8_t **data, char* file_name)
 {
 
     cv::Mat image;
-    image = cv::imread(*file_name);
+    image = cv::imread(std::string(file_name));
     if(!image.data )
     {
         std::cerr << "no image found" << '\n';

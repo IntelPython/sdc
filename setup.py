@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 import platform, os
 
 # Note we don't import Numpy at the toplevel, since setup.py
@@ -6,6 +6,7 @@ import platform, os
 # build dependencies
 import numpy.distutils.misc_util as np_misc
 #import copy
+import versioneer
 
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
@@ -99,20 +100,34 @@ if use_impi:
 
 if is_win:
     # use Intel MPI on Windows
-    MPI_LIBS = ['impi', 'impicxx']
+    MPI_LIBS = ['impi']
     # hdf5-parallel Windows build uses CMake which needs this flag
     H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
 hdf5_libs = MPI_LIBS + ['hdf5']
+io_libs = MPI_LIBS
 if not is_win:
-    hdf5_libs += ['boost_filesystem', 'boost_system']
+    io_libs += ['boost_filesystem', 'boost_system']
 
-ext_io = Extension(name="hio",
-                   sources=["hpat/_io.cpp", "hpat/_csv.cpp"],
-                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h", "hpat/_import_py.h", "hpat/_csv.h", "hpat/_datetime_ext.h"],
+ext_io = Extension(name="hpat.hio",
+                   sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
+                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
+                            "hpat/_import_py.h", "hpat/io/_csv.h",
+                            "hpat/_datetime_ext.h"],
+                   libraries = io_libs,
+                   include_dirs = ind + np_compile_args['include_dirs'],
+                   library_dirs = lid,
+                   define_macros = H5_CPP_FLAGS,
+                   extra_compile_args = eca,
+                   extra_link_args = ela,
+                   language="c++"
+)
+
+ext_hdf5 = Extension(name="hpat.io._hdf5",
+                   sources=["hpat/io/_hdf5.cpp"],
+                   depends=[],
                    libraries = hdf5_libs,
-                   include_dirs = ([HDF5_DIR+'/include',] + ind
-                     + np_compile_args['include_dirs']),
+                   include_dirs = [HDF5_DIR+'/include',] + ind,
                    library_dirs = [HDF5_DIR+'/lib',] + lid,
                    define_macros = H5_CPP_FLAGS,
                    extra_compile_args = eca,
@@ -120,7 +135,7 @@ ext_io = Extension(name="hio",
                    language="c++"
 )
 
-ext_hdist = Extension(name="hdist",
+ext_hdist = Extension(name="hpat.hdist",
                       sources=["hpat/_distributed.cpp"],
                       depends=["hpat/_hpat_common.h"],
                       libraries = MPI_LIBS,
@@ -130,7 +145,7 @@ ext_hdist = Extension(name="hdist",
                       library_dirs = lid,
 )
 
-ext_chiframes = Extension(name="chiframes",
+ext_chiframes = Extension(name="hpat.chiframes",
                           sources=["hpat/_hiframes.cpp"],
                           libraries = MPI_LIBS,
                           depends=["hpat/_hpat_sort.h"],
@@ -141,7 +156,7 @@ ext_chiframes = Extension(name="chiframes",
 )
 
 
-ext_dict = Extension(name="hdict_ext",
+ext_dict = Extension(name="hpat.hdict_ext",
                      sources=["hpat/_dict_ext.cpp"],
                      extra_compile_args = eca,
                      extra_link_args = ela,
@@ -149,7 +164,7 @@ ext_dict = Extension(name="hdict_ext",
                      library_dirs = lid,
 )
 
-ext_set = Extension(name="hset_ext",
+ext_set = Extension(name="hpat.hset_ext",
                      sources=["hpat/_set_ext.cpp"],
                      extra_compile_args = eca,
                      extra_link_args = ela,
@@ -162,7 +177,7 @@ str_libs = np_compile_args['libraries']
 if not is_win:
     str_libs += ['boost_regex']
 
-ext_str = Extension(name="hstr_ext",
+ext_str = Extension(name="hpat.hstr_ext",
                     sources=["hpat/_str_ext.cpp"],
                     libraries=str_libs,
                     define_macros = np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
@@ -177,7 +192,7 @@ ext_str = Extension(name="hstr_ext",
 #dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
 #dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
-ext_dt = Extension(name="hdatetime_ext",
+ext_dt = Extension(name="hpat.hdatetime_ext",
                    sources=["hpat/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
                    define_macros = np_compile_args['define_macros'],
@@ -188,7 +203,7 @@ ext_dt = Extension(name="hdatetime_ext",
                    language="c++"
 )
 
-ext_quantile = Extension(name="quantile_alg",
+ext_quantile = Extension(name="hpat.quantile_alg",
                          sources=["hpat/_quantile_alg.cpp"],
                          depends=["hpat/_hpat_common.h"],
                          libraries = MPI_LIBS,
@@ -215,8 +230,8 @@ if not is_win:
 
 pq_libs += ['arrow', 'parquet']
 
-ext_parquet = Extension(name="parquet_cpp",
-                        sources=["hpat/_parquet.cpp"],
+ext_parquet = Extension(name="hpat.parquet_cpp",
+                        sources=["hpat/io/_parquet.cpp"],
                         libraries = pq_libs,
                         include_dirs = ['.'] + ind,
                         define_macros = [('BUILTIN_PARQUET_READER', None)],
@@ -225,13 +240,13 @@ ext_parquet = Extension(name="parquet_cpp",
                         library_dirs = lid,
 )
 
-#ext_daal_wrapper = Extension(name="daal_wrapper",
+#ext_daal_wrapper = Extension(name="hpat.daal_wrapper",
 #                             include_dirs = [DAALROOT+'/include'],
 #                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
 #                             sources=["hpat/_daal.cpp"]
 #                             )
 
-ext_ros = Extension(name="ros_cpp",
+ext_ros = Extension(name="hpat.ros_cpp",
                     sources=["hpat/_ros.cpp"],
                     include_dirs = ['/opt/ros/lunar/include', '/opt/ros/lunar/include/xmlrpcpp', PREFIX_DIR+'/include/', './ros_include'],
                     extra_compile_args = eca,
@@ -244,7 +259,7 @@ cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui'
 if is_win:
     cv_libs = [l+'331' for l in cv_libs]
 
-ext_cv_wrapper = Extension(name="cv_wrapper",
+ext_cv_wrapper = Extension(name="hpat.cv_wrapper",
                            sources=["hpat/_cv.cpp"],
                            include_dirs = [OPENCV_DIR+'/include'] + ind,
                            library_dirs = [os.path.join(OPENCV_DIR,'lib')] + lid,
@@ -253,8 +268,8 @@ ext_cv_wrapper = Extension(name="cv_wrapper",
                            language="c++",
 )
 
-ext_xenon_wrapper = Extension(name="hxe_ext",
-                              sources=["hpat/_xe_wrapper.cpp"],
+ext_xenon_wrapper = Extension(name="hpat.hxe_ext",
+                              sources=["hpat/io/_xe_wrapper.cpp"],
                               #include_dirs = ['/usr/include'],
                               include_dirs = ['.'] + ind,
                               library_dirs = ['.'] + lid,
@@ -263,10 +278,10 @@ ext_xenon_wrapper = Extension(name="hxe_ext",
                               extra_link_args = ela,
 )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt, ext_io]
 
 if _has_h5py:
-    _ext_mods.append(ext_io)
+    _ext_mods.append(ext_hdf5)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
 #if _has_daal:
@@ -280,7 +295,7 @@ if _has_xenon:
     _ext_mods.append(ext_xenon_wrapper)
 
 setup(name='hpat',
-      version='0.25.0',
+      version=versioneer.get_version(),
       description='compiling Python code for clusters',
       long_description=readme(),
       classifiers=[
@@ -295,7 +310,8 @@ setup(name='hpat',
       keywords='data analytics cluster',
       url='https://github.com/IntelLabs/hpat',
       author='Intel',
-      packages=['hpat'],
+      packages=find_packages(),
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
+      cmdclass=versioneer.get_cmdclass(),
       ext_modules = _ext_mods)

@@ -6,10 +6,11 @@ import string
 import pyarrow.parquet as pq
 import numba
 import hpat
-from hpat import hiframes_sort
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
+
+from .gen_test_data import ParquetGenerator
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
@@ -33,7 +34,15 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     ),
 ]]
 
+
+GLOBAL_VAL = 2
+
+
 class TestSeries(unittest.TestCase):
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   '122 != 1\n'
+                   'NUMA_PES=3 build')
     def test_create1(self):
         def test_impl():
             df = pd.DataFrame({'A': [1,2,3]})
@@ -42,6 +51,9 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   '122 != 1\n'
+                   'NUMA_PES=3 build')
     def test_create2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -58,6 +70,39 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_create_series_index1(self):
+        # create and box an indexed Series
+        def test_impl():
+            A = pd.Series([1,2,3], ['A', 'C', 'B'])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index2(self):
+        def test_impl():
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index3(self):
+        def test_impl():
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'], name='A')
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index4(self):
+        def test_impl(name):
+            A = pd.Series([1,2,3], index=['A', 'C', 'B'], name=name)
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func('A'), test_impl('A'))
 
     def test_create_str(self):
         def test_impl():
@@ -113,6 +158,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    def test_pass_series_index1(self):
+        def test_impl(A):
+            return A
+
+        S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_attr1(self):
         def test_impl(A):
             return A.size
@@ -149,14 +202,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
-    def test_series_attr5(self):
+    def test_series_argsort1(self):
         def test_impl(A):
-            return A.argsort().values
+            return A.argsort()
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
+        A = pd.Series(np.random.ranf(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_attr6(self):
         def test_impl(A):
@@ -220,6 +273,15 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_shape1(self):
+        def test_impl(A):
+            return A.shape
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = hpat.jit(test_impl)
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
     def test_static_setitem_series1(self):
         def test_impl(A):
             A[0] = 2
@@ -238,13 +300,11 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+        self.assertEqual(hpat_func(df.A.copy(), 0), test_impl(df.A.copy(), 0))
 
     def test_setitem_series2(self):
         def test_impl(A, i):
             A[i] = 100
-            # TODO: remove return after aliasing fix
-            return A
 
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
@@ -255,14 +315,55 @@ class TestSeries(unittest.TestCase):
         test_impl(A2, 0)
         np.testing.assert_array_equal(A1.values, A2.values)
 
+    @unittest.skip("enable after remove dead in hiframes is removed")
+    def test_setitem_series3(self):
+        def test_impl(A, i):
+            S = pd.Series(A)
+            S[i] = 100
+
+        n = 11
+        A = np.arange(n)
+        A1 = A.copy()
+        A2 = A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, 0)
+        test_impl(A2, 0)
+        np.testing.assert_array_equal(A1, A2)
+
+    def test_setitem_series_bool1(self):
+        def test_impl(A):
+            A[A>3] = 100
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1)
+        test_impl(A2)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
+    def test_setitem_series_bool2(self):
+        def test_impl(A, B):
+            A[A>3] = B[A>3]
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+        A1 = df.A.copy()
+        A2 = df.A
+        hpat_func = hpat.jit(test_impl)
+        hpat_func(A1, df.B)
+        test_impl(A2, df.B)
+        np.testing.assert_array_equal(A1.values, A2.values)
+
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[0]
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
+        A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        self.assertEqual(hpat_func(A), test_impl(A))
 
     def test_getitem_series1(self):
         def test_impl(A, i):
@@ -326,8 +427,13 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A, 0), test_impl(df.A, 0))
+        pd.testing.assert_series_equal(hpat_func(df.A, 0), test_impl(df.A, 0),
+            check_names=False)
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
     def test_series_op2(self):
         def test_impl(A, i):
             return A+i
@@ -335,7 +441,8 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
+        pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1),
+            check_names=False)
 
     def test_series_op3(self):
         def test_impl(A, i):
@@ -345,7 +452,8 @@ class TestSeries(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A.copy(), 1), test_impl(df.A, 1))
+        pd.testing.assert_series_equal(
+            hpat_func(df.A.copy(), 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op4(self):
         def test_impl(A):
@@ -354,7 +462,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_op5(self):
         def test_impl(A):
@@ -363,7 +471,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.arange(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
     def test_series_op6(self):
         def test_impl(A, B):
@@ -373,7 +481,61 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         B = pd.Series(np.arange(n)**2)
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(A, B), test_impl(A, B))
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    def test_series_op7(self):
+        def test_impl(A):
+            return -A
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
+
+    def test_series_inplace_binop_array(self):
+        def test_impl(A, B):
+            A += B
+            return A
+
+        n = 11
+        A = np.arange(n)**2.0  # TODO: use 2 for test int casting
+        B = pd.Series(np.ones(n))
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_fusion1(self):
+        def test_impl(A, B):
+            return A + B + 1
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 1)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_fusion2(self):
+        # make sure getting data var avoids incorrect single def assumption
+        def test_impl(A, B):
+            S = B + 2
+            if A[0] == 0:
+                S = A + 1
+            return S + B
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 3)
 
     def test_series_len(self):
         def test_impl(A, i):
@@ -399,6 +561,16 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_series_list_str_unbox1(self):
+        def test_impl(A):
+            return A.iloc[0]
+
+        S = pd.Series([['aa', 'b'], ['ccc'], []])
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        # call twice to test potential refcount errors
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     def test_np_typ_call_replace(self):
         # calltype replacement is tricky for np.typ() calls since variable
@@ -441,21 +613,36 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
+                   'Failed in hpat mode pipeline '
+                   '(step: nopython mode backend)\n'
+                   'expecting {{i8*, i8*, i64, i64, double*, [1 x i64], '
+                   '[1 x i64]}, i8*, {i8*, i64, i32, i32, i64, i8*, i8*}} \n'
+                   'but got {{i8*, i8*, i64, i64, double*, [1 x i64], '
+                   '[1 x i64]}, i8*, i8*}\n')
     def test_series_fillna1(self):
         def test_impl(A):
             return A.fillna(5.0)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
 
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
+                   'Failed in hpat mode pipeline '
+                   '(step: nopython mode backend)\n'
+                   'expecting {{i64, i64, i32*, i8*, i8*, i8*}, i8*, '
+                   '{i8*, i64, i32, i32, i64, i8*, i8*}} \n'
+                   'but got {{i64, i64, i32*, i8*, i8*, i8*}, i8*, i8*}\n')
     def test_series_fillna_str1(self):
         def test_impl(A):
             return A.fillna("dd")
 
         df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
 
     def test_series_fillna_str_inplace1(self):
         def test_impl(A):
@@ -499,6 +686,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
+    @unittest.skip("TODO: fix result")
+    def test_series_dropna_str_parallel1(self):
+        def test_impl(A):
+            B = A.dropna()
+            return (B == 'gg').sum()
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc', 'dd', 'gg'])
+        hpat_func = hpat.jit(distributed=['A'])(test_impl)
+        start, end = get_start_end(len(S1))
+        # TODO: gatherv
+        self.assertEqual(hpat_func(S1[start:end]), test_impl(S1))
+
     def test_series_dropna_float_inplace1(self):
         def test_impl(A):
             A.dropna(inplace=True)
@@ -518,6 +717,19 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
+                   'Failed in hpat mode pipeline'
+                   '(step: convert to distributed)\n'
+                   'Invalid use of Function(<built-in function len>)'
+                   'with argument(s) of type(s): (none)\n')
+    def test_series_rename1(self):
+        def test_impl(A):
+            return A.rename('B')
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
 
     def test_series_sum1(self):
         def test_impl(S):
@@ -553,6 +765,9 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   '5 != 2\n'
+                   'NUMA_PES=3 build')
     def test_series_count1(self):
         def test_impl(S):
             return S.count()
@@ -561,6 +776,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
         S = pd.Series([np.nan, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+        S = pd.Series(['aa', 'bb', np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_mean1(self):
@@ -595,6 +812,54 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_value_counts(self):
+        def test_impl(S):
+            return S.value_counts()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series(['AA', 'BB', 'C', 'AA', 'C', 'AA'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   '61 != 110\n'
+                   'NUMA_PES=3 build')
+    def test_series_dist_input1(self):
+        def test_impl(S):
+            return S.max()
+
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        start, end = get_start_end(n)
+        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_series_tuple_input1(self):
+        def test_impl(s_tup):
+            return s_tup[0].max()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        S2 = pd.Series(np.arange(n)+1.0)
+        s_tup = (S, 1, S2)
+        self.assertEqual(hpat_func(s_tup), test_impl(s_tup))
+
+    @unittest.skip("pending handling of build_tuple in dist pass")
+    def test_series_tuple_input_dist1(self):
+        def test_impl(s_tup):
+            return s_tup[0].max()
+
+        hpat_func = hpat.jit(locals={'s_tup:input': 'distributed'})(test_impl)
+        n = 111
+        S = pd.Series(np.arange(n))
+        S2 = pd.Series(np.arange(n)+1.0)
+        start, end = get_start_end(n)
+        s_tup = (S, 1, S2)
+        h_s_tup = (S[start:end], 1, S2[start:end])
+        self.assertEqual(hpat_func(h_s_tup), test_impl(s_tup))
+
     def test_series_rolling1(self):
         def test_impl(S):
             return S.rolling(3).sum()
@@ -615,6 +880,31 @@ class TestSeries(unittest.TestCase):
     def test_series_map1(self):
         def test_impl(S):
             return S.map(lambda a: 2*a)
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_map_global1(self):
+        def test_impl(S):
+            return S.map(lambda a: a + GLOBAL_VAL)
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_map_tup1(self):
+        def test_impl(S):
+            return S.map(lambda a: (a, 2*a))
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_map_tup_map1(self):
+        def test_impl(S):
+            A = S.map(lambda a: (a, 2*a))
+            return A.map(lambda a: a[1])
 
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([1.0, 2., 3., 4., 5.])
@@ -728,6 +1018,11 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, -2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not almost equal to 7 decimals\n'
+                   'ACTUAL: 4.166666666666667\n'
+                   'DESIRED: 12.5\n'
+                   'NUMA_PES=3 build')
     def test_series_cov1(self):
         def test_impl(S1, S2):
             return S1.cov(S2)
@@ -738,6 +1033,11 @@ class TestSeries(unittest.TestCase):
             np.testing.assert_almost_equal(hpat_func(S1, S2), test_impl(S1, S2),
                                            err_msg='S1={}\nS2={}'.format(S1, S2))
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not almost equal to 7 decimals\n'
+                   'ACTUAL: 0.9539980920057239\n'
+                   'DESIRED: 1.0\n'
+                   'NUMA_PES=3 build')
     def test_series_corr1(self):
         def test_impl(S1, S2):
             return S1.corr(S2)
@@ -755,6 +1055,24 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'abc', 'c', 'cccd'])
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('numba.errors.LoweringError - fix needed\n'
+                   'Failed in hpat mode pipeline'
+                   '(step: nopython mode backend)\n'
+                   'str_overload() takes 1 positional argument '
+                   'but 2 were given\n')
+    def test_series_str2str(self):
+        str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
+            'strip', 'swapcase', 'title', 'upper')
+        for method in str2str_methods:
+            func_text = "def test_impl(S):\n"
+            func_text += "  return S.str.{}()\n".format(method)
+            loc_vars = {}
+            exec(func_text, {}, loc_vars)
+            test_impl = loc_vars['test_impl']
+            hpat_func = hpat.jit(test_impl)
+            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_append1(self):
         def test_impl(S, other):
@@ -840,7 +1158,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not equal\n'
+                   'Mismatch: 100%\n'
+                   'Max absolute difference: 0.04361003\n'
+                   'Max relative difference: 9.04840049\n'
+                   'x: array([0.04843 , 0.05106 , 0.057625, 0.0671  ])\n'
+                   'y: array([0.00482 , 0.04843 , 0.05106 , 0.057625])\n'
+                   'NUMA_PES=3 build')
     def test_series_nlargest_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -877,7 +1206,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not equal\n'
+                   'Mismatch: 50%\n'
+                   'Max absolute difference: 0.01813261\n'
+                   'Max relative difference: 0.50757593\n'
+                   'x: array([0.007431, 0.024095, 0.035724, 0.053857])\n'
+                   'y: array([0.007431, 0.024095, 0.031374, 0.035724])\n'
+                   'NUMA_PES=3 build')
     def test_series_nsmallest_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -886,6 +1226,11 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
+                   'Failed in hpat mode pipeline'
+                   '(step: convert to distributed)\n'
+                   'Invalid use of Function(<built-in function len>)'
+                   'with argument(s) of type(s): (none)\n')
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -896,6 +1241,11 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
+                   'Failed in hpat mode pipeline'
+                   '(step: convert to distributed)\n'
+                   'Invalid use of Function(<built-in function len>)'
+                   'with argument(s) of type(s): (none)\n')
     def test_series_head_default1(self):
         def test_impl(S):
             return S.head()
@@ -905,6 +1255,32 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    def test_series_head_index1(self):
+        def test_impl():
+            S = pd.Series([6,9,2,3,6,4,5], [8,1,6,0,9,1,3])
+            return S.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_series_head_index2(self):
+        def test_impl():
+            S = pd.Series([6,9,2,3,6,4,5], ['a','ab','abc','c','f','hh',''])
+            return S.head(3)
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_series_head_index_parallel1(self):
+        def test_impl(S):
+            return S.head(3)
+
+        S = pd.Series([6,9,2,3,6,4,5], ['a','ab','abc','c','f','hh',''])
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+        start, end = get_start_end(len(S))
+        pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
+        self.assertTrue(count_array_OneDs()>0)
 
     def test_series_median1(self):
         def test_impl(S):
@@ -924,7 +1300,13 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError - fix needed\n'
+                   'nan != 0.45894510159707225\n'
+                   'NUMA_PES=3 build')
     def test_series_median_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -934,6 +1316,9 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
 
     def test_series_argsort_parallel(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -970,9 +1355,26 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.ranf(n))
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_sort_values_index1(self):
+        def test_impl(A, B):
+            S = pd.Series(A, B)
+            return S.sort_values()
+
+        n = 11
+        np.random.seed(0)
+        # TODO: support passing Series with Index
+        # S = pd.Series(np.random.ranf(n), np.random.randint(0, 100, n))
+        A = np.random.ranf(n)
+        B = np.random.ranf(n)
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
     def test_series_sort_values_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points

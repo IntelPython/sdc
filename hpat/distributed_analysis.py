@@ -15,11 +15,13 @@ from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 import numpy as np
 import hpat
 import hpat.io
-from hpat.pd_series_ext import BoxedSeriesType
+import hpat.io.np_io
+from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.utils import (get_constant, is_alloc_callname,
                         is_whole_slice, is_array, is_array_container,
-                        is_np_array, find_build_tuple, debug_prints)
-
+                        is_np_array, find_build_tuple, debug_prints,
+                        is_const_slice)
+from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from enum import Enum
 
 
@@ -30,11 +32,6 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
-try:
-    from hpat.ml.d4p import algos as d4p_algos
-except:
-    d4p_algos = []
-
 _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
 
@@ -42,13 +39,25 @@ distributed_analysis_extensions = {}
 auto_rebalance = False
 
 class DistributedAnalysis(object):
-    """analyze program for to distributed transfromation"""
+    """Analyze program for distributed transformation"""
 
-    def __init__(self, func_ir, typemap, calltypes, typingctx):
+    _extra_call = {}
+
+    @classmethod
+    def add_call_analysis(cls, typ, func, analysis_func):
+        '''
+        External modules/packages (like daal4py) can register their own call-analysis.
+        Analysis funcs are stored in a dict with keys (typ, funcname)
+        '''
+        assert (typ, func) not in cls._extra_call
+        cls._extra_call[(typ, func)] = analysis_func
+
+    def __init__(self, func_ir, typemap, calltypes, typingctx, metadata):
         self.func_ir = func_ir
         self.typemap = typemap
         self.calltypes = calltypes
         self.typingctx = typingctx
+        self.metadata = metadata
 
     def _init_run(self):
         self.func_ir._definitions = build_definitions(self.func_ir.blocks)
@@ -94,6 +103,8 @@ class DistributedAnalysis(object):
                 self._analyze_parfor(inst, array_dists, parfor_dists)
             elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                 self._analyze_setitem(inst, array_dists)
+            # elif isinstance(inst, ir.Print):
+            #     continue
             elif type(inst) in distributed_analysis_extensions:
                 # let external calls handle stmt if type matches
                 f = distributed_analysis_extensions[type(inst)]
@@ -109,6 +120,7 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
+                or isinstance(self.typemap[lhs], (SeriesType, DataFrameType))
                                      or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
@@ -138,6 +150,10 @@ class DistributedAnalysis(object):
             self._T_arrs.add(lhs)
             return
         elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
+                and isinstance(self.typemap[rhs.value.name], DataFrameType)
+                and rhs.attr == 'to_csv'):
+            return
+        elif (isinstance(rhs, ir.Expr) and rhs.op == 'getattr'
                 and rhs.attr in ['shape', 'ndim', 'size', 'strides', 'dtype',
                                  'itemsize', 'astype', 'reshape', 'ctypes',
                                  'transpose', 'tofile', 'copy']):
@@ -155,6 +171,16 @@ class DistributedAnalysis(object):
         elif isinstance(rhs, ir.Expr) and rhs.op in ('getiter', 'iternext'):
             # analyze array container access in pair_first
             return
+        elif isinstance(rhs, ir.Arg):
+            if rhs.name in self.metadata['distributed']:
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.OneD
+            elif rhs.name in self.metadata['threaded']:
+                if lhs not in array_dists:
+                    array_dists[lhs] = Distribution.Thread
+            else:
+                dprint("replicated input ", rhs.name, lhs)
+                self._set_REP([inst.target], array_dists)
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
@@ -170,10 +196,17 @@ class DistributedAnalysis(object):
             out_dist = Distribution.REP
 
         parfor_arrs = set()  # arrays this parfor accesses in parallel
-        array_accesses = ir_utils.get_array_accesses(parfor.loop_body)
+        array_accesses = _get_array_accesses(
+            parfor.loop_body, self.func_ir, self.typemap)
         par_index_var = parfor.loop_nests[0].index_variable.name
         #stencil_accesses, _ = get_stencil_accesses(parfor, self.typemap)
         for (arr, index) in array_accesses:
+            # XXX sometimes copy propagation doesn't work for parfor indices
+            # so see if the index has a single variable definition and use it
+            # e.g. test_to_numeric
+            ind_def = self.func_ir._definitions[index]
+            if len(ind_def) == 1 and isinstance(ind_def[0], ir.Var):
+                index = ind_def[0].name
             if index == par_index_var: #or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr, index))
@@ -230,7 +263,7 @@ class DistributedAnalysis(object):
                 return
             warnings.warn(
                 "function call couldn't be found for distributed analysis")
-            self._analyze_call_set_REP(lhs, args, array_dists)
+            self._analyze_call_set_REP(lhs, args, array_dists, fdef)
             return
         else:
             func_name, func_mod = fdef
@@ -250,6 +283,12 @@ class DistributedAnalysis(object):
             self._analyze_call_array(lhs, func_mod, func_name, args, array_dists)
             return
 
+        # handle df.func calls
+        if isinstance(func_mod, ir.Var) and isinstance(
+                self.typemap[func_mod.name], DataFrameType):
+            self._analyze_call_df(lhs, func_mod, func_name, args, array_dists)
+            return
+
         # hpat.distributed_api functions
         if isinstance(func_mod, str) and func_mod == 'hpat.distributed_api':
             self._analyze_call_hpat_dist(lhs, func_name, args, array_dists)
@@ -259,25 +298,25 @@ class DistributedAnalysis(object):
         if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name in ('h5read', 'h5write', 'h5read_filter')):
             return
 
-        if hpat.config._has_h5py and (func_mod == 'hpat.pio_api'
+        if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
                 and func_name == 'get_filter_read_indices'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if fdef == ('quantile', 'hpat.hiframes_api'):
+        if fdef == ('quantile', 'hpat.hiframes.api'):
             # quantile doesn't affect input's distribution
             return
 
-        if fdef == ('nunique', 'hpat.hiframes_api'):
+        if fdef == ('nunique', 'hpat.hiframes.api'):
             # nunique doesn't affect input's distribution
             return
 
-        if fdef == ('unique', 'hpat.hiframes_api'):
+        if fdef == ('unique', 'hpat.hiframes.api'):
             # doesn't affect distribution of input since input can stay 1D
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD_Var
@@ -287,59 +326,134 @@ class DistributedAnalysis(object):
             array_dists[lhs] = new_dist
             return
 
-        if fdef == ('rolling_fixed', 'hpat.hiframes_rolling'):
+        if fdef == ('rolling_fixed', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('rolling_variable', 'hpat.hiframes_rolling'):
+        if fdef == ('rolling_variable', 'hpat.hiframes.rolling'):
             # lhs, in_arr, on_arr should have the same distribution
             new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
             array_dists[rhs.args[0].name] = new_dist
             return
 
-        if fdef == ('shift', 'hpat.hiframes_rolling'):
+        if fdef == ('shift', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('pct_change', 'hpat.hiframes_rolling'):
+        if fdef == ('pct_change', 'hpat.hiframes.rolling'):
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
-        if fdef == ('nlargest', 'hpat.hiframes_api'):
+        if fdef == ('nlargest', 'hpat.hiframes.api'):
             # output of nlargest is REP
             array_dists[lhs] = Distribution.REP
             return
 
-        if fdef == ('median', 'hpat.hiframes_api'):
+        if fdef == ('median', 'hpat.hiframes.api'):
             return
 
-        if fdef == ('concat', 'hpat.hiframes_api'):
+        if fdef == ('concat', 'hpat.hiframes.api'):
             # hiframes concat is similar to np.concatenate
             self._analyze_call_np_concatenate(lhs, args, array_dists)
             return
 
-        if fdef == ('isna', 'hpat.hiframes_api'):
+        if fdef == ('isna', 'hpat.hiframes.api'):
+            return
+
+        if fdef == ('get_series_name', 'hpat.hiframes.api'):
             return
 
         # dummy hiframes functions
-        if func_mod == 'hpat.hiframes_api' and func_name in ('to_series_type',
+        if func_mod == 'hpat.hiframes.api' and func_name in ('get_series_data',
+                'get_series_index',
                 'to_arr_from_series', 'ts_series_to_arr_typ',
-                'to_date_series_type', 'dummy_unbox_series'):
+                'to_date_series_type', 'dummy_unbox_series',
+                'parallel_fix_df_array'):
+            # TODO: support Series type similar to Array
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
 
+        if fdef == ('init_series', 'hpat.hiframes.api'):
+            # lhs, in_arr, and index should have the same distribution
+            new_dist = self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            if len(rhs.args) > 1 and self.typemap[rhs.args[1].name] != types.none:
+                new_dist = self._meet_array_dists(lhs, rhs.args[1].name, array_dists, new_dist)
+                array_dists[rhs.args[0].name] = new_dist
+            return
+
+        if fdef == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
+            # lhs, data arrays, and index should have the same distribution
+            df_typ = self.typemap[lhs]
+            n_cols = len(df_typ.columns)
+            for i in range(n_cols):
+                new_dist = self._meet_array_dists(lhs, rhs.args[i].name, array_dists)
+            # handle index
+            if len(rhs.args) > n_cols and self.typemap[rhs.args[n_cols].name] != types.none:
+                new_dist = self._meet_array_dists(lhs, rhs.args[n_cols].name, array_dists, new_dist)
+            for i in range(n_cols):
+                array_dists[rhs.args[i].name] = new_dist
+            return
+
+        if fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
+        if fdef == ('compute_split_view', 'hpat.hiframes.split_impl'):
+            self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
+            return
+
+        if fdef == ('get_split_view_index', 'hpat.hiframes.split_impl'):
+            # just used in str.get() implementation for now so we know it is
+            # parallel
+            # TODO: handle index similar to getitem to support more cases
+            return
+
+        if fdef == ('get_split_view_data_ptr', 'hpat.hiframes.split_impl'):
+            return
+
+        if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
+            return
+
+        if fdef == ('num_total_chars', 'hpat.str_arr_ext'):
+            return
+
+        if fdef == ('_series_dropna_str_alloc_impl_inner', 'hpat.hiframes.series_kernels'):
+            if lhs not in array_dists:
+                array_dists[lhs] = Distribution.OneD_Var
+            in_dist = array_dists[rhs.args[0].name]
+            out_dist = array_dists[lhs]
+            out_dist = Distribution(min(out_dist.value, in_dist.value))
+            array_dists[lhs] = out_dist
+            # output can cause input REP
+            if out_dist != Distribution.OneD_Var:
+                array_dists[rhs.args[0].name] = out_dist
+            return
+
+        if (fdef == ('copy_non_null_offsets', 'hpat.str_arr_ext')
+                or fdef == ('copy_data', 'hpat.str_arr_ext')):
+            out_arrname = rhs.args[0].name
+            in_arrname = rhs.args[1].name
+            self._meet_array_dists(out_arrname, in_arrname, array_dists)
+            return
+
+        if fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext'):
+            out_arrname = rhs.args[0].name
+            in_arrname = rhs.args[2].name
+            self._meet_array_dists(out_arrname, in_arrname, array_dists)
+            return
+
         # np.fromfile()
-        if fdef == ('file_read', 'hpat.io'):
+        if fdef == ('file_read', 'hpat.io.np_io'):
             return
 
         if hpat.config._has_ros and fdef == ('read_ros_images_inner', 'hpat.ros'):
             return
 
-        if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.parquet_pio'):
+        if hpat.config._has_pyarrow and fdef == ('read_parquet', 'hpat.io.parquet_pio'):
             return
 
-        if hpat.config._has_pyarrow and fdef == ('read_parquet_str', 'hpat.parquet_pio'):
+        if hpat.config._has_pyarrow and fdef == ('read_parquet_str', 'hpat.io.parquet_pio'):
             # string read creates array in output
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
@@ -375,58 +489,20 @@ class DistributedAnalysis(object):
                 self._meet_array_dists(lhs, args[0].name, array_dists)
                 return
 
-        if isinstance(func_mod, ir.Var) and self._analyze_call_d4p(lhs, func_name, self.typemap[func_mod.name], args, array_dists):
-            return
-
         # TODO: make sure assert_equiv is not generated unnecessarily
         # TODO: fix assert_equiv for np.stack from df.value
         if fdef == ('assert_equiv', 'numba.array_analysis'):
             return
 
+        # we perform call-analysis from external at the end
+        if isinstance(func_mod, ir.Var):
+            ky = (self.typemap[func_mod.name], func_name)
+            if ky in DistributedAnalysis._extra_call:
+                if DistributedAnalysis._extra_call[ky](lhs, func_mod, *ky, args, array_dists):
+                    return
+
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
-
-
-    def _analyze_call_d4p(self, lhs, func_name, mod_name, args, array_dists):
-        '''
-        Analyze distribution for calls to daal4py.
-        Return True of a call for daal4py was detected and handled.
-        We cannot simply "meet" distributions, the d4p algos accept a certain decomposition only.
-        The required distribution/decomposition is defined in the algorithms specs.
-        We raise an exception if the required distribution cannot be met.
-        '''
-        if func_name == 'compute':
-            # every d4p algo gets executed by invoking "compute".
-            # we need to find the algorithm that's currently called
-            for algo in d4p_algos:
-                if algo.all_nbtypes[algo.name] == mod_name:
-                    # handle all input arguments and set their distribution as given by the spec
-                    for i in range(len(args)):
-                        aname = args[i].name
-                        adist = algo.spec.input_types[i][2]
-                        if aname not in array_dists:
-                            array_dists[aname] = adist
-                        else:
-                            min_adist = Distribution.OneD_Var if adist == Distribution.OneD else adist
-                            assert array_dists[aname].value <= Distribution.OneD.value, "Cannot handle unknown distribution type"
-                            # bail out if there is a distribution conflict with some other use of the argument
-                            # FIXME: handle Distribution.Thread and Disribution.REP as equivalent
-                            assert array_dists[aname].value >= min_adist.value,\
-                                   'Distribution of argument {} ({}) to "daal4py.{}.compute" must be "{}". '\
-                                   'Some other use of it demands "{}", though.'\
-                                   .format(i+1, algo.spec.input_types[i][0], algo.name, adist, array_dists[aname])
-                    # handle distribution of the result
-                    if lhs not in array_dists:
-                        array_dists[lhs] = algo.spec.result_dist
-                    else:
-                        array_dists[lhs] = Distribution(min(array_dists[lhs].value, algo.spec.result_dist.value))
-                        min_rdist = Distribution.OneD_Var if algo.spec.result_dist == Distribution.OneD else algo.spec.result_dist
-                        assert array_dists[lhs].value >= min_rdist.value,\
-                            'Distribution ({}) to "daal4py.{}.compute" must be at least "{}". '\
-                            'Some other use of it demands "{}", though.'\
-                            .format(algo.name, min_rdist, array_dists[lhs])
-                    return True
-            return False
+        self._analyze_call_set_REP(lhs, args, array_dists, fdef)
 
 
     def _analyze_call_np(self, lhs, func_name, args, array_dists):
@@ -464,7 +540,7 @@ class DistributedAnalysis(object):
         if func_name == 'stack':
             seq_info = guard(find_build_sequence, self.func_ir, args[0])
             if seq_info is None:
-                self._analyze_call_set_REP(lhs, args, array_dists)
+                self._analyze_call_set_REP(lhs, args, array_dists, 'np.' + func_name)
                 return
             in_arrs, _ = seq_info
 
@@ -488,7 +564,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'np.' + func_name)
 
 
     def _analyze_call_array(self, lhs, arr, func_name, args, array_dists):
@@ -513,7 +589,10 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, in_arr_name, array_dists)
             # TODO: support 1D_Var reshape
             if func_name == 'reshape' and array_dists[lhs] == Distribution.OneD_Var:
-                self._analyze_call_set_REP(lhs, args, array_dists)
+                # HACK support A.reshape(n, 1) for 1D_Var
+                if len(args) == 2 and guard(find_const, self.func_ir, args[1]) == 1:
+                    return
+                self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
             return
 
         # Array.tofile() is supported for all distributions
@@ -521,19 +600,31 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'array.' + func_name)
 
+    def _analyze_call_df(self, lhs, arr, func_name, args, array_dists):
+        # to_csv() can be parallelized
+        if func_name == 'to_csv':
+            return
+
+        # set REP if not found
+        self._analyze_call_set_REP(lhs, args, array_dists, 'df.' + func_name)
 
     def _analyze_call_hpat_dist(self, lhs, func_name, args, array_dists):
         """analyze distributions of hpat distributed functions
         (hpat.distributed_api.func_name)
         """
+        if func_name == 'local_len':
+            return
+        if func_name == 'parallel_print':
+            return
+
         if func_name == 'dist_return':
             arr_name = args[0].name
             assert arr_name in array_dists, "array distribution not found"
             if array_dists[arr_name] == Distribution.REP:
                 raise ValueError("distributed return of array {} not valid"
-                                 " since it is replicated")
+                                 " since it is replicated".format(arr_name))
             return
 
         if func_name == 'threaded_return':
@@ -543,16 +634,6 @@ class DistributedAnalysis(object):
                 raise ValueError("threaded return of array {} not valid"
                                  " since it is replicated")
             array_dists[arr_name] = Distribution.Thread
-            return
-
-        if func_name == 'dist_input':
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
-        if func_name == 'threaded_input':
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.Thread
             return
 
         if func_name == 'rebalance_array':
@@ -566,7 +647,7 @@ class DistributedAnalysis(object):
             return
 
         # set REP if not found
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'hpat.distributed_api.' + func_name)
 
     def _analyze_call_np_concatenate(self, lhs, args, array_dists):
         assert len(args) == 1
@@ -643,17 +724,19 @@ class DistributedAnalysis(object):
             return
 
         # set REP if no pattern matched
-        self._analyze_call_set_REP(lhs, args, array_dists)
+        self._analyze_call_set_REP(lhs, args, array_dists, 'np.dot')
 
-    def _analyze_call_set_REP(self, lhs, args, array_dists):
+    def _analyze_call_set_REP(self, lhs, args, array_dists, fdef=None):
         for v in args:
             if (is_array(self.typemap, v.name)
-                    or is_array_container(self.typemap, v.name)):
-                dprint("dist setting call arg REP {}".format(v.name))
+                    or is_array_container(self.typemap, v.name)
+                    or isinstance(self.typemap[v.name], DataFrameType)):
+                dprint("dist setting call arg REP {} in {}".format(v.name, fdef))
                 array_dists[v.name] = Distribution.REP
         if (is_array(self.typemap, lhs)
-                or is_array_container(self.typemap, lhs)):
-            dprint("dist setting call out REP {}".format(lhs))
+                or is_array_container(self.typemap, lhs)
+                or isinstance(self.typemap[lhs], DataFrameType)):
+            dprint("dist setting call out REP {} in {}".format(lhs, fdef))
             array_dists[lhs] = Distribution.REP
 
     def _analyze_getitem(self, inst, lhs, rhs, array_dists):
@@ -723,6 +806,12 @@ class DistributedAnalysis(object):
             self._meet_array_dists(lhs, rhs.value.name, array_dists)
             return
 
+        # output of operations like S.head() is REP since it's a "small" slice
+        # input can remain 1D
+        if guard(is_const_slice, self.typemap, self.func_ir, index_var):
+            array_dists[lhs] = Distribution.REP
+            return
+
         self._set_REP(inst.list_vars(), array_dists)
         return
 
@@ -768,11 +857,12 @@ class DistributedAnalysis(object):
     def _set_REP(self, var_list, array_dists):
         for var in var_list:
             varname = var.name
-            # Handle BoxedSeriesType since it comes from Arg node and it could
+            # Handle SeriesType since it comes from Arg node and it could
             # have user-defined distribution
             if (is_array(self.typemap, varname)
                     or is_array_container(self.typemap, varname)
-                    or isinstance(self.typemap[varname], BoxedSeriesType)):
+                    or isinstance(
+                        self.typemap[varname], (SeriesType, DataFrameType))):
                 dprint("dist setting REP {}".format(varname))
                 array_dists[varname] = Distribution.REP
             # handle tuples of arrays
@@ -800,7 +890,8 @@ class DistributedAnalysis(object):
                 # TODO: handle hiframes filter etc.
                 if (isinstance(inst, Parfor)
                         and parfor_dists[inst.id] == Distribution.OneD_Var):
-                    array_accesses = ir_utils.get_array_accesses(inst.loop_body)
+                    array_accesses = _get_array_accesses(
+                        inst.loop_body, self.func_ir, self.typemap)
                     onedv_arrs = set(arr for (arr, ind) in array_accesses
                                  if arr in array_dists and array_dists[arr] == Distribution.OneD_Var)
                     if (label in loop_bodies
@@ -916,6 +1007,62 @@ def _arrays_written(arrs, blocks):
 #             if invar.name == var2.name or vars_dependent(defs, invar, var2):
 #                 return True
 #     return False
+
+
+
+# array access code is copied from ir_utils to be able to handle specialized
+# array access calls such as get_split_view_index()
+# TODO: implement extendable version in ir_utils
+def get_parfor_array_accesses(parfor, func_ir, typemap, accesses=None):
+    if accesses is None:
+        accesses = set()
+    blocks = wrap_parfor_blocks(parfor)
+    accesses = _get_array_accesses(blocks, func_ir, typemap, accesses)
+    unwrap_parfor_blocks(parfor)
+    return accesses
+
+
+array_accesses_extensions = {}
+array_accesses_extensions[Parfor] = get_parfor_array_accesses
+
+
+def _get_array_accesses(blocks, func_ir, typemap, accesses=None):
+    """returns a set of arrays accessed and their indices.
+    """
+    if accesses is None:
+        accesses = set()
+
+    for block in blocks.values():
+        for inst in block.body:
+            if isinstance(inst, ir.SetItem):
+                accesses.add((inst.target.name, inst.index.name))
+            if isinstance(inst, ir.StaticSetItem):
+                accesses.add((inst.target.name, inst.index_var.name))
+            if isinstance(inst, ir.Assign):
+                lhs = inst.target.name
+                rhs = inst.value
+                if isinstance(rhs, ir.Expr) and rhs.op == 'getitem':
+                    accesses.add((rhs.value.name, rhs.index.name))
+                if isinstance(rhs, ir.Expr) and rhs.op == 'static_getitem':
+                    index = rhs.index
+                    # slice is unhashable, so just keep the variable
+                    if index is None or ir_utils.is_slice_index(index):
+                        index = rhs.index_var.name
+                    accesses.add((rhs.value.name, index))
+                if isinstance(rhs, ir.Expr) and rhs.op == 'call':
+                    fdef = guard(find_callname, func_ir, rhs, typemap)
+                    if fdef is not None:
+                        if fdef == ('get_split_view_index', 'hpat.hiframes.split_impl'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+                        if fdef == ('setitem_str_arr_ptr', 'hpat.str_arr_ext'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+                        if fdef == ('str_arr_item_to_numeric', 'hpat.str_arr_ext'):
+                            accesses.add((rhs.args[0].name, rhs.args[1].name))
+                            accesses.add((rhs.args[2].name, rhs.args[3].name))
+            for T, f in array_accesses_extensions.items():
+                if isinstance(inst, T):
+                    f(inst, func_ir, typemap, accesses)
+    return accesses
 
 
 def dprint(*s):

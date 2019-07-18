@@ -1,3 +1,4 @@
+import operator
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
 from numba.targets.arrayobj import make_array
@@ -12,7 +13,7 @@ from hpat.utils import _numba_to_c_type_map
 from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
 import time
 from llvmlite import ir as lir
-import hdist
+from . import hdist
 import llvmlite.binding as ll
 ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
 ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
@@ -407,7 +408,7 @@ def lower_dist_comm_req_dealloc(context, builder, sig, args):
     return context.get_dummy_value()
 
 
-@lower_builtin('setitem', ReqArrayType, types.intp, mpi_req_numba_type)
+@lower_builtin(operator.setitem, ReqArrayType, types.intp, mpi_req_numba_type)
 def setitem_req_array(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
                                              lir.IntType(64),
@@ -492,7 +493,7 @@ def get_tuple_prod(t):
 def get_tuple_prod_overload(t):
     # handle empty tuple seperately since empty getiter doesn't work
     if t == numba.types.containers.Tuple(()):
-        return lambda a: 1
+        return lambda t: 1
 
     def get_tuple_prod_impl(t):
         res = 1
@@ -547,13 +548,6 @@ def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
     elem_size = dtype_size * lower_dims_size
     permutation_array_index(lhs.ctypes, lhs_len, elem_size, c_rhs.ctypes,
                             p.ctypes, p_len)
-
-
-ll.add_symbol('fix_i_malloc', hdist.fix_i_malloc)
-_fix_i_malloc = types.ExternalFunction("fix_i_malloc",  types.void())
-@numba.njit
-def fix_i_malloc():
-    _fix_i_malloc()
 
 ########### finalize MPI when exiting ####################
 

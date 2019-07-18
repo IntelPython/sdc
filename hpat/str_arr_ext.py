@@ -10,8 +10,10 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
 from numba import cgutils
-from hpat.str_ext import string_type, StringType, del_str
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed, iternext_impl
+from hpat.str_ext import string_type
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+    iternext_impl, RefType)
+from numba.targets.hashing import _Py_hash_t
 import llvmlite.llvmpy.core as lc
 from glob import glob
 
@@ -45,6 +47,8 @@ class StringArrayType(types.IterableType):
     def iterator_type(self):
         return StringArrayIterator()
 
+    def copy(self):
+        return StringArrayType()
 
 string_array_type = StringArrayType()
 
@@ -133,7 +137,7 @@ class StrArrayIteratorModel(models.StructModel):
 lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
 
 @lower_builtin('iternext', StringArrayIterator)
-@iternext_impl
+@iternext_impl(RefType.NEW)
 def iternext_str_array(context, builder, sig, args, result):
     [iterty] = sig.args
     [iter_arg] = args
@@ -201,6 +205,24 @@ def get_data_ptr(typingctx, str_arr_typ=None):
     return data_ctypes_type(string_array_type), codegen
 
 @intrinsic
+def get_data_ptr_ind(typingctx, str_arr_typ, int_t=None):
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+
+        string_array = context.make_helper(
+            builder, string_array_type, in_str_arr)
+        # Create new ArrayCType structure
+        # TODO: put offset/data in main structure since immutable
+        ctinfo = context.make_helper(builder, data_ctypes_type)
+        ctinfo.data = builder.gep(string_array.data, [ind])
+        ctinfo.meminfo = string_array.meminfo
+        res = ctinfo._getvalue()
+        return impl_ret_borrowed(context, builder, data_ctypes_type, res)
+
+    return data_ctypes_type(string_array_type, types.intp), codegen
+
+@intrinsic
 def getitem_str_offset(typingctx, str_arr_typ, ind_t=None):
     def codegen(context, builder, sig, args):
         in_str_arr, ind = args
@@ -239,6 +261,11 @@ def copy_str_arr_slice(typingctx, str_arr_typ, out_str_arr_typ, ind_t=None):
         ind_p1 = builder.add(ind, context.get_constant(types.intp, 1))
         cgutils.memcpy(builder, out_offsets, in_offsets, ind_p1)
         cgutils.memcpy(builder, out_string_array.data, in_string_array.data, builder.load(builder.gep(in_offsets, [ind])))
+        # n_bytes = (num_strings+sizeof(uint8_t)-1)/sizeof(uint8_t)
+        ind_p7 = builder.add(ind, lir.Constant(lir.IntType(64), 7))
+        n_bytes = builder.lshr(ind_p7, lir.Constant(lir.IntType(64), 3))
+        # assuming rest of last byte is set to all ones (e.g. from prealloc)
+        cgutils.memcpy(builder, out_string_array.null_bitmap, in_string_array.null_bitmap, n_bytes)
         return context.get_dummy_value()
 
     return types.void(string_array_type, string_array_type, ind_t), codegen
@@ -282,6 +309,10 @@ def copy_non_null_offsets(typingctx, str_arr_typ, out_str_arr_typ=None):
                 builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
                 builder.store(builder.add(curr_offset, lir.Constant(context.get_data_type(offset_typ), 1)), curr_offset_ptr)
 
+        # set last offset
+        curr_offset = builder.load(curr_offset_ptr)
+        in_val = builder.load(builder.gep(in_string_array.offsets, [n]))
+        builder.store(in_val, builder.gep(out_string_array.offsets, [curr_offset]))
         return context.get_dummy_value()
 
     return types.void(string_array_type, string_array_type), codegen
@@ -315,18 +346,18 @@ def to_string_list(arr):
     return arr
 
 @overload(to_string_list)
-def to_string_list_overload(arr_typ):
-    if is_str_arr_typ(arr_typ):
-        def to_string_impl(str_arr):
-            n = len(str_arr)
+def to_string_list_overload(data):
+    if is_str_arr_typ(data):
+        def to_string_impl(data):
+            n = len(data)
             l_str = []
             for i in range(n):
-                l_str.append(str_arr[i])
+                l_str.append(data[i])
             return l_str
         return to_string_impl
 
-    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
-        count = arr_typ.count
+    if isinstance(data, (types.Tuple, types.UniTuple)):
+        count = data.count
 
         func_text = "def f(data):\n"
         func_text += "  return ({}{})\n".format(','.join(["to_string_list(data[{}])".format(
@@ -338,29 +369,28 @@ def to_string_list_overload(arr_typ):
         to_str_impl = loc_vars['f']
         return to_str_impl
 
-    return lambda a: a
+    return lambda data: data
 
 def cp_str_list_to_array(str_arr, str_list):
     return
 
 @overload(cp_str_list_to_array)
-def cp_str_list_to_array_overload(arr_typ, list_typ):
-    if is_str_arr_typ(arr_typ):
-        def cp_str_list_impl(str_arr, str_list):
-            n = len(str_list)
+def cp_str_list_to_array_overload(str_arr, list_data):
+    if is_str_arr_typ(str_arr):
+        def cp_str_list_impl(str_arr, list_data):
+            n = len(list_data)
             for i in range(n):
-                _str = str_list[i]
-                setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
-                del_str(_str)
+                _str = list_data[i]
+                str_arr[i] = _str
 
         return cp_str_list_impl
 
-    if isinstance(arr_typ, (types.Tuple, types.UniTuple)):
-        count = arr_typ.count
+    if isinstance(str_arr, (types.Tuple, types.UniTuple)):
+        count = str_arr.count
 
-        func_text = "def f(data, l_data):\n"
+        func_text = "def f(str_arr, list_data):\n"
         for i in range(count):
-            func_text += "  cp_str_list_to_array(data[{}], l_data[{}])\n".format(i, i)
+            func_text += "  cp_str_list_to_array(str_arr[{}], list_data[{}])\n".format(i, i)
         func_text += "  return\n"
 
         loc_vars = {}
@@ -368,31 +398,30 @@ def cp_str_list_to_array_overload(arr_typ, list_typ):
         cp_str_impl = loc_vars['f']
         return cp_str_impl
 
-    return lambda a,b: None
+    return lambda str_arr, list_data: None
 
 
 def str_list_to_array(str_list):
     return str_list
 
 @overload(str_list_to_array)
-def str_list_to_array_overload(list_typ):
-    if list_typ == types.List(string_type):
+def str_list_to_array_overload(str_list):
+    if str_list == types.List(string_type):
         def str_list_impl(str_list):
             n = len(str_list)
             n_char = 0
             for i in range(n):
                 _str = str_list[i]
-                n_char += len(_str)
+                n_char += get_utf8_size(_str)
             str_arr = pre_alloc_string_array(n, n_char)
             for i in range(n):
                 _str = str_list[i]
-                setitem_string_array(get_offset_ptr(str_arr), get_data_ptr(str_arr), _str, i)
-                del_str(_str)  # XXX assuming str list is not used anymore
+                str_arr[i] = _str
             return str_arr
 
         return str_list_impl
 
-    return lambda a: a
+    return lambda str_list: str_list
 
 @infer_global(operator.getitem)
 class GetItemStringArray(AbstractTemplate):
@@ -404,21 +433,20 @@ class GetItemStringArray(AbstractTemplate):
         if isinstance(ary, StringArrayType):
             if isinstance(idx, types.SliceType):
                 return signature(string_array_type, *args)
-            elif isinstance(idx, types.Integer):
-                return signature(string_type, *args)
+            # elif isinstance(idx, types.Integer):
+            #     return signature(string_type, *args)
             elif idx == types.Array(types.bool_, 1, 'C'):
                 return signature(string_array_type, *args)
             elif idx == types.Array(types.intp, 1, 'C'):
                 return signature(string_array_type, *args)
 
-@infer
+@infer_global(operator.setitem)
 class SetItemStringArray(AbstractTemplate):
-    key = "setitem"
-
     def generic(self, args, kws):
         assert not kws
         ary, idx, val = args
-        if ary == string_array_type:
+        if (ary == string_array_type and isinstance(idx, types.Integer)
+                and val == string_type):
             return signature(types.none, *args)
 
 
@@ -464,8 +492,8 @@ class CmpOpLTStringArray(CmpOpEqStringArray):
     key = '<'
 
 def is_str_arr_typ(typ):
-    from hpat.pd_series_ext import string_series_type
-    return typ == string_array_type or typ == string_series_type
+    from hpat.hiframes.pd_series_ext import is_str_series_typ
+    return typ == string_array_type or is_str_series_typ(typ)
 
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):
@@ -550,15 +578,15 @@ def str_arr_size_impl(context, builder, typ, val):
 @overload(len)
 def str_arr_len_overload(str_arr):
     if is_str_arr_typ(str_arr):
-        def str_arr_len(s):
-            return s.size
+        def str_arr_len(str_arr):
+            return str_arr.size
         return str_arr_len
 
 
 from numba.targets.listobj import ListInstance
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hstr_ext
+from . import hstr_ext
 ll.add_symbol('get_str_len', hstr_ext.get_str_len)
 ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
 ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
@@ -570,15 +598,22 @@ ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
 ll.add_symbol('print_int', hstr_ext.print_int)
 ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
 ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
+ll.add_symbol('str_arr_to_int64', hstr_ext.str_arr_to_int64)
+ll.add_symbol('str_arr_to_float64', hstr_ext.str_arr_to_float64)
+ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
+ll.add_symbol('c_glob', hstr_ext.c_glob)
+ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
+ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
 
 convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
 
-import hstr_ext
-ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
-ll.add_symbol('c_glob', hstr_ext.c_glob)
 
 setitem_string_array = types.ExternalFunction("setitem_string_array",
-            types.void(types.voidptr, types.voidptr, string_type, types.intp))
+            types.void(types.voidptr, types.voidptr, types.intp, string_type,
+            types.intp))
+_get_utf8_size = types.ExternalFunction("get_utf8_size",
+            types.intp(types.voidptr, types.intp, types.int32))
+
 
 def construct_string_array(context, builder):
     """Creates meminfo and sets dtor.
@@ -608,82 +643,135 @@ def construct_string_array(context, builder):
     return meminfo, meminfo_data_ptr
 
 
+# TODO: overload of constructor doesn't work
+# @overload(StringArray)
+# def string_array_const(in_list=None):
+#     if in_list is None:
+#         return lambda: pre_alloc_string_array(0, 0)
+
+#     def str_arr_from_list(in_list):
+#         n_strs = len(in_list)
+#         total_chars = 0
+#         # TODO: use vector to avoid two passes?
+#         # get total number of chars
+#         for s in in_list:
+#             total_chars += len(s)
+
+#         A = pre_alloc_string_array(n_strs, total_chars)
+#         for i in range(n_strs):
+#             A[i] = in_list[i]
+
+#         return A
+
+#     return str_arr_from_list
+
+
+# used in pd.DataFrame() and pd.Series() to convert list of strings
 @lower_builtin(StringArray)
 @lower_builtin(StringArray, types.List)
+@lower_builtin(StringArray, types.UniTuple)
 def impl_string_array_single(context, builder, sig, args):
-    typ = sig.return_type
-    zero = context.get_constant(types.intp, 0)
-    meminfo, meminfo_data_ptr = construct_string_array(context, builder)
+    if isinstance(args[0], types.UniTuple):
+        assert args[0].dtype == string_type
 
-    str_arr_payload = cgutils.create_struct_proxy(str_arr_payload_type)(context, builder)
     if not sig.args:  # return empty string array if no args
-        # XXX alloc empty arrays for dtor to safely delete?
-        builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
-        string_array = context.make_helper(builder, typ)
-        string_array.meminfo = meminfo
-        string_array.num_items = zero
-        string_array.num_total_chars = zero
-        ret = string_array._getvalue()
-        #context.nrt.decref(builder, ty, ret)
+        res = context.compile_internal(
+            builder, lambda: pre_alloc_string_array(0, 0), sig, args)
+        return res
 
-        return impl_ret_new_ref(context, builder, typ, ret)
+    def str_arr_from_list(in_list):
+        n_strs = len(in_list)
+        total_chars = 0
+        # TODO: use vector to avoid two passes?
+        # get total number of chars
+        for s in in_list:
+            total_chars += get_utf8_size(s)
 
-    string_list = ListInstance(context, builder, sig.args[0], args[0])
+        A = pre_alloc_string_array(n_strs, total_chars)
+        for i in range(n_strs):
+            A[i] = in_list[i]
 
-    # get total size of string buffer
-    fnty = lir.FunctionType(lir.IntType(64),
-                            [lir.IntType(8).as_pointer()])
-    fn_len = builder.module.get_or_insert_function(fnty, name="get_str_len")
-    total_size = cgutils.alloca_once_value(builder, zero)
+        return A
 
-    # loop through all strings and get length
-    with cgutils.for_range(builder, string_list.size) as loop:
-        str_value = string_list.getitem(loop.index)
-        str_len = builder.call(fn_len, [str_value])
-        builder.store(builder.add(builder.load(total_size), str_len), total_size)
+    res = context.compile_internal(builder, str_arr_from_list, sig, args)
+    return res
 
-    # allocate string array
-    fnty = lir.FunctionType(lir.VoidType(),
-                            [lir.IntType(32).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(),
-                             lir.IntType(8).as_pointer().as_pointer(),
-                             lir.IntType(64),
-                             lir.IntType(64)])
-    fn_alloc = builder.module.get_or_insert_function(fnty,
-                                                     name="allocate_string_array")
-    builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
-                            str_arr_payload._get_ptr_by_name('data'),
-                            str_arr_payload._get_ptr_by_name('null_bitmap'),
-                            string_list.size, builder.load(total_size)])
+# @lower_builtin(StringArray)
+# @lower_builtin(StringArray, types.List)
+# def impl_string_array_single(context, builder, sig, args):
+#     typ = sig.return_type
+#     zero = context.get_constant(types.intp, 0)
+#     meminfo, meminfo_data_ptr = construct_string_array(context, builder)
 
-    # set string array values
-    fnty = lir.FunctionType(lir.VoidType(),
-                            [lir.IntType(32).as_pointer(),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(64)])
-    fn_setitem = builder.module.get_or_insert_function(fnty,
-                                                       name="setitem_string_array")
+#     str_arr_payload = cgutils.create_struct_proxy(str_arr_payload_type)(context, builder)
+#     if not sig.args:  # return empty string array if no args
+#         # XXX alloc empty arrays for dtor to safely delete?
+#         builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
+#         string_array = context.make_helper(builder, typ)
+#         string_array.meminfo = meminfo
+#         string_array.num_items = zero
+#         string_array.num_total_chars = zero
+#         ret = string_array._getvalue()
+#         #context.nrt.decref(builder, ty, ret)
 
-    with cgutils.for_range(builder, string_list.size) as loop:
-        str_value = string_list.getitem(loop.index)
-        builder.call(fn_setitem, [str_arr_payload.offsets, str_arr_payload.data,
-                                  str_value, loop.index])
+#         return impl_ret_new_ref(context, builder, typ, ret)
 
-    builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
+#     string_list = ListInstance(context, builder, sig.args[0], args[0])
 
-    string_array = context.make_helper(builder, typ)
-    string_array.num_items = string_list.size
-    string_array.num_total_chars = builder.load(total_size)
-    #cgutils.printf(builder, "str %d %d\n", string_array.num_items, string_array.num_total_chars)
-    string_array.offsets = str_arr_payload.offsets
-    string_array.data = str_arr_payload.data
-    string_array.null_bitmap = str_arr_payload.null_bitmap
-    string_array.meminfo = meminfo
-    ret = string_array._getvalue()
-    #context.nrt.decref(builder, ty, ret)
+#     # get total size of string buffer
+#     fnty = lir.FunctionType(lir.IntType(64),
+#                             [lir.IntType(8).as_pointer()])
+#     fn_len = builder.module.get_or_insert_function(fnty, name="get_str_len")
+#     total_size = cgutils.alloca_once_value(builder, zero)
 
-    return impl_ret_new_ref(context, builder, typ, ret)
+#     # loop through all strings and get length
+#     with cgutils.for_range(builder, string_list.size) as loop:
+#         str_value = string_list.getitem(loop.index)
+#         str_len = builder.call(fn_len, [str_value])
+#         builder.store(builder.add(builder.load(total_size), str_len), total_size)
+
+#     # allocate string array
+#     fnty = lir.FunctionType(lir.VoidType(),
+#                             [lir.IntType(32).as_pointer().as_pointer(),
+#                              lir.IntType(8).as_pointer().as_pointer(),
+#                              lir.IntType(8).as_pointer().as_pointer(),
+#                              lir.IntType(64),
+#                              lir.IntType(64)])
+#     fn_alloc = builder.module.get_or_insert_function(fnty,
+#                                                      name="allocate_string_array")
+#     builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
+#                             str_arr_payload._get_ptr_by_name('data'),
+#                             str_arr_payload._get_ptr_by_name('null_bitmap'),
+#                             string_list.size, builder.load(total_size)])
+
+#     # set string array values
+#     fnty = lir.FunctionType(lir.VoidType(),
+#                             [lir.IntType(32).as_pointer(),
+#                              lir.IntType(8).as_pointer(),
+#                              lir.IntType(8).as_pointer(),
+#                              lir.IntType(64)])
+#     fn_setitem = builder.module.get_or_insert_function(fnty,
+#                                                        name="setitem_string_array")
+
+#     with cgutils.for_range(builder, string_list.size) as loop:
+#         str_value = string_list.getitem(loop.index)
+#         builder.call(fn_setitem, [str_arr_payload.offsets, str_arr_payload.data,
+#                                   str_value, loop.index])
+
+#     builder.store(str_arr_payload._getvalue(), meminfo_data_ptr)
+
+#     string_array = context.make_helper(builder, typ)
+#     string_array.num_items = string_list.size
+#     string_array.num_total_chars = builder.load(total_size)
+#     #cgutils.printf(builder, "str %d %d\n", string_array.num_items, string_array.num_total_chars)
+#     string_array.offsets = str_arr_payload.offsets
+#     string_array.data = str_arr_payload.data
+#     string_array.null_bitmap = str_arr_payload.null_bitmap
+#     string_array.meminfo = meminfo
+#     ret = string_array._getvalue()
+#     #context.nrt.decref(builder, ty, ret)
+
+#     return impl_ret_new_ref(context, builder, typ, ret)
 
 @intrinsic
 def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
@@ -801,6 +889,32 @@ def str_arr_is_na(typingctx, str_arr_typ, ind_typ=None):
 
     return types.bool_(string_array_type, types.intp), codegen
 
+
+@intrinsic
+def str_arr_set_na(typingctx, str_arr_typ, ind_typ=None):
+    # None default to make IntelliSense happy
+    assert is_str_arr_typ(str_arr_typ)
+    def codegen(context, builder, sig, args):
+        in_str_arr, ind = args
+        string_array = context.make_helper(builder, string_array_type, in_str_arr)
+
+        # bits[i / 8] |= kBitmask[i % 8];
+        byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+        bit_ind = builder.urem(ind, lir.Constant(lir.IntType(64), 8))
+        byte_ptr = builder.gep(string_array.null_bitmap, [byte_ind], inbounds=True)
+        byte = builder.load(byte_ptr)
+        ll_typ_mask = lir.ArrayType(lir.IntType(8), 8)
+        mask_tup = cgutils.alloca_once_value(builder, lir.Constant(ll_typ_mask, (1, 2, 4, 8, 16, 32, 64, 128)))
+        mask = builder.load(builder.gep(mask_tup, [lir.Constant(lir.IntType(64), 0), bit_ind], inbounds=True))
+        # flip all bits of mask e.g. 11111101
+        mask = builder.xor(mask, lir.Constant(lir.IntType(8), -1))
+        # unset masked bit
+        builder.store(builder.and_(byte, mask), byte_ptr)
+        return context.get_dummy_value()
+
+    return types.void(string_array_type, types.intp), codegen
+
+
 @intrinsic
 def set_null_bits(typingctx, str_arr_typ=None):
     assert is_str_arr_typ(str_arr_typ)
@@ -815,20 +929,63 @@ def set_null_bits(typingctx, str_arr_typ=None):
     return types.none(string_array_type), codegen
 
 # XXX: setitem works only if value is same size as the previous value
-@lower_builtin('setitem', StringArrayType, types.Integer, StringType)
+@lower_builtin(operator.setitem, StringArrayType, types.Integer, string_type)
 def setitem_str_arr(context, builder, sig, args):
     arr, ind, val = args
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=val)
     string_array = context.make_helper(builder, string_array_type, arr)
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer(),
                              lir.IntType(8).as_pointer(),
+                             lir.IntType(64),
                              lir.IntType(8).as_pointer(),
+                             lir.IntType(64),
+                             lir.IntType(32),
+                             lir.IntType(32),
                              lir.IntType(64)])
-    fn_setitem = builder.module.get_or_insert_function(fnty,
-                                                       name="setitem_string_array")
+    fn_setitem = builder.module.get_or_insert_function(
+        fnty, name="setitem_string_array")
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
-                                  val, ind])
+                              string_array.num_total_chars,
+                              uni_str.data, uni_str.length, uni_str.kind,
+                              uni_str.is_ascii, ind])
     return context.get_dummy_value()
+
+
+@numba.njit(no_cpython_wrapper=True)
+def get_utf8_size(s):
+    if s._is_ascii == 1:
+        return len(s)
+    return _get_utf8_size(s._data, s._length, s._kind)
+
+
+@intrinsic
+def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
+    def codegen(context, builder, sig, args):
+        arr, ind, ptr, length = args
+        string_array = context.make_helper(builder, string_array_type, arr)
+        fnty = lir.FunctionType(lir.VoidType(),
+                                [lir.IntType(32).as_pointer(),
+                                lir.IntType(8).as_pointer(),
+                                lir.IntType(64),
+                                lir.IntType(8).as_pointer(),
+                                lir.IntType(64),
+                                lir.IntType(32),
+                                lir.IntType(32),
+                                lir.IntType(64)])
+        fn_setitem = builder.module.get_or_insert_function(
+            fnty, name="setitem_string_array")
+        # kind doesn't matter since input is ASCII
+        kind = context.get_constant(types.int32, -1)
+        is_ascii = context.get_constant(types.int32, 1)
+        builder.call(fn_setitem, [string_array.offsets, string_array.data,
+                    string_array.num_total_chars,
+                    builder.extract_value(ptr, 0), length, kind, is_ascii, ind
+                    ])
+        return context.get_dummy_value()
+
+    return types.void(str_arr_t, ind_t, ptr_t, len_t), codegen
 
 def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),
@@ -839,31 +996,106 @@ def lower_is_na(context, builder, bull_bitmap, ind):
     return builder.call(fn_getitem, [bull_bitmap,
                                      ind])
 
-@lower_builtin(operator.getitem, StringArrayType, types.Integer)
-def lower_string_arr_getitem(context, builder, sig, args):
-    typ = sig.args[0]
-    ind = args[1]
 
-    string_array = context.make_helper(builder, typ, args[0])
+@intrinsic
+def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
+    def codegen(context, builder, sig, args):
+        dst, src, count, itemsize = args
+        # buff_arr = context.make_array(sig.args[0])(context, builder, buff_arr)
+        # ptr = builder.gep(buff_arr.data, [ind])
+        cgutils.raw_memcpy(builder, dst, src, count, itemsize)
+        return context.get_dummy_value()
 
-    # check for NA
-    # i/8, XXX: lshr since always positive
-    #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
-    #bit_ind = builder.srem
+    return types.void(types.voidptr, types.voidptr, types.intp, types.intp), codegen
 
-    # cgutils.printf(builder, "calling bitmap\n")
-    # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
-    #     cgutils.printf(builder, "is_na %d \n", ind)
-    # cgutils.printf(builder, "calling bitmap done\n")
 
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(32).as_pointer(),
-                             lir.IntType(8).as_pointer(),
-                             lir.IntType(64)])
-    fn_getitem = builder.module.get_or_insert_function(fnty,
-                                                       name="getitem_string_array_std")
-    return builder.call(fn_getitem, [string_array.offsets,
-                                     string_array.data, args[1]])
+# TODO: use overload
+@overload(operator.getitem)
+def str_arr_getitem_int(A, i):
+    if A == string_array_type and isinstance(i, types.Integer):
+        def str_arr_getitem_impl(A, i):
+            start_offset = getitem_str_offset(A, i)
+            end_offset = getitem_str_offset(A, i + 1)
+            length = end_offset - start_offset
+            ptr = get_data_ptr_ind(A, start_offset)
+            ret = decode_utf8(ptr, length)
+            # ret = numba.unicode._empty_string(kind, length)
+            # _memcpy(ret._data, ptr, length, 1)
+            return ret
+
+        return str_arr_getitem_impl
+
+
+@intrinsic
+def decode_utf8(typingctx, ptr_t, len_t=None):
+    def codegen(context, builder, sig, args):
+        ptr, length = args
+
+        # create str and call decode with internal pointers
+        uni_str = cgutils.create_struct_proxy(string_type)(context, builder)
+        fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
+            lir.IntType(64),
+            lir.IntType(32).as_pointer(),
+            lir.IntType(32).as_pointer(),
+            lir.IntType(64).as_pointer(),
+            uni_str.meminfo.type.as_pointer()])
+        fn_decode = builder.module.get_or_insert_function(
+            fnty, name="decode_utf8")
+        builder.call(fn_decode, [ptr, length,
+                                uni_str._get_ptr_by_name('kind'),
+                                uni_str._get_ptr_by_name('is_ascii'),
+                                uni_str._get_ptr_by_name('length'),
+                                uni_str._get_ptr_by_name('meminfo')])
+        uni_str.hash = context.get_constant(_Py_hash_t, -1)
+        uni_str.data = context.nrt.meminfo_data(builder, uni_str.meminfo)
+        # Set parent to NULL
+        uni_str.parent = cgutils.get_null_value(uni_str.parent.type)
+        return uni_str._getvalue()
+
+    return string_type(types.voidptr, types.intp), codegen
+
+
+# @lower_builtin(operator.getitem, StringArrayType, types.Integer)
+# @lower_builtin(operator.getitem, StringArrayType, types.IntegerLiteral)
+# def lower_string_arr_getitem(context, builder, sig, args):
+#     # TODO: support multibyte unicode
+#     # TODO: support Null
+#     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+#     def str_arr_getitem_impl(A, i):
+#         start_offset = getitem_str_offset(A, i)
+#         end_offset = getitem_str_offset(A, i + 1)
+#         length = end_offset - start_offset
+#         ret = numba.unicode._empty_string(kind, length)
+#         ptr = get_data_ptr_ind(A, start_offset)
+#         _memcpy(ret._data, ptr, length, 1)
+#         return ret
+
+#     res = context.compile_internal(builder, str_arr_getitem_impl, sig, args)
+#     return res
+
+    # typ = sig.args[0]
+    # ind = args[1]
+
+    # string_array = context.make_helper(builder, typ, args[0])
+
+    # # check for NA
+    # # i/8, XXX: lshr since always positive
+    # #byte_ind = builder.lshr(ind, lir.Constant(lir.IntType(64), 3))
+    # #bit_ind = builder.srem
+
+    # # cgutils.printf(builder, "calling bitmap\n")
+    # # with cgutils.if_unlikely(builder, lower_is_na(context, builder, string_array.null_bitmap, ind)):
+    # #     cgutils.printf(builder, "is_na %d \n", ind)
+    # # cgutils.printf(builder, "calling bitmap done\n")
+
+    # fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+    #                         [lir.IntType(32).as_pointer(),
+    #                          lir.IntType(8).as_pointer(),
+    #                          lir.IntType(64)])
+    # fn_getitem = builder.module.get_or_insert_function(fnty,
+    #                                                    name="getitem_string_array_std")
+    # return builder.call(fn_getitem, [string_array.offsets,
+    #                                  string_array.data, args[1]])
 
 
 @lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
@@ -877,18 +1109,16 @@ def lower_string_arr_getitem_bool(context, builder, sig, args):
         for i in range(n):
             if bool_arr[i] == True:
                 # TODO: use get_cstr_and_len instead of getitem
-                str = str_arr[i]
+                _str = str_arr[i]
                 n_strs += 1
-                n_chars += len(str)
-                del_str(str)
+                n_chars += get_utf8_size(_str)
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
         for i in range(n):
             if bool_arr[i] == True:
-                str = str_arr[i]
-                setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), str, str_ind)
+                _str = str_arr[i]
+                out_arr[str_ind] = _str
                 str_ind += 1
-                del_str(str)
         return out_arr
     res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
     return res
@@ -905,27 +1135,95 @@ def lower_string_arr_getitem_arr(context, builder, sig, args):
             # TODO: use get_cstr_and_len instead of getitem
             _str = str_arr[ind_arr[i]]
             n_strs += 1
-            n_chars += len(_str)
-            del_str(_str)
+            n_chars += get_utf8_size(_str)
 
         out_arr = pre_alloc_string_array(n_strs, n_chars)
         str_ind = 0
         for i in range(n):
             _str = str_arr[ind_arr[i]]
-            setitem_string_array(get_offset_ptr(out_arr), get_data_ptr(out_arr), _str, str_ind)
+            out_arr[str_ind] = _str
             str_ind += 1
-            del_str(_str)
         return out_arr
     res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
     return res
 
 
-@typeof_impl.register(np.ndarray)
-def typeof_np_string(val, c):
-    if val.ndim == 1 and isinstance(val[0], str):  # and isinstance(val[-1], str):
-        return string_array_type
-    else:
-        return numba.typing.typeof._typeof_ndarray(val, c)
+@lower_builtin(operator.getitem, StringArrayType, types.SliceType)
+def lower_string_arr_getitem_slice(context, builder, sig, args):
+    def str_arr_slice_impl(str_arr, idx):
+        n = len(str_arr)
+        slice_idx = numba.unicode._normalize_slice(idx, n)
+        span = numba.unicode._slice_span(slice_idx)
+
+        if slice_idx.step == 1:
+            start_offset = getitem_str_offset(str_arr, slice_idx.start)
+            end_offset = getitem_str_offset(str_arr, slice_idx.stop)
+            n_chars = end_offset - start_offset
+            new_arr = pre_alloc_string_array(span, np.int64(n_chars))
+            # TODO: more efficient copy
+            for i in range(span):
+                new_arr[i] = str_arr[slice_idx.start+i]
+            return new_arr
+        else:  # TODO: test
+            # get number of chars
+            n_chars = 0
+            for i in range(slice_idx.start, slice_idx.stop, slice_idx.step):
+                _str = str_arr[i]
+                n_chars += get_utf8_size(_str)
+            new_arr = pre_alloc_string_array(span, np.int64(n_chars))
+            # TODO: more efficient copy
+            for i in range(span):
+                new_arr[i] = str_arr[slice_idx.start+i*slice_idx.step]
+            return new_arr
+
+    res = context.compile_internal(builder, str_arr_slice_impl, sig, args)
+    return res
+
+
+@numba.njit(no_cpython_wrapper=True)
+def str_arr_item_to_numeric(out_arr, out_ind, str_arr, ind):
+    return _str_arr_item_to_numeric(hpat.hiframes.split_impl.get_c_arr_ptr(
+        out_arr.ctypes, out_ind), str_arr, ind, out_arr.dtype)
+
+
+@intrinsic
+def _str_arr_item_to_numeric(typingctx, out_ptr_t, str_arr_t, ind_t,
+                                                             out_dtype_t=None):
+    assert str_arr_t == string_array_type
+    assert ind_t == types.int64
+
+    def codegen(context, builder, sig, args):
+        # TODO: return tuple with value and error and avoid array arg?
+        out_ptr, arr, ind, _dtype = args
+        string_array = context.make_helper(builder, string_array_type, arr)
+        fnty = lir.FunctionType(
+            lir.IntType(32),
+            [out_ptr.type,
+             lir.IntType(32).as_pointer(),
+             lir.IntType(8).as_pointer(),
+             lir.IntType(64)])
+        fname = 'str_arr_to_int64'
+        if sig.args[3].dtype == types.float64:
+            fname = 'str_arr_to_float64'
+        else:
+            assert sig.args[3].dtype == types.int64
+        fn_to_numeric = builder.module.get_or_insert_function(fnty, fname)
+        return builder.call(
+            fn_to_numeric,
+            [out_ptr, string_array.offsets, string_array.data, ind])
+
+    return types.int32(
+        out_ptr_t,  string_array_type, types.int64, out_dtype_t), codegen
+
+
+# TODO: support array of strings
+# @typeof_impl.register(np.ndarray)
+# def typeof_np_string(val, c):
+#     arr_typ = numba.typing.typeof._typeof_ndarray(val, c)
+#     # match string dtype
+#     if isinstance(arr_typ.dtype, (types.UnicodeCharSeq, types.CharSeq)):
+#         return string_array_type
+#     return arr_typ
 
 
 @unbox(StringArrayType)
@@ -989,6 +1287,9 @@ class GlobInfer(AbstractTemplate):
 @lower_builtin(glob, string_type)
 def lower_glob(context, builder, sig, args):
     path = args[0]
+    uni_str = cgutils.create_struct_proxy(string_type)(
+        context, builder, value=path)
+    path = uni_str.data
     typ = sig.return_type
     dtype = StringArrayPayloadType()
     meminfo, meminfo_data_ptr = construct_string_array(context, builder)
@@ -999,11 +1300,13 @@ def lower_glob(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
+                             lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64).as_pointer(),
                              lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="c_glob")
     builder.call(fn, [str_arr_payload._get_ptr_by_name('offsets'),
                             str_arr_payload._get_ptr_by_name('data'),
+                            str_arr_payload._get_ptr_by_name('null_bitmap'),
                             string_array._get_ptr_by_name('num_items'),
                             path])
 
@@ -1012,10 +1315,11 @@ def lower_glob(context, builder, sig, args):
     string_array.meminfo = meminfo
     string_array.offsets = str_arr_payload.offsets
     string_array.data = str_arr_payload.data
-    # TODO: set null_bitmap
+    string_array.null_bitmap = str_arr_payload.null_bitmap
     string_array.num_total_chars = builder.zext(builder.load(
         builder.gep(string_array.offsets, [string_array.num_items])), lir.IntType(64))
 
+    # cgutils.printf(builder, "n %d\n", string_array.num_items)
     ret = string_array._getvalue()
     #context.nrt.decref(builder, ty, ret)
 

@@ -12,5 +12,8 @@ HPAT documentation
 
    source/overview
    source/supported
+   source/supportedpandas
    source/notsupported
    source/install
+   source/development
+   source/aws

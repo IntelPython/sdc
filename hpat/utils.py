@@ -3,7 +3,7 @@ import operator
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
-    add_offset_to_labels, find_topo_order)
+    add_offset_to_labels, find_topo_order, find_const)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -11,9 +11,9 @@ from numba.targets.imputils import lower_builtin
 from numba.extending import overload, intrinsic, lower_cast
 import collections
 import numpy as np
-from hpat.str_ext import string_type
+import hpat
+from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
-from hpat.pd_timestamp_ext import pandas_dts_type
 from enum import Enum
 
 
@@ -28,6 +28,8 @@ class CTypeEnum(Enum):
     UInt64 = 7
     Float32 = 5
     Float64 = 6
+    Int16 = 8
+    UInt16 = 9
 
 
 _numba_to_c_type_map = {
@@ -44,6 +46,8 @@ _numba_to_c_type_map = {
     # are not bytes
     # TODO: handle boolean scalars properly
     types.bool_: CTypeEnum.UInt8.value,
+    types.int16: CTypeEnum.Int16.value,
+    types.uint16: CTypeEnum.UInt16.value,
 }
 
 
@@ -163,7 +167,11 @@ def is_alloc_callname(func_name, mod_name):
     return isinstance(mod_name, str) and ((mod_name == 'numpy'
         and func_name in np_alloc_callnames)
         or (func_name == 'empty_inferred'
-            and mod_name in ('numba.extending', 'numba.unsafe.ndarray')))
+            and mod_name in ('numba.extending', 'numba.unsafe.ndarray'))
+        or (func_name == 'pre_alloc_string_array'
+            and mod_name == 'hpat.str_arr_ext')
+        or (func_name in ('alloc_str_list', 'alloc_list_list_str')
+            and mod_name == 'hpat.str_ext'))
 
 def find_build_tuple(func_ir, var):
     """Check if a variable is constructed via build_tuple
@@ -184,19 +192,21 @@ def cprint(*s):
 class CprintInfer(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        return signature(types.none, *args)
+        return signature(types.none, *unliteral_all(args))
 
 
 typ_to_format = {
     types.int32: 'd',
+    types.uint32: 'u',
     types.int64: 'lld',
+    types.uint64: 'llu',
     types.float32: 'f',
     types.float64: 'lf',
 }
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
-import hstr_ext
+from . import hstr_ext
 ll.add_symbol('print_str', hstr_ext.print_str)
 ll.add_symbol('print_char', hstr_ext.print_char)
 
@@ -271,6 +281,23 @@ def is_whole_slice(typemap, func_ir, var, accept_stride=False):
     require(isinstance(arg1_def, ir.Const) and arg1_def.value == None)
     return True
 
+
+def is_const_slice(typemap, func_ir, var, accept_stride=False):
+    """ return True if var can be determined to be a constant size slice """
+    require(typemap[var.name] == types.slice2_type
+            or (accept_stride and typemap[var.name] == types.slice3_type))
+    call_expr = get_definition(func_ir, var)
+    require(isinstance(call_expr, ir.Expr) and call_expr.op == 'call')
+    assert (len(call_expr.args) == 2
+            or (accept_stride and len(call_expr.args) == 3))
+    assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
+    arg0_def = get_definition(func_ir, call_expr.args[0])
+    require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
+    size_const = find_const(func_ir, call_expr.args[1])
+    require(isinstance(size_const, int))
+    return True
+
+
 def get_slice_step(typemap, func_ir, var):
     require(typemap[var.name] == types.slice3_type)
     call_expr = get_definition(func_ir, var)
@@ -280,8 +307,10 @@ def get_slice_step(typemap, func_ir, var):
 
 def is_array(typemap, varname):
     return (varname in typemap
-            and (is_np_array(typemap, varname)
-                or typemap[varname] == string_array_type))
+        and (is_np_array(typemap, varname)
+        or typemap[varname] in (string_array_type, list_string_array_type,
+            hpat.hiframes.split_impl.string_array_split_view_type)
+        or isinstance(typemap[varname], hpat.hiframes.pd_series_ext.SeriesType)))
 
 def is_np_array(typemap, varname):
     return (varname in typemap
@@ -291,7 +320,9 @@ def is_array_container(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], (types.List, types.Set))
                 and (isinstance(typemap[varname].dtype, types.Array)
-                or typemap[varname].dtype == string_array_type))
+                or typemap[varname].dtype == string_array_type
+                or isinstance(typemap[varname].dtype,
+                hpat.hiframes.pd_series_ext.SeriesType)))
 
 
 # converts an iterable to array, similar to np.array, but can support
@@ -301,12 +332,12 @@ def to_array(A):
     return np.array(A)
 
 @overload(to_array)
-def to_array_overload(in_typ):
+def to_array_overload(A):
     # try regular np.array and return it if it works
     def to_array_impl(A):
         return np.array(A)
     try:
-        numba.njit(to_array_impl).get_call_template((in_typ,), {})
+        numba.njit(to_array_impl).get_call_template((A,), {})
         return to_array_impl
     except:
         pass  # should be handled elsewhere (e.g. Set)
@@ -315,16 +346,19 @@ def empty_like_type(n, arr):
     return np.empty(n, arr.dtype)
 
 @overload(empty_like_type)
-def empty_like_type_overload(size_t, arr_typ):
-    if isinstance(arr_typ, types.Array):
-        return lambda a,b: np.empty(a, b.dtype)
-    if isinstance(arr_typ, types.List) and arr_typ.dtype == string_type:
+def empty_like_type_overload(n, arr):
+    if isinstance(arr, hpat.hiframes.pd_categorical_ext.CategoricalArray):
+        from hpat.hiframes.pd_categorical_ext import fix_cat_array_type
+        return lambda n, arr: fix_cat_array_type(np.empty(n, arr.dtype))
+    if isinstance(arr, types.Array):
+        return lambda n, arr: np.empty(n, arr.dtype)
+    if isinstance(arr, types.List) and arr.dtype == string_type:
         def empty_like_type_str_list(n, arr):
             return [''] * n
         return empty_like_type_str_list
 
     # string array buffer for join
-    assert arr_typ == string_array_type
+    assert arr == string_array_type
     def empty_like_type_str_arr(n, arr):
         # average character heuristic
         avg_chars = 20  # heuristic
@@ -342,18 +376,18 @@ def alloc_arr_tup(n, arr_tup, init_vals=()):
     return tuple(arrs)
 
 @overload(alloc_arr_tup)
-def alloc_arr_tup_overload(n_t, data_t, init_vals_t=None):
-    count = data_t.count
+def alloc_arr_tup_overload(n, data, init_vals=()):
+    count = data.count
 
-    allocs = ','.join(["empty_like_type(n, d[{}])".format(i)
+    allocs = ','.join(["empty_like_type(n, data[{}])".format(i)
                         for i in range(count)])
 
-    if init_vals_t is not None:
+    if init_vals is not ():
         # TODO check for numeric value
-        allocs = ','.join(["np.full(n, init_vals[{}], d[{}].dtype)".format(i, i)
+        allocs = ','.join(["np.full(n, init_vals[{}], data[{}].dtype)".format(i, i)
                         for i in range(count)])
 
-    func_text = "def f(n, d, init_vals=()):\n"
+    func_text = "def f(n, data, init_vals=()):\n"
     func_text += "  return ({}{})\n".format(allocs,
         "," if count == 1 else "")  # single value needs comma to become tuple
 
@@ -440,11 +474,17 @@ def gen_getitem(out_var, in_var, ind, calltypes, nodes):
     calltypes[getitem] = None
     nodes.append(ir.Assign(getitem, out_var, loc))
 
-def is_call(stmt):
-    """true if stmt is a getitem or static_getitem assignment"""
+def sanitize_varname(varname):
+    return varname.replace('$', '_').replace('.', '_')
+
+def is_call_assign(stmt):
     return (isinstance(stmt, ir.Assign)
             and isinstance(stmt.value, ir.Expr)
             and stmt.value.op == 'call')
+
+def is_call(expr):
+    return (isinstance(expr, ir.Expr)
+            and expr.op == 'call')
 
 def is_var_assign(inst):
     return isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var)

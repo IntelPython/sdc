@@ -125,7 +125,7 @@ class ReadInnerParallelTyper(AbstractTemplate):
 from numba import cgutils
 from numba.targets.arrayobj import make_array
 from llvmlite import ir as lir
-import ros_cpp
+from . import ros_cpp
 import llvmlite.binding as ll
 ll.add_symbol('open_bag', ros_cpp.open_bag)
 ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)

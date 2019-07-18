@@ -166,6 +166,15 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    def test_datetime_index_df(self):
+        def test_impl(df):
+            df = pd.DataFrame({'A': pd.DatetimeIndex(df['str_date'])})
+            return df.A
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
     def test_datetime_index_date(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).date
@@ -236,7 +245,8 @@ class TestDate(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        pd.testing.assert_index_equal(hpat_func(df), test_impl(df),
+            check_names=False)
 
     def test_datetime_index_year(self):
         def test_impl(df):
@@ -301,6 +311,30 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    def test_datetime_series_dt_date(self):
+        def test_impl(A):
+            return A.dt.date
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        A = pd.DatetimeIndex(df['str_date']).to_series()
+        # TODO: fix index and name
+        pd.testing.assert_series_equal(
+            hpat_func(A), test_impl(A).reset_index(drop=True),
+            check_names=False)
+
+    def test_datetime_series_dt_year(self):
+        def test_impl(A):
+            return A.dt.year
+
+        hpat_func = hpat.jit(test_impl)
+        df = self._gen_str_date_df()
+        A = pd.DatetimeIndex(df['str_date']).to_series()
+        # TODO: fix index and name
+        pd.testing.assert_series_equal(
+            hpat_func(A), test_impl(A).reset_index(drop=True),
+            check_names=False)
 
     def _gen_str_date_df(self):
         rows = 10

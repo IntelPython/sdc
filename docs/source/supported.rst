@@ -67,6 +67,27 @@ as a 9 by 2 array, on three processors:
 HPAT replicates the arrays that are not distributed.
 This is called `REP` distribution for consistency.
 
+Argument and Return Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+HPAT assumes argument and return variables to jitted functions are
+replicated. However, the user can annotate these variables to indicate
+distributed data. In this case,
+the user is responsile for handling of the distributed data chunks outside
+the HPAT scope. For example, the data can come from other jitted functions::
+
+    @hpat.jit(distributed={'A'})
+    def example_return(n):
+        A = np.arange(n)
+        return A
+
+    @hpat.jit(distributed={'B'})
+    def example_arg(B):
+        return B.sum()
+
+    n = 100
+    A = example_return(n)
+    s = example_arg(A)
 
 Distribution Report
 ~~~~~~~~~~~~~~~~~~~
@@ -205,43 +226,6 @@ The example below demonstrates a parallel loop with a reduction::
 Currently, reductions using ``+=``, ``*=``, ``min``, and ``max`` operators are
 supported.
 
-Supported Pandas Operations
----------------------------
-
-Below is the list of the Pandas operators that HPAT supports. Since Numba
-doesn't support Pandas, only these operations can be used for both large and
-small datasets.
-
-1. HPAT supports Dataframe creation with the ``DataFrame`` constructor.
-   Only a dictionary is supported as input. For example::
-
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-
-2. Accessing columns using both getitem (e.g. ``df['A']``) and attribute
-   (e.g. ``df.A``) is supported.
-
-3. Using columns similar to Numpy arrays and performing data-parallel operations
-   listed previously is supported.
-
-4. Filtering data frames using boolean arrays is supported
-   (e.g. ``df[df.A > .5]``).
-
-5. Rolling window operations with `window` and `center` options are supported.
-   Here are a few examples::
-
-         df.A.rolling(window=5).mean()
-         df.A.rolling(3, center=True).apply(lambda a: a[0]+2*a[1]+a[2])
-
-6. ``shift`` operation (e.g. ``df.A.shift(1)``) and ``pct_change`` operation
-   (e.g. ``df.A.pct_change()``) are supported.
-
-
-DataFrame columns with integer data need special care. Pandas dynamically
-converts integer columns to floating point when NaN values are needed.
-This is because Numpy does not support NaN values for integers.
-HPAT does not perform this conversion unless enough information is
-available at compilation time. Hence, the user is responsible for manual
-conversion of integer data to floating point data if needed.
 
 File I/O
 --------

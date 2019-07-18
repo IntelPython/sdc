@@ -27,7 +27,7 @@
 
 // we need a few typedefs to make our macro factory work
 // It requires types to end with '_t'
-typedef std::string StringType_t;
+typedef std::string unicode_type_t;
 typedef bool bool_t;
 typedef int int_t;
 typedef float float32_t;
@@ -321,6 +321,66 @@ void byte_vec_free(byte_vec_t * vec)
     delete vec;
 }
 
+
+// multimap for hash join
+typedef std::unordered_multimap<int64_t, int64_t> multimap_int64_t;
+typedef std::pair<multimap_int64_t::iterator, multimap_int64_t::iterator> multimap_int64_it_t;
+
+multimap_int64_t* multimap_int64_init()
+{
+    return new multimap_int64_t();
+}
+
+void multimap_int64_insert(multimap_int64_t *m, int64_t k, int64_t v)
+{
+    m->insert(std::make_pair(k, v));
+    return;
+}
+
+
+multimap_int64_it_t *multimap_int64_equal_range(multimap_int64_t *m, int64_t k)
+{
+    return new multimap_int64_it_t(m->equal_range(k));
+}
+
+multimap_int64_it_t *multimap_int64_equal_range_alloc()
+{
+    return new multimap_int64_it_t;
+}
+
+void multimap_int64_equal_range_dealloc(multimap_int64_it_t *r)
+{
+    delete r;
+}
+
+void multimap_int64_equal_range_inplace(multimap_int64_t *m, int64_t k, multimap_int64_it_t *r)
+{
+    *r = m->equal_range(k);
+}
+
+// auto range = map.equal_range(1);
+// for (auto it = range.first; it != range.second; ++it) {
+//     std::cout << it->first << ' ' << it->second << '\n';
+// }
+
+
+bool multimap_int64_it_is_valid(multimap_int64_it_t *r)
+{
+    return r->first != r->second;
+}
+
+int64_t multimap_int64_it_get_value(multimap_int64_it_t *r)
+{
+    return (r->first)->second;
+}
+
+void multimap_int64_it_inc(multimap_int64_it_t *r)
+{
+    (r->first)++;
+    return;
+}
+
+
 // all the types that we support for keys and values
 #define TYPES BOOST_PP_TUPLE_TO_LIST(12, (int,                \
                                           int8,               \
@@ -334,7 +394,7 @@ void byte_vec_free(byte_vec_t * vec)
                                           bool,               \
                                           float32,            \
                                           float64,            \
-                                          StringType))
+                                          unicode_type))
 
 // Bring our generic dict to life
 DEF_DICT(byte_vec, int64);
@@ -379,6 +439,14 @@ PyMODINIT_FUNC PyInit_hdict_ext(void) {
     PyObject_SetAttrString(m, "byte_vec_set", PyLong_FromVoidPtr((void*)(&byte_vec_set)));
     PyObject_SetAttrString(m, "byte_vec_free", PyLong_FromVoidPtr((void*)(&byte_vec_free)));
     PyObject_SetAttrString(m, "byte_vec_resize", PyLong_FromVoidPtr((void*)(&byte_vec_resize)));
-
+    DEC_MOD_METHOD(multimap_int64_init);
+    DEC_MOD_METHOD(multimap_int64_insert);
+    DEC_MOD_METHOD(multimap_int64_equal_range);
+    DEC_MOD_METHOD(multimap_int64_it_is_valid);
+    DEC_MOD_METHOD(multimap_int64_it_get_value);
+    DEC_MOD_METHOD(multimap_int64_it_inc);
+    DEC_MOD_METHOD(multimap_int64_equal_range_alloc);
+    DEC_MOD_METHOD(multimap_int64_equal_range_dealloc);
+    DEC_MOD_METHOD(multimap_int64_equal_range_inplace);
     return m;
 }

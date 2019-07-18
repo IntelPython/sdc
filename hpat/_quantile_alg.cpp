@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "_hpat_common.h"
+#include "_distributed.h"
 
 #define root 0
 
@@ -134,15 +135,6 @@ double quantile_parallel_float(T* data, int64_t local_size, double quantile, int
 //     float32:5,
 //     float64:6
 //     }
-
-// TODO: refactor to header
-MPI_Datatype get_MPI_typ(int typ_enum)
-{
-    // printf("h5 type enum:%d\n", typ_enum);
-    MPI_Datatype types_list[] = {MPI_CHAR, MPI_UNSIGNED_CHAR,
-            MPI_INT, MPI_UNSIGNED, MPI_LONG_LONG_INT, MPI_FLOAT, MPI_DOUBLE};
-    return types_list[typ_enum];
-}
 
 template <class T>
 T get_nth_parallel(std::vector<T> &my_array, int64_t k, int myrank, int n_pes, int type_enum)
@@ -349,6 +341,8 @@ T small_get_nth_parallel(std::vector<T> &my_array, int64_t total_size,
         res = all_data_vec[k];
     }
     MPI_Bcast(&res, 1, mpi_typ, root, MPI_COMM_WORLD);
+    delete [] rcounts;
+    delete [] displs;
     return res;
 }
 /*
