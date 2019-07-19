@@ -1114,6 +1114,7 @@ class HiFramesTyped(object):
         val = rhs.args[0]
         nodes = []
         data = self._get_series_data(series_var, nodes)
+        name = self._get_series_name(series_var, nodes)
         kws = dict(rhs.kws)
         inplace = False
         if 'inplace' in kws:
@@ -1133,18 +1134,14 @@ class HiFramesTyped(object):
                 # array and assign it back to the same Series variable
                 # result back to the same variable
                 # TODO: handle string array reflection
-                def str_fillna_impl(A, fill):
+                def str_fillna_impl(A, fill, name):
                     # not using A.fillna since definition list is not working
                     # for A to find callname
-                    return hpat.hiframes.api.fillna_str_alloc(A, fill)
+                    return hpat.hiframes.api.fillna_str_alloc(A, fill, name)
                     #A.fillna(fill)
 
-                fill_var = rhs.args[0]
                 assign.target = series_var  # replace output
-                return self._replace_func(
-                    str_fillna_impl,
-                    [data, fill_var],
-                    pre_nodes=nodes)
+                return self._replace_func(str_fillna_impl, [data, val, name], pre_nodes=nodes)
             else:
                 return self._replace_func(
                     lambda a,b,c: hpat.hiframes.api.fillna(a,b,c),
@@ -1155,7 +1152,7 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['fillna_str_alloc']
             else:
                 func = series_replace_funcs['fillna_alloc']
-            return self._replace_func(func, [data, val], pre_nodes=nodes)
+            return self._replace_func(func, [data, val, name], pre_nodes=nodes)
 
     def _run_call_series_dropna(self, assign, lhs, rhs, series_var):
         dtype = self.typemap[series_var.name].dtype

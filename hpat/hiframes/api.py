@@ -361,8 +361,8 @@ class FillNaType(AbstractTemplate):
 class FillNaStrType(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
-        assert len(args) == 2
-        # args: in_arr, value
+        assert len(args) == 3
+        # args: in_arr, value, name
         return signature(SeriesType(string_type), *args)
 
 @infer_global(dropna)
