@@ -613,13 +613,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline '
-                   '(step: nopython mode backend)\n'
-                   'expecting {{i8*, i8*, i64, i64, double*, [1 x i64], '
-                   '[1 x i64]}, i8*, {i8*, i64, i32, i32, i64, i8*, i8*}} \n'
-                   'but got {{i8*, i8*, i64, i64, double*, [1 x i64], '
-                   '[1 x i64]}, i8*, i8*}\n')
     def test_series_fillna1(self):
         def test_impl(A):
             return A.fillna(5.0)
@@ -628,13 +621,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
             check_names=False)
+    
+    # test inplace fillna for named numeric series (obtained from DataFrame)
+    def test_series_fillna_inplace1(self):
+        def test_impl(A):
+            A.fillna(5.0, inplace=True)
+            return A
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline '
-                   '(step: nopython mode backend)\n'
-                   'expecting {{i64, i64, i32*, i8*, i8*, i8*}, i8*, '
-                   '{i8*, i64, i32, i32, i64, i8*, i8*}} \n'
-                   'but got {{i64, i64, i32*, i8*, i8*, i8*}, i8*, i8*}\n')
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
+
     def test_series_fillna_str1(self):
         def test_impl(A):
             return A.fillna("dd")
