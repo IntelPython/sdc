@@ -10,7 +10,7 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
-from .gen_test_data import ParquetGenerator
+from hpat.tests.gen_test_data import ParquetGenerator
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
