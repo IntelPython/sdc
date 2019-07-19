@@ -55,32 +55,34 @@ numba.targets.hashing._Py_HashSecret_siphash_k1 = 0
 # string methods that take no arguments and return a string
 str2str_noargs = ('capitalize', 'casefold', 'lower', 'swapcase', 'title', 'upper')
 
+def str_overload_noargs(method):
+    @overload_method(types.UnicodeType, method)
+    def str_overload(in_str):
+        def _str_impl(in_str):
+            with numba.objmode(out='unicode_type'):                
+                out = getattr(in_str, method)()
+            return out
+        
+        return _str_impl
+
 for method in str2str_noargs:
-    func_text = "def str_overload(in_str):\n"
-    func_text += "  def _str_impl(in_str):\n"
-    func_text += "    with numba.objmode(out='unicode_type'):\n"
-    func_text += "      out = in_str.{}()\n".format(method)
-    func_text += "    return out\n"
-    func_text += "  return _str_impl\n"
-    loc_vars = {}
-    exec(func_text, {'numba': numba}, loc_vars)
-    str_overload = loc_vars['str_overload']
-    overload_method(types.UnicodeType, method)(str_overload)
+    str_overload_noargs(method)
 
 # strip string methods that take one argument and return a string 
 str2str_1arg = ('lstrip', 'rstrip', 'strip')
 
+def str_overload_1arg(method):
+    @overload_method(types.UnicodeType, method)
+    def str_overload(in_str, arg1):
+        def _str_impl(in_str, arg1):
+            with numba.objmode(out='unicode_type'):
+                out = getattr(in_str, method)(arg1)
+            return out
+
+        return _str_impl
+
 for method in str2str_1arg:
-    func_text = "def str_overload(in_str, arg1):\n"
-    func_text += "  def _str_impl(in_str, arg1):\n"
-    func_text += "    with numba.objmode(out='unicode_type'):\n"
-    func_text += "      out = in_str.{}(arg1)\n".format(method)
-    func_text += "    return out\n"
-    func_text += "  return _str_impl\n"
-    loc_vars = {}
-    exec(func_text, {'numba': numba}, loc_vars)
-    str_overload = loc_vars['str_overload']
-    overload_method(types.UnicodeType, method)(str_overload)
+    str_overload_1arg(method)
 
 @overload_method(types.UnicodeType, 'replace')
 def str_replace_overload(in_str, old, new, count=-1):
