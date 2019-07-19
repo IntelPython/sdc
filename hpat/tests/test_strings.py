@@ -10,7 +10,7 @@ import re
 import pyarrow.parquet as pq
 from hpat.str_arr_ext import StringArray
 from hpat.str_ext import unicode_to_std_str, std_str_to_unicode
-from .gen_test_data import ParquetGenerator
+from hpat.tests.gen_test_data import ParquetGenerator
 
 
 class TestString(unittest.TestCase):
