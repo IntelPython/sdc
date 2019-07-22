@@ -10,6 +10,8 @@ from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
     count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
+from hpat.tests.gen_test_data import ParquetGenerator
+
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
         [np.nan, -2., 3., 9.1],
@@ -611,13 +613,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline '
-                   '(step: nopython mode backend)\n'
-                   'expecting {{i8*, i8*, i64, i64, double*, [1 x i64], '
-                   '[1 x i64]}, i8*, {i8*, i64, i32, i32, i64, i8*, i8*}} \n'
-                   'but got {{i8*, i8*, i64, i64, double*, [1 x i64], '
-                   '[1 x i64]}, i8*, i8*}\n')
     def test_series_fillna1(self):
         def test_impl(A):
             return A.fillna(5.0)
@@ -626,13 +621,18 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
             check_names=False)
+    
+    # test inplace fillna for named numeric series (obtained from DataFrame)
+    def test_series_fillna_inplace1(self):
+        def test_impl(A):
+            A.fillna(5.0, inplace=True)
+            return A
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline '
-                   '(step: nopython mode backend)\n'
-                   'expecting {{i64, i64, i32*, i8*, i8*, i8*}, i8*, '
-                   '{i8*, i64, i32, i32, i64, i8*, i8*}} \n'
-                   'but got {{i64, i64, i32*, i8*, i8*, i8*}, i8*, i8*}\n')
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A),
+            check_names=False)
+
     def test_series_fillna_str1(self):
         def test_impl(A):
             return A.fillna("dd")
@@ -1156,10 +1156,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not equal\n'
+                   'Mismatch: 100%\n'
+                   'Max absolute difference: 0.04361003\n'
+                   'Max relative difference: 9.04840049\n'
+                   'x: array([0.04843 , 0.05106 , 0.057625, 0.0671  ])\n'
+                   'y: array([0.00482 , 0.04843 , 0.05106 , 0.057625])\n'
+                   'NUMA_PES=3 build')
     def test_series_nlargest_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -1196,10 +1204,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Arrays are not equal\n'
+                   'Mismatch: 50%\n'
+                   'Max absolute difference: 0.01813261\n'
+                   'Max relative difference: 0.50757593\n'
+                   'x: array([0.007431, 0.024095, 0.035724, 0.053857])\n'
+                   'y: array([0.007431, 0.024095, 0.031374, 0.035724])\n'
+                   'NUMA_PES=3 build')
     def test_series_nsmallest_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -1282,10 +1298,13 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
+    @unittest.skip('AssertionError - fix needed\n'
+                   'nan != 0.45894510159707225\n'
+                   'NUMA_PES=3 build')
     def test_series_median_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -1294,10 +1313,10 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
     def test_series_argsort_parallel(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
@@ -1350,10 +1369,10 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @unittest.skip('OSError - fix needed\n'
-                   'Failed in hpat mode pipeline (step: convert DataFrames)\n'
-                   'Passed non-file path: kde.parquet\n')
     def test_series_sort_values_parallel1(self):
+        # create `kde.parquet` file
+        ParquetGenerator.gen_kde_pq()
+
         def test_impl():
             df = pq.read_table('kde.parquet').to_pandas()
             S = df.points
