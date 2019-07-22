@@ -31,11 +31,6 @@ class TestString(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: nopython mode backend)\n'
-                   'str_overload() takes 1 positional argument '
-                   'but 2 were given\n')
     def test_str2str(self):
         str2str_methods = ['capitalize', 'casefold', 'lower', 'lstrip',
             'rstrip', 'strip', 'swapcase', 'title', 'upper']
