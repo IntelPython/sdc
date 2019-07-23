@@ -210,9 +210,7 @@ class TestString(unittest.TestCase):
         self.assertTrue(isinstance(ds, pd.Series) and
                         isinstance(rs, pd.Series))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and
-                        # rs[0], rs[2] are `numpy._bool`; flake8 suggests
-                        # using operator `is` but it doesn't work
-                        rs[0] == True and rs[2] == False)  # noqa
+                        rs[0] == True and rs[2] == False)
 
     def test_string_array_bool_getitem(self):
         def test_impl():
