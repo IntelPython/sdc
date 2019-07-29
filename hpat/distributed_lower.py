@@ -14,37 +14,38 @@ from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_typ
 import time
 from llvmlite import ir as lir
 from . import hdist
+from . import transport_mpi
 import llvmlite.binding as ll
-ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
-ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
+ll.add_symbol('hpat_dist_get_rank', transport_mpi.hpat_dist_get_rank)
+ll.add_symbol('hpat_dist_get_size', transport_mpi.hpat_dist_get_size)
 ll.add_symbol('hpat_dist_get_start', hdist.hpat_dist_get_start)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
-ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
-ll.add_symbol('hpat_get_time', hdist.hpat_get_time)
-ll.add_symbol('hpat_barrier', hdist.hpat_barrier)
-ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
-ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
-ll.add_symbol('hpat_dist_exscan_i4', hdist.hpat_dist_exscan_i4)
-ll.add_symbol('hpat_dist_exscan_i8', hdist.hpat_dist_exscan_i8)
-ll.add_symbol('hpat_dist_exscan_f4', hdist.hpat_dist_exscan_f4)
-ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
-ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
-ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
-ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
+ll.add_symbol('hpat_dist_get_time', transport_mpi.hpat_dist_get_time)
+ll.add_symbol('hpat_get_time', transport_mpi.hpat_get_time)
+ll.add_symbol('hpat_barrier', transport_mpi.hpat_barrier)
+ll.add_symbol('hpat_dist_reduce', transport_mpi.hpat_dist_reduce)
+ll.add_symbol('hpat_dist_arr_reduce', transport_mpi.hpat_dist_arr_reduce)
+ll.add_symbol('hpat_dist_exscan_i4', transport_mpi.hpat_dist_exscan_i4)
+ll.add_symbol('hpat_dist_exscan_i8', transport_mpi.hpat_dist_exscan_i8)
+ll.add_symbol('hpat_dist_exscan_f4', transport_mpi.hpat_dist_exscan_f4)
+ll.add_symbol('hpat_dist_exscan_f8', transport_mpi.hpat_dist_exscan_f8)
+ll.add_symbol('hpat_dist_irecv', transport_mpi.hpat_dist_irecv)
+ll.add_symbol('hpat_dist_isend', transport_mpi.hpat_dist_isend)
+ll.add_symbol('hpat_dist_wait', transport_mpi.hpat_dist_wait)
 ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
 ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
-ll.add_symbol('allgather', hdist.allgather)
-ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
-ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
-ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
-ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
-ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
-ll.add_symbol('permutation_int', hdist.permutation_int)
-ll.add_symbol('permutation_array_index', hdist.permutation_array_index)
+ll.add_symbol('allgather', transport_mpi.allgather)
+ll.add_symbol('comm_req_alloc', transport_mpi.comm_req_alloc)
+ll.add_symbol('comm_req_dealloc', transport_mpi.comm_req_dealloc)
+ll.add_symbol('req_array_setitem', transport_mpi.req_array_setitem)
+ll.add_symbol('hpat_dist_waitall', transport_mpi.hpat_dist_waitall)
+ll.add_symbol('oneD_reshape_shuffle', transport_mpi.oneD_reshape_shuffle)
+ll.add_symbol('permutation_int', transport_mpi.permutation_int)
+ll.add_symbol('permutation_array_index', transport_mpi.permutation_array_index)
 
 # get size dynamically from C code
-mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
+mpi_req_llvm_type = lir.IntType(8 * transport_mpi.mpi_req_num_bytes)
 
 
 
@@ -564,7 +565,7 @@ class FinalizeInfer(AbstractTemplate):
         assert len(args) == 0
         return signature(types.int32, *args)
 
-ll.add_symbol('hpat_finalize', hdist.hpat_finalize)
+ll.add_symbol('hpat_finalize', transport_mpi.hpat_finalize)
 
 @lower_builtin(hpat_finalize)
 def lower_hpat_finalize(context, builder, sig, args):

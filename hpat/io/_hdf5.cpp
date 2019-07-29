@@ -1,5 +1,4 @@
 #include <Python.h>
-#include "mpi.h"
 #include "hdf5.h"
 #include <string>
 #include <iostream>

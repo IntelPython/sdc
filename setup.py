@@ -100,15 +100,18 @@ if is_win:
 
 hdf5_libs = MPI_LIBS + ['hdf5']
 io_libs = MPI_LIBS
+boost_libs = []
+
 if not is_win:
-    io_libs += ['boost_filesystem', 'boost_system']
+    boost_libs = ['boost_filesystem', 'boost_system']
+    io_libs += boost_libs
 
 ext_io = Extension(name="hpat.hio",
                    sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
                    depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
                             "hpat/_import_py.h", "hpat/io/_csv.h",
                             "hpat/_datetime_ext.h"],
-                   libraries = io_libs,
+                   libraries=boost_libs,
                    include_dirs = ind + np_compile_args['include_dirs'],
                    library_dirs = lid,
                    define_macros = H5_CPP_FLAGS,
@@ -116,6 +119,17 @@ ext_io = Extension(name="hpat.hio",
                    extra_link_args = ela,
                    language="c++"
 )
+
+ext_mpi = Extension(name="hpat.transport_mpi",
+                    sources=["hpat/transport/hpat_transport_mpi.cpp"],
+                    depends=["hpat/_distributed.h"],
+                    libraries=io_libs,
+                    include_dirs=ind + np_compile_args['include_dirs'],
+                    library_dirs=lid,
+                    extra_compile_args=eca,
+                    extra_link_args=ela,
+                    language="c++"
+                    )
 
 ext_hdf5 = Extension(name="hpat.io._hdf5",
                    sources=["hpat/io/_hdf5.cpp"],
@@ -132,7 +146,6 @@ ext_hdf5 = Extension(name="hpat.io._hdf5",
 ext_hdist = Extension(name="hpat.hdist",
                       sources=["hpat/_distributed.cpp"],
                       depends=["hpat/_hpat_common.h"],
-                      libraries = MPI_LIBS,
                       extra_compile_args = eca,
                       extra_link_args = ela,
                       include_dirs = ind,
@@ -141,7 +154,6 @@ ext_hdist = Extension(name="hpat.hdist",
 
 ext_chiframes = Extension(name="hpat.chiframes",
                           sources=["hpat/_hiframes.cpp"],
-                          libraries = MPI_LIBS,
                           depends=["hpat/_hpat_sort.h"],
                           extra_compile_args = eca,
                           extra_link_args = ela,
@@ -197,19 +209,7 @@ ext_dt = Extension(name="hpat.hdatetime_ext",
                    language="c++"
 )
 
-ext_quantile = Extension(name="hpat.quantile_alg",
-                         sources=["hpat/_quantile_alg.cpp"],
-                         depends=["hpat/_hpat_common.h"],
-                         libraries = MPI_LIBS,
-                         extra_compile_args = eca,
-                         extra_link_args = ela,
-                         include_dirs = ind,
-                         library_dirs = lid,
-)
-
-
-# pq_libs = MPI_LIBS + ['boost_filesystem', 'arrow', 'parquet']
-pq_libs = MPI_LIBS.copy()
+pq_libs = ['arrow', 'parquet']
 
 # Windows MSVC can't have boost library names on command line
 # auto-link magic of boost should be used
@@ -221,8 +221,6 @@ if not is_win:
 # else:
 #     # seperate parquet reader used due to ABI incompatibility of arrow
 #     pq_libs += ['hpat_parquet_reader']
-
-pq_libs += ['arrow', 'parquet']
 
 ext_parquet = Extension(name="hpat.parquet_cpp",
                         sources=["hpat/io/_parquet.cpp"],
@@ -272,7 +270,7 @@ ext_xenon_wrapper = Extension(name="hpat.hxe_ext",
                               extra_link_args = ela,
 )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_quantile, ext_dt, ext_io]
+_ext_mods = [ext_mpi, ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io]
 
 if _has_h5py:
     _ext_mods.append(ext_hdf5)
@@ -302,7 +300,7 @@ setup(name='hpat',
         "Topic :: System :: Distributed Computing",
       ],
       keywords='data analytics cluster',
-      url='https://github.com/IntelLabs/hpat',
+      url='https://github.com/IntelPython/hpat',
       author='Intel',
       packages=find_packages(),
       install_requires=['numba'],
