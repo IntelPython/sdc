@@ -77,8 +77,8 @@ hid_t hpat_h5_open(char* file_name, char* mode, int64_t is_parallel)
     hid_t file_id = -1;
     unsigned flag = H5F_ACC_RDWR;
 
-    int num_pes;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
+    //int num_pes;
+    //MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     // TODO: enable MPIO after fixing address overflow issues
     // if(false && is_parallel && num_pes>1)
     // {
@@ -176,8 +176,8 @@ int hpat_h5_read(hid_t dataset_id, int ndims, int64_t* starts,
 
     hid_t space_id = get_dset_space_from_range(dataset_id, starts, counts);
 
-    int num_pes;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
+    //int num_pes;
+    //MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
     // if(false && is_parallel && num_pes>1)
@@ -252,8 +252,8 @@ int hpat_h5_read_filter(hid_t dataset_id, int ndims, int64_t* starts,
 
     hid_t space_id = get_dset_space_from_indices(dataset_id, ndims, starts, counts, indices, n_indices);
 
-    int num_pes;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
+    //int num_pes;
+    //MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
     // if(false && is_parallel && num_pes>1)
@@ -411,8 +411,8 @@ int hpat_h5_write(hid_t dataset_id, int ndims, int64_t* starts,
     hsize_t* HDF5_start = (hsize_t*)starts;
     hsize_t* HDF5_count = (hsize_t*)counts;
 
-    int num_pes;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
+    //int num_pes;
+    //MPI_Comm_size(MPI_COMM_WORLD, &num_pes);
     hid_t xfer_plist_id = H5P_DEFAULT;
     // TODO: enable MPIO after fixing address overflow issues
     // if(false && is_parallel && num_pes>1)
