@@ -2,6 +2,9 @@
 #include <iostream>
 #include "_meminfo.h"
 
+#ifndef Py_UNREACHABLE
+#define Py_UNREACHABLE() abort()
+#endif
 
 // ******** ported from CPython 31e8d69bfe7cf5d4ffe0967cb225d2a8a229cc97
 

@@ -14,10 +14,6 @@ matrix:
         - env: CONDA_ENV=travisci NUM_PES=2
         - env: CONDA_ENV=travisci NUM_PES=3
 
-branches:
-    only:
-        - master
-
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
