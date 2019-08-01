@@ -317,16 +317,17 @@ if _has_xenon:
 
 # Custom build commands
 #
-# Command to check and adjust code style
-# Usage:
-#    To check style: python ./setup.py style
-#
-#      To fix style: python ./setup.py style -a
+# These commands extends standart setuptools build procedure
 #
 hpat_build_commands = versioneer.get_cmdclass()
 
 
 class style(Command):
+    """ Command to check and adjust code style
+    Usage:
+        To check style: python ./setup.py style
+        To fix style: python ./setup.py style -a
+    """
     user_options = [
         ('apply', 'a', 'Apply codestyle changes to sources.')
     ]
@@ -350,6 +351,11 @@ class style(Command):
     _py_file_extensions = ['.py']
 
     def _get_file_list(self, path, search_extentions):
+        """ Return file list to be adjusted or checked
+        
+        path - is the project base path
+        search_extentions - list of strings with files extension to search recurcivly
+        """
         files = []
         exluded_directories_full_path = [os.path.join(path, excluded_dir)
                                          for excluded_dir in self._project_directory_excluded]
@@ -400,8 +406,9 @@ class style(Command):
                 if not self.apply:
                     if command_cout.find(b'<replacement ') > 0:
                         bad_style_file_names.append(f)
-        except BaseException:
+        except BaseException as original_error:
             print("%s is not installed.\nPlease use: %s" % (self._c_formatter, self._c_formatter_install_msg))
+            print("Original error message is:\n", original_error)
             exit(1)
 
         # Python files handling
@@ -418,8 +425,9 @@ class style(Command):
                     command_output = subprocess.Popen(
                         self._py_formatter_command_line + [f])
                     command_output.wait()
-        except BaseException:
+        except BaseException as original_error:
             print("%s is not installed.\nPlease use: %s" % (self._py_formatter, self._py_formatter_install_msg))
+            print("Original error message is:\n", original_error)
             exit(1)
 
         if bad_style_file_names:
