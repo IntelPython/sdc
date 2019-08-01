@@ -42,7 +42,6 @@ requirements:
 test:
   requires:
     - h5py
-    - pyspark
     - scipy
   imports:
     - hpat
