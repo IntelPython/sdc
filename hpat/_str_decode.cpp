@@ -75,16 +75,17 @@ void _C_UnicodeWriter_Init(_C_UnicodeWriter* writer)
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
-#include "stringlib/codecs.h"
+// TODO needs to be redesigned. This is not acceptable *.h handling.
 #include "stringlib/ucs1lib.h"
+#include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
-#include "stringlib/codecs.h"
 #include "stringlib/ucs2lib.h"
+#include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
-#include "stringlib/codecs.h"
 #include "stringlib/ucs4lib.h"
+#include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
 static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter* writer, Py_UCS4 ch);
