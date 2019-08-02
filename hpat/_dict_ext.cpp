@@ -55,12 +55,16 @@ namespace std
                 n /= sizeof(T);
                 std::size_t seed = 0;
                 for (size_t i = 0; i < n; ++i)
+                {
                     boost::hash_combine(seed, _ptr[i]);
+                }
                 //std::cout << "[" << sizeof(T) << "] " << seed << std::endl;
                 return seed;
             }
             else
+            {
                 return 0;
+            }
         }
 
         // returns the hash-value for given vector of bytes
@@ -74,21 +78,33 @@ namespace std
         {
             std::size_t n = x.size();
             if (n == 0)
+            {
                 return 0;
+            }
             const argument_type::value_type* ptr = x.data();
             size_t h;
             // we now try to reinterpret bytes as integers of different size, starting with long integers
             if (sizeof(uintmax_t) > sizeof(uint64_t) && (h = hashit(reinterpret_cast<const uintmax_t*>(ptr), n)) != 0)
+            {
                 return h;
+            }
             if ((h = hashit(reinterpret_cast<const uint64_t*>(ptr), n)) != 0)
+            {
                 return h;
+            }
             if ((h = hashit(reinterpret_cast<const uint32_t*>(ptr), n)) != 0)
+            {
                 return h;
+            }
             if ((h = hashit(reinterpret_cast<const uint16_t*>(ptr), n)) != 0)
+            {
                 return h;
+            }
             // This is our fall-back, probably pretty slow
             if ((h = hashit(reinterpret_cast<const uint8_t*>(ptr), n)) != 0)
+            {
                 return h;
+            }
 
             // everything must align with 1 byte, so we should not ever get here
             std::cerr << "Unexpected code path taken in hash operation";
@@ -187,7 +203,9 @@ public:
     {
         auto val = m_dict.find(index);
         if (val == m_dict.end())
+        {
             return IFTYPE<VAL>::out(default_val);
+        }
         return IFTYPE<VAL>::out((*val).second);
     }
 
@@ -298,7 +316,9 @@ byte_vec_t* byte_vec_init(size_t n, const unsigned char* val)
 {
     auto v = new byte_vec_t(n);
     if (val)
+    {
         byte_vec_set(v, 0, val, n);
+    }
     return v;
 }
 // in vec, set n bytes starting at position pos to content of val
@@ -306,7 +326,9 @@ byte_vec_t* byte_vec_init(size_t n, const unsigned char* val)
 void byte_vec_set(byte_vec_t* vec, size_t pos, const unsigned char* val, size_t n)
 {
     for (size_t i = 0; i < n; ++i)
+    {
         (*vec)[pos + i] = val[i];
+    }
 }
 // resize vector to given length
 void byte_vec_resize(byte_vec_t* vec, size_t n)
@@ -416,7 +438,9 @@ PyMODINIT_FUNC PyInit_hdict_ext(void)
     };
     m = PyModule_Create(&moduledef);
     if (m == NULL)
+    {
         return NULL;
+    }
 
     // Add our generic dict
     DEC_DICT_MOD(byte_vec, int64);

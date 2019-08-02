@@ -125,7 +125,9 @@ extern "C"
         };
         m = PyModule_Create(&moduledef);
         if (m == NULL)
+        {
             return NULL;
+        }
 
         // init numpy
         import_array();
@@ -226,7 +228,9 @@ extern "C"
         delete[] in_str_arr->offsets;
         delete[] in_str_arr->data;
         if (in_str_arr->null_bitmap != nullptr)
+        {
             delete[] in_str_arr->null_bitmap;
+        }
         return;
     }
 
@@ -276,7 +280,9 @@ extern "C"
                 index_offsets[str_ind + 1] = data_offs.size();
                 str_ind++;
                 if (str_ind == n_strs)
+                {
                     break; // all finished
+                }
                 // start new string
                 data_offs.push_back(data_ind - 1);
                 continue; // stay on same data_ind for start of next string
@@ -410,7 +416,9 @@ extern "C"
     }
         // std::cout << "setitem str: " << *str << " " << index << std::endl;
         if (index == 0)
+        {
             offsets[index] = 0;
+        }
         uint32_t start = offsets[index];
         int64_t utf8_len = -1;
         // std::cout << "start " << start << " len " << len << std::endl;
@@ -446,7 +454,9 @@ extern "C"
         // printf("%d %d\n", start_str_ind, start_chars_ind); fflush(stdout);
         uint32_t curr_offset = 0;
         if (start_str_ind != 0)
+        {
             curr_offset = out_offsets[start_str_ind];
+        }
 
         // set offsets
         for (size_t i = 0; i < (size_t)num_strs; i++)
@@ -749,9 +759,13 @@ extern "C"
             auto p = PyArray_GETPTR1((PyArrayObject*)ret, i);
             CHECK(p, "getting offset in numpy array failed");
             if (!is_na(null_bitmap, i))
+            {
                 err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, s);
+            }
             else
+            {
                 err = PyArray_SETITEM((PyArrayObject*)ret, (char*)p, nan_obj);
+            }
             CHECK(err == 0, "setting item in numpy array failed");
             Py_DECREF(s);
         }

@@ -197,31 +197,29 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
     send_arr_chars_arrs = ", ".join("send_arr_chars_arr_{}".format(i) for i in range(n_str))
     str_comma = "," if n_str == 1 else ""
 
-    func_text += (
-        '  return ShuffleMeta(send_counts, recv_counts, n_send, '
-        'n_out, send_disp, recv_disp, tmp_offset, ({}{}), ({}{}), '
-        '({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), '
-        '({}{}), )\n').format(
-        send_buffs,
-        all_comma,
-        out_arrs,
-        all_comma,
-        send_counts_chars,
-        str_comma,
-        recv_counts_chars,
-        str_comma,
-        send_arr_lens,
-        str_comma,
-        send_arr_chars,
-        str_comma,
-        send_disp_chars,
-        str_comma,
-        recv_disp_chars,
-        str_comma,
-        tmp_offset_chars,
-        str_comma,
-        send_arr_chars_arrs,
-        str_comma)
+    func_template_line = '  return ShuffleMeta(send_counts, recv_counts, n_send, n_out, send_disp, recv_disp,'
+    'tmp_offset, ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}),'
+    '({}{}), ({}{}), )\n'
+    func_text += func_template_line.format(send_buffs,
+                                           all_comma,
+                                           out_arrs,
+                                           all_comma,
+                                           send_counts_chars,
+                                           str_comma,
+                                           recv_counts_chars,
+                                           str_comma,
+                                           send_arr_lens,
+                                           str_comma,
+                                           send_arr_chars,
+                                           str_comma,
+                                           send_disp_chars,
+                                           str_comma,
+                                           recv_disp_chars,
+                                           str_comma,
+                                           tmp_offset_chars,
+                                           str_comma,
+                                           send_arr_chars_arrs,
+                                           str_comma)
 
     # print(func_text)
 

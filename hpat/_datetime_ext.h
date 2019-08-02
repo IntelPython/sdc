@@ -758,10 +758,18 @@ extern "C"
                     ret = (days - 6) / 7;
                 }
                 break;
-            case PANDAS_FR_D: ret = days; break;
-            case PANDAS_FR_h: ret = days * 24 + dts->hour; break;
-            case PANDAS_FR_m: ret = (days * 24 + dts->hour) * 60 + dts->min; break;
-            case PANDAS_FR_s: ret = ((days * 24 + dts->hour) * 60 + dts->min) * 60 + dts->sec; break;
+            case PANDAS_FR_D:
+                ret = days;
+                break;
+            case PANDAS_FR_h:
+                ret = days * 24 + dts->hour;
+                break;
+            case PANDAS_FR_m:
+                ret = (days * 24 + dts->hour) * 60 + dts->min;
+                break;
+            case PANDAS_FR_s:
+                ret = ((days * 24 + dts->hour) * 60 + dts->min) * 60 + dts->sec;
+                break;
             case PANDAS_FR_ms:
                 ret = (((days * 24 + dts->hour) * 60 + dts->min) * 60 + dts->sec) * 1000 + dts->us / 1000;
                 break;

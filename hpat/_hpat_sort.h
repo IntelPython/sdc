@@ -27,11 +27,17 @@ typedef struct
 int __hpat_sort_compare(int64_t x, int64_t y)
 {
     if (x < y)
+    {
         return -1;
+    }
     else if (x == y)
+    {
         return 0;
+    }
     else
+    {
         return 1;
+    }
 }
 
 void __hpat_sort_swap(int64_t* x, int64_t* y)
@@ -651,13 +657,17 @@ int __hpat_quicksort_partition(int64_t** arr, int64_t size, int64_t* comp_arr, i
     while (1)
     {
         do
+        {
             ++i;
-        while (comp_arr[i] <= pivot && i <= high);
+        } while (comp_arr[i] <= pivot && i <= high);
         do
+        {
             --j;
-        while (comp_arr[j] > pivot);
+        } while (comp_arr[j] > pivot);
         if (i >= j)
+        {
             break;
+        }
         for (int index = 0; index < size; index++)
         {
             int64_t* curr_arr = arr[index];

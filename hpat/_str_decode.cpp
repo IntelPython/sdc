@@ -132,7 +132,9 @@ NRT_MemInfo* alloc_writer(_C_UnicodeWriter* writer, Py_ssize_t newlen, Py_UCS4 m
     }
     NRT_MemInfo* newbuffer = NRT_MemInfo_alloc_safe((newlen + 1) * char_size);
     if (newbuffer == NULL)
+    {
         return NULL;
+    }
 
     if (writer->buffer != NULL)
     {
@@ -198,7 +200,9 @@ int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter* writer, Py_ssize_t length
 
         writer->buffer = alloc_writer(writer, newlen, maxchar);
         if (writer->buffer == NULL)
+        {
             return -1;
+        }
     }
     else if (newlen > writer->size)
     {
@@ -216,14 +220,18 @@ int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter* writer, Py_ssize_t length
             maxchar = Py_MAX(maxchar, writer->maxchar);
             newbuffer = alloc_writer(writer, newlen, maxchar);
             if (newbuffer == NULL)
+            {
                 return -1;
+            }
             writer->readonly = 0;
         }
         else
         {
             newbuffer = alloc_writer(writer, newlen, writer->maxchar);
             if (newbuffer == NULL)
+            {
                 return -1;
+            }
         }
         writer->buffer = newbuffer;
     }
@@ -232,7 +240,9 @@ int _C_UnicodeWriter_PrepareInternal(_C_UnicodeWriter* writer, Py_ssize_t length
         assert(!writer->readonly);
         newbuffer = alloc_writer(writer, writer->size, maxchar);
         if (newbuffer == NULL)
+        {
             return -1;
+        }
     }
     return 0;
 
@@ -276,7 +286,9 @@ static Py_ssize_t ascii_decode(const char* start, const char* end, Py_UCS1* dest
         while (p < end)
         {
             if ((unsigned char)*p & 0x80)
+            {
                 break;
+            }
             *q++ = *p++;
         }
         return p - start;
@@ -299,10 +311,14 @@ static Py_ssize_t ascii_decode(const char* start, const char* end, Py_UCS1* dest
             }
             p = _p;
             if (_p == end)
+            {
                 break;
+            }
         }
         if ((unsigned char)*p & 0x80)
+        {
             break;
+        }
         ++p;
     }
     memcpy(dest, start, p - start);
@@ -561,9 +577,13 @@ int64_t unicode_to_utf8(char* out_data, char* data, int64_t size, int kind)
     //
     switch (kind)
     {
-    default: Py_UNREACHABLE();
-    case PyUnicode_1BYTE_KIND: return ucs1lib_utf8_encoder(out_data, (Py_UCS1*)data, size);
-    case PyUnicode_2BYTE_KIND: return ucs2lib_utf8_encoder(out_data, (Py_UCS2*)data, size);
-    case PyUnicode_4BYTE_KIND: return ucs4lib_utf8_encoder(out_data, (Py_UCS4*)data, size);
+    default:
+        Py_UNREACHABLE();
+    case PyUnicode_1BYTE_KIND:
+        return ucs1lib_utf8_encoder(out_data, (Py_UCS1*)data, size);
+    case PyUnicode_2BYTE_KIND:
+        return ucs2lib_utf8_encoder(out_data, (Py_UCS2*)data, size);
+    case PyUnicode_4BYTE_KIND:
+        return ucs4lib_utf8_encoder(out_data, (Py_UCS4*)data, size);
     }
 }

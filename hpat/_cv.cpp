@@ -23,7 +23,9 @@ PyMODINIT_FUNC PyInit_cv_wrapper(void)
     };
     m = PyModule_Create(&moduledef);
     if (m == NULL)
+    {
         return NULL;
+    }
 
     PyObject_SetAttrString(m, "cv_imread", PyLong_FromVoidPtr((void*)(&cv_imread)));
     PyObject_SetAttrString(m, "cv_mat_release", PyLong_FromVoidPtr((void*)(&cv_mat_release)));

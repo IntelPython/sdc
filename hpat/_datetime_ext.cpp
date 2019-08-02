@@ -14,7 +14,9 @@ extern "C"
         };
         m = PyModule_Create(&moduledef);
         if (m == NULL)
+        {
             return NULL;
+        }
 
         // init numpy
         import_array();

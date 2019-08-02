@@ -26,7 +26,9 @@ PyMODINIT_FUNC PyInit_hset_ext(void)
     };
     m = PyModule_Create(&moduledef);
     if (m == NULL)
+    {
         return NULL;
+    }
 
     PyObject_SetAttrString(m, "init_set_string", PyLong_FromVoidPtr((void*)(&init_set_string)));
     PyObject_SetAttrString(m, "insert_set_string", PyLong_FromVoidPtr((void*)(&insert_set_string)));
@@ -65,7 +67,9 @@ int64_t num_total_chars_set_string(std::unordered_set<std::string>* str_set)
 {
     int64_t total_len = 0;
     for (auto it = str_set->cbegin(); it != str_set->cend(); ++it)
+    {
         total_len += (*it).size();
+    }
     return total_len;
 }
 
