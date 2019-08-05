@@ -182,7 +182,6 @@ ext_hdist = Extension(name="hpat.hdist",
 
 ext_chiframes = Extension(name="hpat.chiframes",
                           sources=["hpat/_hiframes.cpp"],
-                          libraries=MPI_LIBS,
                           depends=["hpat/_hpat_sort.h"],
                           extra_compile_args=eca,
                           extra_link_args=ela,
