@@ -59,16 +59,16 @@ def str_overload_noargs(method):
     @overload_method(types.UnicodeType, method)
     def str_overload(in_str):
         def _str_impl(in_str):
-            with numba.objmode(out='unicode_type'):                
+            with numba.objmode(out='unicode_type'):
                 out = getattr(in_str, method)()
             return out
-        
+
         return _str_impl
 
 for method in str2str_noargs:
     str_overload_noargs(method)
 
-# strip string methods that take one argument and return a string 
+# strip string methods that take one argument and return a string
 str2str_1arg = ('lstrip', 'rstrip', 'strip')
 
 def str_overload_1arg(method):
