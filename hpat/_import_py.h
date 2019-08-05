@@ -5,11 +5,17 @@
 
 /* Import 'sym' from module 'module'.
  */
-static PyObject *
-import_sym(const char * module, const char * sym) __UNUSED__ {
-#define CHECK(expr, msg) if(!(expr)){std::cerr << msg << std::endl; PyGILState_Release(gilstate); return NULL;}
-    PyObject *mod = NULL;
-    PyObject *func = NULL;
+static PyObject* import_sym(const char* module, const char* sym) __UNUSED__
+{
+#define CHECK(expr, msg)                                                                                               \
+    if (!(expr))                                                                                                       \
+    {                                                                                                                  \
+        std::cerr << msg << std::endl;                                                                                 \
+        PyGILState_Release(gilstate);                                                                                  \
+        return NULL;                                                                                                   \
+    }
+    PyObject* mod = NULL;
+    PyObject* func = NULL;
     auto gilstate = PyGILState_Ensure();
 
     mod = PyImport_ImportModule(module);
