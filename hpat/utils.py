@@ -1,9 +1,12 @@
+from . import hstr_ext
+import llvmlite.binding as ll
+from llvmlite import ir as lir
 from collections import namedtuple
 import operator
 import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
-    add_offset_to_labels, find_topo_order, find_const)
+                            add_offset_to_labels, find_topo_order, find_const)
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
@@ -53,9 +56,16 @@ _numba_to_c_type_map = {
 
 # silence Numba error messages for now
 # TODO: customize through @hpat.jit
-numba.errors.error_extras = {'unsupported_error': '', 'typing': '', 'reportable': '', 'interpreter': '', 'constant_inference': ''}
+numba.errors.error_extras = {
+    'unsupported_error': '',
+    'typing': '',
+    'reportable': '',
+    'interpreter': '',
+    'constant_inference': ''}
 
 # sentinel value representing non-constant values
+
+
 class NotConstant:
     pass
 
@@ -63,14 +73,17 @@ class NotConstant:
 NOT_CONSTANT = NotConstant()
 
 ReplaceFunc = namedtuple("ReplaceFunc",
-    ["func", "arg_types", "args", "glbls", "pre_nodes"])
+                         ["func", "arg_types", "args", "glbls", "pre_nodes"])
 
 np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
+
 
 def unliteral_all(args):
     return tuple(types.unliteral(a) for a in args)
 
 # TODO: move to Numba
+
+
 class BooleanLiteral(types.Literal, types.Boolean):
 
     def can_convert_to(self, typingctx, other):
@@ -85,14 +98,16 @@ types.Literal.ctor_map[bool] = BooleanLiteral
 numba.datamodel.register_default(
     BooleanLiteral)(numba.extending.models.BooleanModel)
 
+
 @lower_cast(BooleanLiteral, types.Boolean)
 def literal_bool_cast(context, builder, fromty, toty, val):
     lit = context.get_constant_generic(
         builder,
         fromty.literal_type,
         fromty.literal_value,
-        )
+    )
     return context.cast(builder, lit, fromty.literal_type, toty)
+
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
@@ -105,13 +120,14 @@ def get_constant(func_ir, var, default=NOT_CONSTANT):
         return get_constant(func_ir, def_node, default)
     return default
 
+
 def inline_new_blocks(func_ir, block, i, callee_blocks, work_list=None):
     # adopted from inline_closure_call
     scope = block.scope
     instr = block.body[i]
 
     # 1. relabel callee_ir by adding an offset
-    callee_blocks = add_offset_to_labels(callee_blocks, ir_utils._max_label+1)
+    callee_blocks = add_offset_to_labels(callee_blocks, ir_utils._max_label + 1)
     callee_blocks = ir_utils.simplify_CFG(callee_blocks)
     max_label = max(callee_blocks.keys())
     #    reset globals in ir_utils before we use it
@@ -121,7 +137,7 @@ def inline_new_blocks(func_ir, block, i, callee_blocks, work_list=None):
     # 5. split caller blocks into two
     new_blocks = []
     new_block = ir.Block(scope, block.loc)
-    new_block.body = block.body[i+1:]
+    new_block.body = block.body[i + 1:]
     new_label = ir_utils.next_label()
     func_ir.blocks[new_label] = new_block
     new_blocks.append((new_label, new_block))
@@ -160,18 +176,20 @@ def is_alloc_call(func_var, call_table):
              and call_list[0] in ['empty', 'zeros', 'ones', 'full'])
             or call_list == [numba.unsafe.ndarray.empty_inferred])
 
+
 def is_alloc_callname(func_name, mod_name):
     """
     return true if function represents an array creation call
     """
     return isinstance(mod_name, str) and ((mod_name == 'numpy'
-        and func_name in np_alloc_callnames)
-        or (func_name == 'empty_inferred'
-            and mod_name in ('numba.extending', 'numba.unsafe.ndarray'))
-        or (func_name == 'pre_alloc_string_array'
-            and mod_name == 'hpat.str_arr_ext')
-        or (func_name in ('alloc_str_list', 'alloc_list_list_str')
-            and mod_name == 'hpat.str_ext'))
+                                           and func_name in np_alloc_callnames)
+                                          or (func_name == 'empty_inferred'
+                                              and mod_name in ('numba.extending', 'numba.unsafe.ndarray'))
+                                          or (func_name == 'pre_alloc_string_array'
+                                              and mod_name == 'hpat.str_arr_ext')
+                                          or (func_name in ('alloc_str_list', 'alloc_list_list_str')
+                                              and mod_name == 'hpat.str_ext'))
+
 
 def find_build_tuple(func_ir, var):
     """Check if a variable is constructed via build_tuple
@@ -183,6 +201,7 @@ def find_build_tuple(func_ir, var):
     require(isinstance(var_def, ir.Expr))
     require(var_def.op == 'build_tuple')
     return var_def.items
+
 
 def cprint(*s):
     print(*s)
@@ -204,9 +223,6 @@ typ_to_format = {
     types.float64: 'lf',
 }
 
-from llvmlite import ir as lir
-import llvmlite.binding as ll
-from . import hstr_ext
 ll.add_symbol('print_str', hstr_ext.print_str)
 ll.add_symbol('print_char', hstr_ext.print_char)
 
@@ -277,8 +293,8 @@ def is_whole_slice(typemap, func_ir, var, accept_stride=False):
     assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
     arg0_def = get_definition(func_ir, call_expr.args[0])
     arg1_def = get_definition(func_ir, call_expr.args[1])
-    require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
-    require(isinstance(arg1_def, ir.Const) and arg1_def.value == None)
+    require(isinstance(arg0_def, ir.Const) and arg0_def.value is None)
+    require(isinstance(arg1_def, ir.Const) and arg1_def.value is None)
     return True
 
 
@@ -292,7 +308,7 @@ def is_const_slice(typemap, func_ir, var, accept_stride=False):
             or (accept_stride and len(call_expr.args) == 3))
     assert find_callname(func_ir, call_expr) == ('slice', 'builtins')
     arg0_def = get_definition(func_ir, call_expr.args[0])
-    require(isinstance(arg0_def, ir.Const) and arg0_def.value == None)
+    require(isinstance(arg0_def, ir.Const) and arg0_def.value is None)
     size_const = find_const(func_ir, call_expr.args[1])
     require(isinstance(size_const, int))
     return True
@@ -305,24 +321,27 @@ def get_slice_step(typemap, func_ir, var):
     assert len(call_expr.args) == 3
     return call_expr.args[2]
 
+
 def is_array(typemap, varname):
     return (varname in typemap
-        and (is_np_array(typemap, varname)
-        or typemap[varname] in (string_array_type, list_string_array_type,
-            hpat.hiframes.split_impl.string_array_split_view_type)
-        or isinstance(typemap[varname], hpat.hiframes.pd_series_ext.SeriesType)))
+            and (is_np_array(typemap, varname)
+                 or typemap[varname] in (string_array_type, list_string_array_type,
+                                         hpat.hiframes.split_impl.string_array_split_view_type)
+                 or isinstance(typemap[varname], hpat.hiframes.pd_series_ext.SeriesType)))
+
 
 def is_np_array(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], types.Array))
 
+
 def is_array_container(typemap, varname):
     return (varname in typemap
             and isinstance(typemap[varname], (types.List, types.Set))
-                and (isinstance(typemap[varname].dtype, types.Array)
-                or typemap[varname].dtype == string_array_type
-                or isinstance(typemap[varname].dtype,
-                hpat.hiframes.pd_series_ext.SeriesType)))
+            and (isinstance(typemap[varname].dtype, types.Array)
+                 or typemap[varname].dtype == string_array_type
+                 or isinstance(typemap[varname].dtype,
+                               hpat.hiframes.pd_series_ext.SeriesType)))
 
 
 # converts an iterable to array, similar to np.array, but can support
@@ -330,6 +349,7 @@ def is_array_container(typemap, varname):
 # TODO: other types like datetime?
 def to_array(A):
     return np.array(A)
+
 
 @overload(to_array)
 def to_array_overload(A):
@@ -339,11 +359,13 @@ def to_array_overload(A):
     try:
         numba.njit(to_array_impl).get_call_template((A,), {})
         return to_array_impl
-    except:
+    except BaseException:
         pass  # should be handled elsewhere (e.g. Set)
+
 
 def empty_like_type(n, arr):
     return np.empty(n, arr.dtype)
+
 
 @overload(empty_like_type)
 def empty_like_type_overload(n, arr):
@@ -359,6 +381,7 @@ def empty_like_type_overload(n, arr):
 
     # string array buffer for join
     assert arr == string_array_type
+
     def empty_like_type_str_arr(n, arr):
         # average character heuristic
         avg_chars = 20  # heuristic
@@ -375,21 +398,22 @@ def alloc_arr_tup(n, arr_tup, init_vals=()):
         arrs.append(np.empty(n, in_arr.dtype))
     return tuple(arrs)
 
+
 @overload(alloc_arr_tup)
 def alloc_arr_tup_overload(n, data, init_vals=()):
     count = data.count
 
     allocs = ','.join(["empty_like_type(n, data[{}])".format(i)
-                        for i in range(count)])
+                       for i in range(count)])
 
     if init_vals is not ():
         # TODO check for numeric value
         allocs = ','.join(["np.full(n, init_vals[{}], data[{}].dtype)".format(i, i)
-                        for i in range(count)])
+                           for i in range(count)])
 
     func_text = "def f(n, data, init_vals=()):\n"
     func_text += "  return ({}{})\n".format(allocs,
-        "," if count == 1 else "")  # single value needs comma to become tuple
+                                            "," if count == 1 else "")  # single value needs comma to become tuple
 
     loc_vars = {}
     exec(func_text, {'empty_like_type': empty_like_type, 'np': np}, loc_vars)
@@ -400,6 +424,7 @@ def alloc_arr_tup_overload(n, data, init_vals=()):
 @intrinsic
 def get_ctypes_ptr(typingctx, ctypes_typ=None):
     assert isinstance(ctypes_typ, types.ArrayCTypes)
+
     def codegen(context, builder, sig, args):
         in_carr, = args
         ctinfo = context.make_helper(builder, sig.args[0], in_carr)
@@ -463,10 +488,11 @@ def find_str_const(func_ir, var):
 
     # only add supported (s1+s2), TODO: extend to other expressions
     require(isinstance(var_def, ir.Expr) and var_def.op == 'binop'
-        and var_def.fn == operator.add)
+            and var_def.fn == operator.add)
     arg1 = find_str_const(func_ir, var_def.lhs)
     arg2 = find_str_const(func_ir, var_def.rhs)
     return arg1 + arg2
+
 
 def gen_getitem(out_var, in_var, ind, calltypes, nodes):
     loc = out_var.loc
@@ -474,27 +500,34 @@ def gen_getitem(out_var, in_var, ind, calltypes, nodes):
     calltypes[getitem] = None
     nodes.append(ir.Assign(getitem, out_var, loc))
 
+
 def sanitize_varname(varname):
     return varname.replace('$', '_').replace('.', '_')
+
 
 def is_call_assign(stmt):
     return (isinstance(stmt, ir.Assign)
             and isinstance(stmt.value, ir.Expr)
             and stmt.value.op == 'call')
 
+
 def is_call(expr):
     return (isinstance(expr, ir.Expr)
             and expr.op == 'call')
 
+
 def is_var_assign(inst):
     return isinstance(inst, ir.Assign) and isinstance(inst.value, ir.Var)
+
 
 def is_assign(inst):
     return isinstance(inst, ir.Assign)
 
+
 def dump_node_list(node_list):
     for n in node_list:
         print("   ", n)
+
 
 def debug_prints():
     return numba.config.DEBUG_ARRAY_OPT == 1
