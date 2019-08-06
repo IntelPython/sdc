@@ -1,31 +1,38 @@
+from llvmlite import ir as lir
+import llvmlite.binding as ll
 import numba
 import hpat
 from hpat.utils import debug_prints
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
-                    signature, AttributeTemplate, infer_getattr, bound_function)
+                                    signature, AttributeTemplate, infer_getattr, bound_function)
 from numba.extending import (typeof_impl, type_callable, models, register_model,
-                                make_attribute_wrapper, lower_builtin, box, lower_getattr)
+                             make_attribute_wrapper, lower_builtin, box, lower_getattr)
 from numba import cgutils, utils
 from numba.targets.arrayobj import _empty_nd_impl
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+
 
 class SVC(object):
     def __init__(self, nclasses=-1):
         self.n_classes = nclasses
         return
 
+
 class SVCType(types.Type):
     def __init__(self):
         super(SVCType, self).__init__(
-                                    name='SVCType()')
+            name='SVCType()')
+
 
 svc_type = SVCType()
+
 
 class SVCPayloadType(types.Type):
     def __init__(self):
         super(SVCPayloadType, self).__init__(
-                                    name='SVCPayloadType()')
+            name='SVCPayloadType()')
+
 
 @typeof_impl.register(SVC)
 def typeof_svc_val(val, c):
@@ -38,8 +45,11 @@ def typeof_svc_val(val, c):
 #     return typer
 
 # dummy function providing pysignature for SVC()
+
+
 def SVC_dummy(n_classes=-1):
     return 1
+
 
 @infer_global(SVC)
 class SVCConstructorInfer(AbstractTemplate):
@@ -49,14 +59,16 @@ class SVCConstructorInfer(AbstractTemplate):
         sig.pysig = pysig
         return sig
 
+
 @register_model(SVCType)
 class SVCDataModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         dtype = SVCPayloadType()
         members = [
             ('meminfo', types.MemInfoPointer(dtype)),
-            ]
+        ]
         models.StructModel.__init__(self, dmm, fe_type, members)
+
 
 @register_model(SVCPayloadType)
 class SVCPayloadDataModel(models.StructModel):
@@ -64,8 +76,9 @@ class SVCPayloadDataModel(models.StructModel):
         members = [
             ('model', types.Opaque('daal_model')),
             ('n_classes', types.intp),
-            ]
+        ]
         models.StructModel.__init__(self, dmm, fe_type, members)
+
 
 @infer_getattr
 class SVCAttribute(AttributeTemplate):
@@ -83,8 +96,7 @@ class SVCAttribute(AttributeTemplate):
         assert len(args) == 1
         return signature(types.Array(types.float64, 1, 'C'), *args)
 
-from llvmlite import ir as lir
-import llvmlite.binding as ll
+
 try:
     import daal_wrapper
     ll.add_symbol('svc_train', daal_wrapper.svc_train)
@@ -93,6 +105,7 @@ try:
 except ImportError:
     if debug_prints():  # pragma: no cover
         print("daal import error")
+
 
 @lower_builtin(SVC, types.intp)
 def impl_svc_constructor(context, builder, sig, args):
@@ -104,7 +117,7 @@ def impl_svc_constructor(context, builder, sig, args):
     llvoidptr = context.get_value_type(types.voidptr)
     llsize = context.get_value_type(types.uintp)
     dtor_ftype = lir.FunctionType(lir.VoidType(),
-                                     [llvoidptr, llsize, llvoidptr])
+                                  [llvoidptr, llsize, llvoidptr])
     dtor_fn = builder.module.get_or_insert_function(dtor_ftype, name="dtor_svc")
 
     meminfo = context.nrt.meminfo_alloc_dtor(
@@ -124,6 +137,7 @@ def impl_svc_constructor(context, builder, sig, args):
     svc_struct = cgutils.create_struct_proxy(svc_type)(context, builder)
     svc_struct.meminfo = meminfo
     return svc_struct._getvalue()
+
 
 @lower_builtin("svc.train", svc_type, types.Array, types.Array)
 def svc_train_impl(context, builder, sig, args):
@@ -150,16 +164,17 @@ def svc_train_impl(context, builder, sig, args):
     inst_struct = context.make_helper(builder, svc_type, args[0])
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     data_pointer = builder.bitcast(data_pointer,
-                                    context.get_data_type(dtype).as_pointer())
+                                   context.get_data_type(dtype).as_pointer())
 
     svc_struct = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
 
     call_args = [num_features, num_samples, X.data, y.data,
-                                svc_struct._get_ptr_by_name('n_classes')]
+                 svc_struct._get_ptr_by_name('n_classes')]
     model = builder.call(fn, call_args)
     svc_struct.model = model
     builder.store(svc_struct._getvalue(), data_pointer)
     return context.get_dummy_value()
+
 
 @lower_builtin("svc.predict", svc_type, types.Array)
 def svc_predict_impl(context, builder, sig, args):
@@ -168,7 +183,7 @@ def svc_predict_impl(context, builder, sig, args):
     inst_struct = context.make_helper(builder, svc_type, args[0])
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     data_pointer = builder.bitcast(data_pointer,
-                                    context.get_data_type(dtype).as_pointer())
+                                   context.get_data_type(dtype).as_pointer())
     svc_struct = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
 
     p = context.make_array(sig.args[1])(context, builder, args[1])

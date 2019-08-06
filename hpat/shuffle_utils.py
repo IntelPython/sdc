@@ -9,12 +9,11 @@ from hpat.utils import get_ctypes_ptr, _numba_to_c_type_map
 from hpat.timsort import getitem_arr_tup
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, to_string_list,
-    get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
-    pre_alloc_string_array, num_total_chars)
+                              get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
+                              pre_alloc_string_array, num_total_chars)
 
 
-
-########## metadata required for shuffle
+# metadata required for shuffle
 # send_counts -> pre, single
 # recv_counts -> single
 # send_buff
@@ -24,7 +23,7 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
 # send_disp -> single
 # recv_disp -> single
 # tmp_offset -> single
-############### string arrays
+# string arrays
 # send_counts_char -> pre
 # recv_counts_char
 # send_arr_lens -> pre
@@ -32,26 +31,27 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
 # send_disp_char
 # recv_disp_char
 # tmp_offset_char
-#### dummy array to key reference count alive, since ArrayCTypes can't be
-#### passed to jitclass TODO: update
+# dummy array to key reference count alive, since ArrayCTypes can't be
+# passed to jitclass TODO: update
 # send_arr_chars_arr
 
 
 PreShuffleMeta = namedtuple('PreShuffleMeta',
-    'send_counts, send_counts_char_tup, send_arr_lens_tup')
+                            'send_counts, send_counts_char_tup, send_arr_lens_tup')
 
 ShuffleMeta = namedtuple('ShuffleMeta',
-    ('send_counts, recv_counts, n_send, n_out, send_disp, recv_disp, '
-    'tmp_offset, send_buff_tup, out_arr_tup, send_counts_char_tup, '
-    'recv_counts_char_tup, send_arr_lens_tup, send_arr_chars_tup, '
-    'send_disp_char_tup, recv_disp_char_tup, tmp_offset_char_tup, '
-    'send_arr_chars_arr_tup'))
+                         ('send_counts, recv_counts, n_send, n_out, send_disp, recv_disp, '
+                          'tmp_offset, send_buff_tup, out_arr_tup, send_counts_char_tup, '
+                          'recv_counts_char_tup, send_arr_lens_tup, send_arr_chars_tup, '
+                          'send_disp_char_tup, recv_disp_char_tup, tmp_offset_char_tup, '
+                          'send_arr_chars_arr_tup'))
 
 
 # before shuffle, 'send_counts' is needed as well as
 # 'send_counts_char' and 'send_arr_lens' for every string type
 def alloc_pre_shuffle_metadata(arr, data, n_pes, is_contig):
     return PreShuffleMeta(np.zeros(n_pes, np.int32), ())
+
 
 @overload(alloc_pre_shuffle_metadata)
 def alloc_pre_shuffle_metadata_overload(key_arrs, data, n_pes, is_contig):
@@ -84,16 +84,16 @@ def alloc_pre_shuffle_metadata_overload(key_arrs, data, n_pes, is_contig):
     # print(func_text)
 
     loc_vars = {}
-    exec(func_text, {'np':np, 'PreShuffleMeta': PreShuffleMeta}, loc_vars)
+    exec(func_text, {'np': np, 'PreShuffleMeta': PreShuffleMeta}, loc_vars)
     alloc_impl = loc_vars['f']
     return alloc_impl
-
 
 
 # 'send_counts' is updated, and 'send_counts_char' and 'send_arr_lens'
 # for every string type
 def update_shuffle_meta(pre_shuffle_meta, node_id, ind, val, data, is_contig=True):
     pre_shuffle_meta.send_counts[node_id] += 1
+
 
 @overload(update_shuffle_meta)
 def update_shuffle_meta_overload(pre_shuffle_meta, node_id, ind, val, data, is_contig=True):
@@ -118,9 +118,9 @@ def update_shuffle_meta_overload(pre_shuffle_meta, node_id, ind, val, data, is_c
     return update_impl
 
 
-
 def finalize_shuffle_meta(arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals=()):
     return ShuffleMeta()
+
 
 @overload(finalize_shuffle_meta)
 def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_contig, init_vals=()):
@@ -159,15 +159,15 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
             func_text += "  send_counts_char_{} = pre_shuffle_meta.send_counts_char_tup[{}]\n".format(n_str, n_str)
             func_text += "  recv_counts_char_{} = np.empty(n_pes, np.int32)\n".format(n_str)
             func_text += ("  hpat.distributed_api.alltoall("
-                "send_counts_char_{}, recv_counts_char_{}, 1)\n").format(n_str, n_str)
+                          "send_counts_char_{}, recv_counts_char_{}, 1)\n").format(n_str, n_str)
             # alloc output
             func_text += "  n_all_chars = recv_counts_char_{}.sum()\n".format(n_str)
             func_text += "  out_arr_{} = pre_alloc_string_array(n_out, n_all_chars)\n".format(i)
             # send/recv disp
             func_text += ("  send_disp_char_{} = hpat.hiframes.join."
-                "calc_disp(send_counts_char_{})\n").format(n_str, n_str)
+                          "calc_disp(send_counts_char_{})\n").format(n_str, n_str)
             func_text += ("  recv_disp_char_{} = hpat.hiframes.join."
-                "calc_disp(recv_counts_char_{})\n").format(n_str, n_str)
+                          "calc_disp(recv_counts_char_{})\n").format(n_str, n_str)
 
             # tmp_offset_char, send_arr_lens
             func_text += "  tmp_offset_char_{} = np.zeros(n_pes, np.int32)\n".format(n_str)
@@ -208,16 +208,15 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
 
     loc_vars = {}
     exec(func_text, {'np': np, 'hpat': hpat,
-         'pre_alloc_string_array': pre_alloc_string_array,
-         'num_total_chars': num_total_chars,
-         'get_data_ptr': get_data_ptr,
-         'ShuffleMeta': ShuffleMeta,
-         'get_ctypes_ptr': get_ctypes_ptr,
-         'fix_cat_array_type':
-         hpat.hiframes.pd_categorical_ext.fix_cat_array_type}, loc_vars)
+                     'pre_alloc_string_array': pre_alloc_string_array,
+                     'num_total_chars': num_total_chars,
+                     'get_data_ptr': get_data_ptr,
+                     'ShuffleMeta': ShuffleMeta,
+                     'get_ctypes_ptr': get_ctypes_ptr,
+                     'fix_cat_array_type':
+                     hpat.hiframes.pd_categorical_ext.fix_cat_array_type}, loc_vars)
     finalize_impl = loc_vars['f']
     return finalize_impl
-
 
 
 def alltoallv(arr, m):
@@ -235,6 +234,7 @@ def alltoallv_impl(arr, metadata):
     assert arr == string_array_type
     int32_typ_enum = np.int32(_numba_to_c_type_map[types.int32])
     char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
+
     def a2av_str_impl(arr, metadata):
         # TODO: increate refcount?
         offset_ptr = get_offset_ptr(metadata.out_arr)
@@ -248,9 +248,9 @@ def alltoallv_impl(arr, metadata):
     return a2av_str_impl
 
 
-
 def alltoallv_tup(arrs, shuffle_meta):
     return arrs
+
 
 @overload(alltoallv_tup)
 def alltoallv_tup_overload(arrs, meta):
@@ -259,21 +259,22 @@ def alltoallv_tup_overload(arrs, meta):
     for i, typ in enumerate(arrs.types):
         if isinstance(typ, types.Array):
             func_text += ("  hpat.distributed_api.alltoallv("
-                "meta.send_buff_tup[{}], meta.out_arr_tup[{}], meta.send_counts,"
-                "meta.recv_counts, meta.send_disp, meta.recv_disp)\n").format(i, i)
+                          "meta.send_buff_tup[{}], meta.out_arr_tup[{}], meta.send_counts,"
+                          "meta.recv_counts, meta.send_disp, meta.recv_disp)\n").format(i, i)
         else:
             assert typ == string_array_type
             func_text += "  offset_ptr_{} = get_offset_ptr(meta.out_arr_tup[{}])\n".format(i, i)
 
             func_text += ("  hpat.distributed_api.c_alltoallv("
-                "meta.send_arr_lens_tup[{}].ctypes, offset_ptr_{}, meta.send_counts.ctypes, "
-                "meta.recv_counts.ctypes, meta.send_disp.ctypes, "
-                "meta.recv_disp.ctypes, int32_typ_enum)\n").format(n_str, i)
+                          "meta.send_arr_lens_tup[{}].ctypes, offset_ptr_{}, meta.send_counts.ctypes, "
+                          "meta.recv_counts.ctypes, meta.send_disp.ctypes, "
+                          "meta.recv_disp.ctypes, int32_typ_enum)\n").format(n_str, i)
 
             func_text += ("  hpat.distributed_api.c_alltoallv("
-                "meta.send_arr_chars_tup[{}], get_data_ptr(meta.out_arr_tup[{}]), meta.send_counts_char_tup[{}].ctypes,"
-                "meta.recv_counts_char_tup[{}].ctypes, meta.send_disp_char_tup[{}].ctypes,"
-                "meta.recv_disp_char_tup[{}].ctypes, char_typ_enum)\n").format(n_str, i, n_str, n_str, n_str, n_str)
+                          "meta.send_arr_chars_tup[{}], get_data_ptr(meta.out_arr_tup[{}]),"
+                          "meta.send_counts_char_tup[{}].ctypes, meta.recv_counts_char_tup[{}].ctypes,"
+                          "meta.send_disp_char_tup[{}].ctypes, meta.recv_disp_char_tup[{}].ctypes,"
+                          "char_typ_enum)\n").format(n_str, i, n_str, n_str, n_str, n_str)
 
             func_text += "  convert_len_arr_to_offset(offset_ptr_{}, meta.n_out)\n".format(i)
             n_str += 1
@@ -286,9 +287,9 @@ def alltoallv_tup_overload(arrs, meta):
     char_typ_enum = np.int32(_numba_to_c_type_map[types.uint8])
     loc_vars = {}
     exec(func_text, {'hpat': hpat, 'get_offset_ptr': get_offset_ptr,
-         'get_data_ptr': get_data_ptr, 'int32_typ_enum': int32_typ_enum,
-         'char_typ_enum': char_typ_enum,
-         'convert_len_arr_to_offset': convert_len_arr_to_offset}, loc_vars)
+                     'get_data_ptr': get_data_ptr, 'int32_typ_enum': int32_typ_enum,
+                     'char_typ_enum': char_typ_enum,
+                     'convert_len_arr_to_offset': convert_len_arr_to_offset}, loc_vars)
     a2a_impl = loc_vars['f']
     return a2a_impl
 
@@ -296,12 +297,13 @@ def alltoallv_tup_overload(arrs, meta):
 def _get_keys_tup(recvs, key_arrs):
     return recvs[:len(key_arrs)]
 
+
 @overload(_get_keys_tup)
 def _get_keys_tup_overload(recvs, key_arrs):
     n_keys = len(key_arrs.types)
     func_text = "def f(recvs, key_arrs):\n"
     res = ",".join("recvs[{}]".format(i) for i in range(n_keys))
-    func_text += "  return ({}{})\n".format(res, "," if n_keys==1 else "")
+    func_text += "  return ({}{})\n".format(res, "," if n_keys == 1 else "")
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     impl = loc_vars['f']
@@ -311,6 +313,7 @@ def _get_keys_tup_overload(recvs, key_arrs):
 def _get_data_tup(recvs, key_arrs):
     return recvs[len(key_arrs):]
 
+
 @overload(_get_data_tup)
 def _get_data_tup_overload(recvs, key_arrs):
     n_keys = len(key_arrs.types)
@@ -318,17 +321,17 @@ def _get_data_tup_overload(recvs, key_arrs):
     n_data = n_all - n_keys
     func_text = "def f(recvs, key_arrs):\n"
     res = ",".join("recvs[{}]".format(i) for i in range(n_keys, n_all))
-    func_text += "  return ({}{})\n".format(res, "," if n_data==1 else "")
+    func_text += "  return ({}{})\n".format(res, "," if n_data == 1 else "")
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     impl = loc_vars['f']
     return impl
 
 
-
 # returns scalar instead of tuple if only one array
 def getitem_arr_tup_single(arrs, i):
     return arrs[0][i]
+
 
 @overload(getitem_arr_tup_single)
 def getitem_arr_tup_single_overload(arrs, i):
@@ -336,8 +339,10 @@ def getitem_arr_tup_single_overload(arrs, i):
         return lambda arrs, i: arrs[0][i]
     return lambda arrs, i: getitem_arr_tup(arrs, i)
 
+
 def val_to_tup(val):
     return (val,)
+
 
 @overload(val_to_tup)
 def val_to_tup_overload(val):
