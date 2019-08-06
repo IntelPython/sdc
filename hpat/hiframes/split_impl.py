@@ -4,7 +4,7 @@ import numba
 import hpat
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
-    signature, AttributeTemplate, infer_getattr, bound_function)
+                                    signature, AttributeTemplate, infer_getattr, bound_function)
 import numba.typing.typeof
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox,
@@ -12,9 +12,9 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
 from numba import cgutils
 from hpat.str_ext import string_type
 from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
-    iternext_impl, RefType)
+                                    iternext_impl, RefType)
 from hpat.str_arr_ext import (string_array_type, get_data_ptr,
-    is_str_arr_typ, pre_alloc_string_array, _memcpy)
+                              is_str_arr_typ, pre_alloc_string_array, _memcpy)
 
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
@@ -24,7 +24,6 @@ from .. import hstr_ext
 ll.add_symbol('array_setitem', hstr_ext.array_setitem)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
-from .. import hstr_ext
 ll.add_symbol('dtor_str_arr_split_view', hstr_ext.dtor_str_arr_split_view)
 ll.add_symbol('str_arr_split_view_impl', hstr_ext.str_arr_split_view_impl)
 ll.add_symbol('str_arr_split_view_alloc', hstr_ext.str_arr_split_view_alloc)
@@ -52,14 +51,13 @@ class StringArraySplitViewType(types.IterableType):
     # TODO
     @property
     def iterator_type(self):
-        return #StringArrayIterator()
+        return  # StringArrayIterator()
 
     def copy(self):
         return StringArraySplitViewType()
 
 
 string_array_split_view_type = StringArraySplitViewType()
-
 
 
 class StringArraySplitViewPayloadType(types.Type):
@@ -82,9 +80,10 @@ class StringArrayPayloadModel(models.StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+
 str_arr_model_members = [
     ('num_items', types.uint64),  # number of lists
-    #('num_total_strs', types.uint64),  # number of strings total
+    # ('num_total_strs', types.uint64),  # number of strings total
     #('num_total_chars', types.uint64),
     ('index_offsets', types.CPointer(offset_typ)),
     ('data_offsets', types.CPointer(offset_typ)),
@@ -92,6 +91,7 @@ str_arr_model_members = [
     #('null_bitmap', types.CPointer(char_typ)),
     ('meminfo', types.MemInfoPointer(str_arr_split_view_payload_type)),
 ]
+
 
 @register_model(StringArraySplitViewType)
 class StringArrayModel(models.StructModel):
@@ -126,16 +126,18 @@ def construct_str_arr_split_view(context, builder):
     )
     meminfo_data_ptr = context.nrt.meminfo_data(builder, meminfo)
     meminfo_data_ptr = builder.bitcast(meminfo_data_ptr,
-                                   alloc_type.as_pointer())
+                                       alloc_type.as_pointer())
 
     # Nullify all data
     # builder.store( cgutils.get_null_value(alloc_type),
     #             meminfo_data_ptr)
     return meminfo, meminfo_data_ptr
 
+
 @intrinsic
 def compute_split_view(typingctx, str_arr_typ, sep_typ=None):
     assert str_arr_typ == string_array_type and isinstance(sep_typ, types.StringLiteral)
+
     def codegen(context, builder, sig, args):
         str_arr, _ = args
         meminfo, meminfo_data_ptr = construct_str_arr_split_view(
@@ -157,8 +159,8 @@ def compute_split_view(typingctx, str_arr_typ, sep_typ=None):
 
         sep_val = context.get_constant(types.int8, ord(sep_typ.literal_value))
         builder.call(fn_impl,
-            [meminfo_data_ptr, in_str_arr.num_items,
-            in_str_arr.offsets, in_str_arr.data, sep_val])
+                     [meminfo_data_ptr, in_str_arr.num_items,
+                      in_str_arr.offsets, in_str_arr.data, sep_val])
 
         view_payload = cgutils.create_struct_proxy(
             str_arr_split_view_payload_type)(
@@ -216,7 +218,12 @@ def box_str_arr_split_view(typ, val, c):
         # sp_view.index_offsets[str_ind]
         list_start_offset = builder.sext(builder.load(builder.gep(sp_view.index_offsets, [str_ind])), lir.IntType(64))
         # sp_view.index_offsets[str_ind+1]
-        list_end_offset = builder.sext(builder.load(builder.gep(sp_view.index_offsets, [builder.add(str_ind, str_ind.type(1))])), lir.IntType(64))
+        list_end_offset = builder.sext(
+            builder.load(
+                builder.gep(
+                    sp_view.index_offsets, [
+                        builder.add(
+                            str_ind, str_ind.type(1))])), lir.IntType(64))
         # cgutils.printf(builder, "%d %d\n", list_start, list_end)
 
         # Build a new Python list
@@ -232,7 +239,11 @@ def box_str_arr_split_view(typ, val, c):
                 data_start = builder.load(builder.gep(sp_view.data_offsets, [start_index]))
                 # add 1 since starts from -1
                 data_start = builder.add(data_start, data_start.type(1))
-                data_end = builder.load(builder.gep(sp_view.data_offsets, [builder.add(start_index, start_index.type(1))]))
+                data_end = builder.load(
+                    builder.gep(
+                        sp_view.data_offsets, [
+                            builder.add(
+                                start_index, start_index.type(1))]))
                 # cgutils.printf(builder, "ind %lld %lld\n", data_start, data_end)
                 data_ptr = builder.gep(builder.extract_value(sp_view.data, 0), [data_start])
                 str_size = builder.sext(builder.sub(data_end, data_start), lir.IntType(64))
@@ -242,7 +253,6 @@ def box_str_arr_split_view(typ, val, c):
         arr_ptr = builder.call(arr_get_fn, [out_arr, str_ind])
         builder.call(arr_setitem_fn, [out_arr, arr_ptr, list_obj])
 
-
     c.pyapi.decref(np_class_obj)
     return out_arr
 
@@ -250,6 +260,7 @@ def box_str_arr_split_view(typ, val, c):
 @intrinsic
 def pre_alloc_str_arr_view(typingctx, num_items_t, num_offsets_t, data_t=None):
     assert num_items_t == types.intp and num_offsets_t == types.intp
+
     def codegen(context, builder, sig, args):
         num_items, num_offsets, data_ptr = args
         meminfo, meminfo_data_ptr = construct_str_arr_split_view(
@@ -265,8 +276,7 @@ def pre_alloc_str_arr_view(typingctx, num_items_t, num_offsets_t, data_t=None):
             fnty, name="str_arr_split_view_alloc")
 
         builder.call(fn_impl,
-            [meminfo_data_ptr, num_items, num_offsets])
-
+                     [meminfo_data_ptr, num_items, num_offsets])
 
         view_payload = cgutils.create_struct_proxy(
             str_arr_split_view_payload_type)(
@@ -294,6 +304,7 @@ def pre_alloc_str_arr_view(typingctx, num_items_t, num_offsets_t, data_t=None):
 @intrinsic
 def get_c_arr_ptr(typingctx, c_arr, ind_t=None):
     assert isinstance(c_arr, (types.CPointer, types.ArrayCTypes))
+
     def codegen(context, builder, sig, args):
         in_arr, ind = args
         if isinstance(sig.args[0], types.ArrayCTypes):
@@ -386,14 +397,14 @@ class GetItemStringArraySplitView(AbstractTemplate):
                 return signature(string_array_split_view_type, *args)
 
 
-
 @overload(operator.getitem)
 def str_arr_split_view_getitem_overload(A, ind):
     if A == string_array_split_view_type and isinstance(ind, types.Integer):
         kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+
         def _impl(A, ind):
             start_index = getitem_c_arr(A._index_offsets, ind)
-            end_index = getitem_c_arr(A._index_offsets, ind+1)
+            end_index = getitem_c_arr(A._index_offsets, ind + 1)
             n = end_index - start_index - 1
 
             str_list = hpat.str_ext.alloc_str_list(n)
@@ -429,7 +440,7 @@ def str_arr_split_view_getitem_overload(A, ind):
                 if ind[i]:
                     num_items += 1
                     start_index = getitem_c_arr(A._index_offsets, i)
-                    end_index = getitem_c_arr(A._index_offsets, i+1)
+                    end_index = getitem_c_arr(A._index_offsets, i + 1)
                     num_offsets += end_index - start_index
 
             out_arr = pre_alloc_str_arr_view(num_items, num_offsets, A._data)
@@ -438,7 +449,7 @@ def str_arr_split_view_getitem_overload(A, ind):
             for i in range(n):
                 if ind[i]:
                     start_index = getitem_c_arr(A._index_offsets, i)
-                    end_index = getitem_c_arr(A._index_offsets, i+1)
+                    end_index = getitem_c_arr(A._index_offsets, i + 1)
                     n_offsets = end_index - start_index
 
                     setitem_c_arr(out_arr._index_offsets, item_ind, offset_ind)

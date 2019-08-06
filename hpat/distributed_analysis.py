@@ -32,11 +32,13 @@ class Distribution(Enum):
     OneD_Var = 4
     OneD = 5
 
+
 _dist_analysis_result = namedtuple(
     'dist_analysis_result', 'array_dists,parfor_dists')
 
 distributed_analysis_extensions = {}
 auto_rebalance = False
+
 
 class DistributedAnalysis(object):
     """Analyze program for distributed transformation"""
@@ -120,8 +122,8 @@ class DistributedAnalysis(object):
             rhs = rhs.value
 
         if isinstance(rhs, ir.Var) and (is_array(self.typemap, lhs)
-                or isinstance(self.typemap[lhs], (SeriesType, DataFrameType))
-                                     or is_array_container(self.typemap, lhs)):
+                                        or isinstance(self.typemap[lhs], (SeriesType, DataFrameType))
+                                        or is_array_container(self.typemap, lhs)):
             self._meet_array_dists(lhs, rhs.name, array_dists)
             return
         elif (is_array(self.typemap, lhs)
@@ -207,7 +209,7 @@ class DistributedAnalysis(object):
             ind_def = self.func_ir._definitions[index]
             if len(ind_def) == 1 and isinstance(ind_def[0], ir.Var):
                 index = ind_def[0].name
-            if index == par_index_var: #or index in stencil_accesses:
+            if index == par_index_var:  # or index in stencil_accesses:
                 parfor_arrs.add(arr)
                 self._parallel_accesses.add((arr, index))
 
@@ -259,7 +261,7 @@ class DistributedAnalysis(object):
             # blocks of data are passed in, TODO: document
             func_def = guard(get_definition, self.func_ir, rhs.func)
             if isinstance(func_def, ir.Const) and isinstance(func_def.value,
-                                           numba.dispatcher.ObjModeLiftedWith):
+                                                             numba.dispatcher.ObjModeLiftedWith):
                 return
             warnings.warn(
                 "function call couldn't be found for distributed analysis")
@@ -299,11 +301,11 @@ class DistributedAnalysis(object):
             return
 
         if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
-                and func_name in ('h5read', 'h5write', 'h5read_filter')):
+                                      and func_name in ('h5read', 'h5write', 'h5read_filter')):
             return
 
         if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
-                and func_name == 'get_filter_read_indices'):
+                                      and func_name == 'get_filter_read_indices'):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
@@ -366,10 +368,10 @@ class DistributedAnalysis(object):
 
         # dummy hiframes functions
         if func_mod == 'hpat.hiframes.api' and func_name in ('get_series_data',
-                'get_series_index',
-                'to_arr_from_series', 'ts_series_to_arr_typ',
-                'to_date_series_type', 'dummy_unbox_series',
-                'parallel_fix_df_array'):
+                                                             'get_series_index',
+                                                             'to_arr_from_series', 'ts_series_to_arr_typ',
+                                                             'to_date_series_type', 'dummy_unbox_series',
+                                                             'parallel_fix_df_array'):
             # TODO: support Series type similar to Array
             self._meet_array_dists(lhs, rhs.args[0].name, array_dists)
             return
@@ -504,7 +506,6 @@ class DistributedAnalysis(object):
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists, fdef)
 
-
     def _analyze_call_np(self, lhs, func_name, args, array_dists):
         """analyze distributions of numpy functions (np.func_name)
         """
@@ -565,7 +566,6 @@ class DistributedAnalysis(object):
 
         # set REP if not found
         self._analyze_call_set_REP(lhs, args, array_dists, 'np.' + func_name)
-
 
     def _analyze_call_array(self, lhs, arr, func_name, args, array_dists):
         """analyze distributions of array functions (arr.func_name)
@@ -802,7 +802,7 @@ class DistributedAnalysis(object):
         # whole slice or strided slice access
         # for example: A = X[:,5], A = X[::2,5]
         if guard(is_whole_slice, self.typemap, self.func_ir, index_var,
-                    accept_stride=True):
+                 accept_stride=True):
             self._meet_array_dists(lhs, rhs.value.name, array_dists)
             return
 
@@ -872,7 +872,6 @@ class DistributedAnalysis(object):
                 tuple_vars = var_def.items
                 self._set_REP(tuple_vars, array_dists)
 
-
     def _rebalance_arrs(self, array_dists, parfor_dists):
         # rebalance an array if it is accessed in a parfor that has output
         # arrays or is in a loop
@@ -893,7 +892,7 @@ class DistributedAnalysis(object):
                     array_accesses = _get_array_accesses(
                         inst.loop_body, self.func_ir, self.typemap)
                     onedv_arrs = set(arr for (arr, ind) in array_accesses
-                                 if arr in array_dists and array_dists[arr] == Distribution.OneD_Var)
+                                     if arr in array_dists and array_dists[arr] == Distribution.OneD_Var)
                     if (label in loop_bodies
                             or _arrays_written(onedv_arrs, inst.loop_body)):
                         rebalance_arrs |= onedv_arrs
@@ -1007,7 +1006,6 @@ def _arrays_written(arrs, blocks):
 #             if invar.name == var2.name or vars_dependent(defs, invar, var2):
 #                 return True
 #     return False
-
 
 
 # array access code is copied from ir_utils to be able to handle specialized
