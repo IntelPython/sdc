@@ -51,7 +51,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
         typ = typemap[col_var.name]
         # TODO handle list_string_array_type in other nodes
         if typ in (string_array_type, list_string_array_type,
-                    string_array_split_view_type):
+                   string_array_split_view_type):
             continue
         col_shape = equiv_set.get_shape(col_var)
         all_shapes.append(col_shape[0])
@@ -66,7 +66,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
     for _, col_var in filter_node.df_out_vars.items():
         typ = typemap[col_var.name]
         if typ in (string_array_type, list_string_array_type,
-                    string_array_split_view_type):
+                   string_array_split_view_type):
             continue
         (shape, c_post) = array_analysis._gen_shape_call(
             equiv_set, col_var, typ.ndim, None)
@@ -126,6 +126,7 @@ def filter_distributed_analysis(filter_node, array_dists):
 
 distributed_analysis.distributed_analysis_extensions[Filter] = filter_distributed_analysis
 
+
 def build_filter_definitions(filter_node, definitions=None):
     if definitions is None:
         definitions = defaultdict(list)
@@ -134,6 +135,7 @@ def build_filter_definitions(filter_node, definitions=None):
         definitions[col_var.name].append(filter_node)
 
     return definitions
+
 
 ir_utils.build_defs_extensions[Filter] = build_filter_definitions
 
