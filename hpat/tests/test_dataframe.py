@@ -6,8 +6,7 @@ import numpy as np
 
 import numba
 import hpat
-from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
+from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 
@@ -18,7 +17,9 @@ def inner_get_column(df):
     # df2['D'] = np.ones(3)
     return df.A
 
+
 COL_IND = 0
+
 
 class TestDataFrame(unittest.TestCase):
 
@@ -89,7 +90,7 @@ class TestDataFrame(unittest.TestCase):
 
     def test_box2(self):
         def test_impl():
-            df = pd.DataFrame({'A': [1,2,3], 'B': ['a', 'bb', 'ccc']})
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'bb', 'ccc']})
             return df
 
         hpat_func = hpat.jit(test_impl)
@@ -183,7 +184,7 @@ class TestDataFrame(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_filter1(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
             df1 = df[df.A > .5]
             return df1.B.sum()
 
@@ -197,7 +198,7 @@ class TestDataFrame(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_filter2(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
             df1 = df.loc[df.A > .5]
             return np.sum(df1.B)
 
@@ -211,7 +212,7 @@ class TestDataFrame(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_filter3(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+n, 'B': np.arange(n)**2})
+            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
             df1 = df.iloc[(df.A > .5).values]
             return np.sum(df1.B)
 
@@ -232,7 +233,7 @@ class TestDataFrame(unittest.TestCase):
 
     def test_iloc2(self):
         def test_impl(df, n):
-            return df.iloc[np.array([1,4,9])].B.values
+            return df.iloc[np.array([1, 4, 9])].B.values
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -241,7 +242,7 @@ class TestDataFrame(unittest.TestCase):
 
     def test_iloc3(self):
         def test_impl(df):
-            return df.iloc[:,1].values
+            return df.iloc[:, 1].values
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -251,7 +252,7 @@ class TestDataFrame(unittest.TestCase):
     @unittest.skip("TODO: support A[[1,2,3]] in Numba")
     def test_iloc4(self):
         def test_impl(df, n):
-            return df.iloc[[1,4,9]].B.values
+            return df.iloc[[1, 4, 9]].B.values
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -261,7 +262,7 @@ class TestDataFrame(unittest.TestCase):
     def test_iloc5(self):
         # test iloc with global value
         def test_impl(df):
-            return df.iloc[:,COL_IND].values
+            return df.iloc[:, COL_IND].values
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -270,7 +271,7 @@ class TestDataFrame(unittest.TestCase):
 
     def test_loc1(self):
         def test_impl(df):
-            return df.loc[:,'B'].values
+            return df.loc[:, 'B'].values
 
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -281,7 +282,7 @@ class TestDataFrame(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_iat1(self):
         def test_impl(n):
-            df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+            df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
             return df.iat[3, 1]
         hpat_func = hpat.jit(test_impl)
         n = 11
@@ -292,34 +293,34 @@ class TestDataFrame(unittest.TestCase):
             return df.iat[3, 1]
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
         self.assertEqual(hpat_func(df), test_impl(df))
 
     def test_iat3(self):
         def test_impl(df, n):
-            return df.iat[n-1, 1]
+            return df.iat[n - 1, 1]
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
         self.assertEqual(hpat_func(df, n), test_impl(df, n))
 
     def test_iat_set1(self):
         def test_impl(df, n):
-            df.iat[n-1, 1] = n**2
+            df.iat[n - 1, 1] = n**2
             return df.A  # return the column to check column aliasing
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
         df2 = df.copy()
         pd.testing.assert_series_equal(hpat_func(df, n), test_impl(df2, n))
 
     def test_iat_set2(self):
         def test_impl(df, n):
-            df.iat[n-1, 1] = n**2
+            df.iat[n - 1, 1] = n**2
             return df  # check df aliasing/boxing
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n)+n})
+        df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
         df2 = df.copy()
         pd.testing.assert_frame_equal(hpat_func(df, n), test_impl(df2, n))
 
@@ -330,7 +331,7 @@ class TestDataFrame(unittest.TestCase):
     def test_set_column1(self):
         # set existing column
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
             df['A'] = np.arange(n)
             return df
 
@@ -349,7 +350,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
         df2 = df1.copy()
         hpat_func(df1, n)
         test_impl(df2, n)
@@ -362,7 +363,7 @@ class TestDataFrame(unittest.TestCase):
     def test_set_column_new_type1(self):
         # set existing column with a new type
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)+3.0})
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n) + 3.0})
             df['A'] = np.arange(n)
             return df
 
@@ -377,7 +378,7 @@ class TestDataFrame(unittest.TestCase):
     def test_set_column2(self):
         # create new column
         def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)+1.0})
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n) + 1.0})
             df['C'] = np.arange(n)
             return df
 
@@ -396,7 +397,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)+3.0})
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
         df2 = df1.copy()
         hpat_func(df1, n)
         test_impl(df2, n)
@@ -409,7 +410,7 @@ class TestDataFrame(unittest.TestCase):
             df['C'] = df['A'][df['B']]
 
         hpat_func = hpat.jit(test_impl)
-        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
         df2 = df.copy()
         test_impl(df2)
         hpat_func(df)
@@ -697,7 +698,7 @@ class TestDataFrame(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_pct_change1(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.pct_change(3)
 
         hpat_func = hpat.jit(test_impl)
@@ -709,7 +710,7 @@ class TestDataFrame(unittest.TestCase):
     def test_mean1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.mean()
 
         hpat_func = hpat.jit(test_impl)
@@ -721,7 +722,7 @@ class TestDataFrame(unittest.TestCase):
     def test_std1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.std()
 
         hpat_func = hpat.jit(test_impl)
@@ -733,7 +734,7 @@ class TestDataFrame(unittest.TestCase):
     def test_var1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.var()
 
         hpat_func = hpat.jit(test_impl)
@@ -745,7 +746,7 @@ class TestDataFrame(unittest.TestCase):
     def test_max1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.max()
 
         hpat_func = hpat.jit(test_impl)
@@ -757,7 +758,7 @@ class TestDataFrame(unittest.TestCase):
     def test_min1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.min()
 
         hpat_func = hpat.jit(test_impl)
@@ -769,7 +770,7 @@ class TestDataFrame(unittest.TestCase):
     def test_sum1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -781,7 +782,7 @@ class TestDataFrame(unittest.TestCase):
     def test_prod1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.prod()
 
         hpat_func = hpat.jit(test_impl)
@@ -792,7 +793,7 @@ class TestDataFrame(unittest.TestCase):
     def test_count1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.arange(n)+1})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
             return df.count()
 
         hpat_func = hpat.jit(test_impl)
@@ -901,7 +902,7 @@ class TestDataFrame(unittest.TestCase):
             df2.drop(columns=['D'], inplace=True)
             return df2
 
-        df = pd.DataFrame({'A': [1,2,3], 'B': [2,3,4]})
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
@@ -923,13 +924,13 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
-        df2.A[n//2:] = n
+        df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     @unittest.skip("needs dict typing in Numba")
     def test_isin_dict1(self):
         def test_impl(df):
-            vals = {'A': [2,3,4], 'C': [4,5,6]}
+            vals = {'A': [2, 3, 4], 'C': [4, 5, 6]}
             return df.isin(vals)
 
         hpat_func = hpat.jit(test_impl)
@@ -939,7 +940,7 @@ class TestDataFrame(unittest.TestCase):
 
     def test_isin_list1(self):
         def test_impl(df):
-            vals = [2,3,4]
+            vals = [2, 3, 4]
             return df.isin(vals)
 
         hpat_func = hpat.jit(test_impl)
@@ -956,7 +957,7 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
-        df2.A[n//2:] = n
+        df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     def test_append2(self):
@@ -967,7 +968,7 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        df2.A[n//2:] = n
+        df2.A[n // 2:] = n
         df3 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
@@ -984,7 +985,7 @@ class TestDataFrame(unittest.TestCase):
         # TODO: support int as column name
         pd.testing.assert_frame_equal(
             hpat_func(S1, S2),
-            test_impl(S1, S2).rename(columns={0:'0', 1:'1'}))
+            test_impl(S1, S2).rename(columns={0: '0', 1: '1'}))
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
@@ -993,7 +994,7 @@ class TestDataFrame(unittest.TestCase):
         # can cause extra assignments and definition handling errors
         # TODO: inline freevar
         def test_impl():
-            df = pd.DataFrame({'A': [1,2,3], 'B': [2,3,4]})
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
             # TODO: df['C'] = [5,6,7]
             df['C'] = np.ones(3)
             return inner_get_column(df)

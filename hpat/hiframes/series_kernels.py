@@ -10,7 +10,7 @@ from numba.typing.templates import infer_global, AbstractTemplate, signature
 import hpat
 from hpat.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
-    is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
+                              is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
 
 
 # float columns can have regular np.nan
@@ -43,6 +43,7 @@ def _column_fillna_impl(A, B, fill):  # pragma: no cover
             s = fill
         A[i] = s
 
+
 def _series_fillna_str_alloc_impl(B, fill, name):  # pragma: no cover
     n = len(B)
     num_chars = 0
@@ -56,6 +57,7 @@ def _series_fillna_str_alloc_impl(B, fill, name):  # pragma: no cover
     A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
     hpat.hiframes.api.fillna(A, B, fill)
     return hpat.hiframes.api.init_series(A, None, name)
+
 
 def _series_dropna_float_impl(S, name):  # pragma: no cover
     old_len = len(S)
@@ -99,6 +101,7 @@ def _series_dropna_str_alloc_impl(B, name):  # pragma: no cover
 def _get_nan(val):
     return np.nan
 
+
 @overload(_get_nan)
 def _get_nan_overload(val):
     if isinstance(val, (types.NPDatetime, types.NPTimedelta)):
@@ -107,8 +110,10 @@ def _get_nan_overload(val):
     # TODO: other types
     return lambda val: np.nan
 
+
 def _get_type_max_value(dtype):
     return 0
+
 
 @overload(_get_type_max_value)
 def _get_type_max_value_overload(dtype):
@@ -123,6 +128,7 @@ def _sum_handle_nan(s, count):  # pragma: no cover
     if not count:
         s = hpat.hiframes.series_kernels._get_nan(s)
     return s
+
 
 def _column_sum_impl_basic(A):  # pragma: no cover
     numba.parfor.init_prange()
@@ -150,6 +156,7 @@ def _column_sum_impl_count(A):  # pragma: no cover
     res = hpat.hiframes.series_kernels._sum_handle_nan(s, count)
     return res
 
+
 def _column_prod_impl_basic(A):  # pragma: no cover
     numba.parfor.init_prange()
     # TODO: fix output type
@@ -161,6 +168,7 @@ def _column_prod_impl_basic(A):  # pragma: no cover
 
     res = s
     return res
+
 
 @numba.njit
 def _mean_handle_nan(s, count):  # pragma: no cover
@@ -217,9 +225,11 @@ def _column_var_impl(A):  # pragma: no cover
     res = hpat.hiframes.series_kernels._var_handle_nan(s, count)
     return res
 
+
 def _column_std_impl(A):  # pragma: no cover
     var = hpat.hiframes.api.var(A)
     return var**0.5
+
 
 def _column_min_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
@@ -233,6 +243,7 @@ def _column_min_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes.series_kernels._sum_handle_nan(s, count)
     return res
 
+
 def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     s = numba.targets.builtins.get_type_max_value(numba.types.int64)
@@ -242,6 +253,8 @@ def _column_min_impl_no_isnan(in_arr):  # pragma: no cover
     return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
 # TODO: fix for dt64
+
+
 def _column_max_impl(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     count = 0
@@ -254,6 +267,7 @@ def _column_max_impl(in_arr):  # pragma: no cover
     res = hpat.hiframes.series_kernels._sum_handle_nan(s, count)
     return res
 
+
 def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
     numba.parfor.init_prange()
     s = numba.targets.builtins.get_type_min_value(numba.types.int64)
@@ -262,13 +276,15 @@ def _column_max_impl_no_isnan(in_arr):  # pragma: no cover
         s = max(s, hpat.hiframes.pd_timestamp_ext.dt64_to_integer(val))
     return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
+
 def _column_sub_impl_datetime_series_timestamp(in_arr, ts):  # pragma: no cover
     numba.parfor.init_prange()
     n = len(in_arr)
     S = numba.unsafe.ndarray.empty_inferred((n,))
     tsint = hpat.hiframes.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
     for i in numba.parfor.internal_prange(n):
-        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(
+            hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
     return hpat.hiframes.api.init_series(S)
 
 
@@ -278,7 +294,8 @@ def _column_sub_impl_datetimeindex_timestamp(in_arr, ts):  # pragma: no cover
     S = numba.unsafe.ndarray.empty_inferred((n,))
     tsint = hpat.hiframes.pd_timestamp_ext.convert_timestamp_to_datetime64(ts)
     for i in numba.parfor.internal_prange(n):
-        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
+        S[i] = hpat.hiframes.pd_timestamp_ext.integer_to_timedelta64(
+            hpat.hiframes.pd_timestamp_ext.dt64_to_integer(in_arr[i]) - tsint)
     return hpat.hiframes.api.init_timedelta_index(S)
 
 
@@ -304,6 +321,7 @@ def _column_describe_impl(S):  # pragma: no cover
         "max      " + str(a_max) + "\n"
     return res
 
+
 def _column_fillna_alloc_impl(S, val, name):  # pragma: no cover
     # TODO: handle string, etc.
     B = np.empty(len(S), S.dtype)
@@ -315,9 +333,9 @@ def _str_contains_regex_impl(str_arr, pat):  # pragma: no cover
     e = hpat.str_ext.compile_regex(pat)
     return hpat.hiframes.api.str_contains_regex(str_arr, e)
 
+
 def _str_contains_noregex_impl(str_arr, pat):  # pragma: no cover
     return hpat.hiframes.api.str_contains_noregex(str_arr, pat)
-
 
 
 # TODO: use online algorithm, e.g. StatFunctions.scala
@@ -327,7 +345,7 @@ def _column_cov_impl(S1, S2):  # pragma: no cover
     ma = S1.mean()
     mb = S2.mean()
     # TODO: check aligned nans, (S1.notna() != S2.notna()).any()
-    return ((S1-ma)*(S2-mb)).sum()/(S1.count()-1.0)
+    return ((S1 - ma) * (S2 - mb)).sum() / (S1.count() - 1.0)
 
 
 def _column_corr_impl(S1, S2):  # pragma: no cover
@@ -336,17 +354,18 @@ def _column_corr_impl(S1, S2):  # pragma: no cover
     ma = S1.sum()
     mb = S2.sum()
     # TODO: check aligned nans, (S1.notna() != S2.notna()).any()
-    a = n * ((S1*S2).sum()) - ma * mb
+    a = n * ((S1 * S2).sum()) - ma * mb
     b1 = n * (S1**2).sum() - ma**2
     b2 = n * (S2**2).sum() - mb**2
     # TODO: np.clip
     # TODO: np.true_divide?
-    return a / np.sqrt(b1*b2)
+    return a / np.sqrt(b1 * b2)
 
 
 def _series_append_single_impl(arr, other):
     return hpat.hiframes.api.init_series(
         hpat.hiframes.api.concat((arr, other)))
+
 
 def _series_append_tuple_impl(arr, other):
     tup_other = hpat.hiframes.api.to_const_tuple(other)
@@ -356,6 +375,7 @@ def _series_append_tuple_impl(arr, other):
     return hpat.hiframes.api.init_series(
         hpat.hiframes.api.concat(c_arrs))
 
+
 def _series_isna_impl(arr):
     numba.parfor.init_prange()
     n = len(arr)
@@ -363,6 +383,7 @@ def _series_isna_impl(arr):
     for i in numba.parfor.internal_prange(n):
         out_arr[i] = hpat.hiframes.api.isna(arr, i)
     return hpat.hiframes.api.init_series(out_arr)
+
 
 def _series_astype_str_impl(arr):
     n = len(arr)
@@ -464,9 +485,11 @@ def _str_replace_noregex_impl(str_arr, pat, val):
 def lt_f(a, b):
     return a < b
 
+
 @numba.njit
 def gt_f(a, b):
     return a > b
+
 
 series_replace_funcs = {
     'sum': _column_sum_impl_basic,

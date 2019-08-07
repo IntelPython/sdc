@@ -4,30 +4,31 @@ import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload, make_attribute_wrapper)
+                             type_callable, infer, overload, make_attribute_wrapper)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-    AttributeTemplate, bound_function)
+                                    AttributeTemplate, bound_function)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
-    ArrayAttribute, SetItemBuffer)
+                                    ArrayAttribute, SetItemBuffer)
 from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
-    NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
-    NdConstructorLike)
+                                  NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
+                                  NdConstructorLike)
 import hpat
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
-    str_arr_payload_type, StringArrayType, GetItemStringArray)
+                              str_arr_payload_type, StringArrayType, GetItemStringArray)
 from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-    CategoricalArray)
+                                              CategoricalArray)
 from hpat.hiframes.rolling import supported_rolling_funcs
 import datetime
 from hpat.hiframes.split_impl import (string_array_split_view_type,
-    GetItemStringArraySplitView)
+                                      GetItemStringArraySplitView)
 
 
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
+
     def __init__(self, dtype, data=None, index=None, is_named=False):
         # keeping data array in type since operators can make changes such
         # as making array unaligned etc.
@@ -35,7 +36,7 @@ class SeriesType(types.IterableType):
         # convert Record to tuple (for tuple output of map)
         # TODO: handle actual Record objects in Series?
         dtype = (types.Tuple(list(dict(dtype.members).values()))
-                if isinstance(dtype, types.Record) else dtype)
+                 if isinstance(dtype, types.Record) else dtype)
         self.dtype = dtype
         self.data = data
         if index is None:
@@ -87,7 +88,7 @@ class SeriesType(types.IterableType):
                 return self.data.can_convert_to(typingctx, other.data)
             if self.index != types.none and other.index != types.none:
                 return max(self.data.can_convert_to(typingctx, other.data),
-                    self.index.can_convert_to(typingctx, other.index))
+                           self.index.can_convert_to(typingctx, other.index))
 
     def is_precise(self):
         # same as types.Array
@@ -132,11 +133,14 @@ def _get_series_array_type(dtype):
 def is_str_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == string_type
 
+
 def is_dt64_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == types.NPDatetime('ns')
 
+
 def is_timedelta64_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == types.NPTimedelta('ns')
+
 
 def is_datetime_date_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == datetime_date_type
@@ -155,6 +159,7 @@ class SeriesModel(models.StructModel):
         ]
         super(SeriesModel, self).__init__(dmm, fe_type, members)
 
+
 make_attribute_wrapper(SeriesType, 'data', '_data')
 make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
@@ -168,6 +173,7 @@ def series_to_array_type(typ, replace_boxed=False):
 def is_series_type(typ):
     return isinstance(typ, SeriesType)
 
+
 def arr_to_series_type(arr):
     series_type = None
     if isinstance(arr, types.Array):
@@ -179,7 +185,7 @@ def arr_to_series_type(arr):
         series_type = SeriesType(types.List(string_type))
     elif arr == string_array_split_view_type:
         series_type = SeriesType(types.List(string_type),
-                        string_array_split_view_type)
+                                 string_array_split_view_type)
     return series_type
 
 
@@ -197,9 +203,10 @@ def if_series_to_array_type(typ, replace_boxed=False):
     # TODO: other types that can have Series inside?
     return typ
 
+
 def if_arr_to_series_type(typ):
     if isinstance(typ, types.Array) or typ in (string_array_type,
-            list_string_array_type, string_array_split_view_type):
+                                               list_string_array_type, string_array_split_view_type):
         return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
@@ -384,7 +391,7 @@ class SeriesAttribute(AttributeTemplate):
 
         f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (dtype,), None)
+            self.context, f_ir, (dtype,), None)
 
         return signature(SeriesType(f_return_type), *args)
 
@@ -408,7 +415,7 @@ class SeriesAttribute(AttributeTemplate):
         code = args[1].literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-                self.context, f_ir, (dtype1,dtype2,), None)
+            self.context, f_ir, (dtype1, dtype2,), None)
         return signature(SeriesType(f_return_type), *args)
 
     @bound_function("series.combine")
@@ -419,7 +426,7 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_abs(self, ary, args, kws):
         # call np.abs(A) to get return type
         arr_typ = series_to_array_type(ary)
-        all_args = tuple([arr_typ]+list(args))
+        all_args = tuple([arr_typ] + list(args))
         ret_typ = self.context.resolve_function_type(np.abs, all_args, kws).return_type
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
@@ -521,7 +528,7 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         dtype = ary.dtype
         dtype = (pandas_timestamp_type
-            if isinstance(dtype, types.NPDatetime) else dtype)
+                 if isinstance(dtype, types.NPDatetime) else dtype)
         return signature(dtype, *args)
 
     @bound_function("series.min")
@@ -529,7 +536,7 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         dtype = ary.dtype
         dtype = (pandas_timestamp_type
-            if isinstance(dtype, types.NPDatetime) else dtype)
+                 if isinstance(dtype, types.NPDatetime) else dtype)
         return signature(dtype, *args)
 
     @bound_function("series.value_counts")
@@ -562,13 +569,14 @@ class SeriesAttribute(AttributeTemplate):
 #     return typer
 
 str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
-            'strip', 'swapcase', 'title', 'upper')
+                   'strip', 'swapcase', 'title', 'upper')
 
 
 class SeriesStrMethodType(types.Type):
     def __init__(self):
         name = "SeriesStrMethodType"
         super(SeriesStrMethodType, self).__init__(name)
+
 
 series_str_methods_type = SeriesStrMethodType()
 
@@ -624,6 +632,7 @@ class SeriesDtMethodType(types.Type):
         name = "SeriesDtMethodType"
         super(SeriesDtMethodType, self).__init__(name)
 
+
 series_dt_methods_type = SeriesDtMethodType()
 
 
@@ -638,6 +647,7 @@ class SeriesDtMethodAttribute(AttributeTemplate):
 # all date fields return int64 same as Timestamp fields
 def resolve_date_field(self, ary):
     return SeriesType(types.int64)
+
 
 for field in hpat.hiframes.pd_timestamp_ext.date_fields:
     setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
@@ -668,26 +678,33 @@ class SeriesRollingAttribute(AttributeTemplate):
         return signature(SeriesType(types.float64), *args)
 
 # similar to install_array_method in arraydecl.py
+
+
 def install_rolling_method(name, generic):
     my_attr = {"key": "rolling." + name, "generic": generic}
     temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
+
     def rolling_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
     setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
 
+
 def rolling_generic(self, args, kws):
     # output is always float64
     return signature(SeriesType(types.float64), *args)
 
+
 for fname in supported_rolling_funcs:
     install_rolling_method(fname, rolling_generic)
+
 
 class SeriesIatType(types.Type):
     def __init__(self, stype):
         self.stype = stype
         name = "SeriesIatType({})".format(stype)
         super(SeriesIatType, self).__init__(name)
+
 
 @infer_global(operator.getitem)
 class GetItemSeriesIat(AbstractTemplate):
@@ -698,6 +715,7 @@ class GetItemSeriesIat(AbstractTemplate):
         if isinstance(args[0], SeriesIatType):
             return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
+
 @infer
 @infer_global(operator.eq)
 @infer_global(operator.ne)
@@ -707,6 +725,7 @@ class GetItemSeriesIat(AbstractTemplate):
 @infer_global(operator.lt)
 class SeriesCompEqual(AbstractTemplate):
     key = '=='
+
     def generic(self, args, kws):
         from hpat.str_arr_ext import is_str_arr_typ
         assert not kws
@@ -722,21 +741,26 @@ class SeriesCompEqual(AbstractTemplate):
                 or (is_dt64_series_typ(vb) and va == string_type)):
             return signature(SeriesType(types.boolean), va, vb)
 
+
 @infer
 class CmpOpNEqSeries(SeriesCompEqual):
     key = '!='
+
 
 @infer
 class CmpOpGESeries(SeriesCompEqual):
     key = '>='
 
+
 @infer
 class CmpOpGTSeries(SeriesCompEqual):
     key = '>'
 
+
 @infer
 class CmpOpLESeries(SeriesCompEqual):
     key = '<='
+
 
 @infer
 class CmpOpLTSeries(SeriesCompEqual):
@@ -758,14 +782,17 @@ class CmpOpLTSeries(SeriesCompEqual):
 #         if out is not None and out.result == types.NPDatetime('ns'):
 #             return signature(pandas_timestamp_type, ary, out.index)
 
+
 def install_array_method(name, generic):
     # taken from arraydecl.py, Series instead of Array
     my_attr = {"key": "array." + name, "generic": generic}
     temp_class = type("Series_" + name, (AbstractTemplate,), my_attr)
+
     def array_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
     setattr(SeriesAttribute, "resolve_" + name, array_attribute_attachment)
+
 
 def generic_expand_cumulative_series(self, args, kws):
     # taken from arraydecl.py, replaced Array with Series
@@ -774,6 +801,7 @@ def generic_expand_cumulative_series(self, args, kws):
     assert isinstance(self.this, SeriesType)
     return_type = SeriesType(_expand_integer(self.this.dtype))
     return signature(return_type, recvr=self.this)
+
 
 # replacing cumsum/cumprod since arraydecl.py definition uses types.Array
 for fname in ["cumsum", "cumprod"]:
@@ -788,6 +816,7 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in SeriesAttribute.__dict__
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
+
 
 @infer_global(operator.getitem)
 class GetItemSeries(AbstractTemplate):
@@ -855,6 +884,7 @@ class GetItemSeries(AbstractTemplate):
                 sig.return_type = pandas_timestamp_type
         return sig
 
+
 @infer_global(operator.setitem)
 class SetItemSeries(SetItemBuffer):
     def generic(self, args, kws):
@@ -885,12 +915,14 @@ class SetItemSeries(SetItemBuffer):
             res.args = (new_series, idx, val)
             return res
 
+
 @infer_global(operator.setitem)
 class SetItemSeriesIat(SetItemSeries):
     def generic(self, args, kws):
         # iat[] is the same as regular setitem
         if isinstance(args[0], SeriesIatType):
             return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+
 
 inplace_ops = [
     operator.iadd,
@@ -906,6 +938,7 @@ inplace_ops = [
     operator.ior,
     operator.ixor,
 ]
+
 
 def series_op_generic(cls, self, args, kws):
     # return if no Series
@@ -923,18 +956,22 @@ def series_op_generic(cls, self, args, kws):
         sig.args = args
     return sig
 
+
 class SeriesOpUfuncs(NumpyRulesArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesOpUfuncs, self, args, kws)
+
 
 def install_series_method(op, name, generic):
     # taken from arraydecl.py, Series instead of Array
     my_attr = {"key": op, "generic": generic}
     temp_class = type("Series_" + name, (SeriesOpUfuncs,), my_attr)
+
     def array_attribute_attachment(self, ary):
         return types.BoundFunction(temp_class, ary)
 
     setattr(SeriesAttribute, "resolve_" + name, array_attribute_attachment)
+
 
 explicit_binop_funcs = {
     operator.add: 'add',
@@ -951,30 +988,37 @@ explicit_binop_funcs = {
     operator.ge: 'ge',
     operator.ne: 'ne',
     operator.eq: 'eq',
-    }
+}
+
 
 def ex_binop_generic(self, args, kws):
     return SeriesOpUfuncs.generic(self, (self.this,) + args, kws)
 
+
 for op, fname in explicit_binop_funcs.items():
     install_series_method(op, fname, ex_binop_generic)
+
 
 class SeriesInplaceOpUfuncs(NumpyRulesInplaceArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesInplaceOpUfuncs, self, args, kws)
 
+
 class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
     def generic(self, args, kws):
         return series_op_generic(SeriesUnaryOpUfuncs, self, args, kws)
+
 
 # TODO: change class name to Series in install_operations
 SeriesOpUfuncs.install_operations()
 SeriesInplaceOpUfuncs.install_operations()
 SeriesUnaryOpUfuncs.install_operations()
 
+
 class Series_Numpy_rules_ufunc(Numpy_rules_ufunc):
     def generic(self, args, kws):
         return series_op_generic(Series_Numpy_rules_ufunc, self, args, kws)
+
 
 # copied from npydecl.py since deleted
 _aliases = set(["bitwise_not", "mod", "abs"])
@@ -983,14 +1027,16 @@ if np.divide == np.true_divide:
 
 for func in numba.typing.npydecl.supported_ufuncs:
     name = func.__name__
-    #_numpy_ufunc(func)
+    # _numpy_ufunc(func)
+
     class typing_class(Series_Numpy_rules_ufunc):
         key = func
 
     typing_class.__name__ = "resolve_series_{0}".format(name)
 
-    if not name in _aliases:
+    if name not in _aliases:
         infer_global(func, types.Function(typing_class))
+
 
 @infer_global(len)
 class LenSeriesType(AbstractTemplate):
@@ -1010,9 +1056,11 @@ class LenSeriesType(AbstractTemplate):
 #             return typer(*new_args, **new_kws)
 #         return wrapper
 
-#@infer_global(np.full_like)
+# @infer_global(np.full_like)
 
 # TODO: handle all timedelta args
+
+
 def type_sub(context):
     def typer(val1, val2):
         if is_dt64_series_typ(val1) and val2 == pandas_timestamp_type:
@@ -1024,20 +1072,22 @@ def type_sub(context):
             return TimedeltaIndexType(False)
     return typer
 
+
 type_callable('-')(type_sub)
 type_callable(operator.sub)(type_sub)
+
 
 @overload(pd.Series)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
     if index is not None:
         return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-        fastpath=False: hpat.hiframes.api.init_series(
-            hpat.hiframes.api.fix_df_array(data),
-            hpat.hiframes.api.fix_df_array(index),
-            name
-        ))
+                fastpath=False: hpat.hiframes.api.init_series(
+                    hpat.hiframes.api.fix_df_array(data),
+                    hpat.hiframes.api.fix_df_array(index),
+                    name
+                ))
 
     return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-        fastpath=False: hpat.hiframes.api.init_series(
-            hpat.hiframes.api.fix_df_array(data), index, name))
+            fastpath=False: hpat.hiframes.api.init_series(
+                hpat.hiframes.api.fix_df_array(data), index, name))
