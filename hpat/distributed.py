@@ -149,7 +149,7 @@ class DistributedPass(object):
                     if isinstance(rhs, ir.Expr):
                         out_nodes = self._run_expr(inst, namevar_table)
                     elif isinstance(rhs, ir.Var) and (self._is_1D_arr(rhs.name)
-                           and not is_array_container(self.typemap, rhs.name)):
+                                                      and not is_array_container(self.typemap, rhs.name)):
                         self._array_starts[lhs] = self._array_starts[rhs.name]
                         self._array_counts[lhs] = self._array_counts[rhs.name]
                         self._array_sizes[lhs] = self._array_sizes[rhs.name]
@@ -192,9 +192,9 @@ class DistributedPass(object):
                     # TODO: use Parfor loop blocks when replacing funcs in
                     # parfor loop body
                     inline_closure_call(self.func_ir, rp_func.glbls,
-                        block, len(new_body), rp_func.func, self.typingctx,
-                        rp_func.arg_types,
-                        self.typemap, self.calltypes, work_list)
+                                        block, len(new_body), rp_func.func, self.typingctx,
+                                        rp_func.arg_types,
+                                        self.typemap, self.calltypes, work_list)
                     replaced = True
                     break
                 else:
@@ -221,7 +221,7 @@ class DistributedPass(object):
             self._array_sizes[lhs] = self._array_sizes[arr_name]
         if (rhs.op == 'getattr'
                 and (self._is_1D_arr(rhs.value.name)
-                        or self._is_1D_Var_arr(rhs.value.name))
+                     or self._is_1D_Var_arr(rhs.value.name))
                 and rhs.attr == 'size'):
             return self._run_array_size(inst.target, rhs.value)
         if (rhs.op == 'static_getitem'
@@ -261,7 +261,7 @@ class DistributedPass(object):
             return self._run_getsetitem(rhs.value, index, rhs, inst)
         if (rhs.op == 'getattr'
                 and (self._is_1D_arr(rhs.value.name)
-                        or self._is_1D_Var_arr(rhs.value.name))
+                     or self._is_1D_Var_arr(rhs.value.name))
                 and rhs.attr == 'shape'):
             # XXX: return a new tuple using sizes here?
             self._shape_attrs[lhs] = rhs.value.name
@@ -436,7 +436,7 @@ class DistributedPass(object):
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
         if (hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
-                and func_name in ('h5read', 'h5write', 'h5read_filter'))
+                                       and func_name in ('h5read', 'h5write', 'h5read_filter'))
                 and self._is_1D_arr(rhs.args[5].name)):
             # TODO: make create_dataset/create_group collective
             arr = rhs.args[5].name
@@ -462,7 +462,7 @@ class DistributedPass(object):
             self._file_open_set_parallel(file_varname)
 
         if hpat.config._has_h5py and (func_mod == 'hpat.io.pio_api'
-                and func_name == 'get_filter_read_indices'):
+                                      and func_name == 'get_filter_read_indices'):
             #
             out += self._gen_1D_Var_len(assign.target)
             size_var = out[-1].target
@@ -485,7 +485,7 @@ class DistributedPass(object):
 
             def f(fname, cindex, arr, out_dtype, start, count):  # pragma: no cover
                 return hpat.io.parquet_pio.read_parquet_parallel(fname, cindex,
-                                                              arr, out_dtype, start, count)
+                                                                 arr, out_dtype, start, count)
 
             return self._replace_func(f, rhs.args)
 
@@ -505,7 +505,7 @@ class DistributedPass(object):
 
             def f(fname, cindex, start, count):  # pragma: no cover
                 return hpat.io.parquet_pio.read_parquet_str_parallel(fname, cindex,
-                                                                  start, count)
+                                                                     start, count)
 
             f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
                                           (self.typemap[rhs.args[0].name], types.intp,
@@ -517,7 +517,7 @@ class DistributedPass(object):
 
         # TODO: fix numba.extending
         if hpat.config._has_xenon and (fdef == ('read_xenon_col', 'numba.extending')
-                and self._is_1D_arr(rhs.args[3].name)):
+                                       and self._is_1D_arr(rhs.args[3].name)):
             arr = rhs.args[3].name
             assert len(self._array_starts[arr]) == 1, "only 1D arrs in Xenon"
             start_var = self._array_starts[arr][0]
@@ -525,12 +525,13 @@ class DistributedPass(object):
             rhs.args += [start_var, count_var]
 
             def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
-                return hpat.io.xenon_ext.read_xenon_col_parallel(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
+                return hpat.io.xenon_ext.read_xenon_col_parallel(
+                    connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
 
             return self._replace_func(f, rhs.args)
 
         if hpat.config._has_xenon and (fdef == ('read_xenon_str', 'numba.extending')
-                and self._is_1D_arr(lhs)):
+                                       and self._is_1D_arr(lhs)):
             arr = lhs
             size_var = rhs.args[3]
             assert self.typemap[size_var.name] == types.intp
@@ -544,13 +545,20 @@ class DistributedPass(object):
             rhs.args.append(count_var)
 
             def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
-                return hpat.io.xenon_ext.read_xenon_str_parallel(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
+                return hpat.io.xenon_ext.read_xenon_str_parallel(
+                    connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
 
-
-            f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                          (hpat.io.xenon_ext.xe_connect_type, hpat.io.xenon_ext.xe_dset_type, types.intp,
-                                           self.typemap[rhs.args[3].name], types.intp, types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
+            f_block = compile_to_numba_ir(f,
+                                          {'hpat': hpat},
+                                          self.typingctx,
+                                          (hpat.io.xenon_ext.xe_connect_type,
+                                           hpat.io.xenon_ext.xe_dset_type,
+                                           types.intp,
+                                           self.typemap[rhs.args[3].name],
+                                              types.intp,
+                                              types.intp),
+                                          self.typemap,
+                                          self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args)
             out += f_block.body[:-2]
             out[-1].target = assign.target
@@ -644,8 +652,8 @@ class DistributedPass(object):
             out.append(assign)
 
         if fdef == ('rolling_fixed', 'hpat.hiframes.rolling') and (
-                    self._is_1D_arr(rhs.args[0].name)
-                    or self._is_1D_Var_arr(rhs.args[0].name)):
+                self._is_1D_arr(rhs.args[0].name)
+                or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
             if self._is_1D_arr(in_arr):
                 self._array_starts[lhs] = self._array_starts[in_arr]
@@ -658,8 +666,8 @@ class DistributedPass(object):
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
         if fdef == ('rolling_variable', 'hpat.hiframes.rolling') and (
-                    self._is_1D_arr(rhs.args[0].name)
-                    or self._is_1D_Var_arr(rhs.args[0].name)):
+                self._is_1D_arr(rhs.args[0].name)
+                or self._is_1D_Var_arr(rhs.args[0].name)):
             in_arr = rhs.args[0].name
             if self._is_1D_arr(in_arr):
                 self._array_starts[lhs] = self._array_starts[in_arr]
@@ -672,9 +680,9 @@ class DistributedPass(object):
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
         if (func_mod == 'hpat.hiframes.rolling'
-                    and func_name in ('shift', 'pct_change')
-                    and (self._is_1D_arr(rhs.args[0].name)
-                    or self._is_1D_Var_arr(rhs.args[0].name))):
+            and func_name in ('shift', 'pct_change')
+            and (self._is_1D_arr(rhs.args[0].name)
+                 or self._is_1D_Var_arr(rhs.args[0].name))):
             in_arr = rhs.args[0].name
             if self._is_1D_arr(in_arr):
                 self._array_starts[lhs] = self._array_starts[in_arr]
@@ -687,7 +695,7 @@ class DistributedPass(object):
             out = [ir.Assign(ir.Const(True, loc), true_var, loc), assign]
 
         if fdef == ('quantile', 'hpat.hiframes.api') and (self._is_1D_arr(rhs.args[0].name)
-                                                                or self._is_1D_Var_arr(rhs.args[0].name)):
+                                                          or self._is_1D_Var_arr(rhs.args[0].name)):
             arr = rhs.args[0].name
             if arr in self._array_sizes:
                 assert len(self._array_sizes[arr]
@@ -735,7 +743,7 @@ class DistributedPass(object):
             # always rebalance returned distributed arrays
             # TODO: need different flag for 1D_Var return (distributed_var)?
             # TODO: rebalance strings?
-            #return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
+            # return [assign]  # self._run_call_rebalance_array(lhs, assign, rhs.args)
             assign.value = rhs.args[0]
             return [assign]
 
@@ -756,15 +764,14 @@ class DistributedPass(object):
             out += div_nodes
 
             # XXX: get sizes in lower dimensions
-            self._array_starts[lhs] = [-1]*ndim
-            self._array_counts[lhs] = [-1]*ndim
-            self._array_sizes[lhs] = [-1]*ndim
+            self._array_starts[lhs] = [-1] * ndim
+            self._array_counts[lhs] = [-1] * ndim
+            self._array_sizes[lhs] = [-1] * ndim
             self._array_starts[lhs][0] = start_var
             self._array_counts[lhs][0] = count_var
             self._array_sizes[lhs][0] = total_length
 
             return out
-
 
         if fdef == ('threaded_return', 'hpat.distributed_api'):
             assign.value = rhs.args[0]
@@ -772,7 +779,6 @@ class DistributedPass(object):
 
         if fdef == ('rebalance_array', 'hpat.distributed_api'):
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
-
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
         # TODO: remove ml module and use new DAAL API
@@ -827,8 +833,8 @@ class DistributedPass(object):
 
         # output array has same properties (starts etc.) as input array
         if (func_name in ['cumsum', 'cumprod', 'empty_like',
-                                     'zeros_like', 'ones_like', 'full_like',
-                                     'copy', 'ravel', 'ascontiguousarray']
+                          'zeros_like', 'ones_like', 'full_like',
+                          'copy', 'ravel', 'ascontiguousarray']
                 and self._is_1D_arr(args[0].name)):
             if func_name == 'ravel':
                 assert self.typemap[args[0].name].ndim == 1, "only 1D ravel supported"
@@ -909,18 +915,16 @@ class DistributedPass(object):
         if func_name == 'reshape' and self._is_1D_arr(arr.name):
             return self._run_reshape(assign, arr, args)
 
-
         if func_name == 'transpose' and self._is_1D_arr(lhs):
             # Currently only 1D arrays are supported
             assert self._is_1D_arr(arr.name)
             ndim = self.typemap[arr.name].ndim
-            self._array_starts[lhs] = [-1]*ndim
-            self._array_counts[lhs] = [-1]*ndim
-            self._array_sizes[lhs] = [-1]*ndim
+            self._array_starts[lhs] = [-1] * ndim
+            self._array_counts[lhs] = [-1] * ndim
+            self._array_sizes[lhs] = [-1] * ndim
             self._array_starts[lhs][0] = self._array_starts[arr.name][0]
             self._array_counts[lhs][0] = self._array_counts[arr.name][0]
             self._array_sizes[lhs][0] = self._array_sizes[arr.name][0]
-
 
         # TODO: refactor
         # TODO: add unittest
@@ -993,14 +997,14 @@ class DistributedPass(object):
 
             # fix to_csv() type to have None as 1st arg
             call_type = self.calltypes.pop(rhs)
-            arg_typs = list((types.none,)+call_type.args[1:])
+            arg_typs = list((types.none,) + call_type.args[1:])
             arg_typs[5] = types.bool_
             arg_typs = tuple(arg_typs)
             # self.calltypes[rhs] = self.typemap[rhs.func.name].get_call_type(
             #      self.typingctx, arg_typs, {})
             self.calltypes[rhs] = numba.typing.Signature(
-               string_type, arg_typs, new_df_typ,
-               call_type.pysig)
+                string_type, arg_typs, new_df_typ,
+                call_type.pysig)
 
             # None as 1st arg
             none_var = ir.Var(assign.target.scope, mk_unique_var('none'), rhs.loc)
@@ -1027,7 +1031,6 @@ class DistributedPass(object):
             # TODO: fix string data reference count
             dummy_use = numba.njit(lambda a: None)
 
-
             def f(fname, str_out):  # pragma: no cover
                 count = len(str_out)
                 start = hpat.distributed_api.dist_exscan(count)
@@ -1044,10 +1047,10 @@ class DistributedPass(object):
         def f(cond):
             return cond & (hpat.distributed_api.get_rank() == 0)
         f_block = compile_to_numba_ir(f, {'hpat': hpat},
-                                    self.typingctx,
-                                    (self.typemap[cond_var.name],),
-                                    self.typemap,
-                                    self.calltypes).blocks.popitem()[1]
+                                      self.typingctx,
+                                      (self.typemap[cond_var.name],),
+                                      self.typemap,
+                                      self.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [cond_var])
         nodes = f_block.body[:-2]
         return nodes
@@ -1056,15 +1059,15 @@ class DistributedPass(object):
         def f(df):  # pragma: no cover
             l = len(df)
             start = hpat.distributed_api.dist_exscan(l)
-            ind = np.arange(start, start+l)
+            ind = np.arange(start, start + l)
             df2 = hpat.hiframes.pd_dataframe_ext.set_df_index(df, ind)
             return df2
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat, 'np': np},
-                                    self.typingctx,
-                                    (self.typemap[df.name],),
-                                    self.typemap,
-                                    self.calltypes).blocks.popitem()[1]
+                                      self.typingctx,
+                                      (self.typemap[df.name],),
+                                      self.typemap,
+                                      self.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [df])
         nodes = f_block.body[:-2]
         return nodes
@@ -1148,10 +1151,10 @@ class DistributedPass(object):
                 lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size)
 
         f_block = compile_to_numba_ir(f, {'hpat': hpat},
-                                    self.typingctx,
-                                   (self.typemap[lhs.name], self.typemap[in_arr.name],
-                                    types.intp, types.intp, types.intp),
-                                   self.typemap, self.calltypes).blocks.popitem()[1]
+                                      self.typingctx,
+                                      (self.typemap[lhs.name], self.typemap[in_arr.name],
+                                       types.intp, types.intp, types.intp),
+                                      self.typemap, self.calltypes).blocks.popitem()[1]
         dtype_ir = self.dtype_size_assign_ir(dtype, scope, loc)
         out.append(dtype_ir)
         replace_arg_nodes(f_block, [lhs, in_arr, self._array_sizes[lhs.name][0],
@@ -1165,7 +1168,6 @@ class DistributedPass(object):
         #     args[0] = self._tuple_table[new_size_var.name][0]
         # out.append(assign)
 
-
     def _run_call_rebalance_array(self, lhs, assign, args):
         out = [assign]
         if not self._is_1D_Var_arr(args[0].name):
@@ -1175,8 +1177,7 @@ class DistributedPass(object):
                 self._array_counts[lhs] = self._array_counts[in_1d_arr]
                 self._array_sizes[lhs] = self._array_sizes[in_1d_arr]
             else:
-                warnings.warn("array {} is not 1D_Block_Var".format(
-                                args[0].name))
+                warnings.warn("array {} is not 1D_Block_Var".format(args[0].name))
             return out
 
         arr = args[0]
@@ -1189,9 +1190,9 @@ class DistributedPass(object):
         out += div_nodes
 
         # XXX: get sizes in lower dimensions
-        self._array_starts[lhs] = [-1]*ndim
-        self._array_counts[lhs] = [-1]*ndim
-        self._array_sizes[lhs] = [-1]*ndim
+        self._array_starts[lhs] = [-1] * ndim
+        self._array_counts[lhs] = [-1] * ndim
+        self._array_sizes[lhs] = [-1] * ndim
         self._array_starts[lhs][0] = start_var
         self._array_counts[lhs][0] = count_var
         self._array_sizes[lhs][0] = total_length
@@ -1382,7 +1383,7 @@ class DistributedPass(object):
         self.func_ir._definitions[tuple_var.name] = [tuple_call]
         return out, tuple_var
 
-    #new_body += self._run_1D_array_shape(
+    # new_body += self._run_1D_array_shape(
     #                                inst.target, rhs.value)
     # def _run_1D_array_shape(self, lhs, arr):
     #     """return shape tuple with global size of 1D/1D_Var arrays
@@ -1559,8 +1560,7 @@ class DistributedPass(object):
 
             # strided whole slice
             # e.g. A = X[::2,5]
-            elif guard(is_whole_slice, self.typemap, self.func_ir, index_var,
-                        accept_stride=True):
+            elif guard(is_whole_slice, self.typemap, self.func_ir, index_var, accept_stride=True):
                 # FIXME: we use rebalance array to handle the output array
                 # TODO: convert to neighbor exchange
                 # on each processor, the slice has to start from an offset:
@@ -1677,8 +1677,8 @@ class DistributedPass(object):
                 def f(A):  # pragma: no cover
                     arr_len = len(A)
                 f_block = compile_to_numba_ir(f, {'hpat': hpat}, self.typingctx,
-                                                (self.typemap[arr_var.name],),
-                                                self.typemap, self.calltypes).blocks.popitem()[1]
+                                              (self.typemap[arr_var.name],),
+                                              self.typemap, self.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [arr_var])
                 nodes = f_block.body[:-3]  # remove none return
                 l.stop = nodes[-1].target
@@ -1715,8 +1715,8 @@ class DistributedPass(object):
                 return start + prefix, stop + prefix
 
             f_block = compile_to_numba_ir(_fix_ind_bounds, {'hpat': hpat},
-                self.typingctx, (types.intp,types.intp), self.typemap,
-                self.calltypes).blocks.popitem()[1]
+                                          self.typingctx, (types.intp, types.intp), self.typemap,
+                                          self.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [l_nest.start, l_nest.stop])
             nodes = f_block.body[:-2]
             ret_var = nodes[-1].target
@@ -1764,9 +1764,9 @@ class DistributedPass(object):
         out += div_nodes
 
         # XXX: get sizes in lower dimensions
-        self._array_starts[arr.name] = [-1]*ndim
-        self._array_counts[arr.name] = [-1]*ndim
-        self._array_sizes[arr.name] = [-1]*ndim
+        self._array_starts[arr.name] = [-1] * ndim
+        self._array_counts[arr.name] = [-1] * ndim
+        self._array_sizes[arr.name] = [-1] * ndim
         self._array_starts[arr.name][0] = start_var
         self._array_counts[arr.name][0] = count_var
         self._array_sizes[arr.name][0] = total_length
@@ -1819,7 +1819,6 @@ class DistributedPass(object):
     #             if node.fn == '//':
     #                 return lhs // rhs
     #     return None
-
 
     def _gen_1D_div(self, size_var, scope, loc, prefix, end_call_name, end_call):
         div_nodes = []
@@ -2111,8 +2110,7 @@ class DistributedPass(object):
         out += nodes
         return vals_list
 
-    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
-                                                                 err_msg=None):
+    def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None, err_msg=None):
         arg = None
         if len(args) > arg_no:
             arg = args[arg_no]
