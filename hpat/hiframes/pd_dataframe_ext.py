@@ -5,10 +5,10 @@ import numpy as np
 import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-                             type_callable, infer, overload, make_attribute_wrapper, intrinsic,
-                             lower_builtin, overload_method)
+    type_callable, infer, overload, make_attribute_wrapper, intrinsic,
+    lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-                                    AttributeTemplate, bound_function)
+    AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
@@ -19,7 +19,6 @@ from hpat.str_arr_ext import string_array_type
 class DataFrameType(types.Type):  # TODO: IterableType over column names
     """Temporary type class for DataFrame objects.
     """
-
     def __init__(self, data=None, index=None, columns=None, has_parent=False):
         # data is tuple of Array types
         # index is Array type (TODO: Index obj)
@@ -64,7 +63,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
             elif self.index != types.none:
                 new_index = self.index
 
-            data = tuple(a.unify(typingctx, b) for a, b in zip(self.data, other.data))
+            data = tuple(a.unify(typingctx, b) for a,b in zip(self.data, other.data))
             return DataFrameType(
                 data, new_index, self.columns, self.has_parent)
 
@@ -110,7 +109,6 @@ class DataFrameModel(models.StructModel):
             ('parent', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)
-
 
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 make_attribute_wrapper(DataFrameType, 'index', '_index')
@@ -171,7 +169,7 @@ class DataFrameAttribute(AttributeTemplate):
         code = func.literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
         _, f_return_type, _ = numba.compiler.type_inference_stage(
-            self.context, f_ir, (row_typ,), None)
+                self.context, f_ir, (row_typ,), None)
 
         return signature(SeriesType(f_return_type), *args)
 
@@ -197,17 +195,17 @@ def init_dataframe(typingctx, *args):
     not changed.
     """
 
-    n_cols = len(args) // 2
+    n_cols = len(args)//2
     data_typs = tuple(args[:n_cols])
     index_typ = args[n_cols]
-    column_names = tuple(a.literal_value for a in args[n_cols + 1:])
+    column_names = tuple(a.literal_value for a in args[n_cols+1:])
 
     def codegen(context, builder, signature, args):
         in_tup = args[0]
         data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
         index = builder.extract_value(in_tup, n_cols)
         column_strs = [numba.unicode.make_string_from_constant(
-            context, builder, string_type, c) for c in column_names]
+                    context, builder, string_type, c) for c in column_names]
         # create dataframe struct and store values
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
@@ -218,7 +216,7 @@ def init_dataframe(typingctx, *args):
             builder, types.UniTuple(string_type, n_cols), column_strs)
         zero = context.get_constant(types.int8, 0)
         unboxed_tup = context.make_tuple(
-            builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
+            builder, types.UniTuple(types.int8, n_cols+1), [zero]*(n_cols+1))
 
         dataframe.data = data_tup
         dataframe.index = index
@@ -269,7 +267,6 @@ def get_dataframe_data(df, i):
 @numba.generated_jit(nopython=True, no_cpython_wrapper=True)
 def get_dataframe_index(df):
     return lambda df: df._index
-
 
 @intrinsic
 def set_df_index(typingctx, df_t, index_t=None):
@@ -339,12 +336,12 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
             context, builder, value=df_arg)
 
         data_arrs = [builder.extract_value(in_dataframe.data, i)
-                     if i != col_ind else arr_arg for i in range(n_cols)]
+                    if i != col_ind else arr_arg for i in range(n_cols)]
         if is_new_col:
             data_arrs.append(arr_arg)
 
         column_strs = [numba.unicode.make_string_from_constant(
-            context, builder, string_type, c) for c in column_names]
+                    context, builder, string_type, c) for c in column_names]
 
         zero = context.get_constant(types.int8, 0)
         one = context.get_constant(types.int8, 1)
@@ -365,7 +362,7 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
         column_tup = context.make_tuple(
             builder, types.UniTuple(string_type, new_n_cols), column_strs)
         unboxed_tup = context.make_tuple(
-            builder, types.UniTuple(types.int8, new_n_cols + 1), unboxed_vals)
+            builder, types.UniTuple(types.int8, new_n_cols+1), unboxed_vals)
 
         out_dataframe.data = data_tup
         out_dataframe.index = index
@@ -511,8 +508,6 @@ class DataFrameIatType(types.Type):
         super(DataFrameIatType, self).__init__(name)
 
 # df.iloc[] type
-
-
 class DataFrameILocType(types.Type):
     def __init__(self, df_type):
         self.df_type = df_type
@@ -520,8 +515,6 @@ class DataFrameILocType(types.Type):
         super(DataFrameILocType, self).__init__(name)
 
 # df.loc[] type
-
-
 class DataFrameLocType(types.Type):
     def __init__(self, df_type):
         self.df_type = df_type
@@ -545,7 +538,6 @@ class StaticGetItemDataFrameIat(AbstractTemplate):
                 data_typ = df.df_type.data[col_no]
                 return signature(data_typ.dtype, *args)
 
-
 @infer_global(operator.getitem)
 class GetItemDataFrameIat(AbstractTemplate):
     key = operator.getitem
@@ -560,7 +552,6 @@ class GetItemDataFrameIat(AbstractTemplate):
                 col_no = idx.types[1].literal_value
                 data_typ = df.df_type.data[col_no]
                 return signature(data_typ.dtype, *args)
-
 
 @infer_global(operator.setitem)
 class SetItemDataFrameIat(AbstractTemplate):
@@ -590,7 +581,7 @@ class GetItemDataFrameLoc(AbstractTemplate):
             # df1 = df.loc[df.A > .5], df1 = df.loc[np.array([1,2,3])]
             if (isinstance(idx, (SeriesType, types.Array, types.List))
                     and (idx.dtype == types.bool_
-                         or isinstance(idx.dtype, types.Integer))):
+                        or isinstance(idx.dtype, types.Integer))):
                 return signature(df.df_type, *args)
             # df.loc[1:n]
             if isinstance(idx, types.SliceType):
@@ -616,7 +607,7 @@ class GetItemDataFrameILoc(AbstractTemplate):
             # df1 = df.iloc[df.A > .5], df1 = df.iloc[np.array([1,2,3])]
             if (isinstance(idx, (SeriesType, types.Array, types.List))
                     and (idx.dtype == types.bool_
-                         or isinstance(idx.dtype, types.Integer))):
+                        or isinstance(idx.dtype, types.Integer))):
                 return signature(df.df_type, *args)
             # df.iloc[1:n]
             if isinstance(idx, types.SliceType):
@@ -634,52 +625,52 @@ class GetItemDataFrameILoc(AbstractTemplate):
 @overload_method(DataFrameType, 'merge')
 @overload(pd.merge)
 def merge_overload(left, right, how='inner', on=None, left_on=None,
-                   right_on=None, left_index=False, right_index=False, sort=False,
-                   suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
+        right_on=None, left_index=False, right_index=False, sort=False,
+        suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
 
     # check if on's inferred type is NoneType and store the result,
     # use it later to branch based on the value available at compile time
     onHasNoneType = isinstance(numba.typeof(on), types.NoneType)
     def _impl(left, right, how='inner', on=None, left_on=None,
-              right_on=None, left_index=False, right_index=False, sort=False,
-              suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
+            right_on=None, left_index=False, right_index=False, sort=False,
+            suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
         if not onHasNoneType:
             left_on = right_on = on
 
-        return hpat.hiframes.api.join_dummy(left, right, left_on, right_on, how)
+        return hpat.hiframes.api.join_dummy(
+            left, right, left_on, right_on, how)
 
     return _impl
 
-
 @overload(pd.merge_asof)
 def merge_asof_overload(left, right, on=None, left_on=None, right_on=None,
-                        left_index=False, right_index=False, by=None, left_by=None,
-                        right_by=None, suffixes=('_x', '_y'), tolerance=None,
-                        allow_exact_matches=True, direction='backward'):
+        left_index=False, right_index=False, by=None, left_by=None,
+        right_by=None, suffixes=('_x', '_y'), tolerance=None,
+        allow_exact_matches=True, direction='backward'):
 
     # check if on's inferred type is NoneType and store the result,
     # use it later to branch based on the value available at compile time
     onHasNoneType = isinstance(numba.typeof(on), types.NoneType)
     def _impl(left, right, on=None, left_on=None, right_on=None,
-              left_index=False, right_index=False, by=None, left_by=None,
-              right_by=None, suffixes=('_x', '_y'), tolerance=None,
-              allow_exact_matches=True, direction='backward'):
+            left_index=False, right_index=False, by=None, left_by=None,
+            right_by=None, suffixes=('_x', '_y'), tolerance=None,
+            allow_exact_matches=True, direction='backward'):
         if not onHasNoneType:
             left_on = right_on = on
 
-        return hpat.hiframes.api.join_dummy(left, right, left_on, right_on, 'asof')
+        return hpat.hiframes.api.join_dummy(
+            left, right, left_on, right_on, 'asof')
 
     return _impl
 
-
 @overload_method(DataFrameType, 'pivot_table')
 def pivot_table_overload(df, values=None, index=None, columns=None, aggfunc='mean',
-                         fill_value=None, margins=False, dropna=True, margins_name='All',
-                         _pivot_values=None):
+        fill_value=None, margins=False, dropna=True, margins_name='All',
+        _pivot_values=None):
 
     def _impl(df, values=None, index=None, columns=None, aggfunc='mean',
-              fill_value=None, margins=False, dropna=True, margins_name='All',
-              _pivot_values=None):
+            fill_value=None, margins=False, dropna=True, margins_name='All',
+            _pivot_values=None):
 
         return hpat.hiframes.pd_groupby_ext.pivot_table_dummy(
             df, values, index, columns, aggfunc, _pivot_values)
@@ -689,13 +680,13 @@ def pivot_table_overload(df, values=None, index=None, columns=None, aggfunc='mea
 
 @overload(pd.crosstab)
 def crosstab_overload(index, columns, values=None, rownames=None, colnames=None,
-                      aggfunc=None, margins=False, margins_name='All', dropna=True,
-                      normalize=False, _pivot_values=None):
+        aggfunc=None, margins=False, margins_name='All', dropna=True,
+        normalize=False, _pivot_values=None):
     # TODO: hanlde multiple keys (index args)
     # TODO: handle values and aggfunc options
     def _impl(index, columns, values=None, rownames=None, colnames=None,
-              aggfunc=None, margins=False, margins_name='All', dropna=True,
-              normalize=False, _pivot_values=None):
+            aggfunc=None, margins=False, margins_name='All', dropna=True,
+            normalize=False, _pivot_values=None):
         return hpat.hiframes.pd_groupby_ext.crosstab_dummy(
             index, columns, _pivot_values)
     return _impl
@@ -703,18 +694,16 @@ def crosstab_overload(index, columns, values=None, rownames=None, colnames=None,
 
 @overload(pd.concat)
 def concat_overload(objs, axis=0, join='outer', join_axes=None,
-                    ignore_index=False, keys=None, levels=None, names=None,
-                    verify_integrity=False, sort=None, copy=True):
+        ignore_index=False, keys=None, levels=None, names=None,
+        verify_integrity=False, sort=None, copy=True):
     # TODO: handle options
     return (lambda objs, axis=0, join='outer', join_axes=None,
             ignore_index=False, keys=None, levels=None, names=None,
             verify_integrity=False, sort=None, copy=True:
             hpat.hiframes.pd_dataframe_ext.concat_dummy(objs, axis))
 
-
 def concat_dummy(objs):
     return pd.concat(objs)
-
 
 @infer_global(concat_dummy)
 class ConcatDummyTyper(AbstractTemplate):
@@ -793,7 +782,7 @@ class ConcatDummyTyper(AbstractTemplate):
             assert all(isinstance(t, SeriesType) for t in objs.types)
             arr_args = [S.data for S in objs.types]
             concat_typ = hpat.hiframes.api.ConcatType(
-                self.context).generic((types.Tuple(arr_args),), {})
+                    self.context).generic((types.Tuple(arr_args),), {})
             ret_typ = SeriesType(concat_typ.return_type.dtype)
             return signature(ret_typ, *args)
         # TODO: handle other iterables like arrays, lists, ...
@@ -810,10 +799,10 @@ def lower_concat_dummy(context, builder, sig, args):
 
 @overload_method(DataFrameType, 'sort_values')
 def sort_values_overload(df, by, axis=0, ascending=True, inplace=False,
-                         kind='quicksort', na_position='last'):
+        kind='quicksort', na_position='last'):
 
     def _impl(df, by, axis=0, ascending=True, inplace=False, kind='quicksort',
-              na_position='last'):
+            na_position='last'):
 
         return hpat.hiframes.pd_dataframe_ext.sort_values_dummy(
             df, by, ascending, inplace)
@@ -863,7 +852,6 @@ def lower_sort_values_dummy(context, builder, sig, args):
 def set_parent_dummy(df):
     return df
 
-
 @infer_global(set_parent_dummy)
 class ParentDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
@@ -871,7 +859,6 @@ class ParentDummyTyper(AbstractTemplate):
         df, = args
         ret = DataFrameType(df.data, df.index, df.columns, True)
         return signature(ret, *args)
-
 
 @lower_builtin(set_parent_dummy, types.VarArg(types.Any))
 def lower_set_parent_dummy(context, builder, sig, args):
@@ -888,10 +875,8 @@ def itertuples_overload(df, index=True, name='Pandas'):
 
     return _impl
 
-
 def itertuples_dummy(df):
     return df
-
 
 @infer_global(itertuples_dummy)
 class ItertuplesDummyTyper(AbstractTemplate):
@@ -904,7 +889,6 @@ class ItertuplesDummyTyper(AbstractTemplate):
         arr_types = (types.Array(types.int64, 1, 'C'),) + df.data
         iter_typ = hpat.hiframes.api.DataFrameTupleIterator(columns, arr_types)
         return signature(iter_typ, *args)
-
 
 @lower_builtin(itertuples_dummy, types.VarArg(types.Any))
 def lower_itertuples_dummy(context, builder, sig, args):
@@ -922,10 +906,8 @@ def head_overload(df, n=5):
 
     return _impl
 
-
 def head_dummy(df, n):
     return df
-
 
 @infer_global(head_dummy)
 class HeadDummyTyper(AbstractTemplate):
@@ -934,7 +916,6 @@ class HeadDummyTyper(AbstractTemplate):
         # copy type to sethas_parent False, TODO: data always copied?
         out_df = DataFrameType(df.data, df.index, df.columns)
         return signature(out_df, *args)
-
 
 @lower_builtin(head_dummy, types.VarArg(types.Any))
 def lower_head_dummy(context, builder, sig, args):
@@ -945,21 +926,19 @@ def lower_head_dummy(context, builder, sig, args):
 
 @overload_method(DataFrameType, 'fillna')
 def fillna_overload(df, value=None, method=None, axis=None, inplace=False,
-                    limit=None, downcast=None):
+        limit=None, downcast=None):
     # TODO: handle possible **kwargs options?
 
     # TODO: avoid dummy and generate func here when inlining is possible
     # TODO: inplace of df with parent that has a string column (reflection)
     def _impl(df, value=None, method=None, axis=None, inplace=False,
-              limit=None, downcast=None):
+            limit=None, downcast=None):
         return hpat.hiframes.pd_dataframe_ext.fillna_dummy(df, value, inplace)
 
     return _impl
 
-
 def fillna_dummy(df, n):
     return df
-
 
 @infer_global(fillna_dummy)
 class FillnaDummyTyper(AbstractTemplate):
@@ -980,7 +959,6 @@ class FillnaDummyTyper(AbstractTemplate):
             return signature(out_df, *args)
         return signature(types.none, *args)
 
-
 @lower_builtin(fillna_dummy, types.VarArg(types.Any))
 def lower_fillna_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
@@ -990,20 +968,18 @@ def lower_fillna_dummy(context, builder, sig, args):
 
 @overload_method(DataFrameType, 'reset_index')
 def reset_index_overload(df, level=None, drop=False, inplace=False,
-                         col_level=0, col_fill=''):
+        col_level=0, col_fill=''):
 
     # TODO: avoid dummy and generate func here when inlining is possible
     # TODO: inplace of df with parent (reflection)
     def _impl(df, level=None, drop=False, inplace=False,
-              col_level=0, col_fill=''):
+            col_level=0, col_fill=''):
         return hpat.hiframes.pd_dataframe_ext.reset_index_dummy(df, inplace)
 
     return _impl
 
-
 def reset_index_dummy(df, n):
     return df
-
 
 @infer_global(reset_index_dummy)
 class ResetIndexDummyTyper(AbstractTemplate):
@@ -1023,7 +999,6 @@ class ResetIndexDummyTyper(AbstractTemplate):
             return signature(out_df, *args)
         return signature(types.none, *args)
 
-
 @lower_builtin(reset_index_dummy, types.VarArg(types.Any))
 def lower_reset_index_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
@@ -1033,7 +1008,7 @@ def lower_reset_index_dummy(context, builder, sig, args):
 
 @overload_method(DataFrameType, 'dropna')
 def dropna_overload(df, axis=0, how='any', thresh=None, subset=None,
-                    inplace=False):
+                                                                inplace=False):
 
     # TODO: avoid dummy and generate func here when inlining is possible
     # TODO: inplace of df with parent (reflection)
@@ -1042,10 +1017,8 @@ def dropna_overload(df, axis=0, how='any', thresh=None, subset=None,
 
     return _impl
 
-
 def dropna_dummy(df, n):
     return df
-
 
 @infer_global(dropna_dummy)
 class DropnaDummyTyper(AbstractTemplate):
@@ -1066,31 +1039,27 @@ class DropnaDummyTyper(AbstractTemplate):
             return signature(out_df, *args)
         return signature(types.none, *args)
 
-
 @lower_builtin(dropna_dummy, types.VarArg(types.Any))
 def lower_dropna_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
 
-
 @overload_method(DataFrameType, 'drop')
 def drop_overload(df, labels=None, axis=0, index=None, columns=None,
-                  level=None, inplace=False, errors='raise'):
+        level=None, inplace=False, errors='raise'):
 
     # TODO: avoid dummy and generate func here when inlining is possible
     # TODO: inplace of df with parent (reflection)
     def _impl(df, labels=None, axis=0, index=None, columns=None,
-              level=None, inplace=False, errors='raise'):
+            level=None, inplace=False, errors='raise'):
         return hpat.hiframes.pd_dataframe_ext.drop_dummy(
             df, labels, axis, columns, inplace)
 
     return _impl
 
-
 def drop_dummy(df, labels, axis, columns, inplace):
     return df
-
 
 @infer_global(drop_dummy)
 class DropDummyTyper(AbstractTemplate):
@@ -1131,13 +1100,12 @@ class DropDummyTyper(AbstractTemplate):
             inplace = False
 
         # TODO: reflection
-        has_parent = False  # df.has_parent
+        has_parent = False # df.has_parent
         # if not inplace:
         #     has_parent = False  # data is copied
 
         out_df = DataFrameType(new_data, df.index, new_cols, has_parent)
         return signature(out_df, *args)
-
 
 @lower_builtin(drop_dummy, types.VarArg(types.Any))
 def lower_drop_dummy(context, builder, sig, args):
@@ -1154,10 +1122,8 @@ def isin_overload(df, values):
 
     return _impl
 
-
 def isin_dummy(df, labels, axis, columns, inplace):
     return df
-
 
 @infer_global(isin_dummy)
 class IsinDummyTyper(AbstractTemplate):
@@ -1166,9 +1132,8 @@ class IsinDummyTyper(AbstractTemplate):
 
         bool_arr = types.Array(types.bool_, 1, 'C')
         n_cols = len(df.columns)
-        out_df = DataFrameType((bool_arr,) * n_cols, df.index, df.columns)
+        out_df = DataFrameType((bool_arr,)*n_cols, df.index, df.columns)
         return signature(out_df, *args)
-
 
 @lower_builtin(isin_dummy, types.VarArg(types.Any))
 def lower_isin_dummy(context, builder, sig, args):
@@ -1179,19 +1144,19 @@ def lower_isin_dummy(context, builder, sig, args):
 
 @overload_method(DataFrameType, 'append')
 def append_overload(df, other, ignore_index=False, verify_integrity=False,
-                    sort=None):
+                                                                    sort=None):
     if isinstance(other, DataFrameType):
         return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat((df, other)))
+            sort=None: pd.concat((df, other)))
 
     # TODO: tuple case
     # TODO: non-homogenous build_list case
     if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
         return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat([df] + other))
+            sort=None: pd.concat([df] + other))
 
     raise ValueError("invalid df.append() input. Only dataframe and list"
-                     " of dataframes supported")
+                         " of dataframes supported")
 
 
 @overload_method(DataFrameType, 'pct_change')
@@ -1203,10 +1168,8 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 
     return _impl
 
-
 def pct_change_dummy(df, n):
     return df
-
 
 @infer_global(pct_change_dummy)
 class PctChangeDummyTyper(AbstractTemplate):
@@ -1214,17 +1177,15 @@ class PctChangeDummyTyper(AbstractTemplate):
         df = args[0]
         float_arr = types.Array(types.float64, 1, 'C')
         data = tuple(float_arr if isinstance(ary.dtype, types.Integer) else ary
-                     for ary in df.data)
+                    for ary in df.data)
         out_df = DataFrameType(data, df.index, df.columns)
         return signature(out_df, *args)
-
 
 @lower_builtin(pct_change_dummy, types.VarArg(types.Any))
 def lower_pct_change_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
-
 
 @overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -1235,10 +1196,8 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     return _impl
 
-
 def mean_dummy(df, n):
     return df
-
 
 @infer_global(mean_dummy)
 class MeanDummyTyper(AbstractTemplate):
@@ -1250,7 +1209,6 @@ class MeanDummyTyper(AbstractTemplate):
             types.float64, types.Array(types.float64, 1, 'C'),
             string_array_type)
         return signature(out, *args)
-
 
 @lower_builtin(mean_dummy, types.VarArg(types.Any))
 def lower_mean_dummy(context, builder, sig, args):
@@ -1269,10 +1227,8 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     return _impl
 
-
 def std_dummy(df, n):
     return df
-
 
 @infer_global(std_dummy)
 class StdDummyTyper(AbstractTemplate):
@@ -1284,7 +1240,6 @@ class StdDummyTyper(AbstractTemplate):
             types.float64, types.Array(types.float64, 1, 'C'),
             string_array_type)
         return signature(out, *args)
-
 
 @lower_builtin(std_dummy, types.VarArg(types.Any))
 def lower_std_dummy(context, builder, sig, args):
@@ -1303,10 +1258,8 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     return _impl
 
-
 def var_dummy(df, n):
     return df
-
 
 @infer_global(var_dummy)
 class VarDummyTyper(AbstractTemplate):
@@ -1318,7 +1271,6 @@ class VarDummyTyper(AbstractTemplate):
             types.float64, types.Array(types.float64, 1, 'C'),
             string_array_type)
         return signature(out, *args)
-
 
 @lower_builtin(var_dummy, types.VarArg(types.Any))
 def lower_var_dummy(context, builder, sig, args):
@@ -1336,10 +1288,8 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     return _impl
 
-
 def max_dummy(df, n):
     return df
-
 
 @infer_global(max_dummy)
 class MaxDummyTyper(AbstractTemplate):
@@ -1351,7 +1301,6 @@ class MaxDummyTyper(AbstractTemplate):
         dtype = self.context.unify_types(*tuple(d.dtype for d in df.data))
         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
         return signature(out, *args)
-
 
 @lower_builtin(max_dummy, types.VarArg(types.Any))
 def lower_max_dummy(context, builder, sig, args):
@@ -1369,10 +1318,8 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     return _impl
 
-
 def min_dummy(df, n):
     return df
-
 
 @infer_global(min_dummy)
 class MinDummyTyper(AbstractTemplate):
@@ -1385,29 +1332,25 @@ class MinDummyTyper(AbstractTemplate):
         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
         return signature(out, *args)
 
-
 @lower_builtin(min_dummy, types.VarArg(types.Any))
 def lower_min_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
 
-
 @overload_method(DataFrameType, 'sum')
 def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None,
-                 min_count=0):
+                                                                  min_count=0):
     # TODO: kwargs
     # TODO: avoid dummy and generate func here when inlining is possible
     def _impl(df, axis=None, skipna=None, level=None, numeric_only=None,
-              min_count=0):
+                                                                  min_count=0):
         return hpat.hiframes.pd_dataframe_ext.sum_dummy(df)
 
     return _impl
 
-
 def sum_dummy(df, n):
     return df
-
 
 @infer_global(sum_dummy)
 class SumDummyTyper(AbstractTemplate):
@@ -1425,29 +1368,25 @@ class SumDummyTyper(AbstractTemplate):
         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
         return signature(out, *args)
 
-
 @lower_builtin(sum_dummy, types.VarArg(types.Any))
 def lower_sum_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
         sig.return_type)(context, builder)
     return out_obj._getvalue()
 
-
 @overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None,
-                  min_count=0):
+                                                                  min_count=0):
     # TODO: kwargs
     # TODO: avoid dummy and generate func here when inlining is possible
     def _impl(df, axis=None, skipna=None, level=None, numeric_only=None,
-              min_count=0):
+                                                                  min_count=0):
         return hpat.hiframes.pd_dataframe_ext.prod_dummy(df)
 
     return _impl
 
-
 def prod_dummy(df, n):
     return df
-
 
 @infer_global(prod_dummy)
 class ProdDummyTyper(AbstractTemplate):
@@ -1465,7 +1404,6 @@ class ProdDummyTyper(AbstractTemplate):
         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
         return signature(out, *args)
 
-
 @lower_builtin(prod_dummy, types.VarArg(types.Any))
 def lower_prod_dummy(context, builder, sig, args):
     out_obj = cgutils.create_struct_proxy(
@@ -1481,10 +1419,8 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     return _impl
 
-
 def count_dummy(df, n):
     return df
-
 
 @infer_global(count_dummy)
 class CountDummyTyper(AbstractTemplate):
@@ -1492,7 +1428,6 @@ class CountDummyTyper(AbstractTemplate):
         dtype = types.intp
         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
         return signature(out, *args)
-
 
 @lower_builtin(count_dummy, types.VarArg(types.Any))
 def lower_count_dummy(context, builder, sig, args):
@@ -1503,40 +1438,40 @@ def lower_count_dummy(context, builder, sig, args):
 # TODO: other Pandas versions (0.24 defaults are different than 0.23)
 @overload_method(DataFrameType, 'to_csv')
 def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
-                    columns=None, header=True, index=True, index_label=None, mode='w',
-                    encoding=None, compression='infer', quoting=None, quotechar='"',
-                    line_terminator=None, chunksize=None, tupleize_cols=None,
-                    date_format=None, doublequote=True, escapechar=None, decimal='.'):
+        columns=None, header=True, index=True, index_label=None, mode='w',
+        encoding=None, compression='infer', quoting=None, quotechar='"',
+        line_terminator=None, chunksize=None, tupleize_cols=None,
+        date_format=None, doublequote=True, escapechar=None, decimal='.'):
 
     # TODO: refactor when objmode() can understand global string constant
     # String output case
     if path_or_buf is None or path_or_buf == types.none:
         def _impl(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
-                  columns=None, header=True, index=True, index_label=None,
-                  mode='w', encoding=None, compression='infer', quoting=None,
-                  quotechar='"', line_terminator=None, chunksize=None,
-                  tupleize_cols=None, date_format=None, doublequote=True,
-                  escapechar=None, decimal='.'):
+                columns=None, header=True, index=True, index_label=None,
+                mode='w', encoding=None, compression='infer', quoting=None,
+                quotechar='"', line_terminator=None, chunksize=None,
+                tupleize_cols=None, date_format=None, doublequote=True,
+                escapechar=None, decimal='.'):
             with numba.objmode(D='unicode_type'):
                 D = df.to_csv(path_or_buf, sep, na_rep, float_format,
-                              columns, header, index, index_label, mode,
-                              encoding, compression, quoting, quotechar,
-                              line_terminator, chunksize, tupleize_cols,
-                              date_format, doublequote, escapechar, decimal)
+                    columns, header, index, index_label, mode,
+                    encoding, compression, quoting, quotechar,
+                    line_terminator, chunksize, tupleize_cols,
+                    date_format, doublequote, escapechar, decimal)
             return D
 
         return _impl
 
     def _impl(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
-              columns=None, header=True, index=True, index_label=None, mode='w',
-              encoding=None, compression='infer', quoting=None, quotechar='"',
-              line_terminator=None, chunksize=None, tupleize_cols=None,
-              date_format=None, doublequote=True, escapechar=None, decimal='.'):
+            columns=None, header=True, index=True, index_label=None, mode='w',
+            encoding=None, compression='infer', quoting=None, quotechar='"',
+            line_terminator=None, chunksize=None, tupleize_cols=None,
+            date_format=None, doublequote=True, escapechar=None, decimal='.'):
         with numba.objmode:
             df.to_csv(path_or_buf, sep, na_rep, float_format,
-                      columns, header, index, index_label, mode,
-                      encoding, compression, quoting, quotechar,
-                      line_terminator, chunksize, tupleize_cols,
-                      date_format, doublequote, escapechar, decimal)
+                columns, header, index, index_label, mode,
+                encoding, compression, quoting, quotechar,
+                line_terminator, chunksize, tupleize_cols,
+                date_format, doublequote, escapechar, decimal)
 
     return _impl

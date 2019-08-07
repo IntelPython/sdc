@@ -16,11 +16,11 @@ from hpat import distributed, distributed_analysis
 from hpat.distributed_api import Reduce_Type
 from hpat.distributed_analysis import Distribution
 from hpat.utils import (debug_prints, empty_like_type, get_ctypes_ptr,
-                        gen_getitem)
+    gen_getitem)
 
 from hpat.shuffle_utils import (alltoallv, alltoallv_tup,
-                                finalize_shuffle_meta, update_shuffle_meta, alloc_pre_shuffle_metadata,
-                                _get_keys_tup, _get_data_tup)
+    finalize_shuffle_meta, update_shuffle_meta,  alloc_pre_shuffle_metadata,
+    _get_keys_tup, _get_data_tup)
 
 from hpat.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
@@ -37,7 +37,7 @@ MPI_ROOT = 0
 
 class Sort(ir.Stmt):
     def __init__(self, df_in, df_out, key_arrs, out_key_arrs, df_in_vars,
-                 df_out_vars, inplace, loc, ascending=True):
+                                    df_out_vars, inplace, loc, ascending=True):
         # for printing only
         self.df_in = df_in
         self.df_out = df_out
@@ -139,7 +139,6 @@ def sort_distributed_analysis(sort_node, array_dists):
 
 distributed_analysis.distributed_analysis_extensions[Sort] = sort_distributed_analysis
 
-
 def sort_typeinfer(sort_node, typeinferer):
     # input and output arrays have the same type
     for in_key, out_key in zip(sort_node.key_arrs, sort_node.out_key_arrs):
@@ -152,9 +151,7 @@ def sort_typeinfer(sort_node, typeinferer):
             dst=out_col_var.name, src=col_var.name, loc=sort_node.loc))
     return
 
-
 typeinfer.typeinfer_extensions[Sort] = sort_typeinfer
-
 
 def build_sort_definitions(sort_node, definitions=None):
     if definitions is None:
@@ -163,14 +160,12 @@ def build_sort_definitions(sort_node, definitions=None):
     # output arrays are defined
     if not sort_node.inplace:
         for col_var in (sort_node.out_key_arrs
-                        + list(sort_node.df_out_vars.values())):
+                + list(sort_node.df_out_vars.values())):
             definitions[col_var.name].append(sort_node)
 
     return definitions
 
-
 ir_utils.build_defs_extensions[Sort] = build_sort_definitions
-
 
 def visit_vars_sort(sort_node, callback, cbdata):
     if debug_prints():  # pragma: no cover
@@ -190,7 +185,6 @@ def visit_vars_sort(sort_node, callback, cbdata):
     for col_name in list(sort_node.df_out_vars.keys()):
         sort_node.df_out_vars[col_name] = visit_vars_inner(
             sort_node.df_out_vars[col_name], callback, cbdata)
-
 
 # add call to visit sort variable
 ir_utils.visit_vars_extensions[Sort] = visit_vars_sort
@@ -252,12 +246,11 @@ def get_copies_sort(sort_node, typemap):
         kill_set.update({v.name for v in sort_node.out_key_arrs})
     return set(), kill_set
 
-
 ir_utils.copy_propagate_extensions[Sort] = get_copies_sort
 
 
 def apply_copies_sort(sort_node, var_dict, name_var_table,
-                      typemap, calltypes, save_copies):
+                        typemap, calltypes, save_copies):
     """apply copy propagate in sort node"""
     for i in range(len(sort_node.key_arrs)):
         sort_node.key_arrs[i] = replace_vars_inner(sort_node.key_arrs[i], var_dict)
@@ -273,12 +266,11 @@ def apply_copies_sort(sort_node, var_dict, name_var_table,
 
     return
 
-
 ir_utils.apply_copy_propagate_extensions[Sort] = apply_copies_sort
 
 
 def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
-                         targetctx, dist_pass):
+                                                         targetctx, dist_pass):
     parallel = True
     in_vars = list(sort_node.df_in_vars.values())
     out_vars = list(sort_node.df_out_vars.values())
@@ -304,13 +296,13 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
             new_in_vars.append(v_cp)
         in_vars = new_in_vars
 
-    key_name_args = ', '.join("key" + str(i) for i in range(len(key_arrs)))
-    col_name_args = ', '.join(["c" + str(i) for i in range(len(in_vars))])
+    key_name_args = ', '.join("key"+str(i) for i in range(len(key_arrs)))
+    col_name_args = ', '.join(["c"+str(i) for i in range(len(in_vars))])
     # TODO: use *args
     func_text = "def f({}, {}):\n".format(key_name_args, col_name_args)
     func_text += "  key_arrs = ({},)\n".format(key_name_args)
-    func_text += "  data = ({}{})\n".format(col_name_args, "," if len(in_vars) ==
-                                            1 else "")  # single value needs comma to become tuple
+    func_text += "  data = ({}{})\n".format(col_name_args,
+        "," if len(in_vars) == 1 else "")  # single value needs comma to become tuple
     func_text += "  hpat.hiframes.sort.local_sort(key_arrs, data, {})\n".format(sort_node.ascending)
     func_text += "  return key_arrs, data\n"
 
@@ -322,12 +314,12 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     data_tup_typ = types.Tuple([typemap[v.name] for v in in_vars])
 
     f_block = compile_to_numba_ir(sort_impl,
-                                  {'hpat': hpat,
-                                   'to_string_list': to_string_list,
-                                   'cp_str_list_to_array': cp_str_list_to_array},
-                                  typingctx,
-                                  tuple(list(key_typ.types) + list(data_tup_typ.types)),
-                                  typemap, calltypes).blocks.popitem()[1]
+                                    {'hpat': hpat,
+                                    'to_string_list': to_string_list,
+                                    'cp_str_list_to_array': cp_str_list_to_array},
+                                    typingctx,
+                                    tuple(list(key_typ.types) + list(data_tup_typ.types)),
+                                    typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, key_arrs + in_vars)
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
@@ -361,13 +353,13 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
         return out_key, out_data
 
     f_block = compile_to_numba_ir(par_sort_impl,
-                                  {'hpat': hpat,
-                                   'parallel_sort': parallel_sort,
-                                   'to_string_list': to_string_list,
-                                   'cp_str_list_to_array': cp_str_list_to_array},
-                                  typingctx,
-                                  (key_typ, data_tup_typ, types.bool_),
-                                  typemap, calltypes).blocks.popitem()[1]
+                                    {'hpat': hpat,
+                                    'parallel_sort': parallel_sort,
+                                    'to_string_list': to_string_list,
+                                    'cp_str_list_to_array': cp_str_list_to_array},
+                                    typingctx,
+                                    (key_typ, data_tup_typ, types.bool_),
+                                    typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [key_arrs_tup_var, data_tup_var, ascending_var])
     nodes += f_block.body[:-2]
     ret_var = nodes[-1].target
@@ -393,17 +385,15 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
 
 distributed.distributed_run_extensions[Sort] = sort_distributed_run
 
-
 def _copy_array_nodes(var, nodes, typingctx, typemap, calltypes):
     def _impl(arr):
         return arr.copy()
 
     f_block = compile_to_numba_ir(_impl, {}, typingctx, (typemap[var.name],),
-                                  typemap, calltypes).blocks.popitem()[1]
+                                    typemap, calltypes).blocks.popitem()[1]
     replace_arg_nodes(f_block, [var])
     nodes += f_block.body[:-2]
     return nodes[-1].target
-
 
 def to_string_list_typ(typ):
     if typ == string_array_type:
@@ -451,7 +441,7 @@ def parallel_sort(key_arrs, data, ascending=True):
 
     all_samples = hpat.distributed_api.gatherv(samples)
     all_samples = to_string_list(all_samples)
-    bounds = empty_like_type(n_pes - 1, all_samples)
+    bounds = empty_like_type(n_pes-1, all_samples)
 
     if my_rank == MPI_ROOT:
         all_samples.sort()
@@ -474,13 +464,13 @@ def parallel_sort(key_arrs, data, ascending=True):
         val = key_arrs[0][i]
         # TODO: refactor
         if node_id < (n_pes - 1) and (ascending and val >= bounds[node_id]
-                                      or (not ascending) and val <= bounds[node_id]):
+                                or (not ascending) and val <= bounds[node_id]):
             node_id += 1
         update_shuffle_meta(pre_shuffle_meta, node_id, i, (val,),
-                            getitem_arr_tup(data, i), True)
+            getitem_arr_tup(data, i), True)
 
     shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta,
-                                         n_pes, True)
+                                          n_pes, True)
 
     # shuffle
     recvs = alltoallv_tup(key_arrs + data, shuffle_meta)

@@ -4,14 +4,14 @@ import numpy as np
 import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-                             type_callable, infer, overload, make_attribute_wrapper, intrinsic,
-                             lower_builtin, overload_method)
+    type_callable, infer, overload, make_attribute_wrapper, intrinsic,
+    lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-                                    AttributeTemplate, bound_function)
+    AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import hpat
 from hpat.hiframes.pd_series_ext import (SeriesType, _get_series_array_type,
-                                         arr_to_series_type)
+    arr_to_series_type)
 from hpat.str_ext import string_type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.aggregate import get_agg_func
@@ -21,7 +21,6 @@ class DataFrameGroupByType(types.Type):  # TODO: IterableType over groups
     """Temporary type class for DataFrameGroupBy objects before transformation
     to aggregate node.
     """
-
     def __init__(self, df_type, keys, selection, as_index, explicit_select=False):
 
         self.df_type = df_type
@@ -37,7 +36,7 @@ class DataFrameGroupByType(types.Type):  # TODO: IterableType over groups
     def copy(self):
         # XXX is copy necessary?
         return DataFrameGroupByType(self.df_type, self.keys, self.selection,
-                                    self.as_index, self.explicit_select)
+            self.as_index, self.explicit_select)
 
 
 # dummy model since info is kept in type
@@ -47,13 +46,13 @@ register_model(DataFrameGroupByType)(models.OpaqueModel)
 
 @overload_method(DataFrameType, 'groupby')
 def df_groupby_overload(df, by=None, axis=0, level=None, as_index=True,
-                        sort=True, group_keys=True, squeeze=False, observed=False):
+        sort=True, group_keys=True, squeeze=False, observed=False):
 
     if by is None:
         raise ValueError("groupby 'by' argument required")
 
     def _impl(df, by=None, axis=0, level=None, as_index=True,
-              sort=True, group_keys=True, squeeze=False, observed=False):
+            sort=True, group_keys=True, squeeze=False, observed=False):
         return hpat.hiframes.pd_groupby_ext.groupby_dummy(df, by, as_index)
 
     return _impl
@@ -117,7 +116,6 @@ class GetItemDataFrameGroupBy2(AbstractTemplate):
             ret_grp = DataFrameGroupByType(
                 grpby.df_type, grpby.keys, selection, grpby.as_index, True)
             return signature(ret_grp, *args)
-
 
 @infer_getattr
 class DataframeGroupByAttribute(AttributeTemplate):
@@ -217,7 +215,7 @@ class PivotTyper(AbstractTemplate):
                 and isinstance(index, types.StringLiteral)
                 and isinstance(columns, types.StringLiteral)):
             raise ValueError("pivot_table() only support string constants for"
-                             "'values', 'index' and 'columns' arguments")
+                "'values', 'index' and 'columns' arguments")
 
         values = values.literal_value
         index = index.literal_value
@@ -232,9 +230,10 @@ class PivotTyper(AbstractTemplate):
             self.context, f_ir, (data,), None)
         out_arr_typ = _get_series_array_type(out_dtype)
 
+
         pivot_vals = _pivot_values.meta
         n_vals = len(pivot_vals)
-        out_df = DataFrameType((out_arr_typ,) * n_vals, None, tuple(pivot_vals))
+        out_df = DataFrameType((out_arr_typ,)*n_vals, None, tuple(pivot_vals))
 
         return signature(out_df, *args)
 
@@ -262,7 +261,7 @@ class CrossTabTyper(AbstractTemplate):
 
         pivot_vals = _pivot_values.meta
         n_vals = len(pivot_vals)
-        out_df = DataFrameType((out_arr_typ,) * n_vals, None, tuple(pivot_vals))
+        out_df = DataFrameType((out_arr_typ,)*n_vals, None, tuple(pivot_vals))
 
         return signature(out_df, *args)
 
