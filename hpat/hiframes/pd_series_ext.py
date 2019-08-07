@@ -977,28 +977,27 @@ def install_series_method(op, name, generic):
 
 
 explicit_binop_funcs = {
-    operator.add: 'add',
-    operator.sub: 'sub',
-    operator.mul: 'mul',
-    operator.truediv: 'div',
-    operator.truediv: 'truediv',
-    operator.floordiv: 'floordiv',
-    operator.mod: 'mod',
-    operator.pow: 'pow',
-    operator.lt: 'lt',
-    operator.gt: 'gt',
-    operator.le: 'le',
-    operator.ge: 'ge',
-    operator.ne: 'ne',
-    operator.eq: 'eq',
+    'add': operator.add,
+    'sub': operator.sub,
+    'mul': operator.mul,
+    'div': operator.truediv,
+    'truediv': operator.truediv,
+    'floordiv': operator.floordiv,
+    'mod': operator.mod,
+    'pow': operator.pow,
+    'lt': operator.lt,
+    'gt': operator.gt,
+    'le': operator.le,
+    'ge': operator.ge,
+    'ne': operator.ne,
+    'eq': operator.eq,
 }
 
 
 def ex_binop_generic(self, args, kws):
     return SeriesOpUfuncs.generic(self, (self.this,) + args, kws)
 
-
-for op, fname in explicit_binop_funcs.items():
+for fname, op in explicit_binop_funcs.items():
     install_series_method(op, fname, ex_binop_generic)
 
 

@@ -1018,8 +1018,8 @@ class HiFramesTyped(object):
             data = self._get_series_data(series_var, nodes)
             return self._replace_func(func, [data], pre_nodes=nodes)
 
-        if func_name in explicit_binop_funcs.values():
-            binop_map = {v: _binop_to_str[k] for k, v in explicit_binop_funcs.items()}
+        if func_name in explicit_binop_funcs.keys():
+            binop_map = {k: _binop_to_str[v] for k, v in explicit_binop_funcs.items()}
             func_text = "def _binop_impl(A, B):\n"
             func_text += "  return A {} B\n".format(binop_map[func_name])
 
