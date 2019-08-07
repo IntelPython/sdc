@@ -4,17 +4,19 @@ import argparse
 import time
 import hpat
 
+
 @hpat.jit
 def gen_lir(N, D, p, file_name):
     # np.random.seed(0)
-    points = np.random.random((N,D))
-    responses = np.random.random((N,p))
+    points = np.random.random((N, D))
+    responses = np.random.random((N, p))
     f = h5py.File(file_name, "w")
-    dset1 = f.create_dataset("points", (N,D), dtype='f8')
+    dset1 = f.create_dataset("points", (N, D), dtype='f8')
     dset1[:] = points
-    dset2 = f.create_dataset("responses", (N,p), dtype='f8')
+    dset2 = f.create_dataset("responses", (N, p), dtype='f8')
     dset2[:] = responses
     f.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description='Gen Linear Regression.')
@@ -29,6 +31,7 @@ def main():
     file_name = args.file
 
     gen_lir(N, D, p, file_name)
+
 
 if __name__ == '__main__':
     main()
