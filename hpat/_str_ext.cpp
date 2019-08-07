@@ -8,15 +8,9 @@
 
 #include "_str_decode.cpp"
 
-#ifdef USE_BOOST_REGEX
-#include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_search;
-#else
 #include <regex>
 using std::regex;
 using std::regex_search;
-#endif
 
 #include <boost/lexical_cast.hpp>
 
