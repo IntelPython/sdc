@@ -6,26 +6,32 @@ from numba.typing.templates import infer_global, AbstractTemplate, infer
 from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
 import hpat
+from hpat import config
 from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map,
     unliteral_all)
 import time
-from llvmlite import ir as lir
-from . import transport_mpi
+
+if hpat.config._transport_mpi:
+    from . import transport_mpi as transport
+else:
+    from . import transport_seq as transport
+    
 import llvmlite.binding as ll
-ll.add_symbol('c_alltoall', transport_mpi.c_alltoall)
-ll.add_symbol('c_gather_scalar', transport_mpi.c_gather_scalar)
-ll.add_symbol('c_gatherv', transport_mpi.c_gatherv)
-ll.add_symbol('c_bcast', transport_mpi.c_bcast)
-ll.add_symbol('c_recv', transport_mpi.hpat_dist_recv)
-ll.add_symbol('c_send', transport_mpi.hpat_dist_send)
+
+ll.add_symbol('c_alltoall', transport.c_alltoall)
+ll.add_symbol('c_gather_scalar', transport.c_gather_scalar)
+ll.add_symbol('c_gatherv', transport.c_gatherv)
+ll.add_symbol('c_bcast', transport.c_bcast)
+ll.add_symbol('c_recv', transport.hpat_dist_recv)
+ll.add_symbol('c_send', transport.hpat_dist_send)
 
 from enum import Enum
 
 # get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
-mpi_req_numba_type = getattr(types, "int"+str(8 * transport_mpi.mpi_req_num_bytes))
+mpi_req_numba_type = getattr(types, "int"+str(8 * transport.mpi_req_num_bytes))
 
 MPI_ROOT = 0
 

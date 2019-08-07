@@ -45,11 +45,16 @@ enable_hiframes_remove_dead = True
 # quantile imports?
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
-from .. import transport_mpi
 import llvmlite.binding as ll
-ll.add_symbol('quantile_parallel', transport_mpi.quantile_parallel)
-ll.add_symbol('nth_sequential', transport_mpi.nth_sequential)
-ll.add_symbol('nth_parallel', transport_mpi.nth_parallel)
+
+if hpat.config._transport_mpi:
+    from .. import transport_mpi as transport
+else:
+    from .. import transport_seq as transport
+
+ll.add_symbol('quantile_parallel', transport.quantile_parallel)
+ll.add_symbol('nth_sequential', transport.nth_sequential)
+ll.add_symbol('nth_parallel', transport.nth_parallel)
 from numba.targets.arrayobj import make_array
 from hpat.utils import _numba_to_c_type_map, unliteral_all
 
@@ -138,6 +143,10 @@ sum_op = hpat.distributed_api.Reduce_Type.Sum.value
 def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
+    
+    if not hpat.config._transport_mpi:
+        parallel = False
+
     n = len(arr)
     if parallel:
         n = hpat.distributed_api.dist_reduce(n, np.int32(sum_op))

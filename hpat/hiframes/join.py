@@ -669,12 +669,19 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 from numba.targets.arrayobj import make_array
 from hpat.utils import _numba_to_c_type_map
+from hpat import config as hpat_config
 from .. import chiframes
-from .. import transport_mpi
-ll.add_symbol('get_join_sendrecv_counts', transport_mpi.get_join_sendrecv_counts)
+
+if hpat_config._transport_mpi:
+    from .. import transport_mpi as transport
+else:
+    from .. import transport_seq as transport
+
+ll.add_symbol('get_join_sendrecv_counts', transport.get_join_sendrecv_counts)
+ll.add_symbol('c_alltoallv', transport.c_alltoallv)
+
 ll.add_symbol('timsort', chiframes.timsort)
 from .. import hdist
-ll.add_symbol('c_alltoallv', transport_mpi.c_alltoallv)
 
 
 @numba.njit

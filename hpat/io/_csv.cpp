@@ -302,7 +302,17 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
     size_t my_off_start = 0;
     size_t my_off_end = fsz;
 
-    hpat_mpi_csv_get_offsets hpat_mpi_csv_get_offsets_ptr = (hpat_mpi_csv_get_offsets) get_py_registered_symbold("hpat.transport_mpi", "hpat_mpi_csv_get_offsets");
+    std::string transport_func_name;
+    if (is_parallel)
+    {
+        transport_func_name = "hpat.transport_mpi";
+    }
+    else
+    {
+        transport_func_name = "hpat.transport_seq";
+    }
+
+    hpat_mpi_csv_get_offsets hpat_mpi_csv_get_offsets_ptr = (hpat_mpi_csv_get_offsets) get_py_registered_symbold(transport_func_name.c_str(), "hpat_mpi_csv_get_offsets");
     if (!hpat_mpi_csv_get_offsets_ptr)
     {
     	return NULL;

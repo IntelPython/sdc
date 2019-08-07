@@ -4,12 +4,12 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-//     Redistributions of source code must retain the above copyright notice,
-//	 this list of conditions and the following disclaimer.
+//    Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
-//	 Redistributions in binary form must reproduce the above copyright notice,
-//	 this list of conditions and the following disclaimer in the documentation
-//	 and/or other materials provided with the distribution.
+//    Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
@@ -43,19 +43,29 @@ static MPI_Datatype get_MPI_typ(int typ_enum)
 {
     switch (typ_enum)
     {
-    case HPAT_CTypes::INT8: return MPI_CHAR;
-    case HPAT_CTypes::UINT8: return MPI_UNSIGNED_CHAR;
-    case HPAT_CTypes::INT32: return MPI_INT;
-    case HPAT_CTypes::UINT32: return MPI_UNSIGNED;
-    case HPAT_CTypes::INT64: return MPI_LONG_LONG_INT;
-    case HPAT_CTypes::UINT64: return MPI_UNSIGNED_LONG_LONG;
-    case HPAT_CTypes::FLOAT32: return MPI_FLOAT;
-    case HPAT_CTypes::FLOAT64: return MPI_DOUBLE;
+    case HPAT_CTypes::INT8:
+        return MPI_CHAR;
+    case HPAT_CTypes::UINT8:
+        return MPI_UNSIGNED_CHAR;
+    case HPAT_CTypes::INT32:
+        return MPI_INT;
+    case HPAT_CTypes::UINT32:
+        return MPI_UNSIGNED;
+    case HPAT_CTypes::INT64:
+        return MPI_LONG_LONG_INT;
+    case HPAT_CTypes::UINT64:
+        return MPI_UNSIGNED_LONG_LONG;
+    case HPAT_CTypes::FLOAT32:
+        return MPI_FLOAT;
+    case HPAT_CTypes::FLOAT64:
+        return MPI_DOUBLE;
     case HPAT_CTypes::INT16:
         // TODO: use MPI_INT16_T?
         return MPI_SHORT;
-    case HPAT_CTypes::UINT16: return MPI_UNSIGNED_SHORT;
-    default: cerr << "Invalid MPI_Type\n";
+    case HPAT_CTypes::UINT16:
+        return MPI_UNSIGNED_SHORT;
+    default:
+        cerr << "Invalid MPI_Type\n";
     }
     // dummy value in case of error
     // TODO: raise error properly
@@ -1259,19 +1269,24 @@ static double quantile_parallel(void* data, int64_t local_size, int64_t total_si
 
     switch (type_enum)
     {
-    case HPAT_CTypes::INT8: return quantile_parallel_int((char*)data, local_size, at, type_enum, myrank, n_pes);
+    case HPAT_CTypes::INT8:
+        return quantile_parallel_int((char*)data, local_size, at, type_enum, myrank, n_pes);
     case HPAT_CTypes::UINT8:
         return quantile_parallel_int((unsigned char*)data, local_size, at, type_enum, myrank, n_pes);
-    case HPAT_CTypes::INT32: return quantile_parallel_int((int*)data, local_size, at, type_enum, myrank, n_pes);
-    case HPAT_CTypes::UINT32: return quantile_parallel_int((uint32_t*)data, local_size, at, type_enum, myrank, n_pes);
-    case HPAT_CTypes::INT64: return quantile_parallel_int((int64_t*)data, local_size, at, type_enum, myrank, n_pes);
+    case HPAT_CTypes::INT32:
+        return quantile_parallel_int((int*)data, local_size, at, type_enum, myrank, n_pes);
+    case HPAT_CTypes::UINT32:
+        return quantile_parallel_int((uint32_t*)data, local_size, at, type_enum, myrank, n_pes);
+    case HPAT_CTypes::INT64:
+        return quantile_parallel_int((int64_t*)data, local_size, at, type_enum, myrank, n_pes);
     case HPAT_CTypes::UINT64:
         return quantile_parallel_int((uint64_t*)data, local_size, quantile, type_enum, myrank, n_pes);
     case HPAT_CTypes::FLOAT32:
         return quantile_parallel_float((float*)data, local_size, quantile, type_enum, myrank, n_pes);
     case HPAT_CTypes::FLOAT64:
         return quantile_parallel_float((double*)data, local_size, quantile, type_enum, myrank, n_pes);
-    default: cerr << "unknown quantile data type\n";
+    default:
+        cerr << "unknown quantile data type\n";
     }
 
     return -1.0;
@@ -1305,10 +1320,12 @@ static void nth_dispatch(void* res, void* data, int64_t local_size, int64_t k, i
 
     switch (type_enum)
     {
-    case HPAT_CTypes::INT8: return get_nth((char*)res, (char*)data, local_size, k, type_enum, myrank, n_pes, parallel);
+    case HPAT_CTypes::INT8:
+        return get_nth((char*)res, (char*)data, local_size, k, type_enum, myrank, n_pes, parallel);
     case HPAT_CTypes::UINT8:
         return get_nth((unsigned char*)res, (unsigned char*)data, local_size, k, type_enum, myrank, n_pes, parallel);
-    case HPAT_CTypes::INT32: return get_nth((int*)res, (int*)data, local_size, k, type_enum, myrank, n_pes, parallel);
+    case HPAT_CTypes::INT32:
+        return get_nth((int*)res, (int*)data, local_size, k, type_enum, myrank, n_pes, parallel);
     case HPAT_CTypes::UINT32:
         return get_nth((uint32_t*)res, (uint32_t*)data, local_size, k, type_enum, myrank, n_pes, parallel);
     case HPAT_CTypes::INT64:
@@ -1319,7 +1336,8 @@ static void nth_dispatch(void* res, void* data, int64_t local_size, int64_t k, i
         return get_nth((float*)res, (float*)data, local_size, k, type_enum, myrank, n_pes, parallel);
     case HPAT_CTypes::FLOAT64:
         return get_nth((double*)res, (double*)data, local_size, k, type_enum, myrank, n_pes, parallel);
-    default: cerr << "unknown nth data type\n";
+    default:
+        cerr << "unknown nth data type\n";
     }
 }
 
@@ -1336,7 +1354,11 @@ static void nth_parallel(void* res, void* data, int64_t local_size, int64_t k, i
 PyMODINIT_FUNC PyInit_transport_mpi(void)
 {
     static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT, "transport_mpi", "MPI inter-process transport functions", -1, NULL,
+        PyModuleDef_HEAD_INIT,
+        "transport_mpi",
+        "MPI inter-process transport functions",
+        -1,
+        NULL,
     };
 
     PyObject* m = PyModule_Create(&moduledef);
