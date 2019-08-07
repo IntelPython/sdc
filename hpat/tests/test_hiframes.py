@@ -11,7 +11,7 @@ from hpat import hiframes
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end, repeat_test)
 
 
 class TestHiFrames(unittest.TestCase):
@@ -186,6 +186,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_quantile_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -199,6 +200,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_quantile_parallel_float_nan(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32)})
@@ -214,6 +216,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_quantile_parallel_int(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.int32)})
@@ -254,6 +257,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_nunique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -284,6 +288,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('AssertionError - fix needed\n'
                    '5 != 3\n')
+    @repeat_test
     def test_nunique_str_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -310,6 +315,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_unique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -331,6 +337,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('AssertionError - fix needed\n'
                    '2 != 1\n')
+    @repeat_test
     def test_unique_str_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -398,6 +405,7 @@ class TestHiFrames(unittest.TestCase):
     @unittest.skip('utf8 decode error - fix needed\n'
                    'invalid continuation byte\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_str_replace_regex_parallel(self):
         def test_impl(df):
             B = df.A.str.replace('AB*', 'EE', regex=True)
@@ -470,6 +478,7 @@ class TestHiFrames(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @repeat_test
     def test_str_split_parallel(self):
         def test_impl(df):
             B = df.A.str.split(',')
@@ -499,6 +508,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_str_get_parallel(self):
         def test_impl(df):
             A = df.A.str.split(',')
@@ -538,6 +548,7 @@ class TestHiFrames(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_str_flatten_parallel(self):
         def test_impl(df):
             A = df.A.str.split(',')

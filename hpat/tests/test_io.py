@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
-                                   get_start_end)
+                                   get_start_end, repeat_test)
 
 
 kde_file = 'kde.parquet'
@@ -76,6 +76,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_h5_read_parallel(self):
         def test_impl():
             f = h5py.File("lr.hdf5", "r")
@@ -90,6 +91,7 @@ class TestIO(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
 
     @unittest.skip("fix collective create dataset")
+    @repeat_test
     def test_h5_write_parallel(self):
         def test_impl(N, D):
             points = np.ones((N, D))
@@ -399,6 +401,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_csv_infer_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_infer1.csv")
@@ -428,6 +431,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_csv_infer_skip_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_infer1.csv", skiprows=2,
@@ -467,6 +471,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_csv_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
@@ -478,6 +483,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_csv_str_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_date1.csv",
@@ -553,6 +559,7 @@ class TestIO(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_write_csv_parallel1(self):
         def test_impl(n, fname):
             df = pd.DataFrame({'A': np.arange(n)})

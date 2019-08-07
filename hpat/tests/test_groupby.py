@@ -6,7 +6,7 @@ import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end, repeat_test)
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -150,6 +150,7 @@ class TestGroupBy(unittest.TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @repeat_test
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
             df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
@@ -172,6 +173,7 @@ class TestGroupBy(unittest.TestCase):
         p_res = test_impl(p_A, p_B, p_C)
         self.assertEqual(h_res, p_res)
 
+    @repeat_test
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -184,6 +186,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_sum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -196,6 +199,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_count(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -208,6 +212,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_mean(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -220,6 +225,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_min(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -232,6 +238,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_max(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -244,6 +251,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_var(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -256,6 +264,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_std(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -270,6 +279,7 @@ class TestGroupBy(unittest.TestCase):
 
     @unittest.skip('AssertionError - fix needed\n'
                    '16 != 20\n')
+    @repeat_test
     def test_agg_parallel_str(self):
         def test_impl():
             df = pq.read_table("groupby3.pq").to_pandas()
@@ -281,6 +291,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_all_col(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -293,6 +304,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat_test
     def test_agg_parallel_as_index(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -358,6 +370,7 @@ class TestGroupBy(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_pivot_parallel(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
@@ -382,6 +395,7 @@ class TestGroupBy(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_crosstab_parallel1(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")

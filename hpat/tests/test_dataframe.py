@@ -6,7 +6,7 @@ import numpy as np
 
 import numba
 import hpat
-from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
+from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end, repeat_test)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 
@@ -461,6 +461,7 @@ class TestDataFrame(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_df_values_parallel1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -582,6 +583,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
+    @repeat_test
     def test_sort_parallel_single_col(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -604,6 +606,7 @@ class TestDataFrame(unittest.TestCase):
             # restore global val
             hpat.hiframes.sort.MIN_SAMPLES = save_min_samples
 
+    @repeat_test
     def test_sort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()

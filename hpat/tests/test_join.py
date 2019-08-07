@@ -10,7 +10,7 @@ import hpat
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end, repeat_test)
 
 
 class TestJoin(unittest.TestCase):
@@ -89,6 +89,7 @@ class TestJoin(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_join_mutil_parallel1(self):
         def test_impl(A1, B1, C1, A2, B2, D2):
             df1 = pd.DataFrame({'A': A1, 'B': B1, 'C': C1})
@@ -130,6 +131,7 @@ class TestJoin(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_join_left_parallel1(self):
         """
         """
@@ -186,6 +188,7 @@ class TestJoin(unittest.TestCase):
                    'Tuples differ: (-9223372036854775791, Timestamp(\'2017-01-06 00:00:00\'), 9) != \n'
                    '(17, Timestamp(\'2017-01-06 00:00:00\'), 9)\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_join_datetime_parallel1(self):
         def test_impl(df1, df2):
             df3 = pd.merge(df1, df2, on='time')
@@ -224,6 +227,7 @@ class TestJoin(unittest.TestCase):
                    'Tuples differ: (-9223372036854775790, Timestamp(\'2017-02-21 00:00:00\'), 24) !=\n'
                    '(18, Timestamp(\'2017-02-21 00:00:00\'), 24)\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_merge_asof_parallel1(self):
         def test_impl():
             df1 = pd.read_parquet('asof1.pq')
@@ -354,6 +358,7 @@ class TestJoin(unittest.TestCase):
             hpat_func().sort_values('C1').reset_index(drop=True),
             test_impl().sort_values('C1').reset_index(drop=True))
 
+    @repeat_test
     def test_join_cat_parallel1(self):
         # TODO: cat as keys
         def test_impl():

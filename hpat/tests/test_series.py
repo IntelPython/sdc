@@ -4,7 +4,7 @@ import numpy as np
 import pyarrow.parquet as pq
 import hpat
 from hpat.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
+    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end, repeat_test)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 
@@ -681,6 +681,7 @@ class TestSeries(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
     @unittest.skip("TODO: fix result")
+    @repeat_test
     def test_series_dropna_str_parallel1(self):
         def test_impl(A):
             B = A.dropna()
@@ -1171,6 +1172,7 @@ class TestSeries(unittest.TestCase):
                    'x: array([0.04843 , 0.05106 , 0.057625, 0.0671  ])\n'
                    'y: array([0.00482 , 0.04843 , 0.05106 , 0.057625])\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_series_nlargest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1219,6 +1221,7 @@ class TestSeries(unittest.TestCase):
                    'x: array([0.007431, 0.024095, 0.035724, 0.053857])\n'
                    'y: array([0.007431, 0.024095, 0.031374, 0.035724])\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_series_nsmallest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1278,6 +1281,35 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skip(
+    '''Skipped as it corrupts memmory and causes failures of other tests
+    while running with NUM_PES=3 and at least TestSeries and TestBasic suites together.
+    Exact commands to reproduce:
+        mpiexec -n 3 python -W ignore -u -m unittest -v $SUITES $SUITES
+        where SUITES="hpat.tests.TestBasic hpat.tests.TestSeries"
+    Test failures occur on the second suite run only.
+    Exact errors:
+         1. Segmentation fault in TestBasic.test_rebalance
+         2. FAIL in TestBasic.test_astype with following error message:
+             test_astype (hpat.tests.test_basic.TestBasic) ...
+             Fatal error in MPI_Allreduce: Message truncated, error stack:
+             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1,
+                MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD) failed
+             MPIR_Allreduce_impl(764)............:
+             MPIR_Allreduce_intra(238)...........:
+             MPIR_Reduce_impl(1070)..............:
+             MPIR_Reduce_intra(878)..............:
+             MPIR_Reduce_binomial(186)...........:
+             MPIC_Recv(353)......................:
+             MPIDI_CH3U_Request_unpack_uebuf(568): Message truncated; 40 bytes received but buffer size is 8
+             MPIR_Allreduce_intra(268)...........:
+             MPIR_Bcast_impl(1452)...............:
+             MPIR_Bcast(1476)....................:
+             MPIR_Bcast_intra(1287)..............:
+             MPIR_Bcast_binomial(310)............: Failure during collective
+             Fatal error in MPI_Allreduce: Other MPI error, error stack'''
+    )
+    @repeat_test
     def test_series_head_index_parallel1(self):
         def test_impl(S):
             return S.head(3)
@@ -1313,6 +1345,7 @@ class TestSeries(unittest.TestCase):
     @unittest.skip('AssertionError - fix needed\n'
                    'nan != 0.45894510159707225\n'
                    'NUMA_PES=3 build')
+    @repeat_test
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1325,6 +1358,7 @@ class TestSeries(unittest.TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
+    @repeat_test
     def test_series_argsort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1381,6 +1415,7 @@ class TestSeries(unittest.TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
+    @repeat_test
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
