@@ -17,10 +17,9 @@
 //     Float32 = 6
 //     Float64 = 7
 
-struct HPAT_CTypes
-{
-    enum HPAT_CTypeEnum
-    {
+
+struct HPAT_CTypes {
+    enum HPAT_CTypeEnum {
         INT8 = 0,
         UINT8 = 1,
         INT32 = 2,

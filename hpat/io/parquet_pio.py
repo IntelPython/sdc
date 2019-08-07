@@ -1,9 +1,3 @@
-from hpat.config import _has_pyarrow
-import llvmlite.binding as ll
-from llvmlite import ir as lir
-from numba.targets.arrayobj import make_array
-from numba.targets.imputils import lower_builtin
-from numba import cgutils
 import numba
 from numba import ir, config, ir_utils, types
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
@@ -30,6 +24,7 @@ from hpat.utils import unliteral_all
 _type_to_pq_dtype_number = {'bool_': 0, 'int32': 1, 'int64': 2,
                             'int96': 3, 'float32': 4, 'float64': 5,
                             repr(types.NPDatetime('ns')): 3, 'int8': 6}
+
 
 
 def read_parquet():
@@ -109,14 +104,13 @@ class ParquetHandler(object):
 
         out_nodes = []
         # get arrow readers once
-
         def init_arrow_readers(fname):
             arrow_readers = get_arrow_readers(unicode_to_char_ptr(fname))
 
         f_block = compile_to_numba_ir(init_arrow_readers,
-                                      {'get_arrow_readers': _get_arrow_readers,
-                                       'unicode_to_char_ptr': unicode_to_char_ptr,
-                                       }).blocks.popitem()[1]
+                                     {'get_arrow_readers': _get_arrow_readers,
+                                     'unicode_to_char_ptr': unicode_to_char_ptr,
+                                     }).blocks.popitem()[1]
 
         replace_arg_nodes(f_block, [file_name])
         out_nodes += f_block.body[:-3]
@@ -142,8 +136,8 @@ class ParquetHandler(object):
             s = del_arrow_readers(readers)
 
         f_block = compile_to_numba_ir(cleanup_arrow_readers,
-                                      {'del_arrow_readers': _del_arrow_readers,
-                                       }).blocks.popitem()[1]
+                                     {'del_arrow_readers': _del_arrow_readers,
+                                     }).blocks.popitem()[1]
         replace_arg_nodes(f_block, [arrow_readers_var])
         out_nodes += f_block.body[:-3]
         return col_names, col_arrs, out_nodes
@@ -200,7 +194,6 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
-
 def _get_numba_typ_from_pa_typ(pa_typ):
     import pyarrow as pa
     _typ_map = {
@@ -234,7 +227,6 @@ def _get_numba_typ_from_pa_typ(pa_typ):
         raise ValueError("Arrow data type {} not supported yet".format(pa_typ))
     return _typ_map[pa_typ]
 
-
 def parquet_file_schema(file_name):
     import pyarrow.parquet as pq
     col_names = []
@@ -248,7 +240,6 @@ def parquet_file_schema(file_name):
                  for c in col_names]
     # TODO: close file?
     return col_names, col_types
-
 
 def _rm_pd_index(col_names, col_types):
     """remove pandas index if found in columns
@@ -309,6 +300,13 @@ class ReadParallelParquetInfer(AbstractTemplate):
         return signature(types.int32, *unliteral_all(args))
 
 
+from numba import cgutils
+from numba.targets.imputils import lower_builtin
+from numba.targets.arrayobj import make_array
+from llvmlite import ir as lir
+import llvmlite.binding as ll
+
+from hpat.config import _has_pyarrow
 if _has_pyarrow:
     from .. import parquet_cpp
     ll.add_symbol('get_arrow_readers', parquet_cpp.get_arrow_readers)

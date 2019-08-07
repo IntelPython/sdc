@@ -65,7 +65,7 @@ class TestString(unittest.TestCase):
 
     def test_concat(self):
         def test_impl(_str):
-            return (_str + 'test_str')
+            return (_str+'test_str')
         hpat_func = hpat.jit(test_impl)
 
         arg = 'a_'
@@ -210,7 +210,7 @@ class TestString(unittest.TestCase):
         self.assertTrue(isinstance(ds, pd.Series) and
                         isinstance(rs, pd.Series))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and
-                        rs[0] and rs[2] == False)
+                        rs[0] == True and rs[2] == False)
 
     def test_string_array_bool_getitem(self):
         def test_impl():

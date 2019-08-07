@@ -6,8 +6,8 @@ import h5py
 import pyarrow.parquet as pq
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
-                                   get_start_end)
+    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
+    get_start_end)
 
 
 kde_file = 'kde.parquet'
@@ -92,10 +92,10 @@ class TestIO(unittest.TestCase):
     @unittest.skip("fix collective create dataset")
     def test_h5_write_parallel(self):
         def test_impl(N, D):
-            points = np.ones((N, D))
-            responses = np.arange(N) + 1.0
+            points = np.ones((N,D))
+            responses = np.arange(N)+1.0
             f = h5py.File("lr_w.hdf5", "w")
-            dset1 = f.create_dataset("points", (N, D), dtype='f8')
+            dset1 = f.create_dataset("points", (N,D), dtype='f8')
             dset1[:] = points
             dset2 = f.create_dataset("responses", (N,), dtype='f8')
             dset2[:] = responses
@@ -109,8 +109,8 @@ class TestIO(unittest.TestCase):
         X = f['points'][:]
         Y = f['responses'][:]
         f.close()
-        np.testing.assert_almost_equal(X, np.ones((N, D)))
-        np.testing.assert_almost_equal(Y, np.arange(N) + 1.0)
+        np.testing.assert_almost_equal(X, np.ones((N,D)))
+        np.testing.assert_almost_equal(Y, np.arange(N)+1.0)
 
     @unittest.skip("fix collective create dataset and group")
     def test_h5_write_group(self):
@@ -187,7 +187,7 @@ class TestIO(unittest.TestCase):
         def test_impl():
             f = h5py.File("h5_test_filter.h5", "r")
             b = np.arange(11) % 3 == 0
-            X = f['test'][b, :, :, :]
+            X = f['test'][b,:,:,:]
             f.close()
             return X
 
@@ -230,7 +230,6 @@ class TestIO(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_pq_read_freevar_str1(self):
         kde_file2 = 'kde.parquet'
-
         def test_impl():
             df = pd.read_parquet(kde_file2)
             X = df['points']
@@ -259,7 +258,7 @@ class TestIO(unittest.TestCase):
     def test_pq_str(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
-            A = df.two.values == 'foo'
+            A = df.two.values=='foo'
             return A.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -272,7 +271,7 @@ class TestIO(unittest.TestCase):
     def test_pq_str_with_nan_seq(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
+            A = df.five.values=='foo'
             return A
 
         hpat_func = hpat.jit(test_impl)
@@ -283,7 +282,7 @@ class TestIO(unittest.TestCase):
     def test_pq_str_with_nan_par(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
+            A = df.five.values=='foo'
             return A.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -299,7 +298,7 @@ class TestIO(unittest.TestCase):
     def test_pq_str_with_nan_par_multigroup(self):
         def test_impl():
             df = pq.read_table('example2.parquet').to_pandas()
-            A = df.five.values == 'foo'
+            A = df.five.values=='foo'
             return A.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -362,9 +361,9 @@ class TestIO(unittest.TestCase):
     def test_csv1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
-                               names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
-                               )
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int},
+            )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
@@ -372,11 +371,11 @@ class TestIO(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_csv_keys1(self):
         def test_impl():
-            dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int}
+            dtype = {'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int}
             return pd.read_csv("csv_data1.csv",
-                               names=dtype.keys(),
-                               dtype=dtype,
-                               )
+                names=dtype.keys(),
+                dtype=dtype,
+            )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
@@ -384,9 +383,9 @@ class TestIO(unittest.TestCase):
         def test_impl():
             dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
             return pd.read_csv("csv_data1.csv",
-                               names=dtype.keys(),
-                               dtype=dtype,
-                               )
+                names=dtype.keys(),
+                dtype=dtype,
+            )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
@@ -410,10 +409,10 @@ class TestIO(unittest.TestCase):
     def test_csv_skip1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
-                               names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
-                               skiprows=2,
-                               )
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int},
+                skiprows=2,
+            )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
@@ -431,7 +430,7 @@ class TestIO(unittest.TestCase):
     def test_csv_infer_skip_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_infer1.csv", skiprows=2,
-                             names=['A', 'B', 'C', 'D'])
+                names=['A', 'B', 'C', 'D'])
             return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -442,8 +441,8 @@ class TestIO(unittest.TestCase):
     def test_csv_rm_dead1(self):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
-                             names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},)
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int},)
             return df.B.values
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
@@ -451,17 +450,17 @@ class TestIO(unittest.TestCase):
     def test_csv_date1(self):
         def test_impl():
             return pd.read_csv("csv_data_date1.csv",
-                               names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int},
-                               parse_dates=[2])
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int},
+                parse_dates=[2])
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def test_csv_str1(self):
         def test_impl():
             return pd.read_csv("csv_data_date1.csv",
-                               names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int})
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
@@ -470,8 +469,8 @@ class TestIO(unittest.TestCase):
     def test_csv_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
-                             names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int})
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':np.float, 'D':np.int})
             return (df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum())
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
@@ -481,8 +480,8 @@ class TestIO(unittest.TestCase):
     def test_csv_str_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_date1.csv",
-                             names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
+                names=['A', 'B', 'C', 'D'],
+                dtype={'A':np.int, 'B':np.float, 'C':str, 'D':np.int})
             return (df.A.sum(), df.B.sum(), (df.C == '1966-11-13').sum(),
                     df.D.sum())
         hpat_func = hpat.jit(locals={'df:return': 'distributed'})(test_impl)
@@ -493,21 +492,21 @@ class TestIO(unittest.TestCase):
     def test_csv_usecols1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
-                               names=['C'],
-                               dtype={'C': np.float},
-                               usecols=[2],
-                               )
+                names=['C'],
+                dtype={'C':np.float},
+                usecols=[2],
+            )
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def test_csv_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
-            dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
+            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
             df = pd.read_csv("csv_data_cat1.csv",
-                             names=['C1', 'C2', 'C3'],
-                             dtype=dtypes,
-                             )
+                names=['C1', 'C2', 'C3'],
+                dtype=dtypes,
+            )
             return df.C2
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(
@@ -517,9 +516,9 @@ class TestIO(unittest.TestCase):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C', 'D'])
             df = pd.read_csv("csv_data_cat1.csv",
-                             names=['C1', 'C2', 'C3'],
-                             dtype={'C1': np.int, 'C2': ct_dtype, 'C3': str},
-                             )
+                names=['C1', 'C2', 'C3'],
+                dtype={'C1':np.int, 'C2': ct_dtype, 'C3':str},
+            )
             return df
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
@@ -527,9 +526,9 @@ class TestIO(unittest.TestCase):
     def test_csv_single_dtype1(self):
         def test_impl():
             df = pd.read_csv("csv_data_dtype1.csv",
-                             names=['C1', 'C2'],
-                             dtype=np.float64,
-                             )
+                names=['C1', 'C2'],
+                dtype=np.float64,
+            )
             return df
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())

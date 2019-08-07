@@ -24,7 +24,6 @@ from hpat.str_ext import string_type, unicode_to_char_ptr
 from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
 from hpat.str_arr_ext import string_array_type
 
-
 def remove_xenon(rhs, lives, call_list):
     # the call is dead if the read array is dead
     if call_list == [read_xenon_col] and rhs.args[3].name not in lives:
@@ -41,7 +40,6 @@ numba.ir_utils.remove_call_handlers.append(remove_xenon)
 # TODO: implement in regular python
 def read_xenon():
     return
-
 
 def _handle_read(assign, lhs, rhs, func_ir):
     if not hpat.config._has_xenon:
@@ -80,7 +78,7 @@ def _handle_read(assign, lhs, rhs, func_ir):
     loc_vars = {}
     exec(func_text, {}, loc_vars)
     schm_func = loc_vars['f']
-    f_block = compile_to_numba_ir(schm_func, {'np': np, }).blocks.popitem()[1]
+    f_block = compile_to_numba_ir(schm_func, {'np': np,}).blocks.popitem()[1]
     out_nodes += f_block.body[:-3]
     schema_arr_var = out_nodes[-1].target
 
@@ -101,10 +99,9 @@ def _handle_read(assign, lhs, rhs, func_ir):
 
     # we need to close in the URI case since we opened the connection/dataset
     if len(rhs.args) == 1:
-        out_nodes += gen_close_xenon(xe_connect_var, xe_dset_var)
+        out_nodes += gen_close_xenon(xe_connect_var, xe_dset_var);
 
     return col_items, out_nodes
-
 
 _xe_type_to_numba = {'BOOL': types.Array(types.boolean, 1, 'C'),
                      'I8': types.Array(types.char, 1, 'C'),
@@ -119,15 +116,13 @@ _xe_type_to_numba = {'BOOL': types.Array(types.boolean, 1, 'C'),
 
 _type_to_xe_dtype_number = {'int8': 0, 'int16': 1, 'int32': 2, 'int64': 3,
                             'float32': 4, 'float64': 5, 'DECIMAL': 6,
-                            'bool_': 7, 'string': 8, 'BLOB': 9}
-
+                             'bool_': 7, 'string': 8, 'BLOB': 9}
 
 def get_xe_typ_enum(c_type):
     if c_type == string_array_type:
         return _type_to_xe_dtype_number['string']
     assert isinstance(c_type, types.Array)
     return _type_to_xe_dtype_number[get_element_type(c_type.dtype)]
-
 
 def gen_xe_init_from_uri(func_ir, dset_name_var):
     dset_name = get_constant(func_ir, dset_name_var)
@@ -143,7 +138,6 @@ def gen_xe_init_from_uri(func_ir, dset_name_var):
 
     out_nodes, xe_connect_var, xe_dset_var = gen_init_xenon(address, dset_name)
     return out_nodes, col_names, col_types, xe_connect_var, xe_dset_var
-
 
 def parse_xe_schema(schema):
     # print("schema", schema)
@@ -201,7 +195,6 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
     out_nodes.append(assign)
     return out_nodes
 
-
 def gen_init_xenon(address, dset_name):
     # TODO: support non-constant address/dset_name
     func_text = ('def f():\n  connect_t = xe_connect(unicode_to_char_ptr("{}"))\n'.format(address))
@@ -211,9 +204,9 @@ def gen_init_xenon(address, dset_name):
     exec(func_text, {}, loc_vars)
     init_func = loc_vars['f']
     f_block = compile_to_numba_ir(init_func,
-                                  {'xe_connect': xe_connect,
-                                   'unicode_to_char_ptr': unicode_to_char_ptr,
-                                   'xe_open': xe_open}).blocks.popitem()[1]
+                                         {'xe_connect': xe_connect,
+                                         'unicode_to_char_ptr': unicode_to_char_ptr,
+                                         'xe_open': xe_open}).blocks.popitem()[1]
 
     connect_var = None
     dset_t_var = None
@@ -221,13 +214,12 @@ def gen_init_xenon(address, dset_name):
     out_nodes = f_block.body[:-3]
     for stmt in reversed(out_nodes):
         if stmt.target.name.startswith("connect_t"):
-            connect_var = stmt.target
+             connect_var = stmt.target
         if stmt.target.name.startswith("dset_t"):
-            dset_t_var = stmt.target
+             dset_t_var = stmt.target
 
     assert connect_var is not None and dset_t_var is not None
     return out_nodes, connect_var, dset_t_var
-
 
 def gen_close_xenon(connect_var, dset_t_var):
     #
@@ -235,7 +227,7 @@ def gen_close_xenon(connect_var, dset_t_var):
         s = xe_close(connect_var, dset_t_var)
 
     f_block = compile_to_numba_ir(close_func,
-                                  {'xe_close': xe_close}).blocks.popitem()[1]
+                                         {'xe_close': xe_close}).blocks.popitem()[1]
 
     replace_arg_nodes(f_block, [connect_var, dset_t_var])
     out_nodes = f_block.body[:-3]
@@ -248,29 +240,23 @@ def get_element_type(dtype):
         out = 'bool_'
     return out
 
-
 class XeConnectType(types.Opaque):
     def __init__(self):
         super(XeConnectType, self).__init__(name='XeConnectType')
-
 
 xe_connect_type = XeConnectType()
 
 register_model(XeConnectType)(models.OpaqueModel)
 
-
 class XeDSetType(types.Opaque):
     def __init__(self):
         super(XeDSetType, self).__init__(name='XeDSetType')
-
 
 xe_dset_type = XeDSetType()
 
 register_model(XeDSetType)(models.OpaqueModel)
 
-get_column_size_xenon = types.ExternalFunction(
-    "get_column_size_xenon", types.int64(
-        xe_connect_type, xe_dset_type, types.intp))
+get_column_size_xenon = types.ExternalFunction("get_column_size_xenon", types.int64(xe_connect_type, xe_dset_type, types.intp))
 # read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
 xe_connect = types.ExternalFunction("c_xe_connect", xe_connect_type(types.voidptr))
 xe_open = types.ExternalFunction("c_xe_open", xe_dset_type(xe_connect_type, types.voidptr))
@@ -296,7 +282,6 @@ def read_xenon_col(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_
         return context.get_dummy_value()
     return signature(types.none, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp), codegen
 
-
 @intrinsic
 def read_xenon_col_parallel(typingctx, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start_tp, count_tp):
     def codegen(context, builder, sig, args):
@@ -317,7 +302,6 @@ def read_xenon_col_parallel(typingctx, connect_tp, dset_tp, col_id_tp, column_tp
                                 args[5], args[6]])
         return context.get_dummy_value()
     return signature(types.none, connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start_tp, count_tp), codegen
-
 
 @intrinsic
 def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp):
@@ -355,7 +339,6 @@ def read_xenon_str(typingctx, connect_tp, dset_tp, col_id_tp, size_tp, schema_ar
         return impl_ret_new_ref(context, builder, typ, ret)
     return signature(string_array_type, connect_tp, dset_tp, col_id_tp, size_tp, schema_arr_tp), codegen
 
-
 @intrinsic
 def read_xenon_str_parallel(typingctx, connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):
     def codegen(context, builder, sig, args):
@@ -375,7 +358,7 @@ def read_xenon_str_parallel(typingctx, connect_tp, dset_tp, col_id_tp, schema_ar
                                  lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(64).as_pointer(),
                                  lir.IntType(64),
-                                 lir.IntType(64), ])
+                                 lir.IntType(64),])
 
         fn = builder.module.get_or_insert_function(fnty, name="c_read_xenon_col_str_parallel")
         res = builder.call(fn, [args[0], args[1], args[2],
