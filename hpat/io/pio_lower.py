@@ -5,8 +5,7 @@ from numba.targets.arrayobj import make_array
 import hpat.io
 from hpat.io import pio_api
 from hpat.utils import _numba_to_c_type_map
-from hpat.io.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type,
-                          h5group_type)
+from hpat.io.pio_api import (h5file_type, h5dataset_or_group_type, h5dataset_type, h5group_type)
 from hpat.str_ext import string_type, gen_get_unicode_chars, gen_std_str_to_unicode
 
 from llvmlite import ir as lir
@@ -38,6 +37,7 @@ if hpat.config._has_h5py:
         assert h5py.version.hdf5_version_tuple[1] == 10
 
 h5g_close = types.ExternalFunction("h5g_close", types.none(h5group_type))
+
 
 @lower_builtin(operator.getitem, h5file_type, string_type)
 @lower_builtin(operator.getitem, h5dataset_or_group_type, string_type)
@@ -113,12 +113,9 @@ def h5_close(context, builder, sig, args):
     builder.call(fn, args)
     return context.get_dummy_value()
 
-@lower_builtin("h5group.create_dataset", h5group_type, string_type,
-                types.UniTuple, string_type)
-@lower_builtin("h5file.create_dataset", h5file_type, string_type,
-                types.UniTuple, string_type)
-@lower_builtin(pio_api.h5create_dset, h5file_type, string_type,
-                types.UniTuple, string_type)
+@lower_builtin("h5group.create_dataset", h5group_type, string_type, types.UniTuple, string_type)
+@lower_builtin("h5file.create_dataset", h5file_type, string_type, types.UniTuple, string_type)
+@lower_builtin(pio_api.h5create_dset, h5file_type, string_type, types.UniTuple, string_type)
 def h5_create_dset(context, builder, sig, args):
     fg_id, dset_name, counts, dtype_str = args
 
@@ -151,6 +148,7 @@ def h5_create_dset(context, builder, sig, args):
                  typ_arg]
 
     return builder.call(fn, call_args)
+
 
 @lower_builtin("h5group.create_group", h5group_type, string_type)
 @lower_builtin("h5file.create_group", h5file_type, string_type)

@@ -9,18 +9,18 @@ import numba
 import hpat
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                            get_start_end)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                                   get_start_end)
 
 
 class TestJoin(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build') 
+                   'NUMA_PES=3 build')
     def test_join1(self):
         def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+            df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
+            df2 = pd.DataFrame({'key2': 2 * np.arange(n) + 1, 'B': n + np.arange(n) + 1.0})
             df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
             return df3.B.sum()
 
@@ -41,12 +41,12 @@ class TestJoin(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-        df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+        df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
+        df2 = pd.DataFrame({'key2': 2 * np.arange(n) + 1, 'B': n + np.arange(n) + 1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
         n = 11111
-        df1 = pd.DataFrame({'key1': np.arange(n)+3, 'A': np.arange(n)+1.0})
-        df2 = pd.DataFrame({'key2': 2*np.arange(n)+1, 'B': n+np.arange(n)+1.0})
+        df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
+        df2 = pd.DataFrame({'key2': 2 * np.arange(n) + 1, 'B': n + np.arange(n) + 1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
     def test_join1_seq_str(self):
@@ -77,13 +77,13 @@ class TestJoin(unittest.TestCase):
             return df1.merge(df2, on=['A', 'B'])
 
         hpat_func = hpat.jit(test_impl)
-        df1 = pd.DataFrame({'A': [3,1,1,3,4],
-                            'B': [1,2,3,2,3],
-                            'C': [7,8,9,4,5]})
+        df1 = pd.DataFrame({'A': [3, 1, 1, 3, 4],
+                            'B': [1, 2, 3, 2, 3],
+                            'C': [7, 8, 9, 4, 5]})
 
-        df2 = pd.DataFrame({'A': [2,1,4,4,3],
-                            'B': [1,3,2,3,2],
-                            'D': [1,2,3,4,8]})
+        df2 = pd.DataFrame({'A': [2, 1, 4, 4, 3],
+                            'B': [1, 3, 2, 3, 2],
+                            'D': [1, 2, 3, 4, 8]})
 
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
@@ -102,14 +102,14 @@ class TestJoin(unittest.TestCase):
             'C1:input': 'distributed',
             'A2:input': 'distributed',
             'B2:input': 'distributed',
-            'D2:input': 'distributed',})(test_impl)
-        df1 = pd.DataFrame({'A': [3,1,1,3,4],
-                            'B': [1,2,3,2,3],
-                            'C': [7,8,9,4,5]})
+            'D2:input': 'distributed', })(test_impl)
+        df1 = pd.DataFrame({'A': [3, 1, 1, 3, 4],
+                            'B': [1, 2, 3, 2, 3],
+                            'C': [7, 8, 9, 4, 5]})
 
-        df2 = pd.DataFrame({'A': [2,1,4,4,3],
-                            'B': [1,3,2,3,2],
-                            'D': [1,2,3,4,8]})
+        df2 = pd.DataFrame({'A': [2, 1, 4, 4, 3],
+                            'B': [1, 3, 2, 3, 2],
+                            'D': [1, 2, 3, 4, 8]})
 
         start, end = get_start_end(len(df1))
         h_A1 = df1.A.values[start:end]
@@ -142,14 +142,14 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(locals={
             'A1:input': 'distributed',
             'B1:input': 'distributed',
-            'C1:input': 'distributed',})(test_impl)
-        df1 = pd.DataFrame({'A': [3,1,1,3,4],
-                            'B': [1,2,3,2,3],
-                            'C': [7,8,9,4,5]})
+            'C1:input': 'distributed', })(test_impl)
+        df1 = pd.DataFrame({'A': [3, 1, 1, 3, 4],
+                            'B': [1, 2, 3, 2, 3],
+                            'C': [7, 8, 9, 4, 5]})
 
-        df2 = pd.DataFrame({'A': [2,1,4,4,3],
-                            'B': [1,3,2,3,2],
-                            'D': [1,2,3,4,8]})
+        df2 = pd.DataFrame({'A': [2, 1, 4, 4, 3],
+                            'B': [1, 3, 2, 3, 2],
+                            'D': [1, 2, 3, 4, 8]})
 
         start, end = get_start_end(len(df1))
         h_A1 = df1.A.values[start:end]
@@ -217,7 +217,7 @@ class TestJoin(unittest.TestCase):
         df2 = pd.DataFrame(
             {'time': pd.DatetimeIndex(
                 ['2017-01-01', '2017-01-02', '2017-01-04', '2017-02-23',
-                '2017-02-25']), 'A': [2,3,7,8,9]})
+                 '2017-02-25']), 'A': [2, 3, 7, 8, 9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
     @unittest.skip('AssertionError - fix needed\n'
@@ -240,9 +240,9 @@ class TestJoin(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df1 = pd.DataFrame(
-            {'key': [2,3,5,1,2,8], 'A': np.array([4,6,3,9,9,-1], np.float)})
+            {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
-            {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
+            {'key': [1, 2, 9, 3, 2], 'B': np.array([1, 7, 2, 6, 5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
         np.testing.assert_array_equal(h_res.key.values, res.key.values)
@@ -258,9 +258,9 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         # test left run where a key is repeated on left but not right side
         df1 = pd.DataFrame(
-            {'key': [2,3,5,3,2,8], 'A': np.array([4,6,3,9,9,-1], np.float)})
+            {'key': [2, 3, 5, 3, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
-            {'key': [1,2,9,3,10], 'B': np.array([1,7,2,6,5], np.float)})
+            {'key': [1, 2, 9, 3, 10], 'B': np.array([1, 7, 2, 6, 5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
         np.testing.assert_array_equal(h_res.key.values, res.key.values)
@@ -275,9 +275,9 @@ class TestJoin(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df1 = pd.DataFrame(
-            {'key': [2,3,5,1,2,8], 'A': np.array([4,6,3,9,9,-1], np.float)})
+            {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
-            {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
+            {'key': [1, 2, 9, 3, 2], 'B': np.array([1, 7, 2, 6, 5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
         self.assertEqual(set(h_res.key.values), set(res.key.values))
@@ -292,9 +292,9 @@ class TestJoin(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         df1 = pd.DataFrame(
-            {'key': [2,3,5,1,2,8], 'A': np.array([4,6,3,9,9,-1], np.float)})
+            {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
-            {'key': [1,2,9,3,2], 'B': np.array([1,7,2,6,5], np.float)})
+            {'key': [1, 2, 9, 3, 2], 'B': np.array([1, 7, 2, 6, 5], np.float)})
         h_res = hpat_func(df1, df2)
         res = test_impl(df1, df2)
         self.assertEqual(set(h_res.key.values), set(res.key.values))
@@ -313,22 +313,22 @@ class TestJoin(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         n = 11
-        df1 = pd.DataFrame({'A': np.arange(n)+3, 'AA': np.arange(n)+1.0})
-        df2 = pd.DataFrame({'A': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
-        df3 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BB': n+np.arange(n)+1.0})
-        df4 = pd.DataFrame({'B': 2*np.arange(n)+1, 'BBB': n+np.arange(n)+1.0})
+        df1 = pd.DataFrame({'A': np.arange(n) + 3, 'AA': np.arange(n) + 1.0})
+        df2 = pd.DataFrame({'A': 2 * np.arange(n) + 1, 'AAA': n + np.arange(n) + 1.0})
+        df3 = pd.DataFrame({'B': 2 * np.arange(n) + 1, 'BB': n + np.arange(n) + 1.0})
+        df4 = pd.DataFrame({'B': 2 * np.arange(n) + 1, 'BBB': n + np.arange(n) + 1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2, df3, df4)[1], test_impl(df1, df2, df3, df4)[1])
 
     def test_join_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
-            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
+            dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
             df1 = pd.read_csv("csv_data_cat1.csv",
-                names=['C1', 'C2', 'C3'],
-                dtype=dtypes,
-            )
+                              names=['C1', 'C2', 'C3'],
+                              dtype=dtypes,
+                              )
             n = len(df1)
-            df2 = pd.DataFrame({'C1': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+            df2 = pd.DataFrame({'C1': 2 * np.arange(n) + 1, 'AAA': n + np.arange(n) + 1.0})
             df3 = df1.merge(df2, on='C1')
             return df3
 
@@ -339,13 +339,13 @@ class TestJoin(unittest.TestCase):
         # test setting NaN in categorical array
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
-            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
+            dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
             df1 = pd.read_csv("csv_data_cat1.csv",
-                names=['C1', 'C2', 'C3'],
-                dtype=dtypes,
-            )
+                              names=['C1', 'C2', 'C3'],
+                              dtype=dtypes,
+                              )
             n = len(df1)
-            df2 = pd.DataFrame({'C1': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+            df2 = pd.DataFrame({'C1': 2 * np.arange(n) + 1, 'AAA': n + np.arange(n) + 1.0})
             df3 = df1.merge(df2, on='C1', how='right')
             return df3
 
@@ -358,13 +358,13 @@ class TestJoin(unittest.TestCase):
         # TODO: cat as keys
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
-            dtypes = {'C1':np.int, 'C2': ct_dtype, 'C3':str}
+            dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
             df1 = pd.read_csv("csv_data_cat1.csv",
-                names=['C1', 'C2', 'C3'],
-                dtype=dtypes,
-            )
+                              names=['C1', 'C2', 'C3'],
+                              dtype=dtypes,
+                              )
             n = len(df1)
-            df2 = pd.DataFrame({'C1': 2*np.arange(n)+1, 'AAA': n+np.arange(n)+1.0})
+            df2 = pd.DataFrame({'C1': 2 * np.arange(n) + 1, 'AAA': n + np.arange(n) + 1.0})
             df3 = df1.merge(df2, on='C1')
             return df3
 

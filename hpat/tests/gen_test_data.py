@@ -50,9 +50,9 @@ def generate_spark_data():
     import tarfile
 
     if os.path.exists('sdf_dt.pq'):
-      shutil.rmtree('sdf_dt.pq')
+        shutil.rmtree('sdf_dt.pq')
 
-    sdf_dt_archive = os.path.join(os.path.dirname(os.path.abspath(__file__)),'sdf_dt.pq.bz2')
+    sdf_dt_archive = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sdf_dt.pq.bz2')
     tar = tarfile.open(sdf_dt_archive, "r:bz2")
     tar.extractall('.')
     tar.close()
@@ -81,17 +81,17 @@ def generate_other_data():
     dset1[:] = arr
     f.close()
 
-    df = pd.DataFrame({'A': ['bc']+["a"]*3+ ["bc"]*3+['a'], 'B': [-8,1,2,3,1,5,6,7]})
+    df = pd.DataFrame({'A': ['bc'] + ["a"] * 3 + ["bc"] * 3 + ['a'], 'B': [-8, 1, 2, 3, 1, 5, 6, 7]})
     df.to_parquet("groupby3.pq")
 
     df = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
-                            "bar", "bar", "bar", "bar"],
-                        "B": ["one", "one", "one", "two", "two",
-                            "one", "one", "two", "two"],
-                        "C": ["small", "large", "large", "small",
-                            "small", "large", "small", "small",
-                            "large"],
-                        "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
+                             "bar", "bar", "bar", "bar"],
+                       "B": ["one", "one", "one", "two", "two",
+                             "one", "one", "two", "two"],
+                       "C": ["small", "large", "large", "small",
+                             "small", "large", "small", "small",
+                             "large"],
+                       "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
     df.to_parquet("pivot2.pq")
 
     # CSV reader test
@@ -104,7 +104,7 @@ def generate_other_data():
         f.write(data)
 
     with open("csv_data_infer1.csv", "w") as f:
-        f.write('A,B,C,D\n'+data)
+        f.write('A,B,C,D\n' + data)
 
     data = ("0,2.3,2015-01-03,47736\n"
             "1,2.3,1966-11-13,47736\n"
@@ -120,7 +120,7 @@ def generate_other_data():
         'B': [4, 5, 9, 6]})
     df2 = pd.DataFrame({'time': pd.DatetimeIndex(
         ['2017-01-01', '2017-01-14', '2017-01-16', '2017-02-23', '2017-02-23',
-        '2017-02-25']), 'A': [2,3,7,8,9,10]})
+         '2017-02-25']), 'A': [2, 3, 7, 8, 9, 10]})
     df1.to_parquet("asof1.pq")
     df2.to_parquet("asof2.pq")
 
