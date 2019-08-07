@@ -518,7 +518,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         }
         std::shared_ptr<::arrow::Array> arr = chunked_arr->chunk(0);
         // std::cout << arr->ToString() << std::endl;
-
+        int64_t num_values = arr->length();
         auto buffers = arr->data()->buffers;
         // std::cout<<"num buffs: "<< buffers.size()<<std::endl;
         if (buffers.size() != 3)
