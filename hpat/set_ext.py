@@ -1,9 +1,3 @@
-from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
-                              pre_alloc_string_array, StringArrayPayloadType,
-                              is_str_arr_typ)
-from hpat.str_ext import string_type, gen_get_unicode_chars
-from hpat.utils import to_array
-import hpat
 import operator
 import numba
 from numba import types, typing, generated_jit
@@ -28,6 +22,13 @@ ll.add_symbol('set_nextval_string', hset_ext.set_nextval_string)
 ll.add_symbol('num_total_chars_set_string', hset_ext.num_total_chars_set_string)
 ll.add_symbol('populate_str_arr_from_set', hset_ext.populate_str_arr_from_set)
 
+import hpat
+from hpat.utils import to_array
+from hpat.str_ext import string_type, gen_get_unicode_chars
+from hpat.str_arr_ext import (StringArray, StringArrayType, string_array_type,
+                              pre_alloc_string_array, StringArrayPayloadType,
+                              is_str_arr_typ)
+
 
 # similar to types.Container.Set
 class SetType(types.Container):
@@ -47,7 +48,6 @@ class SetType(types.Container):
     def is_precise(self):
         return self.dtype.is_precise()
 
-
 set_string_type = SetType(string_type)
 
 
@@ -59,26 +59,23 @@ register_model(SetType)(models.OpaqueModel)
 
 
 _init_set_string = types.ExternalFunction("init_set_string",
-                                          set_string_type())
-
+                                         set_string_type())
 
 def init_set_string():
     return set()
-
 
 @overload(init_set_string)
 def init_set_overload():
     return lambda: _init_set_string()
 
-
 add_set_string = types.ExternalFunction("insert_set_string",
-                                        types.void(set_string_type, types.voidptr))
+                                    types.void(set_string_type, types.voidptr))
 
 len_set_string = types.ExternalFunction("len_set_string",
-                                        types.intp(set_string_type))
+                                    types.intp(set_string_type))
 
 num_total_chars_set_string = types.ExternalFunction("num_total_chars_set_string",
-                                                    types.intp(set_string_type))
+                                    types.intp(set_string_type))
 
 # TODO: box set(string)
 
@@ -111,11 +108,9 @@ def init_set_string_array(A):
 def set_add_overload(set_obj_typ, item_typ):
     # TODO: expand to other set types
     assert set_obj_typ == set_string_type and item_typ == string_type
-
     def add_impl(set_obj, item):
         return add_set_string(set_obj, item._data)
     return add_impl
-
 
 @overload(len)
 def len_set_str_overload(A):
@@ -156,17 +151,16 @@ class InSetOp(AbstractTemplate):
 @lower_builtin("in", string_type, set_string_type)
 def lower_dict_in(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
-                                             lir.IntType(8).as_pointer()])
+                                                lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
     return builder.call(fn, args)
-
 
 @lower_builtin(operator.contains, set_string_type, string_type)
 def lower_dict_in_op(context, builder, sig, args):
     set_str, unicode_str = args
     char_str = gen_get_unicode_chars(context, builder, unicode_str)
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
-                                             lir.IntType(8).as_pointer()])
+                                                lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
     return builder.call(fn, [char_str, set_str])
 
@@ -185,32 +179,29 @@ def to_array_overload(A):
 
         return set_string_to_array
 
-
 @intrinsic
 def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ=None):
     assert in_set_typ == set_string_type
     assert is_str_arr_typ(in_str_arr_typ)
-
     def codegen(context, builder, sig, args):
         in_set, in_str_arr = args
 
         string_array = context.make_helper(builder, string_array_type, in_str_arr)
 
-        fnty = lir.FunctionType(lir.VoidType(),
+        fnty = lir.FunctionType( lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
                                  lir.IntType(32).as_pointer(),
                                  lir.IntType(8).as_pointer(),
-                                 ])
+                                ])
         fn_getitem = builder.module.get_or_insert_function(fnty,
                                                            name="populate_str_arr_from_set")
         builder.call(fn_getitem, [in_set, string_array.offsets,
-                                  string_array.data])
+                                         string_array.data])
         return context.get_dummy_value()
 
     return types.void(set_string_type, string_array_type), codegen
 
 # TODO: delete iterator
-
 
 @register_model(SetIterType)
 class StrSetIteratorModel(models.StructModel):
@@ -223,7 +214,7 @@ class StrSetIteratorModel(models.StructModel):
 @lower_builtin('getiter', SetType)
 def getiter_set(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                                                [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_iterator_string")
     itp = builder.call(fn, args)
 
@@ -243,13 +234,13 @@ def iternext_setiter(context, builder, sig, args, result):
     iterobj = context.make_helper(builder, iterty, value=it)
 
     fnty = lir.FunctionType(lir.IntType(1),
-                            [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
+                    [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_itervalid_string")
     is_valid = builder.call(fn, [iterobj.itp, iterobj.set])
     result.set_valid(is_valid)
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
-                            [lir.IntType(8).as_pointer()])
+                    [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_nextval_string")
     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
 

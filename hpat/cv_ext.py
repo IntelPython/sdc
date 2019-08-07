@@ -20,7 +20,6 @@ ll.add_symbol('cv_imdecode', cv_wrapper.cv_imdecode)
 ll.add_symbol('cv_mat_release', cv_wrapper.cv_mat_release)
 ll.add_symbol('cv_delete_buf', cv_wrapper.cv_delete_buf)
 
-
 @infer_global(cv2.imread, typing_key='cv2imread')
 class ImreadInfer(AbstractTemplate):
     def generic(self, args, kws):
@@ -32,7 +31,6 @@ class ImreadInfer(AbstractTemplate):
 #     def generic(self, args, kws):
 #         if not kws and len(args) == 2 and args[0] == types.Array(types.uint8, 3, 'C'):
 #             return signature(types.Array(types.uint8, 3, 'C'), *args)
-
 
 @lower_builtin('cv2imread', string_type)
 def lower_cv2_imread(context, builder, sig, args):
@@ -50,6 +48,7 @@ def lower_cv2_imread(context, builder, sig, args):
                              lir.IntType(8).as_pointer()])
     fn_imread = builder.module.get_or_insert_function(fnty, name="cv_imread")
     img = builder.call(fn_imread, [shapes_array, data, fname])
+
 
     return _image_to_array(context, builder, shapes_array, arrtype, data, img)
 
@@ -93,7 +92,6 @@ def _image_to_array(context, builder, shapes_array, arrtype, data, img):
 
     return impl_ret_new_ref(context, builder, arrtype, ary._getvalue())
 
-
 @overload(cv2.resize)
 def resize_overload(A_t, resize_shape_t):
     n_channels = 3
@@ -106,13 +104,13 @@ def resize_overload(A_t, resize_shape_t):
 
     dtype = A_t.dtype
     sig = types.void(
-        types.intp,             # new num rows
-        types.intp,             # new num cols
-        types.CPointer(dtype),  # output data
-        types.CPointer(dtype),  # input data
-        types.intp,             # num rows
-        types.intp,             # num cols
-    )
+                types.intp,             # new num rows
+                types.intp,             # new num cols
+                types.CPointer(dtype),  # output data
+                types.CPointer(dtype),  # input data
+                types.intp,             # num rows
+                types.intp,             # num cols
+                )
     cv_resize = types.ExternalFunction("cv_resize", sig)
 
     def resize_imp(in_arr, resize_shape):
@@ -122,11 +120,10 @@ def resize_overload(A_t, resize_shape_t):
         B = np.empty((resize_shape[1], resize_shape[0], n_channels), A.dtype)
 
         cv_resize(resize_shape[1], resize_shape[0], B.ctypes,
-                  A.ctypes, A.shape[0], A.shape[1])
+                         A.ctypes, A.shape[0], A.shape[1])
         return B
 
     return resize_imp
-
 
 @overload(cv2.imdecode)
 def imdecode_overload(A_t, flags_t):
@@ -137,11 +134,11 @@ def imdecode_overload(A_t, flags_t):
         out_dtype = A_t.dtype
 
         sig = types.CPointer(out_dtype)(
-            types.CPointer(types.intp),  # output shape
-            types.CPointer(in_dtype),   # input array
-            types.intp,                # input size (num_bytes)
-            types.intp,                # flags
-        )
+                    types.CPointer(types.intp), # output shape
+                    types.CPointer(in_dtype),   # input array
+                    types.intp,                # input size (num_bytes)
+                    types.intp,                # flags
+                    )
         cv_imdecode = types.ExternalFunction("cv_imdecode", sig)
 
         def imdecode_imp(A, flags):
@@ -153,7 +150,6 @@ def imdecode_overload(A_t, flags_t):
             return img
 
         return imdecode_imp
-
 
 @intrinsic
 def wrap_array(typingctx, data_ptr, shape_tup):

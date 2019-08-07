@@ -14,12 +14,12 @@ def jit(signature_or_function=None, **options):
     pivots = options.pop('pivots', {})
     assert isinstance(pivots, dict)
     for var, vals in pivots.items():
-        _locals[var + ":pivot"] = vals
+        _locals[var+":pivot"] = vals
 
     h5_types = options.pop('h5_types', {})
     assert isinstance(h5_types, dict)
     for var, vals in h5_types.items():
-        _locals[var + ":h5_types"] = vals
+        _locals[var+":h5_types"] = vals
 
     distributed = set(options.pop('distributed', set()))
     assert isinstance(distributed, (set, list))
@@ -33,11 +33,11 @@ def jit(signature_or_function=None, **options):
 
     #options['parallel'] = True
     options['parallel'] = {'comprehension': True,
-                           'setitem': False,  # FIXME: support parallel setitem
-                           'reduction': True,
-                           'numpy': True,
-                           'stencil': True,
-                           'fusion': True,
+                           'setitem':       False,  # FIXME: support parallel setitem
+                           'reduction':     True,
+                           'numpy':         True,
+                           'stencil':       True,
+                           'fusion':        True,
                            }
 
     # this is for previous version of pipeline manipulation (numba hpat_req <0.38)

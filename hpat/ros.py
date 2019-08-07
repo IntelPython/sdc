@@ -1,8 +1,3 @@
-import llvmlite.binding as ll
-from . import ros_cpp
-from llvmlite import ir as lir
-from numba.targets.arrayobj import make_array
-from numba import cgutils
 from numba import types, ir_utils, ir
 from numba.ir_utils import (compile_to_numba_ir, replace_arg_nodes)
 from numba.typing import signature
@@ -127,6 +122,11 @@ class ReadInnerParallelTyper(AbstractTemplate):
         return signature(types.int32, *args)
 
 
+from numba import cgutils
+from numba.targets.arrayobj import make_array
+from llvmlite import ir as lir
+from . import ros_cpp
+import llvmlite.binding as ll
 ll.add_symbol('open_bag', ros_cpp.open_bag)
 ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)
 ll.add_symbol('get_image_dims', ros_cpp.get_image_dims)

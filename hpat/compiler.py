@@ -1,5 +1,4 @@
 # from .pio import PIO
-from llvmlite import binding
 import hpat
 import hpat.hiframes
 import hpat.hiframes.hiframes_untyped
@@ -19,6 +18,7 @@ if config._has_h5py:
     from hpat.io import pio
 
 # workaround for Numba #3876 issue with large labels in mortgage benchmark
+from llvmlite import binding
 binding.set_option("tmp", "-non-global-value-max-name-size=2048")
 
 # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
@@ -137,8 +137,8 @@ def inline_calls(func_ir, _locals):
                             var_dict = inline_out[1]
                             # TODO: update '##distributed' and '##threaded' in _locals
                             _locals.update((var_dict[k].name, v)
-                                           for k, v in func_def.value.locals.items()
-                                           if k in var_dict)
+                                        for k,v in func_def.value.locals.items()
+                                        if k in var_dict)
                         # for block in new_blocks:
                         #     work_list.append(block)
                         # current block is modified, skip the rest
@@ -154,7 +154,6 @@ def inline_calls(func_ir, _locals):
 class HPATPipeline(numba.compiler.BasePipeline):
     """HPAT compiler pipeline
     """
-
     def define_pipelines(self, pm):
         name = 'hpat'
         pm.create_pipeline(name)
@@ -184,7 +183,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
             pm.add_stage(self.stage_parfor_pass, "convert to parfors")
         pm.add_stage(self.stage_distributed_pass, "convert to distributed")
         pm.add_stage(self.stage_ir_legalization,
-                     "ensure IR is legal prior to lowering")
+                "ensure IR is legal prior to lowering")
         self.add_lowering_stage(pm)
         self.add_cleanup_stage(pm)
 
@@ -196,6 +195,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         assert self.func_ir
         inline_calls(self.func_ir, self.locals)
 
+
     def stage_df_pass(self):
         """
         Convert DataFrame calls
@@ -205,6 +205,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         df_pass = HiFrames(self.func_ir, self.typingctx,
                            self.args, self.locals, self.metadata)
         df_pass.run()
+
 
     def stage_io_pass(self):
         """
@@ -216,6 +217,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
             io_pass = pio.PIO(self.func_ir, self.locals)
             io_pass.run()
 
+
     def stage_repeat_inline_closure(self):
         assert self.func_ir
         inline_pass = InlineClosureCallPass(
@@ -223,6 +225,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
         inline_pass.run()
         post_proc = postproc.PostProcessor(self.func_ir)
         post_proc.run()
+
 
     def stage_distributed_pass(self):
         """
@@ -236,6 +239,7 @@ class HPATPipeline(numba.compiler.BasePipeline):
             self.type_annotation.typemap, self.type_annotation.calltypes,
             self.metadata)
         dist_pass.run()
+
 
     def stage_df_typed_pass(self):
         """
@@ -259,11 +263,9 @@ class HPATPipeline(numba.compiler.BasePipeline):
                                 self.type_annotation.calltypes)
         df_pass.run()
 
-
 class HPATPipelineSeq(HPATPipeline):
     """HPAT pipeline without the distributed pass (used in rolling kernels)
     """
-
     def define_pipelines(self, pm):
         name = 'hpat_seq'
         pm.create_pipeline(name)
@@ -285,10 +287,10 @@ class HPATPipelineSeq(HPATPipeline):
         # pm.add_stage(self.stage_distributed_pass, "convert to distributed")
         pm.add_stage(self.stage_lower_parfor_seq, "parfor seq lower")
         pm.add_stage(self.stage_ir_legalization,
-                     "ensure IR is legal prior to lowering")
+                "ensure IR is legal prior to lowering")
         self.add_lowering_stage(pm)
         self.add_cleanup_stage(pm)
 
     def stage_lower_parfor_seq(self):
         numba.parfor.lower_parfor_sequential(
-            self.typingctx, self.func_ir, self.typemap, self.calltypes)
+                self.typingctx, self.func_ir, self.typemap, self.calltypes)

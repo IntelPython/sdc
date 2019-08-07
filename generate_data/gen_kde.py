@@ -4,7 +4,6 @@ import argparse
 import time
 import hpat
 
-
 @hpat.jit
 def gen_kde(N, file_name):
     # np.random.seed(0)
@@ -13,7 +12,6 @@ def gen_kde(N, file_name):
     dset1 = f.create_dataset("points", (N,), dtype='f8')
     dset1[:] = points
     f.close()
-
 
 def main():
     parser = argparse.ArgumentParser(description='Gen KDE.')
@@ -24,7 +22,6 @@ def main():
     file_name = args.file
 
     gen_kde(N, file_name)
-
 
 if __name__ == '__main__':
     main()

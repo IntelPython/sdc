@@ -1,38 +1,31 @@
-from llvmlite import ir as lir
-import llvmlite.binding as ll
 import numba
 import hpat
 from hpat.utils import debug_prints
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
-                                    signature, AttributeTemplate, infer_getattr, bound_function)
+                    signature, AttributeTemplate, infer_getattr, bound_function)
 from numba.extending import (typeof_impl, type_callable, models, register_model,
-                             make_attribute_wrapper, lower_builtin, box, lower_getattr)
+                                make_attribute_wrapper, lower_builtin, box, lower_getattr)
 from numba import cgutils, utils
 from numba.targets.arrayobj import _empty_nd_impl
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-
 
 class MultinomialNB(object):
     def __init__(self, nclasses=-1):
         self.n_classes = nclasses
         return
 
-
 class MultinomialNBType(types.Type):
     def __init__(self):
         super(MultinomialNBType, self).__init__(
-            name='MultinomialNBType()')
-
+                                    name='MultinomialNBType()')
 
 mnb_type = MultinomialNBType()
-
 
 class MultinomialNBPayloadType(types.Type):
     def __init__(self):
         super(MultinomialNBPayloadType, self).__init__(
-            name='MultinomialNBPayloadType()')
-
+                                    name='MultinomialNBPayloadType()')
 
 @typeof_impl.register(MultinomialNB)
 def typeof_mnb_val(val, c):
@@ -45,11 +38,8 @@ def typeof_mnb_val(val, c):
 #     return typer
 
 # dummy function providing pysignature for MultinomialNB()
-
-
 def MultinomialNB_dummy(n_classes=-1):
     return 1
-
 
 @infer_global(MultinomialNB)
 class MultinomialNBConstructorInfer(AbstractTemplate):
@@ -59,16 +49,14 @@ class MultinomialNBConstructorInfer(AbstractTemplate):
         sig.pysig = pysig
         return sig
 
-
 @register_model(MultinomialNBType)
 class MultinomialNBDataModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         dtype = MultinomialNBPayloadType()
         members = [
             ('meminfo', types.MemInfoPointer(dtype)),
-        ]
+            ]
         models.StructModel.__init__(self, dmm, fe_type, members)
-
 
 @register_model(MultinomialNBPayloadType)
 class MultinomialNBPayloadDataModel(models.StructModel):
@@ -76,9 +64,8 @@ class MultinomialNBPayloadDataModel(models.StructModel):
         members = [
             ('model', types.Opaque('daal_model')),
             ('n_classes', types.intp),
-        ]
+            ]
         models.StructModel.__init__(self, dmm, fe_type, members)
-
 
 @infer_getattr
 class MultinomialNBAttribute(AttributeTemplate):
@@ -96,7 +83,8 @@ class MultinomialNBAttribute(AttributeTemplate):
         assert len(args) == 1
         return signature(types.Array(types.int32, 1, 'C'), *args)
 
-
+from llvmlite import ir as lir
+import llvmlite.binding as ll
 try:
     import daal_wrapper
     ll.add_symbol('mnb_train', daal_wrapper.mnb_train)
@@ -105,7 +93,6 @@ try:
 except ImportError:
     if debug_prints():  # pragma: no cover
         print("daal import error")
-
 
 @lower_builtin(MultinomialNB, types.intp)
 def impl_mnb_constructor(context, builder, sig, args):
@@ -117,7 +104,7 @@ def impl_mnb_constructor(context, builder, sig, args):
     llvoidptr = context.get_value_type(types.voidptr)
     llsize = context.get_value_type(types.uintp)
     dtor_ftype = lir.FunctionType(lir.VoidType(),
-                                  [llvoidptr, llsize, llvoidptr])
+                                     [llvoidptr, llsize, llvoidptr])
     dtor_fn = builder.module.get_or_insert_function(dtor_ftype, name="dtor_mnb")
 
     meminfo = context.nrt.meminfo_alloc_dtor(
@@ -137,7 +124,6 @@ def impl_mnb_constructor(context, builder, sig, args):
     mnb_struct = cgutils.create_struct_proxy(mnb_type)(context, builder)
     mnb_struct.meminfo = meminfo
     return mnb_struct._getvalue()
-
 
 @lower_builtin("mnb.train", mnb_type, types.Array, types.Array)
 def mnb_train_impl(context, builder, sig, args):
@@ -164,17 +150,16 @@ def mnb_train_impl(context, builder, sig, args):
     inst_struct = context.make_helper(builder, mnb_type, args[0])
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     data_pointer = builder.bitcast(data_pointer,
-                                   context.get_data_type(dtype).as_pointer())
+                                    context.get_data_type(dtype).as_pointer())
 
     mnb_struct = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
 
     call_args = [num_features, num_samples, X.data, y.data,
-                 mnb_struct._get_ptr_by_name('n_classes')]
+                                mnb_struct._get_ptr_by_name('n_classes')]
     model = builder.call(fn, call_args)
     mnb_struct.model = model
     builder.store(mnb_struct._getvalue(), data_pointer)
     return context.get_dummy_value()
-
 
 @lower_builtin("mnb.predict", mnb_type, types.Array)
 def mnb_predict_impl(context, builder, sig, args):
@@ -183,7 +168,7 @@ def mnb_predict_impl(context, builder, sig, args):
     inst_struct = context.make_helper(builder, mnb_type, args[0])
     data_pointer = context.nrt.meminfo_data(builder, inst_struct.meminfo)
     data_pointer = builder.bitcast(data_pointer,
-                                   context.get_data_type(dtype).as_pointer())
+                                    context.get_data_type(dtype).as_pointer())
     mnb_struct = cgutils.create_struct_proxy(dtype)(context, builder, builder.load(data_pointer))
 
     p = context.make_array(sig.args[1])(context, builder, args[1])

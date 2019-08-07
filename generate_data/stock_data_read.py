@@ -3,7 +3,6 @@ import numpy as np
 from pandas_datareader import data
 import h5py
 
-
 def main():
     stocks = pd.read_csv('all_syms.csv')
     file_name = "stock_data_all_google.hdf5"
@@ -12,7 +11,7 @@ def main():
     for symbol in stocks.Symbol:
         try:
             df = data.DataReader(symbol, 'google', start='1/1/2000')
-        except BaseException:
+        except:
             continue
         N = len(df)
         grp = f.create_group(symbol)
@@ -24,7 +23,6 @@ def main():
         grp.create_dataset("Date", (N,), dtype='i8')[:] = df.index.values.astype(np.int64)
 
     f.close()
-
 
 if __name__ == '__main__':
     main()

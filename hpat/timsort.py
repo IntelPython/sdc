@@ -60,7 +60,7 @@ MIN_MERGE = 32
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def sort(key_arrs, lo, hi, data):  # pragma: no cover
 
-    nRemaining = hi - lo
+    nRemaining  = hi - lo
     if nRemaining < 2:
         return  # Arrays of size 0 and 1 are always sorted
 
@@ -108,6 +108,7 @@ def sort(key_arrs, lo, hi, data):  # pragma: no cover
     assert stackSize == 1
 
 
+
 # Sorts the specified portion of the specified array using a binary
 # insertion sort.  This is the best method for sorting small numbers
 # of elements.  It requires O(n log n) compares, but O(n^2) data
@@ -134,7 +135,7 @@ def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
     # Buffer pivotStore = s.allocate(1)
 
     while start < hi:
-        # pivotStore = key_arrs[start]  # TODO: copy data to pivot
+        #pivotStore = key_arrs[start]  # TODO: copy data to pivot
         pivot = getitem_arr_tup(key_arrs, start)
         pivot_data = getitem_arr_tup(data, start)
 
@@ -162,6 +163,7 @@ def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
         # first slot after them -- that's why this sort is stable.
         # Slide elements over to make room for pivot.
 
+
         n = start - left  # The number of elements to move
         # TODO: optimize for n==1 and n==2
         # TODO: data
@@ -174,6 +176,7 @@ def binarySort(key_arrs, lo, hi, start, data):  # pragma: no cover
         setitem_arr_tup(key_arrs, left, pivot)
         setitem_arr_tup(data, left, pivot_data)
         start += 1
+
 
 
 # Returns the length of the run beginning at the specified position in
@@ -210,13 +213,14 @@ def countRunAndMakeAscending(key_arrs, lo, hi, data):  # pragma: no cover
     # Find end of run, and reverse range if descending
     if getitem_arr_tup(key_arrs, runHi) < getitem_arr_tup(key_arrs, lo):  # Descending
         runHi += 1
-        while runHi < hi and getitem_arr_tup(key_arrs, runHi) < getitem_arr_tup(key_arrs, runHi - 1):
+        while runHi < hi and getitem_arr_tup(key_arrs, runHi) < getitem_arr_tup(key_arrs, runHi-1):
             runHi += 1
         reverseRange(key_arrs, lo, runHi, data)
     else:                     # Ascending
         runHi += 1
-        while runHi < hi and getitem_arr_tup(key_arrs, runHi) >= getitem_arr_tup(key_arrs, runHi - 1):
+        while runHi < hi and getitem_arr_tup(key_arrs, runHi) >= getitem_arr_tup(key_arrs, runHi-1):
             runHi += 1
+
 
     return runHi - lo
 
@@ -276,7 +280,6 @@ def minRunLength(n):  # pragma: no cover
 # When we get into galloping mode, we stay there until both runs win less
 # often than MIN_GALLOP consecutive times.
 
-
 MIN_GALLOP = 7
 
 # Maximum initial size of tmp array, which is used for merging.  The array
@@ -298,10 +301,11 @@ def init_sort_start(key_arrs, data):
 
     arr_len = len(key_arrs[0])
     # Allocate temp storage (which may be increased later if necessary)
-    tmpLength = (arr_len >> 1 if arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH
-                 else INITIAL_TMP_STORAGE_LENGTH)
+    tmpLength = (arr_len >> 1 if  arr_len < 2 * INITIAL_TMP_STORAGE_LENGTH
+        else INITIAL_TMP_STORAGE_LENGTH)
     tmp = alloc_arr_tup(tmpLength, key_arrs)
     tmp_data = alloc_arr_tup(tmpLength, data)
+
 
     # A stack of pending runs yet to be merged.  Run i starts at
     # address base[i] and extends for len[i] elements.  It's always
@@ -323,9 +327,9 @@ def init_sort_start(key_arrs, data):
 
     stackSize = 0  # Number of pending runs on stack
     stackLen = 5 if arr_len < 120 else (
-        10 if arr_len < 1542 else (
-            19 if arr_len < 119151 else 40
-        ))
+                10 if arr_len < 1542 else (
+                19 if arr_len < 119151 else 40
+                ))
     runBase = np.empty(stackLen, np.int64)
     runLen = np.empty(stackLen, np.int64)
 
@@ -354,11 +358,11 @@ def pushRun(stackSize, runBase, runLen, runBase_val, runLen_val):
 # entry to the method.
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
-                  tmp_data, minGallop):
+                                                          tmp_data, minGallop):
     while stackSize > 1:
         n = stackSize - 2
-        if ((n >= 1 and runLen[n - 1] <= runLen[n] + runLen[n + 1])
-                or (n >= 2 and runLen[n - 2] <= runLen[n] + runLen[n - 1])):
+        if ((n >= 1 and runLen[n-1] <= runLen[n] + runLen[n+1])
+                or (n >= 2 and runLen[n-2] <= runLen[n] + runLen[n-1])):
             if runLen[n - 1] < runLen[n + 1]:
                 n -= 1
         elif runLen[n] > runLen[n + 1]:
@@ -374,10 +378,10 @@ def mergeCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
 # called once, to complete the sort.
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeForceCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength,
-                       tmp, tmp_data, minGallop):
+                                                     tmp, tmp_data, minGallop):
     while stackSize > 1:
         n = stackSize - 2
-        if n > 0 and runLen[n - 1] < runLen[n + 1]:
+        if n > 0 and runLen[n-1] < runLen[n+1]:
             n -= 1
         stackSize, tmpLength, tmp, tmp_data, minGallop = mergeAt(
             stackSize, runBase, runLen, key_arrs, data,
@@ -393,17 +397,18 @@ def mergeForceCollapse(stackSize, runBase, runLen, key_arrs, data, tmpLength,
 # @param i stack index of the first of the two runs to merge
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
-            tmp_data, minGallop, i):
+                                                       tmp_data, minGallop, i):
     assert stackSize >= 2
     assert i >= 0
     assert i == stackSize - 2 or i == stackSize - 3
 
     base1 = runBase[i]
     len1 = runLen[i]
-    base2 = runBase[i + 1]
-    len2 = runLen[i + 1]
+    base2 = runBase[i+1]
+    len2 = runLen[i+1]
     assert len1 > 0 and len2 > 0
     assert base1 + len1 == base2
+
 
     # Record the length of the combined runs. if i is the 3rd-last
     # run now, also slide over the last run (which isn't involved
@@ -411,8 +416,8 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
 
     runLen[i] = len1 + len2
     if i == stackSize - 3:
-        runBase[i + 1] = runBase[i + 2]
-        runLen[i + 1] = runLen[i + 2]
+        runBase[i+1] = runBase[i+2]
+        runLen[i+1] = runLen[i+2]
 
     stackSize -= 1
 
@@ -426,11 +431,12 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
     if len1 == 0:
         return stackSize, tmpLength, tmp, tmp_data, minGallop
 
+
     # Find where the last element of run1 goes in run2. Subsequent elements
     # in run2 can be ignored (because they're already in place).
 
-    len2 = gallopLeft(getitem_arr_tup(key_arrs, base1 + len1 - 1), key_arrs, base2,
-                      len2, len2 - 1)
+    len2 = gallopLeft(getitem_arr_tup(key_arrs, base1+len1-1), key_arrs, base2,
+                                                                len2, len2 - 1)
     assert len2 >= 0
     if len2 == 0:
         return stackSize, tmpLength, tmp, tmp_data, minGallop
@@ -441,13 +447,13 @@ def mergeAt(stackSize, runBase, runLen, key_arrs, data, tmpLength, tmp,
             tmpLength, tmp, tmp_data, key_arrs, data,
             len1)
         minGallop = mergeLo(key_arrs, data, tmp,
-                            tmp_data, minGallop, base1, len1, base2, len2)
+            tmp_data, minGallop, base1, len1, base2, len2)
     else:
         tmpLength, tmp, tmp_data = ensureCapacity(
             tmpLength, tmp, tmp_data, key_arrs, data,
             len2)
         minGallop = mergeHi(key_arrs, data, tmp,
-                            tmp_data, minGallop, base1, len1, base2, len2)
+            tmp_data, minGallop, base1, len1, base2, len2)
 
     return stackSize, tmpLength, tmp, tmp_data, minGallop
 
@@ -474,10 +480,10 @@ def gallopLeft(key, arr, base, _len, hint):
     lastOfs = 0
     ofs = 1
 
-    if key > getitem_arr_tup(arr, base + hint):
+    if key > getitem_arr_tup(arr, base+hint):
         # Gallop right until a[base+hint+lastOfs] < key <= a[base+hint+ofs]
         maxOfs = _len - hint
-        while ofs < maxOfs and key > getitem_arr_tup(arr, base + hint + ofs):
+        while ofs < maxOfs and key > getitem_arr_tup(arr, base+hint+ofs):
             lastOfs = ofs
             ofs = (ofs << 1) + 1
             if ofs <= 0:   # overflow
@@ -492,7 +498,7 @@ def gallopLeft(key, arr, base, _len, hint):
     else:  # key <= a[base + hint]
         # Gallop left until a[base+hint-ofs] < key <= a[base+hint-lastOfs]
         maxOfs = hint + 1
-        while ofs < maxOfs and key <= getitem_arr_tup(arr, base + hint - ofs):
+        while ofs < maxOfs and key <= getitem_arr_tup(arr, base+hint-ofs):
             lastOfs = ofs
             ofs = (ofs << 1) + 1
             if ofs <= 0:   # overflow
@@ -508,6 +514,7 @@ def gallopLeft(key, arr, base, _len, hint):
 
     assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
 
+
     # Now a[base+lastOfs] < key <= a[base+ofs], so key belongs somewhere
     # to the right of lastOfs but no farther right than ofs.  Do a binary
     # search, with invariant a[base + lastOfs - 1] < key <= a[base + ofs].
@@ -516,13 +523,14 @@ def gallopLeft(key, arr, base, _len, hint):
     while lastOfs < ofs:
         m = lastOfs + ((ofs - lastOfs) >> 1)
 
-        if key > getitem_arr_tup(arr, base + m):
+        if key > getitem_arr_tup(arr, base+m):
             lastOfs = m + 1  # a[base + m] < key
         else:
             ofs = m          # key <= a[base + m]
 
     assert lastOfs == ofs    # so a[base + ofs - 1] < key <= a[base + ofs]
     return ofs
+
 
 
 # Like gallopLeft, except that if the range contains an element equal to
@@ -559,10 +567,10 @@ def gallopRight(key, arr, base, _len, hint):
         tmp = lastOfs
         lastOfs = hint - ofs
         ofs = hint - tmp
-    else:  # a[b + hint] <= key
+    else:  #  a[b + hint] <= key
         # Gallop right until a[b+hint + lastOfs] <= key < a[b+hint + ofs]
         maxOfs = _len - hint
-        while ofs < maxOfs and key >= getitem_arr_tup(arr, base + hint + ofs):
+        while ofs < maxOfs and key >= getitem_arr_tup(arr, base+hint+ofs):
             lastOfs = ofs
             ofs = (ofs << 1) + 1
             if ofs <= 0:   # overflow
@@ -576,6 +584,7 @@ def gallopRight(key, arr, base, _len, hint):
         ofs += hint
 
     assert -1 <= lastOfs and lastOfs < ofs and ofs <= _len
+
 
     # Now a[b + lastOfs] <= key < a[b + ofs], so key belongs somewhere to
     # the right of lastOfs but no farther right than ofs.  Do a binary
@@ -639,9 +648,10 @@ def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
     if len1 == 1:
         copyRange_tup(arr, cursor2, arr, dest, len2)
         copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-        copyElement_tup(tmp, cursor1, arr, dest + len2)  # Last elt of run 1 to end of merge
+        copyElement_tup(tmp, cursor1, arr, dest + len2) # Last elt of run 1 to end of merge
         copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
         return minGallop
+
 
     # XXX *************** refactored nested break into func
     len1, len2, cursor1, cursor2, dest, minGallop = mergeLo_inner(
@@ -649,13 +659,14 @@ def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
         len1, len2, tmp, cursor1, cursor2, dest, minGallop)
     # XXX *****************
 
+
     minGallop = 1 if minGallop < 1 else minGallop  # Write back to field
 
     if len1 == 1:
         assert len2 > 0
         copyRange_tup(arr, cursor2, arr, dest, len2)
         copyRange_tup(arr_data, cursor2, arr_data, dest, len2)
-        copyElement_tup(tmp, cursor1, arr, dest + len2)  # Last elt of run 1 to end of merge
+        copyElement_tup(tmp, cursor1, arr, dest + len2) #  Last elt of run 1 to end of merge
         copyElement_tup(tmp_data, cursor1, arr_data, dest + len2)
     elif len1 == 0:
         raise ValueError("Comparison method violates its general contract!")
@@ -670,11 +681,12 @@ def mergeLo(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
 
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2,
-                  dest, minGallop):
+                                                              dest, minGallop):
 
     while True:
-        count1 = 0  # Number of times in a row that first run won
-        count2 = 0  # Number of times in a row that second run won
+        count1 = 0 # Number of times in a row that first run won
+        count2 = 0 # Number of times in a row that second run won
+
 
         # Do the straightforward thing until (if ever) one run starts
         # winning consistently.
@@ -705,6 +717,7 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2,
             if not ((count1 | count2) < minGallop):
                 break
 
+
         # One run is winning so consistently that galloping may be a
         # huge win. So try that, and continue galloping until (if ever)
         # neither run appears to be winning consistently anymore.
@@ -719,7 +732,7 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2,
                 dest += count1
                 cursor1 += count1
                 len1 -= count1
-                if len1 <= 1:  # len1 == 1 or len1 == 0
+                if len1 <= 1: # len1 == 1 or len1 == 0
                     return len1, len2, cursor1, cursor2, dest, minGallop
 
             copyElement_tup(arr, cursor2, arr, dest)
@@ -759,6 +772,7 @@ def mergeLo_inner(arr, arr_data, tmp_data, len1, len2, tmp, cursor1, cursor2,
         minGallop += 2  # Penalize for leaving gallop mode
 
     return len1, len2, cursor1, cursor2, dest, minGallop
+
 
 
 # Like mergeLo, except that this method should be called only if
@@ -818,7 +832,7 @@ def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
         cursor1 -= len1
         copyRange_tup(arr, cursor1 + 1, arr, dest + 1, len1)
         copyRange_tup(arr_data, cursor1 + 1, arr_data, dest + 1, len1)
-        copyElement_tup(tmp, cursor2, arr, dest)  # Move first elt of run2 to front of merge
+        copyElement_tup(tmp, cursor2, arr, dest) # Move first elt of run2 to front of merge
         copyElement_tup(tmp_data, cursor2, arr_data, dest)
     elif len2 == 0:
         raise ValueError("Comparison method violates its general contract!")
@@ -834,11 +848,11 @@ def mergeHi(key_arrs, data, tmp, tmp_data, minGallop, base1, len1, base2, len2):
 # XXX refactored nested loop break
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
-                  cursor2, dest, minGallop):
+                                                     cursor2, dest, minGallop):
 
     while True:
-        count1 = 0  # Number of times in a row that first run won
-        count2 = 0  # Number of times in a row that second run won
+        count1 = 0 # Number of times in a row that first run won
+        count2 = 0 # Number of times in a row that second run won
 
         # Do the straightforward thing until (if ever) one run
         # appears to win consistently.
@@ -858,7 +872,7 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
             else:
                 copyElement_tup(tmp, cursor2, arr, dest)
                 copyElement_tup(tmp_data, cursor2, arr_data, dest)
-                cursor2 -= 1
+                cursor2 -=1
                 dest -= 1
                 count2 += 1
                 count1 = 0
@@ -869,6 +883,7 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
             if not ((count1 | count2) < minGallop):
                 break
 
+
         # One run is winning so consistently that galloping may be a
         # huge win. So try that, and continue galloping until (if ever)
         # neither run appears to be winning consistently anymore.
@@ -876,7 +891,7 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
         while True:
             assert len1 > 0 and len2 > 1
             count1 = len1 - gallopRight(getitem_arr_tup(tmp, cursor2), arr,
-                                        base1, len1, len1 - 1)
+                                                         base1, len1, len1 - 1)
             if count1 != 0:
                 dest -= count1
                 cursor1 -= count1
@@ -895,7 +910,7 @@ def mergeHi_inner(arr, arr_data, tmp_data, base1, len1, len2, tmp, cursor1,
                 return len1, len2, tmp, cursor1, cursor2, dest, minGallop
 
             count2 = len2 - gallopLeft(getitem_arr_tup(arr, cursor1), tmp, 0,
-                                       len2, len2 - 1)
+                                                                len2, len2 - 1)
             if count2 != 0:
                 dest -= count2
                 cursor2 -= count2
@@ -964,7 +979,6 @@ def swap_arrs(data, lo, hi):  # pragma: no cover
         arr[lo] = arr[hi]
         arr[hi] = tmp_v
 
-
 @overload(swap_arrs)
 def swap_arrs_overload(arr_tup, lo, hi):
     count = arr_tup.count
@@ -984,13 +998,11 @@ def swap_arrs_overload(arr_tup, lo, hi):
 
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def copyRange(src_arr, src_pos, dst_arr, dst_pos, n):  # pragma: no cover
-    dst_arr[dst_pos:dst_pos + n] = src_arr[src_pos:src_pos + n]
-
+    dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
 def copyRange_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
-        dst_arr[dst_pos:dst_pos + n] = src_arr[src_pos:src_pos + n]
-
+        dst_arr[dst_pos:dst_pos+n] = src_arr[src_pos:src_pos+n]
 
 @overload(copyRange_tup)
 def copyRange_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
@@ -1007,16 +1019,13 @@ def copyRange_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos, n):
     copy_impl = loc_vars['f']
     return copy_impl
 
-
 @numba.njit(no_cpython_wrapper=True, cache=True)
 def copyElement(src_arr, src_pos, dst_arr, dst_pos):  # pragma: no cover
     dst_arr[dst_pos] = src_arr[src_pos]
 
-
 def copyElement_tup(src_arr_tup, src_pos, dst_arr_tup, dst_pos):  # pragma: no cover
     for src_arr, dst_arr in zip(src_arr_tup, dst_arr_tup):
         dst_arr[dst_pos] = src_arr[src_pos]
-
 
 @overload(copyElement_tup)
 def copyElement_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
@@ -1033,11 +1042,9 @@ def copyElement_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
     copy_impl = loc_vars['f']
     return copy_impl
 
-
 def getitem_arr_tup(arr_tup, ind):  # pragma: no cover
     l = [arr[ind] for arr in arr_tup]
     return tuple(l)
-
 
 @overload(getitem_arr_tup)
 def getitem_arr_tup_overload(arr_tup, ind):
@@ -1053,11 +1060,9 @@ def getitem_arr_tup_overload(arr_tup, ind):
     impl = loc_vars['f']
     return impl
 
-
 def setitem_arr_tup(arr_tup, ind, val_tup):  # pragma: no cover
     for arr, val in zip(arr_tup, val_tup):
         arr[ind] = val
-
 
 @overload(setitem_arr_tup)
 def setitem_arr_tup_overload(arr_tup, ind, val_tup):
@@ -1081,7 +1086,7 @@ def test():  # pragma: no cover
     T = np.ones(3)
     data = (np.arange(3), np.ones(3),)
     sort((T,), 0, 3, data)
-    print("compile time", time.time() - t1)
+    print("compile time", time.time()-t1)
     n = 210000
     np.random.seed(2)
     data = (np.arange(n), np.random.ranf(n))
@@ -1092,7 +1097,7 @@ def test():  # pragma: no cover
     df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
     sort((A,), 0, n, data)
-    print("HPAT", time.time() - t2, "Numpy", t2 - t1)
+    print("HPAT", time.time()-t2, "Numpy", t2-t1)
     # print(df2.B)
     # print(data)
     np.testing.assert_almost_equal(data[0], df2.B.values)
