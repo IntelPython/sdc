@@ -628,13 +628,10 @@ def merge_overload(left, right, how='inner', on=None, left_on=None,
         right_on=None, left_index=False, right_index=False, sort=False,
         suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
 
-    # check if on's inferred type is NoneType and store the result,
-    # use it later to branch based on the value available at compile time
-    onHasNoneType = isinstance(numba.typeof(on), types.NoneType)
     def _impl(left, right, how='inner', on=None, left_on=None,
             right_on=None, left_index=False, right_index=False, sort=False,
             suffixes=('_x', '_y'), copy=True, indicator=False, validate=None):
-        if not onHasNoneType:
+        if on is not None:
             left_on = right_on = on
 
         return hpat.hiframes.api.join_dummy(
@@ -648,14 +645,11 @@ def merge_asof_overload(left, right, on=None, left_on=None, right_on=None,
         right_by=None, suffixes=('_x', '_y'), tolerance=None,
         allow_exact_matches=True, direction='backward'):
 
-    # check if on's inferred type is NoneType and store the result,
-    # use it later to branch based on the value available at compile time
-    onHasNoneType = isinstance(numba.typeof(on), types.NoneType)
     def _impl(left, right, on=None, left_on=None, right_on=None,
             left_index=False, right_index=False, by=None, left_by=None,
             right_by=None, suffixes=('_x', '_y'), tolerance=None,
             allow_exact_matches=True, direction='backward'):
-        if not onHasNoneType:
+        if on is not None:
             left_on = right_on = on
 
         return hpat.hiframes.api.join_dummy(
