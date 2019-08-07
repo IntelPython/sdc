@@ -45,11 +45,11 @@ enable_hiframes_remove_dead = True
 # quantile imports?
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
-from .. import quantile_alg
+from .. import transport_mpi
 import llvmlite.binding as ll
-ll.add_symbol('quantile_parallel', quantile_alg.quantile_parallel)
-ll.add_symbol('nth_sequential', quantile_alg.nth_sequential)
-ll.add_symbol('nth_parallel', quantile_alg.nth_parallel)
+ll.add_symbol('quantile_parallel', transport_mpi.quantile_parallel)
+ll.add_symbol('nth_sequential', transport_mpi.nth_sequential)
+ll.add_symbol('nth_parallel', transport_mpi.nth_parallel)
 from numba.targets.arrayobj import make_array
 from hpat.utils import _numba_to_c_type_map, unliteral_all
 
