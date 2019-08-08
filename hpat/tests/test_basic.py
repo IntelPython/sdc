@@ -52,7 +52,6 @@ class BaseTest(unittest.TestCase):
 
 class TestBasic(BaseTest):
 
-    @unittest.skip('Error - fix needed\n')
     def test_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -66,7 +65,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_setitem1(self):
         def test_impl(N):
             A = np.arange(10)+1.0
@@ -79,7 +77,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_setitem2(self):
         def test_impl(N):
             A = np.arange(10)+1.0
@@ -92,7 +89,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_astype(self):
         def test_impl(N):
             return np.ones(N).astype(np.int32).sum()
@@ -122,7 +118,6 @@ class TestBasic(BaseTest):
         # self.assertEqual(count_array_REPs(), 0)
         # self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_inplace_binop(self):
         def test_impl(N):
             A = np.ones(N)
@@ -136,7 +131,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_getitem_multidim(self):
         def test_impl(N):
             A = np.ones((N, 3))
@@ -150,7 +144,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_whole_slice(self):
         def test_impl(N):
             X = np.ones((N, 4))
@@ -163,7 +156,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_strided_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -176,7 +168,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_assert(self):
         # make sure assert in an inlined function works
         def g(a):
@@ -202,7 +193,6 @@ class TestBasic(BaseTest):
 
         pd.testing.assert_series_equal(hpat.jit(f)(), f())
 
-    @unittest.skip('Error - fix needed\n')
     def test_reduce(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -226,7 +216,6 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_reduce2(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -253,7 +242,6 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_reduce_filter1(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -282,7 +270,6 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n')
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
@@ -304,7 +291,6 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_OneDs(), 0)
             self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.skip('Error - fix needed\n')
     def test_dist_return(self):
         def test_impl(N):
             A = np.arange(N)
@@ -321,7 +307,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.skip('Error - fix needed\n')
     def test_dist_return_tuple(self):
         def test_impl(N):
             A = np.arange(N)
@@ -341,7 +326,6 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.skip('Error - fix needed\n')
     def test_dist_input(self):
         def test_impl(A):
             return len(A)
@@ -352,7 +336,6 @@ class TestBasic(BaseTest):
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
-    @unittest.skip('Error - fix needed\n')
     def test_rebalance(self):
         def test_impl(N):
             A = np.arange(n)
@@ -370,7 +353,6 @@ class TestBasic(BaseTest):
         finally:
             hpat.distributed_analysis.auto_rebalance = False
 
-    @unittest.skip('Error - fix needed\n')
     def test_rebalance_loop(self):
         def test_impl(N):
             A = np.arange(n)
@@ -391,7 +373,6 @@ class TestBasic(BaseTest):
         finally:
             hpat.distributed_analysis.auto_rebalance = False
 
-    @unittest.skip('Error - fix needed\n')
     def test_transpose(self):
         def test_impl(n):
             A = np.ones((30, 40, 50))
