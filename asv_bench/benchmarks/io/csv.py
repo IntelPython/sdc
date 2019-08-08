@@ -5,7 +5,8 @@ from pd_benchmarks.io import csv
 
 
 class ToCSV(csv.ToCSV):
-    params = (['long'] , [tool.value for tool in Tool])
+
+    params = [['long'] , [tool.value for tool in Tool]]
     param_names = ['kind', 'tool']
 
     def setup(self, kind, tool):
