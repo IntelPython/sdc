@@ -1,6 +1,3 @@
-import os
-from distutils import util as distutils_util
-
 import numba
 import hpat
 
@@ -45,8 +42,7 @@ def jit(signature_or_function=None, **options):
 
     # Option MPI is boolean and true by default
     # it means MPI transport will be used
-    mpi_transport_requested_env = distutils_util.strtobool(os.getenv('HPAT_CONFIG_MPI', 'True'))
-    mpi_transport_requested = options.pop('MPI', mpi_transport_requested_env)
+    mpi_transport_requested = options.pop('MPI', hpat.config.config_transport_mpi_default)
     if not isinstance(mpi_transport_requested, (int, bool)):
         raise ValueError("Option MPI or HPAT_CONFIG_MPI environment variable should be boolean")
 
