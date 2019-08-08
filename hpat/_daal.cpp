@@ -1,5 +1,4 @@
 #include <Python.h>
-#include <mpi.h>
 #include "daal.h"
 #include <unordered_set>
 

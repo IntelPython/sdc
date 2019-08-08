@@ -13,20 +13,19 @@ from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map,
     unliteral_all)
 import time
 from llvmlite import ir as lir
-from . import hdist
+from . import transport_mpi
 import llvmlite.binding as ll
-ll.add_symbol('c_alltoall', hdist.c_alltoall)
-ll.add_symbol('c_gather_scalar', hdist.c_gather_scalar)
-ll.add_symbol('c_gatherv', hdist.c_gatherv)
-ll.add_symbol('c_bcast', hdist.c_bcast)
-ll.add_symbol('c_recv', hdist.hpat_dist_recv)
-ll.add_symbol('c_send', hdist.hpat_dist_send)
+ll.add_symbol('c_alltoall', transport_mpi.c_alltoall)
+ll.add_symbol('c_gather_scalar', transport_mpi.c_gather_scalar)
+ll.add_symbol('c_gatherv', transport_mpi.c_gatherv)
+ll.add_symbol('c_bcast', transport_mpi.c_bcast)
+ll.add_symbol('c_recv', transport_mpi.hpat_dist_recv)
+ll.add_symbol('c_send', transport_mpi.hpat_dist_send)
 
 from enum import Enum
 
 # get size dynamically from C code (mpich 3.2 is 4 bytes but openmpi 1.6 is 8)
-from . import hdist
-mpi_req_numba_type = getattr(types, "int"+str(8 * hdist.mpi_req_num_bytes))
+mpi_req_numba_type = getattr(types, "int"+str(8 * transport_mpi.mpi_req_num_bytes))
 
 MPI_ROOT = 0
 

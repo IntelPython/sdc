@@ -1,4 +1,3 @@
-#include "mpi.h"
 #include <Python.h>
 #include <string>
 #include <iostream>
