@@ -15,7 +15,7 @@ import time
 from llvmlite import ir as lir
 from . import hdist
 
-if hpat.config._transport_mpi:
+if hpat.config.config_transport_mpi:
     from . import transport_mpi as transport
 else:
     from . import transport_seq as transport

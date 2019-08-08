@@ -37,4 +37,4 @@ else:
     _has_xenon = True
     import hpat.io.xenon_ext
 
-_transport_mpi = False
+config_transport_mpi = True

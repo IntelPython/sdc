@@ -54,7 +54,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
 
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if hpat.config._transport_mpi:
+    if hpat.config.config_transport_mpi:
         from .. import transport_mpi as transport
     else:
         from .. import transport_seq as transport
@@ -94,7 +94,7 @@ def get_dtype_size(typingctx, dtype=None):
 def tofile_overload(arr_ty, fname_ty):
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if hpat.config._transport_mpi:
+    if hpat.config.config_transport_mpi:
         from .. import transport_mpi as transport
     else:
         from .. import transport_seq as transport

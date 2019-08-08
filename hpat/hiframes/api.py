@@ -47,7 +47,7 @@ import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 
-if hpat.config._transport_mpi:
+if hpat.config.config_transport_mpi:
     from .. import transport_mpi as transport
 else:
     from .. import transport_seq as transport
@@ -144,7 +144,7 @@ def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
     
-    if not hpat.config._transport_mpi:
+    if not hpat.config.config_transport_mpi:
         parallel = False
 
     n = len(arr)

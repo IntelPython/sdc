@@ -200,7 +200,7 @@ ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
 
-    if hpat.config._transport_mpi:
+    if hpat.config.config_transport_mpi:
         for v in csv_node.out_vars:
             if (array_dists[v.name] != distributed.Distribution.OneD and array_dists[v.name] != distributed.Distribution.OneD_Var):
                 parallel = False

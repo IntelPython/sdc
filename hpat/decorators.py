@@ -1,3 +1,6 @@
+import os
+from distutils import util as distutils_util
+
 import numba
 import hpat
 
@@ -39,6 +42,18 @@ def jit(signature_or_function=None, **options):
                            'stencil': True,
                            'fusion': True,
                            }
+
+    # Option MPI is boolean and true by default
+    # it means MPI transport will be used
+    mpi_transport_requested_env = distutils_util.strtobool(os.getenv('HPAT_CONFIG_MPI', 'True'))
+    mpi_transport_requested = options.pop('MPI', mpi_transport_requested_env)
+    if not isinstance(mpi_transport_requested, (int, bool)):
+        raise ValueError("Option MPI or HPAT_CONFIG_MPI environment variable should be boolean")
+
+    if mpi_transport_requested:
+        hpat.config.config_transport_mpi = True
+    else:
+        hpat.config.config_transport_mpi = False
 
     # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
     # from .compiler import add_hpat_stages

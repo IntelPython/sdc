@@ -672,7 +672,7 @@ from hpat.utils import _numba_to_c_type_map
 from hpat import config as hpat_config
 from .. import chiframes
 
-if hpat_config._transport_mpi:
+if hpat_config.config_transport_mpi:
     from .. import transport_mpi as transport
 else:
     from .. import transport_seq as transport
