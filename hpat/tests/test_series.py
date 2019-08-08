@@ -4,7 +4,7 @@ import numpy as np
 import pyarrow.parquet as pq
 import hpat
 from hpat.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end, repeat_test)
+    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 
@@ -681,7 +681,6 @@ class TestSeries(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
     @unittest.skip("TODO: fix result")
-    @repeat_test
     def test_series_dropna_str_parallel1(self):
         def test_impl(A):
             B = A.dropna()
@@ -1172,7 +1171,6 @@ class TestSeries(unittest.TestCase):
                    'x: array([0.04843 , 0.05106 , 0.057625, 0.0671  ])\n'
                    'y: array([0.00482 , 0.04843 , 0.05106 , 0.057625])\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_series_nlargest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1221,7 +1219,6 @@ class TestSeries(unittest.TestCase):
                    'x: array([0.007431, 0.024095, 0.035724, 0.053857])\n'
                    'y: array([0.007431, 0.024095, 0.031374, 0.035724])\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_series_nsmallest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1309,7 +1306,6 @@ class TestSeries(unittest.TestCase):
              MPIR_Bcast_binomial(310)............: Failure during collective
              Fatal error in MPI_Allreduce: Other MPI error, error stack'''
     )
-    @repeat_test
     def test_series_head_index_parallel1(self):
         def test_impl(S):
             return S.head(3)
@@ -1345,7 +1341,6 @@ class TestSeries(unittest.TestCase):
     @unittest.skip('AssertionError - fix needed\n'
                    'nan != 0.45894510159707225\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1358,7 +1353,6 @@ class TestSeries(unittest.TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @repeat_test
     def test_series_argsort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1415,7 +1409,6 @@ class TestSeries(unittest.TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @repeat_test
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()

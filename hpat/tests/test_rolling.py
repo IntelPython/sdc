@@ -6,8 +6,7 @@ import numpy as np
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   repeat_test)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 from hpat.hiframes.rolling import supported_rolling_funcs
 
 LONG_TEST = (int(os.environ['HPAT_LONG_ROLLING_TEST']) != 0
@@ -90,7 +89,6 @@ class TestRolling(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -112,7 +110,6 @@ class TestRolling(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_fixed_parallel_apply1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -230,7 +227,6 @@ class TestRolling(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_variable_parallel1(self):
         wins = ('2s',)
         sizes = (121,)
@@ -256,7 +252,6 @@ class TestRolling(unittest.TestCase):
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
-    @repeat_test
     def test_variable_apply_parallel1(self):
         wins = ('2s',)
         sizes = (121,)
