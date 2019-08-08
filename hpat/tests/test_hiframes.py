@@ -10,8 +10,8 @@ import hpat
 from hpat import hiframes
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                            get_start_end)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                                   get_start_end)
 
 
 class TestHiFrames(unittest.TestCase):
@@ -52,7 +52,7 @@ class TestHiFrames(unittest.TestCase):
             return df['A'][df['B']].values
 
         hpat_func = hpat.jit(test_impl)
-        df = pd.DataFrame({'A': [1,2,3], 'B': [True, False, True]})
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
 
     @unittest.skip('Error - fix needed\n'
@@ -122,7 +122,7 @@ class TestHiFrames(unittest.TestCase):
     def test_column_map(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
-            df['B'] = df.A.map(lambda a: 2*a)
+            df['B'] = df.A.map(lambda a: 2 * a)
             return df.B.sum()
 
         n = 121
@@ -133,7 +133,7 @@ class TestHiFrames(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_column_map_arg(self):
         def test_impl(df):
-            df['B'] = df.A.map(lambda a: 2*a)
+            df['B'] = df.A.map(lambda a: 2 * a)
             return
 
         n = 121
@@ -435,7 +435,7 @@ class TestHiFrames(unittest.TestCase):
         def test_impl(df):
             B = df.A.str.split(',')
             df2 = pd.DataFrame({'B': B})
-            return df2[df2.B.str.len()>1]
+            return df2[df2.B.str.len() > 1]
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
         hpat_func = hpat.jit(test_impl)
@@ -568,7 +568,7 @@ class TestHiFrames(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_1D_Var_len(self):
         def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)+1.0})
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) + 1.0})
             df1 = df[df.A > 5]
             return len(df1.B)
 
@@ -593,8 +593,9 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
         # size 7 with unroll
+
         def test_impl_2(n):
-            df = pd.DataFrame({'A': np.arange(n)+1.0, 'B': np.random.ranf(n)})
+            df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
             Ac = df.A.rolling(7).sum()
             return Ac.sum()
 
@@ -623,7 +624,7 @@ class TestHiFrames(unittest.TestCase):
     def test_rolling3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df.A.rolling(3, center=True).apply(lambda a: a[0]+2*a[1]+a[2])
+            Ac = df.A.rolling(3, center=True).apply(lambda a: a[0] + 2 * a[1] + a[2])
             return Ac.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -677,7 +678,7 @@ class TestHiFrames(unittest.TestCase):
             return C.sum()
 
         n = 11
-        df = pd.DataFrame({'A': np.random.ranf(3*n), 'B': ['one', 'two', 'three']*n})
+        df = pd.DataFrame({'A': np.random.ranf(3 * n), 'B': ['one', 'two', 'three'] * n})
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
@@ -688,8 +689,8 @@ class TestHiFrames(unittest.TestCase):
             return df.B.sum()
 
         n = 121
-        A = [3,4,5,6,1]
-        B = [5,6,2,1,3]
+        A = [3, 4, 5, 6, 1]
+        B = [5, 6, 2, 1, 3]
         n = 5
         start, end = get_start_end(n)
         df = pd.DataFrame({'A': A, 'B': B})
@@ -703,8 +704,8 @@ class TestHiFrames(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_concat(self):
         def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': n-np.arange(n), 'A': n+np.arange(n)+1.0})
+            df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n) + 1.0})
+            df2 = pd.DataFrame({'key2': n - np.arange(n), 'A': n + np.arange(n) + 1.0})
             df3 = pd.concat([df1, df2])
             return df3.A.sum() + df3.key2.sum()
 
@@ -723,7 +724,7 @@ class TestHiFrames(unittest.TestCase):
             df1 = pq.read_table('example.parquet').to_pandas()
             df2 = pq.read_table('example.parquet').to_pandas()
             A3 = pd.concat([df1, df2])
-            return (A3.two=='foo').sum()
+            return (A3.two == 'foo').sum()
 
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
@@ -734,8 +735,8 @@ class TestHiFrames(unittest.TestCase):
                    'NUMA_PES=3 build')
     def test_concat_series(self):
         def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n)+1.0})
-            df2 = pd.DataFrame({'key2': n-np.arange(n), 'A': n+np.arange(n)+1.0})
+            df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n) + 1.0})
+            df2 = pd.DataFrame({'key2': n - np.arange(n), 'A': n + np.arange(n) + 1.0})
             A3 = pd.concat([df1.A, df2.A])
             return A3.sum()
 
@@ -754,7 +755,7 @@ class TestHiFrames(unittest.TestCase):
             df1 = pq.read_table('example.parquet').to_pandas()
             df2 = pq.read_table('example.parquet').to_pandas()
             A3 = pd.concat([df1.two, df2.two])
-            return (A3=='foo').sum()
+            return (A3 == 'foo').sum()
 
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
@@ -771,15 +772,14 @@ class TestHiFrames(unittest.TestCase):
                 s_open = 20 * np.ones(max_num_days)
                 s_low = 28 * np.ones(max_num_days)
                 s_close = 19 * np.ones(max_num_days)
-                df = pd.DataFrame({'Open': s_open, 'Low': s_low,
-                                    'Close': s_close})
+                df = pd.DataFrame({'Open': s_open, 'Low': s_low, 'Close': s_close})
                 df['Stdev'] = df['Close'].rolling(window=90).std()
                 df['Moving Average'] = df['Close'].rolling(window=20).mean()
                 df['Criteria1'] = (df['Open'] - df['Low'].shift(1)) < -df['Stdev']
                 df['Criteria2'] = df['Open'] > df['Moving Average']
                 df['BUY'] = df['Criteria1'] & df['Criteria2']
                 df['Pct Change'] = (df['Close'] - df['Open']) / df['Open']
-                df['Rets'] = df['Pct Change'][df['BUY'] == True]
+                df['Rets'] = df['Pct Change'][df['BUY']]
                 all_res += df['Rets'].mean()
             return all_res
 
@@ -800,15 +800,16 @@ class TestHiFrames(unittest.TestCase):
             df2['C'] = np.full_like(df2.B.values, 3, np.int8)
             return df2
 
-        A = np.array([1,1,2,3])
-        B = np.array([3,4,5,6])
+        A = np.array([1, 1, 2, 3])
+        B = np.array([3, 4, 5, 6])
         hpat_func = hpat.jit(locals={'A:input': 'distributed',
-            'B:input': 'distributed', 'df2:return': 'distributed'})(test_impl)
+                                     'B:input': 'distributed', 'df2:return': 'distributed'})(test_impl)
         start, end = get_start_end(len(A))
         df2 = hpat_func(A[start:end], B[start:end])
         # TODO:
         # pd.testing.assert_frame_equal(
         #     hpat_func(A[start:end], B[start:end]), test_impl(A, B))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,6 @@
   lines (not neessarily number of bytes). The actual file read is
   done lazily in the objects read method.
 */
-#include <mpi.h>
 #include <cstdint>
 #include <cinttypes>
 #include <string>
@@ -20,12 +19,35 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "../_datetime_ext.h"
-#include "../_distributed.h"
 #include "_csv.h"
 
 #include <Python.h>
 #include "structmember.h"
 
+//TODO This function must be deleted or corresponding code should be refactored
+static void* get_py_registered_symbold(const char* module, const char* name)
+{
+    void *name_ptr = nullptr;
+    PyObject *name_obj = nullptr;
+
+    PyObject *py_mod = PyImport_ImportModule(module);
+    if (!py_mod)
+    {
+    	goto cleanup;
+    }
+
+    name_obj = PyObject_GetAttrString(py_mod, name);
+    if (!name_obj)
+    {
+    	goto cleanup;
+    }
+
+    name_ptr = PyLong_AsVoidPtr(name_obj);
+
+cleanup:
+    Py_XDECREF(py_mod);
+    return name_ptr;
+}
 
 // ***********************************************************************************
 // Our file-like object for reading chunks in a std::istream
@@ -248,22 +270,13 @@ extern "C" void PyInit_csv(PyObject * m)
 // C interface for getting the file-like chunk reader
 // ***********************************************************************************
 
-#define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
-
-/// return vector of offsets of newlines in first n bytes of given stream
-static std::vector<size_t> count_lines(std::istream * f, size_t n)
-{
-    std::vector<size_t> pos;
-    char c;
-    size_t i=0;
-    while(i<n && f->get(c)) {
-        if(c == '\n') pos.push_back(i);
-        ++i;
-    }
-    if(i<n) std::cerr << "Warning, read only " << i << " bytes out of " << n << "requested\n";
-    return pos;
-}
-
+typedef void (*hpat_mpi_csv_get_offsets)(std::istream* f,
+        size_t fsz,
+        bool is_parallel,
+        int64_t skiprows,
+        int64_t nrows,
+        size_t& my_off_start,
+        size_t& my_off_end);
 
 /**
  * Split stream into chunks and return a file-like object per rank. The returned object
@@ -272,8 +285,6 @@ static std::vector<size_t> count_lines(std::istream * f, size_t n)
  * We evenly distribute by number of lines by working on byte-chunks in parallel
  *   * counting new-lines and allreducing and exscaning numbers
  *   * computing start/end points of desired chunks-of-lines and sending them to corresponding ranks.
- * Using hpat_dist_get_size and hpat_dist_get_start to compute chunk start/end/size as well as
- * the final chunking of lines.
  *
  * @param[in]  f   the input stream
  * @param[in]  fsz total number of bytes in stream
@@ -288,95 +299,16 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
     }
     // printf("rank %d skiprows %d nrows %d\n", hpat_dist_get_rank(), skiprows, nrows);
 
-    size_t nranks = hpat_dist_get_size();
-
     size_t my_off_start = 0;
     size_t my_off_end = fsz;
 
-    if(is_parallel && nranks > 1) {
-        size_t rank = hpat_dist_get_rank();
-
-        // seek to our chunk
-        size_t byte_offset = hpat_dist_get_start(fsz, nranks, rank);
-        f->seekg(byte_offset, std::ios_base::beg);
-        if(!f->good() || f->eof()) {
-            std::cerr << "Could not seek to start position " << hpat_dist_get_start(fsz, nranks, rank) << std::endl;
-            return NULL;
-        }
-        // We evenly distribute the 'data' byte-wise
-        // count number of lines in chunk
-        // TODO: count only until nrows
-        std::vector<size_t> line_offset = count_lines(f, hpat_dist_get_node_portion(fsz, nranks, rank));
-        size_t no_lines = line_offset.size();
-        // get total number of lines using allreduce
-        size_t tot_no_lines(0);
-
-        hpat_dist_reduce(reinterpret_cast<char *>(&no_lines), reinterpret_cast<char *>(&tot_no_lines), HPAT_ReduceOps::SUM, HPAT_CTypes::UINT64);
-
-        // Now we need to communicate the distribution as we really want it
-        // First determine which is our first line (which is the sum of previous lines)
-        size_t byte_first_line = hpat_dist_exscan_i8(no_lines);
-        size_t byte_last_line = byte_first_line + no_lines;
-
-        // We now determine the chunks of lines that begin and end in our byte-chunk
-
-        // issue IRecv calls, eventually receiving start and end offsets of our line-chunk
-        const int START_OFFSET = 47011;
-        const int END_OFFSET = 47012;
-        std::vector<MPI_Request> mpi_reqs;
-        mpi_reqs.push_back(hpat_dist_irecv(&my_off_start, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, START_OFFSET, (rank>0 || skiprows>0)));
-        mpi_reqs.push_back(hpat_dist_irecv(&my_off_end, 1, HPAT_CTypes::UINT64, MPI_ANY_SOURCE, END_OFFSET, ((rank<(nranks-1)) || nrows!=-1)));
-
-        // check nrows argument
-        if (nrows != -1 && (nrows < 0 || nrows > tot_no_lines))
-        {
-            std::cerr << "Invalid nrows argument: " << nrows << " for total number of lines: "<< tot_no_lines << std::endl;
-            return NULL;
-        }
-
-        // number of lines that actually needs to be parsed
-        size_t n_lines_to_read = nrows != -1 ? nrows : tot_no_lines - skiprows;
-        // TODO skiprows and nrows need testing
-        // send start offset of rank 0
-        if(skiprows > byte_first_line && skiprows <= byte_last_line) {
-            size_t i_off = byte_offset + line_offset[skiprows-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
-            mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, 0, START_OFFSET, true));
-        }
-
-        // send end offset of rank n-1
-        if(nrows > byte_first_line && nrows <= byte_last_line) {
-            size_t i_off = byte_offset + line_offset[nrows-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
-            mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, nranks-1, END_OFFSET, true));
-        }
-
-        // We iterate through chunk boundaries (defined by line-numbers)
-        // we start with boundary 1 as 0 is the beginning of file
-        for(int i=1; i<nranks; ++i) {
-            size_t i_bndry = skiprows + hpat_dist_get_start(n_lines_to_read, (int)nranks, i);
-            // Note our line_offsets mark the end of each line!
-            // we check if boundary is on our byte-chunk
-            if(i_bndry > byte_first_line && i_bndry <= byte_last_line) {
-                // if so, send stream-offset to ranks which start/end here
-                size_t i_off = byte_offset + line_offset[i_bndry-byte_first_line-1]+1; // +1 to skip/include leading/trailing newline
-                // send to rank that starts at this boundary: i
-                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i, START_OFFSET, true));
-                // send to rank that ends at this boundary: i-1
-                mpi_reqs.push_back(hpat_dist_isend(&i_off, 1, HPAT_CTypes::UINT64, i-1, END_OFFSET, true));
-            } else {
-                // if not and we past our chunk -> we stop
-                if(i_bndry > byte_last_line) break;
-            } // else we are before our chunk -> continue iteration
-        }
-        // before reading, make sure we received our start/end offsets
-        hpat_dist_waitall(mpi_reqs.size(), mpi_reqs.data());
-    } // if is_parallel
-    else if (skiprows>0 || nrows != -1) {
-        std::vector<size_t> line_offset = count_lines(f, fsz);
-        if (skiprows>0)
-            my_off_start = line_offset[skiprows-1]+1;
-        if (nrows != -1)
-            my_off_end = line_offset[nrows-1]+1;
+    hpat_mpi_csv_get_offsets hpat_mpi_csv_get_offsets_ptr = (hpat_mpi_csv_get_offsets) get_py_registered_symbold("hpat.transport_mpi", "hpat_mpi_csv_get_offsets");
+    if (!hpat_mpi_csv_get_offsets_ptr)
+    {
+    	return NULL;
     }
+
+    hpat_mpi_csv_get_offsets_ptr(f, fsz, is_parallel, skiprows, nrows, my_off_start, my_off_end);
 
     // Here we now know exactly what chunk to read: [my_off_start,my_off_end[
     // let's create our file-like reader
@@ -396,12 +328,14 @@ static PyObject* csv_chunk_reader(std::istream * f, size_t fsz, bool is_parallel
 }
 
 
+#define CHECK(expr, msg) if(!(expr)){std::cerr << "Error in csv_read: " << msg << std::endl; return NULL;}
+
 // taking a file to create a istream and calling csv_chunk_reader
-extern "C" PyObject* csv_file_chunk_reader(const char * fname, bool is_parallel, int64_t skiprows, int64_t nrows)
+PyObject* csv_file_chunk_reader(const char * fname, bool is_parallel, int64_t skiprows, int64_t nrows)
 {
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
-    auto fsz = boost::filesystem::file_size(fname);
+    size_t fsz = boost::filesystem::file_size(fname);
     std::ifstream * f = new std::ifstream(fname);
     CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
     return csv_chunk_reader(f, fsz, is_parallel, skiprows, nrows);
@@ -409,7 +343,7 @@ extern "C" PyObject* csv_file_chunk_reader(const char * fname, bool is_parallel,
 
 
 // taking a string to create a istream and calling csv_chunk_reader
-extern "C" PyObject* csv_string_chunk_reader(const std::string * str, bool is_parallel)
+PyObject* csv_string_chunk_reader(const std::string * str, bool is_parallel)
 {
     CHECK(str != NULL, "NULL string provided.");
     // get total file-size
