@@ -7,7 +7,7 @@ from pd_benchmarks.io import csv
 class ToCSV(csv.ToCSV):
 
     params = [['long'] , [tool.value for tool in Tool]]
-    param_names = ['kind', 'tool']
+    param_names = csv.ToCSV.param_names + ['tool']
 
     def setup(self, kind, tool):
         super().setup(kind)

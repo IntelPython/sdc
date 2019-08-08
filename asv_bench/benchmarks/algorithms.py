@@ -5,11 +5,9 @@ from pd_benchmarks import algorithms
 
 
 class Quantile(algorithms.Quantile):
-    params = [[0, 0.5, 1],
-              ['linear', 'nearest', 'lower', 'higher', 'midpoint'],
-              ['float', 'int', 'uint'],
-              [tool.value for tool in Tool]]
-    param_names = ['quantile', 'interpolation', 'dtype', 'tool']
+
+    params = algorithms.Quantile.params + [[tool.value for tool in Tool]]
+    param_names = algorithms.Quantile.param_names + ['tool']
 
     def setup(self, quantile, interpolation, dtype, tool):
         super().setup(quantile, interpolation, dtype)
