@@ -148,16 +148,26 @@ ext_io = Extension(name="hpat.hio",
                    language="c++"
                    )
 
-ext_mpi = Extension(name="hpat.transport_mpi",
-                    sources=["hpat/transport/hpat_transport_mpi.cpp"],
-                    depends=["hpat/_distributed.h"],
-                    libraries=io_libs,
-                    include_dirs=ind + np_compile_args['include_dirs'],
-                    library_dirs=lid,
-                    extra_compile_args=eca,
-                    extra_link_args=ela,
-                    language="c++"
-                    )
+ext_transport_mpi = Extension(name="hpat.transport_mpi",
+                              sources=["hpat/transport/hpat_transport_mpi.cpp"],
+                              depends=["hpat/_distributed.h"],
+                              libraries=io_libs,
+                              include_dirs=ind,
+                              library_dirs=lid,
+                              extra_compile_args=eca,
+                              extra_link_args=ela,
+                              language="c++"
+                              )
+
+ext_transport_seq = Extension(name="hpat.transport_seq",
+                              sources=["hpat/transport/hpat_transport_single_process.cpp"],
+                              depends=["hpat/_distributed.h"],
+                              include_dirs=ind,
+                              library_dirs=lid,
+                              extra_compile_args=eca,
+                              extra_link_args=ela,
+                              language="c++"
+                              )
 
 ext_hdf5 = Extension(name="hpat.io._hdf5",
                      sources=["hpat/io/_hdf5.cpp"],
@@ -324,7 +334,7 @@ ext_xenon_wrapper = Extension(name="hpat.hxe_ext",
                               extra_link_args=ela,
                               )
 
-_ext_mods = [ext_mpi, ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
 
 if _has_h5py:
     _ext_mods.append(ext_hdf5)

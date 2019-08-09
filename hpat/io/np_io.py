@@ -54,11 +54,15 @@ def _handle_np_fromfile(assign, lhs, rhs):
 
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    from .. import transport_mpi
+    if hpat.config.config_transport_mpi:
+        from .. import transport_mpi as transport
+    else:
+        from .. import transport_seq as transport
+
     import llvmlite.binding as ll
-    ll.add_symbol('get_file_size', transport_mpi.get_file_size)
+    ll.add_symbol('get_file_size', transport.get_file_size)
     ll.add_symbol('file_read', hio.file_read)
-    ll.add_symbol('file_read_parallel', transport_mpi.file_read_parallel)
+    ll.add_symbol('file_read_parallel', transport.file_read_parallel)
     _fname = rhs.args[0]
     _dtype = rhs.args[1]
 
@@ -90,10 +94,14 @@ def get_dtype_size(typingctx, dtype=None):
 def tofile_overload(arr_ty, fname_ty):
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    from .. import transport_mpi
+    if hpat.config.config_transport_mpi:
+        from .. import transport_mpi as transport
+    else:
+        from .. import transport_seq as transport
+
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
-    ll.add_symbol('file_write_parallel', transport_mpi.file_write_parallel)
+    ll.add_symbol('file_write_parallel', transport.file_write_parallel)
     # TODO: fix Numba to convert literal
     if fname_ty == string_type or isinstance(fname_ty, types.StringLiteral):
         def tofile_impl(arr, fname):
