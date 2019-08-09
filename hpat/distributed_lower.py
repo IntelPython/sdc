@@ -1,3 +1,8 @@
+import atexit
+from numba.typing.templates import infer_global, AbstractTemplate
+import sys
+from numba.typing import signature
+import llvmlite.binding as ll
 import operator
 from numba import types, cgutils
 from numba.targets.imputils import lower_builtin
@@ -14,38 +19,45 @@ from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_typ
 import time
 from llvmlite import ir as lir
 from . import hdist
-import llvmlite.binding as ll
-ll.add_symbol('hpat_dist_get_rank', hdist.hpat_dist_get_rank)
-ll.add_symbol('hpat_dist_get_size', hdist.hpat_dist_get_size)
+
+if hpat.config.config_transport_mpi:
+    from . import transport_mpi as transport
+else:
+    from . import transport_seq as transport
+
+
+ll.add_symbol('hpat_dist_get_rank', transport.hpat_dist_get_rank)
+ll.add_symbol('hpat_dist_get_size', transport.hpat_dist_get_size)
+ll.add_symbol('hpat_dist_get_time', transport.hpat_dist_get_time)
+ll.add_symbol('hpat_get_time', transport.hpat_get_time)
+ll.add_symbol('hpat_barrier', transport.hpat_barrier)
+ll.add_symbol('hpat_dist_reduce', transport.hpat_dist_reduce)
+ll.add_symbol('hpat_dist_arr_reduce', transport.hpat_dist_arr_reduce)
+ll.add_symbol('hpat_dist_exscan_i4', transport.hpat_dist_exscan_i4)
+ll.add_symbol('hpat_dist_exscan_i8', transport.hpat_dist_exscan_i8)
+ll.add_symbol('hpat_dist_exscan_f4', transport.hpat_dist_exscan_f4)
+ll.add_symbol('hpat_dist_exscan_f8', transport.hpat_dist_exscan_f8)
+ll.add_symbol('hpat_dist_irecv', transport.hpat_dist_irecv)
+ll.add_symbol('hpat_dist_isend', transport.hpat_dist_isend)
+ll.add_symbol('hpat_dist_wait', transport.hpat_dist_wait)
+ll.add_symbol('allgather', transport.allgather)
+ll.add_symbol('comm_req_alloc', transport.comm_req_alloc)
+ll.add_symbol('comm_req_dealloc', transport.comm_req_dealloc)
+ll.add_symbol('req_array_setitem', transport.req_array_setitem)
+ll.add_symbol('hpat_dist_waitall', transport.hpat_dist_waitall)
+ll.add_symbol('oneD_reshape_shuffle', transport.oneD_reshape_shuffle)
+ll.add_symbol('permutation_int', transport.permutation_int)
+ll.add_symbol('permutation_array_index', transport.permutation_array_index)
+ll.add_symbol('hpat_finalize', transport.hpat_finalize)
+
+# get size dynamically from C code
+mpi_req_llvm_type = lir.IntType(8 * transport.mpi_req_num_bytes)
+
+ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
+ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
 ll.add_symbol('hpat_dist_get_start', hdist.hpat_dist_get_start)
 ll.add_symbol('hpat_dist_get_end', hdist.hpat_dist_get_end)
 ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
-ll.add_symbol('hpat_dist_get_time', hdist.hpat_dist_get_time)
-ll.add_symbol('hpat_get_time', hdist.hpat_get_time)
-ll.add_symbol('hpat_barrier', hdist.hpat_barrier)
-ll.add_symbol('hpat_dist_reduce', hdist.hpat_dist_reduce)
-ll.add_symbol('hpat_dist_arr_reduce', hdist.hpat_dist_arr_reduce)
-ll.add_symbol('hpat_dist_exscan_i4', hdist.hpat_dist_exscan_i4)
-ll.add_symbol('hpat_dist_exscan_i8', hdist.hpat_dist_exscan_i8)
-ll.add_symbol('hpat_dist_exscan_f4', hdist.hpat_dist_exscan_f4)
-ll.add_symbol('hpat_dist_exscan_f8', hdist.hpat_dist_exscan_f8)
-ll.add_symbol('hpat_dist_irecv', hdist.hpat_dist_irecv)
-ll.add_symbol('hpat_dist_isend', hdist.hpat_dist_isend)
-ll.add_symbol('hpat_dist_wait', hdist.hpat_dist_wait)
-ll.add_symbol('hpat_dist_get_item_pointer', hdist.hpat_dist_get_item_pointer)
-ll.add_symbol('hpat_get_dummy_ptr', hdist.hpat_get_dummy_ptr)
-ll.add_symbol('allgather', hdist.allgather)
-ll.add_symbol('comm_req_alloc', hdist.comm_req_alloc)
-ll.add_symbol('comm_req_dealloc', hdist.comm_req_dealloc)
-ll.add_symbol('req_array_setitem', hdist.req_array_setitem)
-ll.add_symbol('hpat_dist_waitall', hdist.hpat_dist_waitall)
-ll.add_symbol('oneD_reshape_shuffle', hdist.oneD_reshape_shuffle)
-ll.add_symbol('permutation_int', hdist.permutation_int)
-ll.add_symbol('permutation_array_index', hdist.permutation_array_index)
-
-# get size dynamically from C code
-mpi_req_llvm_type = lir.IntType(8 * hdist.mpi_req_num_bytes)
-
 
 
 @lower_builtin(distributed_api.get_rank)
@@ -86,6 +98,7 @@ def dist_get_portion(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(
         fnty, name="hpat_dist_get_node_portion")
     return builder.call(fn, [args[0], args[1], args[2]])
+
 
 @lower_builtin(distributed_api.dist_reduce, types.int8, types.int32)
 @lower_builtin(distributed_api.dist_reduce, types.uint8, types.int32)
@@ -222,10 +235,8 @@ def lower_dist_exscan(context, builder, sig, args):
     return builder.call(fn, [args[0]])
 
 # array, size, pe, tag, cond
-@lower_builtin(distributed_api.irecv, types.npytypes.Array, types.int32,
-                types.int32, types.int32)
-@lower_builtin(distributed_api.irecv, types.npytypes.Array, types.int32,
-               types.int32, types.int32, types.boolean)
+@lower_builtin(distributed_api.irecv, types.npytypes.Array, types.int32, types.int32, types.int32)
+@lower_builtin(distributed_api.irecv, types.npytypes.Array, types.int32, types.int32, types.int32, types.boolean)
 def lower_dist_irecv(context, builder, sig, args):
     # store an int to specify data type
     typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
@@ -252,10 +263,8 @@ def lower_dist_irecv(context, builder, sig, args):
     return builder.call(fn, call_args)
 
 # array, size, pe, tag, cond
-@lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32,
-                types.int32, types.int32)
-@lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32,
-               types.int32, types.int32, types.boolean)
+@lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32, types.int32, types.int32)
+@lower_builtin(distributed_api.isend, types.npytypes.Array, types.int32, types.int32, types.int32, types.boolean)
 def lower_dist_isend(context, builder, sig, args):
     # store an int to specify data type
     typ_enum = _numba_to_c_type_map[sig.args[0].dtype]
@@ -288,6 +297,7 @@ def lower_dist_wait(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
 
+
 @lower_builtin(distributed_api.waitall, types.int32, req_array_type)
 def lower_dist_waitall(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
@@ -296,6 +306,7 @@ def lower_dist_waitall(context, builder, sig, args):
     builder.call(fn, args)
     return context.get_dummy_value()
 
+
 @lower_builtin(distributed_api.rebalance_array_parallel, types.Array, types.intp)
 def lower_dist_rebalance_array_parallel(context, builder, sig, args):
 
@@ -303,8 +314,7 @@ def lower_dist_rebalance_array_parallel(context, builder, sig, args):
     ndim = arr_typ.ndim
     # TODO: support string type
 
-    shape_tup = ",".join(["count"]
-                    + ["in_arr.shape[{}]".format(i) for i in range(1, ndim)])
+    shape_tup = ",".join(["count"] + ["in_arr.shape[{}]".format(i) for i in range(1, ndim)])
     alloc_text = "np.empty(({}), in_arr.dtype)".format(shape_tup)
 
     func_text = """def f(in_arr, count):
@@ -388,7 +398,7 @@ def lower_dist_allgather(context, builder, sig, args):
                  size_arg, val_ptr, typ_arg]
 
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
-                            lir.IntType(32), val_ptr.type, lir.IntType(32)])
+                                             lir.IntType(32), val_ptr.type, lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="allgather")
     builder.call(fn, call_args)
     return context.get_dummy_value()
@@ -399,6 +409,7 @@ def lower_dist_comm_req_alloc(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(32)])
     fn = builder.module.get_or_insert_function(fnty, name="comm_req_alloc")
     return builder.call(fn, args)
+
 
 @lower_builtin(distributed_api.comm_req_dealloc, req_array_type)
 def lower_dist_comm_req_dealloc(context, builder, sig, args):
@@ -486,8 +497,10 @@ def _root_rank_select(old_val, new_val):  # pragma: no cover
         return old_val
     return new_val
 
+
 def get_tuple_prod(t):
     return np.prod(t)
+
 
 @overload(get_tuple_prod)
 def get_tuple_prod_overload(t):
@@ -505,34 +518,39 @@ def get_tuple_prod_overload(t):
 
 
 sig = types.void(
-            types.voidptr,  # output array
-            types.voidptr,  # input array
-            types.intp,     # old_len
-            types.intp,     # new_len
-            types.intp,     # input lower_dim size in bytes
-            types.intp,     # output lower_dim size in bytes
-            )
+    types.voidptr,  # output array
+    types.voidptr,  # input array
+    types.intp,     # old_len
+    types.intp,     # new_len
+    types.intp,     # input lower_dim size in bytes
+    types.intp,     # output lower_dim size in bytes
+)
 
 oneD_reshape_shuffle = types.ExternalFunction("oneD_reshape_shuffle", sig)
+
 
 @numba.njit
 def dist_oneD_reshape_shuffle(lhs, in_arr, new_0dim_global_len, old_0dim_global_len, dtype_size):  # pragma: no cover
     c_in_arr = np.ascontiguousarray(in_arr)
     in_lower_dims_size = get_tuple_prod(c_in_arr.shape[1:])
     out_lower_dims_size = get_tuple_prod(lhs.shape[1:])
-    #print(c_in_arr)
+    # print(c_in_arr)
     # print(new_0dim_global_len, old_0dim_global_len, out_lower_dims_size, in_lower_dims_size)
     oneD_reshape_shuffle(lhs.ctypes, c_in_arr.ctypes,
-                            new_0dim_global_len, old_0dim_global_len,
-                            dtype_size * out_lower_dims_size,
-                            dtype_size * in_lower_dims_size)
-    #print(in_arr)
+                         new_0dim_global_len, old_0dim_global_len,
+                         dtype_size * out_lower_dims_size,
+                         dtype_size * in_lower_dims_size)
+    # print(in_arr)
+
 
 permutation_int = types.ExternalFunction("permutation_int",
                                          types.void(types.voidptr, types.intp))
+
+
 @numba.njit
 def dist_permutation_int(lhs, n):
     permutation_int(lhs.ctypes, n)
+
 
 permutation_array_index = types.ExternalFunction("permutation_array_index",
                                                  types.void(types.voidptr,
@@ -541,6 +559,8 @@ permutation_array_index = types.ExternalFunction("permutation_array_index",
                                                             types.voidptr,
                                                             types.voidptr,
                                                             types.intp))
+
+
 @numba.njit
 def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
     c_rhs = np.ascontiguousarray(rhs)
@@ -551,11 +571,10 @@ def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
 
 ########### finalize MPI when exiting ####################
 
+
 def hpat_finalize():
     return 0
 
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing import signature
 
 @infer_global(hpat_finalize)
 class FinalizeInfer(AbstractTemplate):
@@ -564,7 +583,6 @@ class FinalizeInfer(AbstractTemplate):
         assert len(args) == 0
         return signature(types.int32, *args)
 
-ll.add_symbol('hpat_finalize', hdist.hpat_finalize)
 
 @lower_builtin(hpat_finalize)
 def lower_hpat_finalize(context, builder, sig, args):
@@ -572,12 +590,12 @@ def lower_hpat_finalize(context, builder, sig, args):
     fn = builder.module.get_or_insert_function(fnty, name="hpat_finalize")
     return builder.call(fn, args)
 
+
 @numba.njit
 def call_finalize():
     hpat_finalize()
 
-import atexit
-import sys
+
 atexit.register(call_finalize)
 # flush output before finalize
 atexit.register(sys.stdout.flush)
