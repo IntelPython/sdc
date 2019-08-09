@@ -807,10 +807,8 @@ class DistributedPass(object):
         """transform np.func() calls
         """
         # allocs are handled separately
-        assert not ((self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs))
-                    and func_name in hpat.utils.np_alloc_callnames), (
-                    "allocation calls handled separately "
-                    "'empty', 'zeros', 'ones', 'full' etc.")
+        assert not ((self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs)) and func_name in hpat.utils.np_alloc_callnames), (
+            "allocation calls handled separately 'empty', 'zeros', 'ones', 'full' etc.")
         out = [assign]
         scope = assign.target.scope
         loc = assign.loc
@@ -1749,8 +1747,7 @@ class DistributedPass(object):
 
         # TODO: comprehensive support for Series vars
         from hpat.hiframes.pd_series_ext import SeriesType
-        if isinstance(typ, (SeriesType,
-                hpat.hiframes.pd_dataframe_ext.DataFrameType)):
+        if isinstance(typ, (SeriesType, hpat.hiframes.pd_dataframe_ext.DataFrameType)):
             return None
 
         # gen len() using 1D_Var reduce approach.
