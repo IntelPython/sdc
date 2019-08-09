@@ -39,6 +39,8 @@ def remove_xenon(rhs, lives, call_list):
 numba.ir_utils.remove_call_handlers.append(remove_xenon)
 
 # TODO: implement in regular python
+
+
 def read_xenon():
     return
 
@@ -168,8 +170,8 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
 
     loc = cvar.loc
 
-    func_text = ('def f(xe_connect_var, xe_dset_var, schema_arr):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'.
-                 format(i))
+    func_text = (
+        'def f(xe_connect_var, xe_dset_var, schema_arr):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'. format(i))
     # func_text += '  print(col_size)\n'
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
