@@ -997,6 +997,7 @@ explicit_binop_funcs = {
 def ex_binop_generic(self, args, kws):
     return SeriesOpUfuncs.generic(self, (self.this,) + args, kws)
 
+
 for fname, op in explicit_binop_funcs.items():
     install_series_method(op, fname, ex_binop_generic)
 

@@ -32,6 +32,32 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
 ]]
 
 
+def _make_func_from_text(func_text, func_name='test_impl'):
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    test_impl = loc_vars[func_name]
+    return test_impl
+
+
+def _make_func_use_binop1(operator):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   return A {} B\n".format(operator)
+    return _make_func_from_text(func_text)
+
+
+def _make_func_use_binop2(operator):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   A {} B\n".format(operator)
+    func_text += "   return A\n"
+    return _make_func_from_text(func_text)
+
+
+def _make_func_use_method_arg1(method):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   return A.{}(B)\n".format(method)
+    return _make_func_from_text(func_text)
+
+
 GLOBAL_VAL = 2
 
 
@@ -418,30 +444,21 @@ class TestSeries(unittest.TestCase):
 
     def test_series_op1(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
-
         for operator in arithmetic_binops:
-            func_text = "def test_impl(S):\n"
-            func_text += "   return S {} S\n".format(operator)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_binop1(operator)
             hpat_func = hpat.jit(test_impl)
-        
+
             n = 11
-            df = pd.DataFrame({'A': np.arange(1, n)})
-            pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
     def test_series_op2(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
         for operator in arithmetic_binops:
-            func_text = "def test_impl(S, i):\n"
-            func_text += "   return S {} i\n".format(operator)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_binop1(operator)
             hpat_func = hpat.jit(test_impl)
-        
+
             n = 11
             df = pd.DataFrame({'A': np.arange(1, n)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
@@ -450,34 +467,36 @@ class TestSeries(unittest.TestCase):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
         for operator in arithmetic_binops:
-            func_text = "def test_impl(S, i):\n"
-            func_text += "   S {} i\n".format(operator)
-            func_text += "   return S\n"
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_binop2(operator)
             hpat_func = hpat.jit(test_impl)
-        
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
+
+    def test_series_op4(self):
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop2(operator)
+            hpat_func = hpat.jit(test_impl)
+
             n = 11
             df = pd.DataFrame({'A': np.arange(1, n)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
-    def test_series_op4(self):
+    def test_series_op5(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
         for method in arithmetic_methods:
-            func_text = "def test_impl(S):\n"
-            func_text += "   return S.{}(S)\n".format(method)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_method_arg1(method)
             hpat_func = hpat.jit(test_impl)
-        
-            n = 11
-            df = pd.DataFrame({'A': np.arange(1, n)})
-            pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    def test_series_op5(self):
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
+
+    def test_series_op6(self):
         def test_impl(A):
             return -A
         hpat_func = hpat.jit(test_impl)
@@ -486,33 +505,25 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
-    def test_series_op6(self):
+    def test_series_op7(self):
         comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
 
         for operator in comparison_binops:
-            func_text = "def test_impl(A, B):\n"
-            func_text += "   return A {} B\n".format(operator)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_binop1(operator)
             hpat_func = hpat.jit(test_impl)
-        
+
             n = 11
             A = pd.Series(np.arange(n))
             B = pd.Series(np.arange(n)**2)
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
- 
-    def test_series_op7(self):
+
+    def test_series_op8(self):
         comparison_methods = ('lt', 'gt', 'le', 'ge', 'ne', 'eq')
 
         for method in comparison_methods:
-            func_text = "def test_impl(A, B):\n"
-            func_text += "   return A.{}(B)\n".format(method)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_use_method_arg1(method)
             hpat_func = hpat.jit(test_impl)
-        
+
             n = 11
             A = pd.Series(np.arange(n))
             B = pd.Series(np.arange(n)**2)
@@ -529,15 +540,6 @@ class TestSeries(unittest.TestCase):
         B = pd.Series(np.ones(n))
         np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
 
-    def test_series_abs(self):
-        def test_impl(A):
-            return A.abs()
-        hpat_func = hpat.jit(test_impl)
-
-        S = pd.Series([1, 2.2, -5.8, 3, 2, -1.2, -4, 4.7])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
- 
     def test_series_fusion1(self):
         def test_impl(A, B):
             return A + B + 1
@@ -1047,7 +1049,7 @@ class TestSeries(unittest.TestCase):
             return S.abs()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, -2., 3.])
+        S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('AssertionError - fix needed\n'
@@ -1096,9 +1098,7 @@ class TestSeries(unittest.TestCase):
         for method in str2str_methods:
             func_text = "def test_impl(S):\n"
             func_text += "  return S.str.{}()\n".format(method)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_from_text(func_text)
             hpat_func = hpat.jit(test_impl)
 
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
