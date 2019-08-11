@@ -1,45 +1,69 @@
 from __future__ import print_function, division, absolute_import
-
 import operator
 import types as pytypes  # avoid confusion with numba.types
 import copy
 import warnings
 from collections import defaultdict
-import numba
-from numba import (ir, types, typing, config, numpy_support,
-                   ir_utils, postproc)
-from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
-                            dprint_func_ir, remove_dead, mk_alloc,
-                            get_global_func_typ, get_name_var_table,
-                            get_call_table, get_tuple_table, remove_dels,
-                            compile_to_numba_ir, replace_arg_nodes,
-                            guard, get_definition, require, GuardException,
-                            find_callname, build_definitions,
-                            find_build_sequence, find_const, is_get_setitem)
-from numba.inline_closurecall import inline_closure_call
-from numba.typing import signature
-from numba.parfor import (get_parfor_reductions, get_parfor_params,
-                          wrap_parfor_blocks, unwrap_parfor_blocks)
-from numba.parfor import Parfor, lower_parfor_sequential
 import numpy as np
 
+import numba
+from numba import ir, types, typing, config, numpy_support, ir_utils, postproc
+from numba.ir_utils import (
+    mk_unique_var,
+    replace_vars_inner,
+    find_topo_order,
+    dprint_func_ir,
+    remove_dead,
+    mk_alloc,
+    get_global_func_typ,
+    get_name_var_table,
+    get_call_table,
+    get_tuple_table,
+    remove_dels,
+    compile_to_numba_ir,
+    replace_arg_nodes,
+    guard,
+    get_definition,
+    require,
+    GuardException,
+    find_callname,
+    build_definitions,
+    find_build_sequence,
+    find_const,
+    is_get_setitem)
+from numba.inline_closurecall import inline_closure_call
+from numba.typing import signature
+from numba.parfor import (
+    Parfor,
+    lower_parfor_sequential,
+    get_parfor_reductions,
+    get_parfor_params,
+    wrap_parfor_blocks,
+    unwrap_parfor_blocks)
+
 import hpat
+import hpat.utils
+from hpat import distributed_api, distributed_lower
 from hpat.io.pio_api import h5file_type, h5group_type
-from hpat import (distributed_api,
-                  distributed_lower)  # import lower for module initialization
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
-from hpat.distributed_analysis import (Distribution,
-                                       DistributedAnalysis)
-
-# from mpi4py import MPI
-import hpat.utils
-from hpat.utils import (is_alloc_callname, is_whole_slice, is_array_container,
-                        get_slice_step, is_array, is_np_array, find_build_tuple,
-                        debug_prints, ReplaceFunc, gen_getitem, is_call,
-                        is_const_slice)
 from hpat.distributed_api import Reduce_Type
+from hpat.distributed_analysis import Distribution, DistributedAnalysis
+from hpat.utils import (
+    is_alloc_callname,
+    is_whole_slice,
+    is_array_container,
+    get_slice_step,
+    is_array,
+    is_np_array,
+    find_build_tuple,
+    debug_prints,
+    ReplaceFunc,
+    gen_getitem,
+    is_call,
+    is_const_slice)
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
+
 
 distributed_run_extensions = {}
 
@@ -770,10 +794,9 @@ class DistributedPass(object):
             assign.value = rhs.args[0]
             return [assign]
 
-        if (fdef == ('get_series_data',
-                     'hpat.hiframes.api') or fdef == ('get_series_index',
-                                                      'hpat.hiframes.api') or fdef == ('get_dataframe_data',
-                                                                                       'hpat.hiframes.pd_dataframe_ext')):
+        if ((fdef == ('get_series_data', 'hpat.hiframes.api')
+             or fdef == ('get_series_index', 'hpat.hiframes.api')
+             or fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext'))):
             out = [assign]
             arr = assign.target
             # gen len() using 1D_Var reduce approach.
@@ -829,8 +852,10 @@ class DistributedPass(object):
         """transform np.func() calls
         """
         # allocs are handled separately
-        assert not ((self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs)) and func_name in hpat.utils.np_alloc_callnames), (
-            "allocation calls handled separately 'empty', 'zeros', 'ones', 'full' etc.")
+        is_1D_bool = (self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs))
+        err_str = "allocation calls handled separately 'empty', 'zeros', 'ones', 'full' etc."
+        assert not (is_1D_bool and func_name in hpat.utils.np_alloc_callnames), err_str
+
         out = [assign]
         scope = assign.target.scope
         loc = assign.loc
@@ -1075,9 +1100,9 @@ class DistributedPass(object):
 
     def _fix_parallel_df_index(self, df):
         def f(df):  # pragma: no cover
-            l = len(df)
-            start = hpat.distributed_api.dist_exscan(l)
-            ind = np.arange(start, start + l)
+            length = len(df)
+            start = hpat.distributed_api.dist_exscan(length)
+            ind = np.arange(start, start + length)
             df2 = hpat.hiframes.pd_dataframe_ext.set_df_index(df, ind)
             return df2
 
@@ -1459,9 +1484,8 @@ class DistributedPass(object):
     def _run_getsetitem(self, arr, index_var, node, full_node):
         out = [full_node]
         # 1D_Var arrays need adjustment for 1D_Var parfors as well
-        if ((self._is_1D_arr(arr.name) or
-                (self._is_1D_Var_arr(arr.name) and arr.name in self._array_starts))
-                and (arr.name, index_var.name) in self._parallel_accesses):
+        if ((self._is_1D_arr(arr.name) or (self._is_1D_Var_arr(arr.name) and arr.name in self._array_starts))
+                and ((arr.name, index_var.name) in self._parallel_accesses)):
             scope = index_var.scope
             loc = index_var.loc
             #ndims = self._get_arr_ndim(arr.name)
@@ -2154,18 +2178,18 @@ class DistributedPass(object):
     def _is_1D_arr(self, arr_name):
         # some arrays like stencil buffers are added after analysis so
         # they are not in dists list
-        return (
-            arr_name in self._dist_analysis.array_dists and self._dist_analysis.array_dists[arr_name] == Distribution.OneD)
+        return ((arr_name in self._dist_analysis.array_dists
+                 and self._dist_analysis.array_dists[arr_name] == Distribution.OneD))
 
     def _is_1D_Var_arr(self, arr_name):
         # some arrays like stencil buffers are added after analysis so
         # they are not in dists list
-        return (
-            arr_name in self._dist_analysis.array_dists and self._dist_analysis.array_dists[arr_name] == Distribution.OneD_Var)
+        return ((arr_name in self._dist_analysis.array_dists
+                 and self._dist_analysis.array_dists[arr_name] == Distribution.OneD_Var))
 
     def _is_REP(self, arr_name):
-        return (
-            arr_name not in self._dist_analysis.array_dists or self._dist_analysis.array_dists[arr_name] == Distribution.REP)
+        return ((arr_name not in self._dist_analysis.array_dists
+                 or self._dist_analysis.array_dists[arr_name] == Distribution.REP))
 
 
 def _find_first_print(body):
