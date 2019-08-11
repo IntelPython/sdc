@@ -1,12 +1,14 @@
+import time
 from enum import Enum
 import llvmlite.binding as ll
 import operator
 import numpy as np
+
 import numba
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate, infer
-from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
+from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate, infer
 
 import hpat
 from hpat import config
@@ -14,7 +16,6 @@ from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map, unliteral_all)
-import time
 
 if hpat.config.config_transport_mpi:
     from . import transport_mpi as transport
@@ -428,7 +429,8 @@ def alltoallv_tup_overload(send_data, out_data, send_counts, recv_counts, send_d
 
     func_text = "def f(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):\n"
     for i in range(count):
-        func_text += "  alltoallv(send_data[{}], out_data[{}], send_counts, recv_counts, send_disp, recv_disp)\n".format(i, i)
+        func_text += "  alltoallv(send_data[{}], out_data[{}],\n".format(i, i)
+        func_text += "            send_counts, recv_counts, send_disp, recv_disp)\n"
     func_text += "  return\n"
 
     loc_vars = {}

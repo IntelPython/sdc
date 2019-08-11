@@ -146,8 +146,9 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
             func_text += "  send_buff_{} = arr\n".format(i)
             func_text += "  if not is_contig:\n"
             if i >= n_keys and init_vals != ():
-                func_text += "    send_buff_{} = fix_cat_array_type(np.full(n_send, init_vals[{}], arr.dtype))\n".format(
-                    i, i - n_keys)
+                func_text += "    send_buff_{} = fix_cat_array_type(np.full(n_send,\n".format(i)
+                func_text += "                                              init_vals[{}],\n".format(i - n_keys)
+                func_text += "                                              arr.dtype))\n"
             else:
                 func_text += "    send_buff_{} = fix_cat_array_type(np.empty(n_send, arr.dtype))\n".format(i)
         else:
@@ -195,31 +196,26 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
     send_arr_chars_arrs = ", ".join("send_arr_chars_arr_{}".format(i) for i in range(n_str))
     str_comma = "," if n_str == 1 else ""
 
-    func_text += (
-        '  return ShuffleMeta(send_counts, recv_counts, n_send, '
-        'n_out, send_disp, recv_disp, tmp_offset, ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), )\n').format(
-        send_buffs,
-        all_comma,
-        out_arrs,
-        all_comma,
-        send_counts_chars,
-        str_comma,
-        recv_counts_chars,
-        str_comma,
-        send_arr_lens,
-        str_comma,
-        send_arr_chars,
-        str_comma,
-        send_disp_chars,
-        str_comma,
-        recv_disp_chars,
-        str_comma,
-        tmp_offset_chars,
-        str_comma,
-        send_arr_chars_arrs,
-        str_comma)
-
-    # print(func_text)
+    func_text += ('  return ShuffleMeta(send_counts, recv_counts, n_send, n_out, send_disp, recv_disp, tmp_offset,\n')
+    func_text += ('                     ({}{}), ({}{}), ({}{}), ({}{}), ({}{}),\n').format(send_buffs, all_comma,
+                                                                                           out_arrs,
+                                                                                           all_comma,
+                                                                                           send_counts_chars,
+                                                                                           str_comma,
+                                                                                           recv_counts_chars,
+                                                                                           str_comma,
+                                                                                           send_arr_lens,
+                                                                                           str_comma)
+    func_text += ('                     ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), )\n').format(send_arr_chars,
+                                                                                             str_comma,
+                                                                                             send_disp_chars,
+                                                                                             str_comma,
+                                                                                             recv_disp_chars,
+                                                                                             str_comma,
+                                                                                             tmp_offset_chars,
+                                                                                             str_comma,
+                                                                                             send_arr_chars_arrs,
+                                                                                             str_comma)
 
     loc_vars = {}
     exec(func_text, {'np': np, 'hpat': hpat,
