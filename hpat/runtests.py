@@ -2,40 +2,35 @@ import os
 import unittest
 import hpat.tests
 
-from hpat.tests.tests_config import tests_to_repeat
+""" 
+    Every test in suite can be executed specified times using
+    value > 2 for REPEAT_TEST_NUMBER environment variable.
+    This can be used to locate scpecific failures occured
+    on next execution of affected test.
 
-repeat_test_number = 2
-if 'REPEAT_TEST_NUMBER' in os.environ:
-    repeat_test_number = int(os.environ['REPEAT_TEST_NUMBER'])
-
-""" Decorator to repeat test execution """
-def repeat_test(test):
-    def repeat_test_wrapper(*args, **kwargs):
-        for _ in range(repeat_test_number):
-            test(*args, **kwargs)
-
-    return repeat_test_wrapper
-
-"""
-    Wrap found tests to execute it multiple times using repeat_test decorator
-
-    loadTestsFromModule returns suiteClass with _tests member
-    which contains further suiteClass instanses:
-    hpat_tests = suiteClass(hpat.tests)
-    suiteClass(hpat.tests)._tests = [suiteClass(hpat.tests.TestBasic), suiteClass(hpat.tests.TestDataFrame), ...]
-    suiteClass(hpat.tests)._tests[0] = suiteClass(hpat.tests.TestBasic)
-    suiteClass(hpat.tests.TestBasic)._tests = [TestBasic testMethod=test_array_reduce, ...]
-    test.id() returns the string like hpat.tests.test_basic.TestBasic.test_array_reduce
+    loadTestsFromModule returns TestSuite obj with _tests member
+    which contains further TestSuite instanses for each found testCase:
+    hpat_tests = TestSuite(hpat.tests)
+    TestSuite(hpat.tests)._tests = [TestSuite(hpat.tests.TestBasic), TestSuite(hpat.tests.TestDataFrame), ...]
+    TestSuite(hpat.tests.TestBasic)._tests = [TestBasic testMethod=test_array_reduce, ...]
 """
 def load_tests(loader, tests, pattern):
     suite = unittest.TestSuite()
     hpat_tests = loader.loadTestsFromModule(hpat.tests)
 
-    print('Notice: {} tests will be executed {} times'.format(len(tests_to_repeat), repeat_test_number))
-    for i in range(len(hpat_tests._tests)):
-        for j in range(len(hpat_tests._tests[i]._tests)):
-            if hpat_tests._tests[i]._tests[j].id().split('.')[-1] in tests_to_repeat:
-                hpat_tests._tests[i]._tests[j] = repeat_test(hpat_tests._tests[i]._tests[j])
+    repeat_test_number = 1
+    if 'REPEAT_TEST_NUMBER' in os.environ:
+        repeat_test_number = os.environ['REPEAT_TEST_NUMBER']
+        assert repeat_test_number.isdigit(), 'REPEAT_TEST_NUMBER should be an integer > 0'
+        repeat_test_number = int(repeat_test_number)
+
+    if repeat_test_number > 1:
+        for i, test_case in enumerate(hpat_tests):
+            extended_tests = []
+            for test in test_case:
+                for _ in range(repeat_test_number):
+                    extended_tests.append(test)
+            hpat_tests._tests[i]._tests = extended_tests
 
     suite.addTests(hpat_tests)
     return suite

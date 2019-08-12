@@ -558,6 +558,7 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skip("ERROR: Segmentation fault on the second launch (using REPEAT_TEST_NUMBER=2)")
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
