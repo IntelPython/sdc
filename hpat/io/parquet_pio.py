@@ -342,7 +342,14 @@ def pq_read_lower(context, builder, sig, args):
                              args[3]])
 
 
-@lower_builtin(read_parquet_parallel, types.Opaque('arrow_reader'), types.intp, types.Array, types.int32, types.intp, types.intp)
+@lower_builtin(
+    read_parquet_parallel,
+    types.Opaque('arrow_reader'),
+    types.intp,
+    types.Array,
+    types.int32,
+    types.intp,
+    types.intp)
 def pq_read_parallel_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(64),

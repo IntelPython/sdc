@@ -40,6 +40,17 @@ def jit(signature_or_function=None, **options):
                            'fusion': True,
                            }
 
+    # Option MPI is boolean and true by default
+    # it means MPI transport will be used
+    mpi_transport_requested = options.pop('MPI', hpat.config.config_transport_mpi_default)
+    if not isinstance(mpi_transport_requested, (int, bool)):
+        raise ValueError("Option MPI or HPAT_CONFIG_MPI environment variable should be boolean")
+
+    if mpi_transport_requested:
+        hpat.config.config_transport_mpi = True
+    else:
+        hpat.config.config_transport_mpi = False
+
     # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
     # from .compiler import add_hpat_stages
     # return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)

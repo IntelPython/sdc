@@ -1278,6 +1278,34 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skip(
+    '''Skipped as it corrupts memmory and causes failures of other tests
+    while running with NUM_PES=3 and at least TestSeries and TestBasic suites together.
+    Exact commands to reproduce:
+        mpiexec -n 3 python -W ignore -u -m unittest -v $SUITES $SUITES
+        where SUITES="hpat.tests.TestBasic hpat.tests.TestSeries"
+    Test failures occur on the second suite run only.
+    Exact errors:
+         1. Segmentation fault in TestBasic.test_rebalance
+         2. FAIL in TestBasic.test_astype with following error message:
+             test_astype (hpat.tests.test_basic.TestBasic) ... 
+             Fatal error in MPI_Allreduce: Message truncated, error stack:
+             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1, 
+                MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD) failed
+             MPIR_Allreduce_impl(764)............:
+             MPIR_Allreduce_intra(238)...........:
+             MPIR_Reduce_impl(1070)..............:
+             MPIR_Reduce_intra(878)..............:
+             MPIR_Reduce_binomial(186)...........:
+             MPIC_Recv(353)......................:
+             MPIDI_CH3U_Request_unpack_uebuf(568): Message truncated; 40 bytes received but buffer size is 8
+             MPIR_Allreduce_intra(268)...........:
+             MPIR_Bcast_impl(1452)...............:
+             MPIR_Bcast(1476)....................:
+             MPIR_Bcast_intra(1287)..............:
+             MPIR_Bcast_binomial(310)............: Failure during collective
+             Fatal error in MPI_Allreduce: Other MPI error, error stack'''
+    )
     def test_series_head_index_parallel1(self):
         def test_impl(S):
             return S.head(3)
@@ -1400,6 +1428,31 @@ class TestSeries(unittest.TestCase):
 
         S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_index1(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=['A', 'C', 'B'])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_index2(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=[0, 1, 2])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Enabel after fixing distributed for get_series_index")
+    def test_series_index3(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":

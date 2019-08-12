@@ -1,20 +1,21 @@
-import numba.targets.hashing
-from . import hstr_ext
 import operator
 import re
-import numba
-from numba.extending import (box, unbox, typeof_impl, register_model, models,
-                             NativeValue, lower_builtin, lower_cast, overload,
-                             type_callable, overload_method, intrinsic)
-from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
-from numba import types, typing
-from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
-                                    ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
-from numba import cgutils
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+
+import numba
+from numba import cgutils, types, typing
+from numba.extending import (box, unbox, typeof_impl, register_model, models,
+                             NativeValue, lower_builtin, lower_cast, overload,
+                             type_callable, overload_method, intrinsic)
+import numba.targets.hashing
+from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
+from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
+                                    ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
+
 import hpat
+from . import hstr_ext
 # from hpat.utils import unliteral_all
 # TODO: resolve import conflict
 
@@ -529,10 +530,9 @@ def alloc_str_list(typingctx, n_t=None):
     def codegen(context, builder, sig, args):
         nitems = args[0]
         list_type = types.List(string_type)
-        l = numba.targets.listobj.ListInstance.allocate(
-            context, builder, list_type, nitems)
-        l.size = nitems
-        return impl_ret_new_ref(context, builder, list_type, l.value)
+        result = numba.targets.listobj.ListInstance.allocate(context, builder, list_type, nitems)
+        result.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, result.value)
     return types.List(string_type)(types.intp), codegen
 
 
@@ -546,10 +546,9 @@ def alloc_list_list_str(typingctx, n_t=None):
     def codegen(context, builder, sig, args):
         nitems = args[0]
         list_type = list_string_array_type
-        l = numba.targets.listobj.ListInstance.allocate(
-            context, builder, list_type, nitems)
-        l.size = nitems
-        return impl_ret_new_ref(context, builder, list_type, l.value)
+        result = numba.targets.listobj.ListInstance.allocate(context, builder, list_type, nitems)
+        result.size = nitems
+        return impl_ret_new_ref(context, builder, list_type, result.value)
     return list_string_array_type(types.intp), codegen
 
 
