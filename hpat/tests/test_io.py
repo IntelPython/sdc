@@ -1,4 +1,5 @@
 import unittest
+import sys
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 import numpy as np
