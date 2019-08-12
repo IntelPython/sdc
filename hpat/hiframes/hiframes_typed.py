@@ -315,10 +315,8 @@ class HiFramesTyped(object):
             return nodes
 
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
-            # return index column
             nodes = []
-            var = self._get_series_index(rhs.value, nodes)
-            assign.value = var
+            assign.value = self._get_series_index(rhs.value, nodes)
             nodes.append(assign)
             return nodes
 
