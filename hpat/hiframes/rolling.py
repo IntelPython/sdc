@@ -156,7 +156,9 @@ def lower_rolling_fixed(context, builder, sig, args):
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
                types.Boolean, types.functions.Dispatcher)
 def lower_rolling_fixed_apply(context, builder, sig, args):
-    def func(a, w, c, p, f): return roll_fixed_apply(a, w, c, p, f)
+
+    def func(a, w, c, p, f):
+        return roll_fixed_apply(a, w, c, p, f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
@@ -200,14 +202,22 @@ def lower_rolling_variable(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 
-@lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
-               types.Boolean, types.functions.Dispatcher)
+@lower_builtin(
+    rolling_variable,
+    types.Array,
+    types.Array,
+    types.Integer,
+    types.Boolean,
+    types.Boolean,
+    types.functions.Dispatcher)
 def lower_rolling_variable_apply(context, builder, sig, args):
-    def func(a, o, w, c, p, f): return roll_variable_apply(a, o, w, c, p, f)
+
+    def func(a, o, w, c, p, f):
+        return roll_variable_apply(a, o, w, c, p, f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
-#### adapted from pandas window.pyx ####
+# ** adapted from pandas window.pyx ****
 
 
 comm_border_tag = 22  # arbitrary, TODO: revisit comm tags
