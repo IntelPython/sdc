@@ -309,8 +309,8 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     # TODO: use *args
     func_text = "def f({}, {}):\n".format(key_name_args, col_name_args)
     func_text += "  key_arrs = ({},)\n".format(key_name_args)
-    func_text += "  data = ({}{})\n".format(col_name_args, "," if len(in_vars) ==
-                                            1 else "")  # single value needs comma to become tuple
+    # single value needs comma to become tuple
+    func_text += "  data = ({}{})\n".format(col_name_args, "," if len(in_vars) == 1 else "")
     func_text += "  hpat.hiframes.sort.local_sort(key_arrs, data, {})\n".format(sort_node.ascending)
     func_text += "  return key_arrs, data\n"
 
@@ -349,8 +349,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
 
     ascending_var = ir.Var(scope, mk_unique_var('ascending'), loc)
     typemap[ascending_var.name] = types.bool_
-    nodes.append(
-        ir.Assign(ir.Const(sort_node.ascending, loc), ascending_var, loc))
+    nodes.append(ir.Assign(ir.Const(sort_node.ascending, loc), ascending_var, loc))
 
     # parallel case
     def par_sort_impl(key_arrs, data, ascending):

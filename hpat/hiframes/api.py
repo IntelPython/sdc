@@ -1,33 +1,35 @@
 import itertools
-from hpat.utils import _numba_to_c_type_map, unliteral_all
-from numba.targets.arrayobj import make_array
-import llvmlite.binding as ll
-from llvmlite import ir as lir
-import llvmlite.llvmpy.core as lc
 import operator
 from collections import namedtuple
 import pandas as pd
 import numpy as np
+import llvmlite.binding as ll
+from llvmlite import ir as lir
+import llvmlite.llvmpy.core as lc
 
 import numba
 from numba import ir, ir_utils
-from numba.ir_utils import require, mk_unique_var
 from numba import types, cgutils
+from numba.ir_utils import require, mk_unique_var
 import numba.array_analysis
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.typing.arraydecl import _expand_integer
-from numba.extending import overload, intrinsic
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_impl, RefType)
-from numba.targets.arrayobj import _getitem_array1d
-from numba.extending import register_model, models
+from numba.extending import overload, intrinsic, register_model, models
+from numba.targets.imputils import (
+    lower_builtin,
+    impl_ret_untracked,
+    impl_ret_new_ref,
+    impl_ret_borrowed,
+    iternext_impl,
+    RefType)
+from numba.targets.arrayobj import make_array, _getitem_array1d
 
 import hpat
+from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type, list_string_array_type
-from hpat.str_arr_ext import (StringArrayType, string_array_type, is_str_arr_typ)
-
 from hpat.set_ext import build_set
-from numba.targets.imputils import lower_builtin, impl_ret_untracked
+from hpat.str_arr_ext import (StringArrayType, string_array_type, is_str_arr_typ)
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower)
 from hpat.hiframes.pd_series_ext import (
     SeriesType,
@@ -1599,8 +1601,8 @@ class DataFrameTupleIteratorModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         # We use an unsigned index to avoid the cost of negative index tests.
         # XXX array_types[0] is implicit index
-        members = ([('index', types.EphemeralPointer(types.uintp))] + [('array{}'.format(i), arr)
-                                                                       for i, arr in enumerate(fe_type.array_types[1:])])
+        members = ([('index', types.EphemeralPointer(types.uintp))]
+                   + [('array{}'.format(i), arr) for i, arr in enumerate(fe_type.array_types[1:])])
         super(DataFrameTupleIteratorModel, self).__init__(dmm, fe_type, members)
 
     def from_return(self, builder, value):
