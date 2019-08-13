@@ -468,8 +468,7 @@ class GetItemTuple(AbstractTemplate):
 
     def generic(self, args, kws):
         tup, idx = args
-        if (not isinstance(tup, types.BaseTuple) or
-                not isinstance(idx, types.IntegerLiteral)):
+        if (not isinstance(tup, types.BaseTuple) or not isinstance(idx, types.IntegerLiteral)):
             return
         idx_val = idx.literal_value
         if isinstance(idx_val, int):
@@ -497,8 +496,7 @@ def getitem_tuple_lower(context, builder, sig, args):
         items = cgutils.unpack_tuple(builder, tup)[idx]
         res = context.make_tuple(builder, sig.return_type, items)
     else:
-        raise NotImplementedError("unexpected index %r for %s"
-                                  % (idx, sig.args[0]))
+        raise NotImplementedError("unexpected index %r for %s" % (idx, sig.args[0]))
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 

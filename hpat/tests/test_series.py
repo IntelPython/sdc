@@ -32,6 +32,32 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
 ]]
 
 
+def _make_func_from_text(func_text, func_name='test_impl'):
+    loc_vars = {}
+    exec(func_text, {}, loc_vars)
+    test_impl = loc_vars[func_name]
+    return test_impl
+
+
+def _make_func_use_binop1(operator):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   return A {} B\n".format(operator)
+    return _make_func_from_text(func_text)
+
+
+def _make_func_use_binop2(operator):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   A {} B\n".format(operator)
+    func_text += "   return A\n"
+    return _make_func_from_text(func_text)
+
+
+def _make_func_use_method_arg1(method):
+    func_text = "def test_impl(A, B):\n"
+    func_text += "   return A.{}(B)\n".format(method)
+    return _make_func_from_text(func_text)
+
+
 GLOBAL_VAL = 2
 
 
@@ -417,69 +443,60 @@ class TestSeries(unittest.TestCase):
             hpat_func(S), test_impl(S).reset_index(drop=True))
 
     def test_series_op1(self):
-        def test_impl(A, i):
-            return A + A
-        hpat_func = hpat.jit(test_impl)
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = hpat.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        pd.testing.assert_series_equal(hpat_func(df.A, 0),
-                                       test_impl(df.A, 0), check_names=False)
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Attribute "dtype" are different\n'
-                   '[left]:  int64\n'
-                   '[right]: int32\n')
     def test_series_op2(self):
-        def test_impl(A, i):
-            return A+i
-        hpat_func = hpat.jit(test_impl)
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        pd.testing.assert_series_equal(hpat_func(df.A, 1),
-                                       test_impl(df.A, 1), check_names=False)
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n)})
+            pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op3(self):
-        def test_impl(A, i):
-            A += i
-            return A
-        hpat_func = hpat.jit(test_impl)
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        pd.testing.assert_series_equal(hpat_func(df.A.copy(), 1),
-                                       test_impl(df.A, 1), check_names=False)
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop2(operator)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
     def test_series_op4(self):
-        def test_impl(A):
-            return A.add(A)
-        hpat_func = hpat.jit(test_impl)
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
-        n = 11
-        A = pd.Series(np.arange(n))
-        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop2(operator)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n)})
+            pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op5(self):
-        def test_impl(A):
-            return A.pow(A)
-        hpat_func = hpat.jit(test_impl)
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
-        n = 11
-        A = pd.Series(np.arange(n))
-        pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
+        for method in arithmetic_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
     def test_series_op6(self):
-        def test_impl(A, B):
-            return A.eq(B)
-        hpat_func = hpat.jit(test_impl)
-
-        n = 11
-        A = pd.Series(np.arange(n))
-        B = pd.Series(np.arange(n)**2)
-        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
-
-    def test_series_op7(self):
         def test_impl(A):
             return -A
         hpat_func = hpat.jit(test_impl)
@@ -487,6 +504,30 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
+
+    def test_series_op7(self):
+        comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
+
+        for operator in comparison_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            A = pd.Series(np.arange(n))
+            B = pd.Series(np.arange(n)**2)
+            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
+
+    def test_series_op8(self):
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'ne', 'eq')
+
+        for method in comparison_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            A = pd.Series(np.arange(n))
+            B = pd.Series(np.arange(n)**2)
+            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
 
     def test_series_inplace_binop_array(self):
         def test_impl(A, B):
@@ -499,10 +540,6 @@ class TestSeries(unittest.TestCase):
         B = pd.Series(np.ones(n))
         np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Attribute "dtype" are different\n'
-                   '[left]:  int64\n'
-                   '[right]: int32\n')
     def test_series_fusion1(self):
         def test_impl(A, B):
             return A + B + 1
@@ -514,10 +551,6 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 1)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Attribute "dtype" are different\n'
-                   '[left]:  int64\n'
-                   '[right]: int32\n')
     def test_series_fusion2(self):
         # make sure getting data var avoids incorrect single def assumption
         def test_impl(A, B):
@@ -1016,7 +1049,7 @@ class TestSeries(unittest.TestCase):
             return S.abs()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, -2., 3.])
+        S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('AssertionError - fix needed\n'
@@ -1059,20 +1092,13 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'abc', 'c', 'cccd'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('numba.errors.LoweringError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: nopython mode backend)\n'
-                   'str_overload() takes 1 positional argument '
-                   'but 2 were given\n')
     def test_series_str2str(self):
         str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
                            'strip', 'swapcase', 'title', 'upper')
         for method in str2str_methods:
             func_text = "def test_impl(S):\n"
             func_text += "  return S.str.{}()\n".format(method)
-            loc_vars = {}
-            exec(func_text, {}, loc_vars)
-            test_impl = loc_vars['test_impl']
+            test_impl = _make_func_from_text(func_text)
             hpat_func = hpat.jit(test_impl)
 
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
@@ -1278,6 +1304,34 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skip(
+    '''Skipped as it corrupts memmory and causes failures of other tests
+    while running with NUM_PES=3 and at least TestSeries and TestBasic suites together.
+    Exact commands to reproduce:
+        mpiexec -n 3 python -W ignore -u -m unittest -v $SUITES $SUITES
+        where SUITES="hpat.tests.TestBasic hpat.tests.TestSeries"
+    Test failures occur on the second suite run only.
+    Exact errors:
+         1. Segmentation fault in TestBasic.test_rebalance
+         2. FAIL in TestBasic.test_astype with following error message:
+             test_astype (hpat.tests.test_basic.TestBasic) ... 
+             Fatal error in MPI_Allreduce: Message truncated, error stack:
+             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1, 
+                MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD) failed
+             MPIR_Allreduce_impl(764)............:
+             MPIR_Allreduce_intra(238)...........:
+             MPIR_Reduce_impl(1070)..............:
+             MPIR_Reduce_intra(878)..............:
+             MPIR_Reduce_binomial(186)...........:
+             MPIC_Recv(353)......................:
+             MPIDI_CH3U_Request_unpack_uebuf(568): Message truncated; 40 bytes received but buffer size is 8
+             MPIR_Allreduce_intra(268)...........:
+             MPIR_Bcast_impl(1452)...............:
+             MPIR_Bcast(1476)....................:
+             MPIR_Bcast_intra(1287)..............:
+             MPIR_Bcast_binomial(310)............: Failure during collective
+             Fatal error in MPI_Allreduce: Other MPI error, error stack'''
+    )
     def test_series_head_index_parallel1(self):
         def test_impl(S):
             return S.head(3)
@@ -1400,6 +1454,31 @@ class TestSeries(unittest.TestCase):
 
         S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_index1(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=['A', 'C', 'B'])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_index2(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=[0, 1, 2])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Enabel after fixing distributed for get_series_index")
+    def test_series_index3(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":

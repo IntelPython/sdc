@@ -65,8 +65,7 @@ def alloc_pre_shuffle_metadata_overload(key_arrs, data, n_pes, is_contig):
     n_str = 0
     for i, typ in enumerate(key_arrs.types + data.types):
         if typ == string_array_type:
-            func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys
-                else "  arr = data[{}]\n".format(i - n_keys))
+            func_text += ("  arr = key_arrs[{}]\n".format(i) if i < n_keys else "  arr = data[{}]\n".format(i - n_keys))
             func_text += "  send_counts_char_{} = np.zeros(n_pes, np.int32)\n".format(n_str)
             func_text += "  send_arr_lens_{} = np.empty(1, np.uint32)\n".format(n_str)
             # needs allocation since written in update before finalize
@@ -74,8 +73,7 @@ def alloc_pre_shuffle_metadata_overload(key_arrs, data, n_pes, is_contig):
             func_text += "    send_arr_lens_{} = np.empty(len(arr), np.uint32)\n".format(n_str)
             n_str += 1
 
-    count_char_tup = ", ".join("send_counts_char_{}".format(i)
-                                                        for i in range(n_str))
+    count_char_tup = ", ".join("send_counts_char_{}".format(i) for i in range(n_str))
     lens_tup = ", ".join("send_arr_lens_{}".format(i) for i in range(n_str))
     extra_comma = "," if n_str == 1 else ""
     func_text += "  return PreShuffleMeta(send_counts, ({}{}), ({}{}))\n".format(
@@ -148,7 +146,9 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
             func_text += "  send_buff_{} = arr\n".format(i)
             func_text += "  if not is_contig:\n"
             if i >= n_keys and init_vals != ():
-                func_text += "    send_buff_{} = fix_cat_array_type(np.full(n_send, init_vals[{}], arr.dtype))\n".format(i, i - n_keys)
+                func_text += "    send_buff_{} = fix_cat_array_type(np.full(n_send,\n".format(i)
+                func_text += "                                              init_vals[{}],\n".format(i - n_keys)
+                func_text += "                                              arr.dtype))\n"
             else:
                 func_text += "    send_buff_{} = fix_cat_array_type(np.empty(n_send, arr.dtype))\n".format(i)
         else:
@@ -196,15 +196,26 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
     send_arr_chars_arrs = ", ".join("send_arr_chars_arr_{}".format(i) for i in range(n_str))
     str_comma = "," if n_str == 1 else ""
 
-
-    func_text += ('  return ShuffleMeta(send_counts, recv_counts, n_send, '
-        'n_out, send_disp, recv_disp, tmp_offset, ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), )\n').format(
-            send_buffs, all_comma, out_arrs, all_comma, send_counts_chars, str_comma, recv_counts_chars, str_comma,
-            send_arr_lens, str_comma, send_arr_chars, str_comma, send_disp_chars, str_comma, recv_disp_chars, str_comma,
-            tmp_offset_chars, str_comma, send_arr_chars_arrs, str_comma
-        )
-
-    # print(func_text)
+    func_text += ('  return ShuffleMeta(send_counts, recv_counts, n_send, n_out, send_disp, recv_disp, tmp_offset,\n')
+    func_text += ('                     ({}{}), ({}{}), ({}{}), ({}{}), ({}{}),\n').format(send_buffs, all_comma,
+                                                                                           out_arrs,
+                                                                                           all_comma,
+                                                                                           send_counts_chars,
+                                                                                           str_comma,
+                                                                                           recv_counts_chars,
+                                                                                           str_comma,
+                                                                                           send_arr_lens,
+                                                                                           str_comma)
+    func_text += ('                     ({}{}), ({}{}), ({}{}), ({}{}), ({}{}), )\n').format(send_arr_chars,
+                                                                                             str_comma,
+                                                                                             send_disp_chars,
+                                                                                             str_comma,
+                                                                                             recv_disp_chars,
+                                                                                             str_comma,
+                                                                                             tmp_offset_chars,
+                                                                                             str_comma,
+                                                                                             send_arr_chars_arrs,
+                                                                                             str_comma)
 
     loc_vars = {}
     exec(func_text, {'np': np, 'hpat': hpat,
@@ -221,6 +232,7 @@ def finalize_shuffle_meta_overload(key_arrs, data, pre_shuffle_meta, n_pes, is_c
 
 def alltoallv(arr, m):
     return
+
 
 @overload(alltoallv)
 def alltoallv_impl(arr, metadata):
@@ -239,11 +251,22 @@ def alltoallv_impl(arr, metadata):
         # TODO: increate refcount?
         offset_ptr = get_offset_ptr(metadata.out_arr)
         hpat.distributed_api.c_alltoallv(
-            metadata.send_arr_lens.ctypes, offset_ptr, metadata.send_counts.ctypes,
-            metadata.recv_counts.ctypes, metadata.send_disp.ctypes, metadata.recv_disp.ctypes, int32_typ_enum)
+            metadata.send_arr_lens.ctypes,
+            offset_ptr,
+            metadata.send_counts.ctypes,
+            metadata.recv_counts.ctypes,
+            metadata.send_disp.ctypes,
+            metadata.recv_disp.ctypes,
+            int32_typ_enum)
         hpat.distributed_api.c_alltoallv(
-            metadata.send_arr_chars, get_data_ptr(metadata.out_arr), metadata.send_counts_char.ctypes,
-            metadata.recv_counts_char.ctypes, metadata.send_disp_char.ctypes, metadata.recv_disp_char.ctypes, char_typ_enum)
+            metadata.send_arr_chars,
+            get_data_ptr(
+                metadata.out_arr),
+            metadata.send_counts_char.ctypes,
+            metadata.recv_counts_char.ctypes,
+            metadata.send_disp_char.ctypes,
+            metadata.recv_disp_char.ctypes,
+            char_typ_enum)
         convert_len_arr_to_offset(offset_ptr, metadata.n_out)
     return a2av_str_impl
 
