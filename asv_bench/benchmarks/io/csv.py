@@ -5,6 +5,7 @@ from pd_benchmarks.io import csv
 
 
 class ToCSV(csv.ToCSV):
+    warmup_time = 1.0
 
     params = [['long'] , [tool.value for tool in Tool]]
     param_names = csv.ToCSV.param_names + ['tool']
