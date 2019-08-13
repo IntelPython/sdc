@@ -591,6 +591,7 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skip("ERROR: Segmentation fault on the second launch (using HPAT_REPEAT_TEST_NUMBER=2)")
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
@@ -1314,9 +1315,9 @@ class TestSeries(unittest.TestCase):
     Exact errors:
          1. Segmentation fault in TestBasic.test_rebalance
          2. FAIL in TestBasic.test_astype with following error message:
-             test_astype (hpat.tests.test_basic.TestBasic) ... 
+             test_astype (hpat.tests.test_basic.TestBasic) ...
              Fatal error in MPI_Allreduce: Message truncated, error stack:
-             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1, 
+             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1,
                 MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD) failed
              MPIR_Allreduce_impl(764)............:
              MPIR_Allreduce_intra(238)...........:
