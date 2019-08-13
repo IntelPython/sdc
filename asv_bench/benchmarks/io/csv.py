@@ -14,11 +14,11 @@ class ToCSV(csv.ToCSV):
 
     @staticmethod
     @hpat.jit
-    def _to_csv(df, fname):
+    def _frame(df, fname):
         df.to_csv(fname)
 
     def time_frame(self, kind, tool):
         if tool == Tool.pandas.value:
             super().time_frame(kind)
         elif tool == Tool.hpat.value:
-            self._to_csv(self.df, self.fname)
+            self._frame(self.df, self.fname)

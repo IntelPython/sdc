@@ -58,7 +58,7 @@
 
     // The Pythons you'd like to test against.  If not provided, defaults
     // to the current version of Python used to run `asv`.
-    "pythons": ["3.7"],
+    "pythons": ["3.7.4"],
 
     // The list of conda channel names to be searched for benchmark
     // dependency packages in the specified order
@@ -74,21 +74,26 @@
     // pip (with all the conda available packages installed first,
     // followed by the pip installed packages).
     "matrix": {
-        "boost": ["1.67.0"],
+        "boost": ["1.70.0"],
+        "cmake": ["3.15.1", null],
+        "gcc_linux-64": ["7.3.0", null],
+        "gfortran_linux-64": ["7.3.0", null],
         "gitpython": ["2.1.13"],
+        "gxx_linux-64": ["7.3.0", null],
         "h5py": ["2.9.0"],
         "impi_rt": ["2019.4"],
-        "libboost": ["1.67.0"],
         "mkl-devel": ["2019.4"],
+        "mpi": ["1.0", null],
+        "mpich": ["3.2.1", null],
         "numba": ["0.46.0dev0"],
         "numpy": ["1.16.4"],
         "pandas": ["0.24.2"],
-        "pyarrow": ["0.11.1"],
+        "pyarrow": ["0.14.1"],
         "scipy": ["1.2.1"],
         "tbb-devel": ["2019.4"],
-        "vc": ["14.1"],
-        "vs2015_runtime": ["14.15.26706"],
-        "vs2015_win-64": ["14.0.25420"]
+        "vc": ["14.1", null],
+        "vs2015_runtime": ["14.15.26706", null],
+        "vs2015_win-64": ["14.0.25420", null]
     },
 
     // Combinations of libraries/python versions can be excluded/included
@@ -116,7 +121,26 @@
     //     {"python": "3.2", "sys_platform": "win32"}, // skip py3.2 on windows
     //     {"environment_type": "conda", "six": null}, // don't run without six on conda
     // ],
-    //
+     "exclude": [
+         {"sys_platform": "(?!win32).*", "cmake": null},
+         {"sys_platform": "(?!win32).*", "mpich": null},
+         {"sys_platform": "(?!win32).*", "mpi": null},
+         {"sys_platform": "(?!win32).*", "gcc_linux-64": null},
+         {"sys_platform": "(?!win32).*", "gxx_linux-64": null},
+         {"sys_platform": "(?!win32).*", "gfortran_linux-64": null},
+         {"sys_platform": "(?!win32).*", "vc": "14.1"},
+         {"sys_platform": "(?!win32).*", "vs2015_runtime": "14.15.26706"},
+         {"sys_platform": "(?!win32).*", "vs2015_win-64": "14.0.25420"},
+         {"sys_platform": "win32", "cmake": "3.15.1"},
+         {"sys_platform": "win32", "mpich": "3.2.1"},
+         {"sys_platform": "win32", "mpi": "1.0"},
+         {"sys_platform": "win32", "gcc_linux-64": "7.3.0"},
+         {"sys_platform": "win32", "gxx_linux-64": "7.3.0"},
+         {"sys_platform": "win32", "gfortran_linux-64": "7.3.0"},
+         {"sys_platform": "win32", "vc": null},
+         {"sys_platform": "win32", "vs2015_runtime": null},
+         {"sys_platform": "win32", "vs2015_win-64": null}
+     ],
     // "include": [
     //     // additional env for python2.7
     //     {"python": "2.7", "numpy": "1.8"},

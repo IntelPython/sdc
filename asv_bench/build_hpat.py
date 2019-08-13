@@ -30,9 +30,8 @@ def get_mpivars_path():
     if 'I_MPI_ROOT' not in env:
         raise EnvironmentError('I_MPI_ROOT not found in the system environment')
 
-    mpivars_relpath = Path('intel64') / 'bin' / 'mpivars.bat'
     mpi_roots = [Path(mpi_root) for mpi_root in env['I_MPI_ROOT'].split(os.pathsep)]
-    mpivars_paths = [mpi_root / mpivars_relpath for mpi_root in mpi_roots]
+    mpivars_paths = [mpi_root / 'intel64' / 'bin' / 'mpivars.bat' for mpi_root in mpi_roots]
     existing_mpivars = [mpivars_path for mpivars_path in mpivars_paths if mpivars_path.exists()]
 
     if not existing_mpivars:
@@ -41,6 +40,21 @@ def get_mpivars_path():
     first_mpivars_path, *_ = existing_mpivars
 
     return first_mpivars_path
+
+
+def run_cmd(cmd, cwd=None, env=None):
+    """
+    Run specified command with logging
+
+    :param cmd: command
+    :param cwd: current working directory
+    :param env: environment
+    """
+    logger = logging.getLogger(__name__)
+
+    logger.info('Running \'%s\'', subprocess.list2cmdline(cmd))
+    proc = subprocess.run(cmd, cwd=cwd, env=env)
+    logger.info(proc.stdout)
 
 
 def _build_win(cwd, env_dir):
@@ -55,7 +69,6 @@ def _build_win(cwd, env_dir):
     :param cwd: current working directory
     :param env_dir: conda environment directory
     """
-    logger = logging.getLogger(__name__)
     env = os.environ.copy()
 
     env_library_dir = env_dir / 'Library'
@@ -75,20 +88,24 @@ def _build_win(cwd, env_dir):
 
     mpivars_cmd = [f'{get_mpivars_path()}']
     build_cmd = ['python', 'setup.py', 'develop']
-
     common_cmd = mpivars_cmd + ['&&'] + build_cmd
-    logger.info('Running \'%s\'', subprocess.list2cmdline(common_cmd))
-    proc = subprocess.run(common_cmd, cwd=cwd, env=env)
-    logger.info(proc.stdout)
+    run_cmd(common_cmd, cwd=cwd, env=env)
 
 
 def _build_lin(cwd, env_dir):
     """
-    Build HPAT on Linux
+    Build HPAT on Linux via the following commands:
+        set HDF5_DIR=%CONDA_PREFIX%
+        python setup.py develop
 
     :param cwd: current working directory
     :param env_dir: conda environment directory
     """
+    env = os.environ.copy()
+    env['HDF5_DIR'] = f'{env_dir}'
+
+    cmd = ['python', 'setup.py', 'develop']
+    run_cmd(cmd, cwd=cwd, env=env)
 
 
 def get_builder():
