@@ -5,8 +5,10 @@ from pd_benchmarks import algorithms
 
 
 class Quantile(algorithms.Quantile):
-
-    params = algorithms.Quantile.params + [[tool.value for tool in Tool]]
+    params = [[0.5],
+              ['linear', 'nearest', 'lower', 'higher', 'midpoint'],
+              ['float', 'int', 'uint'],
+              [tool.value for tool in Tool]]
     param_names = algorithms.Quantile.param_names + ['tool']
 
     def setup(self, quantile, interpolation, dtype, tool):
@@ -15,7 +17,7 @@ class Quantile(algorithms.Quantile):
     @staticmethod
     @hpat.jit
     def _quantile(idx, quantile, interpolation=None):
-        idx.quantile(quantile, interpolation=interpolation)
+        return idx.quantile(quantile, interpolation=interpolation)
 
     def time_quantile(self, quantile, interpolation, dtype, tool):
         if tool == Tool.pandas.value:
