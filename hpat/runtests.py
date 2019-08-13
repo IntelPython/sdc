@@ -2,9 +2,9 @@ import os
 import unittest
 import hpat.tests
 
-""" 
+"""
     Every test in suite can be executed specified times using
-    value > 2 for REPEAT_TEST_NUMBER environment variable.
+    desired value for HPAT_REPEAT_TEST_NUMBER environment variable.
     This can be used to locate scpecific failures occured
     on next execution of affected test.
 
@@ -17,12 +17,7 @@ import hpat.tests
 def load_tests(loader, tests, pattern):
     suite = unittest.TestSuite()
     hpat_tests = loader.loadTestsFromModule(hpat.tests)
-
-    repeat_test_number = 1
-    if 'REPEAT_TEST_NUMBER' in os.environ:
-        repeat_test_number = os.environ['REPEAT_TEST_NUMBER']
-        assert repeat_test_number.isdigit(), 'REPEAT_TEST_NUMBER should be an integer > 0'
-        repeat_test_number = int(repeat_test_number)
+    repeat_test_number = int(os.getenv('HPAT_REPEAT_TEST_NUMBER', '1'))
 
     if repeat_test_number > 1:
         for i, test_case in enumerate(hpat_tests):
