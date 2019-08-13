@@ -1,15 +1,17 @@
 import operator
 import numpy as np
+from llvmlite import ir as lir
+
 import numba
 from numba import types, cgutils
-from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
-from llvmlite import ir as lir
+from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.extending import register_model, models, infer_getattr, infer, intrinsic
-from hpat.str_ext import string_type
+
 import hpat
-from hpat.utils import unliteral_all
 import hpat.io
+from hpat.str_ext import string_type
+from hpat.utils import unliteral_all
 
 if hpat.config._has_h5py:
     import h5py
@@ -18,7 +20,7 @@ if hpat.config._has_h5py:
     ll.add_symbol('hpat_h5_read_filter', _hdf5.hpat_h5_read_filter)
 
 
-################## Types #######################
+# **************** Types ***********************
 
 class H5FileType(types.Opaque):
     def __init__(self):

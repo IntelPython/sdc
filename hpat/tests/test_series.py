@@ -1430,6 +1430,31 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_index1(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=['A', 'C', 'B'])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_index2(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=[0, 1, 2])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Enabel after fixing distributed for get_series_index")
+    def test_series_index3(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()

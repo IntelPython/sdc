@@ -246,6 +246,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_shape(self, ary):
         return types.Tuple((types.int64,))
 
+    def resolve_index(self, ary):
+        return ary.index
+
     def resolve_str(self, ary):
         assert ary.dtype in (string_type, types.List(string_type))
         # TODO: add dtype to series_str_methods_type

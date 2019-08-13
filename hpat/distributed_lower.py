@@ -1,23 +1,24 @@
+import time
 import atexit
-from numba.typing.templates import infer_global, AbstractTemplate
 import sys
-from numba.typing import signature
-import llvmlite.binding as ll
 import operator
-from numba import types, cgutils
-from numba.targets.imputils import lower_builtin
-from numba.targets.arrayobj import make_array
-from numba.extending import overload
-import numba.targets.arrayobj
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-from numba.typing.builtins import IndexValueType
 import numpy as np
+from llvmlite import ir as lir
+import llvmlite.binding as ll
+
+import numba.targets.arrayobj
+from numba import types, cgutils
+from numba.extending import overload
+from numba.targets.imputils import lower_builtin, impl_ret_new_ref, impl_ret_borrowed
+from numba.targets.arrayobj import make_array
+from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate
+from numba.typing.builtins import IndexValueType
+
 import hpat
 from hpat import distributed_api
 from hpat.utils import _numba_to_c_type_map
 from hpat.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
-import time
-from llvmlite import ir as lir
 from . import hdist
 
 if hpat.config.config_transport_mpi:
@@ -569,7 +570,7 @@ def dist_permutation_array_index(lhs, lhs_len, dtype_size, rhs, p, p_len):
     permutation_array_index(lhs.ctypes, lhs_len, elem_size, c_rhs.ctypes,
                             p.ctypes, p_len)
 
-########### finalize MPI when exiting ####################
+# ********* finalize MPI when exiting ********************
 
 
 def hpat_finalize():
