@@ -5,7 +5,8 @@ from enum import Enum
 from pathlib import Path
 
 PD_BENCHMARKS_MODULE = 'pd_benchmarks'
-pandas_benchmarks_path = Path(__file__).absolute().parents[1] / 'pandas' / 'asv_bench' / 'benchmarks' / '__init__.py'
+build_dir = Path(__file__).absolute().parents[3] / 'build'
+pandas_benchmarks_path = build_dir / 'asv_bench' / 'pandas' / 'asv_bench' / 'benchmarks' / '__init__.py'
 spec = importlib.util.spec_from_file_location(PD_BENCHMARKS_MODULE, pandas_benchmarks_path)
 pd_benchmarks_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pd_benchmarks_module)
