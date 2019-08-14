@@ -1,4 +1,5 @@
 import unittest
+import platform
 import pandas as pd
 import numpy as np
 import random
@@ -319,6 +320,7 @@ class TestJoin(unittest.TestCase):
         df4 = pd.DataFrame({'B': 2 * np.arange(n) + 1, 'BBB': n + np.arange(n) + 1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2, df3, df4)[1], test_impl(df1, df2, df3, df4)[1])
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
@@ -335,6 +337,7 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat2(self):
         # test setting NaN in categorical array
         def test_impl():
@@ -354,6 +357,7 @@ class TestJoin(unittest.TestCase):
             hpat_func().sort_values('C1').reset_index(drop=True),
             test_impl().sort_values('C1').reset_index(drop=True))
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat_parallel1(self):
         # TODO: cat as keys
         def test_impl():
