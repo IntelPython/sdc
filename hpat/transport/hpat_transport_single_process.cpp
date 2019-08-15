@@ -34,13 +34,6 @@
 #ifdef _WIN32 // MSC_VER
 #include <Windows.h>
 
-// avoid including winsock2.h
-typedef struct timeval
-{
-    long tv_sec;
-    long tv_usec;
-} timeval;
-
 // no gettimeofday on Win32/Win64
 int gettimeofday(struct timeval* tp, struct timezone* tzp)
 {
