@@ -31,6 +31,31 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef _WIN32 // MSC_VER
+#include <Windows.h>
+
+// no gettimeofday on Win32/Win64
+int gettimeofday(struct timeval* tp, struct timezone* tzp)
+{
+    static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
+
+    SYSTEMTIME nSystemTime;
+    FILETIME nFileTime;
+    uint64_t nTime;
+
+    GetSystemTime(&nSystemTime);
+    SystemTimeToFileTime(&nSystemTime, &nFileTime);
+    nTime = ((uint64_t)nFileTime.dwLowDateTime);
+    nTime += ((uint64_t)nFileTime.dwHighDateTime) << 32;
+
+    tp->tv_sec = (long)((nTime - EPOCH) / 10000000L);
+    tp->tv_usec = (long)(nSystemTime.wMilliseconds * 1000);
+    return 0;
+}
+#else
+#include <sys/time.h>
+#endif // _WIN32
+
 #include "../_hpat_common.h"
 
 using namespace std;
@@ -215,7 +240,12 @@ static int hpat_dist_get_size()
 
 static double hpat_dist_get_time()
 {
-    throw runtime_error(__FUNCTION__ + string(": Is not implemented"));
+    timeval result;
+    gettimeofday(&result, nullptr);
+    double sec = result.tv_sec;
+    double usec = result.tv_usec;
+
+    return sec + (usec / 1E6);
 }
 
 static MPI_Request hpat_dist_irecv(void* out, int size, int type_enum, int pe, int tag, bool cond)
@@ -261,7 +291,7 @@ static int hpat_finalize()
 
 static double hpat_get_time()
 {
-    throw runtime_error(__FUNCTION__ + string(": Is not implemented"));
+    return hpat_dist_get_time();
 }
 
 /// return vector of offsets of newlines in first n bytes of given stream
