@@ -1485,6 +1485,30 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_iterator_int(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3, 4, 5])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_iterator_string(self):
+        def test_impl():
+            A = pd.Series(['a', 'ab', 'abc', '', 'dddd'])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_iterator_one_value(self):
+        def test_impl():
+            A = pd.Series([5])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
