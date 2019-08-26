@@ -41,7 +41,7 @@ AggFuncStruct = namedtuple('AggFuncStruct',
                            ['var_typs', 'init_func', 'update_all_func', 'combine_all_func',
                             'eval_all_func'])
 
-supported_agg_funcs = ['sum', 'count', 'mean',
+supported_agg_funcs = ['sum', 'count', 'mean','median',
                        'min', 'max', 'prod', 'var', 'std', 'agg', 'aggregate']
 
 
@@ -538,6 +538,67 @@ class EvalDummyTyper(AbstractTemplate):
 
 
 def agg_distributed_run(agg_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
+    print("agg_node ",agg_node)
+    print("agg_node.agg_func ",agg_node.agg_func)
+    print("agg_node.df_in_vars ",agg_node.df_in_vars)
+    print("agg_node.df_out_vars ",agg_node.df_out_vars)
+    # TODO: check function name or add special decorator
+    if True:
+        in_col_vars = [v for (n, v) in agg_node.df_in_vars.items()]
+        out_col_vars = [v for (n, v) in agg_node.df_out_vars.items()]
+        in_col_typs = tuple(typemap[v.name] for v in in_col_vars)
+        out_col_typs = tuple(typemap[v.name] for v in out_col_vars)
+        print("in_col_vars ",in_col_vars)
+        print("out_col_vars ",out_col_vars)
+        print("in_col_typs ",in_col_typs)
+        print("out_col_typs ",out_col_typs)
+
+        f_ir, pm = compile_to_optimized_ir(
+            agg_node.agg_func, in_col_typs, typingctx)
+
+        f_ir._definitions = build_definitions(f_ir.blocks)
+        print("++++++++++++++++++++++++++=")
+        f_ir.dump();
+        print("++++++++++++++++++++++++++=")
+
+        nodes = []
+        if agg_node.pivot_arr is None:
+            scope = agg_node.key_arrs[0].scope
+            loc = agg_node.loc
+            none_var = ir.Var(scope, mk_unique_var("dummy_none"), loc)
+            typemap[none_var.name] = types.none
+            nodes.append(ir.Assign(ir.Const(None, loc), none_var, loc))
+            in_col_vars.append(none_var)
+        else:
+            in_col_vars.append(agg_node.pivot_arr)
+
+
+        func_call = ir.Expr.call(
+                        ir.Var(f_ir.blocks[0].scope, "dummy", agg_node.loc),
+                        in_col_vars, (), agg_node.loc)
+        nodes.append(func_call)
+
+        # tuple_assign = ir.Expr.build_tuple([func_call], agg_node.loc)
+
+        # replace_arg_nodes(f_block, agg_node.key_arrs + in_col_vars)
+
+        # tuple_assign = f_block.body[-3]
+        # assert (is_assign(tuple_assign) and isinstance(tuple_assign.value, ir.Expr)
+        #         and tuple_assign.value.op == 'build_tuple')
+        # nodes += f_block.body[:-3]
+
+        out_vars = list(agg_node.df_out_vars.values())
+        return_key = agg_node.out_key_vars is not None
+        if return_key:
+            out_vars += agg_node.out_key_vars
+
+        for i, var in enumerate(out_vars):
+            assert(i == 0)
+            out_var = func_call
+            nodes.append(ir.Assign(out_var, var, var.loc))
+
+        return nodes
+
     parallel = True
     for v in (list(agg_node.df_in_vars.values())
               + list(agg_node.df_out_vars.values()) + agg_node.key_arrs):

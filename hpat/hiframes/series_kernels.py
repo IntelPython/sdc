@@ -192,6 +192,20 @@ def _column_mean_impl(A):  # pragma: no cover
     res = hpat.hiframes.series_kernels._mean_handle_nan(s, count)
     return res
 
+def _column_median_impl(A):  # pragma: no cover
+    numba.parfor.init_prange()
+    count = 0
+    s = 0
+    for i in numba.parfor.internal_prange(len(A)):
+        val = A[i]
+        if not np.isnan(val):
+            s += val
+            count += 1
+
+    res = hpat.hiframes.series_kernels._mean_handle_nan(s, count)
+    # res = hpat.hiframes.api.median(A)
+    return res
+    # return hpat.hiframes.api.median(A)
 
 @numba.njit
 def _var_handle_nan(s, count):  # pragma: no cover
@@ -529,6 +543,7 @@ series_replace_funcs = {
     'head': lambda A, I, k, name: hpat.hiframes.api.init_series(A[:k], None, name),
     'head_index': lambda A, I, k, name: hpat.hiframes.api.init_series(A[:k], I[:k], name),
     'median': lambda A: hpat.hiframes.api.median(A),
+    # 'median': _column_median_impl,
     # TODO: handle NAs in argmin/argmax
     'idxmin': lambda A: A.argmin(),
     'idxmax': lambda A: A.argmax(),

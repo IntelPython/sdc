@@ -201,6 +201,11 @@ class DataframeGroupByAttribute(AttributeTemplate):
         func = get_agg_func(None, 'std', None)
         return self._get_agg_typ(grp, args, func.__code__)
 
+    @bound_function("groupby.median")
+    def resolve_median(self, grp, args, kws):
+        func = get_agg_func(None, 'median', None)
+        return self._get_agg_typ(grp, args, func.__code__)
+
 
 # a dummy pivot_table function that will be replace in dataframe_pass
 def pivot_table_dummy(df, values, index, columns, aggfunc, _pivot_values):

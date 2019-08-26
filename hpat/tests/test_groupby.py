@@ -393,6 +393,15 @@ class TestGroupBy(unittest.TestCase):
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    def test_agg_seq_median(self):
+        def test_impl(df):
+            A = df.groupby('A')['B'].median()
+            return A.values
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
+        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+
 
 if __name__ == "__main__":
     unittest.main()
