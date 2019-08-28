@@ -848,6 +848,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_dist_input1(self):
+        '''Verify distribution of a Series without index'''
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
@@ -860,6 +861,7 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_series_dist_input2(self):
+        '''Verify distribution of a Series with integer index'''
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
@@ -872,6 +874,7 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
 
     def test_series_dist_input3(self):
+        '''Verify distribution of a Series with string index'''
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
@@ -1268,6 +1271,7 @@ class TestSeries(unittest.TestCase):
                    'Invalid use of Function(<built-in function len>)'
                    'with argument(s) of type(s): (none)\n')
     def test_series_head_default1(self):
+        '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
             return S.head()
         hpat_func = hpat.jit(test_impl)
@@ -1278,6 +1282,7 @@ class TestSeries(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
     def test_series_head_index1(self):
+        '''Verifies head method for Series with integer index created inside jitted function'''
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
             return S.head(3)
@@ -1286,6 +1291,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_head_index2(self):
+        '''Verifies head method for Series with string index created inside jitted function'''
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
             return S.head(3)
@@ -1298,6 +1304,7 @@ class TestSeries(unittest.TestCase):
                    '[left]:  RangeIndex(start=0, stop=3, step=1)'
                    '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index3(self):
+        '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):
             return S.head(3)
         hpat_func = hpat.jit(test_impl)
@@ -1306,6 +1313,7 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_head_index4(self):
+        '''Verifies head method for non-distributed pass of Series with string index'''
         def test_impl(S):
             return S.head(3)
         hpat_func = hpat.jit(test_impl)
@@ -1319,6 +1327,7 @@ class TestSeries(unittest.TestCase):
                    'Invalid use of Function(<built-in function len>)'
                    'with argument(s) of type(s): (none)\n')
     def test_series_head_parallel1(self):
+        '''Verifies head method for distributed Series with string data and no index'''
         def test_impl(S):
             return S.head(7)
 
@@ -1337,6 +1346,7 @@ class TestSeries(unittest.TestCase):
                    '[left]:  RangeIndex(start=0, stop=3, step=1)'
                    '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index_parallel1(self):
+        '''Verifies head method for distributed Series with integer index'''
         def test_impl(S):
             return S.head(3)
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
@@ -1347,8 +1357,9 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(count_array_OneDs() > 0)
 
     def test_series_head_index_parallel2(self):
+        '''Verifies head method for distributed Series with string index'''
         def test_impl(S):
-            return S.head(4)
+            return S.head(3)
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
 
         S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])

@@ -196,8 +196,8 @@ def gatherv_overload(data):
 
             # displacements
             all_data = StringArray([''])  # dummy arrays on non-root PEs
-            displs = np.empty(n_loc, np.int32)
-            displs_char = np.empty(n_loc, np.int32)
+            displs = np.empty(0, np.int32)
+            displs_char = np.empty(0, np.int32)
 
             if rank == MPI_ROOT:
                 all_data = pre_alloc_string_array(n_total, n_total_char)
@@ -330,8 +330,18 @@ def const_slice_getitem(arr, slice_index, start, count):
 
 @overload(const_slice_getitem)
 def const_slice_getitem_overload(arr, slice_index, start, count):
-    # slice.index start/stop contain absolute indexes of the slice in input array
-    # start/count define part of the array processed by this processor
+    '''Provides parallel implementation of getting a const slice from arrays of different types
+
+    Arguments:
+    arr -- part of the input array processed by this processor
+    slice_index -- start and stop of the slice in the input array (same on all ranks)
+    start -- position of first arr element in the input array 
+    count -- lenght of the part of the array processed by this processor
+
+    Return value:
+    Function providing implementation basing on arr type. The function should implement
+    logic of fetching const slice from the array distributed over multiple processes.
+    '''
 
     # TODO: should this also handle slices not staring from zero?
     if arr == string_array_type:
@@ -345,7 +355,7 @@ def const_slice_getitem_overload(arr, slice_index, start, count):
             n_chars = np.uint64(0)
             if k > start:
                 # if slice end is beyond the start of this subset we have to send our elements
-                my_end = min(count, max(k - start, 0))
+                my_end = min(count, k - start)
                 my_arr = arr[:my_end]
             else:
                 my_arr = arr[:0]
@@ -372,10 +382,9 @@ def const_slice_getitem_overload(arr, slice_index, start, count):
         k = slice_index.stop
 
         out_arr = np.empty(k, arr.dtype)
-        my_arr = arr[:0]
         if k > start:
             # if slice end is beyond the start of this subset we have to send our elements
-            my_end = min(count, max(k - start, 0))
+            my_end = min(count, k - start)
             my_arr = arr[:my_end]
         else:
             my_arr = arr[:0]
