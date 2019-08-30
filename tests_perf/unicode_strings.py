@@ -1,6 +1,5 @@
-from pandas.util import testing as tm
-
 from .common import Implementation, ImplRunner
+from .data_generator import DataGenerator
 
 
 class Methods:
@@ -8,7 +7,14 @@ class Methods:
     param_names = ['implementation']
 
     def setup(self, implementation):
-        self.s = tm.randu(10 ** 4)
+        N = 10 ** 4
+        data_generator = DataGenerator()
+        self.s = data_generator.randu(N)
+
+
+class WidthMethods(Methods):
+    def setup(self, implementation):
+        super().setup(implementation)
         self.width = 10 ** 8
 
     def time_center(self, implementation):
