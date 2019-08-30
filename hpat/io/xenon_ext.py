@@ -1,5 +1,9 @@
+import numpy as np
+from llvmlite import ir as lir
+import llvmlite.binding as ll
+
 import numba
-from numba import ir, ir_utils, types
+from numba import cgutils, ir, ir_utils, types
 from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
@@ -8,21 +12,15 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             find_callname, guard, require, get_definition,
                             build_definitions, replace_vars_stmt, replace_vars_inner)
 
-from llvmlite import ir as lir
-import llvmlite.binding as ll
-from numba.targets.imputils import impl_ret_new_ref
 from numba.extending import lower_builtin, overload, intrinsic, register_model, models
 from numba.typing import signature
-from numba import cgutils
-from numba.targets.imputils import lower_builtin
+from numba.targets.imputils import impl_ret_new_ref, lower_builtin
 from numba.targets.arrayobj import make_array
 
-import numpy as np
 import hpat
 from hpat.utils import get_constant, NOT_CONSTANT
 from hpat.str_ext import string_type, unicode_to_char_ptr
-from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array
-from hpat.str_arr_ext import string_array_type
+from hpat.str_arr_ext import StringArray, StringArrayPayloadType, construct_string_array, string_array_type
 
 
 def remove_xenon(rhs, lives, call_list):
@@ -39,6 +37,8 @@ def remove_xenon(rhs, lives, call_list):
 numba.ir_utils.remove_call_handlers.append(remove_xenon)
 
 # TODO: implement in regular python
+
+
 def read_xenon():
     return
 
@@ -168,18 +168,16 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
 
     loc = cvar.loc
 
-    func_text = ('def f(xe_connect_var, xe_dset_var, schema_arr):\n  col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'.
-                 format(i))
+    func_text = ('def f(xe_connect_var, xe_dset_var, schema_arr):\n')
+    func_text = ('    col_size = get_column_size_xenon(xe_connect_var, xe_dset_var, {})\n'. format(i))
     # func_text += '  print(col_size)\n'
     # generate strings differently since upfront allocation is not possible
     if c_type == string_array_type:
         # pass size for easier allocation and distributed analysis
-        func_text += '  column = read_xenon_str(xe_connect_var, xe_dset_var, {}, col_size, schema_arr)\n'.format(
-            i)
+        func_text += '  column = read_xenon_str(xe_connect_var, xe_dset_var, {}, col_size, schema_arr)\n'.format(i)
     else:
         el_type = get_element_type(c_type.dtype)
-        func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(
-            el_type)
+        func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
         func_text += '  status = read_xenon_col(xe_connect_var, xe_dset_var, {}, column, schema_arr)\n'.format(i)
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -269,9 +267,15 @@ xe_dset_type = XeDSetType()
 register_model(XeDSetType)(models.OpaqueModel)
 
 get_column_size_xenon = types.ExternalFunction(
-    "get_column_size_xenon", types.int64(
-        xe_connect_type, xe_dset_type, types.intp))
-# read_xenon_col = types.ExternalFunction("c_read_xenon", types.void(string_type, types.intp, types.voidptr, types.CPointer(types.int64)))
+    "get_column_size_xenon", types.int64(xe_connect_type, xe_dset_type, types.intp))
+# read_xenon_col = types.ExternalFunction(
+#     "c_read_xenon",
+#     types.void(
+#         string_type,
+#         types.intp,
+#         types.voidptr,
+#         types.CPointer(
+#             types.int64)))
 xe_connect = types.ExternalFunction("c_xe_connect", xe_connect_type(types.voidptr))
 xe_open = types.ExternalFunction("c_xe_open", xe_dset_type(xe_connect_type, types.voidptr))
 xe_close = types.ExternalFunction("c_xe_close", types.void(xe_connect_type, xe_dset_type))

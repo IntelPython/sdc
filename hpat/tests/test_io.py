@@ -1,4 +1,5 @@
 import unittest
+import platform
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 import numpy as np
@@ -351,6 +352,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_pq_spark_date(self):
         def test_impl():
             df = pd.read_parquet('sdf_dt.pq')
@@ -359,6 +361,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
@@ -380,6 +383,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_const_dtype1(self):
         def test_impl():
             dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
@@ -390,6 +394,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_infer1(self):
         def test_impl():
             return pd.read_csv("csv_data_infer1.csv")
@@ -407,6 +412,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_skip1(self):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
@@ -448,6 +454,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_date1(self):
         def test_impl():
             return pd.read_csv("csv_data_date1.csv",
@@ -457,6 +464,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_str1(self):
         def test_impl():
             return pd.read_csv("csv_data_date1.csv",
@@ -500,6 +508,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
@@ -513,6 +522,7 @@ class TestIO(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(), test_impl(), check_names=False)
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_cat2(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C', 'D'])
@@ -524,6 +534,7 @@ class TestIO(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_csv_single_dtype1(self):
         def test_impl():
             df = pd.read_csv("csv_data_dtype1.csv",

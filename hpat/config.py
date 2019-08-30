@@ -1,3 +1,6 @@
+import os
+from distutils import util as distutils_util
+
 try:
     from .io import _hdf5
     import h5py
@@ -36,3 +39,11 @@ except ImportError:
 else:
     _has_xenon = True
     import hpat.io.xenon_ext
+
+# default value for transport
+# used if no function decorator controls the transport
+config_transport_mpi_default = distutils_util.strtobool(os.getenv('HPAT_CONFIG_MPI', 'True'))
+
+# current value for transport controlled by decorator
+# need to initialize this here because decorator called later then modules have been initialized
+config_transport_mpi = config_transport_mpi_default

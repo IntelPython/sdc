@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <iostream>
+
 #include "_meminfo.h"
 
 #ifndef Py_UNREACHABLE
@@ -72,19 +73,23 @@ void _C_UnicodeWriter_Init(_C_UnicodeWriter* writer)
 #include "stringlib/bytesobject.cpp"
 
 #include "stringlib/asciilib.h"
+
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
 // TODO needs to be redesigned. This is not acceptable *.h handling.
 #include "stringlib/ucs1lib.h"
+
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
 #include "stringlib/ucs2lib.h"
+
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
 #include "stringlib/ucs4lib.h"
+
 #include "stringlib/codecs.h"
 #include "stringlib/undef.h"
 
