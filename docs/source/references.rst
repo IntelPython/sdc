@@ -1,10 +1,19 @@
-.. _development:
+.. _references:
 
-HPAT Development
-================
+References
+==========
 
-Technology Overview and Architecture
-------------------------------------
+HPAT implements Pandas and Numpy API as a DSL.
+Data structures are implemented as Numba extensions, and
+compiler stages are responsible for different levels of abstraction.
+For example, `Series data type support <https://github.com/IntelLabs/hpat/blob/master/hpat/hiframes/pd_series_ext.py>`_
+and `Series transformations <https://github.com/IntelLabs/hpat/blob/master/hpat/hiframes/hiframes_typed.py>`_
+implement the `Pandas Series API <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html>`_.
+Follow the pipeline for a simple function like `Series.sum()`
+for initial understanding of the transformations.
+
+HPAT Technology Overview
+------------------------
 
 This `slide deck <https://drive.google.com/open?id=1jLikSEAqOFf8kKO8vgT7ru6dKU1LGiDR>`_
 provides an overview of HPAT technology and software architecture.
@@ -17,8 +26,8 @@ These papers provide deeper dive in technical ideas (might not be necessary for 
 - `ParallelAccelerator DSL approach <https://users.soe.ucsc.edu/~lkuper/papers/parallelaccelerator-ecoop17.pdf>`_
 
 
-Numba Development
------------------
+Numba
+-----
 
 HPAT sits on top of Numba and is heavily tied to many of its features.
 Therefore, understanding Numba's internal details and being able to develop Numba extensions
@@ -51,15 +60,3 @@ is necessary.
     `get_file_size <https://github.com/IntelLabs/hpat/blob/master/hpat/io.py#L12>`_.
 - | `Developer reference manual <http://numba.pydata.org/numba-doc/latest/developer/index.html>`_
     provides more details if necessary.
-
-HPAT Development
-----------------
-
-HPAT implements Pandas and Numpy API as a DSL.
-Data structures are implemented as Numba extensions, and
-compiler stages are responsible for different levels of abstraction.
-For example, `Series data type support <https://github.com/IntelLabs/hpat/blob/master/hpat/hiframes/pd_series_ext.py>`_
-and `Series transformations <https://github.com/IntelLabs/hpat/blob/master/hpat/hiframes/hiframes_typed.py>`_
-implement the `Pandas Series API <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html>`_.
-Follow the pipeline for a simple function like `Series.sum()`
-for initial understanding of the transformations.

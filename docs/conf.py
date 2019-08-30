@@ -87,13 +87,13 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'classic'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -157,6 +157,12 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
+numfig = True
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+#configuration for intersphinx
+intersphinx_mapping = {
+	'python': ('https://docs.python.org/', None),
+	'numba': ('http://numba.pydata.org/numba-doc/latest/index.html', None),
+	'numpy': ('http://docs.scipy.org/doc/numpy', None),
+	'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+}

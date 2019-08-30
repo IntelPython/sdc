@@ -8,12 +8,10 @@ HPAT documentation
 
 .. toctree::
    :maxdepth: 2
+   :numbered:
    :caption: Contents:
 
    source/overview
-   source/supported
-   source/supportedpandas
-   source/notsupported
+   source/userguide
    source/install
-   source/development
-   source/aws
+   source/references
