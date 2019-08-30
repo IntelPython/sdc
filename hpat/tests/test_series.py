@@ -1476,7 +1476,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enabel after fixing distributed for get_series_index")
+    @unittest.skip("Enable after fixing distributed for get_series_index")
     def test_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
@@ -1487,7 +1487,23 @@ class TestSeries(unittest.TestCase):
 
     def test_series_iterator_int(self):
         def test_impl():
-            A = pd.Series([1, 2, 3, 4, 5])
+            A = pd.Series([3, 2, 1, 5, 4])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_iterator_float(self):
+        def test_impl():
+            A = pd.Series([0.3, 0.2222, 0.1756, 0.005, 0.4])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_iterator_boolean(self):
+        def test_impl():
+            A = pd.Series([True, False])
             return [i for i in A]
 
         hpat_func = hpat.jit(test_impl)
@@ -1504,6 +1520,22 @@ class TestSeries(unittest.TestCase):
     def test_series_iterator_one_value(self):
         def test_impl():
             A = pd.Series([5])
+            return [i for i in A]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    def test_series_iterator_func_param(self):
+        def test_impl(A):
+            return [i for i in A]
+
+        A = pd.Series([3, 2, 1, 5, 4])
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+
+    def test_series_iterator_empty(self):
+        def test_impl():
+            A = pd.Series([np.int64(x) for x in range(0)])
             return [i for i in A]
 
         hpat_func = hpat.jit(test_impl)
