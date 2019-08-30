@@ -33,7 +33,9 @@ else:
             def prdct_impl(n, d, model):
                 w = np.ones((n, d), dtype=np.double) - 22.5
                 algo = d4p.logistic_regression_prediction(
-                    2, resultsToCompute="computeClassesLabels|computeClassesProbabilities|computeClassesLogProbabilities")
+                    2,
+                    resultsToCompute="computeClassesLabels|computeClassesProbabilities|computeClassesLogProbabilities"
+                )
                 return algo.compute(w, model)
 
             train_hpat = hpat.jit(train_impl)
