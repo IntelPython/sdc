@@ -1,4 +1,6 @@
-from .common import Implementation, ImplRunner
+import hpat
+
+from .common import Implementation
 from .data_generator import DataGenerator
 
 
@@ -19,7 +21,13 @@ class Quantile():
         }
         self.idx = data[dtype]
 
+    @staticmethod
+    @hpat.jit
+    def _quantile(idx, quantile, interpolation):
+        return idx.quantile(quantile, interpolation=interpolation)
+
     def time_quantile(self, quantile, interpolation, dtype, implementation):
-        def _quantile(idx, quantile, interpolation=interpolation):
-            return idx.quantile(quantile, interpolation=interpolation)
-        ImplRunner(implementation, _quantile).run(self.idx, quantile, interpolation=interpolation)
+        if implementation == Implementation.hpat.value:
+            return self._quantile(self.idx, quantile, interpolation)
+        if implementation == Implementation.native.value:
+            return self.idx.quantile(quantile, interpolation)

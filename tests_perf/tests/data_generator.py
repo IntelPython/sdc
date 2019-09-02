@@ -6,9 +6,6 @@ from pandas.util import testing as tm
 
 
 class DataGenerator:
-    def __init__(self):
-        pass
-
     def randu(self, length):
         """Generate one random unicode string."""
         return tm.randu(length)
