@@ -2272,6 +2272,14 @@ class HiFramesTyped(object):
         return nodes[-1].target
 
     def _get_index_values(self, series_data, nodes):
+        """
+        Generate index values by numpy.arange
+
+        :param series_data: numba ir.Var for series data
+        :param nodes: list of all irs
+        :return: numba ir.Var for generated index
+        """
+
         def _gen_arange(S):  # pragma: no cover
             n = len(S)
             return np.arange(n)
