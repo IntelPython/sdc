@@ -335,7 +335,7 @@ def const_slice_getitem_overload(arr, slice_index, start, count):
     Arguments:
     arr -- part of the input array processed by this processor
     slice_index -- start and stop of the slice in the input array (same on all ranks)
-    start -- position of first arr element in the input array 
+    start -- position of first arr element in the input array
     count -- lenght of the part of the array processed by this processor
 
     Return value:
