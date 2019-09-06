@@ -6,7 +6,8 @@ import numpy as np
 
 import numba
 import hpat
-from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_start_end)
+from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
+                                   count_array_OneDs, dist_IR_contains, get_start_end)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 
@@ -57,9 +58,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
+        
     def test_unbox1(self):
         def test_impl(df):
             return df.A
@@ -123,14 +122,6 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Assertion Error - fix needed\n'
-                   'Not equal to tolerance rtol=1e-07, atol=0\n'
-                   'Mismatch: 100%\n'
-                   'Max absolute difference: 3.\n'
-                   'Max relative difference: 0.27272727\n'
-                   'x: array(8.)\n'
-                   'y: array(11.)\n'
-                   'NUMA_PES=3 build')
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -183,8 +174,6 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_column_list_getitem1(self):
         def test_impl(df):
             return df[['A', 'C']]
@@ -195,8 +184,6 @@ class TestDataFrame(unittest.TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -209,8 +196,6 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_filter2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -223,8 +208,6 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_filter3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -293,8 +276,6 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_iat1(self):
         def test_impl(n):
             df = pd.DataFrame({'B': np.ones(n), 'A': np.arange(n) + n})
@@ -418,8 +399,6 @@ class TestDataFrame(unittest.TestCase):
         test_impl(df2, n)
         pd.testing.assert_frame_equal(df1, df2)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_set_column_bool1(self):
         def test_impl(df):
             df['C'] = df['A'][df['B']]
@@ -474,8 +453,6 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_df_values_parallel1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -708,8 +685,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -719,8 +694,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_mean1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -731,8 +704,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_std1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -743,8 +714,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_var1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -755,8 +724,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_max1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -767,8 +734,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_min1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -779,8 +744,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_sum1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -791,8 +754,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_prod1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -985,8 +946,6 @@ class TestDataFrame(unittest.TestCase):
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_concat_columns1(self):
         def test_impl(S1, S2):
             return pd.concat([S1, S2], axis=1)
@@ -999,8 +958,6 @@ class TestDataFrame(unittest.TestCase):
             hpat_func(S1, S2),
             test_impl(S1, S2).rename(columns={0: '0', 1: '1'}))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_var_rename(self):
         # tests df variable replacement in hiframes_untyped where inlining
         # can cause extra assignments and definition handling errors
