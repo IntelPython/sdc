@@ -27,20 +27,20 @@
 import operator
 
 from numba import types
-from numba.extending import (
-    types,
-    overload,
-    overload_method
-)
+from numba.extending import (types, overload, overload_method)
 
-
-from hpat.hiframes.pd_series_ext import SeriesType as HPATPandasSeriesType
+from hpat.hiframes.pd_series_ext import SeriesType
 
 
 '''
 Pandas Series (https://pandas.pydata.org/pandas-docs/stable/reference/series.html)
 functions and operators definition in HPAT
 Also, it contains Numba internal operators which are required for Series type handling
+
+Implemented methods:
+
+Implemented operators:
+    getitem
 '''
 
 
@@ -55,11 +55,11 @@ def hpat_pandas_series_getitem(self, idx):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
     '''
 
-    if not isinstance(self, HPATPandasSeriesType):
-        raise numba_TypingError('The object must be a pandas.series')
+    if not isinstance(self, SeriesType):
+        raise TypingError('The object must be a pandas.series. Given: {}'.format(self))
 
-    if not isinstance(idx, numba_types.Integer):
-        raise numba_TypingError('The index must be an Integer')
+    if not isinstance(idx, types.Integer):
+        raise TypingError('The index must be an Integer. Given: {}'.format(idx))
 
     def hpat_pandas_series_getitem_impl(self, idx):
         result = self._data[idx]
