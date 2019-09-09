@@ -1,25 +1,29 @@
+"""
+
+"""
 import hpat
 
-from .common import Implementation
+from .common import Implementation as Impl
 from .data_generator import StringSeriesGenerator
 
 
 class Methods:
     params = [
-        [Implementation.native.value, Implementation.hpat.value]
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
     ]
     param_names = ['implementation']
 
     def setup(self, implementation):
-        self.s = StringSeriesGenerator().generate()
+        self.series = StringSeriesGenerator().generate()
 
     @staticmethod
     @hpat.jit
-    def _len(s):
-        return s.str.len()
+    def _len(series):
+        return series.str.len()
 
     def time_len(self, implementation):
-        if implementation == Implementation.hpat.value:
-            return self._len(self.s)
-        if implementation == Implementation.native.value:
-            return self.s.str.len()
+        """Time both interpreted and compiled Series.str.len"""
+        if implementation == Impl.compiled_python.value:
+            return self._len(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.str.len()
