@@ -1,11 +1,11 @@
 import numba
 
-from .common import Implementation
+from .common import Implementation as Impl
 from .data_generator import DataGenerator
 
 
 class Methods:
-    params = [Implementation.native.value, Implementation.njit.value]
+    params = [Impl.interpreted_python.value, Impl.compiled_python.value]
     param_names = ['implementation']
 
     def setup(self, implementation):
@@ -25,9 +25,9 @@ class WidthMethods(Methods):
         return s.center(width)
 
     def time_center(self, implementation):
-        if implementation == Implementation.njit.value:
+        if implementation == Impl.compiled_python.value:
             return self._center(self.s, self.width)
-        if implementation == Implementation.native.value:
+        if implementation == Impl.interpreted_python.value:
             return self.s.center(self.width)
 
     @staticmethod
@@ -36,9 +36,9 @@ class WidthMethods(Methods):
         return s.ljust(width)
 
     def time_ljust(self, implementation):
-        if implementation == Implementation.njit.value:
+        if implementation == Impl.compiled_python.value:
             return self._rjust(self.s, self.width)
-        if implementation == Implementation.native.value:
+        if implementation == Impl.interpreted_python.value:
             return self.s.rjust(self.width)
 
     @staticmethod
@@ -47,7 +47,7 @@ class WidthMethods(Methods):
         return s.rjust(width)
 
     def time_rjust(self, implementation):
-        if implementation == Implementation.njit.value:
+        if implementation == Impl.compiled_python.value:
             return self._rjust(self.s, self.width)
-        if implementation == Implementation.native.value:
+        if implementation == Impl.interpreted_python.value:
             return self.s.rjust(self.width)
