@@ -4,9 +4,9 @@ from enum import Enum
 
 
 class Implementation(Enum):
-    native = 'native'
-    njit = 'njit'
-    hpat = 'hpat'
+    """Python implementations"""
+    interpreted_python = 'interpreted_python'
+    compiled_python = 'compiled_python'
 
 
 class BaseIO:
