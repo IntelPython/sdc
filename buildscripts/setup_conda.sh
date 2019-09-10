@@ -16,10 +16,10 @@ fi
 # Install
 chmod +x miniconda.sh
 ./miniconda.sh -b
+export PATH=$HOME/miniconda3/bin:$PATH
 
 # Create conda env
 conda create -n $CONDA_ENV -q -y python=$PYTHON_VER
 source activate $CONDA_ENV
 # Install conda-build
-export PATH=$HOME/miniconda3/bin:$PATH
 conda install -q -y conda-build
