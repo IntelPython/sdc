@@ -18,8 +18,8 @@ class DataGenerator:
     SEED = 123
 
     def __init__(self, size=None, seed=None):
-        self.seed = seed or self.SEED
         self.size = size or self.N
+        self.seed = seed or self.SEED
 
     @contextlib.contextmanager
     def set_seed(self):
@@ -78,7 +78,7 @@ class StringSeriesGenerator(DataGenerator):
     N = 10 ** 5 + 513
     RANDS_CHARS = np.array(list(string.ascii_letters + string.digits + string.whitespace), dtype=(np.str_, 1))
 
-    def __init__(self, size=None, nchars=None, seed=None):
+    def __init__(self, size=None, seed=None, nchars=None):
         super().__init__(size=size, seed=seed)
 
         self.nchars = nchars or self.NCHARS
@@ -110,4 +110,4 @@ class StringSeriesGenerator(DataGenerator):
         with self.set_seed():
             np.random.shuffle(result_array)
 
-        return np.concatenate(arrays)
+        return result_array

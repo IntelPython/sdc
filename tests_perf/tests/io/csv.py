@@ -16,12 +16,12 @@ class ToCSV(BaseIO):
 
     @staticmethod
     @hpat.jit
-    def _frame(df, fname):
-        df.to_csv(fname)
+    def _to_csv(df, fname):
+        return df.to_csv(fname)
 
-    def time_frame(self, implementation):
+    def time_to_csv(self, implementation):
         """Time both interpreted and compiled DataFrame.to_csv"""
         if implementation == Impl.compiled_python.value:
-            self._frame(self.df, self.fname)
-        elif implementation == Impl.interpreted_python.value:
-            self.df.to_csv(self.fname)
+            return self._to_csv(self.df, self.fname)
+        if implementation == Impl.interpreted_python.value:
+            return self.df.to_csv(self.fname)
