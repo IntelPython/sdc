@@ -1,12 +1,14 @@
+import time
 from enum import Enum
 import llvmlite.binding as ll
 import operator
 import numpy as np
+
 import numba
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate, infer
-from numba.typing import signature
 from numba.extending import models, register_model, intrinsic, overload
+from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate, infer
 
 import hpat
 from hpat import config
@@ -14,7 +16,6 @@ from hpat.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)
 from hpat.utils import (debug_prints, empty_like_type, _numba_to_c_type_map, unliteral_all)
-import time
 
 if hpat.config.config_transport_mpi:
     from . import transport_mpi as transport
@@ -102,12 +103,14 @@ def gather_scalar(data):  # pragma: no cover
 
 c_gather_scalar = types.ExternalFunction("c_gather_scalar", types.void(types.voidptr, types.voidptr, types.int32))
 
+
 # TODO: test
 @overload(gather_scalar)
 def gather_scalar_overload(val):
     assert isinstance(val, (types.Integer, types.Float))
     # TODO: other types like boolean
     typ_val = _numba_to_c_type_map[val]
+
     func_text = (
         "def gather_scalar_impl(val):\n"
         "  n_pes = hpat.distributed_api.get_size()\n"
@@ -158,7 +161,6 @@ def gatherv_overload(data):
             displs = np.empty(1, np.int32)
             if rank == MPI_ROOT:
                 displs = hpat.hiframes.join.calc_disp(recv_counts)
-            #  print(rank, n_loc, n_total, recv_counts, displs)
             c_gatherv(
                 data.ctypes,
                 np.int32(n_loc),
@@ -194,15 +196,14 @@ def gatherv_overload(data):
 
             # displacements
             all_data = StringArray([''])  # dummy arrays on non-root PEs
-            displs = np.empty(1, np.int32)
-            displs_char = np.empty(1, np.int32)
+            displs = np.empty(0, np.int32)
+            displs_char = np.empty(0, np.int32)
 
             if rank == MPI_ROOT:
                 all_data = pre_alloc_string_array(n_total, n_total_char)
                 displs = hpat.hiframes.join.calc_disp(recv_counts)
                 displs_char = hpat.hiframes.join.calc_disp(recv_counts_char)
 
-            #  print(rank, n_loc, n_total, recv_counts, displs)
             offset_ptr = get_offset_ptr(all_data)
             data_ptr = get_data_ptr(all_data)
             c_gatherv(
@@ -329,30 +330,46 @@ def const_slice_getitem(arr, slice_index, start, count):
 
 @overload(const_slice_getitem)
 def const_slice_getitem_overload(arr, slice_index, start, count):
+    '''Provides parallel implementation of getting a const slice from arrays of different types
+
+    Arguments:
+    arr -- part of the input array processed by this processor
+    slice_index -- start and stop of the slice in the input array (same on all ranks)
+    start -- position of first arr element in the input array 
+    count -- lenght of the part of the array processed by this processor
+
+    Return value:
+    Function providing implementation basing on arr type. The function should implement
+    logic of fetching const slice from the array distributed over multiple processes.
+    '''
+
+    # TODO: should this also handle slices not staring from zero?
     if arr == string_array_type:
         reduce_op = Reduce_Type.Sum.value
 
         def getitem_str_impl(arr, slice_index, start, count):
             rank = hpat.distributed_api.get_rank()
             k = slice_index.stop
+
             # get total characters for allocation
             n_chars = np.uint64(0)
-            if k > count:
-                my_end = min(count, max(k - start, 0))
+            if k > start:
+                # if slice end is beyond the start of this subset we have to send our elements
+                my_end = min(count, k - start)
                 my_arr = arr[:my_end]
-                my_arr = hpat.distributed_api.gatherv(my_arr)
-                n_chars = hpat.distributed_api.dist_reduce(
-                    num_total_chars(my_arr), np.int32(reduce_op))
-                if rank == 0:
-                    out_arr = my_arr
             else:
-                if rank == 0:
-                    my_arr = arr[:k]
-                    n_chars = num_total_chars(my_arr)
-                    out_arr = my_arr
-                n_chars = bcast_scalar(n_chars)
+                my_arr = arr[:0]
+
+            # get the total number of chars in our array, then gather all arrays into one
+            # and compute total number of chars in all arrays
+            n_chars = num_total_chars(my_arr)
+            my_arr = hpat.distributed_api.gatherv(my_arr)
+            n_chars = hpat.distributed_api.dist_reduce(n_chars, np.int32(reduce_op))
+
             if rank != 0:
                 out_arr = pre_alloc_string_array(k, n_chars)
+            else:
+                out_arr = my_arr
 
             # actual communication
             hpat.distributed_api.bcast(out_arr)
@@ -363,17 +380,22 @@ def const_slice_getitem_overload(arr, slice_index, start, count):
     def getitem_impl(arr, slice_index, start, count):
         rank = hpat.distributed_api.get_rank()
         k = slice_index.stop
+
         out_arr = np.empty(k, arr.dtype)
-        if k > count:
-            my_end = min(count, max(k - start, 0))
+        if k > start:
+            # if slice end is beyond the start of this subset we have to send our elements
+            my_end = min(count, k - start)
             my_arr = arr[:my_end]
-            my_arr = hpat.distributed_api.gatherv(my_arr)
-            if rank == 0:
-                print(my_arr)
-                out_arr = my_arr
         else:
-            if rank == 0:
-                out_arr = arr[:k]
+            my_arr = arr[:0]
+
+        # gather all subsets from all processors
+        my_arr = hpat.distributed_api.gatherv(my_arr)
+
+        if rank == 0:
+            out_arr = my_arr
+
+        # actual communication
         hpat.distributed_api.bcast(out_arr)
         return out_arr
 
@@ -428,7 +450,8 @@ def alltoallv_tup_overload(send_data, out_data, send_counts, recv_counts, send_d
 
     func_text = "def f(send_data, out_data, send_counts, recv_counts, send_disp, recv_disp):\n"
     for i in range(count):
-        func_text += "  alltoallv(send_data[{}], out_data[{}], send_counts, recv_counts, send_disp, recv_disp)\n".format(i, i)
+        func_text += "  alltoallv(send_data[{}], out_data[{}],\n".format(i, i)
+        func_text += "            send_counts, recv_counts, send_disp, recv_disp)\n"
     func_text += "  return\n"
 
     loc_vars = {}

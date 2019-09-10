@@ -955,7 +955,7 @@ def ensureCapacity(tmpLength, tmp, tmp_data, key_arrs, data, minCapacity):
     return tmpLength, tmp, tmp_data
 
 
-################### Utils #############
+# ***************** Utils *************
 
 
 def swap_arrs(data, lo, hi):  # pragma: no cover
@@ -1035,8 +1035,8 @@ def copyElement_tup_overload(src_arr_tup, src_pos, dst_arr_tup, dst_pos):
 
 
 def getitem_arr_tup(arr_tup, ind):  # pragma: no cover
-    l = [arr[ind] for arr in arr_tup]
-    return tuple(l)
+    result = [arr[ind] for arr in arr_tup]
+    return tuple(result)
 
 
 @overload(getitem_arr_tup)

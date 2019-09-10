@@ -1,4 +1,5 @@
 import unittest
+import platform
 import pandas as pd
 import numpy as np
 import random
@@ -15,8 +16,6 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
 
 class TestJoin(unittest.TestCase):
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_join1(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
@@ -32,8 +31,6 @@ class TestJoin(unittest.TestCase):
         n = 11111
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_join1_seq(self):
         def test_impl(df1, df2):
             df3 = df1.merge(df2, left_on='key1', right_on='key2')
@@ -70,8 +67,6 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(set(hpat_func()), set(test_impl()))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_join_mutil_seq1(self):
         def test_impl(df1, df2):
             return df1.merge(df2, on=['A', 'B'])
@@ -87,8 +82,6 @@ class TestJoin(unittest.TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_join_mutil_parallel1(self):
         def test_impl(A1, B1, C1, A2, B2, D2):
             df1 = pd.DataFrame({'A': A1, 'B': B1, 'C': C1})
@@ -128,8 +121,6 @@ class TestJoin(unittest.TestCase):
         p_res = test_impl(p_A1, p_B1, p_C1, p_A2, p_B2, p_D2)
         self.assertEqual(h_res, p_res)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_join_left_parallel1(self):
         """
         """
@@ -319,6 +310,7 @@ class TestJoin(unittest.TestCase):
         df4 = pd.DataFrame({'B': 2 * np.arange(n) + 1, 'BBB': n + np.arange(n) + 1.0})
         pd.testing.assert_frame_equal(hpat_func(df1, df2, df3, df4)[1], test_impl(df1, df2, df3, df4)[1])
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat1(self):
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
@@ -335,6 +327,7 @@ class TestJoin(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat2(self):
         # test setting NaN in categorical array
         def test_impl():
@@ -354,6 +347,7 @@ class TestJoin(unittest.TestCase):
             hpat_func().sort_values('C1').reset_index(drop=True),
             test_impl().sort_values('C1').reset_index(drop=True))
 
+    @unittest.skipIf(platform.system() == 'Windows', "error on windows")
     def test_join_cat_parallel1(self):
         # TODO: cat as keys
         def test_impl():
