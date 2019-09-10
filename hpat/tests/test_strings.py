@@ -13,7 +13,7 @@ from hpat.str_ext import unicode_to_std_str, std_str_to_unicode
 from hpat.tests.gen_test_data import ParquetGenerator
 
 
-class TestString(unittest.TestCase):
+class TestStrings(unittest.TestCase):
 
     def test_pass_return(self):
         def test_impl(_str):
@@ -207,10 +207,8 @@ class TestString(unittest.TestCase):
         )
         ds, rs = hpat_func(df.B)
         gc.collect()
-        self.assertTrue(isinstance(ds, pd.Series) and
-                        isinstance(rs, pd.Series))
-        self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and
-                        rs[0] and rs[2] == False)
+        self.assertTrue(isinstance(ds, pd.Series) and isinstance(rs, pd.Series))
+        self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] and not rs[2])
 
     def test_string_array_bool_getitem(self):
         def test_impl():
@@ -222,8 +220,6 @@ class TestString(unittest.TestCase):
 
         self.assertEqual(hpat_func(), True)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_string_NA_box(self):
         # create `example.parquet` file
         ParquetGenerator.gen_pq_test()
