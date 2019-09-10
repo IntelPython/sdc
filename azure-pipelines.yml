@@ -13,5 +13,5 @@ jobs:
 
   - script: |
       call activate CB
-      conda build --python 3.7 --override-channels -c numba -c conda-forge -c defaults -c intel --output-folder=. buildscripts/hpat-conda-recipe/
+      conda build --python 3.7 --override-channels -c numba/label/dev -c conda-forge -c defaults -c intel --output-folder=. buildscripts/hpat-conda-recipe/
     displayName: conda build
