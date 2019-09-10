@@ -1,3 +1,11 @@
+"""
+Input data generator for performance tests.
+"""
+import contextlib
+import string
+
+from collections.abc import Iterable
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +14,27 @@ from pandas.util import testing as tm
 
 
 class DataGenerator:
+    N = 10 ** 6 + 513
+    SEED = 123
+
+    def __init__(self, size=None, seed=None):
+        self.size = size or self.N
+        self.seed = seed or self.SEED
+
+    @contextlib.contextmanager
+    def set_seed(self):
+        """Substitute random seed for context"""
+        state = np.random.get_state()
+        np.random.seed(self.seed)
+        try:
+            yield
+        finally:
+            np.random.set_state(state)
+
+    def generate(self, *args, **kwargs):
+        """Generate data"""
+        raise NotImplementedError
+
     def randu(self, length):
         """Generate one random unicode string."""
         return tm.randu(length)
@@ -42,3 +71,43 @@ class DataGenerator:
             'C': data + 2.0,
             'D': data + 3.0,
         }, index=index)
+
+
+class StringSeriesGenerator(DataGenerator):
+    NCHARS = [0, 1, 3, 5, 9, 17, 33, 61, 97]
+    N = 10 ** 5 + 513
+    RANDS_CHARS = np.array(list(string.ascii_letters + string.digits + string.whitespace), dtype=(np.str_, 1))
+
+    def __init__(self, size=None, seed=None, nchars=None):
+        super().__init__(size=size, seed=seed)
+
+        self.nchars = nchars or self.NCHARS
+        if not isinstance(self.nchars, Iterable):
+            self.nchars = [self.nchars]
+
+        self.size = len(self.nchars) * self.size
+
+    def generate(self):
+        """Generate series of strings"""
+        return pd.Series(pd.Index(self._rands_array))
+
+    @property
+    def _rands_array(self):
+        """Generate an array of random strings of different sizes"""
+        arrays = []
+        for n in self.nchars:
+            if n == 0:
+                # generate array of empty strings
+                arr = np.array(self.size * [''])
+            else:
+                # generate array of random n-size strings
+                with self.set_seed():
+                    arr = np.random.choice(self.RANDS_CHARS, size=n * self.size).view((np.str_, n))
+            arrays.append(arr)
+
+        result_array = np.concatenate(arrays)
+        # shuffle strings array
+        with self.set_seed():
+            np.random.shuffle(result_array)
+
+        return result_array
