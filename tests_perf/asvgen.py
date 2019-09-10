@@ -83,6 +83,11 @@ class ASVGen:
                     results = json.load(fd)['results']
                 data = {}
                 for benchmark, result in results.items():
+                    # combine benchmarks parameters to match parameters combinations and results, e.g.:
+                    # result['params'] = [[0, 1], ['interpreted', 'compiled']]
+                    # params = [(0, 'interpreted'), (0, 'compiled'), (1, 'interpreted'), (1, 'compiled')]
+                    # result['results'] = [1.87, 1.31, 1.85, 1.28]
+                    # def time_smth(0, 'interpreted'): ... => 1.87
                     params = itertools.product(*result.get('params', []))
                     for params, res, stats in zip(params, result['result'], result['stats']):
                         bench_args = ', '.join([p for p in params])
