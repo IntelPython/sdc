@@ -15,8 +15,8 @@ if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
 else
   # TODO investigate root cause of NumbaPerformanceWarning
   if [ -z "$HPAT_NUM_PES" ]; then
-    mpiexec -n $HPAT_NUM_PES python -W ignore -u -m hpat.runtests -v
-  else
     python -W ignore -u -m hpat.runtests -v
+  else
+    mpiexec -n $HPAT_NUM_PES python -W ignore -u -m hpat.runtests -v
   fi
 fi
