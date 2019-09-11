@@ -11,7 +11,7 @@ matrix:
         - os: osx
           env: CONDA_ENV=travisci HPAT_NUM_PES=2 PYTHON_VER=3.7
         - os: osx
-          env: CONDA_ENV=travisci HPAT_NUM_PES=3 PYTHON_VER=3.7 
+          env: CONDA_ENV=travisci HPAT_NUM_PES=3 PYTHON_VER=3.7
         - env: CONDA_ENV=travisci HPAT_CONFIG_MPI=False PYTHON_VER=3.7 HPAT_RUN_COVERAGE=True
         - env: CONDA_ENV=travisci HPAT_NUM_PES=1 PYTHON_VER=3.7
         - env: CONDA_ENV=travisci HPAT_NUM_PES=2 PYTHON_VER=3.7

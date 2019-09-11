@@ -11,7 +11,7 @@ python -m hpat.tests.gen_test_data
 if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
   export PYTHONPATH=.
   coverage erase
-  coverage run --source=./hpat --omit ./hpat/ml/*,./hpat/xenon_ext.py,./hpat/ros.py,./hpat/cv_ext.py,./hpat/tests/* -u -m hpat.runtests -v
+  coverage run --source=./hpat --omit ./hpat/ml/*,./hpat/xenon_ext.py,./hpat/ros.py,./hpat/cv_ext.py,./hpat/tests/* ./hpat/runtests.py
 else
   # TODO investigate root cause of NumbaPerformanceWarning
   # http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
