@@ -2,4 +2,4 @@
 
 source activate $CONDA_ENV
 
-conda build --python $PYTHON_VER --override-channels -c numba -c ehsantn -c conda-forge -c defaults ./buildscripts/hpat-conda-recipe/
+conda build --python $PYTHON_VER --override-channels -c numba -c conda-forge -c defaults ./buildscripts/hpat-conda-recipe/
