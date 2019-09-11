@@ -1,7 +1,7 @@
-.. _references:
+.. _DevelopersGuide:
 
-References
-==========
+Developer's Guide
+=================
 
 HPAT implements Pandas and Numpy API as a DSL.
 Data structures are implemented as Numba extensions, and
@@ -60,3 +60,37 @@ is necessary.
     `get_file_size <https://github.com/IntelLabs/hpat/blob/master/hpat/io.py#L12>`_.
 - | `Developer reference manual <http://numba.pydata.org/numba-doc/latest/developer/index.html>`_
     provides more details if necessary.
+
+How to update the documentation
+--------------------------------
+
+The HPAT documentation is generated from RST files using Sphinx. If you want to add to the documentation follow these steps:
+
+1. If you don't have sphinx installed then install sphinx in your conda environment::
+   
+    conda install sphinx
+
+	
+2. To add new documentation you either can modify an existing RST file or create a new RST file. The location of that file will be:
+   docs/source/
+
+   
+3. If you create a new RST file you should also modify the index.rst to add your filename in the table of contents. index.rst is in the same directory as other RST files. Adding the filename to this list will introduce a new section in online documentation.
+
+
+4. To build the documentation::
+
+    cd docs
+    make html
+   
+This will generate all html files in _build/html directory. 
+
+   
+5. If you want to generate pdf you should have latexmk installed. After making sure you have latexmk installed follow these steps::
+
+    cd docs
+    make latex
+    cd _build/latex
+    make all-pdf 
+
+The pdf will be generated in _build/latex directory as HPAT.pdf.
