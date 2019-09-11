@@ -16,7 +16,7 @@ requirements:
   host:
     - python
     - setuptools
-    - numba 0.44.*
+    - numba >0.44
     - numpy
     - pandas >=0.23
     - pyarrow >=0.9
@@ -24,9 +24,7 @@ requirements:
     - boost
     - hdf5
     - h5py
-    - mpich # [not win]
-    - impi-devel # [win]
-    - impi_rt # [win]
+    - impi-devel
 
   run:
     - python
@@ -35,9 +33,8 @@ requirements:
     - pyarrow >=0.9
     - arrow-cpp
     - boost
-    - numba 0.44.*
-    - mpich # [not win]
-    - impi_rt # [win]
+    - numba >0.44
+    - impi_rt
 
 test:
   requires:
