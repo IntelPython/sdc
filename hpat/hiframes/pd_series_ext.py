@@ -1,28 +1,67 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+import datetime
 import operator
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 import numba
 from numba import types
-from numba.extending import (models, register_model, lower_cast, infer_getattr,
-                             type_callable, infer, overload, make_attribute_wrapper)
-from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-                                    AttributeTemplate, bound_function)
-from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
-                                    ArrayAttribute, SetItemBuffer)
-from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
-                                  NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
-                                  NdConstructorLike)
+from numba.extending import (
+    models,
+    register_model,
+    lower_cast,
+    infer_getattr,
+    type_callable,
+    infer,
+    overload,
+    make_attribute_wrapper)
+from numba.typing.arraydecl import (get_array_index_type, _expand_integer, ArrayAttribute, SetItemBuffer)
+from numba.typing.npydecl import (
+    Numpy_rules_ufunc,
+    NumpyRulesArrayOperator,
+    NumpyRulesInplaceArrayOperator,
+    NumpyRulesUnaryArrayOperator,
+    NdConstructorLike)
+from numba.typing.templates import (infer_global, AbstractTemplate, signature, AttributeTemplate, bound_function)
+
 import hpat
-from hpat.str_ext import string_type, list_string_array_type
-from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
-                              str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
-from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-                                              CategoricalArray)
+from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
+from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from hpat.hiframes.rolling import supported_rolling_funcs
-import datetime
-from hpat.hiframes.split_impl import (string_array_split_view_type,
-                                      GetItemStringArraySplitView)
+from hpat.hiframes.split_impl import (string_array_split_view_type, GetItemStringArraySplitView)
+from hpat.str_arr_ext import (
+    string_array_type,
+    offset_typ,
+    char_typ,
+    str_arr_payload_type,
+    StringArrayType,
+    GetItemStringArray)
+from hpat.str_ext import string_type, list_string_array_type
 
 
 class SeriesType(types.IterableType):
@@ -258,16 +297,16 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == types.NPDatetime('ns')
         return series_dt_methods_type
 
-    def resolve_iat(self, ary):
-        return SeriesIatType(ary)
+#    def resolve_iat(self, ary):
+#        return SeriesIatType(ary)
 
-    def resolve_iloc(self, ary):
-        # TODO: support iat/iloc differences
-        return SeriesIatType(ary)
+#    def resolve_iloc(self, ary):
+#        # TODO: support iat/iloc differences
+#        return SeriesIatType(ary)
 
-    def resolve_loc(self, ary):
-        # TODO: support iat/iloc differences
-        return SeriesIatType(ary)
+#    def resolve_loc(self, ary):
+#        # TODO: support iat/iloc differences
+#        return SeriesIatType(ary)
 
     @bound_function("array.astype")
     def resolve_astype(self, ary, args, kws):
@@ -712,7 +751,7 @@ class SeriesIatType(types.Type):
 # @infer_global(operator.getitem)
 # class GetItemSeriesIat(AbstractTemplate):
 #     key = operator.getitem
-# 
+#
 #     def generic(self, args, kws):
 #         # iat[] is the same as regular getitem
 #         if isinstance(args[0], SeriesIatType):
@@ -721,7 +760,7 @@ class SeriesIatType(types.Type):
 
 @infer
 @infer_global(operator.eq)
-@infer_global(operator.ne)
+#@infer_global(operator.ne)
 @infer_global(operator.ge)
 @infer_global(operator.gt)
 @infer_global(operator.le)
@@ -824,27 +863,27 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
 # @infer_global(operator.getitem)
 # class GetItemSeries(AbstractTemplate):
 #     key = operator.getitem
-# 
+#
 #     def generic(self, args, kws):
 #         assert not kws
 #         [in_arr, in_idx] = args
 #         is_arr_series = False
 #         is_idx_series = False
 #         is_arr_dt_index = False
-# 
+#
 #         if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
 #             return None
-# 
+#
 #         if isinstance(in_arr, SeriesType):
 #             in_arr = series_to_array_type(in_arr)
 #             is_arr_series = True
 #             if in_arr.dtype == types.NPDatetime('ns'):
 #                 is_arr_dt_index = True
-# 
+#
 #         if isinstance(in_idx, SeriesType):
 #             in_idx = series_to_array_type(in_idx)
 #             is_idx_series = True
-# 
+#
 #         # TODO: dt_index
 #         if in_arr == string_array_type:
 #             # XXX fails due in overload
@@ -872,7 +911,7 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
 #         else:
 #             out = get_array_index_type(in_arr, in_idx)
 #             sig = signature(out.result, in_arr, out.index)
-# 
+#
 #         if sig is not None:
 #             arg1 = sig.args[0]
 #             arg2 = sig.args[1]
@@ -989,7 +1028,7 @@ explicit_binop_funcs = {
     'gt': operator.gt,
     'le': operator.le,
     'ge': operator.ge,
-    'ne': operator.ne,
+#    'ne': operator.ne,
     'eq': operator.eq,
 }
 
@@ -1041,11 +1080,11 @@ for func in numba.typing.npydecl.supported_ufuncs:
         infer_global(func, types.Function(typing_class))
 
 
-@infer_global(len)
-class LenSeriesType(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
-            return signature(types.intp, *args)
+# @infer_global(len)
+# class LenSeriesType(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
+#             return signature(types.intp, *args)
 
 # @infer_global(np.empty_like)
 # @infer_global(np.zeros_like)
