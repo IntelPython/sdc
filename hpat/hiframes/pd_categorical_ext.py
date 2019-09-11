@@ -134,6 +134,7 @@ def fix_cat_array_type(typingctx, arr=None):
 
     return fixed_arr(arr), codegen
 
+
 @intrinsic
 def cat_array_to_int(typingctx, arr=None):
     # TODO: fix aliasing
@@ -148,9 +149,11 @@ def cat_array_to_int(typingctx, arr=None):
 
     return out_arr(arr), codegen
 
+
 @overload_method(CategoricalArray, 'copy')
 def cat_arr_copy_overload(arr):
     return lambda arr: set_cat_dtype(cat_array_to_int(arr).copy(), arr)
+
 
 @intrinsic
 def set_cat_dtype(typingctx, arr, cat_arr=None):

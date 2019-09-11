@@ -59,17 +59,22 @@ def get_rolling_setup_args(func_ir, rhs, get_consts=True):
 def rolling_fixed(arr, win):  # pragma: no cover
     return arr
 
+
 def rolling_fixed_parallel(arr, win):  # pragma: no cover
     return arr
+
 
 def rolling_variable(arr, on_arr, win):  # pragma: no cover
     return arr
 
+
 def rolling_cov(arr, arr2, win):  # pragma: no cover
     return arr
 
+
 def rolling_corr(arr, arr2, win):  # pragma: no cover
     return arr
+
 
 @infer_global(rolling_fixed)
 @infer_global(rolling_fixed_parallel)
@@ -85,7 +90,6 @@ class RollingType(AbstractTemplate):
                          types.bool_, types.bool_, f_type)
 
 
-
 @infer_global(rolling_variable)
 class RollingVarType(AbstractTemplate):
     def generic(self, args, kws):
@@ -98,7 +102,6 @@ class RollingVarType(AbstractTemplate):
         ret_typ = if_series_to_array_type(arr).copy(dtype=types.float64)
         return signature(ret_typ, arr, on_arr, types.intp,
                          types.bool_, types.bool_, f_type)
-
 
 
 @infer_global(rolling_cov)
@@ -117,15 +120,20 @@ class RollingCovType(AbstractTemplate):
 def lower_rolling_fixed(context, builder, sig, args):
     func_name = sig.args[-1].literal_value
     if func_name == 'sum':
-        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
+        def func(a, w, c, p):
+            return roll_fixed_linear_generic(a, w, c, p, init_data_sum, add_sum, remove_sum, calc_sum)
     elif func_name == 'mean':
-        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_mean, add_mean, remove_mean, calc_mean)
+        def func(a, w, c, p):
+            return roll_fixed_linear_generic(a, w, c, p, init_data_mean, add_mean, remove_mean, calc_mean)
     elif func_name == 'var':
-        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_var)
+        def func(a, w, c, p):
+            return roll_fixed_linear_generic(a, w, c, p, init_data_var, add_var, remove_var, calc_var)
     elif func_name == 'std':
-        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_var, add_var, remove_var, calc_std)
+        def func(a, w, c, p):
+            return roll_fixed_linear_generic(a, w, c, p, init_data_var, add_var, remove_var, calc_std)
     elif func_name == 'count':
-        func = lambda a,w,c,p: roll_fixed_linear_generic(a,w,c,p, init_data_count, add_count, remove_count, calc_count)
+        def func(a, w, c, p):
+            return roll_fixed_linear_generic(a, w, c, p, init_data_count, add_count, remove_count, calc_count)
     elif func_name in ['median', 'min', 'max']:
         # just using 'apply' since we don't have streaming/linear support
         # TODO: implement linear support similar to others
@@ -135,8 +143,9 @@ def lower_rolling_fixed(context, builder, sig, args):
         loc_vars = {}
         exec(func_text, {'np': np}, loc_vars)
         kernel_func = numba.njit(loc_vars['kernel_func'])
-        def func(a,w,c,p):
-            return roll_fixed_apply(a,w,c,p, kernel_func)
+
+        def func(a, w, c, p):
+            return roll_fixed_apply(a, w, c, p, kernel_func)
     else:
         raise ValueError("invalid rolling (fixed) function {}".format(func_name))
 
@@ -147,7 +156,9 @@ def lower_rolling_fixed(context, builder, sig, args):
 @lower_builtin(rolling_fixed, types.Array, types.Integer, types.Boolean,
                types.Boolean, types.functions.Dispatcher)
 def lower_rolling_fixed_apply(context, builder, sig, args):
-    func = lambda a,w,c,p,f: roll_fixed_apply(a,w,c,p,f)
+
+    def func(a, w, c, p, f):
+        return roll_fixed_apply(a, w, c, p, f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
@@ -157,15 +168,20 @@ def lower_rolling_fixed_apply(context, builder, sig, args):
 def lower_rolling_variable(context, builder, sig, args):
     func_name = sig.args[-1].literal_value
     if func_name == 'sum':
-        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_sum, add_sum, remove_sum, calc_sum)
+        def func(a, o, w, c, p):
+            return roll_var_linear_generic(a, o, w, c, p, init_data_sum, add_sum, remove_sum, calc_sum)
     elif func_name == 'mean':
-        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_mean, add_mean, remove_mean, calc_mean)
+        def func(a, o, w, c, p):
+            return roll_var_linear_generic(a, o, w, c, p, init_data_mean, add_mean, remove_mean, calc_mean)
     elif func_name == 'var':
-        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_var)
+        def func(a, o, w, c, p):
+            return roll_var_linear_generic(a, o, w, c, p, init_data_var, add_var, remove_var, calc_var)
     elif func_name == 'std':
-        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_var, add_var, remove_var, calc_std)
+        def func(a, o, w, c, p):
+            return roll_var_linear_generic(a, o, w, c, p, init_data_var, add_var, remove_var, calc_std)
     elif func_name == 'count':
-        func = lambda a,o,w,c,p: roll_var_linear_generic(a,o,w,c,p, init_data_count, add_count, remove_count, calc_count_var)
+        def func(a, o, w, c, p):
+            return roll_var_linear_generic(a, o, w, c, p, init_data_count, add_count, remove_count, calc_count_var)
     elif func_name in ['median', 'min', 'max']:
         # TODO: linear support
         func_text = "def kernel_func(A):\n"
@@ -175,8 +191,9 @@ def lower_rolling_variable(context, builder, sig, args):
         loc_vars = {}
         exec(func_text, {'np': np, 'dropna': _dropna}, loc_vars)
         kernel_func = numba.njit(loc_vars['kernel_func'])
-        def func(a,o,w,c,p,):
-            return roll_variable_apply(a,o,w,c,p, kernel_func)
+
+        def func(a, o, w, c, p,):
+            return roll_variable_apply(a, o, w, c, p, kernel_func)
     else:
         raise ValueError("invalid rolling (variable) function {}".format(func_name))
 
@@ -185,14 +202,23 @@ def lower_rolling_variable(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
 
-@lower_builtin(rolling_variable, types.Array, types.Array, types.Integer, types.Boolean,
-               types.Boolean, types.functions.Dispatcher)
+@lower_builtin(
+    rolling_variable,
+    types.Array,
+    types.Array,
+    types.Integer,
+    types.Boolean,
+    types.Boolean,
+    types.functions.Dispatcher)
 def lower_rolling_variable_apply(context, builder, sig, args):
-    func = lambda a,o,w,c,p,f: roll_variable_apply(a,o,w,c,p,f)
+
+    def func(a, o, w, c, p, f):
+        return roll_variable_apply(a, o, w, c, p, f)
     res = context.compile_internal(builder, func, sig, args)
     return impl_ret_borrowed(context, builder, sig.return_type, res)
 
-#### adapted from pandas window.pyx ####
+# ** adapted from pandas window.pyx ****
+
 
 comm_border_tag = 22  # arbitrary, TODO: revisit comm tags
 
@@ -209,10 +235,10 @@ def roll_fixed_linear_generic(in_arr, win, center, parallel, init_data,
 
     if parallel:
         # halo length is w/2 to handle even w such as w=4
-        halo_size = np.int32(win // 2) if center else np.int32(win-1)
+        halo_size = np.int32(win // 2) if center else np.int32(win - 1)
         if _is_small_for_parallel(N, halo_size):
             return _handle_small_data(in_arr, win, center, rank, n_pes,
-                              init_data, add_obs, remove_obs, calc_out)
+                                      init_data, add_obs, remove_obs, calc_out)
 
         comm_data = _border_icomm(
             in_arr, rank, n_pes, halo_size, in_arr.dtype, center)
@@ -220,7 +246,7 @@ def roll_fixed_linear_generic(in_arr, win, center, parallel, init_data,
             r_recv_req) = comm_data
 
     output, data = roll_fixed_linear_generic_seq(in_arr, win, center,
-                            init_data, add_obs, remove_obs, calc_out)
+                                                 init_data, add_obs, remove_obs, calc_out)
 
     if parallel:
         _border_send_wait(r_send_req, l_send_req, rank, n_pes, center)
@@ -255,6 +281,7 @@ def roll_fixed_linear_generic(in_arr, win, center, parallel, init_data,
                     output[i - offset] = calc_out(minp, *data)
 
     return output
+
 
 @numba.njit
 def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
@@ -295,6 +322,7 @@ def roll_fixed_linear_generic_seq(in_arr, win, center, init_data, add_obs,
 
     return output, border_data
 
+
 @numba.njit
 def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):  # pragma: no cover
     rank = hpat.distributed_api.get_rank()
@@ -306,10 +334,10 @@ def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):  # pragma: no 
 
     if parallel:
         # halo length is w/2 to handle even w such as w=4
-        halo_size = np.int32(win // 2) if center else np.int32(win-1)
+        halo_size = np.int32(win // 2) if center else np.int32(win - 1)
         if _is_small_for_parallel(N, halo_size):
             return _handle_small_data_apply(in_arr, win, center, rank, n_pes,
-                                      kernel_func)
+                                            kernel_func)
 
         comm_data = _border_icomm(
             in_arr, rank, n_pes, halo_size, in_arr.dtype, center)
@@ -324,20 +352,21 @@ def roll_fixed_apply(in_arr, win, center, parallel, kernel_func):  # pragma: no 
         # recv right
         if center and rank != n_pes - 1:
             hpat.distributed_api.wait(r_recv_req, True)
-            border_data = np.concatenate((in_arr[N-win+1:], r_recv_buff))
+            border_data = np.concatenate((in_arr[N - win + 1:], r_recv_buff))
             ind = 0
-            for i in range(max(N-offset, 0), N):
-                output[i] = kernel_func(border_data[ind:ind+win])
+            for i in range(max(N - offset, 0), N):
+                output[i] = kernel_func(border_data[ind:ind + win])
                 ind += 1
 
         # recv left
         if rank != 0:
             hpat.distributed_api.wait(l_recv_req, True)
-            border_data = np.concatenate((l_recv_buff, in_arr[:win-1]))
+            border_data = np.concatenate((l_recv_buff, in_arr[:win - 1]))
             for i in range(0, win - offset - 1):
-                output[i] = kernel_func(border_data[i:i+win])
+                output[i] = kernel_func(border_data[i:i + win])
 
     return output
+
 
 @numba.njit
 def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
@@ -353,7 +382,7 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
         output[i] = np.nan
     ind = 0
     for i in range(win - 1 - offset, N - offset):
-        output[i] = kernel_func(in_arr[ind:ind+win])
+        output[i] = kernel_func(in_arr[ind:ind + win])
         ind += 1
     for i in range(max(N - offset, 0), N):
         output[i] = np.nan
@@ -366,7 +395,7 @@ def roll_fixed_apply_seq(in_arr, win, center, kernel_func):  # pragma: no cover
 
 @numba.njit
 def roll_var_linear_generic(in_arr, on_arr_dt, win, center, parallel, init_data,
-                              add_obs, remove_obs, calc_out):  # pragma: no cover
+                            add_obs, remove_obs, calc_out):  # pragma: no cover
     rank = hpat.distributed_api.get_rank()
     n_pes = hpat.distributed_api.get_size()
     on_arr = cast_dt64_arr_to_int(on_arr_dt)
@@ -380,16 +409,16 @@ def roll_var_linear_generic(in_arr, on_arr_dt, win, center, parallel, init_data,
     if parallel:
         if _is_small_for_parallel_variable(on_arr, win):
             return _handle_small_data_variable(in_arr, on_arr, win, rank,
-                               n_pes, init_data, add_obs, remove_obs, calc_out)
+                                               n_pes, init_data, add_obs, remove_obs, calc_out)
 
         comm_data = _border_icomm_var(
             in_arr, on_arr, rank, n_pes, win, in_arr.dtype)
         (l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req,
-        l_recv_t_req) = comm_data
+         l_recv_t_req) = comm_data
 
     start, end = _build_indexer(on_arr, N, win, left_closed, right_closed)
     output = roll_var_linear_generic_seq(in_arr, on_arr, win, start, end,
-                            init_data, add_obs, remove_obs, calc_out)
+                                         init_data, add_obs, remove_obs, calc_out)
 
     if parallel:
         _border_send_wait(r_send_req, r_send_req, rank, n_pes, False)
@@ -471,7 +500,7 @@ def _get_var_recv_starts(on_arr, l_recv_t_buff, num_zero_starts, win):
 
 @numba.njit
 def roll_var_linear_generic_seq(in_arr, on_arr, win, start, end, init_data,
-                              add_obs, remove_obs, calc_out):  # pragma: no cover
+                                add_obs, remove_obs, calc_out):  # pragma: no cover
     #
     N = len(in_arr)
     # TODO: support minp arg end_range etc.
@@ -502,6 +531,7 @@ def roll_var_linear_generic_seq(in_arr, on_arr, win, start, end, init_data,
 
     return output
 
+
 @numba.njit
 def roll_variable_apply(in_arr, on_arr_dt, win, center, parallel, kernel_func):  # pragma: no cover
     rank = hpat.distributed_api.get_rank()
@@ -517,12 +547,12 @@ def roll_variable_apply(in_arr, on_arr_dt, win, center, parallel, kernel_func): 
     if parallel:
         if _is_small_for_parallel_variable(on_arr, win):
             return _handle_small_data_variable_apply(in_arr, on_arr, win, rank,
-                               n_pes, kernel_func)
+                                                     n_pes, kernel_func)
 
         comm_data = _border_icomm_var(
             in_arr, on_arr, rank, n_pes, win, in_arr.dtype)
         (l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req,
-        l_recv_t_req) = comm_data
+         l_recv_t_req) = comm_data
 
     start, end = _build_indexer(on_arr, N, win, left_closed, right_closed)
     output = roll_variable_apply_seq(in_arr, on_arr, win, start, end, kernel_func)
@@ -550,7 +580,7 @@ def roll_variable_apply(in_arr, on_arr_dt, win, center, parallel, kernel_func): 
             for i in range(0, num_zero_starts):
                 halo_ind = recv_starts[i]
                 sub_arr = np.concatenate(
-                    (l_recv_buff[halo_ind:], in_arr[:i+1]))
+                    (l_recv_buff[halo_ind:], in_arr[:i + 1]))
                 if len(sub_arr) >= minp:
                     output[i] = kernel_func(sub_arr)
                 else:
@@ -626,9 +656,11 @@ def _build_indexer(on_arr, N, win, left_closed, right_closed):
 # -------------------
 # sum
 
+
 @numba.njit
 def init_data_sum():  # pragma: no cover
     return 0, 0.0
+
 
 @numba.njit
 def add_sum(val, nobs, sum_x):  # pragma: no cover
@@ -637,12 +669,14 @@ def add_sum(val, nobs, sum_x):  # pragma: no cover
         sum_x += val
     return nobs, sum_x
 
+
 @numba.njit
 def remove_sum(val, nobs, sum_x):  # pragma: no cover
     if not np.isnan(val):
         nobs -= 1
         sum_x -= val
     return nobs, sum_x
+
 
 @numba.njit
 def calc_sum(minp, nobs, sum_x):  # pragma: no cover
@@ -656,6 +690,7 @@ def calc_sum(minp, nobs, sum_x):  # pragma: no cover
 def init_data_mean():  # pragma: no cover
     return 0, 0.0, 0
 
+
 @numba.njit
 def add_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
     if not np.isnan(val):
@@ -665,6 +700,7 @@ def add_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
             neg_ct += 1
     return nobs, sum_x, neg_ct
 
+
 @numba.njit
 def remove_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
     if not np.isnan(val):
@@ -673,6 +709,7 @@ def remove_mean(val, nobs, sum_x, neg_ct):  # pragma: no cover
         if val < 0:
             neg_ct -= 1
     return nobs, sum_x, neg_ct
+
 
 @numba.njit
 def calc_mean(minp, nobs, sum_x, neg_ct):  # pragma: no cover
@@ -698,6 +735,7 @@ def calc_mean(minp, nobs, sum_x, neg_ct):  # pragma: no cover
 def init_data_var():  # pragma: no cover
     return 0, 0.0, 0.0
 
+
 @numba.njit
 def add_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
     if not np.isnan(val):
@@ -706,6 +744,7 @@ def add_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
         mean_x += delta / nobs
         ssqdm_x += ((nobs - 1) * delta ** 2) / nobs
     return nobs, mean_x, ssqdm_x
+
 
 @numba.njit
 def remove_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
@@ -719,6 +758,7 @@ def remove_var(val, nobs, mean_x, ssqdm_x):  # pragma: no cover
             mean_x = 0.0
             ssqdm_x = 0.0
     return nobs, mean_x, ssqdm_x
+
 
 @numba.njit
 def calc_var(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
@@ -747,15 +787,18 @@ def calc_std(minp, nobs, mean_x, ssqdm_x):  # pragma: no cover
 # -------------------
 # count
 
+
 @numba.njit
 def init_data_count():  # pragma: no cover
     return (0.0,)
+
 
 @numba.njit
 def add_count(val, count_x):  # pragma: no cover
     if not np.isnan(val):
         count_x += 1.0
     return (count_x,)
+
 
 @numba.njit
 def remove_count(val, count_x):  # pragma: no cover
@@ -765,9 +808,11 @@ def remove_count(val, count_x):  # pragma: no cover
 
 # XXX: pandas uses minp=0 for fixed window count but minp=1 for variable window
 
+
 @numba.njit
 def calc_count(minp, count_x):  # pragma: no cover
     return count_x
+
 
 @numba.njit
 def calc_count_var(minp, count_x):  # pragma: no cover
@@ -815,6 +860,7 @@ def shift_impl(in_arr, shift, parallel):  # pragma: no cover
 
     return output
 
+
 @numba.njit
 def shift_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
@@ -823,13 +869,15 @@ def shift_seq(in_arr, shift):  # pragma: no cover
     output[:shift] = np.nan
 
     for i in range(shift, N):
-        output[i] = in_arr[i-shift]
+        output[i] = in_arr[i - shift]
 
     return output
 
 # pct_change -------------
 
 # dummy
+
+
 def pct_change():  # pragma: no cover
     return
 
@@ -838,6 +886,7 @@ def pct_change():  # pragma: no cover
 def pct_change_overload(in_arr, shift, parallel):
     if not isinstance(parallel, types.Literal):
         return pct_change_impl
+
 
 def pct_change_impl(in_arr, shift, parallel):  # pragma: no cover
     N = len(in_arr)
@@ -868,6 +917,7 @@ def pct_change_impl(in_arr, shift, parallel):  # pragma: no cover
 
     return output
 
+
 @numba.njit
 def pct_change_seq(in_arr, shift):  # pragma: no cover
     N = len(in_arr)
@@ -876,12 +926,13 @@ def pct_change_seq(in_arr, shift):  # pragma: no cover
     output[:shift] = np.nan
 
     for i in range(shift, N):
-        prev = in_arr[i-shift]
+        prev = in_arr[i - shift]
         output[i] = (in_arr[i] - prev) / prev
 
     return output
 
 # communication calls -----------
+
 
 @numba.njit
 def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):  # pragma: no cover
@@ -891,17 +942,17 @@ def _border_icomm(in_arr, rank, n_pes, halo_size, dtype, center):  # pragma: no 
         r_recv_buff = np.empty(halo_size, dtype)
     # send right
     if rank != n_pes - 1:
-        r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank+1), comm_tag, True)
+        r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], halo_size, np.int32(rank + 1), comm_tag, True)
     # recv left
     if rank != 0:
-        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, halo_size, np.int32(rank-1), comm_tag, True)
+        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, halo_size, np.int32(rank - 1), comm_tag, True)
     # center cases
     # send left
     if center and rank != 0:
-        l_send_req = hpat.distributed_api.isend(in_arr[:halo_size], halo_size, np.int32(rank-1), comm_tag, True)
+        l_send_req = hpat.distributed_api.isend(in_arr[:halo_size], halo_size, np.int32(rank - 1), comm_tag, True)
     # recv right
     if center and rank != n_pes - 1:
-        r_recv_req = hpat.distributed_api.irecv(r_recv_buff, halo_size, np.int32(rank+1), comm_tag, True)
+        r_recv_req = hpat.distributed_api.irecv(r_recv_buff, halo_size, np.int32(rank + 1), comm_tag, True)
 
     return l_recv_buff, r_recv_buff, l_send_req, r_send_req, l_recv_req, r_recv_req
 
@@ -921,16 +972,20 @@ def _border_icomm_var(in_arr, on_arr, rank, n_pes, win_size, dtype):  # pragma: 
 
     # send right
     if rank != n_pes - 1:
-        hpat.distributed_api.send(halo_size, np.int32(rank+1), comm_tag)
-        r_send_req = hpat.distributed_api.isend(in_arr[-halo_size:], np.int32(halo_size), np.int32(rank+1), comm_tag, True)
-        r_send_t_req = hpat.distributed_api.isend(on_arr[-halo_size:], np.int32(halo_size), np.int32(rank+1), comm_tag, True)
+        hpat.distributed_api.send(halo_size, np.int32(rank + 1), comm_tag)
+        r_send_req = hpat.distributed_api.isend(
+            in_arr[-halo_size:], np.int32(halo_size), np.int32(rank + 1), comm_tag, True)
+        r_send_t_req = hpat.distributed_api.isend(
+            on_arr[-halo_size:], np.int32(halo_size), np.int32(rank + 1), comm_tag, True)
     # recv left
     if rank != 0:
-        halo_size = hpat.distributed_api.recv(np.int64, np.int32(rank-1), comm_tag)
+        halo_size = hpat.distributed_api.recv(np.int64, np.int32(rank - 1), comm_tag)
         l_recv_buff = np.empty(halo_size, dtype)
-        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, np.int32(halo_size), np.int32(rank-1), comm_tag, True)
+        l_recv_req = hpat.distributed_api.irecv(l_recv_buff, np.int32(halo_size), np.int32(rank - 1), comm_tag, True)
         l_recv_t_buff = np.empty(halo_size, np.int64)
-        l_recv_t_req = hpat.distributed_api.irecv(l_recv_t_buff, np.int32(halo_size), np.int32(rank-1), comm_tag, True)
+        l_recv_t_req = hpat.distributed_api.irecv(
+            l_recv_t_buff, np.int32(halo_size), np.int32(
+                rank - 1), comm_tag, True)
 
     return l_recv_buff, l_recv_t_buff, r_send_req, r_send_t_req, l_recv_req, l_recv_t_req
 
@@ -944,6 +999,7 @@ def _border_send_wait(r_send_req, l_send_req, rank, n_pes, center):  # pragma: n
     if center and rank != 0:
         hpat.distributed_api.wait(l_send_req, True)
 
+
 @numba.njit
 def _is_small_for_parallel(N, halo_size):  # pragma: no cover
     # gather data on one processor and compute sequentially if data of any
@@ -954,25 +1010,26 @@ def _is_small_for_parallel(N, halo_size):  # pragma: no cover
     # using 2*halo_size+1 to accomodate center cases with data on more than
     # 2 processor
     num_small = hpat.distributed_api.dist_reduce(
-        int(N<=2*halo_size+1), np.int32(Reduce_Type.Sum.value))
+        int(N <= 2 * halo_size + 1), np.int32(Reduce_Type.Sum.value))
     return num_small != 0
 
 # TODO: refactor small data functions
 @numba.njit
 def _handle_small_data(in_arr, win, center, rank, n_pes, init_data, add_obs,
-                                                         remove_obs, calc_out):  # pragma: no cover
+                       remove_obs, calc_out):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
     if rank == 0:
         all_out, _ = roll_fixed_linear_generic_seq(all_in_arr, win, center,
-                                      init_data, add_obs, remove_obs, calc_out)
+                                                   init_data, add_obs, remove_obs, calc_out)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
     start = hpat.distributed_api.get_start(all_N, n_pes, rank)
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
+
 
 @numba.njit
 def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):  # pragma: no cover
@@ -981,13 +1038,14 @@ def _handle_small_data_apply(in_arr, win, center, rank, n_pes, kernel_func):  # 
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
     if rank == 0:
         all_out = roll_fixed_apply_seq(all_in_arr, win, center,
-                                                   kernel_func)
+                                       kernel_func)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
     start = hpat.distributed_api.get_start(all_N, n_pes, rank)
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
+
 
 @numba.njit
 def _handle_small_data_shift(in_arr, shift, rank, n_pes):  # pragma: no cover
@@ -1003,6 +1061,7 @@ def _handle_small_data_shift(in_arr, shift, rank, n_pes):  # pragma: no cover
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
 
+
 @numba.njit
 def _handle_small_data_pct_change(in_arr, shift, rank, n_pes):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
@@ -1017,8 +1076,10 @@ def _handle_small_data_pct_change(in_arr, shift, rank, n_pes):  # pragma: no cov
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
 
+
 def cast_dt64_arr_to_int(arr):  # pragma: no cover
     return arr
+
 
 @infer_global(cast_dt64_arr_to_int)
 class DtArrToIntType(AbstractTemplate):
@@ -1028,6 +1089,7 @@ class DtArrToIntType(AbstractTemplate):
         assert (args[0] == types.Array(types.NPDatetime('ns'), 1, 'C')
                 or args[0] == types.Array(types.int64, 1, 'C'))
         return signature(types.Array(types.int64, 1, 'C'), *args)
+
 
 @lower_builtin(cast_dt64_arr_to_int, types.Array(types.NPDatetime('ns'), 1, 'C'))
 @lower_builtin(cast_dt64_arr_to_int, types.Array(types.int64, 1, 'C'))
@@ -1048,12 +1110,13 @@ def _is_small_for_parallel_variable(on_arr, win_size):  # pragma: no cover
     end = on_arr[-1]
     pe_range = end - start
     num_small = hpat.distributed_api.dist_reduce(
-        int(pe_range<=win_size), np.int32(Reduce_Type.Sum.value))
+        int(pe_range <= win_size), np.int32(Reduce_Type.Sum.value))
     return num_small != 0
+
 
 @numba.njit
 def _handle_small_data_variable(in_arr, on_arr, win, rank, n_pes, init_data,
-                                                add_obs, remove_obs, calc_out):  # pragma: no cover
+                                add_obs, remove_obs, calc_out):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
@@ -1061,7 +1124,7 @@ def _handle_small_data_variable(in_arr, on_arr, win, rank, n_pes, init_data,
     if rank == 0:
         start, end = _build_indexer(all_on_arr, all_N, win, False, True)
         all_out = roll_var_linear_generic_seq(all_in_arr, all_on_arr, win,
-                          start, end, init_data, add_obs, remove_obs, calc_out)
+                                              start, end, init_data, add_obs, remove_obs, calc_out)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
@@ -1069,9 +1132,10 @@ def _handle_small_data_variable(in_arr, on_arr, win, rank, n_pes, init_data,
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
 
+
 @numba.njit
 def _handle_small_data_variable_apply(in_arr, on_arr, win, rank, n_pes,
-                                        kernel_func):  # pragma: no cover
+                                      kernel_func):  # pragma: no cover
     all_N = hpat.distributed_api.dist_reduce(
         len(in_arr), np.int32(Reduce_Type.Sum.value))
     all_in_arr = hpat.distributed_api.gatherv(in_arr)
@@ -1079,13 +1143,14 @@ def _handle_small_data_variable_apply(in_arr, on_arr, win, rank, n_pes,
     if rank == 0:
         start, end = _build_indexer(all_on_arr, all_N, win, False, True)
         all_out = roll_variable_apply_seq(all_in_arr, all_on_arr, win,
-                          start, end, kernel_func)
+                                          start, end, kernel_func)
     else:
         all_out = np.empty(all_N, np.float64)
     hpat.distributed_api.bcast(all_out)
     start = hpat.distributed_api.get_start(all_N, n_pes, rank)
     end = hpat.distributed_api.get_end(all_N, n_pes, rank)
     return all_out[start:end]
+
 
 @numba.njit
 def _dropna(arr):  # pragma: no cover
