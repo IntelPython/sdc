@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pandas</title>
+    <style type="text/css">
+        body { font: 11pt Calibri,"Helvetica Neue",Arial,sans-serif; }
+        table, td, th { border-collapse: collapse; border: 1px solid #ccc; }
+        table { margin-bottom: 1em; }
+        th { background-color: #eee; text-align: left; }
+        td, th { padding: .2em; }
+        .extra_info { margin: 8px 0; color: #777; font-size: 8pt; }
+    </style>
+</head>
+<body>
+    <div class="extra_info">
+        <div>
+            {% for key, value in extra_info.items() %}
+                {%if value %}
+                    <b>{{ key }}:</b> {{ value }}{{ ', ' if not loop.last }}
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    <table id="asvgen">
+        <thead>
+            <tr>
+                <th>Row #</th>
+                <th>Benchmark</th>
+                <th>Result, s</th>
+                <th>Min, s</th>
+                <th>Arithmetic Mean, s</th>
+                <th>Max, s</th>
+                <th>Standard Deviation, s</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for test_name, result in data.items() %}
+                {% if result['result'] and result['stats'] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ test_name }}</td>
+                        <td>{{ result['result'] }}</td>
+                        <td>{{ result['stats']['min'] }}</td>
+                        <td>{{ result['stats']['mean'] }}</td>
+                        <td>{{ result['stats']['max'] }}</td>
+                        <td>{{ result['stats']['std'] }}</td>
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

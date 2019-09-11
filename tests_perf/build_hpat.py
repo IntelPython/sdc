@@ -60,10 +60,10 @@ def run_cmd(cmd, cwd=None, env=None):
 def _build_win(cwd, env_dir):
     """
     Build HPAT on Windows via the following commands:
-        set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
-        set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-        "%I_MPI_ROOT%"\intel64\bin\mpivars.bat
-        set HDF5_DIR=%CONDA_PREFIX%\Library
+        set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\\Library\\include
+        set LIB=%LIB%;%CONDA_PREFIX%\\Library\\lib
+        "%I_MPI_ROOT%"\\intel64\\bin\\mpivars.bat
+        set HDF5_DIR=%CONDA_PREFIX%\\Library
         python setup.py develop
 
     :param cwd: current working directory
