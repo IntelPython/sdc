@@ -24,6 +24,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from hpat.datatypes.hpat_pandas_series_functions import *
 import datetime
 import operator
 import numpy as np
@@ -760,7 +761,7 @@ class SeriesIatType(types.Type):
 
 @infer
 @infer_global(operator.eq)
-#@infer_global(operator.ne)
+# @infer_global(operator.ne)
 @infer_global(operator.ge)
 @infer_global(operator.gt)
 @infer_global(operator.le)
@@ -1028,7 +1029,7 @@ explicit_binop_funcs = {
     'gt': operator.gt,
     'le': operator.le,
     'ge': operator.ge,
-#    'ne': operator.ne,
+    #    'ne': operator.ne,
     'eq': operator.eq,
 }
 
@@ -1123,15 +1124,21 @@ type_callable(operator.sub)(type_sub)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
     if index is not None:
-        return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-                fastpath=False: hpat.hiframes.api.init_series(
-                    hpat.hiframes.api.fix_df_array(data),
-                    hpat.hiframes.api.fix_df_array(index),
-                    name
-                ))
+        def hpat_pandas_series_index_ctor_impl(
+                data=None,
+                index=None,
+                dtype=None,
+                name=None,
+                copy=False,
+                fastpath=False):
+            return hpat.hiframes.api.init_series(
+                hpat.hiframes.api.fix_df_array(data),
+                hpat.hiframes.api.fix_df_array(index),
+                name)
 
-    return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-            fastpath=False: hpat.hiframes.api.init_series(
-                hpat.hiframes.api.fix_df_array(data), index, name))
+        return hpat_pandas_series_index_ctor_impl
 
-from hpat.datatypes.hpat_pandas_series_functions import *
+    def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+        return hpat.hiframes.api.init_series(hpat.hiframes.api.fix_df_array(data), index, name)
+
+    return hpat_pandas_series_ctor_impl

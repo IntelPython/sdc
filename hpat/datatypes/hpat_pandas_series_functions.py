@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 import operator
+import pandas
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -45,10 +46,9 @@ Implemented operators:
     iloc
     len
     loc
-    ne
 
 Implemented methods:
-
+    ne
 '''
 
 
@@ -79,7 +79,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.SliceType):
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            result = hpat.hiframes.api.init_series(self._data[idx])
+            result = pandas.Series(self._data[idx])
             return result
 
         return hpat_pandas_series_getitem_idx_slice_impl
@@ -102,15 +102,19 @@ def hpat_pandas_series_getitem(self, idx):
 def hpat_pandas_series_iloc(self):
     '''
     Pandas Series opearator iloc implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.at.html#pandas.Series.at
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iat.html#pandas.Series.iat
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iloc.html#pandas.Series.iloc
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.loc.html#pandas.Series.loc
 
     Algorithm: result = series.iloc
     Where:
         series: pandas.series
 
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_list_str_unbox1
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
     '''
 
-    _func_name = 'Operator iloc().'
+    _func_name = 'Operator at/iat/iloc/loc().'
 
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
@@ -143,25 +147,28 @@ def hpat_pandas_series_len(self):
 
     return hpat_pandas_series_len_impl
 
-@overload(operator.ne)
+
+@overload_method(SeriesType, 'ne')
 def hpat_pandas_series_not_equal(lhs, rhs):
     '''
-    Pandas Series opearator != implementation.
+    Pandas Series method ne implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.ne.html#pandas.Series.ne
 
-    Algorithm: result = (A != B)
+    Algorithm: result = lhs.ne(rhs)
+
     Where:
-        A: pandas.series
-        B: pandas.series
+        lhs: pandas.series
+        rhs: pandas.series
 
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
     '''
 
-    _func_name = 'Operator ne().'
+    _func_name = 'Method ne().'
 
     if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: lhs{} rhs{}'.format(_func_name, lhs, rhs))
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
 
     def hpat_pandas_series_not_equal_impl(lhs, rhs):
-        return (lhs._data != rhs._data)
+        return pandas.Series(lhs._data != rhs._data)
 
     return hpat_pandas_series_not_equal_impl
