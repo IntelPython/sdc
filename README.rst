@@ -23,12 +23,9 @@ HPAT's documentation can be found `here <https://intellabs.github.io/hpat-doc/>`
 Installing Binary Packages (conda)
 ----------------------------------
 ::
+
    conda install -c intel -c intel/label/test hpat
 
-Building HPAT from Source
--------------------------
-
-To build HPAT from Source, please refer to the following `instrunction <docs/source/install.rst>`_
 
 Example
 #######
@@ -68,6 +65,8 @@ These academic papers describe the underlying methods in HPAT:
 - `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
 - `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
 - `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
+
+
 Building HPAT from Source on Linux
 ----------------------------------
 
@@ -84,7 +83,7 @@ If you do not have conda, we recommend using Miniconda3::
 It is possible to build HPAT via conda-build or setuptools. Follow one of the
 cases below to install HPAT and its dependencies on Linux.
 
-Building with conda-build
+Building on Linux with conda-build
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
@@ -96,8 +95,8 @@ Building with conda-build
     # build HPAT
     conda build --python $PYVER --override-channels -c numba -c defaults -c intel buildscripts/hpat-conda-recipe
 
-Building with setuptools
-~~~~~~~~~~~~~~~~~~~~~~~~
+Building on Linux with setuptools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
     PYVER=<3.6 or 3.7>
@@ -110,8 +109,8 @@ Building with setuptools
 
 In case of issues, reinstalling in a new conda environment is recommended.
 
-Building from Source on Windows
--------------------------------
+Building HPAT from Source on Windows
+------------------------------------
 
 Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0):
 
@@ -122,8 +121,8 @@ Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0):
 It is possible to build HPAT via conda-build or setuptools. Follow one of the
 cases below to install HPAT and its dependencies on Windows.
 
-Build with conda-build:
-~~~~~~~~~~~~~~~~~~~~~~~
+Building on Windows with conda-build
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
     set PYVER=<3.6 or 3.7>
@@ -133,8 +132,8 @@ Build with conda-build:
     cd hpat
     conda build --python %PYVER% --override-channels -c numba -c defaults -c intel buildscripts\hpat-conda-recipe
 
-Build with setuptools:
-~~~~~~~~~~~~~~~~~~~~~~
+Building on Windows with setuptools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
     conda create -n HPAT -c numba -c defaults -c intel python=<3.6 or 3.7> numba impi-devel pyarrow scipy pandas boost
