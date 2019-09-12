@@ -48,6 +48,7 @@ Implemented operators:
     loc
 
 Implemented methods:
+    append
     ne
 '''
 
@@ -55,12 +56,13 @@ Implemented methods:
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     '''
-    Pandas Series opearator getitem implementation
+    Pandas Series opearator 'getitem' implementation
 
     Algorithm: result = series[idx]
     Where:
         series: pandas.series
-           idx: integer number or pandas.series
+           idx: integer number, slice or pandas.series
+        result: pandas.series or an element of the underneath type
 
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
     '''
@@ -72,6 +74,10 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.Integer):
         def hpat_pandas_series_getitem_idx_integer_impl(self, idx):
+            '''
+            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
+            '''
+
             result = self._data[idx]
             return result
 
@@ -79,6 +85,10 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.SliceType):
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+            '''
+            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
+            '''
+
             result = pandas.Series(self._data[idx])
             return result
 
@@ -86,6 +96,9 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
+            '''
+            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_setitem_series_bool2
+            '''
             super_index = idx._data
             result = self._data[super_index]
             return result
@@ -101,7 +114,7 @@ def hpat_pandas_series_getitem(self, idx):
 @overload_attribute(SeriesType, 'loc')
 def hpat_pandas_series_iloc(self):
     '''
-    Pandas Series opearator iloc implementation.
+    Pandas Series opearator 'iloc' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.at.html#pandas.Series.at
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iat.html#pandas.Series.iat
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iloc.html#pandas.Series.iloc
@@ -110,6 +123,7 @@ def hpat_pandas_series_iloc(self):
     Algorithm: result = series.iloc
     Where:
         series: pandas.series
+        result: pandas.series
 
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
     '''
@@ -128,12 +142,14 @@ def hpat_pandas_series_iloc(self):
 @overload(len)
 def hpat_pandas_series_len(self):
     '''
-    Pandas Series opearator len implementation
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.str.len.html#pandas.Series.str.len
+    Pandas Series opearator 'len' implementation
+        https://docs.python.org/2/library/functions.html#len
 
     Algorithm: result = len(series)
     Where:
         series: pandas.series
+        result: number of items in the object
+
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_len
     '''
 
@@ -148,17 +164,50 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
+@overload_method(SeriesType, 'append')
+def hpat_pandas_series_append(self, to_append):
+    '''
+    Pandas Series method 'append' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.append.html#pandas.Series.append
+
+    Algorithm: result = S.append(self, to_append, ignore_index=False, verify_integrity=False)
+
+    Where:
+                   S: pandas.series
+           to_append: pandas.series
+        ignore_index: unsupported
+    verify_integrity: unsupported
+              result: new pandas.series object
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_append1
+    '''
+
+    _func_name = 'Method append().'
+
+    if not isinstance(self, SeriesType) or not isinstance(to_append, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
+
+    def hpat_pandas_series_append_impl(self, to_append):
+        return pandas.Series(self._data + to_append._data)
+
+    return hpat_pandas_series_append_impl
+
+
 @overload_method(SeriesType, 'ne')
 def hpat_pandas_series_not_equal(lhs, rhs):
     '''
-    Pandas Series method ne implementation.
+    Pandas Series method 'ne' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.ne.html#pandas.Series.ne
 
-    Algorithm: result = lhs.ne(rhs)
+    Algorithm: result = lhs.ne(other, level=None, fill_value=None, axis=0)
 
     Where:
-        lhs: pandas.series
-        rhs: pandas.series
+               lhs: pandas.series
+             other: pandas.series
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: boolean result
 
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
     '''

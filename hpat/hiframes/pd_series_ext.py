@@ -490,28 +490,28 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_corr(self, ary, args, kws):
         return self._resolve_cov_func(ary, args, kws)
 
-    @bound_function("series.append")
-    def resolve_append(self, ary, args, kws):
-        # TODO: ignore_index
-        assert not kws
-        arr_typ = if_series_to_array_type(ary)
-        other, = args
-        if isinstance(other, (SeriesType, types.Array)):
-            all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other)))
-        elif isinstance(other, types.BaseTuple):
-            all_arrs = types.Tuple((arr_typ, *[if_series_to_array_type(a) for a in other.types]))
-        elif isinstance(other, (types.List, types.Set)):
-            # add only one value from the list for typing since it shouldn't
-            # matter for np.concatenate typing
-            all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other.dtype)))
-        else:
-            raise ValueError("Invalid input for Series.append (Series, or tuple/list of Series expected)")
-
-        # TODO: list
-        # call np.concatenate to handle type promotion e.g. int, float -> float
-        ret_typ = self.context.resolve_function_type(np.concatenate, (all_arrs,), kws).return_type
-        ret_typ = if_arr_to_series_type(ret_typ)
-        return signature(ret_typ, *args)
+#     @bound_function("series.append")
+#     def resolve_append(self, ary, args, kws):
+#         # TODO: ignore_index
+#         assert not kws
+#         arr_typ = if_series_to_array_type(ary)
+#         other, = args
+#         if isinstance(other, (SeriesType, types.Array)):
+#             all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other)))
+#         elif isinstance(other, types.BaseTuple):
+#             all_arrs = types.Tuple((arr_typ, *[if_series_to_array_type(a) for a in other.types]))
+#         elif isinstance(other, (types.List, types.Set)):
+#             # add only one value from the list for typing since it shouldn't
+#             # matter for np.concatenate typing
+#             all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other.dtype)))
+#         else:
+#             raise ValueError("Invalid input for Series.append (Series, or tuple/list of Series expected)")
+# 
+#         # TODO: list
+#         # call np.concatenate to handle type promotion e.g. int, float -> float
+#         ret_typ = self.context.resolve_function_type(np.concatenate, (all_arrs,), kws).return_type
+#         ret_typ = if_arr_to_series_type(ret_typ)
+#         return signature(ret_typ, *args)
 
     @bound_function("series.isna")
     def resolve_isna(self, ary, args, kws):
