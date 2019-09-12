@@ -671,11 +671,6 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
     def test_df_head1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
