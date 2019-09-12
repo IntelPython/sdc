@@ -6,7 +6,7 @@ parameters:
 jobs:
 - job: ${{ parameters.name }}
   timeoutInMinutes: 60
-  pool: 
+  pool:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     maxParallel: 11
