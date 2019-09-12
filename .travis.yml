@@ -1,0 +1,20 @@
+# reference: https://github.com/numba/numba/blob/master/.travis.yml
+
+dist: trusty
+
+matrix:
+    include: 
+        - env: CONDA_ENV=travisci PYTHON_VER=3.7
+
+# TODO Remove travis from repository and add code coverage check
+#before_install:
+#    - buildscripts/setup_conda.sh
+#    - export PATH=$HOME/miniconda3/bin:$PATH
+#install:
+#    - buildscripts/build.sh
+#
+#after_success:
+#    - buildscripts/after_success.sh
+
+notifications:
+    email: false

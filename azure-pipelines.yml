@@ -22,35 +22,29 @@ jobs:
     vmImage: xcode9-macos10.13
     matrix:
       py36_numpes0:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         PYTHON_VER: '3.6'
 
       py36_numpes3:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '3'
         PYTHON_VER: '3.6'
 
       py37_numpes0:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         PYTHON_VER: '3.7'
         
       py37_numpes1:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '1'
         PYTHON_VER: '3.7'
 
       py37_numpes2:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '2'
         PYTHON_VER: '3.7'
 
       py37_numpes3:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '3'
         PYTHON_VER: '3.7'
@@ -61,35 +55,29 @@ jobs:
     vmImage: ubuntu-16.04
     matrix:
       py36_numpes0:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         PYTHON_VER: '3.6'
 
       py36_numpes3:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '3'
         PYTHON_VER: '3.6'
 
       py37_numpes0:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         PYTHON_VER: '3.7'
         
       py37_numpes1:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '1'
         PYTHON_VER: '3.7'
 
       py37_numpes2:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '2'
         PYTHON_VER: '3.7'
 
       py37_numpes3:
-        BUILD_PIPELINE: 'azure'
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '3'
         PYTHON_VER: '3.7'
