@@ -28,9 +28,8 @@ requirements:
     - boost
     - hdf5
     - h5py
-    - mpich # [not win]
-    - impi_rt # [win]
-    - impi-devel # [win]
+    - impi_rt
+    - impi-devel
 
   run:
     - python
@@ -40,7 +39,6 @@ requirements:
     - arrow-cpp
     - boost
     - numba ==0.45
-    - mpich # [not win]
     - impi_rt # [win]
 
 test:

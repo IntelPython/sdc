@@ -24,21 +24,3 @@ conda create -n $CONDA_ENV -q -y python=$PYTHON_VER
 source activate $CONDA_ENV
 # Install conda-build
 $CONDA_INSTALL conda-build
-
-# Environment for Travis build
-if [ "$BUILD_PIPELINE" == "travis" ]; then
-  $CONDA_INSTALL pyarrow
-  # install compilers
-  if [[ "$unamestr" == 'Linux' ]]; then
-    $CONDA_INSTALL gcc_linux-64 gxx_linux-64 gfortran_linux-64
-  elif [[ "$unamestr" == 'Darwin' ]]; then
-    $CONDA_INSTALL clang_osx-64 clangxx_osx-64 gfortran_osx-64
-  else
-    echo "Error in compiler install"
-  fi
-  $CONDA_INSTALL mpich mpi -c conda-forge --no-deps
-  $CONDA_INSTALL -c numba numba
-  $CONDA_INSTALL libgfortran
-  $CONDA_INSTALL h5py
-  $CONDA_INSTALL coveralls
-fi
