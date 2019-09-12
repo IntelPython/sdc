@@ -1,15 +1,17 @@
 import operator
 import numpy as np
+from llvmlite import ir as lir
+
 import numba
 from numba import types, cgutils
-from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.typing import signature
-from llvmlite import ir as lir
+from numba.typing.templates import infer_global, AbstractTemplate, AttributeTemplate, bound_function
 from numba.extending import register_model, models, infer_getattr, infer, intrinsic
-from hpat.str_ext import string_type
+
 import hpat
-from hpat.utils import unliteral_all
 import hpat.io
+from hpat.str_ext import string_type
+from hpat.utils import unliteral_all
 
 if hpat.config._has_h5py:
     import h5py
@@ -18,11 +20,12 @@ if hpat.config._has_h5py:
     ll.add_symbol('hpat_h5_read_filter', _hdf5.hpat_h5_read_filter)
 
 
-################## Types #######################
+# **************** Types ***********************
 
 class H5FileType(types.Opaque):
     def __init__(self):
         super(H5FileType, self).__init__(name='H5FileType')
+
 
 h5file_type = H5FileType()
 
@@ -31,6 +34,7 @@ class H5DatasetType(types.Opaque):
     def __init__(self):
         super(H5DatasetType, self).__init__(name='H5DatasetType')
 
+
 h5dataset_type = H5DatasetType()
 
 
@@ -38,12 +42,14 @@ class H5GroupType(types.Opaque):
     def __init__(self):
         super(H5GroupType, self).__init__(name='H5GroupType')
 
+
 h5group_type = H5GroupType()
 
 
 class H5DatasetOrGroupType(types.Opaque):
     def __init__(self):
         super(H5DatasetOrGroupType, self).__init__(name='H5DatasetOrGroupType')
+
 
 h5dataset_or_group_type = H5DatasetOrGroupType()
 
@@ -77,10 +83,12 @@ def _create_dataset_typer(args, kws):
     name = args[0] if len(args) > 0 else types.unliteral(kwargs['name'])
     shape = args[1] if len(args) > 1 else types.unliteral(kwargs['shape'])
     dtype = args[2] if len(args) > 2 else types.unliteral(kwargs['dtype'])
+
     def create_dset_stub(name, shape, dtype):
         pass
     pysig = numba.utils.pysignature(create_dset_stub)
     return signature(h5dataset_type, name, shape, dtype).replace(pysig=pysig)
+
 
 @infer_getattr
 class FileAttribute(AttributeTemplate):
@@ -104,6 +112,7 @@ class FileAttribute(AttributeTemplate):
     def resolve_create_group(self, f_id, args, kws):
         return signature(h5group_type, *unliteral_all(args))
 
+
 @infer_getattr
 class GroupOrDatasetAttribute(AttributeTemplate):
     key = h5dataset_or_group_type
@@ -123,6 +132,7 @@ class GroupAttribute(AttributeTemplate):
     def resolve_create_dataset(self, f_id, args, kws):
         return _create_dataset_typer(unliteral_all(args), kws)
 
+
 @infer_global(operator.getitem)
 class GetItemH5File(AbstractTemplate):
     key = operator.getitem
@@ -136,12 +146,14 @@ class GetItemH5File(AbstractTemplate):
         if in_f == h5dataset_or_group_type and in_idx == string_type:
             return signature(h5dataset_or_group_type, in_f, in_idx)
 
+
 @infer_global(operator.setitem)
 class SetItemH5Dset(AbstractTemplate):
     def generic(self, args, kws):
         assert not kws
         if args[0] == h5dataset_type:
             return signature(types.none, *args)
+
 
 def h5g_get_num_objs():
     return
@@ -180,8 +192,10 @@ def h5write():
     """dummy function for C h5_write"""
     return
 
+
 def h5_read_dummy():
     return
+
 
 @infer_global(h5_read_dummy)
 class H5ReadType(AbstractTemplate):
@@ -264,7 +278,9 @@ class H5GgetObjNameByIdx(AbstractTemplate):
         assert len(args) == 2
         return signature(string_type, *args)
 
+
 sum_op = hpat.distributed_api.Reduce_Type.Sum.value
+
 
 @numba.njit
 def get_filter_read_indices(bool_arr):
@@ -297,6 +313,7 @@ def get_filter_read_indices(bool_arr):
     end = hpat.distributed_api.get_end(n, n_pes, rank)
     return all_indices[start:end]
 
+
 @intrinsic
 def tuple_to_ptr(typingctx, tuple_tp=None):
     def codegen(context, builder, sig, args):
@@ -305,9 +322,20 @@ def tuple_to_ptr(typingctx, tuple_tp=None):
         return builder.bitcast(ptr, lir.IntType(8).as_pointer())
     return signature(types.voidptr, tuple_tp), codegen
 
-_h5read_filter = types.ExternalFunction("hpat_h5_read_filter",
-    types.int32(h5dataset_or_group_type, types.int32, types.voidptr,
-    types.voidptr, types.intp, types.voidptr, types.int32, types.voidptr, types.int32))
+
+_h5read_filter = types.ExternalFunction(
+    "hpat_h5_read_filter",
+    types.int32(
+        h5dataset_or_group_type,
+        types.int32,
+        types.voidptr,
+        types.voidptr,
+        types.intp,
+        types.voidptr,
+        types.int32,
+        types.voidptr,
+        types.int32))
+
 
 @numba.njit
 def h5read_filter(dset_id, ndim, starts, counts, is_parallel, out_arr, read_indices):
@@ -315,4 +343,4 @@ def h5read_filter(dset_id, ndim, starts, counts, is_parallel, out_arr, read_indi
     counts_ptr = tuple_to_ptr(counts)
     type_enum = hpat.distributed_api.get_type_enum(out_arr)
     return _h5read_filter(dset_id, ndim, starts_ptr, counts_ptr, is_parallel,
-                   out_arr.ctypes, type_enum, read_indices.ctypes, len(read_indices))
+                          out_arr.ctypes, type_enum, read_indices.ctypes, len(read_indices))

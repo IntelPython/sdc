@@ -2,6 +2,7 @@ import numpy as np
 import hpat
 import time
 
+
 @hpat.jit
 def logistic_regression(iterations):
     t1 = time.time()
@@ -18,7 +19,8 @@ def logistic_regression(iterations):
         accuracy = np.sum(R == Y) / N
 
     print(accuracy, w)
-    print("Execution time:", time.time()-t1)
+    print("Execution time:", time.time() - t1)
     return w
+
 
 w = logistic_regression(20)
