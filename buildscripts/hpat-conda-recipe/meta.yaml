@@ -1,19 +1,12 @@
-{% set version = "0.29.2" %}
-{% set buildnumber = 1 %}
-
 package:
   name: hpat
-  version: {{version}}
+  version: {{ GIT_DESCRIBE_TAG }}
 
 source:
    path: ../..
 
 build:
-  number: {{buildnumber}}
-  script_env:
-    - HPAT_CONFIG_MPI
-    - HPAT_NUM_PES
-    - HPAT_RUN_COVERAGE
+  number: {{ GIT_DESCRIBE_NUMBER|int }}
 
 requirements:
   build:
@@ -47,7 +40,6 @@ test:
   requires:
     - h5py
     - scipy
-    - coveralls
   imports:
     - hpat
 

@@ -2,7 +2,7 @@
 
 source activate $CONDA_ENV
 
-if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
+if [ "$RUN_COVERAGE" == "yes" ]; then
     coverage combine
     coveralls -v
 fi

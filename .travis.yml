@@ -5,23 +5,23 @@ dist: trusty
 matrix:
     include:
         - os: osx
-          env: CONDA_ENV=travisci HPAT_CONFIG_MPI=False PYTHON_VER=3.7
+          env: CONDA_ENV=travisci NUM_PES=1
         - os: osx
-          env: CONDA_ENV=travisci HPAT_NUM_PES=1 PYTHON_VER=3.7
+          env: CONDA_ENV=travisci NUM_PES=2
         - os: osx
-          env: CONDA_ENV=travisci HPAT_NUM_PES=2 PYTHON_VER=3.7
-        - os: osx
-          env: CONDA_ENV=travisci HPAT_NUM_PES=3 PYTHON_VER=3.7
-        - env: CONDA_ENV=travisci HPAT_CONFIG_MPI=False PYTHON_VER=3.7 HPAT_RUN_COVERAGE=True
-        - env: CONDA_ENV=travisci HPAT_NUM_PES=1 PYTHON_VER=3.7
-        - env: CONDA_ENV=travisci HPAT_NUM_PES=2 PYTHON_VER=3.7
-        - env: CONDA_ENV=travisci HPAT_NUM_PES=3 PYTHON_VER=3.7
+          env: CONDA_ENV=travisci NUM_PES=3
+        - env: RUN_COVERAGE=yes CONDA_ENV=travisci NUM_PES=1
+        - env: CONDA_ENV=travisci NUM_PES=2
+        - env: CONDA_ENV=travisci NUM_PES=3
 
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
 install:
     - buildscripts/build.sh
+
+script:
+    - buildscripts/test.sh
 
 after_success:
     - buildscripts/after_success.sh
