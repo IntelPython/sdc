@@ -7,8 +7,8 @@ HPAT documentation
    :caption: Contents:
 
    overview
-   GettingStarted
+   UserGuide
    DevelopersGuide
-   distributed
+   Modules
 
 To download HPAT documentation PDF click here :download:`pdf <../_build/latex/HPAT.pdf>`
