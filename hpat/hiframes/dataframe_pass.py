@@ -294,15 +294,14 @@ class DataFramePass(object):
             in_arr = self._get_dataframe_data(df_var, col_name, nodes)
 
             if guard(is_whole_slice, self.typemap, self.func_ir, col_filter_var):
-                def func(A, ind, name): return hpat.hiframes.api.init_series(
-                    A, None, name)
+                def func(A, ind, name):
+                    return hpat.hiframes.api.init_series(A, None, name)
             else:
                 # TODO: test this case
-                def func(A, ind, name): return hpat.hiframes.api.init_series(
-                    A[ind], None, name)
+                def func(A, ind, name):
+                    return hpat.hiframes.api.init_series(A[ind], None, name)
 
-            return self._replace_func(func,
-                                      [in_arr, col_filter_var, name_var], pre_nodes=nodes)
+            return self._replace_func(func, [in_arr, col_filter_var, name_var], pre_nodes=nodes)
 
         if self._is_df_iat_var(rhs.value):
             df_var = guard(get_definition, self.func_ir, rhs.value).value
@@ -1010,8 +1009,11 @@ class DataFramePass(object):
         """
         df_typ = self.typemap[df_var.name]
         # check for no arg or just include='all'
-        if not (len(rhs.args) == 0 and (len(rhs.kws) == 0 or (len(rhs.kws) ==
-                                                              1 and rhs.kws[0][0] == 'include' and guard(find_const, self.func_ir, rhs.kws[0][1]) == 'all'))):
+        if not (len(rhs.args) == 0
+                and (len(rhs.kws) == 0
+                     or (len(rhs.kws) == 1
+                         and rhs.kws[0][0] == 'include'
+                         and guard(find_const, self.func_ir, rhs.kws[0][1]) == 'all'))):
             raise ValueError("only describe() with include='all' supported")
 
         col_name_args = ["c" + str(i) for i in range(len(df_typ.columns))]
@@ -1360,10 +1362,16 @@ class DataFramePass(object):
 
         out_vars = []
         data = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
-        def isin_func(A, B): return hpat.hiframes.api.df_isin(A, B)
-        def isin_vals_func(A, B): return hpat.hiframes.api.df_isin_vals(A, B)
+
+        def isin_func(A, B):
+            return hpat.hiframes.api.df_isin(A, B)
+
+        def isin_vals_func(A, B):
+            return hpat.hiframes.api.df_isin_vals(A, B)
         # create array of False values used when other col not available
-        def bool_arr_func(A): return np.zeros(len(A), np.bool_)
+
+        def bool_arr_func(A):
+            return np.zeros(len(A), np.bool_)
         # use the first array of df to get len. TODO: check for empty df
         false_arr_args = [data[0]]
 
@@ -1826,7 +1834,8 @@ class DataFramePass(object):
 
         # generate a concat call for each output column
         # TODO: support non-numericals like string
-        def gen_nan_func(A): return np.full(len(A), np.nan)
+        def gen_nan_func(A):
+            return np.full(len(A), np.nan)
         # gen concat function
         arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
         func_text = "def _concat_imp({}):\n".format(arg_names)

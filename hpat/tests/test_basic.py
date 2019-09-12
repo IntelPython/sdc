@@ -328,8 +328,7 @@ class TestBasic(BaseTest):
                 a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
         dist_sum(1.0)  # run to compile
         np.testing.assert_allclose(
-            dist_sum((hpat_func(n)[0] + hpat_func(n)[1]).sum()),
-                    (test_impl(n)[0] + test_impl(n)[1]).sum())
+            dist_sum((hpat_func(n)[0] + hpat_func(n)[1]).sum()), (test_impl(n)[0] + test_impl(n)[1]).sum())
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
 

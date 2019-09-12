@@ -14,6 +14,8 @@ import hpat.tests
     TestSuite(hpat.tests)._tests = [TestSuite(hpat.tests.TestBasic), TestSuite(hpat.tests.TestDataFrame), ...]
     TestSuite(hpat.tests.TestBasic)._tests = [TestBasic testMethod=test_array_reduce, ...]
 """
+
+
 def load_tests(loader, tests, pattern):
     suite = unittest.TestSuite()
     hpat_tests = loader.loadTestsFromModule(hpat.tests)

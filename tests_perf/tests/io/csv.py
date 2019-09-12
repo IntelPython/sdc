@@ -12,7 +12,7 @@ class ToCSV(BaseIO):
     def setup(self, implementation):
         N = 10 ** 4
         data_generator = DataGenerator()
-        self.df = data_generator.make_numeric_dataframe(5*N)
+        self.df = data_generator.make_numeric_dataframe(5 * N)
 
     @staticmethod
     @hpat.jit
