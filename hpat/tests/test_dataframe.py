@@ -50,6 +50,15 @@ class TestDataFrame(unittest.TestCase):
         c = 2
         pd.testing.assert_series_equal(hpat_func(A, B, c), test_impl(A, B, c))
 
+    @unittest.skip('Implement feature to create DataFrame without column names')
+    def test_create_without_column_names(self):
+        def test_impl():
+            df = pd.DataFrame([100, 200, 300, 400, 200, 100])
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        
     def test_unbox1(self):
         def test_impl(df):
             return df.A
@@ -72,6 +81,15 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
         pd.testing.assert_series_equal(hpat_func(df.copy(), True), test_impl(df.copy(), True))
         pd.testing.assert_series_equal(hpat_func(df.copy(), False), test_impl(df.copy(), False))
+
+    @unittest.skip('Implement feature to create DataFrame without column names')
+    def test_unbox_without_column_names(self):
+        def test_impl(df):
+            return df
+
+        df = pd.DataFrame([100, 200, 300, 400, 200, 100])
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @unittest.skip('AssertionError - fix needed\n'
                    'Attribute "dtype" are different\n'
