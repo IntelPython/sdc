@@ -64,9 +64,6 @@ GLOBAL_VAL = 2
 
 class TestSeries(unittest.TestCase):
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   '122 != 1\n'
-                   'NUMA_PES=3 build')
     def test_create1(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -75,9 +72,6 @@ class TestSeries(unittest.TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   '122 != 1\n'
-                   'NUMA_PES=3 build')
     def test_create2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -595,7 +589,6 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @unittest.skip("ERROR: Segmentation fault on the second launch (using HPAT_REPEAT_TEST_NUMBER=2)")
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
@@ -635,7 +628,7 @@ class TestSeries(unittest.TestCase):
 
         one, two, three = hpat_func()
         self.assertTrue(isinstance(one, np.ndarray))
-        self.assertTrue(isinstance(two,  np.ndarray))
+        self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
     @unittest.skip("needs empty_like typing fix in npydecl.py")
@@ -778,7 +771,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_sum2(self):
         def test_impl(S):
-            return (S+S).sum()
+            return (S + S).sum()
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([np.nan, 2., 3.])
@@ -800,9 +793,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   '5 != 2\n'
-                   'NUMA_PES=3 build')
     def test_series_count1(self):
         def test_impl(S):
             return S.count()
@@ -857,16 +847,40 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['AA', 'BB', 'C', 'AA', 'C', 'AA'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   '61 != 110\n'
-                   'NUMA_PES=3 build')
     def test_series_dist_input1(self):
+        '''Verify distribution of a Series without index'''
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
 
         n = 111
         S = pd.Series(np.arange(n))
+        start, end = get_start_end(n)
+        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_series_dist_input2(self):
+        '''Verify distribution of a Series with integer index'''
+        def test_impl(S):
+            return S.max()
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+
+        n = 111
+        S = pd.Series(np.arange(n), 1 + np.arange(n))
+        start, end = get_start_end(n)
+        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+
+    def test_series_dist_input3(self):
+        '''Verify distribution of a Series with string index'''
+        def test_impl(S):
+            return S.max()
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+
+        n = 111
+        S = pd.Series(np.arange(n), ['abc{}'.format(id) for id in range(n)])
         start, end = get_start_end(n)
         self.assertEqual(hpat_func(S[start:end]), test_impl(S))
         self.assertEqual(count_array_REPs(), 0)
@@ -879,7 +893,7 @@ class TestSeries(unittest.TestCase):
 
         n = 111
         S = pd.Series(np.arange(n))
-        S2 = pd.Series(np.arange(n)+1.0)
+        S2 = pd.Series(np.arange(n) + 1.0)
         s_tup = (S, 1, S2)
         self.assertEqual(hpat_func(s_tup), test_impl(s_tup))
 
@@ -891,7 +905,7 @@ class TestSeries(unittest.TestCase):
 
         n = 111
         S = pd.Series(np.arange(n))
-        S2 = pd.Series(np.arange(n)+1.0)
+        S2 = pd.Series(np.arange(n) + 1.0)
         start, end = get_start_end(n)
         s_tup = (S, 1, S2)
         h_s_tup = (S[start:end], 1, S2[start:end])
@@ -916,7 +930,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_map1(self):
         def test_impl(S):
-            return S.map(lambda a: 2*a)
+            return S.map(lambda a: 2 * a)
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1.0, 2., 3., 4., 5.])
@@ -932,7 +946,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_map_tup1(self):
         def test_impl(S):
-            return S.map(lambda a: (a, 2*a))
+            return S.map(lambda a: (a, 2 * a))
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1.0, 2., 3., 4., 5.])
@@ -940,7 +954,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_map_tup_map1(self):
         def test_impl(S):
-            A = S.map(lambda a: (a, 2*a))
+            A = S.map(lambda a: (a, 2 * a))
             return A.map(lambda a: a[1])
         hpat_func = hpat.jit(test_impl)
 
@@ -949,7 +963,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
@@ -958,7 +972,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_float3264(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([np.float64(1), np.float64(2),
@@ -969,7 +983,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_assert1(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1, 2, 3])
@@ -979,7 +993,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_assert2(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([6., 21., 3., 5.])
@@ -989,7 +1003,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_integer(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b, 16)
+            return S1.combine(S2, lambda a, b: 2 * a + b, 16)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1, 2, 3, 4, 5])
@@ -998,7 +1012,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_different_types(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([6.1, 21.2, 3.3, 5.4, 6.7])
@@ -1007,7 +1021,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_integer_samelen(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1, 2, 3, 4, 5])
@@ -1016,7 +1030,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_samelen(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b)
+            return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
@@ -1025,7 +1039,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_value(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b, 1237.56)
+            return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
@@ -1034,7 +1048,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_combine_value_samelen(self):
         def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2*a + b, 1237.56)
+            return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
         hpat_func = hpat.jit(test_impl)
 
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
@@ -1043,7 +1057,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_apply1(self):
         def test_impl(S):
-            return S.apply(lambda a: 2*a)
+            return S.apply(lambda a: 2 * a)
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1.0, 2., 3., 4., 5.])
@@ -1057,11 +1071,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Arrays are not almost equal to 7 decimals\n'
-                   'ACTUAL: 4.166666666666667\n'
-                   'DESIRED: 12.5\n'
-                   'NUMA_PES=3 build')
     def test_series_cov1(self):
         def test_impl(S1, S2):
             return S1.cov(S2)
@@ -1073,11 +1082,6 @@ class TestSeries(unittest.TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Arrays are not almost equal to 7 decimals\n'
-                   'ACTUAL: 0.9539980920057239\n'
-                   'DESIRED: 1.0\n'
-                   'NUMA_PES=3 build')
     def test_series_corr1(self):
         def test_impl(S1, S2):
             return S1.corr(S2)
@@ -1194,14 +1198,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Arrays are not equal\n'
-                   'Mismatch: 100%\n'
-                   'Max absolute difference: 0.04361003\n'
-                   'Max relative difference: 9.04840049\n'
-                   'x: array([0.04843 , 0.05106 , 0.057625, 0.0671  ])\n'
-                   'y: array([0.00482 , 0.04843 , 0.05106 , 0.057625])\n'
-                   'NUMA_PES=3 build')
     def test_series_nlargest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1242,14 +1238,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Arrays are not equal\n'
-                   'Mismatch: 50%\n'
-                   'Max absolute difference: 0.01813261\n'
-                   'Max relative difference: 0.50757593\n'
-                   'x: array([0.007431, 0.024095, 0.035724, 0.053857])\n'
-                   'y: array([0.007431, 0.024095, 0.031374, 0.035724])\n'
-                   'NUMA_PES=3 build')
     def test_series_nsmallest_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1283,6 +1271,7 @@ class TestSeries(unittest.TestCase):
                    'Invalid use of Function(<built-in function len>)'
                    'with argument(s) of type(s): (none)\n')
     def test_series_head_default1(self):
+        '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
             return S.head()
         hpat_func = hpat.jit(test_impl)
@@ -1293,6 +1282,7 @@ class TestSeries(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
     def test_series_head_index1(self):
+        '''Verifies head method for Series with integer index created inside jitted function'''
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
             return S.head(3)
@@ -1301,49 +1291,78 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_head_index2(self):
+        '''Verifies head method for Series with string index created inside jitted function'''
         def test_impl():
-            S = pd.Series([6, 9, 2, 3, 6, 4, 5],
-                          ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
+            S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
             return S.head(3)
         hpat_func = hpat.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @unittest.skip(
-    '''Skipped as it corrupts memmory and causes failures of other tests
-    while running with NUM_PES=3 and at least TestSeries and TestBasic suites together.
-    Exact commands to reproduce:
-        mpiexec -n 3 python -W ignore -u -m unittest -v $SUITES $SUITES
-        where SUITES="hpat.tests.TestBasic hpat.tests.TestSeries"
-    Test failures occur on the second suite run only.
-    Exact errors:
-         1. Segmentation fault in TestBasic.test_rebalance
-         2. FAIL in TestBasic.test_astype with following error message:
-             test_astype (hpat.tests.test_basic.TestBasic) ...
-             Fatal error in MPI_Allreduce: Message truncated, error stack:
-             MPI_Allreduce(907)..................: MPI_Allreduce(sbuf=0x7ffe3b734128, rbuf=0x7ffe3b734120, count=1,
-                MPI_LONG_LONG_INT, MPI_SUM, MPI_COMM_WORLD) failed
-             MPIR_Allreduce_impl(764)............:
-             MPIR_Allreduce_intra(238)...........:
-             MPIR_Reduce_impl(1070)..............:
-             MPIR_Reduce_intra(878)..............:
-             MPIR_Reduce_binomial(186)...........:
-             MPIC_Recv(353)......................:
-             MPIDI_CH3U_Request_unpack_uebuf(568): Message truncated; 40 bytes received but buffer size is 8
-             MPIR_Allreduce_intra(268)...........:
-             MPIR_Bcast_impl(1452)...............:
-             MPIR_Bcast(1476)....................:
-             MPIR_Bcast_intra(1287)..............:
-             MPIR_Bcast_binomial(310)............: Failure during collective
-             Fatal error in MPI_Allreduce: Other MPI error, error stack'''
-    )
+    @unittest.skip('Failed due to lack of Int64Index support. Error:'
+                   'Series.index values are different (66.66667 %)'
+                   '[left]:  RangeIndex(start=0, stop=3, step=1)'
+                   '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
+    def test_series_head_index3(self):
+        '''Verifies head method for non-distributed pass of Series with integer index'''
+        def test_impl(S):
+            return S.head(3)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_head_index4(self):
+        '''Verifies head method for non-distributed pass of Series with string index'''
+        def test_impl(S):
+            return S.head(3)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('numba.errors.TypingError - fix needed\n'
+                   'Failed in hpat mode pipeline'
+                   '(step: convert to distributed)\n'
+                   'Invalid use of Function(<built-in function len>)'
+                   'with argument(s) of type(s): (none)\n')
+    def test_series_head_parallel1(self):
+        '''Verifies head method for distributed Series with string data and no index'''
+        def test_impl(S):
+            return S.head(7)
+
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+
+        # need to test different lenghts, as head's size is fixed and implementation
+        # depends on relation of size of the data per processor to output data size
+        for n in range(1, 5):
+            S = pd.Series(['a', 'ab', 'abc', 'c', 'f', 'hh', ''] * n)
+            start, end = get_start_end(len(S))
+            pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
+            self.assertTrue(count_array_OneDs() > 0)
+
+    @unittest.skip('Failed due to lack of Int64Index support. Error:'
+                   'Series.index values are different (66.66667 %)'
+                   '[left]:  RangeIndex(start=0, stop=3, step=1)'
+                   '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index_parallel1(self):
+        '''Verifies head method for distributed Series with integer index'''
         def test_impl(S):
             return S.head(3)
         hpat_func = hpat.jit(distributed={'S'})(test_impl)
 
-        S = pd.Series([6, 9, 2, 3, 6, 4, 5],
-                      ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
+        S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
+        start, end = get_start_end(len(S))
+        pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
+        self.assertTrue(count_array_OneDs() > 0)
+
+    def test_series_head_index_parallel2(self):
+        '''Verifies head method for distributed Series with string index'''
+        def test_impl(S):
+            return S.head(3)
+        hpat_func = hpat.jit(distributed={'S'})(test_impl)
+
+        S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         start, end = get_start_end(len(S))
         pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
         self.assertTrue(count_array_OneDs() > 0)
@@ -1369,9 +1388,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'nan != 0.45894510159707225\n'
-                   'NUMA_PES=3 build')
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -1476,7 +1492,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enabel after fixing distributed for get_series_index")
+    @unittest.skip("Enable after fixing distributed for get_series_index")
     def test_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
