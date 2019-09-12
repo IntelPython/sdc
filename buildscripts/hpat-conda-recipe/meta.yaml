@@ -1,15 +1,12 @@
-{% set version = "0.29.2" %}
-{% set buildnumber = 1 %}
-
 package:
   name: hpat
-  version: {{version}}
+  version: {{ GIT_DESCRIBE_TAG }}
 
 source:
    path: ../..
 
 build:
-  number: {{buildnumber}}
+  number: {{ GIT_DESCRIBE_NUMBER|int }}
   script_env:
     - HPAT_CONFIG_MPI
     - HPAT_NUM_PES
@@ -23,7 +20,7 @@ requirements:
   host:
     - python
     - setuptools
-    - numba >0.44
+    - numba ==0.45
     - numpy
     - pandas >=0.23
     - pyarrow >=0.9
@@ -31,7 +28,9 @@ requirements:
     - boost
     - hdf5
     - h5py
-    - impi-devel
+    - mpich # [not win]
+    - impi_rt # [win]
+    - impi-devel # [win]
 
   run:
     - python
@@ -40,8 +39,9 @@ requirements:
     - pyarrow >=0.9
     - arrow-cpp
     - boost
-    - numba >0.44
-    - impi_rt
+    - numba ==0.45
+    - mpich # [not win]
+    - impi_rt # [win]
 
 test:
   requires:
