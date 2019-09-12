@@ -16,7 +16,7 @@ jobs:
       conda build --python 3.7 --override-channels -c numba -c conda-forge -c defaults -c intel --output-folder=. buildscripts/hpat-conda-recipe/
     displayName: conda build
 
-- template: buildscripts/azure-linux-macos.yml
+- template: buildscripts/azure-template-linux-macos.yml
   parameters:
     name: macOS
     vmImage: xcode9-macos10.13
