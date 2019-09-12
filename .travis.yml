@@ -7,14 +7,13 @@ matrix:
         - env: CONDA_ENV=travisci PYTHON_VER=3.7
 
 # TODO Remove travis from repository and add code coverage check
-#before_install:
-#    - buildscripts/setup_conda.sh
-#    - export PATH=$HOME/miniconda3/bin:$PATH
-#install:
-#    - buildscripts/build.sh
-#
-#after_success:
-#    - buildscripts/after_success.sh
+before_install: skip
+
+install: skip
+
+script: skip
+
+after_success: skip
 
 notifications:
     email: false
