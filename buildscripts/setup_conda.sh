@@ -6,6 +6,7 @@
 
 # Download
 unamestr=`uname`
+CONDA_INSTALL="conda install -q -y"
 if [[ "$unamestr" == 'Linux' ]]; then
   wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 elif [[ "$unamestr" == 'Darwin' ]]; then
@@ -22,4 +23,4 @@ export PATH=$HOME/miniconda3/bin:$PATH
 conda create -n $CONDA_ENV -q -y python=$PYTHON_VER
 source activate $CONDA_ENV
 # Install conda-build
-conda install -q -y conda-build
+$CONDA_INSTALL conda-build
