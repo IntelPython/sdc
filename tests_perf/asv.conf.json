@@ -82,7 +82,7 @@
         "mkl-devel": ["2019.4"],
         "mpi": ["1.0", null],
         "mpich": ["3.2.1", null],
-        "numba": ["0.46.0dev0=np116py37h6538335_143", "0.46.0dev0"],
+        "numba": ["0.46.0dev0=np116py37h6538335_143", "0.46.0dev0=np116py37hf484d3e_143"],
         "numpy": ["1.16.4"],
         "pandas": ["0.24.2"],
         "pyarrow": ["0.14.1"],
@@ -131,7 +131,7 @@
          {"sys_platform": "win32", "gcc_linux-64": "7.3.0"},
          {"sys_platform": "win32", "gxx_linux-64": "7.3.0"},
          {"sys_platform": "win32", "gfortran_linux-64": "7.3.0"},
-         {"sys_platform": "win32", "numba": "0.46.0dev0"},
+         {"sys_platform": "win32", "numba": "0.46.0dev0=np116py37hf484d3e_143"},
          {"sys_platform": "win32", "vc": null},
          {"sys_platform": "win32", "vs2015_runtime": null},
          {"sys_platform": "win32", "vs2015_win-64": null}
