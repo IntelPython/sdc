@@ -20,28 +20,12 @@ alternatives like `Apache Spark <http://spark.apache.org/>`_.
 
 HPAT's documentation can be found `here <https://intellabs.github.io/hpat-doc/>`_.
 
-Installation
-############
+Installing Binary Packages (conda)
+----------------------------------
+::
 
-HPAT can be installed in `Anaconda <https://www.anaconda.com/download/>`_
-environment easily (Linux/Mac/Windows)::
+   conda install -c intel -c intel/label/test hpat
 
-    conda create -n HPAT -c ehsantn -c anaconda -c conda-forge hpat
-
-.. used if master of Numba is needed for latest hpat package
-.. conda create -n HPAT -c ehsantn -c numba/label/dev -c anaconda -c conda-forge hpat
-
-Docker Container
-----------------
-
-An HPAT docker image is also available for running containers. For example::
-
-    docker run -it ehsantn/hpat bash
-
-Building HPAT from Source
--------------------------
-
-To build HPAT from Source, please refer to the following `instrunction <docs/source/install.rst>`_
 
 Example
 #######
@@ -72,36 +56,6 @@ Save this in a file named `pi.py` and run (on 8 cores)::
 This should demonstrate about 100x speedup compared to regular Python version
 without `@hpat.jit` and `mpiexec`.
 
-Jupyter Notebook
-################
-
-To use HPAT with Jupyter Notebook, install jupyter, ipython, and ipyparallel.
-Then, create a mpi profile for ipython::
-
-    ipython profile create --parallel --profile=mpi
-
-Next, edit the ipcluster_config.py file.  This file will be in your ipython
-directory in the profile_mpi directory.  Your ipython directory is in your
-IPYTHONDIR environment variable if you have one defined and ~/.ipython if you
-don't have this variable defined.  To the ipcluster_config.py file, add the
-following line::
-
-    c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'
-
-Then, start the Jupyter notebook and click on IPython Clusters, select the
-number of engines (i.e., cores) you'd like to use and click Start next to the
-mpi profile.  You can now run an HPAT function and the work will be distributed
-across the number of cores you selected on the current node.
-
-If you wish to run across multiple nodes, you can add the following to
-ipcluster_config.py::
-
-    c.MPILauncher.mpi_args = ["-machinefile", "path_to_file/machinefile"]
-
-This machinefile option is forwarded to mpi and the specified machine file in
-the second argument contains a list of machine names across which to distribute work.
-More information about the -machinefile option can be found 
-`here <https://www.open-mpi.org/faq/?category=running#mpirun-hostfile>`_.
 
 References
 ##########
@@ -111,3 +65,102 @@ These academic papers describe the underlying methods in HPAT:
 - `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
 - `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
 - `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
+
+
+Building HPAT from Source on Linux
+----------------------------------
+
+We use `Anaconda <https://www.anaconda.com/download/>`_ distribution of
+Python for setting up HPAT build environment.
+
+If you do not have conda, we recommend using Miniconda3::
+
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    chmod +x miniconda.sh
+    ./miniconda.sh -b
+    export PATH=$HOME/miniconda3/bin:$PATH
+
+It is possible to build HPAT via conda-build or setuptools. Follow one of the
+cases below to install HPAT and its dependencies on Linux.
+
+Building on Linux with conda-build
+~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+    PYVER=<3.6 or 3.7>
+    conda create -n CBLD python=$PYVER conda-build
+    source activate CBLD
+    git clone https://github.com/IntelPython/hpat
+    cd hpat
+    # build HPAT
+    conda build --python $PYVER --override-channels -c numba -c conda-forge -c defaults buildscripts/hpat-conda-recipe
+
+Building on Linux with setuptools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+    PYVER=<3.6 or 3.7>
+    conda create -n HPAT -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
+    source activate HPAT
+    git clone https://github.com/IntelPython/hpat
+    cd hpat
+    # build HPAT
+    python setup.py install
+
+In case of issues, reinstalling in a new conda environment is recommended.
+
+Building HPAT from Source on Windows
+------------------------------------
+
+Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0):
+
+* Install `Build Tools for Visual Studio 2017 (14.0) <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017>`_.
+* Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
+* Start 'Anaconda prompt'
+
+It is possible to build HPAT via conda-build or setuptools. Follow one of the
+cases below to install HPAT and its dependencies on Windows.
+
+Building on Windows with conda-build
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+    set PYVER=<3.6 or 3.7>
+    conda create -n CBLD -q -y python=%PYVER% conda-build conda-verify vc vs2015_runtime vs2015_win-64
+    activate CBLD
+    git clone https://github.com/IntelPython/hpat.git
+    cd hpat
+    conda build --python %PYVER% --override-channels -c numba -c defaults -c intel buildscripts\hpat-conda-recipe
+
+Building on Windows with setuptools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
+
+    conda create -n HPAT -c numba -c defaults -c intel python=<3.6 or 3.7> numba impi-devel pyarrow scipy pandas boost
+    activate HPAT
+    git clone https://github.com/IntelPython/hpat.git
+    cd hpat
+    set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
+    set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
+    %CONDA_PREFIX%\Library\bin\mpivars.bat quiet
+    python setup.py install
+
+.. "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
+
+Troubleshooting Windows Build
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run ‘rc.exe’``,
+  add Windows Kits to your PATH (e.g. ``C:\Program Files (x86)\Windows Kits\8.0\bin\x86``).
+* Some errors can be mitigated by ``set DISTUTILS_USE_SDK=1``.
+* For setting up Visual Studio, one might need go to registry at
+  ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
+  and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
+
+Running unit tests
+------------------
+::
+
+    conda install h5py
+    python hpat/tests/gen_test_data.py
+    python -m unittest
