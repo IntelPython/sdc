@@ -1,15 +1,7 @@
 Modules
-===========
+========
 
-Distributed
-------------
-
-.. automodule:: hpat.distributed
-   :members:
-   :show-inheritance:
-   :undoc-members:
+.. toctree::
+   :maxdepth: 2
    
-.. automodule::hpat.distributed_api
-   :members:
-   :show-inheritance:
-   :undoc-members:
+   distributed
