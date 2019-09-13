@@ -5,10 +5,9 @@ from .data_generator import StringSeriesGenerator
 
 
 class Methods:
-    timeout = 120
     params = [
         [StringSeriesGenerator.N],
-        [StringSeriesGenerator.NCHARS],
+        StringSeriesGenerator.NCHARS,
         [Impl.interpreted_python.value, Impl.compiled_python.value]
     ]
     param_names = ['size', 'nchars', 'implementation']

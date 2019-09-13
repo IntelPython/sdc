@@ -40,11 +40,11 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td>{{ test_name }}</td>
-                        <td>{{ result['result'] }}</td>
-                        <td>{{ result['stats']['min'] }}</td>
-                        <td>{{ result['stats']['mean'] }}</td>
-                        <td>{{ result['stats']['max'] }}</td>
-                        <td>{{ result['stats']['std'] }}</td>
+                        <td>{{ '%0.5f'| format(result['result']|float) }}</td>
+                        <td>{{ '%0.5f'| format(result['stats']['min']|float) }}</td>
+                        <td>{{ '%0.5f'| format(result['stats']['mean']|float) }}</td>
+                        <td>{{ '%0.5f'| format(result['stats']['max']|float) }}</td>
+                        <td>{{ '%0.5f'| format(result['stats']['std']|float) }}</td>
                     </tr>
                 {% endif %}
             {% endfor %}
