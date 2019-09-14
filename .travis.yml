@@ -3,28 +3,17 @@
 dist: trusty
 
 matrix:
-    include:
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=1
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=2
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=3
-        - env: RUN_COVERAGE=yes CONDA_ENV=travisci NUM_PES=1
-        - env: CONDA_ENV=travisci NUM_PES=2
-        - env: CONDA_ENV=travisci NUM_PES=3
+    include: 
+        - env: CONDA_ENV=travisci PYTHON_VER=3.7
 
-before_install:
-    - buildscripts/setup_conda.sh
-    - export PATH=$HOME/miniconda3/bin:$PATH
-install:
-    - buildscripts/build.sh
+# TODO Remove travis from repository and add code coverage check
+before_install: skip
 
-script:
-    - buildscripts/test.sh
+install: skip
 
-after_success:
-    - buildscripts/after_success.sh
+script: skip
+
+after_success: skip
 
 notifications:
     email: false
