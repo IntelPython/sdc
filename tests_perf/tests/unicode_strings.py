@@ -5,7 +5,9 @@ from .data_generator import DataGenerator
 
 
 class Methods:
-    params = [Impl.interpreted_python.value, Impl.compiled_python.value]
+    params = [
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
     param_names = ['implementation']
 
     def setup(self, implementation):
