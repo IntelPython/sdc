@@ -1,4 +1,4 @@
-HPAT documentation
+HPAT User's Guide
 ===================
    
 .. toctree::
@@ -8,7 +8,6 @@ HPAT documentation
 
    overview
    UserGuide
-   DevelopersGuide
    Modules
 
 To download HPAT documentation PDF click here :download:`pdf <../_build/latex/HPAT.pdf>`
