@@ -40,12 +40,16 @@ functions and operators definition in HPAT
 Also, it contains Numba internal operators which are required for Series type handling
 
 Implemented operators:
+    add
     at
+    div
     getitem
     iat
     iloc
     len
     loc
+    mul
+    sub
 
 Implemented methods:
     append
@@ -221,3 +225,123 @@ def hpat_pandas_series_not_equal(lhs, rhs):
         return pandas.Series(lhs._data != rhs._data)
 
     return hpat_pandas_series_not_equal_impl
+
+
+@overload_method(SeriesType, 'add')
+def hpat_pandas_series_add(lhs, rhs):
+    '''
+    Pandas Series operator 'add' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.add.html#pandas.Series.add
+
+    Algorithm: result = lhs.add(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    '''
+
+    _func_name = 'Operator add().'
+
+    if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
+
+    def hpat_pandas_series_add_impl(lhs, rhs):
+        return pandas.Series(lhs._data + rhs._data)
+
+    return hpat_pandas_series_add_impl
+
+
+@overload_method(SeriesType, 'sub')
+def hpat_pandas_series_sub(lhs, rhs):
+    '''
+    Pandas Series operator 'sub' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.sub.html#pandas.Series.sub
+
+    Algorithm: result = lhs.sub(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    '''
+
+    _func_name = 'Operator sub().'
+
+    if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
+
+    def hpat_pandas_series_sub_impl(lhs, rhs):
+        return pandas.Series(lhs._data - rhs._data)
+
+    return hpat_pandas_series_sub_impl
+
+
+@overload_method(SeriesType, 'mul')
+def hpat_pandas_series_mul(lhs, rhs):
+    '''
+    Pandas Series operator 'mul' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.mul.html#pandas.Series.mul
+
+    Algorithm: result = lhs.mul(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    '''
+
+    _func_name = 'Operator mul().'
+
+    if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
+
+    def hpat_pandas_series_mul_impl(lhs, rhs):
+        return pandas.Series(lhs._data * rhs._data)
+
+    return hpat_pandas_series_mul_impl
+
+
+@overload_method(SeriesType, 'div')
+def hpat_pandas_series_div(lhs, rhs):
+    '''
+    Pandas Series operator 'div' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.div.html#pandas.Series.div
+
+    Algorithm: result = lhs.div(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    '''
+
+    _func_name = 'Operator div().'
+
+    if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
+
+    def hpat_pandas_series_div_impl(lhs, rhs):
+        return pandas.Series(lhs._data / rhs._data)
+
+    return hpat_pandas_series_div_impl

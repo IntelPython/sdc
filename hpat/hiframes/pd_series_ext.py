@@ -1146,10 +1146,10 @@ def install_series_method(op, name, generic):
 
 
 explicit_binop_funcs = {
-    'add': operator.add,
-    'sub': operator.sub,
-    'mul': operator.mul,
-    'div': operator.truediv,
+    # 'add': operator.add,
+    # 'sub': operator.sub,
+    # 'mul': operator.mul,
+    # 'div': operator.truediv,
     'truediv': operator.truediv,
     'floordiv': operator.floordiv,
     'mod': operator.mod,
@@ -1158,7 +1158,7 @@ explicit_binop_funcs = {
     'gt': operator.gt,
     'le': operator.le,
     'ge': operator.ge,
-    #    'ne': operator.ne,
+       # 'ne': operator.ne,
     'eq': operator.eq,
 }
 
