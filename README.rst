@@ -150,7 +150,7 @@ Building on Windows with setuptools
 Troubleshooting Windows Build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run ‘rc.exe’``,
+* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run 'rc.exe'``,
   add Windows Kits to your PATH (e.g. ``C:\Program Files (x86)\Windows Kits\8.0\bin\x86``).
 * Some errors can be mitigated by ``set DISTUTILS_USE_SDK=1``.
 * For setting up Visual Studio, one might need go to registry at
