@@ -137,25 +137,21 @@ class StringArrayIterator(types.SimpleIteratorType):
         super(StringArrayIterator, self).__init__(name, yield_type)
 
 
-@register_model(StringArrayIterator)
-class StrArrayIteratorModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        # We use an unsigned index to avoid the cost of negative index tests.
-        members = [('index', types.EphemeralPointer(types.uintp)),
-                   ('array', string_array_type)]
-        super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
-
-
-lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
-
-
-@lower_builtin('iternext', StringArrayIterator)
-@iternext_impl(RefType.NEW)
 def iternext_str_array(context, builder, sig, args, result):
-    [iterty] = sig.args
+    """
+    Implementation of iternext() for the StringArrayIterator type
+
+    :param context: context descriptor
+    :param builder: llvmlite IR Builder
+    :param sig: iterator signature
+    :param args: tuple with iterator arguments, such as instruction, operands and types
+    :param result: iternext result
+    """
+
+    [itertype] = sig.args
     [iter_arg] = args
 
-    iterobj = context.make_helper(builder, iterty, value=iter_arg)
+    iterobj = context.make_helper(builder, itertype, value=iter_arg)
     len_sig = signature(types.intp, string_array_type)
     nitems = context.compile_internal(builder, lambda a: len(a), len_sig, [iterobj.array])
 
@@ -169,6 +165,20 @@ def iternext_str_array(context, builder, sig, args, result):
         result.yield_(value)
         nindex = cgutils.increment_index(builder, index)
         builder.store(nindex, iterobj.index)
+
+
+@register_model(StringArrayIterator)
+class StrArrayIteratorModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        # We use an unsigned index to avoid the cost of negative index tests.
+        members = [('index', types.EphemeralPointer(types.uintp)),
+                   ('array', string_array_type)]
+        super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
+
+
+lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
+
+lower_builtin('iternext', StringArrayIterator)(iternext_impl(RefType.NEW)(iternext_str_array))
 
 
 @intrinsic

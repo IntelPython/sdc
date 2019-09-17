@@ -72,8 +72,11 @@ class ASVGen:
     def generate(self):
         """Generate HTML reports based on ASV results"""
         for subdir in self.result_subdirs:
-            with (subdir / self.machine_json).open(encoding='utf-8') as fd:
-                machine_info = json.load(fd)
+            machine_info = {}
+            machine_json_path = subdir / self.machine_json
+            if machine_json_path.exists():
+                with machine_json_path.open(encoding='utf-8') as fd:
+                    machine_info = json.load(fd)
             for res_path in subdir.glob('*.json'):
                 if res_path.name == self.machine_json:
                     # Skip machine info file
@@ -90,7 +93,7 @@ class ASVGen:
                     # def time_smth(0, 'interpreted'): ... => 1.87
                     params = itertools.product(*result.get('params', []))
                     for params, res, stats in zip(params, result['result'], result['stats']):
-                        bench_args = ', '.join([p for p in params])
+                        bench_args = ', '.join([str(p) for p in params])
                         data[f'{benchmark}({bench_args})'] = {'result': res, 'stats': stats}
                 context = {
                     'extra_info': machine_info,
