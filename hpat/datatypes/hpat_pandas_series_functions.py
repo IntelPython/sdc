@@ -614,6 +614,71 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
+@overload_method(SeriesType, 'take')
+def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
+    """
+    Pandas Series method :meth:`pandas.Series.take` implementation.
+
+    .. only:: developer
+
+       Tests: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_default
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_default_unboxing
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_int
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_int_unboxing
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_str
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_str_unboxing
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    indices: :obj:`array-like`
+         An array of ints indicating which positions to take
+    axis: {0 or `index`, 1 or `columns`, None}, default 0
+        The axis on which to select elements. 0 means that we are selecting rows,
+        1 means that we are selecting columns.
+        *unsupported*
+    is_copy: :obj:`bool`, default True
+        Whether to return a copy of the original object or not.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object containing the elements taken from the object
+    """
+
+    _func_name = 'Method take().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(indices, types.List):
+        raise TypingError('{} The indices must be a List. Given: {}'.format(_func_name, indices))
+
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
+        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
+
+    if not (isinstance(is_copy, (types.Boolean, types.Omitted)) or is_copy == False):
+        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, is_copy))
+
+    if self.index is not types.none:
+        def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
+            local_data = [self._data[i] for i in indices] 
+            local_index = [self._index[i] for i in indices] 
+
+            return pandas.Series(local_data, local_index)
+
+        return hpat_pandas_series_take_impl
+    else:
+        def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
+            local_data = [self._data[i] for i in indices] 
+
+            return pandas.Series(local_data, indices)
+    
+        return hpat_pandas_series_take_noindex_impl
+
+
 @overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """

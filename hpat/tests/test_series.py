@@ -1636,6 +1636,73 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_take_index_default(self):
+        def pyfunc():
+            series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0])
+            indices = [1, 3]
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        ref_result = pyfunc()
+        result = cfunc()
+        pd.testing.assert_series_equal(ref_result, result)
+
+    def test_series_take_index_default_unboxing(self):
+        def pyfunc(series, indices):
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0])
+        indices = [1, 3]
+        ref_result = pyfunc(series, indices)
+        result = cfunc(series, indices)
+        pd.testing.assert_series_equal(ref_result, result)
+
+    def test_series_take_index_int(self):
+        def pyfunc():
+            series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0], index=[3, 0, 4, 2, 1])
+            indices = [1, 3]
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        ref_result = pyfunc()
+        result = cfunc()
+        pd.testing.assert_series_equal(ref_result, result)
+
+    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
+    def test_series_take_index_int_unboxing(self):
+        def pyfunc(series, indices):
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0], index=[3, 0, 4, 2, 1])
+        indices = [1, 3]
+        ref_result = pyfunc(series, indices)
+        result = cfunc(series, indices)
+        pd.testing.assert_series_equal(ref_result, result)
+
+    def test_series_take_index_str(self):
+        def pyfunc():
+            series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0], index=['test', 'series', 'take', 'str', 'index'])
+            indices = [1, 3]
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        ref_result = pyfunc()
+        result = cfunc()
+        pd.testing.assert_series_equal(ref_result, result)
+
+    def test_series_take_index_str_unboxing(self):
+        def pyfunc(series, indices):
+            return series.take(indices)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series([1.0, 13.0, 9.0, -1.0, 7.0], index=['test', 'series', 'take', 'str', 'index'])
+        indices = [1, 3]
+        ref_result = pyfunc(series, indices)
+        result = cfunc(series, indices)
+        pd.testing.assert_series_equal(ref_result, result)
+
     def test_series_iterator_int(self):
         def test_impl(A):
             return [i for i in A]
