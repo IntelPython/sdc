@@ -31,7 +31,7 @@ requirements:
     - mpich # [not win]
     - impi_rt # [win]
     - impi-devel # [win]
-    - conda-package-handling ==1.4.0
+    - conda-package-handling !=1.5.0 #[win]
 
   run:
     - python
@@ -43,7 +43,7 @@ requirements:
     - numba ==0.45
     - mpich # [not win]
     - impi_rt # [win]
-    - conda-package-handling ==1.4.0
+    - conda-package-handling !=1.5.0 #[win]
 
 test:
   requires:
