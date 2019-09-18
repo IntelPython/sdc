@@ -5,9 +5,9 @@ from math import sqrt
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs,
-                            count_parfor_OneD_Vars, count_array_OneD_Vars,
-                            dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs,
+                                   count_parfor_OneD_Vars, count_array_OneD_Vars,
+                                   dist_IR_contains)
 from datetime import datetime
 import random
 
@@ -246,7 +246,7 @@ class TestDate(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = self._gen_str_date_df()
         pd.testing.assert_index_equal(hpat_func(df), test_impl(df),
-            check_names=False)
+                                      check_names=False)
 
     def test_datetime_index_year(self):
         def test_impl(df):
@@ -340,8 +340,9 @@ class TestDate(unittest.TestCase):
         rows = 10
         data = []
         for row in range(rows):
-            data.append(datetime(2017, random.randint(1,12), random.randint(1,28)).isoformat())
-        return pd.DataFrame({'str_date' : data})
+            data.append(datetime(2017, random.randint(1, 12), random.randint(1, 28)).isoformat())
+        return pd.DataFrame({'str_date': data})
+
 
 if __name__ == "__main__":
     unittest.main()

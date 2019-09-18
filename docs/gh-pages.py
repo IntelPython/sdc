@@ -15,9 +15,9 @@ In practice, you should use either actual clean tags from a current build or
 something like 'current' as a stable URL for the most current version of the """
 from __future__ import print_function, division, absolute_import
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Imports
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 import os
 import re
 import shutil
@@ -27,18 +27,20 @@ from os.path import join as pjoin
 
 from subprocess import Popen, PIPE, CalledProcessError, check_call
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Globals
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 pages_dir = 'gh-pages'
 html_dir = '_build/html'
 pdf_dir = '_build/latex'
-pages_repo = 'https://github.com/IntelLabs/hpat-doc.git'
+pages_repo = 'https://github.com/IntelPython/hpat-doc.git'
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Functions
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+
 def sub_environment():
     """Return an environment dict for executing subcommands in."""
     env = os.environ.copy()
@@ -81,15 +83,16 @@ def sh3(cmd):
 
 def init_repo(path):
     """clone the gh-pages repo if we haven't already."""
-    sh("git clone %s %s"%(pages_repo, path))
+    sh("git clone %s %s" % (pages_repo, path))
     here = os.getcwd()
     cd(path)
     sh('git checkout gh-pages')
     cd(here)
 
-#-----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # Script starts
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     # The tag can be given as a positional argument
     try:
@@ -132,7 +135,7 @@ if __name__ == '__main__':
     try:
         cd(pages_dir)
         status = sh2('git status | head -1').decode()
-        branch = re.match('\#?\s*On branch (.*)$', status).group(1)
+        branch = re.match(r'\#?\s*On branch (.*)$', status).group(1)
         if branch != 'gh-pages':
             e = 'On %r, git branch is %r, MUST be "gh-pages"' % (pages_dir,
                                                                  branch)
