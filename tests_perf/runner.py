@@ -142,7 +142,9 @@ class TimeBenchmark(Benchmark):
         # Warming up
         timeit.timeit(number=1)
 
-        return timer.repeat(repeat=self.repeat, number=self.number)
+        samples = timer.repeat(repeat=self.repeat, number=self.number)
+
+        return [sample/self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
