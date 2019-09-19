@@ -21,32 +21,13 @@ jobs:
     name: macOS
     vmImage: xcode9-macos10.13
     matrix:
-      py36_numpes0:
-        CONDA_ENV: 'travisci'
-        PYTHON_VER: '3.6'
-
-      py36_numpes3:
-        CONDA_ENV: 'travisci'
-        HPAT_NUM_PES: '3'
-        PYTHON_VER: '3.6'
-
       py37_numpes0:
         CONDA_ENV: 'travisci'
-        PYTHON_VER: '3.7'
-        
-      py37_numpes1:
-        CONDA_ENV: 'travisci'
-        HPAT_NUM_PES: '1'
         PYTHON_VER: '3.7'
 
       py37_numpes2:
         CONDA_ENV: 'travisci'
         HPAT_NUM_PES: '2'
-        PYTHON_VER: '3.7'
-
-      py37_numpes3:
-        CONDA_ENV: 'travisci'
-        HPAT_NUM_PES: '3'
         PYTHON_VER: '3.7'
 
 - template: buildscripts/azure-template-linux-macos.yml
