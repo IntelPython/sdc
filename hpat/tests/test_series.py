@@ -482,7 +482,7 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op5(self):
-        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', )
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow' )
 
         for method in arithmetic_methods:
             test_impl = _make_func_use_method_arg1(method)

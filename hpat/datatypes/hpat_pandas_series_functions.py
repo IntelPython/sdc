@@ -146,7 +146,7 @@ def hpat_pandas_series_iloc(self):
 @overload(len)
 def hpat_pandas_series_len(self):
     """
-    Pandas Series opearator 'len' implementation
+    Pandas Series operator 'len' implementation
         https://docs.python.org/2/library/functions.html#len
 
     Algorithm: result = len(series)
@@ -230,7 +230,7 @@ def hpat_pandas_series_not_equal(lhs, rhs):
 @overload_method(SeriesType, 'add')
 def hpat_pandas_series_add(lhs, rhs):
     """
-    Pandas Series operator 'add' implementation.
+    Pandas Series method 'add' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.add.html#pandas.Series.add
 
     Algorithm: result = lhs.add(other, level=None, fill_value=None, axis=0)
@@ -246,7 +246,7 @@ def hpat_pandas_series_add(lhs, rhs):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
     """
 
-    _func_name = 'Operator add().'
+    _func_name = 'Method add().'
 
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
@@ -262,7 +262,7 @@ def hpat_pandas_series_add(lhs, rhs):
         return hpat_pandas_series_add_impl
 
     if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
-        def hpat_pandas_series_add_impl(lhs, rhs):
+        def hpat_pandas_series_add_number_impl(lhs, rhs):
             """
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -270,7 +270,7 @@ def hpat_pandas_series_add(lhs, rhs):
 
             return pandas.Series(lhs._data + rhs)
 
-        return hpat_pandas_series_add_impl
+        return hpat_pandas_series_add_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
@@ -278,7 +278,7 @@ def hpat_pandas_series_add(lhs, rhs):
 @overload_method(SeriesType, 'sub')
 def hpat_pandas_series_sub(lhs, rhs):
     """
-    Pandas Series operator 'sub' implementation.
+    Pandas Series method 'sub' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.sub.html#pandas.Series.sub
 
     Algorithm: result = lhs.sub(other, level=None, fill_value=None, axis=0)
@@ -294,7 +294,7 @@ def hpat_pandas_series_sub(lhs, rhs):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
     """
 
-    _func_name = 'Operator sub().'
+    _func_name = 'Method sub().'
 
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
@@ -310,7 +310,7 @@ def hpat_pandas_series_sub(lhs, rhs):
         return hpat_pandas_series_sub_impl
 
     if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
-        def hpat_pandas_series_sub_impl(lhs, rhs):
+        def hpat_pandas_series_sub_number_impl(lhs, rhs):
             """
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -318,7 +318,7 @@ def hpat_pandas_series_sub(lhs, rhs):
 
             return pandas.Series(lhs._data - rhs)
 
-        return hpat_pandas_series_sub_impl
+        return hpat_pandas_series_sub_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
@@ -326,7 +326,7 @@ def hpat_pandas_series_sub(lhs, rhs):
 @overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(lhs, rhs):
     """
-    Pandas Series operator 'mul' implementation.
+    Pandas Series method 'mul' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.mul.html#pandas.Series.mul
 
     Algorithm: result = lhs.mul(other, level=None, fill_value=None, axis=0)
@@ -342,7 +342,7 @@ def hpat_pandas_series_mul(lhs, rhs):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
     """
 
-    _func_name = 'Operator mul().'
+    _func_name = 'Method mul().'
 
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
@@ -358,7 +358,7 @@ def hpat_pandas_series_mul(lhs, rhs):
         return hpat_pandas_series_mul_impl
 
     if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
-        def hpat_pandas_series_mul_impl(lhs, rhs):
+        def hpat_pandas_series_mul_number_impl(lhs, rhs):
             """
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -366,7 +366,7 @@ def hpat_pandas_series_mul(lhs, rhs):
 
             return pandas.Series(lhs._data * rhs)
 
-        return hpat_pandas_series_mul_impl
+        return hpat_pandas_series_mul_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
@@ -375,7 +375,7 @@ def hpat_pandas_series_mul(lhs, rhs):
 @overload_method(SeriesType, 'truediv')
 def hpat_pandas_series_div(lhs, rhs):
     """
-    Pandas Series operator 'div' implementation.
+    Pandas Series method 'div' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.div.html#pandas.Series.div
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.truediv.html#pandas.Series.truediv
 
@@ -393,7 +393,7 @@ def hpat_pandas_series_div(lhs, rhs):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
     """
 
-    _func_name = 'Operator div()/truediv().'
+    _func_name = 'Method div()/truediv().'
 
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
@@ -409,7 +409,7 @@ def hpat_pandas_series_div(lhs, rhs):
         return hpat_pandas_series_div_impl
 
     if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
-        def hpat_pandas_series_div_impl(lhs, rhs):
+        def hpat_pandas_series_div_number_impl(lhs, rhs):
             """
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -417,7 +417,7 @@ def hpat_pandas_series_div(lhs, rhs):
 
             return pandas.Series(lhs._data / rhs)
 
-        return hpat_pandas_series_div_impl
+        return hpat_pandas_series_div_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
@@ -425,7 +425,7 @@ def hpat_pandas_series_div(lhs, rhs):
 @overload_method(SeriesType, 'floordiv')
 def hpat_pandas_series_floordiv(lhs, rhs):
     """
-    Pandas Series operator 'floordiv' implementation.
+    Pandas Series method 'floordiv' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.floordiv.html#pandas.Series.floordiv
 
     Algorithm: result = lhs.floordiv(other, level=None, fill_value=None, axis=0)
@@ -441,7 +441,7 @@ def hpat_pandas_series_floordiv(lhs, rhs):
     Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
     """
 
-    _func_name = 'Operator floordiv().'
+    _func_name = 'Method floordiv().'
 
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
@@ -457,7 +457,7 @@ def hpat_pandas_series_floordiv(lhs, rhs):
         return hpat_pandas_series_floordiv_impl
 
     if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
-        def hpat_pandas_series_floordiv_impl(lhs, rhs):
+        def hpat_pandas_series_floordiv_number_impl(lhs, rhs):
             """
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -465,7 +465,7 @@ def hpat_pandas_series_floordiv(lhs, rhs):
 
             return pandas.Series(lhs._data // rhs)
 
-        return hpat_pandas_series_floordiv_impl
+        return hpat_pandas_series_floordiv_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
