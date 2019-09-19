@@ -74,8 +74,9 @@ class DataGenerator:
 
 
 class StringSeriesGenerator(DataGenerator):
-    NCHARS = [0, 1, 3, 5, 9, 17, 33, 61, 97]
-    N = 10 ** 5 + 513
+    NCHARS = [1, 3, 5, 9, 17, 33]
+    N = 5 * 10 ** 6 + 513
+    # RANDS_CHARS = [a-zA-Z] + [0-9] + [ \t\n\r\f\v]
     RANDS_CHARS = np.array(list(string.ascii_letters + string.digits + string.whitespace), dtype=(np.str_, 1))
 
     def __init__(self, size=None, seed=None, nchars=None):
