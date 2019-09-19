@@ -966,6 +966,44 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
 
+    @unittest.skip("Implement getting columns attribute")
+    def test_dataframe_columns_attribute(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
+            return df.columns
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement getting columns attribute")
+    def test_dataframe_columns_iterator(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
+            return [column for column in df.columns]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement set_index for DataFrame")
+    def test_dataframe_set_index(self):
+        def test_impl():
+            df = pd.DataFrame({'month': [1, 4, 7, 10],
+                               'year': [2012, 2014, 2013, 2014],
+                               'sale': [55, 40, 84, 31]})
+            return df.set_index('month')
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement sort_index for DataFrame")
+    def test_dataframe_sort_index(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3, 4, 5]}, index=[100, 29, 234, 1, 150])
+            return df.sort_index()
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
