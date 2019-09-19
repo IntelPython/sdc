@@ -142,7 +142,9 @@ class TimeBenchmark(Benchmark):
         # Warming up
         timeit.timeit(number=1)
 
-        return timer.repeat(repeat=self.repeat, number=self.number)
+        samples = timer.repeat(repeat=self.repeat, number=self.number)
+
+        return [sample/self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
@@ -180,7 +182,7 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
                     if not name.startswith(f'{type_}_'):
                         continue
 
-                    name_parts = module.__name__.split('.', 1)[1:] + [name]
+                    name_parts = module.__name__.split('.', 1)[1:] + [module_attr.__name__, name]
                     benchmark_name = '.'.join(name_parts)
                     func = inspect.getattr_static(module_attr, name)
                     params = inspect.getattr_static(module_attr, 'params', [[]])
@@ -207,7 +209,7 @@ def dump_results(results, file_path):
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bench', default='tests_perf.tests', help='Module with performance tests')
+    parser.add_argument('--bench', default='tests', help='Module with performance tests')
     parser.add_argument('--number', default=1, type=int, help='Repeat count')
     parser.add_argument('--repeat', default=10, type=int, help='Number of executions')
     parser.add_argument('--results-dir', default='../build/tests_perf', type=Path,
