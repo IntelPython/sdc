@@ -1558,6 +1558,24 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    @unittest.skip("Implement indexing by RangeIndex for Series")
+    def test_series_default_index(self):
+        def test_impl():
+            A = pd.Series([3, 2, 1, 5, 4])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement drop_duplicates for Series")
+    def test_series_drop_duplicates(self):
+        def test_impl():
+            A = pd.Series(['lama', 'cow', 'lama', 'beetle', 'lama', 'hippo'])
+            return A.drop_duplicates()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
