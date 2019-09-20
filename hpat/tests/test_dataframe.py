@@ -128,10 +128,9 @@ class TestDataFrame(unittest.TestCase):
             return df
 
         hpat_func = hpat.jit(test_impl)
-        from pandas.api.types import CategoricalDtype
         df = pd.DataFrame({'A': [1, 2, 3],
                            'B': pd.Series(['N', 'Y', 'Y'],
-                                          dtype=CategoricalDtype(['N', 'Y']))})
+                                          dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
     def test_box_dist_return(self):
