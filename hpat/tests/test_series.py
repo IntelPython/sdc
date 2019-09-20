@@ -482,7 +482,7 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op5(self):
-        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow' )
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
         for method in arithmetic_methods:
             test_impl = _make_func_use_method_arg1(method)
@@ -503,7 +503,10 @@ class TestSeries(unittest.TestCase):
             n = 11
             operand_series = pd.Series(np.arange(1, n))
             operand_scalar = 10
-            pd.testing.assert_series_equal(hpat_func(operand_series, operand_scalar), test_impl(operand_series, operand_scalar), check_names=False)
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
 
     def test_series_op5_float_scalar(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
@@ -515,7 +518,10 @@ class TestSeries(unittest.TestCase):
             n = 11
             operand_series = pd.Series(np.arange(1, n))
             operand_scalar = .5
-            pd.testing.assert_series_equal(hpat_func(operand_series, operand_scalar), test_impl(operand_series, operand_scalar), check_names=False)
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
 
     def test_series_op6(self):
         def test_impl(A):

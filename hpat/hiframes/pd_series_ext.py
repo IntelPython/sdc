@@ -634,7 +634,7 @@ class SeriesAttribute(AttributeTemplate):
             all_arrs = types.Tuple((arr_typ, if_series_to_array_type(other.dtype)))
         else:
             raise ValueError("Invalid input for Series.append (Series, or tuple/list of Series expected)")
- 
+
         # TODO: list
         # call np.concatenate to handle type promotion e.g. int, float -> float
         ret_typ = self.context.resolve_function_type(np.concatenate, (all_arrs,), kws).return_type
@@ -1158,7 +1158,7 @@ explicit_binop_funcs = {
     'gt': operator.gt,
     'le': operator.le,
     'ge': operator.ge,
-       # 'ne': operator.ne,
+    # 'ne': operator.ne,
     'eq': operator.eq,
 }
 
