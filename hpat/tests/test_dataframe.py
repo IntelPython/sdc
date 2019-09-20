@@ -58,7 +58,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
-        
+
     def test_unbox1(self):
         def test_impl(df):
             return df.A
