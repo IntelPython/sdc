@@ -76,6 +76,7 @@ from enum import Enum
 from importlib import import_module
 from pathlib import Path
 
+
 class BenchmarksType(Enum):
     """Benchmark types"""
     TIME = 'time'
@@ -126,14 +127,17 @@ class Benchmark:
 
 
 class TimeBenchmark(Benchmark):
-    def __init__(self,  name, func, param, source, repeat=10, number=1):
+    def __init__(self, name, func, param, source, repeat=10, number=1):
         super().__init__(name, func, param, source)
         self.repeat = repeat
         self.number = number
 
     def run(self):
         """Run benchmark timing"""
-        func = lambda: self.func(self.instance, *self.param)
+
+        def func():
+            return self.func(self.instance, *self.param)
+
         timer = timeit.Timer(
             stmt=func,
             setup=self.redo_setup,
@@ -144,7 +148,7 @@ class TimeBenchmark(Benchmark):
 
         samples = timer.repeat(repeat=self.repeat, number=self.number)
 
-        return [sample/self.number for sample in samples]
+        return [sample / self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
@@ -192,12 +196,13 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
 
 def compute_stats(samples):
     """Statistical analysis of the samples"""
-    return   {
+    return {
         'min': min(samples),
         'max': max(samples),
         'mean': statistics.mean(samples),
         'std': statistics.stdev(samples)
     }
+
 
 def dump_results(results, file_path):
     """Dump benchmarking results to json-file"""

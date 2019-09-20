@@ -5,6 +5,7 @@ from hpat import *
 from numba.typed import Dict
 from collections import defaultdict
 
+
 class TestHpatJitIssues(unittest.TestCase):
 
     @unittest.skip("Dict is not supported as class member")
@@ -43,11 +44,11 @@ class TestHpatJitIssues(unittest.TestCase):
     def test_list_sort_lambda(self):
         @numba.njit
         def sort_with_list_and_lambda():
-            l = [5, 4, 3, 2, 1, 0]
+            data = [5, 4, 3, 2, 1, 0]
 
-            l.sort(key=lambda x: x)
+            data.sort(key=lambda x: x)
 
-            return l
+            return data
 
         sort_with_list_and_lambda()
 
@@ -59,11 +60,11 @@ class TestHpatJitIssues(unittest.TestCase):
 
         @numba.njit
         def sort_with_list():
-            l = [5, 4, 3, 2, 1, 0]
+            data = [5, 4, 3, 2, 1, 0]
 
-            l.sort(key=key_func)
+            data.sort(key=key_func)
 
-            return l
+            return data
 
         sort_with_list()
 
@@ -71,11 +72,11 @@ class TestHpatJitIssues(unittest.TestCase):
     def test_sorted_lambda(self):
         @numba.njit
         def sorted_with_list():
-            l = [5, 4, 3, 2, 1, 0]
+            data = [5, 4, 3, 2, 1, 0]
 
-            sorted(l, key=lambda x: x)
+            sorted(data, key=lambda x: x)
 
-            return l
+            return data
 
         sorted_with_list()
 
@@ -87,11 +88,11 @@ class TestHpatJitIssues(unittest.TestCase):
 
         @numba.njit
         def sorted_with_list():
-            l = [5, 4, 3, 2, 1, 0]
+            data = [5, 4, 3, 2, 1, 0]
 
-            sorted(l, key=key_func)
+            sorted(data, key=key_func)
 
-            return l
+            return data
 
         sorted_with_list()
 
@@ -112,7 +113,7 @@ class TestHpatJitIssues(unittest.TestCase):
         def func_with_try_except():
             try:
                 return 0
-            except:
+            except BaseException:
                 return 1
 
         func_with_try_except()
@@ -137,6 +138,7 @@ class TestHpatJitIssues(unittest.TestCase):
             return d['a']
 
         func_with_dict()
+
 
 if __name__ == "__main__":
     unittest.main()

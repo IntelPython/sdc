@@ -189,7 +189,8 @@ def hpat_pandas_series_append(self, to_append):
     _func_name = 'Method append().'
 
     if not isinstance(self, SeriesType) or not isinstance(to_append, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
 
     def hpat_pandas_series_append_impl(self, to_append):
         return pandas.Series(self._data + to_append._data)
@@ -468,4 +469,3 @@ def hpat_pandas_series_floordiv(lhs, rhs):
         return hpat_pandas_series_floordiv_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
-
