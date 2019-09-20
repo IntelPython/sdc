@@ -478,7 +478,7 @@ def hpat_pandas_series_floordiv(lhs, rhs):
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'pow')
-def hpat_pandas_series_pow(lhs, rhs):
+def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'pow' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.pow.html#pandas.Series.pow
@@ -501,6 +501,9 @@ def hpat_pandas_series_pow(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_pow_impl(lhs, rhs):
             """
@@ -522,10 +525,10 @@ def hpat_pandas_series_pow(lhs, rhs):
 
         return hpat_pandas_series_pow_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'mod')
-def hpat_pandas_series_mod(lhs, rhs):
+def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'mod' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.mod.html#pandas.Series.mod
@@ -548,6 +551,9 @@ def hpat_pandas_series_mod(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_mod_impl(lhs, rhs):
             """
@@ -569,10 +575,10 @@ def hpat_pandas_series_mod(lhs, rhs):
 
         return hpat_pandas_series_mod_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'eq')
-def hpat_pandas_series_eq(lhs, rhs):
+def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'eq' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.eq.html#pandas.Series.eq
@@ -595,6 +601,9 @@ def hpat_pandas_series_eq(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_eq_impl(lhs, rhs):
             """
@@ -616,10 +625,10 @@ def hpat_pandas_series_eq(lhs, rhs):
 
         return hpat_pandas_series_eq_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'ge')
-def hpat_pandas_series_ge(lhs, rhs):
+def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'ge' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.ge.html#pandas.Series.ge
@@ -642,6 +651,9 @@ def hpat_pandas_series_ge(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_ge_impl(lhs, rhs):
             """
@@ -663,10 +675,10 @@ def hpat_pandas_series_ge(lhs, rhs):
 
         return hpat_pandas_series_ge_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'lt')
-def hpat_pandas_series_lt(lhs, rhs):
+def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'lt' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.lt.html#pandas.Series.lt
@@ -689,6 +701,9 @@ def hpat_pandas_series_lt(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_lt_impl(lhs, rhs):
             """
@@ -710,10 +725,10 @@ def hpat_pandas_series_lt(lhs, rhs):
 
         return hpat_pandas_series_lt_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'gt')
-def hpat_pandas_series_gt(lhs, rhs):
+def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'gt' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.gt.html#pandas.Series.gt
@@ -736,6 +751,9 @@ def hpat_pandas_series_gt(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_gt_impl(lhs, rhs):
             """
@@ -757,10 +775,10 @@ def hpat_pandas_series_gt(lhs, rhs):
 
         return hpat_pandas_series_gt_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
 
 @overload_method(SeriesType, 'le')
-def hpat_pandas_series_le(lhs, rhs):
+def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method 'le' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.le.html#pandas.Series.le
@@ -783,6 +801,9 @@ def hpat_pandas_series_le(lhs, rhs):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
+    if level is not types.none or fill_value is not types.none or axis is not 0:
+        raise TypingError('Unsupported parameters {}'.format(_func_name))
+
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_le_impl(lhs, rhs):
             """
@@ -804,4 +825,4 @@ def hpat_pandas_series_le(lhs, rhs):
 
         return hpat_pandas_series_le_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
