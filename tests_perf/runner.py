@@ -76,6 +76,7 @@ from enum import Enum
 from importlib import import_module
 from pathlib import Path
 
+
 class BenchmarksType(Enum):
     """Benchmark types"""
     TIME = 'time'
@@ -126,14 +127,17 @@ class Benchmark:
 
 
 class TimeBenchmark(Benchmark):
-    def __init__(self,  name, func, param, source, repeat=10, number=1):
+    def __init__(self, name, func, param, source, repeat=10, number=1):
         super().__init__(name, func, param, source)
         self.repeat = repeat
         self.number = number
 
     def run(self):
         """Run benchmark timing"""
-        func = lambda: self.func(self.instance, *self.param)
+
+        def func():
+            return self.func(self.instance, *self.param)
+
         timer = timeit.Timer(
             stmt=func,
             setup=self.redo_setup,
@@ -142,7 +146,9 @@ class TimeBenchmark(Benchmark):
         # Warming up
         timeit.timeit(number=1)
 
-        return timer.repeat(repeat=self.repeat, number=self.number)
+        samples = timer.repeat(repeat=self.repeat, number=self.number)
+
+        return [sample / self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
@@ -180,7 +186,7 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
                     if not name.startswith(f'{type_}_'):
                         continue
 
-                    name_parts = module.__name__.split('.', 1)[1:] + [name]
+                    name_parts = module.__name__.split('.', 1)[1:] + [module_attr.__name__, name]
                     benchmark_name = '.'.join(name_parts)
                     func = inspect.getattr_static(module_attr, name)
                     params = inspect.getattr_static(module_attr, 'params', [[]])
@@ -190,12 +196,13 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
 
 def compute_stats(samples):
     """Statistical analysis of the samples"""
-    return   {
+    return {
         'min': min(samples),
         'max': max(samples),
         'mean': statistics.mean(samples),
         'std': statistics.stdev(samples)
     }
+
 
 def dump_results(results, file_path):
     """Dump benchmarking results to json-file"""
@@ -207,7 +214,7 @@ def dump_results(results, file_path):
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bench', default='tests_perf.tests', help='Module with performance tests')
+    parser.add_argument('--bench', default='tests', help='Module with performance tests')
     parser.add_argument('--number', default=1, type=int, help='Repeat count')
     parser.add_argument('--repeat', default=10, type=int, help='Number of executions')
     parser.add_argument('--results-dir', default='../build/tests_perf', type=Path,
