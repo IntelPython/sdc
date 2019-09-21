@@ -71,7 +71,7 @@ import platform
 import statistics
 import timeit
 
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 from enum import Enum
 from importlib import import_module
 from pathlib import Path
@@ -227,21 +227,23 @@ def main():
     args = parse_args()
     logger = setup_logging()
 
-    results = {}
-    result = []
-    stats = []
-    params_combinations = []
+    results = defaultdict(list)
     logger.info('Running benchmarks in "%s"...', args.bench)
     for benchmark in discover_benchmarks(args.bench, repeat=args.repeat, number=args.number):
         samples = benchmark.run()
-        result.append(statistics.median(samples))
-        stats.append(compute_stats(samples))
-        results[benchmark.name] = {'result': result, 'stats': stats}
-        params_combinations.append(benchmark.param)
+        results[benchmark.name].append(
+            {'result': statistics.median(samples), 'stats': compute_stats(samples), 'params': benchmark.param}
+        )
         logger.info('%s%s: %ss', benchmark.name, benchmark.param, round(statistics.median(samples), 5))
 
-    params = [list(OrderedDict.fromkeys(y)) for y in zip(*params_combinations)]
-    data = {'results': {name: {'params': params, **result} for name, result in results.items()}}
+    formatted_results = {}
+    for name, res in results.items():
+        formatted_results[name] = {
+            'result': [r['result'] for r in res],
+            'stats': [r['stats'] for r in res],
+            'params': [list(OrderedDict.fromkeys(y)) for y in zip(*[r['params'] for r in res])],
+        }
+    data = {'results': formatted_results}
     results_json = args.results_dir / platform.node() / 'results.json'
     dump_results(data, results_json)
     logger.info('Results dumped to "%s"', results_json)
