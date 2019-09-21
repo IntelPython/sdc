@@ -1020,6 +1020,26 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.skip("Implement iterrows for DataFrame")
+    def test_dataframe_iterrows(self):
+        def test_impl(df):
+            print(df.iterrows())
+            return [row for _, row in df.iterrows()]
+
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [0.2, 0.5, 0.001], 'C': ['a', 'bb', 'ccc']})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Support parameter axis=1")
+    def test_dataframe_axis_param(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
+            return df.sum(axis=1)
+
+        n = 100
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+
 
 if __name__ == "__main__":
     unittest.main()
