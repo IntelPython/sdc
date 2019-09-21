@@ -71,10 +71,11 @@ import platform
 import statistics
 import timeit
 
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 from enum import Enum
 from importlib import import_module
 from pathlib import Path
+
 
 class BenchmarksType(Enum):
     """Benchmark types"""
@@ -126,14 +127,17 @@ class Benchmark:
 
 
 class TimeBenchmark(Benchmark):
-    def __init__(self,  name, func, param, source, repeat=10, number=1):
+    def __init__(self, name, func, param, source, repeat=10, number=1):
         super().__init__(name, func, param, source)
         self.repeat = repeat
         self.number = number
 
     def run(self):
         """Run benchmark timing"""
-        func = lambda: self.func(self.instance, *self.param)
+
+        def func():
+            return self.func(self.instance, *self.param)
+
         timer = timeit.Timer(
             stmt=func,
             setup=self.redo_setup,
@@ -144,7 +148,7 @@ class TimeBenchmark(Benchmark):
 
         samples = timer.repeat(repeat=self.repeat, number=self.number)
 
-        return [sample/self.number for sample in samples]
+        return [sample / self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
@@ -192,12 +196,13 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
 
 def compute_stats(samples):
     """Statistical analysis of the samples"""
-    return   {
+    return {
         'min': min(samples),
         'max': max(samples),
         'mean': statistics.mean(samples),
         'std': statistics.stdev(samples)
     }
+
 
 def dump_results(results, file_path):
     """Dump benchmarking results to json-file"""
@@ -222,21 +227,23 @@ def main():
     args = parse_args()
     logger = setup_logging()
 
-    results = {}
-    result = []
-    stats = []
-    params_combinations = []
+    results = defaultdict(list)
     logger.info('Running benchmarks in "%s"...', args.bench)
     for benchmark in discover_benchmarks(args.bench, repeat=args.repeat, number=args.number):
         samples = benchmark.run()
-        result.append(statistics.median(samples))
-        stats.append(compute_stats(samples))
-        results[benchmark.name] = {'result': result, 'stats': stats}
-        params_combinations.append(benchmark.param)
+        results[benchmark.name].append(
+            {'result': statistics.median(samples), 'stats': compute_stats(samples), 'params': benchmark.param}
+        )
         logger.info('%s%s: %ss', benchmark.name, benchmark.param, round(statistics.median(samples), 5))
 
-    params = [list(OrderedDict.fromkeys(y)) for y in zip(*params_combinations)]
-    data = {'results': {name: {'params': params, **result} for name, result in results.items()}}
+    formatted_results = {}
+    for name, res in results.items():
+        formatted_results[name] = {
+            'result': [r['result'] for r in res],
+            'stats': [r['stats'] for r in res],
+            'params': [list(OrderedDict.fromkeys(y)) for y in zip(*[r['params'] for r in res])],
+        }
+    data = {'results': formatted_results}
     results_json = args.results_dir / platform.node() / 'results.json'
     dump_results(data, results_json)
     logger.info('Results dumped to "%s"', results_json)

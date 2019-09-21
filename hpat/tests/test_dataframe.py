@@ -58,7 +58,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
-        
+
     def test_unbox1(self):
         def test_impl(df):
             return df.A
@@ -121,6 +121,17 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_box_categorical(self):
+        def test_impl(df):
+            df['A'] = df['A'] + 1
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1, 2, 3],
+                           'B': pd.Series(['N', 'Y', 'Y'],
+                                          dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
+        pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
     def test_box_dist_return(self):
         def test_impl(n):
