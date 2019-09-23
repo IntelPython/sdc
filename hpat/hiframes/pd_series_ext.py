@@ -1,28 +1,72 @@
-import operator
-import pandas as pd
-import numpy as np
-import numba
-from numba import types
-from numba.extending import (models, register_model, lower_cast, infer_getattr,
-                             type_callable, infer, overload, make_attribute_wrapper)
-from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-                                    AttributeTemplate, bound_function)
-from numba.typing.arraydecl import (get_array_index_type, _expand_integer,
-                                    ArrayAttribute, SetItemBuffer)
-from numba.typing.npydecl import (Numpy_rules_ufunc, NumpyRulesArrayOperator,
-                                  NumpyRulesInplaceArrayOperator, NumpyRulesUnaryArrayOperator,
-                                  NdConstructorLike)
-import hpat
-from hpat.str_ext import string_type, list_string_array_type
-from hpat.str_arr_ext import (string_array_type, offset_typ, char_typ,
-                              str_arr_payload_type, StringArrayType, GetItemStringArray)
-from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
-from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-                                              CategoricalArray)
-from hpat.hiframes.rolling import supported_rolling_funcs
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
 import datetime
-from hpat.hiframes.split_impl import (string_array_split_view_type,
-                                      GetItemStringArraySplitView)
+import operator
+import numpy as np
+import pandas as pd
+import llvmlite.llvmpy.core as lc
+
+import numba
+from numba import types, cgutils
+from numba.extending import (
+    models,
+    register_model,
+    lower_cast,
+    lower_builtin,
+    infer_getattr,
+    type_callable,
+    infer,
+    overload,
+    make_attribute_wrapper)
+from numba.typing.arraydecl import (get_array_index_type, _expand_integer, ArrayAttribute, SetItemBuffer)
+from numba.typing.npydecl import (
+    Numpy_rules_ufunc,
+    NumpyRulesArrayOperator,
+    NumpyRulesInplaceArrayOperator,
+    NumpyRulesUnaryArrayOperator,
+    NdConstructorLike)
+from numba.typing.templates import (infer_global, AbstractTemplate, signature, AttributeTemplate, bound_function)
+from numba.targets.imputils import (impl_ret_new_ref, iternext_impl, RefType)
+from numba.targets.arrayobj import (make_array, _getitem_array1d)
+
+import hpat
+from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
+from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
+from hpat.hiframes.rolling import supported_rolling_funcs
+from hpat.hiframes.split_impl import (string_array_split_view_type, GetItemStringArraySplitView)
+from hpat.str_arr_ext import (
+    string_array_type,
+    iternext_str_array,
+    offset_typ,
+    char_typ,
+    str_arr_payload_type,
+    StringArrayType,
+    GetItemStringArray)
+from hpat.str_ext import string_type, list_string_array_type
 
 
 class SeriesType(types.IterableType):
@@ -35,9 +79,8 @@ class SeriesType(types.IterableType):
         data = _get_series_array_type(dtype) if data is None else data
         # convert Record to tuple (for tuple output of map)
         # TODO: handle actual Record objects in Series?
-        dtype = (types.Tuple(list(dict(dtype.members).values()))
-                 if isinstance(dtype, types.Record) else dtype)
-        self.dtype = dtype
+        self.dtype = (types.Tuple(list(dict(dtype.members).values()))
+                      if isinstance(dtype, types.Record) else dtype)
         self.data = data
         if index is None:
             index = types.none
@@ -96,9 +139,38 @@ class SeriesType(types.IterableType):
 
     @property
     def iterator_type(self):
-        # same as Buffer
         # TODO: fix timestamp
-        return types.iterators.ArrayIterator(self.data)
+        return SeriesIterator(self)
+
+
+class SeriesIterator(types.SimpleIteratorType):
+    """
+    Type class for iterator over dataframe series.
+    """
+
+    def __init__(self, series_type):
+        self.series_type = series_type
+        self.array_type = series_type.data
+
+        name = f'iter({self.series_type.data})'
+        yield_type = series_type.dtype
+        super(SeriesIterator, self).__init__(name, yield_type)
+
+    @property
+    def _iternext(self):
+        if isinstance(self.array_type, StringArrayType):
+            return iternext_str_array
+        elif isinstance(self.array_type, types.Array):
+            return iternext_series_array
+
+
+@register_model(SeriesIterator)
+class SeriesIteratorModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        members = [('index', types.EphemeralPointer(types.uintp)),
+                   ('array', fe_type.series_type.data)]
+
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
 
 def _get_series_array_type(dtype):
@@ -163,6 +235,97 @@ class SeriesModel(models.StructModel):
 make_attribute_wrapper(SeriesType, 'data', '_data')
 make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
+
+
+@lower_builtin('getiter', SeriesType)
+def getiter_series(context, builder, sig, args):
+    """
+    Getting iterator for the Series type
+
+    :param context: context descriptor
+    :param builder: llvmlite IR Builder
+    :param sig: iterator signature
+    :param args: tuple with iterator arguments, such as instruction, operands and types
+    :param result: iternext result
+    :return: reference to iterator
+    """
+
+    arraytype = sig.args[0].data
+
+    # Create instruction to get array to iterate
+    zero_member_pointer = context.get_constant(types.intp, 0)
+    zero_member = context.get_constant(types.int32, 0)
+    alloca = args[0].operands[0]
+    gep_result = builder.gep(alloca, [zero_member_pointer, zero_member])
+    array = builder.load(gep_result)
+
+    # TODO: call numba getiter with gep_result for array
+    iterobj = context.make_helper(builder, sig.return_type)
+    zero_index = context.get_constant(types.intp, 0)
+    indexptr = cgutils.alloca_once_value(builder, zero_index)
+
+    iterobj.index = indexptr
+    iterobj.array = array
+
+    if context.enable_nrt:
+        context.nrt.incref(builder, arraytype, array)
+
+    result = iterobj._getvalue()
+    # Note: a decref on the iterator will dereference all internal MemInfo*
+    out = impl_ret_new_ref(context, builder, sig.return_type, result)
+    return out
+
+
+# TODO: call it from numba.targets.arrayobj, need separate function in numba
+def iternext_series_array(context, builder, sig, args, result):
+    """
+    Implementation of iternext() for the ArrayIterator type
+
+    :param context: context descriptor
+    :param builder: llvmlite IR Builder
+    :param sig: iterator signature
+    :param args: tuple with iterator arguments, such as instruction, operands and types
+    :param result: iternext result
+    """
+
+    [iterty] = sig.args
+    [iter] = args
+    arrayty = iterty.array_type
+
+    if arrayty.ndim != 1:
+        raise NotImplementedError("iterating over %dD array" % arrayty.ndim)
+
+    iterobj = context.make_helper(builder, iterty, value=iter)
+    ary = make_array(arrayty)(context, builder, value=iterobj.array)
+
+    nitems, = cgutils.unpack_tuple(builder, ary.shape, count=1)
+
+    index = builder.load(iterobj.index)
+    is_valid = builder.icmp(lc.ICMP_SLT, index, nitems)
+    result.set_valid(is_valid)
+
+    with builder.if_then(is_valid):
+        value = _getitem_array1d(context, builder, arrayty, ary, index,
+                                 wraparound=False)
+        result.yield_(value)
+        nindex = cgutils.increment_index(builder, index)
+        builder.store(nindex, iterobj.index)
+
+
+@lower_builtin('iternext', SeriesIterator)
+@iternext_impl(RefType.BORROWED)
+def iternext_series(context, builder, sig, args, result):
+    """
+    Iternext implementation depending on Array type
+
+    :param context: context descriptor
+    :param builder: llvmlite IR Builder
+    :param sig: iterator signature
+    :param args: tuple with iterator arguments, such as instruction, operands and types
+    :param result: iternext result
+    """
+    iternext_func = sig.args[0]._iternext
+    iternext_func(context=context, builder=builder, sig=sig, args=args, result=result)
 
 
 def series_to_array_type(typ, replace_boxed=False):
@@ -258,13 +421,16 @@ class SeriesAttribute(AttributeTemplate):
         assert ary.dtype == types.NPDatetime('ns')
         return series_dt_methods_type
 
+# PR135. This needs to be commented out
     def resolve_iat(self, ary):
         return SeriesIatType(ary)
 
+# PR135. This needs to be commented out
     def resolve_iloc(self, ary):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
 
+# PR135. This needs to be commented out
     def resolve_loc(self, ary):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
@@ -451,6 +617,7 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_corr(self, ary, args, kws):
         return self._resolve_cov_func(ary, args, kws)
 
+# PR135. This needs to be commented out
     @bound_function("series.append")
     def resolve_append(self, ary, args, kws):
         # TODO: ignore_index
@@ -709,6 +876,7 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
+# PR135. This needs to be commented out
 @infer_global(operator.getitem)
 class GetItemSeriesIat(AbstractTemplate):
     key = operator.getitem
@@ -721,7 +889,7 @@ class GetItemSeriesIat(AbstractTemplate):
 
 @infer
 @infer_global(operator.eq)
-@infer_global(operator.ne)
+# @infer_global(operator.ne)
 @infer_global(operator.ge)
 @infer_global(operator.gt)
 @infer_global(operator.le)
@@ -821,6 +989,7 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
         setattr(SeriesAttribute, attr, func)
 
 
+# PR135. This needs to be commented out
 @infer_global(operator.getitem)
 class GetItemSeries(AbstractTemplate):
     key = operator.getitem
@@ -977,19 +1146,19 @@ def install_series_method(op, name, generic):
 
 
 explicit_binop_funcs = {
-    'add': operator.add,
-    'sub': operator.sub,
-    'mul': operator.mul,
-    'div': operator.truediv,
-    'truediv': operator.truediv,
-    'floordiv': operator.floordiv,
+    # 'add': operator.add,
+    # 'sub': operator.sub,
+    # 'mul': operator.mul,
+    # 'div': operator.truediv,
+    # 'truediv': operator.truediv,
+    # 'floordiv': operator.floordiv,
     'mod': operator.mod,
     'pow': operator.pow,
     'lt': operator.lt,
     'gt': operator.gt,
     'le': operator.le,
     'ge': operator.ge,
-    'ne': operator.ne,
+    # 'ne': operator.ne,
     'eq': operator.eq,
 }
 
@@ -1041,11 +1210,11 @@ for func in numba.typing.npydecl.supported_ufuncs:
         infer_global(func, types.Function(typing_class))
 
 
-@infer_global(len)
-class LenSeriesType(AbstractTemplate):
-    def generic(self, args, kws):
-        if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
-            return signature(types.intp, *args)
+# @infer_global(len)
+# class LenSeriesType(AbstractTemplate):
+#     def generic(self, args, kws):
+#         if not kws and len(args) == 1 and isinstance(args[0], SeriesType):
+#             return signature(types.intp, *args)
 
 # @infer_global(np.empty_like)
 # @infer_global(np.zeros_like)
@@ -1084,13 +1253,23 @@ type_callable(operator.sub)(type_sub)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
     if index is not None:
-        return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-                fastpath=False: hpat.hiframes.api.init_series(
-                    hpat.hiframes.api.fix_df_array(data),
-                    hpat.hiframes.api.fix_df_array(index),
-                    name
-                ))
+        def hpat_pandas_series_index_ctor_impl(
+                data=None,
+                index=None,
+                dtype=None,
+                name=None,
+                copy=False,
+                fastpath=False):
+            return hpat.hiframes.api.init_series(
+                hpat.hiframes.api.fix_df_array(data),
+                hpat.hiframes.api.fix_df_array(index),
+                name)
 
-    return (lambda data=None, index=None, dtype=None, name=None, copy=False,
-            fastpath=False: hpat.hiframes.api.init_series(
-                hpat.hiframes.api.fix_df_array(data), index, name))
+        return hpat_pandas_series_index_ctor_impl
+
+    def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+        return hpat.hiframes.api.init_series(hpat.hiframes.api.fix_df_array(data), index, name)
+
+    return hpat_pandas_series_ctor_impl
+
+from hpat.datatypes.hpat_pandas_series_functions import *
