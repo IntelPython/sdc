@@ -33,7 +33,6 @@ from numba.errors import TypingError
 
 from hpat.hiframes.pd_series_ext import SeriesType
 
-
 '''
 Pandas Series (https://pandas.pydata.org/pandas-docs/stable/reference/series.html)
 functions and operators definition in HPAT
@@ -477,6 +476,7 @@ def hpat_pandas_series_floordiv(lhs, rhs):
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
 
+
 @overload_method(SeriesType, 'pow')
 def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
     """
@@ -502,7 +502,9 @@ def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_pow_impl(lhs, rhs):
@@ -525,7 +527,10 @@ def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_pow_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -552,7 +557,9 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_mod_impl(lhs, rhs):
@@ -560,7 +567,7 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
             """
 
-            return pandas.Series(lhs._data % rhs._data)
+            return pandas.Series(lhs.data % rhs._data)
 
         return hpat_pandas_series_mod_impl
 
@@ -571,11 +578,14 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
             Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
-            return pandas.Series(lhs._data % rhs)
+            return pandas.Series(lhs.data % rhs)
 
         return hpat_pandas_series_mod_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'eq')
 def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -602,7 +612,9 @@ def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_eq_impl(lhs, rhs):
@@ -625,7 +637,10 @@ def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_eq_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'ge')
 def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -652,7 +667,9 @@ def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_ge_impl(lhs, rhs):
@@ -675,7 +692,10 @@ def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_ge_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'lt')
 def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -702,7 +722,9 @@ def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_lt_impl(lhs, rhs):
@@ -725,7 +747,10 @@ def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_lt_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'gt')
 def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -752,7 +777,9 @@ def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_gt_impl(lhs, rhs):
@@ -775,7 +802,10 @@ def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_gt_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
 
 @overload_method(SeriesType, 'le')
 def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
@@ -802,7 +832,9 @@ def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
     if level is not types.none or fill_value is not types.none or axis is not 0:
-        raise TypingError('Unsupported parameters {}'.format(_func_name))
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
     if isinstance(rhs, SeriesType):
         def hpat_pandas_series_le_impl(lhs, rhs):
@@ -825,4 +857,7 @@ def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
 
         return hpat_pandas_series_le_impl
 
-    raise TypingError('{} The object must be a pandas.series and argument must be a number. Given rhs: {}'.format(_func_name, rhs))
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
+
