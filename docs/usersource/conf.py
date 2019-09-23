@@ -21,14 +21,16 @@ import os
 import sys
 import sphinx_bootstrap_theme
 
-'''try:
+try:
     import hpat
 except ImportError:
     sys.path.insert(0, os.path.abspath('../..'))
-    import hpat'''
+    import hpat
 	
 sys.path.insert(0, os.path.abspath('../..'))
-#sys.path.append(os.path.abspath('..\..'))
+sys.path.append(os.path.abspath('../../hpat/'))
+sys.path.append(os.path.abspath('../../hpat/Pandas/'))
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -45,7 +47,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.githubpages',
 			  'sphinx.ext.napoleon',
 			  'sphinx.ext.autosectionlabel',
-			  'sphinx.ext.autosummary'
+			  'sphinx.ext.autosummary',
+              'sphinx.ext.viewcode'
 ]
 
 
@@ -63,9 +66,9 @@ napoleon_use_param = True
 napoleon_use_rtype = True
 
 
-#autosummary_generate = True
+autosummary_generate = True
 autosectionlabel_prefix_document = True
-autodoc_mock_imports = ['numba', 
+'''autodoc_mock_imports = ['numba', 
 						'llvmlite',
 						'hpat.hstr_ext',
 						'hpat.dict_ext',
@@ -87,10 +90,31 @@ autodoc_mock_imports = ['numba',
 						'hpat.compiler',
 						'pandas',
 						'numpy',
-]
-						
-suppress_warnings = ['autosectionlabel.*'
-]
+]'''
+
+#add_module_names = False						
+suppress_warnings = ['autosectionlabel.*']
+autodoc_docstring_signature = True
+
+'''def get_new_name(full_module_name):
+    """
+    return new module name
+    """
+    #split the full_module_name by "."'s
+    return full_module_name.split('_')[-1]
+
+def process_docstring(app, what, name, obj, options, lines):
+    id(name)
+    name = get_new_name(name)
+    id(name)
+    print('The new name is ', name)
+
+    # loop through each line in the docstring and replace |class| with
+    # the classname
+
+def setup(app):
+    app.connect('autodoc-process-docstring', process_docstring)'''
+    
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

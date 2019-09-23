@@ -96,7 +96,7 @@ class DistributedPass(object):
            The content for **Developer's Guide** should go here
 
         .. only:: user
-    
+
            The content here is visible only to the **User's Guide** So all user specific content should be added here
            
         Note

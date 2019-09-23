@@ -8,6 +8,6 @@ HPAT Developer's Guide
 
    overview
    DevelopersGuide
-   Modules
+   api
 
 To download HPAT documentation PDF click here :download:`pdf <../_builddev/latex/HPAT.pdf>`

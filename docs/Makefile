@@ -44,12 +44,10 @@ latex:
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) usersource $(BUILDDIR)/latex
 	@echo
 	@echo "Build finished; the LaTeX files are in $(BUILDDIR)/latex."
-	@echo "Run \`make' in that directory to run these through (pdf)latex" \
-	      "(use \`make latexpdf' here to do that automatically)."
+	@echo "Run \`make all-pdf' in that directory to run these through (pdf)latex"
 
 devlatex:
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) devsource $(DEVBUILDDIR)/latex
 	@echo
 	@echo "Build finished; the LaTeX files are in $(DEVBUILDDIR)/latex."
-	@echo "Run \`make' in that directory to run these through (pdf)latex" \
-	      "(use \`make latexpdf' here to do that automatically)."
+	@echo "Run \`make all-pdf' in that directory to run these through (pdf)latex"

@@ -5,3 +5,4 @@ Modules
    :maxdepth: 2
    
    distributed
+   datatypes

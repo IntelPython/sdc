@@ -24,6 +24,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+
+| :class:`pandas.Series` functions and operators implementations in HPAT
+| Also, it contains Numba internal operators which are required for Series type handling
+
+"""
+
 import operator
 import pandas
 
@@ -34,38 +41,28 @@ from numba.errors import TypingError
 from hpat.hiframes.pd_series_ext import SeriesType
 
 
-'''
-Pandas Series (https://pandas.pydata.org/pandas-docs/stable/reference/series.html)
-functions and operators definition in HPAT
-Also, it contains Numba internal operators which are required for Series type handling
-
-Implemented operators:
-    at
-    getitem
-    iat
-    iloc
-    len
-    loc
-
-Implemented methods:
-    append
-    ne
-'''
-
 
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
-    '''
-    Pandas Series opearator 'getitem' implementation
+    """
+    Pandas Series operator :attr:`pandas.Series.get` implementation
 
-    Algorithm: result = series[idx]
-    Where:
-        series: pandas.series
-           idx: integer number, slice or pandas.series
-        result: pandas.series or an element of the underneath type
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
-    '''
+    **Algorithm**: result = series[idx]
+    
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
+    
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+           input series
+    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
+        input index
+    
+    Returns
+    -------
+    :class:`pandas.Series` or an element of the underneath type
+            object of :class:`pandas.Series`
+    """
 
     _func_name = 'Operator getitem().'
 
@@ -74,9 +71,9 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.Integer):
         def hpat_pandas_series_getitem_idx_integer_impl(self, idx):
-            '''
-            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
-            '''
+            """
+            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
+            """
 
             result = self._data[idx]
             return result
@@ -85,9 +82,9 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.SliceType):
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            '''
-            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
-            '''
+            """
+            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
+            """
 
             result = pandas.Series(self._data[idx])
             return result
@@ -96,9 +93,9 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            '''
-            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_setitem_series_bool2
-            '''
+            """
+            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_setitem_series_bool2
+            """
             super_index = idx._data
             result = self._data[super_index]
             return result
@@ -112,21 +109,25 @@ def hpat_pandas_series_getitem(self, idx):
 @overload_attribute(SeriesType, 'iat')
 @overload_attribute(SeriesType, 'iloc')
 @overload_attribute(SeriesType, 'loc')
-def hpat_pandas_series_iloc(self):
-    '''
-    Pandas Series opearator 'iloc' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.at.html#pandas.Series.at
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iat.html#pandas.Series.iat
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iloc.html#pandas.Series.iloc
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.loc.html#pandas.Series.loc
+def iloc(self):
+    """
+    Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
 
-    Algorithm: result = series.iloc
-    Where:
-        series: pandas.series
-        result: pandas.series
+    **Algorithm**: result = series.iloc
+    
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
+    
+    Parameters
+    ----------
+    series: :class:`pandas.Series`
+           input series
+    
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns an object of Pandas Series
 
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
-    '''
+    """
 
     _func_name = 'Operator at/iat/iloc/loc().'
 
@@ -141,17 +142,22 @@ def hpat_pandas_series_iloc(self):
 
 @overload(len)
 def hpat_pandas_series_len(self):
-    '''
-    Pandas Series opearator 'len' implementation
-        https://docs.python.org/2/library/functions.html#len
-
-    Algorithm: result = len(series)
-    Where:
-        series: pandas.series
-        result: number of items in the object
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_len
-    '''
+    """
+    Pandas Series operator :func:`len` implementation
+    
+    .. only:: developer
+    
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_len
+    
+    Parameters
+    ----------
+    series: :class:`pandas.Series`
+    
+    Returns
+    -------
+    :obj:`int`
+        number of items in the object
+    """
 
     _func_name = 'Operator len().'
 
@@ -165,22 +171,30 @@ def hpat_pandas_series_len(self):
 
 
 @overload_method(SeriesType, 'append')
-def hpat_pandas_series_append(self, to_append):
-    '''
-    Pandas Series method 'append' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.append.html#pandas.Series.append
+def append(self, to_append):
+    """
+    append(self, to_append, ignore_index=False, verify_integrity=False)
+    
+    Pandas Series method :meth:`pandas.Series.append` implementation.
+    
+    .. only:: developer
+    
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_append1
 
-    Algorithm: result = S.append(self, to_append, ignore_index=False, verify_integrity=False)
+    Parameters
+    -----------
+    to_append : :obj:`pandas.Series`
+               input argument
+    ignore_index:
+                 *unsupported*
+    verify_integrity:
+                     *unsupported*
 
-    Where:
-                   S: pandas.series
-           to_append: pandas.series
-        ignore_index: unsupported
-    verify_integrity: unsupported
-              result: new pandas.series object
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_append1
-    '''
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series`  
+    """
 
     _func_name = 'Method append().'
 
@@ -194,23 +208,33 @@ def hpat_pandas_series_append(self, to_append):
 
 
 @overload_method(SeriesType, 'ne')
-def hpat_pandas_series_not_equal(lhs, rhs):
-    '''
-    Pandas Series method 'ne' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.ne.html#pandas.Series.ne
+def ne(lhs, rhs):
+    """
+    Pandas Series method :meth:`pandas.Series.ne` implementation. 
 
-    Algorithm: result = lhs.ne(other, level=None, fill_value=None, axis=0)
+    .. only:: developer
+    
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+       
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    other:  :class:`pandas.Series`
+          another input arg
+    level: 
+         *unsupported*
+    fill_value: 
+              *unsupported*
+    axis: 
+         *unsupported*
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: boolean result
+    Returns
+    -------
+    :obj:`bool` 
+       True if successful, False otherwise
 
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
-    '''
+    """
 
     _func_name = 'Method ne().'
 

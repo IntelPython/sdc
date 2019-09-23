@@ -536,8 +536,9 @@ Methods:
 
 Indexing, iteration:
 
-* :attr:`pandas.Series.iat`
-* :attr:`pandas.Series.iloc`
+* :func:`pandas.Series.iat <datatypes.hpat_pandas_series_functions.hpat_pandas_series_iloc>`
+* :func:`pandas.Series.iloc <datatypes.hpat_pandas_series_functions.hpat_pandas_series_iloc>`
+* :func:`pandas.Series.append <datatypes.hpat_pandas_series_functions.hpat_pandas_series_append>`
 
 Binary operator functions:
 
