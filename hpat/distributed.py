@@ -86,7 +86,7 @@ class DistributedPass(object):
 
     def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes,
                  metadata):
-        """ Here are more details about the init method or the class 
+        """ The summary for the class or init method can be mentioned here 
        
         The details can be multiple lines. You can mention all the supported
         and not supported args here or you can do it in ``Parameters`` section

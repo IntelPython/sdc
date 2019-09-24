@@ -29,7 +29,6 @@ except ImportError:
 	
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.append(os.path.abspath('../../hpat/'))
-sys.path.append(os.path.abspath('../../hpat/Pandas/'))
 
 # -- General configuration ------------------------------------------------
 
@@ -68,52 +67,11 @@ napoleon_use_rtype = True
 
 autosummary_generate = True
 autosectionlabel_prefix_document = True
-'''autodoc_mock_imports = ['numba', 
-						'llvmlite',
-						'hpat.hstr_ext',
-						'hpat.dict_ext',
-						'hpat.str_ext',
-						'hpat.str_arr_ext',
-						'hpat.utils',
-						'hpat.hset_ext',
-						'hpat.set_ext',
-						'hpat.distributed_api',
-						'hpat.config',
-						'hpat.timsort',
-						'hpat.io',
-						'hpat.hdist',
-						'hpat.transport_seq',
-						'hpat.distributed_lower',
-						'hpat.distributed_analysis',
-						'hpat.hdatetime_ext',
-						'hpat.hiframes',
-						'hpat.compiler',
-						'pandas',
-						'numpy',
-]'''
 
-#add_module_names = False						
+
+add_module_names = False						
 suppress_warnings = ['autosectionlabel.*']
 autodoc_docstring_signature = True
-
-'''def get_new_name(full_module_name):
-    """
-    return new module name
-    """
-    #split the full_module_name by "."'s
-    return full_module_name.split('_')[-1]
-
-def process_docstring(app, what, name, obj, options, lines):
-    id(name)
-    name = get_new_name(name)
-    id(name)
-    print('The new name is ', name)
-
-    # loop through each line in the docstring and replace |class| with
-    # the classname
-
-def setup(app):
-    app.connect('autodoc-process-docstring', process_docstring)'''
     
 
 # Add any paths that contain templates here, relative to this directory.

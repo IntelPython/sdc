@@ -109,13 +109,13 @@ def hpat_pandas_series_getitem(self, idx):
 @overload_attribute(SeriesType, 'iat')
 @overload_attribute(SeriesType, 'iloc')
 @overload_attribute(SeriesType, 'loc')
-def iloc(self):
+def hpat_pandas_series_iloc(self):
     """
     Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
 
-    **Algorithm**: result = series.iloc
-    
-    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
+    .. only:: developer
+       
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
     
     Parameters
     ----------
@@ -125,7 +125,7 @@ def iloc(self):
     Returns
     -------
     :obj:`pandas.Series`
-         returns an object of Pandas Series
+         returns an object of :obj:`pandas.Series`
 
     """
 
@@ -171,10 +171,8 @@ def hpat_pandas_series_len(self):
 
 
 @overload_method(SeriesType, 'append')
-def append(self, to_append):
-    """
-    append(self, to_append, ignore_index=False, verify_integrity=False)
-    
+def hpat_pandas_series_append(self, to_append):
+    """    
     Pandas Series method :meth:`pandas.Series.append` implementation.
     
     .. only:: developer
@@ -183,7 +181,7 @@ def append(self, to_append):
 
     Parameters
     -----------
-    to_append : :obj:`pandas.Series`
+    to_append : :obj:`pandas.Series` object
                input argument
     ignore_index:
                  *unsupported*
@@ -193,7 +191,7 @@ def append(self, to_append):
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series`  
+         returns :obj:`pandas.Series` object 
     """
 
     _func_name = 'Method append().'
@@ -208,7 +206,7 @@ def append(self, to_append):
 
 
 @overload_method(SeriesType, 'ne')
-def ne(lhs, rhs):
+def hpat_pandas_series_ne(lhs, rhs):
     """
     Pandas Series method :meth:`pandas.Series.ne` implementation. 
 
@@ -220,19 +218,17 @@ def ne(lhs, rhs):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    other:  :class:`pandas.Series`
-          another input arg
-    level: 
+    level: type for this argument
          *unsupported*
-    fill_value: 
+    fill_value: type for this argument
               *unsupported*
-    axis: 
+    axis: type for this argument
          *unsupported*
 
     Returns
     -------
     :obj:`bool` 
-       True if successful, False otherwise
+       Returns True if successful, False otherwise
 
     """
 
