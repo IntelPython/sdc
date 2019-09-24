@@ -1281,11 +1281,7 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
+
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1296,11 +1292,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
+
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
@@ -1352,11 +1344,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
     def test_series_head_parallel1(self):
         '''Verifies head method for distributed Series with string data and no index'''
         def test_impl(S):
