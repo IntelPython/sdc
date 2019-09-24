@@ -79,7 +79,7 @@ class StringSeriesGenerator(DataGenerator):
     # RANDS_CHARS = [a-zA-Z] + [0-9] + [ \t\n\r\f\v]
     RANDS_CHARS = np.array(list(string.ascii_letters + string.digits + string.whitespace), dtype=(np.str_, 1))
 
-    def __init__(self, size=None, seed=None, nchars=None):
+    def __init__(self, size=None, nchars=None, seed=None):
         super().__init__(size=size, seed=seed)
 
         self.nchars = nchars or self.NCHARS
@@ -90,21 +90,14 @@ class StringSeriesGenerator(DataGenerator):
 
     def generate(self):
         """Generate series of strings"""
-        return pd.Series(pd.Index(self._rands_array))
+        return pd.Series(pd.Index(self.rands_array))
 
     @property
-    def _rands_array(self):
-        """Generate an array of random strings of different sizes"""
+    def rands_array(self):
+        """Array of random strings"""
         arrays = []
         for n in self.nchars:
-            if n == 0:
-                # generate array of empty strings
-                arr = np.array(self.size * [''])
-            else:
-                # generate array of random n-size strings
-                with self.set_seed():
-                    arr = np.random.choice(self.RANDS_CHARS, size=n * self.size).view((np.str_, n))
-            arrays.append(arr)
+            arrays.append(self._rands_array(n))
 
         result_array = np.concatenate(arrays)
         # shuffle strings array
@@ -112,3 +105,27 @@ class StringSeriesGenerator(DataGenerator):
             np.random.shuffle(result_array)
 
         return result_array
+
+    def _rands_array(self, n):
+        """Generate an array of random n-size strings"""
+        if n == 0:
+            # generate array of empty strings
+            return np.array(self.size * [''])
+
+        # generate array of random n-size strings
+        with self.set_seed():
+            return np.random.choice(self.RANDS_CHARS, size=n * self.size).view((np.str_, n))
+
+
+class WhiteSpaceStringSeriesGenerator(StringSeriesGenerator):
+    def _rands_array(self, n):
+        """Generate an array of random n-size strings which start and end with white space"""
+        if n < 3:
+            # generate array of white space strings
+            return np.array(self.size * [' ' * n])
+
+        # generate array of random n-size strings which start and end with white space
+        with self.set_seed():
+            arr = np.random.choice(self.RANDS_CHARS, size=(n - 2) * self.size).view((np.str_, n - 2))
+            np.char.center(arr, n)
+            return arr

@@ -41,7 +41,6 @@ from numba.errors import TypingError
 from hpat.hiframes.pd_series_ext import SeriesType
 
 
-
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
@@ -126,7 +125,6 @@ def hpat_pandas_series_iloc(self):
     -------
     :obj:`pandas.Series`
          returns an object of :obj:`pandas.Series`
-
     """
 
     _func_name = 'Operator at/iat/iloc/loc().'
@@ -197,7 +195,8 @@ def hpat_pandas_series_append(self, to_append):
     _func_name = 'Method append().'
 
     if not isinstance(self, SeriesType) or not isinstance(to_append, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
 
     def hpat_pandas_series_append_impl(self, to_append):
         return pandas.Series(self._data + to_append._data)
@@ -229,7 +228,6 @@ def hpat_pandas_series_ne(lhs, rhs):
     -------
     :obj:`bool` 
        Returns True if successful, False otherwise
-
     """
 
     _func_name = 'Method ne().'
@@ -241,3 +239,246 @@ def hpat_pandas_series_ne(lhs, rhs):
         return pandas.Series(lhs._data != rhs._data)
 
     return hpat_pandas_series_not_equal_impl
+
+
+@overload_method(SeriesType, 'add')
+def hpat_pandas_series_add(lhs, rhs):
+    """
+    Pandas Series method 'add' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.add.html#pandas.Series.add
+
+    Algorithm: result = lhs.add(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series or scalar value
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    """
+
+    _func_name = 'Method add().'
+
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
+
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_add_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(lhs._data + rhs._data)
+
+        return hpat_pandas_series_add_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_add_number_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(lhs._data + rhs)
+
+        return hpat_pandas_series_add_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+
+
+@overload_method(SeriesType, 'sub')
+def hpat_pandas_series_sub(lhs, rhs):
+    """
+    Pandas Series method 'sub' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.sub.html#pandas.Series.sub
+
+    Algorithm: result = lhs.sub(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series or scalar value
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    """
+
+    _func_name = 'Method sub().'
+
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
+
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_sub_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(lhs._data - rhs._data)
+
+        return hpat_pandas_series_sub_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_sub_number_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(lhs._data - rhs)
+
+        return hpat_pandas_series_sub_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+
+
+@overload_method(SeriesType, 'mul')
+def hpat_pandas_series_mul(lhs, rhs):
+    """
+    Pandas Series method 'mul' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.mul.html#pandas.Series.mul
+
+    Algorithm: result = lhs.mul(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series or scalar value
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    """
+
+    _func_name = 'Method mul().'
+
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
+
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_mul_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(lhs._data * rhs._data)
+
+        return hpat_pandas_series_mul_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_mul_number_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(lhs._data * rhs)
+
+        return hpat_pandas_series_mul_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+
+
+@overload_method(SeriesType, 'div')
+@overload_method(SeriesType, 'truediv')
+def hpat_pandas_series_div(lhs, rhs):
+    """
+    Pandas Series method 'div' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.div.html#pandas.Series.div
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.truediv.html#pandas.Series.truediv
+
+    Algorithm: result = lhs.div(other, level=None, fill_value=None, axis=0)
+    Algorithm: result = lhs.truediv(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series or scalar value
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    """
+
+    _func_name = 'Method div()/truediv().'
+
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
+
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_div_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(lhs._data / rhs._data)
+
+        return hpat_pandas_series_div_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_div_number_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(lhs._data / rhs)
+
+        return hpat_pandas_series_div_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+
+
+@overload_method(SeriesType, 'floordiv')
+def hpat_pandas_series_floordiv(lhs, rhs):
+    """
+    Pandas Series method 'floordiv' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.floordiv.html#pandas.Series.floordiv
+
+    Algorithm: result = lhs.floordiv(other, level=None, fill_value=None, axis=0)
+
+    Where:
+               lhs: pandas.series
+             other: pandas.series or scalar value
+             level: unsupported
+        fill_value: unsupported
+              axis: unsupported
+            result: pandas.series result of the operation
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    """
+
+    _func_name = 'Method floordiv().'
+
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
+
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_floordiv_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(lhs._data // rhs._data)
+
+        return hpat_pandas_series_floordiv_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_floordiv_number_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(lhs._data // rhs)
+
+        return hpat_pandas_series_floordiv_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))

@@ -492,6 +492,37 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
+    @unittest.skipIf(platform.system() == 'Windows', "Attribute dtype are different: int64, int32")
+    def test_series_op5_integer_scalar(self):
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
+
+        for method in arithmetic_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = 10
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
+    def test_series_op5_float_scalar(self):
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
+
+        for method in arithmetic_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = .5
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
     def test_series_op6(self):
         def test_impl(A):
             return -A
@@ -1250,11 +1281,7 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
+
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1265,11 +1292,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
+
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
@@ -1321,11 +1344,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
     def test_series_head_parallel1(self):
         '''Verifies head method for distributed Series with string data and no index'''
         def test_impl(S):
@@ -1557,6 +1575,24 @@ class TestSeries(unittest.TestCase):
         A = pd.Series([np.int64(x) for x in range(0)])
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+
+    @unittest.skip("Implement indexing by RangeIndex for Series")
+    def test_series_default_index(self):
+        def test_impl():
+            A = pd.Series([3, 2, 1, 5, 4])
+            return A.index
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement drop_duplicates for Series")
+    def test_series_drop_duplicates(self):
+        def test_impl():
+            A = pd.Series(['lama', 'cow', 'lama', 'beetle', 'lama', 'hippo'])
+            return A.drop_duplicates()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":
