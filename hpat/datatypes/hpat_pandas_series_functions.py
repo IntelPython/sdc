@@ -158,7 +158,7 @@ def hpat_pandas_series_shape(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_shape_impl(self):
-        return len(self._data),
+        return self._data.shape
 
     return hpat_pandas_series_shape_impl
 
