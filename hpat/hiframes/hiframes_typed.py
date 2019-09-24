@@ -306,6 +306,7 @@ class HiFramesTyped(object):
             assign.value = ir.Global("np.dtype({})".format(typ_str), np.dtype(typ_str), rhs.loc)
             return [assign]
 
+        # PR135. This needs to be commented out
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
             # simply return the column
             nodes = []

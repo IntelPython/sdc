@@ -281,6 +281,15 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_values(self):
+        def test_impl(A):
+            return A.values
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
     def test_series_values1(self):
         def test_impl(A):
             return (A == 2).values

@@ -54,6 +54,9 @@ Implemented operators:
 Implemented methods:
     append
     ne
+
+Implemented attributes:
+    values
 '''
 
 
@@ -141,6 +144,32 @@ def hpat_pandas_series_iloc(self):
         return self
 
     return hpat_pandas_series_iloc_impl
+
+
+@overload_attribute(SeriesType, 'values')
+def hpat_pandas_series_iloc(self):
+    """
+    Pandas Series attribute 'values' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.values.html#pandas.Series.values
+
+    Algorithm: result = series.values
+    Where:
+        series: pandas.series
+        result: pandas.series as ndarray
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_values
+    """
+
+    _func_name = 'Attribute values.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_values_impl(self):
+        return self._data
+
+    return hpat_pandas_series_values_impl
+
 
 
 @overload(len)
