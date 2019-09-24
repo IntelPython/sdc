@@ -31,57 +31,7 @@ import time
 import sys
 import pandas
 
-
-def perf_data_gen(tmpl, max_item_len, max_bytes_size):
-
-    result = []
-    obj_size = sys.getsizeof(tmpl, -1)
-
-    while (obj_size < max_bytes_size) and (obj_size >= 0):
-        for item in tmpl:
-            local_item = item
-            local_item_len = len(local_item)
-
-            while (local_item_len < max_item_len) and (local_item_len >= 0):
-                local_item += item
-                local_item_len = len(local_item)
-
-            result.append(local_item)
-
-        obj_size = sys.getsizeof(result, -1)
-
-    return result
-
-
-test_results_data = pandas.DataFrame(columns=['name', 'type', 'width', 'Time(s)'])
-
-
-def add_results(test_name, test_type, test_data_width, test_results):
-    local_results = pandas.DataFrame({'name': test_name,
-                                      'type': test_type,
-                                      'width': test_data_width,
-                                      'Time(s)': test_results})
-    global test_results_data
-#     test_results_data = pandas.concat([test_results_data, local_results])
-    test_results_data = test_results_data.append(local_results)
-
-
-def print_results():
-    global test_results_data
-
-    # Following code is terrible. needs to be redeveloped
-    # print(test_results_data)
-    median_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].median()
-    min_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].min()
-    max_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].max()
-
-    test_results_data = test_results_data.set_index(['name', 'type', 'width'])
-    test_results_data['median'] = median_col
-    test_results_data['min'] = min_col
-    test_results_data['max'] = max_col
-    test_results_data = test_results_data.reset_index()
-
-    print(test_results_data.groupby(['name', 'type', 'width', 'median', 'min', 'max']).first())
+from test_perf_utils import *
 
 
 STRIP_CASES = [
