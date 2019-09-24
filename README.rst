@@ -93,14 +93,14 @@ Building on Linux with conda-build
     git clone https://github.com/IntelPython/hpat
     cd hpat
     # build HPAT
-    conda build --python $PYVER --override-channels -c numba -c defaults -c intel buildscripts/hpat-conda-recipe
+    conda build --python $PYVER --override-channels -c numba -c conda-forge -c defaults buildscripts/hpat-conda-recipe
 
 Building on Linux with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
     PYVER=<3.6 or 3.7>
-    conda create -n HPAT -q -y -c numba -c defaults -c intel numba impi-devel pyarrow gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
+    conda create -n HPAT -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
     source activate HPAT
     git clone https://github.com/IntelPython/hpat
     cd hpat
@@ -150,7 +150,7 @@ Building on Windows with setuptools
 Troubleshooting Windows Build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run ‘rc.exe’``,
+* If the ``cl`` compiler throws the error fatal ``error LNK1158: cannot run 'rc.exe'``,
   add Windows Kits to your PATH (e.g. ``C:\Program Files (x86)\Windows Kits\8.0\bin\x86``).
 * Some errors can be mitigated by ``set DISTUTILS_USE_SDK=1``.
 * For setting up Visual Studio, one might need go to registry at

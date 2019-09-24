@@ -1,14 +1,13 @@
 import hpat
 
 from .common import Implementation as Impl
-from .data_generator import StringSeriesGenerator
+from .data_generator import StringSeriesGenerator, WhiteSpaceStringSeriesGenerator
 
 
-class Methods:
-    timeout = 120
+class String:
     params = [
         [StringSeriesGenerator.N],
-        [StringSeriesGenerator.NCHARS],
+        StringSeriesGenerator.NCHARS,
         [Impl.interpreted_python.value, Impl.compiled_python.value]
     ]
     param_names = ['size', 'nchars', 'implementation']
@@ -87,3 +86,51 @@ class Methods:
             return self._upper(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.str.upper()
+
+
+class WhiteSpaceString:
+    params = [
+        [WhiteSpaceStringSeriesGenerator.N],
+        WhiteSpaceStringSeriesGenerator.NCHARS,
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'nchars', 'implementation']
+
+    def setup(self, size, nchars, implementation):
+        self.series = WhiteSpaceStringSeriesGenerator(size=size, nchars=nchars).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _lstrip(series):
+        return series.str.lstrip()
+
+    def time_lstrip(self, size, nchars, implementation):
+        """Time both interpreted and compiled Series.str.lstrip"""
+        if implementation == Impl.compiled_python.value:
+            return self._lstrip(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.str.lstrip()
+
+    @staticmethod
+    @hpat.jit
+    def _rstrip(series):
+        return series.str.rstrip()
+
+    def time_rstrip(self, size, nchars, implementation):
+        """Time both interpreted and compiled Series.str.rstrip"""
+        if implementation == Impl.compiled_python.value:
+            return self._rstrip(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.str.rstrip()
+
+    @staticmethod
+    @hpat.jit
+    def _strip(series):
+        return series.str.strip()
+
+    def time_strip(self, size, nchars, implementation):
+        """Time both interpreted and compiled Series.str.strip"""
+        if implementation == Impl.compiled_python.value:
+            return self._strip(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.str.strip()

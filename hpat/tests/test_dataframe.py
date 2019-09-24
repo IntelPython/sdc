@@ -58,7 +58,7 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
-        
+
     def test_unbox1(self):
         def test_impl(df):
             return df.A
@@ -121,6 +121,17 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_box_categorical(self):
+        def test_impl(df):
+            df['A'] = df['A'] + 1
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        df = pd.DataFrame({'A': [1, 2, 3],
+                           'B': pd.Series(['N', 'Y', 'Y'],
+                                          dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
+        pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
     def test_box_dist_return(self):
         def test_impl(n):
@@ -699,6 +710,16 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+    def test_median1(self):
+        # TODO: non-numeric columns should be ignored automatically
+        def test_impl(n):
+            df = pd.DataFrame({'A': 2 ** np.arange(n), 'B': np.arange(n) + 1.0})
+            return df.median()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+
     def test_std1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -965,6 +986,64 @@ class TestDataFrame(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
+
+    @unittest.skip("Implement getting columns attribute")
+    def test_dataframe_columns_attribute(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
+            return df.columns
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement getting columns attribute")
+    def test_dataframe_columns_iterator(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
+            return [column for column in df.columns]
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement set_index for DataFrame")
+    def test_dataframe_set_index(self):
+        def test_impl():
+            df = pd.DataFrame({'month': [1, 4, 7, 10],
+                               'year': [2012, 2014, 2013, 2014],
+                               'sale': [55, 40, 84, 31]})
+            return df.set_index('month')
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement sort_index for DataFrame")
+    def test_dataframe_sort_index(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3, 4, 5]}, index=[100, 29, 234, 1, 150])
+            return df.sort_index()
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement iterrows for DataFrame")
+    def test_dataframe_iterrows(self):
+        def test_impl(df):
+            print(df.iterrows())
+            return [row for _, row in df.iterrows()]
+
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [0.2, 0.5, 0.001], 'C': ['a', 'bb', 'ccc']})
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Support parameter axis=1")
+    def test_dataframe_axis_param(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
+            return df.sum(axis=1)
+
+        n = 100
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
 
 if __name__ == "__main__":

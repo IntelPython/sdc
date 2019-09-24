@@ -1,5 +1,6 @@
 
 import pandas as pd
+import pandas.api.types
 import numpy as np
 import datetime
 import numba
@@ -126,7 +127,8 @@ def _infer_series_dtype(S):
         else:
             raise ValueError(
                 "object dtype infer: data type for column {} not supported".format(S.name))
-
+    elif isinstance(S.dtype, pandas.api.types.CategoricalDtype):
+        return PDCategoricalDtype(S.dtype.categories)
     # regular numpy types
     try:
         return numpy_support.from_dtype(S.dtype)
