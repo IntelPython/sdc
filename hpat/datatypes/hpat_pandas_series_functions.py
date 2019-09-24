@@ -501,7 +501,7 @@ def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -556,7 +556,7 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -611,7 +611,7 @@ def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -666,7 +666,7 @@ def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -721,7 +721,7 @@ def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -776,7 +776,7 @@ def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
@@ -831,7 +831,7 @@ def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
     if not isinstance(lhs, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    if level is not types.none or fill_value is not types.none or axis is not 0:
+    if level is not None or fill_value is not None or axis is not 0:
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
