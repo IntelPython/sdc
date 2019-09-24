@@ -28,7 +28,7 @@ import operator
 import pandas
 
 from numba import types
-from numba.extending import (types, overload, overload_method, overload_attribute)
+from numba.extending import (types, overload, overload_method, overload_attribute, infer_getattr)
 from numba.errors import TypingError
 
 from hpat.hiframes.pd_series_ext import SeriesType
@@ -54,6 +54,10 @@ Implemented operators:
 Implemented methods:
     append
     ne
+    
+Implemented attributes:
+    shape
+    
 '''
 
 
@@ -141,6 +145,31 @@ def hpat_pandas_series_iloc(self):
         return self
 
     return hpat_pandas_series_iloc_impl
+
+
+@overload_attribute(SeriesType, 'shape')
+def hpat_pandas_series_shape(self):
+    """
+    Pandas Series attribute 'shape' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.shape.html
+
+    Algorithm: result = series.shape
+    Where:
+        series: pandas.series
+        result: a tuple of the shape of the underlying data
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shape1
+    """
+
+    _func_name = 'Attribute shape.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_shape_impl(self):
+        return len(self._data),
+
+    return hpat_pandas_series_shape_impl
 
 
 @overload(len)

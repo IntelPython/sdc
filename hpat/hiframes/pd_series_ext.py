@@ -102,6 +102,10 @@ class SeriesType(types.IterableType):
         # needed?
         return self.dtype, self.data, self.index, self.is_named
 
+    @property
+    def ndim(self):
+        return self.data.ndim
+
     def unify(self, typingctx, other):
         if isinstance(other, SeriesType):
             new_index = types.none
@@ -403,11 +407,11 @@ def cast_series(context, builder, fromty, toty, val):
 class SeriesAttribute(AttributeTemplate):
     key = SeriesType
 
-    def resolve_values(self, ary):
-        return series_to_array_type(ary, True)
+    # def resolve_values(self, ary):
+    #     return series_to_array_type(ary, True)
 
-    def resolve_shape(self, ary):
-        return types.Tuple((types.int64,))
+    # def resolve_shape(self, ary):return types.Tuple((types.int64,))
+    #
 
     def resolve_index(self, ary):
         return ary.index
@@ -425,10 +429,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_iat(self, ary):
         return SeriesIatType(ary)
 
-# PR135. This needs to be commented out
-    def resolve_iloc(self, ary):
-        # TODO: support iat/iloc differences
-        return SeriesIatType(ary)
+# # PR135. This needs to be commented out
+#     def resolve_iloc(self, ary):
+#         # TODO: support iat/iloc differences
+#         return SeriesIatType(ary)
 
 # PR135. This needs to be commented out
     def resolve_loc(self, ary):
