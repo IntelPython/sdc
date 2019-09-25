@@ -409,6 +409,7 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_shape(self, ary):
         return types.Tuple((types.int64,))
 
+# PR171. This needs to be commented out
     def resolve_index(self, ary):
         return ary.index
 

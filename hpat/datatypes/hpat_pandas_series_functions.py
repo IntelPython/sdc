@@ -138,6 +138,32 @@ def hpat_pandas_series_iloc(self):
     return hpat_pandas_series_iloc_impl
 
 
+@overload_attribute(SeriesType, 'index')
+def hpat_pandas_series_index(self):
+    """
+    Pandas Series attribute 'index' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.index.html#pandas.Series.index
+
+    Algorithm: result = series.index
+    Where:
+        series: pandas.series
+        result: the index of the Series
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index1
+           python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index2
+    """
+
+    _func_name = 'Attribute index.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_index_impl(self):
+        return self._index
+
+    return hpat_pandas_series_index_impl
+
+
 @overload(len)
 def hpat_pandas_series_len(self):
     """
