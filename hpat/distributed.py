@@ -1,3 +1,9 @@
+"""
+.. module:: distributed.py
+ 
+The description of the entire module will be here. 
+Supported and unsupported list can also be added here
+"""
 from __future__ import print_function, division, absolute_import
 import operator
 import types as pytypes  # avoid confusion with numba.types
@@ -73,10 +79,47 @@ fir_text = None
 
 
 class DistributedPass(object):
-    """analyze program and transfrom to distributed"""
+    """The summary of the class should be here for example below is the summary line for this class
+    
+    This class analyzes program and transforms to distributed
+    """
 
     def __init__(self, func_ir, typingctx, targetctx, typemap, calltypes,
                  metadata):
+        """ The summary for the class or init method can be mentioned here 
+       
+        The details can be multiple lines. You can mention all the supported
+        and not supported args here or you can do it in ``Parameters`` section
+        
+        .. only:: developer
+                 
+           The content for **Developer's Guide** should go here
+
+        .. only:: user
+
+           The content here is visible only to the **User's Guide** So all user specific content should be added here
+           
+        Note
+        ----
+        Do not include the `self` paramter in the ``Parameters`` section
+        
+        Parameters
+        -----------
+        func_ir : str
+             description of `func_ir`.(optional) you can mention supported or not here
+        typingctx : TypeForThisParam
+             description of `typingctx`
+        targetctx : TypeForThisParam
+             description of `targetctx`
+        typemap : TypeForThisParam
+             description of `typemap`
+        calltypes : TypeForThisParam
+             description of `calltypes`
+        metadata : TypeForThisParam
+             description of `metadata`
+             
+        """
+
         self.func_ir = func_ir
         self.typingctx = typingctx
         self.targetctx = targetctx
@@ -146,6 +189,7 @@ class DistributedPass(object):
         str_io.close()
 
     def _run_dist_pass(self, blocks):
+        """This function does something"""
         topo_order = find_topo_order(blocks)
         namevar_table = get_name_var_table(blocks)
         work_list = list((l, blocks[l]) for l in reversed(topo_order))
@@ -2193,6 +2237,7 @@ class DistributedPass(object):
 
 
 def _find_first_print(body):
+    """ This function finds the first print of something """
     for (i, inst) in enumerate(body):
         if isinstance(inst, ir.Print):
             return i

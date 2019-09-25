@@ -7,6 +7,7 @@ SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = HPAT
 SOURCEDIR     = .
 BUILDDIR      = _build
+DEVBUILDDIR   = _builddev
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -14,7 +15,7 @@ $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx in
 endif
 
 
-ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) source
+ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS)
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -22,7 +23,7 @@ help:
 	
 
 clean:
-		rm -rf $(BUILDDIR)/*
+		rm -rf $(BUILDDIR)/* $(DEVBUILDDIR)/*
 
 	  
 
@@ -30,20 +31,23 @@ clean:
 .PHONY: help Makefile
 
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) usersource -t user $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."     
 
+developerhtml:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) devsource -t developer $(DEVBUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(DEVBUILDDIR)/html."     
+
 latex:
-	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
+	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) usersource $(BUILDDIR)/latex
 	@echo
 	@echo "Build finished; the LaTeX files are in $(BUILDDIR)/latex."
-	@echo "Run \`make' in that directory to run these through (pdf)latex" \
-	      "(use \`make latexpdf' here to do that automatically)."
+	@echo "Run \`make all-pdf' in that directory to run these through (pdf)latex"
 
-latexpdf: 
-	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
-	cd $(BUILDDIR)/latex
-	make all-pdf
+devlatex:
+	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) devsource $(DEVBUILDDIR)/latex
 	@echo
-	@echo "Build finished; the PDF files are in %BUILDDIR%/latex."
+	@echo "Build finished; the LaTeX files are in $(DEVBUILDDIR)/latex."
+	@echo "Run \`make all-pdf' in that directory to run these through (pdf)latex"
