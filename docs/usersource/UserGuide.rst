@@ -37,7 +37,7 @@ HPAT compiles the source code to efficient native parallel code
 (with `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_).
 This is in contrast to other frameworks such as Apache Spark which are
 master-executor libraries. Hence, HPAT is typically 100x or more faster.
-HPAT is built on top of `Numba <https://github.com/numba/numba>`_
+HPAT is built on top of `Numba <http://numba.pydata.org/numba-doc/latest/index.html>`_
 and `LLVM <https://llvm.org/>`_ compilers.
 
 How to Install HPAT
@@ -481,7 +481,8 @@ In addition:
 Integer NaN Issue
 -----------------
 
-DataFrame columns with integer data need special care.`Pandas <http://pandas.pydata.org/>`_ dynamically
+
+DataFrame columns with integer data need special care.  `Pandas <http://pandas.pydata.org/>`_ dynamically
 converts integer columns to floating point when NaN values are needed.
 This is because `Numpy <http://www.numpy.org/>`_ does not support NaN values for integers.
 HPAT does not perform this conversion unless enough information is
@@ -535,8 +536,9 @@ Methods:
 
 Indexing, iteration:
 
-* :attr:`pandas.Series.iat`
-* :attr:`pandas.Series.iloc`
+* :func:`pandas.Series.iat <datatypes.hpat_pandas_series_functions.hpat_pandas_series_iloc>`
+* :func:`pandas.Series.iloc <datatypes.hpat_pandas_series_functions.hpat_pandas_series_iloc>`
+* :func:`pandas.Series.append <datatypes.hpat_pandas_series_functions.hpat_pandas_series_append>`
 
 Binary operator functions:
 

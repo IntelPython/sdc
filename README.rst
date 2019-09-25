@@ -127,7 +127,7 @@ Building on Windows with conda-build
 
     set PYVER=<3.6 or 3.7>
     conda create -n CBLD -q -y python=%PYVER% conda-build conda-verify vc vs2015_runtime vs2015_win-64
-    activate CBLD
+    conda activate CBLD
     git clone https://github.com/IntelPython/hpat.git
     cd hpat
     conda build --python %PYVER% --override-channels -c numba -c defaults -c intel buildscripts\hpat-conda-recipe
@@ -137,7 +137,7 @@ Building on Windows with setuptools
 ::
 
     conda create -n HPAT -c numba -c defaults -c intel python=<3.6 or 3.7> numba impi-devel pyarrow scipy pandas boost
-    activate HPAT
+    conda activate HPAT
     git clone https://github.com/IntelPython/hpat.git
     cd hpat
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
@@ -156,6 +156,7 @@ Troubleshooting Windows Build
 * For setting up Visual Studio, one might need go to registry at
   ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
   and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
+* Sometimes if the conda version or visual studio version being used are not latest then building HPAT can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
 
 Running unit tests
 ------------------
