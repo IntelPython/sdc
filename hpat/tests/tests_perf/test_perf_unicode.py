@@ -31,7 +31,7 @@ import time
 import sys
 import pandas
 
-from test_perf_utils import *
+from hpat.tests.tests_perf.test_perf_utils import *
 
 
 STRIP_CASES = [
