@@ -4,10 +4,13 @@
 # You can set these variables from the command line.
 SPHINXOPTS    = -j1
 SPHINXBUILD   = sphinx-build
+SPHINXAUTOGEN = sphinx-autogen
 SPHINXPROJ    = HPAT
 SOURCEDIR     = .
 BUILDDIR      = _build
 DEVBUILDDIR   = _builddev
+PYRUN         = python
+DOCSRCDIR     = ../API_Doc
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -23,17 +26,20 @@ help:
 	
 
 clean:
-		rm -rf $(BUILDDIR)/* $(DEVBUILDDIR)/*
-
-	  
-
+		rm -rf $(BUILDDIR)/* $(DEVBUILDDIR)/*	  
+		rm -rf $(SRCDIR)$(DOCSRCDIR)/*
 
 .PHONY: help Makefile
 
 html:
+	rm -rf $(SRCDIR)$(DOCSRCDIR)/*
+	$(PYRUN) rename_function.py
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) usersource -t user $(BUILDDIR)/html
+	$(PYRUN) CleanRSTfiles.py
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) usersource -t user $(BUILDDIR)/html 
 	@echo
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."     
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."  
+     
 
 developerhtml:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) devsource -t developer $(DEVBUILDDIR)/html

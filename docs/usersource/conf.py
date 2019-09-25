@@ -26,9 +26,10 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.abspath('../..'))
     import hpat
+
 	
 sys.path.insert(0, os.path.abspath('../..'))
-sys.path.append(os.path.abspath('../../hpat/'))
+import API_Doc
 
 # -- General configuration ------------------------------------------------
 
@@ -65,14 +66,14 @@ napoleon_use_param = True
 napoleon_use_rtype = True
 
 
-autosummary_generate = True
 autosectionlabel_prefix_document = True
 
 
 add_module_names = False						
 suppress_warnings = ['autosectionlabel.*']
 autodoc_docstring_signature = True
-    
+
+autosummary_generate = True   
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
