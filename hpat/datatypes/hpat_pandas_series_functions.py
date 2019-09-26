@@ -141,16 +141,22 @@ def hpat_pandas_series_iloc(self):
 @overload_attribute(SeriesType, 'index')
 def hpat_pandas_series_index(self):
     """
-    Pandas Series attribute 'index' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.index.html#pandas.Series.index
+    Pandas Series attribute :attr:`pandas.Series.index` implementation
 
-    Algorithm: result = series.index
-    Where:
-        series: pandas.series
-        result: the index of the Series
+    **Algorithm**: result = series.index
 
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index1
-           python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index2
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index2
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :class:`pandas.Series`
+           the index of the Series
     """
 
     _func_name = 'Attribute index.'

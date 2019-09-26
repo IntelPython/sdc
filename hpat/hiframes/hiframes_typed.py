@@ -315,11 +315,11 @@ class HiFramesTyped(object):
             return nodes
 
         # PR171. This needs to be commented out
-        if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
-            nodes = []
-            assign.value = self._get_series_index(rhs.value, nodes)
-            nodes.append(assign)
-            return nodes
+        # if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
+        #     nodes = []
+        #     assign.value = self._get_series_index(rhs.value, nodes)
+        #     nodes.append(assign)
+        #     return nodes
 
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'shape':
             nodes = []

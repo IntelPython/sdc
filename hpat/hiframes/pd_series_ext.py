@@ -410,8 +410,8 @@ class SeriesAttribute(AttributeTemplate):
         return types.Tuple((types.int64,))
 
 # PR171. This needs to be commented out
-    def resolve_index(self, ary):
-        return ary.index
+#     def resolve_index(self, ary):
+#         return ary.index
 
     def resolve_str(self, ary):
         assert ary.dtype in (string_type, types.List(string_type))
