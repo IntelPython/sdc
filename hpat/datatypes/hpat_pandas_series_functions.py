@@ -480,20 +480,25 @@ def hpat_pandas_series_floordiv(lhs, rhs):
 @overload_method(SeriesType, 'pow')
 def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'pow' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.pow.html#pandas.Series.pow
+    Pandas Series method :meth:`pandas.Series.pow` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.pow(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method pow().'
@@ -535,20 +540,25 @@ def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'mod' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.mod.html#pandas.Series.mod
+    Pandas Series method :meth:`pandas.Series.mod` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.mod(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method mod().'
@@ -590,20 +600,25 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'eq')
 def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'eq' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.eq.html#pandas.Series.eq
+    Pandas Series method :meth:`pandas.Series.eq` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.eq(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method eq().'
@@ -645,20 +660,25 @@ def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'ge')
 def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'ge' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.ge.html#pandas.Series.ge
+    Pandas Series method :meth:`pandas.Series.ge` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.ge(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method ge().'
@@ -700,20 +720,25 @@ def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'lt')
 def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'lt' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.lt.html#pandas.Series.lt
+    Pandas Series method :meth:`pandas.Series.lt` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.lt(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method lt().'
@@ -755,20 +780,25 @@ def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'gt')
 def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'gt' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.gt.html#pandas.Series.gt
+    Pandas Series method :meth:`pandas.Series.gt` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.gt(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method gt().'
@@ -810,20 +840,25 @@ def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'le')
 def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method 'le' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.le.html#pandas.Series.le
+    Pandas Series method :meth:`pandas.Series.le` implementation.
+    .. only:: developer
 
-    Algorithm: result = lhs.le(other, level=None, fill_value=None, axis=0)
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
 
-    Where:
-               lhs: pandas.series
-             other: pandas.series or scalar value
-             level: unsupported
-        fill_value: unsupported
-              axis: unsupported
-            result: pandas.series
-
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+    Parameters
+    ----------
+    lhs: :class:`pandas.Series`
+        input arg
+    level: type for this argument
+         *unsupported*
+    fill_value: type for this argument
+              *unsupported*
+    axis: type for this argument
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method le().'
