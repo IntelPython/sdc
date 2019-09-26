@@ -545,7 +545,7 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
 
     def test_series_op8(self):
-        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq')
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
 
         for method in comparison_methods:
             test_impl = _make_func_use_method_arg1(method)
@@ -558,7 +558,7 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skipIf(platform.system() == 'Windows', "Attribute dtype are different: int64, int32")
     def test_series_op8_integer_scalar(self):
-        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq')
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
 
         for method in comparison_methods:
             test_impl = _make_func_use_method_arg1(method)
@@ -573,7 +573,7 @@ class TestSeries(unittest.TestCase):
                 check_names=False)
 
     def test_series_op8_float_scalar(self):
-        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq')
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
 
         for method in comparison_methods:
             test_impl = _make_func_use_method_arg1(method)

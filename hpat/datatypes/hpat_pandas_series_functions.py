@@ -204,7 +204,7 @@ def hpat_pandas_series_append(self, to_append):
 
 
 @overload_method(SeriesType, 'ne')
-def hpat_pandas_series_ne(lhs, rhs):
+def hpat_pandas_series_ne(lhs, rhs, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.ne` implementation. 
 
@@ -231,13 +231,38 @@ def hpat_pandas_series_ne(lhs, rhs):
 
     _func_name = 'Method ne().'
 
-    if not isinstance(lhs, SeriesType) or not isinstance(rhs, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given lhs: {}, rhs: {}'.format(_func_name, lhs, rhs))
+    if not isinstance(lhs, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given lhs: {}'.format(_func_name, lhs))
 
-    def hpat_pandas_series_not_equal_impl(lhs, rhs):
-        return pandas.Series(lhs._data != rhs._data)
+    if level is not None or fill_value is not None or axis != 0:
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
 
-    return hpat_pandas_series_not_equal_impl
+    if isinstance(rhs, SeriesType):
+        def hpat_pandas_series_ne_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
+            """
+
+            return pandas.Series(lhs._data != rhs._data)
+
+        return hpat_pandas_series_ne_impl
+
+    if isinstance(rhs, types.Integer) or isinstance(rhs, types.Float):
+        def hpat_pandas_series_ne_impl(lhs, rhs):
+            """
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8_integer_scalar
+            Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8_float_scalar
+            """
+
+            return pandas.Series(lhs._data != rhs)
+
+        return hpat_pandas_series_ne_impl
+
+    raise TypingError(
+        '{} The object must be a pandas.series and argument must be a number. Given lhs: {} and rhs: {}'.format(
+            _func_name, lhs, rhs))
 
 
 @overload_method(SeriesType, 'add')
