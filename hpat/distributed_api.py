@@ -1,3 +1,8 @@
+"""
+.. module:: distributed_api.py
+ 
+The description of the distributed_api module will be here.
+"""
 import time
 from enum import Enum
 import llvmlite.binding as ll

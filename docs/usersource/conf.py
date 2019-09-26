@@ -21,14 +21,15 @@ import os
 import sys
 import sphinx_bootstrap_theme
 
-'''try:
+try:
     import hpat
 except ImportError:
     sys.path.insert(0, os.path.abspath('../..'))
-    import hpat'''
+    import hpat
 	
 sys.path.insert(0, os.path.abspath('../..'))
-#sys.path.append(os.path.abspath('..\..'))
+sys.path.append(os.path.abspath('../../hpat/'))
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -45,38 +46,33 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.githubpages',
 			  'sphinx.ext.napoleon',
 			  'sphinx.ext.autosectionlabel',
-			  'sphinx.ext.autosummary'
+			  'sphinx.ext.autosummary',
+              'sphinx.ext.viewcode'
 ]
 
 
-#autosummary_generate = True
+#Numpy and Google docstring options
+napoleon_google_docstring = True
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = True
+napoleon_include_private_with_doc = True
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+
+
+autosummary_generate = True
 autosectionlabel_prefix_document = True
-autodoc_mock_imports = ['numba', 
-						'llvmlite',
-						'hpat.hstr_ext',
-						'hpat.dict_ext',
-						'hpat.str_ext',
-						'hpat.str_arr_ext',
-						'hpat.utils',
-						'hpat.hset_ext',
-						'hpat.set_ext',
-						'hpat.distributed_api',
-						'hpat.config',
-						'hpat.timsort',
-						'hpat.io',
-						'hpat.hdist',
-						'hpat.transport_seq',
-						'hpat.distributed_lower',
-						'hpat.distributed_analysis',
-						'hpat.hdatetime_ext',
-						'hpat.hiframes',
-						'hpat.compiler',
-						'pandas',
-						'numpy',
-]
-						
-suppress_warnings = ['autosectionlabel.*'
-]
+
+
+add_module_names = False						
+suppress_warnings = ['autosectionlabel.*']
+autodoc_docstring_signature = True
+    
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
