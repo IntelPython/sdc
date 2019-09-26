@@ -141,15 +141,21 @@ def hpat_pandas_series_iloc(self):
 @overload_attribute(SeriesType, 'shape')
 def hpat_pandas_series_shape(self):
     """
-    Pandas Series attribute 'shape' implementation.
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.shape.html
+    Pandas Series attribute :attr:`pandas.Series.shape` implementation
 
-    Algorithm: result = series.shape
-    Where:
-        series: pandas.series
-        result: a tuple of the shape of the underlying data
+    **Algorithm**: result = series.shape
 
-    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shape1
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shape1
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+          input series
+
+    Returns
+    -------
+    :obj:`tuple`
+        a tuple of the shape of the underlying data
     """
 
     _func_name = 'Attribute shape.'
