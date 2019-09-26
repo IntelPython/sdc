@@ -134,3 +134,8 @@ class WhiteSpaceString:
             return self._strip(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.str.strip()
+
+    @staticmethod
+    @hpat.jit
+    def _min(series):
+        return series.min()
