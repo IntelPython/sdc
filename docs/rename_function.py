@@ -1,8 +1,8 @@
 """
-This script requires developers to add the following information:
-1. add file and directory name to srcdir_srcfiles
-2. add file and function name to srcfiles_srcfuncs
-3. add expected display name for the function to display_names
+    This script requires developers to add the following information:
+    1. add file and function name to srcfiles_srcfuncs
+    2. add file and directory name to srcdir_srcfiles
+    3. add expected display name for the function to display_names
 """
 
 
@@ -11,23 +11,30 @@ import os
 import itertools
 from shutil import copyfile
 
-# Add the function names with the src file
-# srcfiles_srcfuncs = { srcfile : [func1, func2..]}
-# key : srcfile
-# values per key : function names that should be changed
-# If the file is already present, just add the func name in the respective values
-# Create new entry if the srcfile is not present
+"""
+    Add the function names with the src file in this dictionary
+    If the file is already present, just add the func name in the respective values
+    Create new entry if the srcfile is not present
+    
+    srcfiles_srcfuncs = { srcfile : [func1, func2..]}
+    srcfile : file containing the function that should be renamed
+    [func1, func2..] : list of function names that should be changed
+
+"""
 srcfiles_srcfuncs = {
     "hpat_pandas_series_functions.py" : ["hpat_pandas_series_append", "hpat_pandas_series_ne", "hpat_pandas_series_iloc"]
 }
 
+"""
+     Add the filenames and the parent directory in this dictionary
+     If the dir is already present in this list, just add the filename in the respective values
+     Create a new entry if the dir is not present in this dictionary
+     
+     srcdir_srcfiles = { parentdir : [filename1, filename2..]}
+     parentdir : Parent directory for the file
+     [filename1, filename2 ..] : List of files that have the functions to be renamed
 
-# Add the filenames and the parent directory
-# srcdir_srcfiles = { parentdir : [filename1, filename2..]}
-# key: parent dirname
-# values per key : filenames to be copied within the parent dir
-# If the dir is already present in this list, just add the filename in the respective values
-# Create a new entry if the dir is not present in this dictionary
+ """
 srcdir_srcfiles = {
     "hpat/datatypes" : ["hpat_pandas_series_functions.py"],
     "hpat/hiframes"  : ["aggregate.py", "boxing.py"]

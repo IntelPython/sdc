@@ -1,7 +1,7 @@
-API References
-==============
+API References:Supported Pandas APIs
+=====================================
 
-This page gives an overview of all Pandas methods that are overloaded in HPAT
+This page gives an overview of all Pandas APIs supported currently by HPAT
 
 .. toctree::
    :maxdepth: 2
