@@ -9,3 +9,4 @@ This section provides a list of all operations of Pandas Series supported in HPA
    
    ne
    append
+   iloc

@@ -7,4 +7,3 @@ This page gives an overview of all Pandas methods that are overloaded in HPAT
    :maxdepth: 2
    
    series
-   

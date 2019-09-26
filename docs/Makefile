@@ -4,13 +4,12 @@
 # You can set these variables from the command line.
 SPHINXOPTS    = -j1
 SPHINXBUILD   = sphinx-build
-SPHINXAUTOGEN = sphinx-autogen
 SPHINXPROJ    = HPAT
 SOURCEDIR     = .
 BUILDDIR      = _build
 DEVBUILDDIR   = _builddev
 PYRUN         = python
-DOCSRCDIR     = ../API_Doc
+DOCSRCDIR     = ./API_Doc
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -27,12 +26,13 @@ help:
 
 clean:
 		rm -rf $(BUILDDIR)/* $(DEVBUILDDIR)/*	  
-		rm -rf $(SRCDIR)$(DOCSRCDIR)/*
+		rm -rf $(SOURCEDIR)$(DOCSRCDIR)
+		rm -rf $(SOURCEDIR)/usersource/api/*
 
 .PHONY: help Makefile
 
 html:
-	rm -rf $(SRCDIR)$(DOCSRCDIR)/*
+	rm -rf $(SOURCEDIR)$(DOCSRCDIR)
 	$(PYRUN) rename_function.py
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) usersource -t user $(BUILDDIR)/html
 	$(PYRUN) CleanRSTfiles.py

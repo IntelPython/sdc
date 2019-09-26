@@ -1,42 +1,72 @@
+"""
+This script requires developers to add the following information:
+1. add file and directory name to srcdir_srcfiles
+2. add file and function name to srcfiles_srcfuncs
+3. add expected display name for the function to display_names
+"""
+
+
+
 import os
 import itertools
 from shutil import copyfile
 
-# Add the directory names for the files here
-# For example, if the file containing the function is hpat/hiframes/aggregate.py
-# then add "hpat/hiframes" in the below list
-srcfunc_dir = ["hpat/datatypes"]
+# Add the function names with the src file
+# srcfiles_srcfuncs = { srcfile : [func1, func2..]}
+# key : srcfile
+# values per key : function names that should be changed
+# If the file is already present, just add the func name in the respective values
+# Create new entry if the srcfile is not present
+srcfiles_srcfuncs = {
+    "hpat_pandas_series_functions.py" : ["hpat_pandas_series_append", "hpat_pandas_series_ne", "hpat_pandas_series_iloc"]
+}
 
-#Add the filename containing the function here
-srcfile_list = ["hpat_pandas_series_functions.py"]
 
-#Add the original function names here
-original_func_names = ['hpat_pandas_series_append', 'hpat_pandas_series_ne']
-total_func_num = len(original_func_names)
+# Add the filenames and the parent directory
+# srcdir_srcfiles = { parentdir : [filename1, filename2..]}
+# key: parent dirname
+# values per key : filenames to be copied within the parent dir
+# If the dir is already present in this list, just add the filename in the respective values
+# Create a new entry if the dir is not present in this dictionary
+srcdir_srcfiles = {
+    "hpat/datatypes" : ["hpat_pandas_series_functions.py"],
+    "hpat/hiframes"  : ["aggregate.py", "boxing.py"]
+}
 
-#Add the function name that should be displayed in documentation
-display_names = ['append', 'ne']
+
+# Add the function name that will replace the original name and should be displayed in documentation
+# Always add new name at the ends. Do not change the order
+display_names = ['append', 'ne', 'iloc']
 cur_dir = os.getcwd()
 
-#this is the dir where all the source files will be copied
-temp_src_dir = os.path.join(cur_dir, "..", "API_Doc")
+# This is the dir where all the source files will be copied
+src_copy_dir = os.path.join(cur_dir, "..", "API_Doc")
+if not os.path.exists(src_copy_dir):
+    os.mkdir(src_copy_dir)
 
-#Copy all the files in a separate dir
-for dir, file in zip(srcfunc_dir, srcfile_list):
-    src_file = os.path.join(cur_dir, "..", dir, file)
-    dst_file = os.path.join(cur_dir, "..", "API_Doc", file)
-    copyfile(src_file, dst_file)
+# Copy all required srcfiles
+for dir in srcdir_srcfiles:
+    file_list = srcdir_srcfiles[dir]
+    for f in file_list:
+        src_file = os.path.join(cur_dir, "..", dir, f)
+        dst_file = os.path.join(cur_dir, "..", "API_Doc", f)
+        copyfile(src_file, dst_file)
+        
+os.chdir(src_copy_dir)
 
-os.chdir(temp_src_dir)
+# Change the function names in copied files
+i = 0
+for filename in srcfiles_srcfuncs:
+    func_list = srcfiles_srcfuncs[filename]
+    with open(filename, '+r') as fn:
+        content = fn.read()
+        for func in func_list:
+            print(func)
+            content = content.replace(func, display_names[i])
+            i += 1
+        fn.seek(0, 0)
+        fn.write(content)
 
-#Search for the original function names in eachfile and replace it with the names that should be displayed
-for filename in os.listdir(temp_src_dir):
-    with open(filename, 'r+') as f:
-        data = f.read()
-        for i in range(total_func_num):
-            data = data.replace(original_func_names[i], display_names[i])
-        f.seek(0, 0)
-        f.write(data)
 
             
 
