@@ -314,11 +314,12 @@ class HiFramesTyped(object):
             nodes.append(assign)
             return nodes
 
-        if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
-            nodes = []
-            assign.value = self._get_series_index(rhs.value, nodes)
-            nodes.append(assign)
-            return nodes
+        # PR171. This needs to be commented out
+        # if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
+        #     nodes = []
+        #     assign.value = self._get_series_index(rhs.value, nodes)
+        #     nodes.append(assign)
+        #     return nodes
 
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'shape':
             nodes = []
@@ -941,11 +942,16 @@ class HiFramesTyped(object):
                     ir.Const(5, lhs.loc), n_arg, lhs.loc))
 
             data = self._get_series_data(series_var, nodes)
-            index = self._get_series_index(series_var, nodes)
-            name = self._get_series_name(series_var, nodes)
             func = series_replace_funcs[func_name]
-            if self.typemap[index.name] != types.none:
+
+            if self.typemap[series_var.name].index != types.none:
+                index = self._get_series_index(series_var, nodes)
                 func = series_replace_funcs['head_index']
+            else:
+                index = self._get_index_values(data, nodes)
+
+            name = self._get_series_name(series_var, nodes)
+
             return self._replace_func(
                 func, (data, index, n_arg, name), pre_nodes=nodes)
 
@@ -1066,18 +1072,7 @@ class HiFramesTyped(object):
         if self.typemap[series_var.name].index != types.none:
             index_var = self._get_series_index(series_var, nodes)
         else:
-            # generating the range Index, TODO: general get_index_values()
-            def _get_data(S):  # pragma: no cover
-                n = len(S)
-                return np.arange(n)
-
-            f_block = compile_to_numba_ir(
-                _get_data, {'np': np}, self.typingctx,
-                (self.typemap[data.name],),
-                self.typemap, self.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, [data])
-            nodes += f_block.body[:-2]
-            index_var = nodes[-1].target
+            index_var = self._get_index_values(data, nodes)
 
         # output data arrays for results, before conversion to Series
         out_data = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
@@ -2274,6 +2269,27 @@ class HiFramesTyped(object):
             self.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_var])
+        nodes += f_block.body[:-2]
+        return nodes[-1].target
+
+    def _get_index_values(self, series_data, nodes):
+        """
+        Generate index values by numpy.arange
+
+        :param series_data: numba ir.Var for series data
+        :param nodes: list of all irs
+        :return: numba ir.Var for generated index
+        """
+
+        def _gen_arange(S):  # pragma: no cover
+            n = len(S)
+            return np.arange(n)
+
+        f_block = compile_to_numba_ir(
+            _gen_arange, {'np': np}, self.typingctx,
+            (self.typemap[series_data.name],),
+            self.typemap, self.calltypes).blocks.popitem()[1]
+        replace_arg_nodes(f_block, [series_data])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 

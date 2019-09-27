@@ -69,7 +69,10 @@ The HPAT documentation is generated from RST files using Sphinx. If you want to 
 1. If you don't have sphinx installed then install sphinx in your conda environment::
    
     conda install sphinx
+    
+2. You should also install sphinx_bootstrap_theme because that is the theme used for hPAT documentation::
 
+    pip install sphinx_bootstrap_theme
 	
 2. To add new documentation you either can modify an existing RST file or create a new RST file. The location of that file will be:
    docs/source/
@@ -78,10 +81,16 @@ The HPAT documentation is generated from RST files using Sphinx. If you want to 
 3. If you create a new RST file you should also modify the index.rst to add your filename in the table of contents. index.rst is in the same directory as other RST files. Adding the filename to this list will introduce a new section in online documentation.
 
 
-4. To build the documentation::
+4. To build the developer'sdocumentation::
 
     cd docs
+    make developerhtml
+    
+    If you want to build user documentation::
+    
+    cd docs
     make html
+    
    
 This will generate all html files in _build/html directory. 
 
