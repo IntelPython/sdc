@@ -33,8 +33,8 @@
 
 import operator
 import pandas
+import numpy as np
 
-from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 
@@ -482,3 +482,43 @@ def hpat_pandas_series_floordiv(lhs, rhs):
         return hpat_pandas_series_floordiv_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given rhs: {}'.format(_func_name, rhs))
+
+
+@overload_method(SeriesType, 'quantile')
+def hpat_pandas_series_quantile(self, q=.5):
+    """
+    Pandas Series method :meth:`pandas.Series.quantile` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_number_quntile
+
+    Parameters
+    -----------
+    q : :obj: float or array-like object
+              default 0.5
+    interpolation:
+                 *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series` or float
+    """
+
+    _func_name = 'Method quantile().'
+
+    supported_q_types = (float, types.Float, types.Omitted)
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if type(q) not in supported_q_types:
+        raise TypingError(
+            '{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
+
+    def hpat_pandas_series_quantile_impl(self, q=.5):
+        return np.quantile(self._data, q)
+
+    return hpat_pandas_series_quantile_impl
+

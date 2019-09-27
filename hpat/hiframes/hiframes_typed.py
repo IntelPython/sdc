@@ -872,14 +872,14 @@ class HiFramesTyped(object):
                 data = self._get_series_data(series_var, nodes)
             return self._replace_func(func, [data], pre_nodes=nodes)
 
-        if func_name == 'quantile':
-            nodes = []
-            data = self._get_series_data(series_var, nodes)
-            return self._replace_func(
-                lambda A, q: hpat.hiframes.api.quantile(A, q),
-                [data, rhs.args[0]],
-                pre_nodes=nodes
-            )
+        # if func_name == 'quantile':
+        #     nodes = []
+        #     data = self._get_series_data(series_var, nodes)
+        #     return self._replace_func(
+        #         lambda A, q: hpat.hiframes.api.quantile(A, q),
+        #         [data, rhs.args[0]],
+        #         pre_nodes=nodes
+        #     )
 
         if func_name == 'fillna':
             return self._run_call_series_fillna(assign, lhs, rhs, series_var)

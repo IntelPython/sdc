@@ -1594,6 +1594,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_number_quantile(self):
+        def test_impl():
+            A = pd.Series([1, 2.5, .5, 3, 5])
+            return A.quantile()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
