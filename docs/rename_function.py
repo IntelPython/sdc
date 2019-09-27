@@ -65,17 +65,11 @@ os.chdir(src_copy_dir)
 i = 0
 for filename in srcfiles_srcfuncs:
     func_list = srcfiles_srcfuncs[filename]
-    with open(filename, '+r') as fn:
+    with open(filename, 'r') as fn:
         content = fn.read()
         for func in func_list:
             print(func)
             content = content.replace(func, display_names[i])
             i += 1
-        fn.seek(0, 0)
+    with open(filename, 'w') as fn:
         fn.write(content)
-
-
-            
-
-        
-
