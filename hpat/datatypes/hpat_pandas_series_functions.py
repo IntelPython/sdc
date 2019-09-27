@@ -216,17 +216,19 @@ def hpat_pandas_series_ne(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
 
     Returns
     -------
-    :obj:`bool` 
-       Returns True if successful, False otherwise
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method ne().'
@@ -520,12 +522,15 @@ def hpat_pandas_series_pow(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -580,12 +585,15 @@ def hpat_pandas_series_mod(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -640,12 +648,15 @@ def hpat_pandas_series_eq(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -700,12 +711,15 @@ def hpat_pandas_series_ge(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -760,12 +774,15 @@ def hpat_pandas_series_lt(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -820,12 +837,15 @@ def hpat_pandas_series_gt(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
@@ -880,12 +900,15 @@ def hpat_pandas_series_le(lhs, rhs, level=None, fill_value=None, axis=0):
     ----------
     lhs: :class:`pandas.Series`
         input arg
-    level: type for this argument
+    rhs: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
          *unsupported*
-    fill_value: type for this argument
+    fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: type for this argument
+    axis: default 0
          *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
