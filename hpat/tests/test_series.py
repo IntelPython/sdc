@@ -1197,6 +1197,65 @@ class TestSeries(unittest.TestCase):
         np.testing.assert_array_equal(hpat_func(S1, S2, S3),
                                       test_impl(S1, S2, S3))
 
+    def test_series_isin_list1(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        values = [1, 2, 5, 7, 8]
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_list2(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        values = [1., 2., 5., 7., 8.]
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_list3(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['a', 'b', 'q', 'w', 'c', 'd', 'e', 'r'])
+        values = ['a', 'q', 'c', 'd', 'e']
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_set1(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        values = {1, 2, 5, 7, 8}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_set2(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        values = {1., 2., 5., 7., 8.}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    @unittest.skip('TODO: requires hashable unicode strings in Numba')
+    def test_series_isin_set3(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['a', 'b', 'c', 'd', 'e'] * 2)
+        values = {'b', 'c', 'e'}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
     def test_series_isna1(self):
         def test_impl(S):
             return S.isna()
