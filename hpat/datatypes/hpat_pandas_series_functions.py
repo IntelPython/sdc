@@ -189,6 +189,37 @@ def hpat_pandas_series_iloc(self):
     return hpat_pandas_series_values_impl
 
 
+@overload_attribute(SeriesType, 'index')
+def hpat_pandas_series_index(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.index` implementation
+
+    **Algorithm**: result = series.index
+
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_index2
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :class:`pandas.Series`
+           the index of the Series
+    """
+
+    _func_name = 'Attribute index.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_index_impl(self):
+        return self._index
+
+    return hpat_pandas_series_index_impl
+
 
 @overload(len)
 def hpat_pandas_series_len(self):
@@ -218,6 +249,44 @@ def hpat_pandas_series_len(self):
         return len(self._data)
 
     return hpat_pandas_series_len_impl
+
+
+@overload_method(SeriesType, 'isin')
+def hpat_pandas_series_isin(self, values):
+    """
+    Pandas Series method :meth:`pandas.Series.isin` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isin_list1
+
+    Parameters
+    -----------
+    values : :obj:`list` or :obj:`set` object
+               specifies values to look for in the series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object indicating if each element of self is in values
+    """
+
+    _func_name = 'Method isin().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(values, (types.Set, types.List)):
+        raise TypingError(
+            '{} The argument must be set or list-like object. Given values: {}'.format(_func_name, values))
+
+    def hpat_pandas_series_isin_impl(self, values):
+        # TODO: replace with below line when Numba supports np.isin in nopython mode
+        # return pandas.Series(np.isin(self._data, values))
+        return pandas.Series([(x in values) for x in self._data])
+
+    return hpat_pandas_series_isin_impl
 
 
 @overload_method(SeriesType, 'append')
