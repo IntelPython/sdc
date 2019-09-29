@@ -164,6 +164,37 @@ def hpat_pandas_series_iloc(self):
     return hpat_pandas_series_iloc_impl
 
 
+@overload_attribute(SeriesType, 'shape')
+def hpat_pandas_series_shape(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.shape` implementation
+
+    **Algorithm**: result = series.shape
+
+    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shape1
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+          input series
+
+    Returns
+    -------
+    :obj:`tuple`
+        a tuple of the shape of the underlying data
+    """
+
+    _func_name = 'Attribute shape.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_shape_impl(self):
+        return self._data.shape
+
+    return hpat_pandas_series_shape_impl
+
+
 @overload_attribute(SeriesType, 'values')
 def hpat_pandas_series_iloc(self):
     """

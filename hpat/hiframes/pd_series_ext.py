@@ -102,6 +102,10 @@ class SeriesType(types.IterableType):
         # needed?
         return self.dtype, self.data, self.index, self.is_named
 
+    @property
+    def ndim(self):
+        return self.data.ndim
+
     def unify(self, typingctx, other):
         if isinstance(other, SeriesType):
             new_index = types.none
@@ -407,8 +411,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
-    def resolve_shape(self, ary):
-        return types.Tuple((types.int64,))
+# PR135. This needs to be commented out
+    # def resolve_shape(self, ary):
+    #     return types.Tuple((types.int64,))
 
 # PR171. This needs to be commented out
 #     def resolve_index(self, ary):
