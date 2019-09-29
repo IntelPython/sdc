@@ -407,6 +407,7 @@ def cast_series(context, builder, fromty, toty, val):
 class SeriesAttribute(AttributeTemplate):
     key = SeriesType
 
+    # PR135. This needs to be commented out
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
