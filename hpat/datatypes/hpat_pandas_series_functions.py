@@ -41,6 +41,32 @@ from numba.errors import TypingError
 from hpat.hiframes.pd_series_ext import SeriesType
 
 
+'''
+Pandas Series (https://pandas.pydata.org/pandas-docs/stable/reference/series.html)
+functions and operators definition in HPAT
+Also, it contains Numba internal operators which are required for Series type handling
+
+Implemented operators:
+    add
+    at
+    div
+    getitem
+    iat
+    iloc
+    len
+    loc
+    mul
+    sub
+
+Implemented methods:
+    append
+    ne
+
+Implemented attributes:
+    values
+'''
+
+
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
@@ -136,6 +162,31 @@ def hpat_pandas_series_iloc(self):
         return self
 
     return hpat_pandas_series_iloc_impl
+
+
+@overload_attribute(SeriesType, 'values')
+def hpat_pandas_series_iloc(self):
+    """
+    Pandas Series attribute 'values' implementation.
+        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.values.html#pandas.Series.values
+
+    Algorithm: result = series.values
+    Where:
+        series: pandas.series
+        result: pandas.series as ndarray
+
+    Test:  python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_values
+    """
+
+    _func_name = 'Attribute values.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_values_impl(self):
+        return self._data
+
+    return hpat_pandas_series_values_impl
 
 
 @overload_attribute(SeriesType, 'index')
