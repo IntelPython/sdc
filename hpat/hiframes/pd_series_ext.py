@@ -895,12 +895,12 @@ class GetItemSeriesIat(AbstractTemplate):
 
 
 @infer
-# @infer_global(operator.eq)
-# @infer_global(operator.ne)
-# @infer_global(operator.ge)
-# @infer_global(operator.gt)
-# @infer_global(operator.le)
-# @infer_global(operator.lt)
+@infer_global(operator.eq)
+@infer_global(operator.ne)
+@infer_global(operator.ge)
+@infer_global(operator.gt)
+@infer_global(operator.le)
+@infer_global(operator.lt)
 class SeriesCompEqual(AbstractTemplate):
     key = '=='
 

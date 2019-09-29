@@ -554,7 +554,7 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
 
     def test_series_op8(self):
-        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'ne', 'eq')
 
         for method in comparison_methods:
             test_impl = _make_func_use_method_arg1(method)
