@@ -896,7 +896,7 @@ class GetItemSeriesIat(AbstractTemplate):
 
 @infer
 @infer_global(operator.eq)
-# @infer_global(operator.ne)
+@infer_global(operator.ne)
 @infer_global(operator.ge)
 @infer_global(operator.gt)
 @infer_global(operator.le)
@@ -1159,14 +1159,14 @@ explicit_binop_funcs = {
     # 'div': operator.truediv,
     # 'truediv': operator.truediv,
     # 'floordiv': operator.floordiv,
-    'mod': operator.mod,
-    'pow': operator.pow,
-    'lt': operator.lt,
-    'gt': operator.gt,
-    'le': operator.le,
-    'ge': operator.ge,
+    # 'mod': operator.mod,
+    # 'pow': operator.pow,
+    # 'lt': operator.lt,
+    # 'gt': operator.gt,
+    # 'le': operator.le,
+    # 'ge': operator.ge,
     # 'ne': operator.ne,
-    'eq': operator.eq,
+    # 'eq': operator.eq,
 }
 
 

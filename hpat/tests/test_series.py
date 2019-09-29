@@ -565,6 +565,37 @@ class TestSeries(unittest.TestCase):
             B = pd.Series(np.arange(n)**2)
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
 
+    @unittest.skipIf(platform.system() == 'Windows', "Attribute dtype are different: int64, int32")
+    def test_series_op8_integer_scalar(self):
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
+
+        for method in comparison_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = 10
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
+    def test_series_op8_float_scalar(self):
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
+
+        for method in comparison_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = .5
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
     def test_series_inplace_binop_array(self):
         def test_impl(A, B):
             A += B
