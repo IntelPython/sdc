@@ -102,6 +102,10 @@ class SeriesType(types.IterableType):
         # needed?
         return self.dtype, self.data, self.index, self.is_named
 
+    @property
+    def ndim(self):
+        return self.data.ndim
+
     def unify(self, typingctx, other):
         if isinstance(other, SeriesType):
             new_index = types.none
@@ -403,14 +407,17 @@ def cast_series(context, builder, fromty, toty, val):
 class SeriesAttribute(AttributeTemplate):
     key = SeriesType
 
+    # PR135. This needs to be commented out
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
-    def resolve_shape(self, ary):
-        return types.Tuple((types.int64,))
+# PR135. This needs to be commented out
+    # def resolve_shape(self, ary):
+    #     return types.Tuple((types.int64,))
 
-    def resolve_index(self, ary):
-        return ary.index
+# PR171. This needs to be commented out
+#     def resolve_index(self, ary):
+#         return ary.index
 
     def resolve_str(self, ary):
         assert ary.dtype in (string_type, types.List(string_type))
@@ -889,7 +896,7 @@ class GetItemSeriesIat(AbstractTemplate):
 
 @infer
 @infer_global(operator.eq)
-# @infer_global(operator.ne)
+@infer_global(operator.ne)
 @infer_global(operator.ge)
 @infer_global(operator.gt)
 @infer_global(operator.le)
@@ -1152,14 +1159,14 @@ explicit_binop_funcs = {
     # 'div': operator.truediv,
     # 'truediv': operator.truediv,
     # 'floordiv': operator.floordiv,
-    'mod': operator.mod,
-    'pow': operator.pow,
-    'lt': operator.lt,
-    'gt': operator.gt,
-    'le': operator.le,
-    'ge': operator.ge,
+    # 'mod': operator.mod,
+    # 'pow': operator.pow,
+    # 'lt': operator.lt,
+    # 'gt': operator.gt,
+    # 'le': operator.le,
+    # 'ge': operator.ge,
     # 'ne': operator.ne,
-    'eq': operator.eq,
+    # 'eq': operator.eq,
 }
 
 

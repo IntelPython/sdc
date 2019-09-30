@@ -306,6 +306,7 @@ class HiFramesTyped(object):
             assign.value = ir.Global("np.dtype({})".format(typ_str), np.dtype(typ_str), rhs.loc)
             return [assign]
 
+        # PR135. This needs to be commented out
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'values':
             # simply return the column
             nodes = []
@@ -314,11 +315,12 @@ class HiFramesTyped(object):
             nodes.append(assign)
             return nodes
 
-        if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
-            nodes = []
-            assign.value = self._get_series_index(rhs.value, nodes)
-            nodes.append(assign)
-            return nodes
+        # PR171. This needs to be commented out
+        # if isinstance(rhs_type, SeriesType) and rhs.attr == 'index':
+        #     nodes = []
+        #     assign.value = self._get_series_index(rhs.value, nodes)
+        #     nodes.append(assign)
+        #     return nodes
 
         if isinstance(rhs_type, SeriesType) and rhs.attr == 'shape':
             nodes = []
