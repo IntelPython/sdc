@@ -256,6 +256,26 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_getattr_ndim(self):
+        '''Verifies getting Series attribute ndim is supported'''
+        def test_impl(S):
+            return S.ndim
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_getattr_T(self):
+        '''Verifies getting Series attribute T is supported'''
+        def test_impl(S):
+            return S.T
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_series_copy_str1(self):
         def test_impl(A):
             return A.copy()
@@ -334,9 +354,7 @@ class TestSeries(unittest.TestCase):
            converts float series to series of strings
         '''
         def test_impl(A):
-            res = A.astype(str)
-            print(res)
-            return res
+            return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11.0
