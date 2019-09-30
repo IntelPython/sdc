@@ -485,19 +485,19 @@ def hpat_pandas_series_floordiv(lhs, rhs):
 
 
 @overload_method(SeriesType, 'quantile')
-def hpat_pandas_series_quantile(self, q=.5):
+def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
     Pandas Series method :meth:`pandas.Series.quantile` implementation.
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_number_quntile
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_number_quantile
 
     Parameters
     -----------
     q : :obj: float or array-like object
               default 0.5
-    interpolation:
+    interpolation: ‘linear’, ‘lower’, ‘higher’, ‘midpoint’, ‘nearest’
                  *unsupported*
 
     Returns
@@ -513,11 +513,15 @@ def hpat_pandas_series_quantile(self, q=.5):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
+    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+        raise TypingError(
+            '{} Unsupported parameters. Given interpolation: {}'.format(_func_name, interpolation, {type(interpolation)}))
+
     if type(q) not in supported_q_types:
         raise TypingError(
             '{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
 
-    def hpat_pandas_series_quantile_impl(self, q=.5):
+    def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
         return np.quantile(self._data, q)
 
     return hpat_pandas_series_quantile_impl
