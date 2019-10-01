@@ -134,6 +134,3 @@ class WhiteSpaceString:
             return self._strip(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.str.strip()
-
-
-
