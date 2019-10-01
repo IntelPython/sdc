@@ -33,6 +33,7 @@
 
 import operator
 import pandas
+import numpy as np
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -1128,3 +1129,44 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_le_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'unique')
+def hpat_pandas_series_unique(self, sorted=False):
+    """
+    Pandas Series method :meth:`pandas.Series.unique` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_unique
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    sorted: :obj:`bool`
+        return array is sorted
+
+    Returns
+    -------
+    :obj:`numpy.array`
+         returns :obj:`numpy.array` ndarray
+    """
+
+    _func_name = 'Method unique().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_unique_impl_sorted(self):
+        return np.unique(self._data)
+
+    def hpat_pandas_series_unique_impl(self):
+        unique_values = []
+        for value in self._data:
+            if value not in unique_values:
+                unique_values.append(value)
+        return unique_values
+
+    return hpat_pandas_series_unique_impl_sorted if sorted else hpat_pandas_series_unique_impl

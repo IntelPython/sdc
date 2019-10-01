@@ -1693,6 +1693,14 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_unique(self):
+        def test_impl():
+            A = pd.Series([2, 1, 3, 3])
+            return A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
