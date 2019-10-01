@@ -1693,6 +1693,33 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    @unittest.skip("Implement unique without sorting like in pandas")
+    def test_unique(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([2, 1, 3, 3])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_sorted(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 1001
+        S = pd.Series(np.arange(n))
+        S[2] = 0
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_str(self):
+        def test_impl():
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
