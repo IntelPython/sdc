@@ -28,7 +28,6 @@ Provided by `asv.conf.json` file.
 
 
 #### Running
-##### Deactivate HPAT. Activate environment base. 
 ##### Install Airspeed Velocity in Anaconda Prompt:
 `conda install -c conda-forge asv`
 

@@ -78,14 +78,7 @@ class DataGenerator:
         }, index=index)
 
 
-class SeriesGenerator(DataGenerator):
-
-    def generate(self):
-        """Generate series"""
-        return pd.Series(self.rand_array)
-
-
-class StringSeriesGenerator(SeriesGenerator):
+class StringSeriesGenerator(DataGenerator):
     NCHARS = [1, 3, 5, 9, 17, 33]
     N = 5 * 10 ** 6 + 513
     # RANDS_CHARS = [a-zA-Z] + [0-9] + [ \t\n\r\f\v]
@@ -99,6 +92,10 @@ class StringSeriesGenerator(SeriesGenerator):
             self.nchars = [self.nchars]
 
         self.size = len(self.nchars) * self.size
+
+    def generate(self):
+        """Generate series"""
+        return pd.Series(self.rand_array)
 
     @property
     def rand_array(self):
@@ -137,16 +134,3 @@ class WhiteSpaceStringSeriesGenerator(StringSeriesGenerator):
             arr = np.random.choice(self.RANDS_CHARS, size=(n - 2) * self.size).view((np.str_, n - 2))
             np.char.center(arr, n)
             return arr
-
-
-class FloatSeriesGenerator(SeriesGenerator):
-    N = 5 * 10 ** 6 + 513
-
-    def __init__(self, size=None, seed=None):
-        super().__init__(size=size, seed=seed)
-
-    @property
-    def rand_array(self):
-        """Array of random floats"""
-        with self.set_seed():
-            return np.array(randn(self.size))
