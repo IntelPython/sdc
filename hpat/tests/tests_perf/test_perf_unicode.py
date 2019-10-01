@@ -111,6 +111,7 @@ class TestStringMethods(unittest.TestCase):
     def tearDownClass(self):
         print_results()
 
+    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_split(self):
         pyfunc = usecase_split
         hpat_func = numba.njit(pyfunc)
@@ -120,6 +121,7 @@ class TestStringMethods(unittest.TestCase):
             add_results('unicode_split', 'JIT', data_width, hpat_func(test_data))
             add_results('unicode_split', 'Reference', data_width, pyfunc(test_data))
 
+    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_join(self):
         pyfunc = usecase_join
         hpat_func = numba.njit(pyfunc)
@@ -129,6 +131,7 @@ class TestStringMethods(unittest.TestCase):
             add_results('unicode_join', 'JIT', data_width, hpat_func(test_data))
             add_results('unicode_join', 'Reference', data_width, pyfunc(test_data))
 
+    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_center(self):
         pyfunc = usecase_center
         hpat_func = numba.njit(pyfunc, parallel=True)
