@@ -1,7 +1,7 @@
 import hpat
 
 from .common import Implementation as Impl
-from .data_generator import DataGenerator
+from .data_generator import DataGenerator, FloatSeriesGenerator
 
 
 class Quantile():
@@ -31,3 +31,109 @@ class Quantile():
             return self._quantile(self.idx, quantile, interpolation)
         if implementation == Impl.interpreted_python.value:
             return self.idx.quantile(quantile, interpolation)
+
+
+class Absolute:
+    params = [
+        [3 * 10 ** 8 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size=size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _abs(series):
+        return series.abs()
+
+    def time_abs(self, size, implementation):
+        """Time both interpreted and compiled Series.abs"""
+        if implementation == Impl.compiled_python.value:
+            return self._abs(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.abs()
+
+
+class Covariation:
+    params = [
+        [10 ** 8 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+        self.series2 = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _cov(series, series2):
+        return series.cov(series2)
+
+    def time_cov(self, size, implementation):
+        """Time both interpreted and compiled Series.cov"""
+        if implementation == Impl.compiled_python.value:
+            return self._cov(self.series, self.series2)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.cov(self.series2)
+
+
+class ValueCounts:
+    params = [
+        [5 * 10 ** 6 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _value_counts(series):
+        return series.value_counts()
+
+    def time_value_counts(self,  size, implementation):
+        """Time both interpreted and compiled Series.value_counts"""
+        if implementation == Impl.compiled_python.value:
+            return self._value_counts(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.value_counts()
+
+class MinMax:
+    params = [
+        [25 * 10 ** 7 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size=size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _min(series):
+        return series.min()
+
+    def time_min(self, size, implementation):
+        """Time both interpreted and compiled Series.min"""
+        if implementation == Impl.compiled_python.value:
+            return self._min(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.min()
+
+    @staticmethod
+    @hpat.jit
+    def _max(series):
+        return series.max()
+
+    def time_max(self, size, implementation):
+        """Time both interpreted and compiled Series.max"""
+        if implementation == Impl.compiled_python.value:
+            return self._max(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.max()
+
+
