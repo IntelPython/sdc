@@ -73,7 +73,14 @@ class DataGenerator:
         }, index=index)
 
 
-class StringSeriesGenerator(DataGenerator):
+class SeriesGenerator(DataGenerator):
+
+    def generate(self):
+        """Generate series"""
+        return pd.Series(self.rand_array)
+
+
+class StringSeriesGenerator(SeriesGenerator):
     NCHARS = [1, 3, 5, 9, 17, 33]
     N = 5 * 10 ** 6 + 513
     # RANDS_CHARS = [a-zA-Z] + [0-9] + [ \t\n\r\f\v]
@@ -88,16 +95,12 @@ class StringSeriesGenerator(DataGenerator):
 
         self.size = len(self.nchars) * self.size
 
-    def generate(self):
-        """Generate series of strings"""
-        return pd.Series(pd.Index(self.rands_array))
-
     @property
-    def rands_array(self):
+    def rand_array(self):
         """Array of random strings"""
         arrays = []
         for n in self.nchars:
-            arrays.append(self._rands_array(n))
+            arrays.append(self._rand_array(n))
 
         result_array = np.concatenate(arrays)
         # shuffle strings array
@@ -106,7 +109,7 @@ class StringSeriesGenerator(DataGenerator):
 
         return result_array
 
-    def _rands_array(self, n):
+    def _rand_array(self, n):
         """Generate an array of random n-size strings"""
         if n == 0:
             # generate array of empty strings
@@ -118,7 +121,7 @@ class StringSeriesGenerator(DataGenerator):
 
 
 class WhiteSpaceStringSeriesGenerator(StringSeriesGenerator):
-    def _rands_array(self, n):
+    def _rand_array(self, n):
         """Generate an array of random n-size strings which start and end with white space"""
         if n < 3:
             # generate array of white space strings
@@ -129,3 +132,16 @@ class WhiteSpaceStringSeriesGenerator(StringSeriesGenerator):
             arr = np.random.choice(self.RANDS_CHARS, size=(n - 2) * self.size).view((np.str_, n - 2))
             np.char.center(arr, n)
             return arr
+
+
+class FloatSeriesGenerator(SeriesGenerator):
+    N = 5 * 10 ** 6 + 513
+
+    def __init__(self, size=None, seed=None):
+        super().__init__(size=size, seed=seed)
+
+    @property
+    def rand_array(self):
+        """Array of random floats"""
+        with self.set_seed():
+            return np.array(randn(self.size))
