@@ -1,35 +1,11 @@
 .. _overview:
 
-Quick Introduction to HPAT
+What is HPAT?
 ==========================
 
-High Performance Analytics Toolkit (HPAT) is a big data analytics and machine
-learning framework that provides Python's ease of use but is extremely fast.
+HPAT is the extension of `Numba <http://numba.pydata.org/numba-doc/latest/user/overview.html>`_ that allows a just-in-time compilation of Python codes, which are the mix of `Pandas DataFrame <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html>`_ , `NumPy Array <https://docs.scipy.org/doc/numpy/reference/generated/numpy.array.html>`_ , and other numerical functions. 
+ 
+Being the `Numba <http://numba.pydata.org/numba-doc/latest/user/overview.html>`_ extension, with the :func:`@jit <numba.jit>` and respective compilation options HPAT generates machine code using the `LLVM Compiler <http://llvm.org/docs/>`_ as well as can auto-parallelize the code.
 
-HPAT scales analytics programs in python to cluster/cloud environments
-automatically, requiring only minimal code changes. Here is a logistic
-regression program using HPAT::
+On a single machine HPAT parallelism can be either multi-threading (based on TBB or `OpenMP <https://openmp.org>`_ ) or multi-processing. In addition HPAT can seamlessly scale to many nodes with `MPI <https://www.open-mpi.org/doc/>`_ , which allows to implement big data analysis workflows using familiar Python APIs such as `Pandas <http://pandas.pydata.org/>`_ and `Numpy <http://www.numpy.org/>`_ and distributed numerical and machine learning libraries, such as `daal4py <https://software.intel.com/en-us/articles/daal4py-overview-a-high-level-python-api-to-the-intel-data-analytics-acceleration-library>`_ . 
 
-    @hpat.jit
-    def logistic_regression(iterations):
-        f = h5py.File("lr.hdf5", "r")
-        X = f['points'][:]
-        Y = f['responses'][:]
-        D = X.shape[1]
-        w = np.random.ranf(D)
-        t1 = time.time()
-        for i in range(iterations):
-            z = ((1.0 / (1.0 + np.exp(-Y * np.dot(X, w))) - 1.0) * Y)
-            w -= np.dot(z, X)
-        return w
-
-This code runs on cluster and cloud environments using a simple command like::
-
-    mpiexec -n 1024 python logistic_regression.py
-
-HPAT compiles the source code to efficient native parallel code
-(with `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_).
-This is in contrast to other frameworks such as Apache Spark which are
-master-executor libraries. Hence, HPAT is typically 100x or more faster.
-HPAT is built on top of `Numba <https://github.com/numba/numba>`_
-and `LLVM <https://llvm.org/>`_ compilers.
