@@ -700,13 +700,13 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
-    @bound_function("series.max")
-    def resolve_max(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.max")
+    # def resolve_max(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.min")
     def resolve_min(self, ary, args, kws):

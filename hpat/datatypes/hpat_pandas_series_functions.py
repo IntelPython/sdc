@@ -33,6 +33,7 @@
 
 import operator
 import pandas
+import numpy as np
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -1128,3 +1129,55 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_le_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'max')
+def hpat_pandas_series_max(self, axis=0, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.max` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max1
+
+    Parameters
+    -----------
+    axis:
+        *unsupported*
+    skipna: :obj:`bool` object
+        Exclude nan values when computing the result
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         returns :obj: scalar
+    """
+
+    _func_name = 'Method max().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(skipna, (types.Omitted, bool)):
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_max_impl(self, axis=0, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return np.nanmax(self._data)
+        else:
+            return self._data.max()
+
+    return hpat_pandas_series_max_impl
