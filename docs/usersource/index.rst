@@ -14,4 +14,4 @@ HPAT User's Guide
    apireference
    developers
 
-To download HPAT documentation PDF click here :download:`pdf <../_build/latex/HPAT.pdf>`
+To download HPAT documentation PDF click here :download:`pdf <../HPAT.pdf>`
