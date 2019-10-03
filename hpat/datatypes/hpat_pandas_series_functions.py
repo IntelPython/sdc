@@ -33,7 +33,7 @@
 
 import operator
 import pandas
-import numpy as np
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -1132,7 +1132,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
 
 @overload_method(SeriesType, 'max')
-def hpat_pandas_series_max(self, axis=0, skipna=True, level=None, numeric_only=None):
+def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.max` implementation.
 
@@ -1163,20 +1163,24 @@ def hpat_pandas_series_max(self, axis=0, skipna=True, level=None, numeric_only=N
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+
     if not isinstance(skipna, (types.Omitted, bool)):
         raise TypingError(
             '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
 
-    if not (isinstance(axis, types.Omitted) or axis == 0) \
+    if not (isinstance(axis, types.Omitted) or axis is None) \
             or not (isinstance(level, types.Omitted) or level is None) \
             or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
         raise TypingError(
             '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
                                                                                             numeric_only))
 
-    def hpat_pandas_series_max_impl(self, axis=0, skipna=True, level=None, numeric_only=None):
+    def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
         if skipna:
-            return np.nanmax(self._data)
+            return numpy.nanmax(self._data)
         else:
             return self._data.max()
 
