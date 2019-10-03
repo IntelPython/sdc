@@ -33,6 +33,7 @@
 
 import operator
 import pandas
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -354,6 +355,63 @@ def hpat_pandas_series_append(self, to_append):
         return pandas.Series(self._data + to_append._data)
 
     return hpat_pandas_series_append_impl
+
+
+@overload_method(SeriesType, 'min')
+def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.min` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_attr3
+
+    Parameters
+    -----------
+    axis :  {index (0)}, default: None
+               Axis for the function to be applied on.
+    skipna:  :obj:`bool`, default: True
+                *unsupported*
+    level:  :obj:`int` or level name, default: None
+                *unsupported*
+    numeric_only:  :obj:`bool`, default: None
+                *unsupported*
+    **kwargs:
+                *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series` or :obj:`int` or :obj:`float`
+         returns :obj:`pandas.Series` object or :obj:`int` or :obj:`float`
+    """
+
+    _func_name = 'Method min().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+
+    if not isinstance(skipna, (types.Omitted, bool)):
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_min_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return numpy.nanmin(self._data)
+        else:
+            return self._data.min()
+
+    return hpat_pandas_series_min_impl
 
 
 @overload_method(SeriesType, 'ne')

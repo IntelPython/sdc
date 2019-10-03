@@ -241,6 +241,7 @@ make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
+from hpat.datatypes.hpat_pandas_series_functions import *
 @lower_builtin('getiter', SeriesType)
 def getiter_series(context, builder, sig, args):
     """
@@ -708,13 +709,13 @@ class SeriesAttribute(AttributeTemplate):
                  if isinstance(dtype, types.NPDatetime) else dtype)
         return signature(dtype, *args)
 
-    @bound_function("series.min")
-    def resolve_min(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.min")
+    # def resolve_min(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.value_counts")
     def resolve_value_counts(self, ary, args, kws):
@@ -1279,4 +1280,4 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
     return hpat_pandas_series_ctor_impl
 
-from hpat.datatypes.hpat_pandas_series_functions import *
+
