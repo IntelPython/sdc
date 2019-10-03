@@ -356,6 +356,40 @@ def hpat_pandas_series_append(self, to_append):
     return hpat_pandas_series_append_impl
 
 
+@overload_method(SeriesType, 'isna')
+def hpat_pandas_series_append(self, to_append):
+    """
+    Pandas Series method :meth:`pandas.Series.append` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+               input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method isna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_append_impl(self):
+        for i in range(len(self._data)):
+
+        return pandas.Series(self._data)
+
+    return hpat_pandas_series_append_impl
+
+
 @overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """
