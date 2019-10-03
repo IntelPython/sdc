@@ -11,6 +11,10 @@ from hpat.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
 from numba.errors import TypingError
+<<<<<<< HEAD
+=======
+
+>>>>>>> Implement series.cumsum() in new style
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -2664,6 +2668,63 @@ class TestSeries(unittest.TestCase):
             result_ref = test_series_count_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
+
+    def test_series_cumsum(self):
+        def test_impl():
+            series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+            return series.cumsum()
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+        pd.testing.assert_series_equal(pyfunc(), cfunc())
+
+    def test_series_cumsum_unboxing(self):
+        def test_impl(s):
+            return s.cumsum()
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+
+        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+        pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
+
+    def test_series_cumsum_full(self):
+        def test_impl(s, axis, skipna):
+            return s.cumsum(axis=axis, skipna=skipna)
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+
+        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+        axis = None
+        for skipna in [True, False]:
+            ref_result = pyfunc(series, axis=axis, skipna=skipna)
+            jit_result = cfunc(series, axis=axis, skipna=skipna)
+            pd.testing.assert_series_equal(ref_result, jit_result)
+
+    def test_series_cumsum_str(self):
+        def test_impl(s):
+            return s.cumsum()
+
+        cfunc = hpat.jit(test_impl)
+        series = pd.Series(['test', 'series', 'cumsum', 'str', 'dtype'])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method cumsum(). The object must be a number. Given self.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_cumsum_unsupported_axis(self):
+        def test_impl(s, axis):
+            return s.cumsum(axis=axis)
+
+        cfunc = hpat.jit(test_impl)
+        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+        for axis in [0, 1]:
+            with self.assertRaises(TypingError) as raises:
+                cfunc(series, axis=axis)
+            msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
+            self.assertIn(msg, str(raises.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

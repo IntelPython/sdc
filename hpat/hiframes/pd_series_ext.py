@@ -986,12 +986,13 @@ def generic_expand_cumulative_series(self, args, kws):
     return signature(return_type, recvr=self.this)
 
 
-# replacing cumsum/cumprod since arraydecl.py definition uses types.Array
-for fname in ["cumsum", "cumprod"]:
+# replacing cumprod since arraydecl.py definition uses types.Array
+for fname in ["cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_cumsum',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_prod', 'resolve_count']

@@ -2051,6 +2051,61 @@ def hpat_pandas_series_unique(self):
     return hpat_pandas_series_unique_impl
 
 
+@overload_method(SeriesType, 'cumsum')
+def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
+    """
+    Pandas Series method :meth:`pandas.Series.cumsum` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_full
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unsupported_axis
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None - row-wise operation
+        1      - column-wise operation
+        *unsupported*
+    skipna: :obj:`bool`
+        exclude NA/null values
+    *args:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method cumsum().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, types.Number):
+        raise TypingError('{} The object must be a number. Given self.dtype: {}'.format(_func_name, self.dtype))
+
+    if not isinstance(axis, (types.Omitted, types.NoneType)) and axis is not None:
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    def hpat_pandas_series_cumsum_impl(self, axis=None, skipna=True):
+        if skipna:
+            # nampy.nancumsum replaces NANs with 0, series.cumsum does not, so replace back 0 with NANs
+            data = numpy.nancumsum(self._data)
+            data[numpy.isnan(self._data)] = numpy.nan
+            return pandas.Series(data)
+
+        return pandas.Series(self._data.cumsum())
+
+    return hpat_pandas_series_cumsum_impl
+
+
 @overload_method(SeriesType, 'nunique')
 def hpat_pandas_series_nunique(self, dropna=True):
     """
