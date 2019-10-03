@@ -33,7 +33,7 @@
 
 import operator
 import pandas
-import numpy as np
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -1157,7 +1157,11 @@ def hpat_pandas_series_append(self):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+
     def hpat_pandas_series_abs_impl(self):
-        return pandas.Series(np.abs(self._data))
+        return pandas.Series(numpy.abs(self._data))
 
     return hpat_pandas_series_abs_impl
