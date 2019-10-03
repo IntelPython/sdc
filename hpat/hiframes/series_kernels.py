@@ -513,7 +513,7 @@ series_replace_funcs = {
     'pct_change_default': lambda A: hpat.hiframes.api.init_series(hpat.hiframes.rolling.pct_change(A, 1, False)),
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
-    'abs': lambda A: hpat.hiframes.api.init_series(np.abs(A)),  # TODO: timedelta
+    # 'abs': lambda A: hpat.hiframes.api.init_series(np.abs(A)),  # TODO: timedelta
     'cov': _column_cov_impl,
     'corr': _column_corr_impl,
     'append_single': _series_append_single_impl,
