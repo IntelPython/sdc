@@ -35,6 +35,11 @@ class DataGenerator:
         """Generate data"""
         raise NotImplementedError
 
+    @property
+    def rand_array(self, *args, **kwargs):
+        """Random array"""
+        raise NotImplementedError
+
     def randu(self, length):
         """Generate one random unicode string."""
         return tm.randu(length)
@@ -145,3 +150,11 @@ class FloatSeriesGenerator(SeriesGenerator):
         """Array of random floats"""
         with self.set_seed():
             return np.array(randn(self.size))
+
+
+class FloatSeriesIndexGenerator(FloatSeriesGenerator):
+
+    def generate(self):
+        ind = StringSeriesGenerator(self.size).generate()
+        d = FloatSeriesGenerator(self.size).generate()
+        return pd.Series(data = d, index = ind)

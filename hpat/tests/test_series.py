@@ -281,6 +281,15 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_values(self):
+        def test_impl(A):
+            return A.values
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
+
     def test_series_values1(self):
         def test_impl(A):
             return (A == 2).values
@@ -555,6 +564,37 @@ class TestSeries(unittest.TestCase):
             A = pd.Series(np.arange(n))
             B = pd.Series(np.arange(n)**2)
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
+
+    @unittest.skipIf(platform.system() == 'Windows', "Attribute dtype are different: int64, int32")
+    def test_series_op8_integer_scalar(self):
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
+
+        for method in comparison_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = 10
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
+    def test_series_op8_float_scalar(self):
+        comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
+
+        for method in comparison_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = .5
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
 
     def test_series_inplace_binop_array(self):
         def test_impl(A, B):
@@ -1165,6 +1205,65 @@ class TestSeries(unittest.TestCase):
         # Test series tuple
         np.testing.assert_array_equal(hpat_func(S1, S2, S3),
                                       test_impl(S1, S2, S3))
+
+    def test_series_isin_list1(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        values = [1, 2, 5, 7, 8]
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_list2(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        values = [1., 2., 5., 7., 8.]
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_list3(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['a', 'b', 'q', 'w', 'c', 'd', 'e', 'r'])
+        values = ['a', 'q', 'c', 'd', 'e']
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_set1(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        values = {1, 2, 5, 7, 8}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    def test_series_isin_set2(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        values = {1., 2., 5., 7., 8.}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
+
+    @unittest.skip('TODO: requires hashable unicode strings in Numba')
+    def test_series_isin_set3(self):
+        def test_impl(S, values):
+            return S.isin(values)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['a', 'b', 'c', 'd', 'e'] * 2)
+        values = {'b', 'c', 'e'}
+        pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
 
     def test_series_isna1(self):
         def test_impl(S):

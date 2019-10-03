@@ -7,7 +7,11 @@ HPAT User's Guide
    :caption: Contents:
 
    overview
-   UserGuide
+   GettingStarted
+   compilation
+   performance
+   workflow
    apireference
+   developers
 
-To download HPAT documentation PDF click here :download:`pdf <../_build/latex/HPAT.pdf>`
+To download HPAT documentation PDF click here :download:`pdf <../HPAT.pdf>`

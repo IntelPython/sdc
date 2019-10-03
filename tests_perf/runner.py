@@ -144,7 +144,7 @@ class TimeBenchmark(Benchmark):
             timer=timeit.default_timer)
 
         # Warming up
-        timeit.timeit(number=1)
+        timer.timeit(number=1)
 
         samples = timer.repeat(repeat=self.repeat, number=self.number)
 
