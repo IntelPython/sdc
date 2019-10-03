@@ -358,7 +358,7 @@ def hpat_pandas_series_append(self, to_append):
 
 
 @overload_method(SeriesType, 'min')
-def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
+def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None, **kwargs):
     """
     Pandas Series method :meth:`pandas.Series.min` implementation.
 
