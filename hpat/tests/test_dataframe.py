@@ -567,7 +567,6 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
-    @unittest.skip('Error - fix needed; issue is related to __pycache__\n')
     def test_sort_parallel_single_col(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
