@@ -135,9 +135,6 @@ class TestIO(unittest.TestCase):
         f.close()
         np.testing.assert_almost_equal(X, arr)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   '2282 != 5050\n'
-                   'NUMA_PES=3 build')
     def test_h5_read_group(self):
         def test_impl():
             f = h5py.File("test_group_read.hdf5", "r")
