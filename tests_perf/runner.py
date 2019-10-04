@@ -69,17 +69,18 @@ import logging
 import pkgutil
 import platform
 import statistics
-import timeit
+import subprocess
+import tempfile
 
 from collections import defaultdict, OrderedDict
-from enum import Enum
 from importlib import import_module
 from pathlib import Path
 
+from tests_perf.benchmark import BenchmarksType, TimeBenchmark
 
-class BenchmarksType(Enum):
-    """Benchmark types"""
-    TIME = 'time'
+
+EXECUTABLE = 'python'
+SCRIPT = 'benchmark.py'
 
 
 def setup_logging():
@@ -92,63 +93,6 @@ def setup_logging():
     logger.addHandler(stream_handler)
 
     return logger
-
-
-class Benchmark:
-    def __init__(self, name, func, param, sources):
-        self.name = name
-        self.func = func
-        self.param = param
-        self.source = sources
-
-        self.setup = inspect.getattr_static(sources, 'setup', None)
-        self.teardown = inspect.getattr_static(sources, 'teardown', None)
-
-        self.instance = sources()
-
-    def run(self):
-        """Run benchmark with its parameters"""
-        self.func(self.instance, *self.param)
-
-    def do_setup(self):
-        """Run setup method of benchmark"""
-        if self.setup:
-            self.setup(self.instance, *self.param)
-
-    def redo_setup(self):
-        """Run teardown and setup methods of benchmark"""
-        self.do_teardown()
-        self.do_setup()
-
-    def do_teardown(self):
-        """Run teardown method of benchmark"""
-        if self.teardown:
-            self.teardown(self.instance, *self.param)
-
-
-class TimeBenchmark(Benchmark):
-    def __init__(self, name, func, param, source, repeat=10, number=1):
-        super().__init__(name, func, param, source)
-        self.repeat = repeat
-        self.number = number
-
-    def run(self):
-        """Run benchmark timing"""
-
-        def func():
-            return self.func(self.instance, *self.param)
-
-        timer = timeit.Timer(
-            stmt=func,
-            setup=self.redo_setup,
-            timer=timeit.default_timer)
-
-        # Warming up
-        timer.timeit(number=1)
-
-        samples = timer.repeat(repeat=self.repeat, number=self.number)
-
-        return [sample / self.number for sample in samples]
 
 
 def discover_modules(mnodule_name):
@@ -194,6 +138,28 @@ def discover_benchmarks(module_name, type_=BenchmarksType.TIME.value, repeat=10,
                         yield TimeBenchmark(benchmark_name, func, param, module_attr, repeat=repeat, number=number)
 
 
+def run_benchmark(benchmark):
+    """
+    Run specified benchmark in separate process
+
+    :param benchmark: benchmark object
+    :param env_name: Conda environment name
+    :param executable: Executable
+    :return: samples of the run
+    """
+    logger = logging.getLogger(__name__)
+    bench_file_name = benchmark.name.replace('.', '_')
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bench_pickle = Path(temp_dir) / f'{bench_file_name}.pickle'
+        benchmark.to_pickle(bench_pickle)
+        samples_json = Path(temp_dir) / f'{bench_file_name}.json'
+        cmd = [EXECUTABLE, SCRIPT, '--bench-pickle', str(bench_pickle), '--res-json', str(samples_json)]
+        logger.info('Running "%s"', subprocess.list2cmdline(cmd))
+        subprocess.run(cmd, check=True, shell=True)
+        with samples_json.open(encoding='utf-8') as fd:
+            return json.load(fd)
+
+
 def compute_stats(samples):
     """Statistical analysis of the samples"""
     return {
@@ -230,7 +196,7 @@ def main():
     results = defaultdict(list)
     logger.info('Running benchmarks in "%s"...', args.bench)
     for benchmark in discover_benchmarks(args.bench, repeat=args.repeat, number=args.number):
-        samples = benchmark.run()
+        samples = run_benchmark(benchmark)
         results[benchmark.name].append(
             {'result': statistics.median(samples), 'stats': compute_stats(samples), 'params': benchmark.param}
         )
