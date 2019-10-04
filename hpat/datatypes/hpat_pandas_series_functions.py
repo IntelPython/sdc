@@ -777,6 +777,61 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
 
+@overload_method(SeriesType, 'max')
+def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.max` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max1
+
+    Parameters
+    -----------
+    axis:
+        *unsupported*
+    skipna: :obj:`bool` object
+        Exclude nan values when computing the result
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         returns :obj: scalar
+    """
+
+    _func_name = 'Method max().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+
+    if not isinstance(skipna, (types.Omitted, bool)):
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return numpy.nanmax(self._data)
+        else:
+            return self._data.max()
+
+    return hpat_pandas_series_max_impl
+
+
 @overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     """
@@ -1131,33 +1186,27 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
 
-@overload_method(SeriesType, 'max')
-def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
+@overload_method(SeriesType, 'abs')
+def hpat_pandas_series_append(self):
     """
-    Pandas Series method :meth:`pandas.Series.max` implementation.
+    Pandas Series method :meth:`pandas.Series.abs` implementation.
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_abs1
 
     Parameters
     -----------
-    axis:
-        *unsupported*
-    skipna: :obj:`bool` object
-        Exclude nan values when computing the result
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
+    self: :obj:`pandas.Series`
+          input series
 
     Returns
     -------
-    :obj:
-         returns :obj: scalar
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` containing the absolute value of elements
     """
 
-    _func_name = 'Method max().'
+    _func_name = 'Method abs().'
 
     if not isinstance(self, SeriesType):
         raise TypingError(
@@ -1165,23 +1214,10 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
 
     if not isinstance(self.dtype, (types.Integer, types.Float)):
         raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
 
-    if not isinstance(skipna, (types.Omitted, bool)):
-        raise TypingError(
-            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
+    def hpat_pandas_series_abs_impl(self):
+        return pandas.Series(numpy.abs(self._data))
 
-    if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
-            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
-                                                                                            numeric_only))
+    return hpat_pandas_series_abs_impl
 
-    def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
-        if skipna:
-            return numpy.nanmax(self._data)
-        else:
-            return self._data.max()
-
-    return hpat_pandas_series_max_impl

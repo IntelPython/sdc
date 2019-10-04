@@ -598,14 +598,14 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_combine(self, ary, args, kws):
         return self._resolve_combine_func(ary, args, kws)
 
-    @bound_function("series.abs")
-    def resolve_abs(self, ary, args, kws):
-        # call np.abs(A) to get return type
-        arr_typ = series_to_array_type(ary)
-        all_args = tuple([arr_typ] + list(args))
-        ret_typ = self.context.resolve_function_type(np.abs, all_args, kws).return_type
-        ret_typ = if_arr_to_series_type(ret_typ)
-        return signature(ret_typ, *args)
+    # @bound_function("series.abs")
+    # def resolve_abs(self, ary, args, kws):
+    #     # call np.abs(A) to get return type
+    #     arr_typ = series_to_array_type(ary)
+    #     all_args = tuple([arr_typ] + list(args))
+    #     ret_typ = self.context.resolve_function_type(np.abs, all_args, kws).return_type
+    #     ret_typ = if_arr_to_series_type(ret_typ)
+    #     return signature(ret_typ, *args)
 
     def _resolve_cov_func(self, ary, args, kws):
         # array is valid since hiframes_typed calls this after type replacement
