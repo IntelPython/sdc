@@ -33,6 +33,7 @@
 
 import operator
 import pandas
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -1128,3 +1129,39 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_le_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'abs')
+def hpat_pandas_series_append(self):
+    """
+    Pandas Series method :meth:`pandas.Series.abs` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_abs1
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+          input series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` containing the absolute value of elements
+    """
+
+    _func_name = 'Method abs().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+
+    def hpat_pandas_series_abs_impl(self):
+        return pandas.Series(numpy.abs(self._data))
+
+    return hpat_pandas_series_abs_impl
