@@ -112,9 +112,9 @@ In case of issues, reinstalling in a new conda environment is recommended.
 Building HPAT from Source on Windows
 ------------------------------------
 
-Building HPAT on Windows requires Build Tools for Visual Studio 2017 (14.0):
+Building HPAT on Windows requires Build Tools for Visual Studio 2019 (with component MSVC v140 - VS 2015 C++ build tools (v14.00)):
 
-* Install `Build Tools for Visual Studio 2017 (14.0) <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017>`_.
+* Install `Build Tools for Visual Studio 2019 (with component MSVC v140 - VS 2015 C++ build tools (v14.00)) <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019>`_.
 * Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
 * Start 'Anaconda prompt'
 
