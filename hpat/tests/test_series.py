@@ -1693,6 +1693,33 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_groupby_count(self):
+        def test_impl():
+            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
+            grouped = A.groupby(A, sort=False)
+            return grouped.count()
+
+        hpat_func = hpat.jit(test_impl)
+
+        ref_result = test_impl()
+        result = hpat_func()
+        np.testing.assert_array_equal(result, ref_result)
+
+    @unittest.skip("getiter for this type is not implemented yet")
+    def test_series_groupby_iterator_int(self):
+        def test_impl():
+            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
+            grouped = A.groupby(A)
+            return [i for i in grouped]
+
+        hpat_func = hpat.jit(test_impl)
+
+        ref_result = test_impl()
+        result = hpat_func()
+        print("Result JIT", result)
+        print("Result Python", ref_result)
+        np.testing.assert_array_equal(result, ref_result)
+
 
 if __name__ == "__main__":
     unittest.main()
