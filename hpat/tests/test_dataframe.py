@@ -590,7 +590,6 @@ class TestDataFrame(unittest.TestCase):
             # restore global val
             hpat.hiframes.sort.MIN_SAMPLES = save_min_samples
 
-    @unittest.skip('Error - fix needed; issue is related to __pycache__\n')
     def test_sort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
