@@ -56,30 +56,6 @@ class Absolute:
             return self.series.abs()
 
 
-class Covariation:
-    params = [
-        [10 ** 8 + 513],
-        [Impl.interpreted_python.value, Impl.compiled_python.value]
-    ]
-    param_names = ['size', 'implementation']
-
-    def setup(self, size, implementation):
-        self.series = FloatSeriesGenerator(size).generate()
-        self.series2 = FloatSeriesGenerator(size).generate()
-
-    @staticmethod
-    @hpat.jit
-    def _cov(series, series2):
-        return series.cov(series2)
-
-    def time_cov(self, size, implementation):
-        """Time both interpreted and compiled Series.cov"""
-        if implementation == Impl.compiled_python.value:
-            return self._cov(self.series, self.series2)
-        if implementation == Impl.interpreted_python.value:
-            return self.series.cov(self.series2)
-
-
 class ValueCounts:
     params = [
         [5 * 10 ** 6 + 513],
@@ -148,6 +124,18 @@ class Correlation:
     def setup(self, size, implementation):
         self.series = FloatSeriesGenerator(size).generate()
         self.series2 = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _cov(series, series2):
+        return series.cov(series2)
+
+    def time_cov(self, size, implementation):
+        """Time both interpreted and compiled Series.cov"""
+        if implementation == Impl.compiled_python.value:
+            return self._cov(self.series, self.series2)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.cov(self.series2)
 
     @staticmethod
     @hpat.jit
