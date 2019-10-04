@@ -41,6 +41,8 @@ from numba.extending import (types, overload, overload_method, overload_attribut
 from numba.errors import TypingError
 
 from hpat.hiframes.pd_series_ext import SeriesType
+from hpat.set_ext import init_set_string
+from hpat.utils import to_array
 
 
 '''
@@ -1169,9 +1171,11 @@ def hpat_pandas_series_append(self):
 
 
 @overload_method(SeriesType, 'unique')
-def hpat_pandas_series_unique(self, sorted=False):
+def hpat_pandas_series_unique(self):
     """
     Pandas Series method :meth:`pandas.Series.unique` implementation.
+
+    Note: Return values order sorted by values
 
     .. only:: developer
 
@@ -1181,8 +1185,6 @@ def hpat_pandas_series_unique(self, sorted=False):
     -----------
     self: :class:`pandas.Series`
         input arg
-    sorted: :obj:`bool`
-        return array is sorted
 
     Returns
     -------
@@ -1192,15 +1194,22 @@ def hpat_pandas_series_unique(self, sorted=False):
 
     _func_name = 'Method unique().'
 
-    def hpat_pandas_series_unique_impl_sorted(self):
-        return numpy.unique(self._data)
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if self.dtype is types.unicode_type:
+        def hpat_pandas_series_unique_str_impl(self):
+            unique_strings = init_set_string()
+            for value in self:
+                unique_strings.add(value)
+
+            return to_array(unique_strings)
+
+        return hpat_pandas_series_unique_str_impl
 
     def hpat_pandas_series_unique_impl(self):
-        unique_values = []
-        for value in self._data:
-            if value not in unique_values:
-                unique_values.append(value)
-        return unique_values
+        return numpy.unique(self._data)
 
-    return hpat_pandas_series_unique_impl_sorted if sorted else hpat_pandas_series_unique_impl
+    return hpat_pandas_series_unique_impl
 

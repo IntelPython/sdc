@@ -1699,7 +1699,15 @@ class TestSeries(unittest.TestCase):
             return A.unique()
 
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        np.testing.assert_array_equal(sorted(hpat_func()), sorted(test_impl()))
+
+    def test_series_unique_str(self):
+        def test_impl():
+            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
+            return df.A.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_array_equal(sorted(hpat_func()), sorted(test_impl()))
 
 
 if __name__ == "__main__":

@@ -288,15 +288,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
-    def test_unique_str(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
-            return df.A.unique()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 1001
-        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
-
     @unittest.skip('AssertionError - fix needed\n'
                    '2 != 1\n')
     def test_unique_str_parallel(self):

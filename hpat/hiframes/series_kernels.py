@@ -501,7 +501,7 @@ series_replace_funcs = {
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes.api.nunique(A),
-    'unique': lambda A: hpat.hiframes.api.unique(A),
+    # 'unique': lambda A: hpat.hiframes.api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,
     'fillna_str_alloc': _series_fillna_str_alloc_impl,
