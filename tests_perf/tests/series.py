@@ -2,6 +2,7 @@ import hpat
 
 from .common import Implementation as Impl
 from .data_generator import StringSeriesGenerator, WhiteSpaceStringSeriesGenerator
+from .data_generator import FloatSeriesGenerator, FloatSeriesIndexGenerator
 
 
 class String:
@@ -134,3 +135,58 @@ class WhiteSpaceString:
             return self._strip(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.str.strip()
+
+
+class SortValues:
+    params = [
+        [2 * 10 ** 6 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size=size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _sort_values(series):
+        return series.sort_values()
+
+    def time_sort_values(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._sort_values(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.sort_values()
+
+
+class IdxMaxMin:
+    params = [
+        [10 ** 5],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesIndexGenerator(size=size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _idxmax(series):
+        return series.idxmax()
+
+    def time_idxmax(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._idxmax(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.idxmax()
+
+    @staticmethod
+    @hpat.jit
+    def _idxmin(series):
+        return series.idxmin()
+
+    def time_idxmin(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._idxmin(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.idxmin()
