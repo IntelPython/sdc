@@ -155,6 +155,6 @@ class FloatSeriesGenerator(SeriesGenerator):
 class FloatSeriesIndexGenerator(FloatSeriesGenerator):
 
     def generate(self):
-        ind = StringSeriesGenerator(self.size).generate()
-        d = FloatSeriesGenerator(self.size).generate()
-        return pd.Series(data = d, index = ind)
+        index = StringSeriesGenerator(self.size).generate()
+        data = FloatSeriesGenerator(self.size).generate()
+        return pd.Series(data=data, index=index)

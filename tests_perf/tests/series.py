@@ -1,7 +1,8 @@
 import hpat
 
 from .common import Implementation as Impl
-from .data_generator import StringSeriesGenerator, WhiteSpaceStringSeriesGenerator, FloatSeriesGenerator, FloatSeriesIndexGenerator
+from .data_generator import StringSeriesGenerator, WhiteSpaceStringSeriesGenerator
+from .data_generator import FloatSeriesGenerator, FloatSeriesIndexGenerator
 
 
 class String:
@@ -136,7 +137,7 @@ class WhiteSpaceString:
             return self.series.str.strip()
 
 
-class Sort_values:
+class SortValues:
     params = [
         [2 * 10 ** 6 + 513],
         [Impl.interpreted_python.value, Impl.compiled_python.value]
