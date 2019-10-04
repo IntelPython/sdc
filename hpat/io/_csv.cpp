@@ -363,7 +363,7 @@ PyObject* csv_file_chunk_reader(const char* fname, bool is_parallel, int64_t ski
     CHECK(fname != NULL, "NULL filename provided.");
     // get total file-size
     size_t fsz = boost::filesystem::file_size(fname);
-    std::ifstream* f = new std::ifstream(fname);
+    std::ifstream* f = new std::ifstream(fname, std::ifstream::binary);
     CHECK(f->good() && !f->eof() && f->is_open(), "could not open file.");
     return csv_chunk_reader(f, fsz, is_parallel, skiprows, nrows);
 }
