@@ -1,6 +1,9 @@
 import unittest
+import platform
 import hpat
 import numba
+import numpy as np
+import pandas as pd
 from hpat import *
 from numba.typed import Dict
 from collections import defaultdict
@@ -311,6 +314,93 @@ class TestHpatJitIssues(unittest.TestCase):
         B = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 3)
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv1_issue(self):
+        def test_impl():
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                               )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv_keys1_issue(self):
+        def test_impl():
+            dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int}
+            return pd.read_csv("csv_data1.csv",
+                               names=dtype.keys(),
+                               dtype=dtype,
+                               )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv_const_dtype1_issue(self):
+        def test_impl():
+            dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+            return pd.read_csv("csv_data1.csv",
+                               names=dtype.keys(),
+                               dtype=dtype,
+                               )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv_skip1_issue(self):
+        def test_impl():
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                               skiprows=2,
+                               )
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv_date1_issue(self):
+        def test_impl():
+            return pd.read_csv("csv_data_date1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int},
+                               parse_dates=[2])
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(platform.system() == 'Windows',
+                     'AssertionError: Attributes are different'
+                     'Attribute "dtype" are different'
+                     '[left]:  int64'
+                     '[right]: int32')
+    def test_csv_str1_issue(self):
+        def test_impl():
+            return pd.read_csv("csv_data_date1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
 
 if __name__ == "__main__":
     unittest.main()
