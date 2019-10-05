@@ -33,12 +33,15 @@
 
 import operator
 import pandas
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 
+import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
+from hpat.datatypes.hpat_pandas_seriesgroupby_types import SeriesGroupByType
 
 
 '''
@@ -322,7 +325,7 @@ def hpat_pandas_series_isin(self, values):
 
 @overload_method(SeriesType, 'append')
 def hpat_pandas_series_append(self, to_append):
-    """    
+    """
     Pandas Series method :meth:`pandas.Series.append` implementation.
     
     .. only:: developer
@@ -354,6 +357,81 @@ def hpat_pandas_series_append(self, to_append):
         return pandas.Series(self._data + to_append._data)
 
     return hpat_pandas_series_append_impl
+
+
+@overload_method(SeriesType, 'groupby')
+def hpat_pandas_series_groupby(
+        self,
+        by=None,
+        axis=0,
+        level=None,
+        as_index=True,
+        sort=True,
+        group_keys=True,
+        squeeze=False,
+        observed=False):
+    """
+    Pandas Series method :meth:`pandas.Series.groupby` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_groupby_count
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    by: :obj:`pandas.Series` object
+        Used to determine the groups for the groupby
+    axis:
+        *unsupported*
+    level:
+        *unsupported*
+    as_index:
+        *unsupported*
+    sort:
+        *unsupported*
+    group_keys:
+        *unsupported*
+    squeeze:
+        *unsupported*
+    observed:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.SeriesGroupBy`
+         returns :obj:`pandas.SeriesGroupBy` object
+    """
+
+    _func_name = 'Method Series.groupby().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if by is None and axis is None:
+        raise TypingError("{} You have to supply one of 'by' or 'axis' parameters".format(_func_name))
+
+    if level is not None and not isinstance(level, (types.Integer, types.NoneType, types.Omitted)):
+        raise TypingError("{} 'level' must be an Integer. Given: {}".format(_func_name, level))
+
+    def hpat_pandas_series_groupby_impl(
+            self,
+            by=None,
+            axis=0,
+            level=None,
+            as_index=True,
+            sort=True,
+            group_keys=True,
+            squeeze=False,
+            observed=False):
+        # TODO Needs to implement parameters value check
+        # if level is not None and (level < -1 or level > 0):
+        #     raise ValueError("Method Series.groupby(). level > 0 or level < -1 only valid with MultiIndex")
+
+        return pandas.core.groupby.SeriesGroupBy(self)
+
+    return hpat_pandas_series_groupby_impl
 
 
 @overload_method(SeriesType, 'ne')
@@ -1128,3 +1206,39 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_le_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'abs')
+def hpat_pandas_series_append(self):
+    """
+    Pandas Series method :meth:`pandas.Series.abs` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_abs1
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+          input series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` containing the absolute value of elements
+    """
+
+    _func_name = 'Method abs().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+
+    def hpat_pandas_series_abs_impl(self):
+        return pandas.Series(numpy.abs(self._data))
+
+    return hpat_pandas_series_abs_impl
