@@ -14,9 +14,11 @@ requirements:
     - {{ compiler('cxx') }}
     - cmake >=3.2
     - python 3.6.*
-    - pyarrow 0.9.*
+    - pyarrow ==0.14.1
+    - arrow-cpp ==0.14.1
   run:
-    - pyarrow 0.9.*
+    - pyarrow ==0.14.1
+    - arrow-cpp ==0.14.1
 
 
 about:
