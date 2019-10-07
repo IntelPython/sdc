@@ -211,10 +211,6 @@ class TestJoin(unittest.TestCase):
                  '2017-02-25']), 'A': [2, 3, 7, 8, 9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Tuples differ: (-9223372036854775790, Timestamp(\'2017-02-21 00:00:00\'), 24) !=\n'
-                   '(18, Timestamp(\'2017-02-21 00:00:00\'), 24)\n'
-                   'NUMA_PES=3 build')
     def test_merge_asof_parallel1(self):
         def test_impl():
             df1 = pd.read_parquet('asof1.pq')
