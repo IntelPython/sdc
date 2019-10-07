@@ -797,7 +797,6 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip("TODO: fix result")
     def test_series_dropna_str_parallel1(self):
         def test_impl(A):
             B = A.dropna()
