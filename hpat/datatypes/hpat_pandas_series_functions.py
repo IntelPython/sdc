@@ -1547,3 +1547,67 @@ def hpat_pandas_series_nunique(self, dropna=True):
             return len(data_set) + 1
 
     return hpat_pandas_series_nunique_impl
+
+
+@overload_method(SeriesType, 'median')
+def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.median` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median_skipna_default1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median_skipna_false1
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+          input series
+    axis: :obj:`int` or :obj:`string` {0 or `index`, None}, default None
+        The axis for the function to be applied on.
+        *unsupported*
+    skipna: :obj:`bool`, default True
+        exclude NA/null values when computing the result
+    level: :obj:`int` or :obj:`string`, default None
+         *unsupported*
+    numeric_only: :obj:`bool` or None, default None
+         *unsupported*
+
+    Returns
+    -------
+    :obj:`float` or :obj:`pandas.Series` (if level is specified)
+         median of values in the series
+
+    """
+
+    _func_name = 'Method median().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, types.Number):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+
+    if not (isinstance(axis, (types.Integer, types.UnicodeType, types.Omitted)) or axis is None):
+        raise TypingError('{} The axis must be an Integer or a String. Currently unsupported. Given: {}'.format(_func_name, axis))
+
+    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna == True):
+        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, skipna))
+
+    if not ((level is None or isinstance(level, types.Omitted))
+            or (numeric_only is None or isinstance(numeric_only, types.Omitted))
+            or (axis is None or isinstance(axis, types.Omitted))
+    ):
+        raise TypingError('{} Unsupported parameters. Given level: {}, numeric_only: {}, axis: {}'.format(_func_name, level, numeric_only, axis))
+
+
+    def hpat_pandas_series_median_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return numpy.nanmedian(self._data)
+
+        return numpy.median(self._data)
+
+    return hpat_pandas_series_median_impl
