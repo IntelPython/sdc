@@ -268,16 +268,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
-    def test_unique(self):
-        def test_impl(S):
-            return S.unique()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 1001
-        S = pd.Series(np.arange(n))
-        S[2] = 0
-        self.assertEqual(set(hpat_func(S)), set(test_impl(S)))
-
     def test_unique_parallel(self):
         # TODO: test without file
         def test_impl():

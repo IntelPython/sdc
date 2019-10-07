@@ -142,6 +142,179 @@ class TestHpatJitIssues(unittest.TestCase):
 
         func_with_dict()
 
+    @unittest.skip('TODO: needs different integer typing in Numba\n'
+                   'AssertionError - Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_binop_int_casting(self):
+        def test_impl(A):
+            res = A + 42
+            return res.dtype
+        hpat_func = hpat.jit(test_impl)
+
+        A = np.ones(1, dtype='int32')
+        self.assertEqual(hpat_func(A), test_impl(A))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_box1_issue(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_set_column1_issue(self):
+        # set existing column
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
+            df['A'] = np.arange(n)
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_set_column_reflect4(self):
+        # set existing column
+        def test_impl(df, n):
+            df['A'] = np.arange(n)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
+        df2 = df1.copy()
+        hpat_func(df1, n)
+        test_impl(df2, n)
+        pd.testing.assert_frame_equal(df1, df2)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_set_column_new_type1(self):
+        # set existing column with a new type
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n) + 3.0})
+            df['A'] = np.arange(n)
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_set_column2(self):
+        # create new column
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n) + 1.0})
+            df['C'] = np.arange(n)
+            return df
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_set_column_reflect3(self):
+        # create new column
+        def test_impl(df, n):
+            df['C'] = np.arange(n)
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
+        df2 = df1.copy()
+        hpat_func(df1, n)
+        test_impl(df2, n)
+        pd.testing.assert_frame_equal(df1, df2)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_op2_issue(self):
+        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+
+        for operator in arithmetic_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            df = pd.DataFrame({'A': np.arange(1, n)})
+            pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_op5_integer_scalar_issue(self):
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
+
+        for method in arithmetic_methods:
+            test_impl = _make_func_use_method_arg1(method)
+            hpat_func = hpat.jit(test_impl)
+
+            n = 11
+            operand_series = pd.Series(np.arange(1, n))
+            operand_scalar = 10
+            pd.testing.assert_series_equal(
+                hpat_func(operand_series, operand_scalar),
+                test_impl(operand_series, operand_scalar),
+                check_names=False)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_fusion1_issue(self):
+        def test_impl(A, B):
+            return A + B + 1
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 1)
+
+    @unittest.skip('AssertionError - fix needed\n'
+                   'Attribute "dtype" are different\n'
+                   '[left]:  int64\n'
+                   '[right]: int32\n')
+    def test_series_fusion2_issue(self):
+        # make sure getting data var avoids incorrect single def assumption
+        def test_impl(A, B):
+            S = B + 2
+            if A[0] == 0:
+                S = A + 1
+            return S + B
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        self.assertEqual(count_parfor_REPs(), 3)
+
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
