@@ -1778,6 +1778,37 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    @unittest.skip("Implement unique without sorting like in pandas")
+    def test_unique(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([2, 1, 3, 3])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_sorted(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        S = pd.Series(np.arange(n))
+        S[2] = 0
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_str(self):
+        def test_impl():
+            data = pd.Series(['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'])
+            return data.unique()
+
+        hpat_func = hpat.jit(test_impl)
+
+        # since the orider of the elements are diffrent - check count of elements only
+        ref_result = test_impl().size
+        result = hpat_func().size
+        np.testing.assert_array_equal(ref_result, result)
+
     def test_series_groupby_count(self):
         def test_impl():
             A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
