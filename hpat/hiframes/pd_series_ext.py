@@ -488,12 +488,12 @@ class SeriesAttribute(AttributeTemplate):
         out = SeriesType(ary.dtype, ary.data, out_index)
         return signature(out, *args)
 
-    @bound_function("array.take")
-    def resolve_take(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_take.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+#     @bound_function("array.take")
+#     def resolve_take(self, ary, args, kws):
+#         resolver = ArrayAttribute.resolve_take.__wrapped__
+#         sig = resolver(self, ary.data, args, kws)
+#         sig.return_type = if_arr_to_series_type(sig.return_type)
+#         return sig
 
     @bound_function("series.quantile")
     def resolve_quantile(self, ary, args, kws):
@@ -986,7 +986,7 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
