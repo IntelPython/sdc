@@ -364,7 +364,8 @@ def hpat_pandas_series_isna(self):
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
 
     Parameters
     -----------
@@ -376,29 +377,20 @@ def hpat_pandas_series_isna(self):
     :obj:`pandas.Series`
          returns :obj:`pandas.Series` object
     """
-    print("RTRTRTR")
+
     _func_name = 'Method isna().'
 
     if not isinstance(self, SeriesType):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+
     def hpat_pandas_series_isna_impl(self):
-        print("LALALLA")
-        print(numpy.isnan(self._data[0]))
-        # result = numpy.array([])
-        l = len(self._data)
-        for i in range(l):
-            self._data[i] = numpy.isnan(self._data[i])
-        print(self._data)
-            #if self._data[i] is None:
-            #result = result + numpy.isnan(self._data[i])
-        #     print(result)
-        #     #else:
-        #     #    result = result + False
-        # print(result)
-        # # return pandas.Series(result)
-        return pandas.Series(self._data)
+
+        return pandas.Series(numpy.isnan(self._data))
 
     return hpat_pandas_series_isna_impl
 

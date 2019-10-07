@@ -1270,7 +1270,7 @@ class TestSeries(unittest.TestCase):
             return S.isna()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([4, 2, 3])
+        S = pd.Series([0, np.NaN, -3])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_isna1(self):
