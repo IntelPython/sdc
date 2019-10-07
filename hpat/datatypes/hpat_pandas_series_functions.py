@@ -1180,6 +1180,7 @@ def hpat_pandas_series_unique(self):
     .. only:: developer
 
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_unique
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_unique_str
 
     Parameters
     -----------
@@ -1204,7 +1205,7 @@ def hpat_pandas_series_unique(self):
             for value in self:
                 unique_strings.add(value)
 
-            return numpy.array(unique_strings)
+            return to_array(unique_strings)
 
         return hpat_pandas_series_unique_str_impl
 
