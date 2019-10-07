@@ -173,10 +173,6 @@ class TestJoin(unittest.TestCase):
                 ['2017-01-01', '2017-01-06', '2017-01-03']), 'A': [7, 8, 9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Tuples differ: (-9223372036854775791, Timestamp(\'2017-01-06 00:00:00\'), 9) != \n'
-                   '(17, Timestamp(\'2017-01-06 00:00:00\'), 9)\n'
-                   'NUMA_PES=3 build')
     def test_join_datetime_parallel1(self):
         def test_impl(df1, df2):
             df3 = pd.merge(df1, df2, on='time')
