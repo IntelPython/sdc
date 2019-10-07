@@ -33,6 +33,7 @@
 
 import operator
 import pandas
+import numpy
 
 from numba import types
 from numba.extending import (types, overload, overload_method, overload_attribute)
@@ -357,7 +358,7 @@ def hpat_pandas_series_append(self, to_append):
 
 
 @overload_method(SeriesType, 'isna')
-def hpat_pandas_series_append(self, to_append):
+def hpat_pandas_series_isna(self):
     """
     Pandas Series method :meth:`pandas.Series.append` implementation.
 
@@ -375,19 +376,31 @@ def hpat_pandas_series_append(self, to_append):
     :obj:`pandas.Series`
          returns :obj:`pandas.Series` object
     """
-
+    print("RTRTRTR")
     _func_name = 'Method isna().'
 
     if not isinstance(self, SeriesType):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
-    def hpat_pandas_series_append_impl(self):
-        for i in range(len(self._data)):
-
+    def hpat_pandas_series_isna_impl(self):
+        print("LALALLA")
+        print(numpy.isnan(self._data[0]))
+        # result = numpy.array([])
+        l = len(self._data)
+        for i in range(l):
+            self._data[i] = numpy.isnan(self._data[i])
+        print(self._data)
+            #if self._data[i] is None:
+            #result = result + numpy.isnan(self._data[i])
+        #     print(result)
+        #     #else:
+        #     #    result = result + False
+        # print(result)
+        # # return pandas.Series(result)
         return pandas.Series(self._data)
 
-    return hpat_pandas_series_append_impl
+    return hpat_pandas_series_isna_impl
 
 
 @overload_method(SeriesType, 'ne')

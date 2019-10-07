@@ -241,6 +241,7 @@ make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
+from hpat.datatypes.hpat_pandas_series_functions import *
 @lower_builtin('getiter', SeriesType)
 def getiter_series(context, builder, sig, args):
     """
@@ -648,11 +649,11 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
-    @bound_function("series.isna")
-    def resolve_isna(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.isna")
+    # def resolve_isna(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     # alias of isna
     @bound_function("series.isnull")
@@ -1279,4 +1280,4 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
     return hpat_pandas_series_ctor_impl
 
-from hpat.datatypes.hpat_pandas_series_functions import *
+
