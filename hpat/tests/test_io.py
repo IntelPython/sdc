@@ -285,11 +285,6 @@ class TestIO(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('AssertionError - fix needed\n'
-                   'Arrays are not almost equal to 7 decimals\n'
-                   'ACTUAL: 4625837024398916366\n'
-                   'DESIRED: 2\n'
-                   'NUMA_PES=3 build')
     def test_pq_str_with_nan_par_multigroup(self):
         def test_impl():
             df = pq.read_table('example2.parquet').to_pandas()
