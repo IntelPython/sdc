@@ -1204,7 +1204,7 @@ def hpat_pandas_series_unique(self):
             for value in self:
                 unique_strings.add(value)
 
-            return to_array(unique_strings)
+            return numpy.array(unique_strings)
 
         return hpat_pandas_series_unique_str_impl
 
