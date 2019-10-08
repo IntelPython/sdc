@@ -2637,6 +2637,58 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
+    def test_series_var(self):
+        def pyfunc():
+            series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        ref_result = pyfunc()
+        result = cfunc()
+        np.testing.assert_equal(ref_result, result)
+
+    def test_series_var_unboxing(self):
+        def pyfunc(series, skipna, ddof):
+            return series.var(skipna=skipna, ddof=ddof)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
+        for ddof in [0, 1]:
+            for skipna in [True, False]:
+                ref_result = pyfunc(series, skipna=skipna, ddof=ddof)
+                result = cfunc(series, skipna=skipna, ddof=ddof)
+                np.testing.assert_equal(ref_result, result)
+
+    def test_series_var_str(self):
+        def pyfunc(series):
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(['test', 'series', 'var', 'str'])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method var(). The object must be a number. Given self.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_var_unsupported_params(self):
+        def pyfunc(series, axis, level, numeric_only):
+            return series.var(axis=axis, level=level, numeric_only=numeric_only)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
+        msg = 'Method var(). Unsupported parameters. Given {}: {}'
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=1, level=None, numeric_only=None)
+        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=1, numeric_only=None)
+        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=None, numeric_only=True)
+        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+
     def test_series_count(self):
         def test_series_count_impl(S):
             return S.count()
@@ -2664,6 +2716,7 @@ class TestSeries(unittest.TestCase):
             result_ref = test_series_count_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
+
 
 if __name__ == "__main__":
     unittest.main()
