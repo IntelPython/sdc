@@ -907,7 +907,7 @@ class TestSeries(unittest.TestCase):
             return S.min()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([-5, 6.7, 13])
+        S = pd.Series([-5, 6.7, 0])
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_max1(self):

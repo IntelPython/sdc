@@ -371,9 +371,9 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     Parameters
     -----------
     axis :  :obj:`int`, default: None
-               Axis for the function to be applied on.
-    skipna:  :obj:`bool`, default: True
                 *unsupported*
+    skipna:  :obj:`bool`, default: True
+                Exclude nan values when computing the result
     level:  :obj:`int` or level name, default: None
                 *unsupported*
     numeric_only:  :obj:`bool`, default: None
@@ -391,7 +391,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, (types.Integer, types.Float)):
+    if not isinstance(self.dtype, types.Number):
         raise TypingError(
             '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
 
