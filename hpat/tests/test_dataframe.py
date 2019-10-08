@@ -590,13 +590,14 @@ class TestDataFrame(unittest.TestCase):
             hpat.hiframes.sort.MIN_SAMPLES = save_min_samples
 
     def test_df_isna1(self):
+        '''Verify DataFrame.isna implementation for various types of data'''
         def test_impl(df):
             return df.isna()
         hpat_func = hpat.jit(test_impl)
 
         # TODO: add column with datetime values when test_series_datetime_isna1 is fixed
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
-                           'B': [np.nan, 5, 6, np.nan],
+                           'B': [np.inf, 5, np.nan, 6],
                            'C': ['aa', 'b', None, 'ccc'],
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))

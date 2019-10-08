@@ -1380,14 +1380,19 @@ class DataFramePass(object):
         # output data and create a new dataframe
         n_cols = len(df_typ.columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
+        init_df_args_data = ", ".join(d + '_O' for d in data_args)
+        init_df_args_cols = ", ".join("'{}'".format(c) for c in df_typ.columns)
 
-        func_text = "def _isna_impl({}):\n".format(", ".join(data_args))
+        func_lines = []
+        func_lines.append("def _isna_impl({}):".format(", ".join(data_args)))
         for d in data_args:
-            func_text += "  {} = hpat.hiframes.api.init_series({})\n".format(d + '_S', d)
-            func_text += "  {} = hpat.hiframes.api.get_series_data({}.isna())\n".format(d + '_O', d + '_S')
-        func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-            ", ".join(d + '_O' for d in data_args),
-            ", ".join("'{}'".format(c) for c in df_typ.columns))
+            func_lines.append("  {} = hpat.hiframes.api.init_series({})".format(d + '_S', d))
+            func_lines.append("  {} = hpat.hiframes.api.get_series_data({}.isna())".format(d + '_O', d + '_S'))
+        func_lines.append("  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            init_df_args_data,
+            init_df_args_cols
+        ))
+        func_text = '\n'.join(func_lines)
 
         loc_vars = {}
         exec(func_text, {}, loc_vars)
