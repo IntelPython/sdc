@@ -1177,6 +1177,41 @@ def lower_isna_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
+@overload_method(DataFrameType, 'astype')
+def astype_overload(df, dtype, copy=True, errors='raise'):
+
+    def _impl(df, dtype, copy=True, errors='raise'):
+        return hpat.hiframes.pd_dataframe_ext.astype_dummy(df, dtype, copy, errors)
+
+    return _impl
+
+
+def astype_dummy(df, dtype, copy, errors):
+    return df
+
+
+@infer_global(astype_dummy)
+class AstypeDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df, dtype, copy, errors = args
+
+        if isinstance(dtype, types.Function) and dtype.typing_key == str:
+            out_arr = string_array_type
+        else:
+            out_arr = types.Array(dtype.dtype, 1, 'C')
+
+        n_cols = len(df.columns)
+        out_df = DataFrameType((out_arr,) * n_cols, df.index, df.columns)
+        return signature(out_df, *args)
+
+
+@lower_builtin(astype_dummy, types.VarArg(types.Any))
+def lower_astype_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
+
+
 @overload_method(DataFrameType, 'isin')
 def isin_overload(df, values):
 

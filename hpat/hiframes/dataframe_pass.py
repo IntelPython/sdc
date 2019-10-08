@@ -580,6 +580,9 @@ class DataFramePass(object):
         if fdef == ('isna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_isna(assign, lhs, rhs)
 
+        if fdef == ('astype_dummy', 'hpat.hiframes.pd_dataframe_ext'):
+            return self._run_call_df_astype(assign, lhs, rhs)
+
         if fdef == ('fillna_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_df_fillna(assign, lhs, rhs)
 
@@ -729,6 +732,18 @@ class DataFramePass(object):
             impl = hpat.hiframes.pd_dataframe_ext.isna_overload(
                 *arg_typs, **kw_typs)
             stub = (lambda df: None)
+            return self._replace_func(impl, rhs.args,
+                                      pysig=numba.utils.pysignature(stub),
+                                      kws=dict(rhs.kws))
+
+        if func_name == 'astype':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.typemap[v.name]
+                       for name, v in dict(rhs.kws).items()}
+            impl = hpat.hiframes.pd_dataframe_ext.astype_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, dtype, copy=True, errors='raise' : None)
             return self._replace_func(impl, rhs.args,
                                       pysig=numba.utils.pysignature(stub),
                                       kws=dict(rhs.kws))
@@ -1401,6 +1416,41 @@ class DataFramePass(object):
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
         return self._replace_func(_isna_impl, col_vars, pre_nodes=nodes)
+
+    def _run_call_df_astype(self, assign, lhs, rhs):
+        '''Transforms calls to DataFrame.astype() during the dataframe pass (compilation),
+           replacing them with a call to auto-generated function, that uses Series.astype()
+           on each column of the dataframe.
+        '''
+        df_var = rhs.args[0]
+        dtype_var = rhs.args[1]
+        df_typ = self.typemap[df_var.name]
+
+        # impl: for each column, convert data to series, call S.astype(dtype_value), get
+        # output data and create a new dataframe
+        n_cols = len(df_typ.columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+        init_df_args_data = ", ".join(d + '_O' for d in data_args)
+        init_df_args_cols = ", ".join("'{}'".format(c) for c in df_typ.columns)
+
+        func_lines = []
+        func_lines.append("def _astype_impl({}, new_dtype):\n".format(", ".join(data_args)))
+        for d in data_args:
+            func_lines.append("  {} = hpat.hiframes.api.init_series({})\n".format(d + '_S', d))
+            func_lines.append("  {} = hpat.hiframes.api.get_series_data({}.astype(new_dtype))\n".format(d + '_O', d + '_S'))
+        func_lines.append("  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+            init_df_args_data,
+            init_df_args_cols
+        ))
+        func_text = '\n'.join(func_lines)
+
+        loc_vars = {}
+        exec(func_text, {}, loc_vars)
+        _astype_impl = loc_vars['_astype_impl']
+
+        nodes = []
+        col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
+        return self._replace_func(_astype_impl, col_vars + [dtype_var], pre_nodes=nodes)
 
     def _run_call_isin(self, assign, lhs, rhs):
         df_var, values = rhs.args
