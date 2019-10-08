@@ -97,21 +97,23 @@ class StringArrayPayloadModel(models.StructModel):
         models.StructModel.__init__(self, dmm, fe_type, members)
 
 
-str_arr_model_members = [
-    ('num_items', types.uint64),
-    ('num_total_chars', types.uint64),
-    ('offsets', types.CPointer(offset_typ)),
-    ('data', types.CPointer(char_typ)),
-    ('null_bitmap', types.CPointer(char_typ)),
-    ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-]
-
-
 @register_model(StringArrayType)
 class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
+        members = [
+            ('num_items', types.uint64),
+            ('num_total_chars', types.uint64),
+            ('offsets', types.CPointer(offset_typ)),
+            ('data', types.CPointer(char_typ)),
+            ('null_bitmap', types.CPointer(char_typ)),
+            ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
+        ]
+        super().__init__(dmm, fe_type, members)
+        # models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
 
-        models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
+
+# import pdb; pdb.set_trace()
+make_attribute_wrapper(StringArrayType, 'data', '_data')
 
 # TODO: fix overload for things like 'getitem'
 # @overload(operator.getitem)

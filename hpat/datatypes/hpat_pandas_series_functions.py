@@ -384,15 +384,36 @@ def hpat_pandas_series_isna(self):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, (types.Integer, types.Float)):
-        raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+    if isinstance(self.dtype, (types.Integer, types.Float)):
 
-    def hpat_pandas_series_isna_impl(self):
+        def hpat_pandas_series_isna_impl(self):
 
-        return pandas.Series(numpy.isnan(self._data))
+            return pandas.Series(numpy.isnan(self._data))
 
-    return hpat_pandas_series_isna_impl
+        return hpat_pandas_series_isna_impl
+
+    if isinstance(self.dtype, types.UnicodeType):
+        def hpat_pandas_series_isna_impl(self):
+
+            print("LALALAL")
+            _data = self._data
+            print(_data._data)
+            # print(self._data.null_bitmap)
+
+            # if self._data[1].isspace():
+            #     print("YYAAAAAAAAAA")
+            #result = numpy.array([])
+            # result = []
+            # for i in range(len(self._data)):
+            #     if self._data[i] is None:
+            #         result = result + numpy.nan
+            #     else:
+            #         result = result + 1
+            # return pandas.Series(numpy.isnan(result))
+            return (1)
+
+        return hpat_pandas_series_isna_impl
+
 
 
 @overload_method(SeriesType, 'ne')
