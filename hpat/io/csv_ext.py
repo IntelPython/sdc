@@ -1,3 +1,6 @@
+import llvmlite.binding as ll
+from llvmlite import ir as lir
+from .. import hio
 from collections import defaultdict
 import numba
 from numba import typeinfer, ir, ir_utils, config, types, cgutils
@@ -21,8 +24,7 @@ from hpat import objmode
 import pandas as pd
 import numpy as np
 
-from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-    CategoricalArray)
+from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 
 
 class CsvReader(ir.Stmt):
@@ -107,6 +109,7 @@ def visit_vars_csv(csv_node, callback, cbdata):
     csv_node.file_name = visit_vars_inner(csv_node.file_name, callback, cbdata)
     return
 
+
 # add call to visit csv variable
 ir_utils.visit_vars_extensions[CsvReader] = visit_vars_csv
 
@@ -164,8 +167,7 @@ def get_copies_csv(csv_node, typemap):
 ir_utils.copy_propagate_extensions[CsvReader] = get_copies_csv
 
 
-def apply_copies_csv(csv_node, var_dict, name_var_table,
-                      typemap, calltypes, save_copies):
+def apply_copies_csv(csv_node, var_dict, name_var_table, typemap, calltypes, save_copies):
     """apply copy propagate in csv node"""
 
     # update output_vars
@@ -181,6 +183,7 @@ def apply_copies_csv(csv_node, var_dict, name_var_table,
 
 ir_utils.apply_copy_propagate_extensions[CsvReader] = apply_copies_csv
 
+
 def build_csv_definitions(csv_node, definitions=None):
     if definitions is None:
         definitions = defaultdict(list)
@@ -190,25 +193,28 @@ def build_csv_definitions(csv_node, definitions=None):
 
     return definitions
 
+
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 
-from .. import hio
-from llvmlite import ir as lir
-import llvmlite.binding as ll
 ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
+
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = True
-    for v in csv_node.out_vars:
-        if (array_dists[v.name] != distributed.Distribution.OneD
-                and array_dists[v.name] != distributed.Distribution.OneD_Var):
-            parallel = False
+
+    if hpat.config.config_transport_mpi:
+        for v in csv_node.out_vars:
+            if (array_dists[v.name] != distributed.Distribution.OneD
+                    and array_dists[v.name] != distributed.Distribution.OneD_Var):
+                parallel = False
+    else:
+        parallel = False
 
     n_cols = len(csv_node.out_vars)
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
     # get column variables
     arg_names = ", ".join("arr" + str(i) for i in range(n_cols))
-    func_text  = "def csv_impl(fname):\n"
+    func_text = "def csv_impl(fname):\n"
     func_text += "    ({},) = _csv_reader_py(fname)\n".format(arg_names)
     # print(func_text)
 
@@ -232,10 +238,11 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     # get global array sizes by calling allreduce on chunk lens
     # TODO: get global size from C
     for arr in csv_node.out_vars:
-        f = lambda A: hpat.distributed_api.dist_reduce(len(A), np.int32(_op))
+        def f(A):
+            return hpat.distributed_api.dist_reduce(len(A), np.int32(_op))
         f_block = compile_to_numba_ir(
             f, {'hpat': hpat, 'np': np,
-            '_op': hpat.distributed_api.Reduce_Type.Sum.value},
+                '_op': hpat.distributed_api.Reduce_Type.Sum.value},
             typingctx, (typemap[arr.name],), typemap, calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [arr])
         nodes += f_block.body[:-2]
@@ -258,16 +265,20 @@ class StreamReaderType(types.Opaque):
     def __init__(self):
         super(StreamReaderType, self).__init__(name='StreamReaderType')
 
+
 stream_reader_type = StreamReaderType()
 register_model(StreamReaderType)(models.OpaqueModel)
+
 
 @box(StreamReaderType)
 def box_stream_reader(typ, val, c):
     return val
 
+
 csv_file_chunk_reader = types.ExternalFunction(
     "csv_file_chunk_reader", stream_reader_type(
         types.voidptr, types.bool_, types.int64, types.int64))
+
 
 def _get_dtype_str(t):
     dtype = t.dtype
@@ -288,6 +299,7 @@ def _get_dtype_str(t):
         return 'string_array_type'
     return '{}[::1]'.format(dtype)
 
+
 def _get_pd_dtype_str(t):
     dtype = t.dtype
     if isinstance(dtype, PDCategoricalDtype):
@@ -298,25 +310,24 @@ def _get_pd_dtype_str(t):
         return 'str'
     return 'np.{}'.format(dtype)
 
+
 # XXX: temporary fix pending Numba's #3378
 # keep the compiled functions around to make sure GC doesn't delete them and
 # the reference to the dynamic function inside them
 # (numba/lowering.py:self.context.add_dynamic_addr ...)
 compiled_funcs = []
 
+
 def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skiprows):
     # TODO: support non-numpy types like strings
-    date_inds = ", ".join(str(i) for i, t in enumerate(col_typs)
-                           if t.dtype == types.NPDatetime('ns'))
+    date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     typ_strs = ", ".join(["{}='{}'".format(_sanitize_varname(cname), _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
-    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t))
-                          for cname, t in zip(col_names, col_typs)])
+    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
 
     func_text = "def csv_reader_py(fname):\n"
     func_text += "  skiprows = {}\n".format(skiprows)
-    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {}, skiprows, -1)\n".format(
-                                                                      parallel)
+    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {}, skiprows, -1)\n".format(parallel)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
@@ -339,6 +350,7 @@ def _gen_csv_reader_py(col_names, col_typs, usecols, sep, typingctx, targetctx, 
     jit_func = numba.njit(csv_reader_py)
     compiled_funcs.append(jit_func)
     return jit_func
+
 
 def _sanitize_varname(varname):
     new_name = varname.replace('$', '_').replace('.', '_')
