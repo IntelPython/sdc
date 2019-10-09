@@ -595,15 +595,20 @@ class HiFramesTyped(object):
 
         self._convert_series_calltype(rhs)
         rhs.args = new_args
-        if isinstance(self.typemap[lhs], SeriesType):
+
+        # Second condition is to avoid chenging SeriesGroupBy class members
+        # test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_groupby_count
+        if isinstance(self.typemap[lhs], SeriesType) and not isinstance(func_mod, ir.Var):
             scope = assign.target.scope
             new_lhs = ir.Var(scope, mk_unique_var(lhs + '_data'), rhs.loc)
             self.typemap[new_lhs.name] = self.calltypes[rhs].return_type
             nodes.append(ir.Assign(rhs, new_lhs, rhs.loc))
-            return self._replace_func(lambda A: hpat.hiframes.api.init_series(A), [new_lhs], pre_nodes=nodes)
-        else:
-            nodes.append(assign)
-            return nodes
+            def _replace_func_param_impl(A):
+                return hpat.hiframes.api.init_series(A)
+            return self._replace_func(_replace_func_param_impl, [new_lhs], pre_nodes=nodes)
+
+        nodes.append(assign)
+        return nodes
 
     def _run_call_hiframes(self, assign, lhs, rhs, func_name):
         if func_name in ('to_arr_from_series',):
@@ -1036,7 +1041,7 @@ class HiFramesTyped(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'take', 'astype')
+        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'astype')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):

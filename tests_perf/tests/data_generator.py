@@ -150,3 +150,11 @@ class FloatSeriesGenerator(SeriesGenerator):
         """Array of random floats"""
         with self.set_seed():
             return np.array(randn(self.size))
+
+
+class FloatSeriesIndexGenerator(FloatSeriesGenerator):
+
+    def generate(self):
+        index = StringSeriesGenerator(self.size).generate()
+        data = FloatSeriesGenerator(self.size).generate()
+        return pd.Series(data=data, index=index)
