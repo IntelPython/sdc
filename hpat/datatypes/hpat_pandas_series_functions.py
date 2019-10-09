@@ -926,7 +926,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max
              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max_param
 
     Parameters

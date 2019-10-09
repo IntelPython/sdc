@@ -916,22 +916,35 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_series_max1(self):
+    def test_series_max(self):
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3., np.inf])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        # TODO type_min/type_max
+        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                           [8, 31, 1123, -1024],
+                           [2., 3., 1, -1000, np.inf]]:
+            S = pd.Series(input_data)
 
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.max() any parameters unsupported")
     def test_series_max_param(self):
-        def test_impl(S):
-            return S.max(skipna=True)
+        def test_impl(S, param_skipna):
+            return S.max(skipna=param_skipna)
 
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3., 1, -1000, np.inf])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        for input_data, param_skipna in [([np.nan, 2., np.nan, 3., 1, -1000, np.inf], True),
+                                         ([2., 3., 1, np.inf, -1000], False)]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
 
     def test_series_value_counts(self):
         def test_impl(S):
