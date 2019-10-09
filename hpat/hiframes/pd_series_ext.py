@@ -241,6 +241,7 @@ make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
+from hpat.datatypes.hpat_pandas_series_functions import *
 @lower_builtin('getiter', SeriesType)
 def getiter_series(context, builder, sig, args):
     """
@@ -690,10 +691,10 @@ class SeriesAttribute(AttributeTemplate):
         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
         return signature(dtype, *args)
 
-    @bound_function("series.idxmin")
-    def resolve_idxmin(self, ary, args, kws):
-        assert not kws
-        return signature(types.intp, *args)
+    # @bound_function("series.idxmin")
+    # def resolve_idxmin(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(types.intp, *args)
 
     @bound_function("series.idxmax")
     def resolve_idxmax(self, ary, args, kws):
@@ -1279,4 +1280,3 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
     return hpat_pandas_series_ctor_impl
 
-from hpat.datatypes.hpat_pandas_series_functions import *

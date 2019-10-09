@@ -1556,6 +1556,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(n))
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    def test_series_min_arr(self):
+        def test_impl(S):
+            return S.idxmin()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 8, 6, 34 ])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_idxmax1(self):
         def test_impl(A):
             return A.idxmax()
