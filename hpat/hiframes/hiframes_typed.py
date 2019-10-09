@@ -867,7 +867,6 @@ class HiFramesTyped(object):
 
         if func_name in ('std', 'nunique', 'describe', 'isna',
                          'isnull', 'median', 'idxmin', 'idxmax', 'unique'):
-
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
