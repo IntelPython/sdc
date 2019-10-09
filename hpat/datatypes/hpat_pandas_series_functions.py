@@ -388,8 +388,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     _func_name = 'Method min().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
     if not isinstance(self.dtype, types.Number):
         raise TypingError(
