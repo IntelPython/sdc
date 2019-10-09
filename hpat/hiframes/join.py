@@ -1,3 +1,13 @@
+from .. import hdist
+from .. import chiframes
+from hpat import config as hpat_config
+from hpat.utils import _numba_to_c_type_map
+from numba.targets.arrayobj import make_array
+import llvmlite.binding as ll
+from llvmlite import ir as lir
+from numba import cgutils
+from numba.extending import (register_model, models, lower_builtin)
+from numba.typing.templates import (signature, AbstractTemplate, infer_global, infer)
 import operator
 from collections import defaultdict
 import numpy as np
@@ -22,10 +32,16 @@ from hpat.str_arr_ext import (string_array_type, to_string_list,
                               setitem_str_offset, str_arr_set_na)
 from hpat.str_ext import string_type
 from hpat.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
-from hpat.shuffle_utils import (getitem_arr_tup_single, val_to_tup, alltoallv,
-    alltoallv_tup, finalize_shuffle_meta,
-    update_shuffle_meta,  alloc_pre_shuffle_metadata,
-    _get_keys_tup, _get_data_tup)
+from hpat.shuffle_utils import (
+    getitem_arr_tup_single,
+    val_to_tup,
+    alltoallv,
+    alltoallv_tup,
+    finalize_shuffle_meta,
+    update_shuffle_meta,
+    alloc_pre_shuffle_metadata,
+    _get_keys_tup,
+    _get_data_tup)
 from hpat.hiframes.pd_categorical_ext import CategoricalArray
 
 
@@ -275,6 +291,7 @@ def apply_copies_join(join_node, var_dict, name_var_table,
 
 ir_utils.apply_copy_propagate_extensions[Join] = apply_copies_join
 
+
 def build_join_definitions(join_node, definitions=None):
     if definitions is None:
         definitions = defaultdict(list)
@@ -283,6 +300,7 @@ def build_join_definitions(join_node, definitions=None):
         definitions[col_var.name].append(join_node)
 
     return definitions
+
 
 ir_utils.build_defs_extensions[Join] = build_join_definitions
 
@@ -301,10 +319,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     left_key_vars = tuple(join_node.left_vars[c] for c in join_node.left_keys)
     right_key_vars = tuple(join_node.right_vars[c] for c in join_node.right_keys)
 
-    left_other_col_vars = tuple(v for (n, v) in sorted(join_node.left_vars.items())
-                           if n not in join_node.left_keys)
-    right_other_col_vars = tuple(v for (n, v) in sorted(join_node.right_vars.items())
-                            if n not in join_node.right_keys)
+    left_other_col_vars = tuple(v for (n, v) in sorted(join_node.left_vars.items()) if n not in join_node.left_keys)
+    right_other_col_vars = tuple(v for (n, v) in sorted(join_node.right_vars.items()) if n not in join_node.right_keys)
     # get column types
     arg_vars = (left_key_vars + right_key_vars
                 + left_other_col_vars + right_other_col_vars)
@@ -312,10 +328,8 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     scope = arg_vars[0].scope
 
     # arg names of non-key columns
-    left_other_names = tuple("t1_c" + str(i)
-                        for i in range(len(left_other_col_vars)))
-    right_other_names = tuple("t2_c" + str(i)
-                         for i in range(len(right_other_col_vars)))
+    left_other_names = tuple("t1_c" + str(i) for i in range(len(left_other_col_vars)))
+    right_other_names = tuple("t2_c" + str(i) for i in range(len(right_other_col_vars)))
 
     left_key_names = tuple("t1_key" + str(i) for i in range(n_keys))
     right_key_names = tuple("t2_key" + str(i) for i in range(n_keys))
@@ -329,12 +343,10 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     func_text += "    t1_keys = ({},)\n".format(",".join(left_key_names))
     func_text += "    t2_keys = ({},)\n".format(",".join(right_key_names))
-
     func_text += "    data_left = ({}{})\n".format(",".join(left_other_names),
-                                                "," if len(left_other_names) != 0 else "")
+                                                   "," if len(left_other_names) != 0 else "")
     func_text += "    data_right = ({}{})\n".format(",".join(right_other_names),
-                                                "," if len(right_other_names) != 0 else "")
-
+                                                    "," if len(right_other_names) != 0 else "")
 
     if join_node.how == 'asof':
         if left_parallel or right_parallel:
@@ -362,29 +374,33 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
     # using the same output left key causes errors for asof case
     if join_node.left_keys == join_node.right_keys:
         out_r_key_vars = tuple(ir.Var(scope, mk_unique_var('dummy_k'), loc)
-                                                        for _ in range(n_keys))
+                               for _ in range(n_keys))
         for v, w in zip(out_r_key_vars, out_l_key_vars):
             typemap[v.name] = typemap[w.name]
 
     merge_out = out_l_key_vars + out_r_key_vars
-    merge_out += tuple(join_node.df_out_vars[n] for (n, v) in sorted(join_node.left_vars.items())
-                  if n not in join_node.left_keys)
-    merge_out += tuple(join_node.df_out_vars[n] for (n, v) in sorted(join_node.right_vars.items())
-                  if n not in join_node.right_keys)
+    merge_out += tuple(join_node.df_out_vars[n]
+                       for (n, v) in sorted(join_node.left_vars.items()) if n not in join_node.left_keys)
+    merge_out += tuple(join_node.df_out_vars[n] for (n, v)
+                       in sorted(join_node.right_vars.items()) if n not in join_node.right_keys)
     out_names = ["t3_c" + str(i) for i in range(len(merge_out))]
 
     if join_node.how == 'asof':
         func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes.join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
+                      " = hpat.hiframes.join.local_merge_asof(t1_keys, t2_keys, data_left, data_right)\n")
     elif method == 'sort':
-        func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes.join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
-            join_node.how in ('left', 'outer'), join_node.how == 'outer'))
+        func_text += (
+            "    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
+            " = hpat.hiframes.join.local_merge_new(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
+                join_node.how in (
+                    'left', 'outer'), join_node.how == 'outer'))
     else:
         assert method == 'hash'
-        func_text += ("    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
-        " = hpat.hiframes.join.local_hash_join(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
-            join_node.how in ('left', 'outer'), join_node.how == 'outer'))
+        func_text += (
+            "    out_t1_keys, out_t2_keys, out_data_left, out_data_right"
+            " = hpat.hiframes.join.local_hash_join(t1_keys, t2_keys, data_left, data_right, {}, {})\n".format(
+                join_node.how in (
+                    'left', 'outer'), join_node.how == 'outer'))
 
     for i in range(len(left_other_names)):
         func_text += "    left_{} = out_data_left[{}]\n".format(i, i)
@@ -404,11 +420,10 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         func_text += "    {} = t2_keys_{}\n".format(out_names[n_keys + i], i)
 
     for i in range(len(left_other_names)):
-        func_text += "    {} = left_{}\n".format(out_names[i+2*n_keys], i)
+        func_text += "    {} = left_{}\n".format(out_names[i + 2 * n_keys], i)
 
     for i in range(len(right_other_names)):
-        func_text += "    {} = right_{}\n".format(out_names[i+2*n_keys+len(left_other_names)], i)
-
+        func_text += "    {} = right_{}\n".format(out_names[i + 2 * n_keys + len(left_other_names)], i)
 
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -416,11 +431,13 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
 
     # print(func_text)
 
-    glbs = {'hpat': hpat, 'np': np,
-                                  'to_string_list': to_string_list,
-                                  'cp_str_list_to_array': cp_str_list_to_array,
-                                  'parallel_join': parallel_join,
-                                  'parallel_asof_comm': parallel_asof_comm}
+    glbs = {
+        'hpat': hpat,
+        'np': np,
+        'to_string_list': to_string_list,
+        'cp_str_list_to_array': cp_str_list_to_array,
+        'parallel_join': parallel_join,
+        'parallel_asof_comm': parallel_asof_comm}
 
     f_block = compile_to_numba_ir(join_impl,
                                   glbs,
@@ -442,20 +459,15 @@ def _get_table_parallel_flags(join_node, array_dists):
     par_dists = (distributed.Distribution.OneD,
                  distributed.Distribution.OneD_Var)
 
-    left_parallel = all(array_dists[v.name] in par_dists
-                        for v in join_node.left_vars.values())
-    right_parallel = all(array_dists[v.name] in par_dists
-                        for v in join_node.right_vars.values())
+    left_parallel = all(array_dists[v.name] in par_dists for v in join_node.left_vars.values())
+    right_parallel = all(array_dists[v.name] in par_dists for v in join_node.right_vars.values())
     if not left_parallel:
-        assert not any(array_dists[v.name] in par_dists
-                        for v in join_node.left_vars.values())
+        assert not any(array_dists[v.name] in par_dists for v in join_node.left_vars.values())
     if not right_parallel:
-        assert not any(array_dists[v.name] in par_dists
-                        for v in join_node.right_vars.values())
+        assert not any(array_dists[v.name] in par_dists for v in join_node.right_vars.values())
 
     if left_parallel or right_parallel:
-        assert all(array_dists[v.name] in par_dists
-                        for v in join_node.df_out_vars.values())
+        assert all(array_dists[v.name] in par_dists for v in join_node.df_out_vars.values())
 
     return left_parallel, right_parallel
 
@@ -466,16 +478,13 @@ def parallel_join_impl(key_arrs, data):
     n_pes = hpat.distributed_api.get_size()
     pre_shuffle_meta = alloc_pre_shuffle_metadata(key_arrs, data, n_pes, False)
 
-
     # calc send/recv counts
     for i in range(len(key_arrs[0])):
         val = getitem_arr_tup_single(key_arrs, i)
         node_id = hash(val) % n_pes
-        update_shuffle_meta(pre_shuffle_meta, node_id, i, val_to_tup(val),
-            getitem_arr_tup(data, i), False)
+        update_shuffle_meta(pre_shuffle_meta, node_id, i, val_to_tup(val), getitem_arr_tup(data, i), False)
 
-    shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta,
-                                          n_pes, False)
+    shuffle_meta = finalize_shuffle_meta(key_arrs, data, pre_shuffle_meta, n_pes, False)
 
     # write send buffers
     for i in range(len(key_arrs[0])):
@@ -496,6 +505,7 @@ def parallel_join_impl(key_arrs, data):
 @generated_jit(nopython=True, cache=True)
 def parallel_join(key_arrs, data):
     return parallel_join_impl
+
 
 @numba.njit
 def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
@@ -518,7 +528,7 @@ def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
     offset = -1
     i = 0
     # ignore no overlap processors (end of their interval is before current)
-    while i < n_pes-1 and bnd_ends[i] < my_start:
+    while i < n_pes - 1 and bnd_ends[i] < my_start:
         i += 1
     while i < n_pes and bnd_starts[i] <= my_end:
         offset, count = _count_overlap(right_key_arrs[0], bnd_starts[i], bnd_ends[i])
@@ -544,10 +554,10 @@ def parallel_asof_comm(left_key_arrs, right_key_arrs, right_data):
     recv_disp = hpat.hiframes.join.calc_disp(recv_counts)
     hpat.distributed_api.alltoallv(right_key_arrs[0], out_r_keys, send_counts,
                                    recv_counts, send_disp, recv_disp)
-    hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts,
-                                   recv_counts, send_disp, recv_disp)
+    hpat.distributed_api.alltoallv_tup(right_data, out_r_data, send_counts, recv_counts, send_disp, recv_disp)
 
     return (out_r_keys,), out_r_data
+
 
 @numba.njit
 def _count_overlap(r_key_arr, start, end):
@@ -564,10 +574,9 @@ def _count_overlap(r_key_arr, start, end):
     return offset, count
 
 
-
-
 def write_send_buff(shuffle_meta, node_id, i, val, data):
     return i
+
 
 @overload(write_send_buff)
 def write_data_buff_overload(meta, node_id, i, val, data):
@@ -579,13 +588,15 @@ def write_data_buff_overload(meta, node_id, i, val, data):
         val = ("val[{}]".format(i) if i < n_keys
                else "data[{}][i]".format(i - n_keys))
         func_text += "  val_{} = {}\n".format(i, val)
-        if not typ in (string_type, string_array_type):
+        if typ not in (string_type, string_array_type):
             func_text += "  meta.send_buff_tup[{}][w_ind] = val_{}\n".format(i, i)
         else:
             func_text += "  n_chars_{} = get_utf8_size(val_{})\n".format(i, i)
             func_text += "  meta.send_arr_lens_tup[{}][w_ind] = n_chars_{}\n".format(n_str, i)
-            func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id] + meta.tmp_offset_char_tup[{}][node_id]\n".format(i, n_str, n_str)
-            func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}._data, n_chars_{})\n".format(n_str, i, i, i)
+            func_text += "  indc_{} = meta.send_disp_char_tup[{}][node_id]".format(i, n_str)
+            func_text += "  + meta.tmp_offset_char_tup[{}][node_id]\n".format(n_str)
+            func_text += "  str_copy_ptr(meta.send_arr_chars_tup[{}], indc_{}, val_{}._data, n_chars_{})\n".format(
+                n_str, i, i, i)
             func_text += "  meta.tmp_offset_char_tup[{}][node_id] += n_chars_{}\n".format(n_str, i)
             n_str += 1
 
@@ -594,12 +605,9 @@ def write_data_buff_overload(meta, node_id, i, val, data):
     # print(func_text)
 
     loc_vars = {}
-    exec(func_text, {'str_copy_ptr': str_copy_ptr,
-        'get_utf8_size': get_utf8_size}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr, 'get_utf8_size': get_utf8_size}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
-
-
 
 
 # def write_send_buff(shuffle_meta, node_id, val):
@@ -634,6 +642,7 @@ def write_data_buff_overload(meta, node_id, i, val, data):
 def write_data_send_buff(data_shuffle_meta, node_id, i, data, key_meta):
     return
 
+
 @overload(write_data_send_buff)
 def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
     func_text = "def f(meta_tup, node_id, ind, data, key_meta):\n"
@@ -647,33 +656,28 @@ def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
             assert typ == string_array_type
             func_text += "  n_chars_{} = get_utf8_size(val_{})\n".format(i, i)
             func_text += "  meta_tup[{}].send_arr_lens[ind_{}] = n_chars_{}\n".format(i, i, i)
-            func_text += "  indc_{} = meta_tup[{}].send_disp_char[node_id] + meta_tup[{}].tmp_offset_char[node_id]\n".format(i, i, i)
-            func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{}, val_{}._data, n_chars_{})\n".format(i, i, i, i)
+            func_text += "  indc_{} = meta_tup[{}].send_disp_char[node_id]".format(i, i)
+            func_text += "  + meta_tup[{}].tmp_offset_char[node_id]\n".format(i)
+            func_text += "  str_copy_ptr(meta_tup[{}].send_arr_chars, indc_{},".format(i, i)
+            func_text += "  val_{}._data, n_chars_{})\n".format(i, i)
             func_text += "  meta_tup[{}].tmp_offset_char[node_id] += n_chars_{}\n".format(i, i)
 
     func_text += "  return\n"
     loc_vars = {}
-    exec(func_text, {'str_copy_ptr': str_copy_ptr,
-        'get_utf8_size': get_utf8_size}, loc_vars)
+    exec(func_text, {'str_copy_ptr': str_copy_ptr, 'get_utf8_size': get_utf8_size}, loc_vars)
     write_impl = loc_vars['f']
     return write_impl
 
 
-from numba.typing.templates import (
-    signature, AbstractTemplate, infer_global, infer)
-from numba.extending import (register_model, models, lower_builtin)
-from numba import cgutils
+if hpat_config.config_transport_mpi:
+    from .. import transport_mpi as transport
+else:
+    from .. import transport_seq as transport
 
+ll.add_symbol('get_join_sendrecv_counts', transport.get_join_sendrecv_counts)
+ll.add_symbol('c_alltoallv', transport.c_alltoallv)
 
-from llvmlite import ir as lir
-import llvmlite.binding as ll
-from numba.targets.arrayobj import make_array
-from hpat.utils import _numba_to_c_type_map
-from .. import chiframes
-ll.add_symbol('get_join_sendrecv_counts', chiframes.get_join_sendrecv_counts)
 ll.add_symbol('timsort', chiframes.timsort)
-from .. import hdist
-ll.add_symbol('c_alltoallv', hdist.c_alltoallv)
 
 
 @numba.njit
@@ -681,9 +685,8 @@ def calc_disp(arr):
     disp = np.empty_like(arr)
     disp[0] = 0
     for i in range(1, len(arr)):
-        disp[i] = disp[i-1] + arr[i-1]
+        disp[i] = disp[i - 1] + arr[i - 1]
     return disp
-
 
 
 def ensure_capacity(arr, new_size):
@@ -695,6 +698,7 @@ def ensure_capacity(arr, new_size):
             np.empty(new_len, arr.dtype))
         new_arr[:curr_len] = arr
     return new_arr
+
 
 @overload(ensure_capacity)
 def ensure_capacity_overload(arr, new_size):
@@ -720,22 +724,22 @@ def ensure_capacity_str(arr, new_size, n_chars):
     new_arr = arr
     curr_len = len(arr)
     curr_num_chars = num_total_chars(arr)
-    needed_total_chars = getitem_str_offset(arr, new_size-1) + n_chars
+    needed_total_chars = getitem_str_offset(arr, new_size - 1) + n_chars
 
     # TODO: corner case test
     #print("new alloc", new_size, curr_len, getitem_str_offset(arr, new_size-1), n_chars, curr_num_chars)
     if curr_len < new_size or needed_total_chars > curr_num_chars:
         new_len = int(2 * curr_len if curr_len < new_size else curr_len)
-        new_num_chars = int(2 * curr_num_chars + n_chars
-            if needed_total_chars > curr_num_chars else curr_num_chars)
+        new_num_chars = int(2 * curr_num_chars + n_chars if needed_total_chars > curr_num_chars else curr_num_chars)
         new_arr = pre_alloc_string_array(new_len, new_num_chars)
-        copy_str_arr_slice(new_arr, arr, new_size-1)
+        copy_str_arr_slice(new_arr, arr, new_size - 1)
 
     return new_arr
 
 
 def trim_arr_tup(data, new_size):  # pragma: no cover
     return data
+
 
 @overload(trim_arr_tup)
 def trim_arr_tup_overload(data, new_size):
@@ -766,9 +770,10 @@ def trim_arr_tup_overload(data, new_size):
 #     return out_left_key, out_data_left, out_data_right
 
 def copy_elem_buff(arr, ind, val):  # pragma: no cover
-    new_arr = ensure_capacity(arr, ind+1)
+    new_arr = ensure_capacity(arr, ind + 1)
     new_arr[ind] = val
     return new_arr
+
 
 @overload(copy_elem_buff)
 def copy_elem_buff_overload(arr, ind, val):
@@ -776,15 +781,18 @@ def copy_elem_buff_overload(arr, ind, val):
         return copy_elem_buff
 
     assert arr == string_array_type
+
     def copy_elem_buff_str(arr, ind, val):
-        new_arr = ensure_capacity_str(arr, ind+1, len(val))
+        new_arr = ensure_capacity_str(arr, ind + 1, len(val))
         new_arr[ind] = val
         return new_arr
 
     return copy_elem_buff_str
 
+
 def copy_elem_buff_tup(arr, ind, val):  # pragma: no cover
     return arr
+
 
 @overload(copy_elem_buff_tup)
 def copy_elem_buff_tup_overload(data, ind, val):
@@ -803,8 +811,10 @@ def copy_elem_buff_tup_overload(data, ind, val):
     cp_impl = loc_vars['f']
     return cp_impl
 
+
 def trim_arr(arr, size):  # pragma: no cover
     return hpat.hiframes.pd_categorical_ext.fix_cat_array_type(arr[:size])
+
 
 @overload(trim_arr)
 def trim_arr_overload(arr, size):
@@ -812,6 +822,7 @@ def trim_arr_overload(arr, size):
         return trim_arr
 
     assert arr == string_array_type
+
     def trim_arr_str(arr, size):
         # print("trim size", size, arr[size-1], getitem_str_offset(arr, size))
         new_arr = pre_alloc_string_array(size, np.int64(getitem_str_offset(arr, size)))
@@ -820,10 +831,12 @@ def trim_arr_overload(arr, size):
 
     return trim_arr_str
 
+
 def setnan_elem_buff(arr, ind):  # pragma: no cover
-    new_arr = ensure_capacity(arr, ind+1)
+    new_arr = ensure_capacity(arr, ind + 1)
     setitem_arr_nan(new_arr, ind)
     return new_arr
+
 
 @overload(setnan_elem_buff)
 def setnan_elem_buff_overload(arr, ind):
@@ -831,8 +844,9 @@ def setnan_elem_buff_overload(arr, ind):
         return setnan_elem_buff
 
     assert arr == string_array_type
+
     def setnan_elem_buff_str(arr, ind):
-        new_arr = ensure_capacity_str(arr, ind+1, 0)
+        new_arr = ensure_capacity_str(arr, ind + 1, 0)
         # TODO: why doesn't setitem_str_offset work
         #setitem_str_offset(arr, ind+1, getitem_str_offset(arr, ind))
         new_arr[ind] = ''
@@ -842,8 +856,10 @@ def setnan_elem_buff_overload(arr, ind):
 
     return setnan_elem_buff_str
 
+
 def setnan_elem_buff_tup(arr, ind):  # pragma: no cover
     return arr
+
 
 @overload(setnan_elem_buff_tup)
 def setnan_elem_buff_tup_overload(data, ind):
@@ -863,9 +879,8 @@ def setnan_elem_buff_tup_overload(data, ind):
     return cp_impl
 
 
-#@numba.njit
-def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=False,
-                                                               is_right=False):
+# @numba.njit
+def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=False, is_right=False):
     l_len = len(left_keys[0])
     r_len = len(right_keys[0])
     # TODO: approximate output size properly
@@ -938,10 +953,11 @@ def local_hash_join_impl(left_keys, right_keys, data_left, data_right, is_left=F
 
     return out_left_key, out_right_key, out_data_left, out_data_right
 
+
 @generated_jit(nopython=True, cache=True, no_cpython_wrapper=True)
-def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False,
-                                                               is_right=False):
+def local_hash_join(left_keys, right_keys, data_left, data_right, is_left=False, is_right=False):
     return local_hash_join_impl
+
 
 @generated_jit(nopython=True, cache=True)
 def _hash_if_tup(val):
@@ -949,10 +965,12 @@ def _hash_if_tup(val):
         return lambda val: val[0]
     return lambda val: hash(val)
 
+
 @generated_jit(nopython=True, cache=True)
 def _check_ind_if_hashed(right_keys, r_ind, l_key):
     if right_keys == types.Tuple((types.intp[::1],)):
         return lambda right_keys, r_ind, l_key: r_ind
+
     def _impl(right_keys, r_ind, l_key):
         r_key = getitem_arr_tup(right_keys, r_ind)
         if r_key != l_key:
@@ -962,8 +980,7 @@ def _check_ind_if_hashed(right_keys, r_ind, l_key):
 
 
 @numba.njit
-def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False,
-                                                               is_outer=False):
+def local_merge_new(left_keys, right_keys, data_left, data_right, is_left=False, is_outer=False):
     l_len = len(left_keys[0])
     r_len = len(right_keys[0])
     # TODO: approximate output size properly
@@ -1089,6 +1106,7 @@ def local_merge_asof(left_keys, right_keys, data_left, data_right):
 def setitem_arr_nan(arr, ind):
     arr[ind] = np.nan
 
+
 @overload(setitem_arr_nan)
 def setitem_arr_nan_overload(arr, ind):
     if isinstance(arr.dtype, types.Float):
@@ -1096,6 +1114,7 @@ def setitem_arr_nan_overload(arr, ind):
 
     if isinstance(arr.dtype, (types.NPDatetime, types.NPTimedelta)):
         nat = arr.dtype('NaT')
+
         def _setnan_impl(arr, ind):
             arr[ind] = nat
         return _setnan_impl
@@ -1124,9 +1143,11 @@ def setitem_arr_nan_overload(arr, ind):
         return setitem_arr_nan_int
     return lambda arr, ind: None
 
+
 def setitem_arr_tup_nan(arr_tup, ind):  # pragma: no cover
     for arr in arr_tup:
         arr[ind] = np.nan
+
 
 @overload(setitem_arr_tup_nan)
 def setitem_arr_tup_nan_overload(arr_tup, ind):
@@ -1142,8 +1163,10 @@ def setitem_arr_tup_nan_overload(arr_tup, ind):
     impl = loc_vars['f']
     return impl
 
+
 def copy_arr_tup(arrs):
     return tuple(a.copy() for a in arrs)
+
 
 @overload(copy_arr_tup)
 def copy_arr_tup_overload(arrs):
