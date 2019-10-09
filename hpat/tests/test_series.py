@@ -907,7 +907,7 @@ class TestSeries(unittest.TestCase):
             return S.max()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3.])
+        S = pd.Series([np.nan, 2., 3., np.inf])
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_max_param(self):
@@ -916,7 +916,7 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3., 1, -1000])
+        S = pd.Series([np.nan, 2., 3., 1, -1000, np.inf])
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_value_counts(self):
