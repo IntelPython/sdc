@@ -134,3 +134,112 @@ class MinMax:
             return self._max(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.max()
+
+
+class Nlargest:
+    params = [
+        [5 * 10 ** 7 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _nlargest(series):
+        return series.nlargest()
+
+    def time_nlargest(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._nlargest(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.nlargest()
+
+class Nsmallest:
+    params = [
+        [8 * 10 ** 7 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _nsmallest(series):
+        return series.nsmallest()
+
+    def time_nsmallest(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._nsmallest(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.nsmallest()
+
+
+class Var:
+    params = [
+        [2 * 10 ** 8 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _var(series):
+        return series.var()
+
+    def time_var(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._var(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.var()
+
+
+class Mean:
+    params = [
+        [3 * 10 ** 8 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _mean(series):
+        return series.mean()
+
+    def time_mean(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._mean(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.mean()
+
+
+class Median:
+    params = [
+        [6 * 10 ** 7 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _median(series):
+        return series.median()
+
+    def time_median(self, size, implementation):
+        if implementation == Impl.compiled_python.value:
+            return self._median(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.median()
