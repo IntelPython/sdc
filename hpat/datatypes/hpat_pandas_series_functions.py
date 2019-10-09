@@ -1362,4 +1362,3 @@ def hpat_pandas_series_append(self):
         return pandas.Series(numpy.abs(self._data))
 
     return hpat_pandas_series_abs_impl
-
