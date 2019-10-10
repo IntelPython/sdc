@@ -853,8 +853,8 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max', 'prod'):
             if rhs.args or rhs.kws:
-                raise ValueError("unsupported Series.{}() arguments".format(
-                    func_name))
+                raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
+
             # TODO: handle skipna, min_count arguments
             series_typ = self.typemap[series_var.name]
             series_dtype = series_typ.dtype
