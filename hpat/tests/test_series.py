@@ -4,11 +4,12 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
+
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
-
 from hpat.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
+
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
@@ -256,22 +257,159 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
-    def test_series_astype_str1(self):
-        def test_impl(A):
-            return A.astype(str)
+    def test_series_astype_int_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts integer series to series of strings
+        '''
+        def test_impl(S):
+            return S.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11
         S = pd.Series(np.arange(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_astype_str2(self):
+    def test_series_astype_int_to_str2(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           converts integer series to series of strings
+        '''
+        def test_impl(S):
+            return S.astype('str')
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+        def test_impl(S):
+            return S.astype(str)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str2(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           handles string series not changing it
+        '''
+        def test_impl(S):
+            return S.astype('str')
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: requires str(datetime64) support in Numba')
+    def test_series_astype_dt_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts datetime series to series of strings
+        '''
         def test_impl(A):
             return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series(['aa', 'bb', 'cc'])
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        S = pd.Series([pd.Timestamp('20130101 09:00:00'),
+                       pd.Timestamp('20130101 09:00:02'),
+                       pd.Timestamp('20130101 09:00:03')
+        ])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('AssertionError: Series are different'
+                   '[left]:  [0.000000, 1.000000, 2.000000, 3.000000, ...'
+                   '[right]:  [0.0, 1.0, 2.0, 3.0, ...'
+                   'TODO: needs alignment to NumPy on Numba side')
+    def test_series_astype_float_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts float series to series of strings
+        '''
+        def test_impl(A):
+            res = A.astype(str)
+            print(res)
+            return res
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_int32_to_int64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series with dtype=int32 to series with dtype=int64
+        '''
+        def test_impl(A):
+            return A.astype(np.int64)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n), dtype=np.int32)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_int_to_float64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts integer series to series of float
+        '''
+        def test_impl(A):
+            return A.astype(np.float64)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_float_to_int32(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts float series to series of integers
+        '''
+        def test_impl(A):
+            return A.astype(np.int32)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support string literal as dtype arg')
+    def test_series_astype_literal_dtype1(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           converts float series to series of integers
+        '''
+        def test_impl(A):
+            return A.astype('int32')
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to int')
+    def test_series_astype_str_to_int32(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series of strings to series of integers
+        '''
+        import numba
+        def test_impl(A):
+            return A.astype(np.int32)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series([str(x) for x in np.arange(n) - n // 2])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to float')
+    def test_series_astype_str_to_float64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series of strings to series of float
+        '''
+        def test_impl(A):
+            return A.astype(np.float64)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_np_call_on_series1(self):
         def test_impl(A):

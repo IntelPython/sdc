@@ -446,7 +446,8 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.
         dtype, = args
-        if isinstance(dtype, types.Function) and dtype.typing_key == str:
+        if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+                or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
             ret_type = SeriesType(string_type)
             sig = signature(ret_type, *args)
         else:
