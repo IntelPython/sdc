@@ -192,7 +192,7 @@ class TestSeriesStringMethods(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.total_data_size_bytes = 1024**2 # 1Mb
+        cls.total_data_length = 10**5 + 513
 
     @classmethod
     def tearDownClass(cls):
@@ -203,7 +203,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -219,7 +219,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -234,7 +234,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -249,7 +249,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -264,7 +264,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -279,7 +279,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         hpat_func = hpat.jit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -296,7 +296,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(strip_cases, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -313,7 +313,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(strip_cases, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)
@@ -330,7 +330,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
 
         for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen(strip_cases, data_width, self.total_data_size_bytes)
+            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data)

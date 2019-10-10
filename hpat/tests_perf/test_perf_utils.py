@@ -63,6 +63,24 @@ def get_size(obj):
     return size
 
 
+def multiply_data(tmpl, max_item_len):
+    """Multiply specified 2D like data."""
+    result = []
+    for item in tmpl:
+        local_item = item
+        local_item_len = len(local_item)
+
+        while (local_item_len < max_item_len) and (local_item_len >= 0):
+            local_item += item
+            local_item_len = len(local_item)
+
+        # Trim local_item to max_item_len
+        local_item = local_item[:max_item_len]
+        result.append(local_item)
+
+    return result
+
+
 def perf_data_gen(tmpl, max_item_len, max_bytes_size):
     """
     Data generator produces 2D like data.
@@ -72,24 +90,28 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
 
                 return: list of strings
     """
-
     result = []
-    obj_size = get_size(tmpl)
-
-    while (obj_size < max_bytes_size) and (obj_size >= 0):
-        for item in tmpl:
-            local_item = item
-            local_item_len = len(local_item)
-
-            while (local_item_len < max_item_len) and (local_item_len >= 0):
-                local_item += item
-                local_item_len = len(local_item)
-
-            result.append(local_item)
-
-        obj_size = get_size(result)
+    while get_size(result) < max_bytes_size:
+        result.extend(multiply_data(tmpl, max_item_len))
 
     return result
+
+
+def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
+    """
+    Data generator produces 2D like data.
+                  tmpl: list of input template string
+          max_item_len: length (in elements) of resulted string in an element of the result array
+           max_obj_len: maximum length of the return data
+
+                return: list of strings
+    """
+    result = []
+    while len(result) < max_obj_len:
+        result.extend(multiply_data(tmpl, max_item_len))
+
+    # Trim result to max_obj_len
+    return result[:max_obj_len]
 
 
 test_results_data = pandas.DataFrame()
@@ -157,7 +179,7 @@ def print_results():
     grouped_data = test_results_data.groupby(index)[columns].first().sort_values(['name', 'type', 'width'])
     print(grouped_data.to_string())
 
-    with pandas.ExcelWriter('test_results.xlsx') as writer:
+    with pandas.ExcelWriter('perf_results.xlsx') as writer:
         grouped_data.to_excel(writer)
 
 
