@@ -27,7 +27,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import gc
 import sys
+
 import pandas
 
 """
@@ -44,6 +46,23 @@ Data handling:
 """
 
 
+def get_size(obj):
+    """Sum size of object and its members."""
+    size = 0
+    processed_ids = set()
+    objects = [obj]
+    while objects:
+        need_refer = []
+        for obj in objects:
+            if id(obj) in processed_ids:
+                continue
+            processed_ids.add(id(obj))
+            need_refer.append(obj)
+            size += sys.getsizeof(obj)
+        objects = gc.get_referents(*need_refer)
+    return size
+
+
 def perf_data_gen(tmpl, max_item_len, max_bytes_size):
     """
     Data generator produces 2D like data.
@@ -55,7 +74,7 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
     """
 
     result = []
-    obj_size = sys.getsizeof(tmpl, -1)
+    obj_size = get_size(tmpl)
 
     while (obj_size < max_bytes_size) and (obj_size >= 0):
         for item in tmpl:
@@ -68,27 +87,32 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
 
             result.append(local_item)
 
-        obj_size = sys.getsizeof(result, -1)
+        obj_size = get_size(result)
 
     return result
 
 
-test_results_data = pandas.DataFrame(columns=['name', 'type', 'width', 'Time(s)'])
+test_results_data = pandas.DataFrame()
 
 
-def add_results(test_name, test_type, test_data_width, test_results):
+def add_results(test_name, test_type, data_size, data_width, test_results, boxing_results=None, compile_results=None):
     """
     Add performance testing timing results into global storage
               test_name: Name of test (1st column in grouped result)
               test_type: Type of test (2nd column in grouped result)
         test_data_width: Scalability attribute for input data (3rd column in grouped result)
            test_results: List of timing results of the experiment
+         boxing_results: List of timing results of the overhead (boxing/unboxing)
+       compilation_time: Timing result of compilation
     """
 
     local_results = pandas.DataFrame({'name': test_name,
                                       'type': test_type,
-                                      'width': test_data_width,
-                                      'Time(s)': test_results})
+                                      'size': data_size,
+                                      'width': data_width,
+                                      'Time(s)': test_results,
+                                      'Compilation(s)': compile_results,
+                                      'Boxing(s)': boxing_results})
     global test_results_data
 #     test_results_data = pandas.concat([test_results_data, local_results])
     test_results_data = test_results_data.append(local_results)
@@ -97,42 +121,44 @@ def add_results(test_name, test_type, test_data_width, test_results):
 def print_results():
     """
     Print performance testing results from global data storage
-
     Example:
-        name           type      width median   min      max
-        unicode_center JIT       16    0.717773 0.672643 0.759156
-                                 64    0.681843 0.664885 0.732811
-                                 512   0.697704 0.670506 0.733021
-                                 1024  0.672802 0.665532 0.712082
-                       Reference 16    0.441212 0.418706 0.478509
-                                 64    0.431903 0.423517 0.473604
-                                 512   0.429890 0.421120 0.478813
-                                 1024  0.429866 0.422612 0.468271
-        unicode_join   JIT       16    0.677574 0.658613 0.704243
-                                 64    0.638922 0.631664 0.681562
-                                 512   0.831152 0.797906 0.850718
-                                 1024  1.076941 1.041046 1.123236
-                       Reference 16    0.273045 0.254438 0.280705
-                                 64    0.249600 0.240926 0.272831
-                                 512   0.394346 0.386359 0.431976
-                                 1024  0.553249 0.542781 0.607437
+                                                median       min       max  compilation(median)  boxing(median)
+        name           type      size  width
+        series_str_len JIT       33174 16     0.005283  0.005190  0.005888             0.163459        0.001801
+                                 6201  64     0.001473  0.001458  0.001886             0.156071        0.000528
+                                 1374  512    0.001087  0.001066  0.001268             0.154500        0.000972
+                                 729   1024   0.000998  0.000993  0.001235             0.155549        0.001002
+                       Reference 33174 16     0.007499  0.007000  0.010999                  NaN        0.000000
+                                 6201  64     0.001998  0.001498  0.002002                  NaN        0.000000
+                                 1374  512    0.000541  0.000500  0.000960                  NaN        0.000000
+                                 729   1024   0.000500  0.000000  0.000502                  NaN        0.000000
     """
-
     global test_results_data
+
+    if test_results_data.empty:
+        return None
 
     # Following code is terrible. needs to be redeveloped
     # print(test_results_data)
-    median_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].median()
-    min_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].min()
-    max_col = test_results_data.groupby(['name', 'type', 'width'])['Time(s)'].max()
+    index = ['name', 'type', 'size', 'width']
+    median_col = test_results_data.groupby(index)['Time(s)'].median()
+    min_col = test_results_data.groupby(index)['Time(s)'].min()
+    max_col = test_results_data.groupby(index)['Time(s)'].max()
 
-    test_results_data = test_results_data.set_index(['name', 'type', 'width'])
+    test_results_data = test_results_data.set_index(index)
     test_results_data['median'] = median_col
     test_results_data['min'] = min_col
     test_results_data['max'] = max_col
+    test_results_data['compilation(median)'] = test_results_data.groupby(index)['Compilation(s)'].median(skipna=False)
+    test_results_data['boxing(median)'] = test_results_data.groupby(index)['Boxing(s)'].median(skipna=False)
     test_results_data = test_results_data.reset_index()
 
-    print(test_results_data.groupby(['name', 'type', 'width', 'median', 'min', 'max']).first())
+    columns = ['median', 'min', 'max', 'compilation(median)', 'boxing(median)']
+    grouped_data = test_results_data.groupby(index)[columns].first().sort_values(['name', 'type', 'width'])
+    print(grouped_data.to_string())
+
+    with pandas.ExcelWriter('test_results.xlsx') as writer:
+        grouped_data.to_excel(writer)
 
 
 if __name__ == "__main__":

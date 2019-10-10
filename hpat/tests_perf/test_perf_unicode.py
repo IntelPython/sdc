@@ -26,12 +26,10 @@
 # *****************************************************************************
 
 import unittest
-import numba
 import time
-import sys
-import pandas
+import numba
 
-from hpat.tests.tests_perf.test_perf_utils import *
+from hpat.tests_perf.test_perf_utils import *
 
 
 STRIP_CASES = [
@@ -104,42 +102,39 @@ class TestStringMethods(unittest.TestCase):
         super().__init__(*args, **kwargs)
 
     @classmethod
-    def setUpClass(self):
-        self.total_data_size_bytes = 1.0E+07
+    def setUpClass(cls):
+        cls.total_data_size_bytes = 1.0E+07
 
     @classmethod
-    def tearDownClass(self):
+    def setUpClass(cls):
         print_results()
 
-    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_split(self):
         pyfunc = usecase_split
         hpat_func = numba.njit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
             test_data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
-            add_results('unicode_split', 'JIT', data_width, hpat_func(test_data))
-            add_results('unicode_split', 'Reference', data_width, pyfunc(test_data))
+            add_results('unicode_split', 'JIT', len(test_data), data_width, hpat_func(test_data))
+            add_results('unicode_split', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
-    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_join(self):
         pyfunc = usecase_join
         hpat_func = numba.njit(pyfunc)
 
         for data_width in [16, 64, 512, 1024]:
             test_data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
-            add_results('unicode_join', 'JIT', data_width, hpat_func(test_data))
-            add_results('unicode_join', 'Reference', data_width, pyfunc(test_data))
+            add_results('unicode_join', 'JIT', len(test_data), data_width, hpat_func(test_data))
+            add_results('unicode_join', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
-    @unittest.skip("Needs to be moved to separate configuration instead runing with all other tests")
     def test_unicode_center(self):
         pyfunc = usecase_center
         hpat_func = numba.njit(pyfunc, parallel=True)
 
         for data_width in [16, 64, 512, 1024]:
             test_data = perf_data_gen(STRIP_CASES, 32, self.total_data_size_bytes)
-            add_results('unicode_center', 'JIT', data_width, hpat_func(test_data))
-            add_results('unicode_center', 'Reference', data_width, pyfunc(test_data))
+            add_results('unicode_center', 'JIT', len(test_data), data_width, hpat_func(test_data))
+            add_results('unicode_center', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
 
 if __name__ == "__main__":
