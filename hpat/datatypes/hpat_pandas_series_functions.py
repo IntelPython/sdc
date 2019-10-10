@@ -924,7 +924,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     _func_name = 'Method max().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
         raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
