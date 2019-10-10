@@ -1249,7 +1249,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
 
 @overload_method(SeriesType, 'abs')
-def hpat_pandas_series_append(self):
+def hpat_pandas_series_abs(self):
     """
     Pandas Series method :meth:`pandas.Series.abs` implementation.
 
