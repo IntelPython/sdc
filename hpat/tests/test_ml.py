@@ -5,21 +5,22 @@ from math import sqrt
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                            count_parfor_OneDs, count_array_OneDs,
-                            count_parfor_OneD_Vars, count_array_OneD_Vars,
-                            dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs,
+                                   count_parfor_OneD_Vars, count_array_OneD_Vars,
+                                   dist_IR_contains)
 
 
 class TestML(unittest.TestCase):
+
     def test_logistic_regression(self):
         def test_impl(n, d):
             iterations = 3
-            X = np.ones((n,d))+.5
+            X = np.ones((n, d)) + .5
             Y = np.ones(n)
             D = X.shape[1]
-            w = np.ones(D)-0.5
+            w = np.ones(D) - 0.5
             for i in range(iterations):
-                w -= np.dot(((1.0 / (1.0 + np.exp(-Y * np.dot(X,w))) - 1.0) * Y), X)
+                w -= np.dot(((1.0 / (1.0 + np.exp(-Y * np.dot(X, w))) - 1.0) * Y), X)
             return w
 
         hpat_func = hpat.jit(test_impl)
@@ -34,7 +35,7 @@ class TestML(unittest.TestCase):
             iterations = 3
             g = 2 * np.ones(D) - 1
             X = 2 * np.ones((N, D)) - 1
-            Y = ((np.dot(X, g) > 0.0) == (np.ones(N) > .90))+.0
+            Y = ((np.dot(X, g) > 0.0) == (np.ones(N) > .90)) + .0
 
             w = 2 * np.ones(D) - 1
             for i in range(iterations):
@@ -80,7 +81,7 @@ class TestML(unittest.TestCase):
                 p = X[i]
                 d = (-(p - points)**2) / (2 * b**2)
                 m = np.min(d)
-                exps += m - np.log(b * N)+np.log(np.sum(np.exp(d - m)))
+                exps += m - np.log(b * N) + np.log(np.sum(np.exp(d - m)))
             return exps
 
         hpat_func = hpat.jit(test_impl)
@@ -89,19 +90,18 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.skip("fix getitem dist after static_getitem is removed")
     def test_kmeans(self):
         def test_impl(numCenter, numIter, N, D):
             A = np.ones((N, D))
             centroids = np.zeros((numCenter, D))
 
             for l in range(numIter):
-                dist = np.array([[sqrt(np.sum((A[i,:]-centroids[j,:])**2))
-                                        for j in range(numCenter)] for i in range(N)])
-                labels = np.array([dist[i,:].argmin() for i in range(N)])
+                dist = np.array([[sqrt(np.sum((A[i, :] - centroids[j, :])**2))
+                                  for j in range(numCenter)] for i in range(N)])
+                labels = np.array([dist[i, :].argmin() for i in range(N)])
 
-                centroids = np.array([[np.sum(A[labels==i, j])/np.sum(labels==i)
-                                         for j in range(D)] for i in range(numCenter)])
+                centroids = np.array([[np.sum(A[labels == i, j]) / np.sum(labels == i)
+                                       for j in range(D)] for i in range(numCenter)])
 
             return centroids
 
@@ -112,6 +112,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneD_Vars(), 1)
         self.assertEqual(count_parfor_OneDs(), 5)
         self.assertEqual(count_parfor_OneD_Vars(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

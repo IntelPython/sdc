@@ -1,10 +1,10 @@
 #include <Python.h>
-#include <string>
+#include <boost/foreach.hpp>
 #include <cstring>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
-#include <boost/foreach.hpp>
+#include <string>
 #define foreach BOOST_FOREACH
 
 void* open_bag(std::string* fname);
@@ -13,24 +13,25 @@ void get_image_dims(int64_t* out_dims, rosbag::Bag* bag);
 int read_images(uint8_t* buff, rosbag::Bag* bag);
 int read_images_parallel(uint8_t* buff, rosbag::Bag* bag, int64_t start, int64_t cout);
 
-PyMODINIT_FUNC PyInit_ros_cpp(void) {
-    PyObject *m;
+PyMODINIT_FUNC PyInit_ros_cpp(void)
+{
+    PyObject* m;
     static struct PyModuleDef moduledef = {
-            PyModuleDef_HEAD_INIT, "ros_cpp", "No docs", -1, NULL, };
+        PyModuleDef_HEAD_INIT,
+        "ros_cpp",
+        "No docs",
+        -1,
+        NULL,
+    };
     m = PyModule_Create(&moduledef);
     if (m == NULL)
         return NULL;
 
-    PyObject_SetAttrString(m, "open_bag",
-                            PyLong_FromVoidPtr((void*)(&open_bag)));
-    PyObject_SetAttrString(m, "get_msg_count",
-                            PyLong_FromVoidPtr((void*)(&get_msg_count)));
-    PyObject_SetAttrString(m, "get_image_dims",
-                            PyLong_FromVoidPtr((void*)(&get_image_dims)));
-    PyObject_SetAttrString(m, "read_images",
-                            PyLong_FromVoidPtr((void*)(&read_images)));
-    PyObject_SetAttrString(m, "read_images_parallel",
-                            PyLong_FromVoidPtr((void*)(&read_images_parallel)));
+    PyObject_SetAttrString(m, "open_bag", PyLong_FromVoidPtr((void*)(&open_bag)));
+    PyObject_SetAttrString(m, "get_msg_count", PyLong_FromVoidPtr((void*)(&get_msg_count)));
+    PyObject_SetAttrString(m, "get_image_dims", PyLong_FromVoidPtr((void*)(&get_image_dims)));
+    PyObject_SetAttrString(m, "read_images", PyLong_FromVoidPtr((void*)(&read_images)));
+    PyObject_SetAttrString(m, "read_images_parallel", PyLong_FromVoidPtr((void*)(&read_images_parallel)));
     return m;
 }
 
@@ -68,12 +69,12 @@ int read_images(uint8_t* buff, rosbag::Bag* bag)
     uint32_t width;
     int channels = 3;
     int msg_no = 0;
-    foreach(rosbag::MessageInstance const msg, view)
+    foreach (rosbag::MessageInstance const msg, view)
     {
         sensor_msgs::Image::ConstPtr im_msg = msg.instantiate<sensor_msgs::Image>();
         if (im_msg != NULL)
         {
-            if (msg_no==0)
+            if (msg_no == 0)
             {
                 height = im_msg->height;
                 width = im_msg->width;
@@ -82,14 +83,14 @@ int read_images(uint8_t* buff, rosbag::Bag* bag)
             {
                 if (height != im_msg->height || width != im_msg->width)
                 {
-                    std::cerr << "ROS image height/width not consistent" << "\n";
+                    std::cerr << "ROS image height/width not consistent"
+                              << "\n";
                     return -1;
                 }
-
             }
-            int img_size = height*width*channels;
+            int img_size = height * width * channels;
             // std::cout << img_size << " " << im_msg->step << "\n";
-            uint8_t *curr_buff = buff + img_size*msg_no;
+            uint8_t* curr_buff = buff + img_size * msg_no;
             memcpy(curr_buff, im_msg->data.data(), img_size);
             msg_no++;
         }
@@ -105,14 +106,14 @@ int read_images_parallel(uint8_t* buff, rosbag::Bag* bag, int64_t start, int64_t
     uint32_t width = 0;
     int channels = 3;
     int64_t msg_no = 0;
-    foreach(rosbag::MessageInstance const msg, view)
+    foreach (rosbag::MessageInstance const msg, view)
     {
         if (msg_no < start)
         {
             msg_no++;
             continue;
         }
-        if (msg_no >= start+count)
+        if (msg_no >= start + count)
             break;
         sensor_msgs::Image::ConstPtr im_msg = msg.instantiate<sensor_msgs::Image>();
         if (im_msg != NULL)
@@ -126,14 +127,14 @@ int read_images_parallel(uint8_t* buff, rosbag::Bag* bag, int64_t start, int64_t
             {
                 if (height != im_msg->height || width != im_msg->width)
                 {
-                    std::cerr << "ROS image height/width not consistent" << "\n";
+                    std::cerr << "ROS image height/width not consistent"
+                              << "\n";
                     return -1;
                 }
-
             }
-            int img_size = height*width*channels;
+            int img_size = height * width * channels;
             // std::cout << img_size << " " << im_msg->step << "\n";
-            uint8_t *curr_buff = buff + img_size*(msg_no-start);
+            uint8_t* curr_buff = buff + img_size * (msg_no - start);
             memcpy(curr_buff, im_msg->data.data(), img_size);
             msg_no++;
         }

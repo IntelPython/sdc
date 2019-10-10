@@ -6,11 +6,13 @@ import numba
 import hpat
 import random
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
-    dist_IR_contains, get_rank, get_start_end)
+                                   count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
+                                   dist_IR_contains, get_rank, get_start_end)
+
 
 def get_np_state_ptr():
     return numba._helperlib.rnd_get_np_state_ptr()
+
 
 def _copy_py_state(r, ptr):
     """
@@ -51,6 +53,7 @@ class BaseTest(unittest.TestCase):
 
 
 class TestBasic(BaseTest):
+
     def test_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -66,7 +69,7 @@ class TestBasic(BaseTest):
 
     def test_setitem1(self):
         def test_impl(N):
-            A = np.arange(10)+1.0
+            A = np.arange(10) + 1.0
             A[0] = 30
             return A.sum()
 
@@ -78,7 +81,7 @@ class TestBasic(BaseTest):
 
     def test_setitem2(self):
         def test_impl(N):
-            A = np.arange(10)+1.0
+            A = np.arange(10) + 1.0
             A[0:4] = 30
             return A.sum()
 
@@ -117,7 +120,6 @@ class TestBasic(BaseTest):
         # self.assertEqual(count_array_REPs(), 0)
         # self.assertEqual(count_parfor_REPs(), 0)
 
-
     def test_inplace_binop(self):
         def test_impl(N):
             A = np.ones(N)
@@ -147,7 +149,7 @@ class TestBasic(BaseTest):
     def test_whole_slice(self):
         def test_impl(N):
             X = np.ones((N, 4))
-            X[:,3] = (X[:,3]) / (np.max(X[:,3]) - np.min(X[:,3]))
+            X[:, 3] = (X[:, 3]) / (np.max(X[:, 3]) - np.min(X[:, 3]))
             return X.sum()
 
         hpat_func = hpat.jit(test_impl)
@@ -170,17 +172,18 @@ class TestBasic(BaseTest):
 
     def test_assert(self):
         # make sure assert in an inlined function works
+
         def g(a):
-            assert a==0
+            assert a == 0
 
         hpat_g = hpat.jit(g)
+
         def f():
             hpat_g(0)
 
         hpat_f = hpat.jit(f)
         hpat_f()
 
-    @unittest.skip("pending Numba #3946")
     def test_inline_locals(self):
         # make sure locals in inlined function works
         @hpat.jit(locals={'B': hpat.float64[:]})
@@ -199,8 +202,9 @@ class TestBasic(BaseTest):
         funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
         for (dtype, func) in itertools.product(dtypes, funcs):
             # loc allreduce doesn't support int64 on windows
-            if (sys.platform.startswith('win') and dtype=='int64'
-                                            and func in ['argmin', 'argmax']):
+            if (sys.platform.startswith('win')
+                    and dtype == 'int64'
+                    and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(n):
                 A = np.arange(0, n, 1, np.{})
@@ -222,8 +226,9 @@ class TestBasic(BaseTest):
         funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
         for (dtype, func) in itertools.product(dtypes, funcs):
             # loc allreduce doesn't support int64 on windows
-            if (sys.platform.startswith('win') and dtype=='int64'
-                                            and func in ['argmin', 'argmax']):
+            if (sys.platform.startswith('win')
+                    and dtype == 'int64'
+                    and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(A):
                 return A.{}()
@@ -232,7 +237,7 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            hpat_func = hpat.jit(locals={'A:input': 'distributed'})(test_impl)
             n = 21
             start, end = get_start_end(n)
             np.random.seed(0)
@@ -248,8 +253,9 @@ class TestBasic(BaseTest):
         funcs = ['sum', 'prod', 'min', 'max', 'argmin', 'argmax']
         for (dtype, func) in itertools.product(dtypes, funcs):
             # loc allreduce doesn't support int64 on windows
-            if (sys.platform.startswith('win') and dtype=='int64'
-                                            and func in ['argmin', 'argmax']):
+            if (sys.platform.startswith('win')
+                    and dtype == 'int64'
+                    and func in ['argmin', 'argmax']):
                 continue
             func_text = """def f(A):
                 A = A[A>5]
@@ -259,7 +265,7 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = hpat.jit(locals={'A:input':'distributed'})(test_impl)
+            hpat_func = hpat.jit(locals={'A:input': 'distributed'})(test_impl)
             n = 21
             start, end = get_start_end(n)
             np.random.seed(0)
@@ -273,7 +279,7 @@ class TestBasic(BaseTest):
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
-        for (op,typ) in zip(binops,dtypes):
+        for (op, typ) in zip(binops, dtypes):
             func_text = """def f(n):
                   A = np.arange(0, 10, 1, {})
                   B = np.arange(0 +  3, 10 + 3, 1, {})
@@ -310,7 +316,7 @@ class TestBasic(BaseTest):
     def test_dist_return_tuple(self):
         def test_impl(N):
             A = np.arange(N)
-            B = np.arange(N)+1.5
+            B = np.arange(N) + 1.5
             return A, B
 
         hpat_func = hpat.jit(locals={'A:return': 'distributed',
@@ -321,8 +327,7 @@ class TestBasic(BaseTest):
                 a, np.int32(hpat.distributed_api.Reduce_Type.Sum.value)))
         dist_sum(1.0)  # run to compile
         np.testing.assert_allclose(
-            dist_sum((hpat_func(n)[0] + hpat_func(n)[1]).sum()),
-                    (test_impl(n)[0] + test_impl(n)[1]).sum())
+            dist_sum((hpat_func(n)[0] + hpat_func(n)[1]).sum()), (test_impl(n)[0] + test_impl(n)[1]).sum())
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
 
@@ -339,7 +344,7 @@ class TestBasic(BaseTest):
     def test_rebalance(self):
         def test_impl(N):
             A = np.arange(n)
-            B = A[A>10]
+            B = A[A > 10]
             C = hpat.distributed_api.rebalance_array(B)
             return C.sum()
 
@@ -356,7 +361,7 @@ class TestBasic(BaseTest):
     def test_rebalance_loop(self):
         def test_impl(N):
             A = np.arange(n)
-            B = A[A>10]
+            B = A[A > 10]
             s = 0
             for i in range(3):
                 s += B.sum()
@@ -478,6 +483,7 @@ class TestBasic(BaseTest):
         for arr_len in [15, 23, 26]:
             A, B, _ = hpat_func3(arr_len)
             np.testing.assert_allclose(A, B)
+
 
 if __name__ == "__main__":
     unittest.main()

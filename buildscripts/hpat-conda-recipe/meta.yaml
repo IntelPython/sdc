@@ -7,6 +7,10 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
+  script_env:
+    - HPAT_CONFIG_MPI
+    - HPAT_NUM_PES
+    - HPAT_RUN_COVERAGE
 
 requirements:
   build:
@@ -16,37 +20,42 @@ requirements:
   host:
     - python
     - setuptools
-    - numba 0.44.*
+    - numba ==0.45
     - numpy
     - pandas >=0.23
-    - pyarrow >=0.9
-    - arrow-cpp
+    - pyarrow ==0.14.1
+    - arrow-cpp ==0.14.1
     - boost
     - hdf5
     - h5py
     - mpich # [not win]
+    - impi_rt # [win]
+    - impi-devel # [win]
+    - conda-package-handling ==1.3.11 #[win]
 
   run:
     - python
     - {{ pin_compatible('numpy') }}
     - pandas >=0.23
-    - pyarrow >=0.9
-    - arrow-cpp
+    - pyarrow ==0.14.1
+    - arrow-cpp ==0.14.1
     - boost
-    - numba 0.44.*
+    - numba ==0.45
     - mpich # [not win]
+    - impi_rt # [win]
+    - conda-package-handling ==1.3.11 #[win]
 
 test:
   requires:
     - h5py
-    - pyspark
     - scipy
+    - coveralls
   imports:
     - hpat
 
 
 about:
-  home: https://github.com/IntelLabs/hpat
+  home: https://github.com/IntelPython/hpat
   license: BSD
   license_file: LICENSE.md
   summary: A compiler-based big data framework in Python

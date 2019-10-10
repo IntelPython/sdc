@@ -1,25 +1,28 @@
 import numba
 from numba import types
 from numba.extending import (typeof_impl, unbox, register_model, models,
-    NativeValue, box)
+                             NativeValue, box)
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
-    lower_builtin)
+                                    lower_builtin)
 from numba.typing import signature
 
 import hpat
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
-    box_datetime_date_array)
+                                            box_datetime_date_array)
 
 
 _data_array_typ = types.Array(types.int64, 1, 'C')
 
 # Array of datetime date objects, same as Array but knows how to box
 # TODO: defer to Array for all operations
+
+
 class ArrayDatetimeDate(types.Array):
     def __init__(self):
         super(ArrayDatetimeDate, self).__init__(
             datetime_date_type, 1, 'C', name='array_datetime_date')
+
 
 array_datetime_date = ArrayDatetimeDate()
 
@@ -40,6 +43,7 @@ def box_df_dummy(typ, val, c):
 def np_arr_to_array_datetime_date(A):
     return A
 
+
 @infer_global(np_arr_to_array_datetime_date)
 class NpArrToArrDtType(AbstractTemplate):
     def generic(self, args, kws):
@@ -47,8 +51,9 @@ class NpArrToArrDtType(AbstractTemplate):
         assert len(args) == 1
         return signature(array_datetime_date, *args)
 
+
 @lower_builtin(np_arr_to_array_datetime_date, types.Array(types.int64, 1, 'C'))
 @lower_builtin(np_arr_to_array_datetime_date,
-    types.Array(datetime_date_type, 1, 'C'))
+               types.Array(datetime_date_type, 1, 'C'))
 def lower_np_arr_to_array_datetime_date(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, args[0])
