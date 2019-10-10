@@ -1146,6 +1146,37 @@ def lower_drop_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
+@overload_method(DataFrameType, 'isna')
+def isna_overload(df):
+
+    def _impl(df):
+        return hpat.hiframes.pd_dataframe_ext.isna_dummy(df)
+
+    return _impl
+
+
+def isna_dummy(df):
+    return df
+
+
+@infer_global(isna_dummy)
+class IsnaDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        df, = args
+        bool_arr = types.Array(types.bool_, 1, 'C')
+        n_cols = len(df.columns)
+        out_df = DataFrameType((bool_arr,) * n_cols, df.index, df.columns)
+        return signature(out_df, *args)
+
+
+@lower_builtin(isna_dummy, types.VarArg(types.Any))
+def lower_isna_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
+
+
 @overload_method(DataFrameType, 'isin')
 def isin_overload(df, values):
 
