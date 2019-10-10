@@ -184,7 +184,6 @@ class TestBasic(BaseTest):
         hpat_f = hpat.jit(f)
         hpat_f()
 
-    @unittest.skip("pending Numba #3946")
     def test_inline_locals(self):
         # make sure locals in inlined function works
         @hpat.jit(locals={'B': hpat.float64[:]})

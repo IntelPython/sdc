@@ -489,12 +489,12 @@ class SeriesAttribute(AttributeTemplate):
         out = SeriesType(ary.dtype, ary.data, out_index)
         return signature(out, *args)
 
-    @bound_function("array.take")
-    def resolve_take(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_take.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+#     @bound_function("array.take")
+#     def resolve_take(self, ary, args, kws):
+#         resolver = ArrayAttribute.resolve_take.__wrapped__
+#         sig = resolver(self, ary.data, args, kws)
+#         sig.return_type = if_arr_to_series_type(sig.return_type)
+#         return sig
 
     @bound_function("series.quantile")
     def resolve_quantile(self, ary, args, kws):
@@ -509,11 +509,11 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_nunique(self, ary, args, kws):
         return signature(types.intp, *args)
 
-    @bound_function("series.unique")
-    def resolve_unique(self, ary, args, kws):
-        # unique returns ndarray for some reason
-        arr_typ = series_to_array_type(ary)
-        return signature(arr_typ, *args)
+    # @bound_function("series.unique")
+    # def resolve_unique(self, ary, args, kws):
+    #     # unique returns ndarray for some reason
+    #     arr_typ = series_to_array_type(ary)
+    #     return signature(arr_typ, *args)
 
     @bound_function("series.describe")
     def resolve_describe(self, ary, args, kws):
@@ -599,14 +599,14 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_combine(self, ary, args, kws):
         return self._resolve_combine_func(ary, args, kws)
 
-    @bound_function("series.abs")
-    def resolve_abs(self, ary, args, kws):
-        # call np.abs(A) to get return type
-        arr_typ = series_to_array_type(ary)
-        all_args = tuple([arr_typ] + list(args))
-        ret_typ = self.context.resolve_function_type(np.abs, all_args, kws).return_type
-        ret_typ = if_arr_to_series_type(ret_typ)
-        return signature(ret_typ, *args)
+    # @bound_function("series.abs")
+    # def resolve_abs(self, ary, args, kws):
+    #     # call np.abs(A) to get return type
+    #     arr_typ = series_to_array_type(ary)
+    #     all_args = tuple([arr_typ] + list(args))
+    #     ret_typ = self.context.resolve_function_type(np.abs, all_args, kws).return_type
+    #     ret_typ = if_arr_to_series_type(ret_typ)
+    #     return signature(ret_typ, *args)
 
     def _resolve_cov_func(self, ary, args, kws):
         # array is valid since hiframes_typed calls this after type replacement
@@ -987,7 +987,7 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
