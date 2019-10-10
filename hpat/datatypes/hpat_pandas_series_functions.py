@@ -409,6 +409,59 @@ def hpat_pandas_series_groupby(
     return hpat_pandas_series_groupby_impl
 
 
+@overload_method(SeriesType, 'isna')
+def hpat_pandas_series_isna(self):
+    """
+    Pandas Series method :meth:`pandas.Series.append` implementation.
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+               input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method isna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if isinstance(self.dtype, (types.Integer, types.Float)):
+
+        def hpat_pandas_series_isna_impl(self):
+
+            return pandas.Series(numpy.isnan(self._data))
+
+        return hpat_pandas_series_isna_impl
+
+    if isinstance(self.dtype, types.UnicodeType):
+
+        def hpat_pandas_series_isna_impl(self):
+            arr = numpy.arange(len(self._data))
+            #Need to find way to create arr[bool] without workaround
+            result = arr == 4
+            byte_size = 8
+            for i in range(len(self._data)):
+                bmap_idx = i // byte_size
+                bit_idx = i % byte_size
+                bmap = self._data.null_bitmap[bmap_idx]
+                bit_value = (bmap >> bit_idx) & 1
+                result[i] = bit_value == 0
+            return pandas.Series(result)
+
+        return hpat_pandas_series_isna_impl
+
+
 @overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """

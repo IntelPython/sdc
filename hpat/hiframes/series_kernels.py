@@ -518,7 +518,7 @@ series_replace_funcs = {
     'corr': _column_corr_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
-    'isna': _series_isna_impl,
+    # 'isna': _series_isna_impl,
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,

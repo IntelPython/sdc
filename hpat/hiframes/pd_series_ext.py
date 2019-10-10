@@ -648,11 +648,11 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
-    @bound_function("series.isna")
-    def resolve_isna(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.isna")
+    # def resolve_isna(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     # alias of isna
     @bound_function("series.isnull")
