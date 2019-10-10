@@ -241,7 +241,6 @@ make_attribute_wrapper(SeriesType, 'index', '_index')
 make_attribute_wrapper(SeriesType, 'name', '_name')
 
 
-from hpat.datatypes.hpat_pandas_series_functions import *
 @lower_builtin('getiter', SeriesType)
 def getiter_series(context, builder, sig, args):
     """
@@ -987,7 +986,7 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take', 'resolve_min']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
@@ -1280,4 +1279,4 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
     return hpat_pandas_series_ctor_impl
 
-
+from hpat.datatypes.hpat_pandas_series_functions import *

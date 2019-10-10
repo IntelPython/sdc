@@ -497,7 +497,7 @@ series_replace_funcs = {
     'count': _column_count_impl,
     'mean': _column_mean_impl,
     'max': defaultdict(lambda: _column_max_impl, [(types.NPDatetime('ns'), _column_max_impl_no_isnan)]),
-    # 'min': defaultdict(lambda: _column_min_impl, [(types.NPDatetime('ns'), _column_min_impl_no_isnan)]),
+    'min': defaultdict(lambda: _column_min_impl, [(types.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
     'nunique': lambda A: hpat.hiframes.api.nunique(A),
