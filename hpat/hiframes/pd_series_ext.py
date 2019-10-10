@@ -508,11 +508,11 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_nunique(self, ary, args, kws):
         return signature(types.intp, *args)
 
-    @bound_function("series.unique")
-    def resolve_unique(self, ary, args, kws):
-        # unique returns ndarray for some reason
-        arr_typ = series_to_array_type(ary)
-        return signature(arr_typ, *args)
+    # @bound_function("series.unique")
+    # def resolve_unique(self, ary, args, kws):
+    #     # unique returns ndarray for some reason
+    #     arr_typ = series_to_array_type(ary)
+    #     return signature(arr_typ, *args)
 
     @bound_function("series.describe")
     def resolve_describe(self, ary, args, kws):
@@ -700,13 +700,13 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
-    @bound_function("series.max")
-    def resolve_max(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.max")
+    # def resolve_max(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.min")
     def resolve_min(self, ary, args, kws):
@@ -986,7 +986,8 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_take', 'resolve_max']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

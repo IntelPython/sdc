@@ -797,7 +797,6 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip("TODO: fix result")
     def test_series_dropna_str_parallel1(self):
         def test_impl(A):
             B = A.dropna()
@@ -917,13 +916,35 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_series_max1(self):
+    def test_series_max(self):
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        # TODO type_min/type_max
+        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                           [8, 31, 1123, -1024],
+                           [2., 3., 1, -1000, np.inf]]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.max() any parameters unsupported")
+    def test_series_max_param(self):
+        def test_impl(S, param_skipna):
+            return S.max(skipna=param_skipna)
+
+        hpat_func = hpat.jit(test_impl)
+
+        for input_data, param_skipna in [([np.nan, 2., np.nan, 3., 1, -1000, np.inf], True),
+                                         ([2., 3., 1, np.inf, -1000], False)]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
 
     def test_series_value_counts(self):
         def test_impl(S):
@@ -1316,6 +1337,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', None, 'c', 'cccd'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError: Series are different')
+    def test_series_dt_isna1(self):
+        def test_impl(S):
+            return S.isna()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_nlargest1(self):
         def test_impl(S):
             return S.nlargest(4)
@@ -1396,7 +1426,6 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1406,7 +1435,6 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
-
 
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
@@ -1777,6 +1805,37 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
+
+    @unittest.skip("Implement unique without sorting like in pandas")
+    def test_unique(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        S = pd.Series([2, 1, 3, 3])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_sorted(self):
+        def test_impl(S):
+            return S.unique()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        S = pd.Series(np.arange(n))
+        S[2] = 0
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_unique_str(self):
+        def test_impl():
+            data = pd.Series(['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'])
+            return data.unique()
+
+        hpat_func = hpat.jit(test_impl)
+
+        # since the orider of the elements are diffrent - check count of elements only
+        ref_result = test_impl().size
+        result = hpat_func().size
+        np.testing.assert_array_equal(ref_result, result)
 
     def test_series_groupby_count(self):
         def test_impl():
