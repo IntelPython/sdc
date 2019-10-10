@@ -709,13 +709,13 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    @bound_function("series.min")
-    def resolve_min(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.min")
+    # def resolve_min(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.value_counts")
     def resolve_value_counts(self, ary, args, kws):
@@ -988,7 +988,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_take', 'resolve_max']
+                           'resolve_take', 'resolve_max', 'resolve_min']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
