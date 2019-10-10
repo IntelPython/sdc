@@ -797,7 +797,6 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip("TODO: fix result")
     def test_series_dropna_str_parallel1(self):
         def test_impl(A):
             B = A.dropna()
@@ -1316,6 +1315,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', None, 'c', 'cccd'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError: Series are different')
+    def test_series_dt_isna1(self):
+        def test_impl(S):
+            return S.isna()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_nlargest1(self):
         def test_impl(S):
             return S.nlargest(4)
@@ -1396,7 +1404,6 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1406,7 +1413,6 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
-
 
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
