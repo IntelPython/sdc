@@ -418,6 +418,7 @@ def hpat_pandas_series_isna(self):
 
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
 
     Parameters
     -----------
