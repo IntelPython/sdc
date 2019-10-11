@@ -449,6 +449,7 @@ def hpat_pandas_series_isna(self):
         def hpat_pandas_series_isna_impl(self):
             result = numpy.empty(len(self._data), numpy.bool_)
             byte_size = 8
+            # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
             for i in range(len(self._data)):
                 bmap_idx = i // byte_size
                 bit_idx = i % byte_size
