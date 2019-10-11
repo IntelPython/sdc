@@ -1437,10 +1437,6 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @unittest.skip('Failed due to lack of Int64Index support. Error:'
-                   'Series.index values are different (66.66667 %)'
-                   '[left]:  RangeIndex(start=0, stop=3, step=1)'
-                   '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index3(self):
         '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):
@@ -1627,7 +1623,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enable after fixing distributed for get_series_index")
     def test_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
@@ -1693,7 +1688,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Implement indexing by RangeIndex for Series")
     def test_series_default_index(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])

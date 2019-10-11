@@ -950,11 +950,12 @@ class HiFramesTyped(object):
             data = self._get_series_data(series_var, nodes)
             func = series_replace_funcs[func_name]
 
-            if self.typemap[series_var.name].index != types.none:
-                index = self._get_series_index(series_var, nodes)
-                func = series_replace_funcs['head_index']
-            else:
-                index = self._get_index_values(data, nodes)
+            # TODO: Don't set index to none
+            # if self.typemap[series_var.name].index != types.none:
+            index = self._get_series_index(series_var, nodes)
+            func = series_replace_funcs['head_index']
+            # else:
+            #     index = self._get_index_values(data, nodes)
 
             name = self._get_series_name(series_var, nodes)
 

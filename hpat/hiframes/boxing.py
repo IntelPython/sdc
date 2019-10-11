@@ -155,10 +155,19 @@ def _infer_series_list_dtype(S):
 
 def _infer_index_type(index):
     # TODO: support proper inference
+
+    # np.dtype('O') - Python objects
     if index.dtype == np.dtype('O') and len(index) > 0:
         first_val = index[0]
         if isinstance(first_val, str):
             return string_array_type
+
+    # Types like
+    elif index.dtype == np.int64:
+        # RangeIndex or integers in index
+        # TODO: Doesn't work
+        return types.Array(types.Integer, 1, 'C')
+
     return types.none
 
 
@@ -275,6 +284,26 @@ def unbox_series(typ, val, c):
     if typ.index == string_array_type:
         index_obj = c.pyapi.object_getattr_string(val, "index")
         series.index = unbox_str_series(string_array_type, index_obj, c).value
+
+    if typ.index == types.Array:
+        #TODO: Case when index is ArrayType
+        print("Index is array")
+
+    if isinstance(typ.index, types.NoneType):
+        # TODO: Case when index is NoneType
+        print("None index")
+
+        # TODO: make this in inference??
+
+        # Allocate a new native list?
+        # get size of array
+        # arr_size_fnty = LLType.function(c.pyapi.py_ssize_t, [c.pyapi.pyobj])
+        # arr_size_fn = c.pyapi._get_function(arr_size_fnty, name="array_size")
+        # size = c.builder.call(arr_size_fn, [arr_obj])
+
+        # ok, list = listobj.ListInstance.allocate_ex(c.context, c.builder, types.ListType, 3)
+
+
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
         series.name = numba.unicode.unbox_unicode_str(
