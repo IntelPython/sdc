@@ -166,13 +166,36 @@ class Sum:
         return series.sum()
 
     def time_sum(self, size, implementation):
-        """Time both interpreted and compiled Series.min"""
+        """Time both interpreted and compiled Series.sum"""
         if implementation == Impl.compiled_python.value:
             return self._sum(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.sum()
 
 
+class Count:
+    params = [
+        [5 * 10 ** 8 + 513],
+        [Impl.interpreted_python.value, Impl.compiled_python.value]
+    ]
+    param_names = ['size', 'implementation']
+
+    def setup(self, size, implementation):
+        self.series = FloatSeriesGenerator(size).generate()
+
+    @staticmethod
+    @hpat.jit
+    def _count(series):
+        return series.count()
+
+    def time_count(self, size, implementation):
+        """Time both interpreted and compiled Series.count"""
+        if implementation == Impl.compiled_python.value:
+            return self._count(self.series)
+        if implementation == Impl.interpreted_python.value:
+            return self.series.count()
+
+              
 class Nlargest:
     params = [
         [5 * 10 ** 7 + 513],
