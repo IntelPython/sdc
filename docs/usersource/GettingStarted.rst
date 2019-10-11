@@ -32,7 +32,24 @@ How to use HPAT
     •	Working with a machine learning library, e.g. scikit-learn, xgboost, daal
     
     Each snapshot can have two flavors - serial and parallel to illustrate easiness of getting parallel performance. Each code snapshot provides the link to full examples located at GitHub repo>
- 
+
+Here's an example which describes reading data from a csv file and performing basic operation like finding mean and sorting values of a specific column:
+
+.. literalinclude:: ../../examples/series_basic.py
+   :language: python
+   :linenos:
+   :caption: series_basic
+   :name: series_basic
+   
+Here's another simple example which uses merge and concat operations for Pandas Dataframes:
+
+.. literalinclude:: ../../examples/Basic_DataFrame.py
+   :language: python
+   :linenos:
+   :caption: merge_concat
+   :name: merge_concat
+
+   
 What If I Get A Compilation Error
 =================================
 

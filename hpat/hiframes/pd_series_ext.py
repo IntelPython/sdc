@@ -446,7 +446,8 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.
         dtype, = args
-        if isinstance(dtype, types.Function) and dtype.typing_key == str:
+        if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+                or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
             ret_type = SeriesType(string_type)
             sig = signature(ret_type, *args)
         else:
@@ -700,21 +701,21 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
-    @bound_function("series.max")
-    def resolve_max(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.max")
+    # def resolve_max(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
-    @bound_function("series.min")
-    def resolve_min(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.min")
+    # def resolve_min(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.value_counts")
     def resolve_value_counts(self, ary, args, kws):
@@ -986,7 +987,8 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_take', 'resolve_max', 'resolve_min']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
