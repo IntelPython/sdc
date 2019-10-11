@@ -68,7 +68,6 @@ for filename in srcfiles_srcfuncs:
     with open(filename, 'r') as fn:
         content = fn.read()
         for func in func_list:
-            print(func)
             content = content.replace(func, display_names[i])
             i += 1
     with open(filename, 'w') as fn:

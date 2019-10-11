@@ -66,7 +66,6 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @unittest.skip("pending numba #3881")
     def test_agg_seq_min_date(self):
         def test_impl(df):
             df2 = df.groupby('A', as_index=False).min()

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+import platform
 import hpat
 import numpy as np
 import pandas as pd
@@ -294,7 +295,7 @@ class TestStrings(unittest.TestCase):
         A = np.array(['AA', 'B'])
         self.assertEqual(hpat_func(A), test_impl(A))
 
-    @unittest.skip("TODO: crashes, llvm ir is invalid?")
+    @unittest.skipIf(platform.system() == 'Windows', "no glob support on windows yet")
     def test_glob(self):
         def test_impl():
             glob.glob("*py")

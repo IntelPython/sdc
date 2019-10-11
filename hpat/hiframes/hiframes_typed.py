@@ -853,8 +853,8 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max', 'prod'):
             if rhs.args or rhs.kws:
-                raise ValueError("unsupported Series.{}() arguments".format(
-                    func_name))
+                raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
+
             # TODO: handle skipna, min_count arguments
             series_typ = self.typemap[series_var.name]
             series_dtype = series_typ.dtype
@@ -1042,7 +1042,7 @@ class HiFramesTyped(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'take', 'astype')
+        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'astype')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):
