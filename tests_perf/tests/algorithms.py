@@ -166,7 +166,7 @@ class Sum:
         return series.sum()
 
     def time_sum(self, size, implementation):
-        """Time both interpreted and compiled Series.min"""
+        """Time both interpreted and compiled Series.sum"""
         if implementation == Impl.compiled_python.value:
             return self._sum(self.series)
         if implementation == Impl.interpreted_python.value:
@@ -188,7 +188,7 @@ class Sum:
             return series.count()
 
         def time_count(self, size, implementation):
-            """Time both interpreted and compiled Series.value_counts"""
+            """Time both interpreted and compiled Series.count"""
             if implementation == Impl.compiled_python.value:
                 return self._count(self.series)
             if implementation == Impl.interpreted_python.value:
