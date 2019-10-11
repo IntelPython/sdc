@@ -1457,7 +1457,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_number
 
     Parameters
     -----------
@@ -1477,11 +1477,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
         raise TypingError(
             '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    # if not isinstance(self.dtype, types.Number):
-    #         raise TypingError(
-    #      '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
     if isinstance(self.data, StringArrayType):
-
 
         def hpat_pandas_series_nunique_str_impl(self, dropna=True):
             str_set = set(self._data)
