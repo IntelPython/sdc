@@ -1286,7 +1286,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         # column with NA
-        S = pd.Series([np.nan, 2., 3.])
+        S = pd.Series([np.nan, 2., 3., np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_isnull1(self):

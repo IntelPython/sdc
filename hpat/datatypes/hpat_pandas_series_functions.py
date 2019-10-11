@@ -412,11 +412,10 @@ def hpat_pandas_series_groupby(
 @overload_method(SeriesType, 'isna')
 def hpat_pandas_series_isna(self):
     """
-    Pandas Series method :meth:`pandas.Series.append` implementation.
+    Pandas Series method :meth:`pandas.Series.isna` implementation.
 
     .. only:: developer
 
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
 
@@ -448,9 +447,7 @@ def hpat_pandas_series_isna(self):
     if isinstance(self.dtype, types.UnicodeType):
 
         def hpat_pandas_series_isna_impl(self):
-            arr = numpy.arange(len(self._data))
-            #Need to find way to create arr[bool] without workaround
-            result = arr == 4
+            result = numpy.empty(len(self._data), numpy.bool_)
             byte_size = 8
             for i in range(len(self._data)):
                 bmap_idx = i // byte_size
