@@ -100,12 +100,15 @@ def usecase_center(input_data):
 class TestStringMethods(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.test_results = TestResults()
+        cls.test_results.load()
+
         cls.total_data_size_bytes = [1.0E+07]
         cls.width = [16, 64, 512, 1024]
 
     @classmethod
     def tearDownClass(cls):
-        print_results()
+        cls.test_results.print()
 
     def test_unicode_split(self):
         pyfunc = usecase_split
@@ -114,8 +117,8 @@ class TestStringMethods(unittest.TestCase):
         for data_size in self.total_data_size_bytes:
             for data_width in self.width:
                 test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
-                add_results('unicode_split', 'JIT', len(test_data), data_width, hpat_func(test_data))
-                add_results('unicode_split', 'Reference', len(test_data), data_width, pyfunc(test_data))
+                self.test_results.add('unicode_split', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                self.test_results.add('unicode_split', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
     def test_unicode_join(self):
         pyfunc = usecase_join
@@ -124,8 +127,8 @@ class TestStringMethods(unittest.TestCase):
         for data_size in self.total_data_size_bytes:
             for data_width in self.width:
                 test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
-                add_results('unicode_join', 'JIT', len(test_data), data_width, hpat_func(test_data))
-                add_results('unicode_join', 'Reference', len(test_data), data_width, pyfunc(test_data))
+                self.test_results.add('unicode_join', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                self.test_results.add('unicode_join', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
     def test_unicode_center(self):
         pyfunc = usecase_center
@@ -134,8 +137,8 @@ class TestStringMethods(unittest.TestCase):
         for data_size in self.total_data_size_bytes:
             for data_width in self.width:
                 test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
-                add_results('unicode_center', 'JIT', len(test_data), data_width, hpat_func(test_data))
-                add_results('unicode_center', 'Reference', len(test_data), data_width, pyfunc(test_data))
+                self.test_results.add('unicode_center', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                self.test_results.add('unicode_center', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
 
 if __name__ == "__main__":

@@ -29,8 +29,10 @@
 
 import gc
 import sys
+from pathlib import Path
 
 import pandas
+from numba import config
 
 """
 Utility functions collection to support performance testing of
@@ -118,73 +120,97 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
     return result[:max_obj_len]
 
 
-test_results_data = pandas.DataFrame()
+class  TestResults:
+    perf_results_xlsx = 'perf_results.xlsx'
+    raw_perf_results_xlsx = 'raw_perf_results.xlsx'
+    index = ['name', 'N', 'type', 'size', 'width']
+    test_results_data = pandas.DataFrame(index=index)
+
+    @property
+    def grouped_data(self):
+        """
+        Group global storage results
+        Example:
+                                                    median       min       max  compilation(median)  boxing(median)
+            name           type      size  width
+            series_str_len JIT       33174 16     0.005283  0.005190  0.005888             0.163459        0.001801
+                                     6201  64     0.001473  0.001458  0.001886             0.156071        0.000528
+                                     1374  512    0.001087  0.001066  0.001268             0.154500        0.000972
+                                     729   1024   0.000998  0.000993  0.001235             0.155549        0.001002
+                           Reference 33174 16     0.007499  0.007000  0.010999                  NaN        0.000000
+                                     6201  64     0.001998  0.001498  0.002002                  NaN        0.000000
+                                     1374  512    0.000541  0.000500  0.000960                  NaN        0.000000
+                                     729   1024   0.000500  0.000000  0.000502                  NaN        0.000000
+        """
+        if self.test_results_data.empty:
+            return None
+
+        median_col = self.test_results_data.groupby(self.index)['Time(s)'].median()
+        min_col = self.test_results_data.groupby(self.index)['Time(s)'].min()
+        max_col = self.test_results_data.groupby(self.index)['Time(s)'].max()
+        compilation_col = self.test_results_data.groupby(self.index)['Compilation(s)'].median(skipna=False)
+        boxing_col = self.test_results_data.groupby(self.index)['Boxing(s)'].median(skipna=False)
+
+        test_results_data = self.test_results_data.set_index(self.index)
+        test_results_data['median'] = median_col
+        test_results_data['min'] = min_col
+        test_results_data['max'] = max_col
+        test_results_data['compilation(median)'] = compilation_col
+        test_results_data['boxing(median)'] = boxing_col
+        test_results_data = test_results_data.reset_index()
+
+        columns = ['median', 'min', 'max', 'compilation(median)', 'boxing(median)']
+        return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
+
+    def add(self, test_name, test_type, data_size, data_width, test_results,
+            boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
+        """
+        Add performance testing timing results into global storage
+                  test_name: Name of test (1st column in grouped result)
+                  test_type: Type of test (2nd column in grouped result)
+            test_data_width: Scalability attribute for input data (3rd column in grouped result)
+               test_results: List of timing results of the experiment
+             boxing_results: List of timing results of the overhead (boxing/unboxing)
+           compilation_time: Timing result of compilation
+                num_threads: Value from NUMBA_NUM_THREADS
+        """
+        local_results = pandas.DataFrame({'name': test_name,
+                                          'N': num_threads,
+                                          'type': test_type,
+                                          'size': data_size,
+                                          'width': data_width,
+                                          'Time(s)': test_results,
+                                          'Compilation(s)': compile_results,
+                                          'Boxing(s)': boxing_results}, index=self.index)
+        self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
 
-def add_results(test_name, test_type, data_size, data_width, test_results, boxing_results=None, compile_results=None):
-    """
-    Add performance testing timing results into global storage
-              test_name: Name of test (1st column in grouped result)
-              test_type: Type of test (2nd column in grouped result)
-        test_data_width: Scalability attribute for input data (3rd column in grouped result)
-           test_results: List of timing results of the experiment
-         boxing_results: List of timing results of the overhead (boxing/unboxing)
-       compilation_time: Timing result of compilation
-    """
+    def print(self):
+        """
+        Print performance testing results from global data storage
+        """
+        print(self.grouped_data.to_string())
 
-    local_results = pandas.DataFrame({'name': test_name,
-                                      'type': test_type,
-                                      'size': data_size,
-                                      'width': data_width,
-                                      'Time(s)': test_results,
-                                      'Compilation(s)': compile_results,
-                                      'Boxing(s)': boxing_results})
-    global test_results_data
-#     test_results_data = pandas.concat([test_results_data, local_results])
-    test_results_data = test_results_data.append(local_results)
+    def dump(self):
+        """
+        Dump performance testing results from global data storage to excel
+        """
+        # openpyxl need to be installed
+        with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
+            self.grouped_data.to_excel(writer)
 
+        with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
+            self.test_results_data.to_excel(writer, index=False)
 
-def print_results():
-    """
-    Print performance testing results from global data storage
-    Example:
-                                                median       min       max  compilation(median)  boxing(median)
-        name           type      size  width
-        series_str_len JIT       33174 16     0.005283  0.005190  0.005888             0.163459        0.001801
-                                 6201  64     0.001473  0.001458  0.001886             0.156071        0.000528
-                                 1374  512    0.001087  0.001066  0.001268             0.154500        0.000972
-                                 729   1024   0.000998  0.000993  0.001235             0.155549        0.001002
-                       Reference 33174 16     0.007499  0.007000  0.010999                  NaN        0.000000
-                                 6201  64     0.001998  0.001498  0.002002                  NaN        0.000000
-                                 1374  512    0.000541  0.000500  0.000960                  NaN        0.000000
-                                 729   1024   0.000500  0.000000  0.000502                  NaN        0.000000
-    """
-    global test_results_data
-
-    if test_results_data.empty:
-        return None
-
-    # Following code is terrible. needs to be redeveloped
-    # print(test_results_data)
-    index = ['name', 'type', 'size', 'width']
-    median_col = test_results_data.groupby(index)['Time(s)'].median()
-    min_col = test_results_data.groupby(index)['Time(s)'].min()
-    max_col = test_results_data.groupby(index)['Time(s)'].max()
-
-    test_results_data = test_results_data.set_index(index)
-    test_results_data['median'] = median_col
-    test_results_data['min'] = min_col
-    test_results_data['max'] = max_col
-    test_results_data['compilation(median)'] = test_results_data.groupby(index)['Compilation(s)'].median(skipna=False)
-    test_results_data['boxing(median)'] = test_results_data.groupby(index)['Boxing(s)'].median(skipna=False)
-    test_results_data = test_results_data.reset_index()
-
-    columns = ['median', 'min', 'max', 'compilation(median)', 'boxing(median)']
-    grouped_data = test_results_data.groupby(index)[columns].first().sort_values(index)
-    print(grouped_data.to_string())
-
-    with pandas.ExcelWriter('perf_results.xlsx') as writer:
-        grouped_data.to_excel(writer)
+    def load(self):
+        """
+        Load existing performance testing results from excel to global data storage
+        """
+        raw_perf_results_xlsx = Path(self.raw_perf_results_xlsx)
+        if raw_perf_results_xlsx.exists():
+            with raw_perf_results_xlsx.open('rb') as fd:
+                # xlrd need to be installed
+                self.test_results_data = pandas.read_excel(fd)
 
 
 if __name__ == "__main__":
