@@ -1857,7 +1857,6 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
     def test_series_take_index_int_unboxing(self):
         def pyfunc(series, indices):
             return series.take(indices)

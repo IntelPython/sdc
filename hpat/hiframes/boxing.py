@@ -155,10 +155,18 @@ def _infer_series_list_dtype(S):
 
 def _infer_index_type(index):
     # TODO: support proper inference
+
+    # np.dtype('O') - Python objects
     if index.dtype == np.dtype('O') and len(index) > 0:
         first_val = index[0]
         if isinstance(first_val, str):
             return string_array_type
+
+    elif index.dtype == np.int64:
+        # RangeIndex or Int64Index
+        dtype = numba.numpy_support.from_dtype(index.dtype)
+        return types.Array(dtype, 1, 'C')
+
     return types.none
 
 
@@ -275,6 +283,12 @@ def unbox_series(typ, val, c):
     if typ.index == string_array_type:
         index_obj = c.pyapi.object_getattr_string(val, "index")
         series.index = unbox_str_series(string_array_type, index_obj, c).value
+
+    if isinstance(typ.index, types.Array):
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
+        series.index = unbox_array(typ.index, index_data, c).value
+
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
         series.name = numba.unicode.unbox_unicode_str(
