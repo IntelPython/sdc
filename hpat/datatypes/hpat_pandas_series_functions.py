@@ -31,40 +31,19 @@
 
 """
 
+import numpy
 import operator
 import pandas
 import numpy as np
 
-from numba.extending import (types, overload, overload_method, overload_attribute)
 from numba.errors import TypingError
+from numba.extending import (types, overload, overload_method, overload_attribute)
+from numba import types
 
+import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
-
-
-'''
-Pandas Series (https://pandas.pydata.org/pandas-docs/stable/reference/series.html)
-functions and operators definition in HPAT
-Also, it contains Numba internal operators which are required for Series type handling
-
-Implemented operators:
-    add
-    at
-    div
-    getitem
-    iat
-    iloc
-    len
-    loc
-    mul
-    sub
-
-Implemented methods:
-    append
-    ne
-
-Implemented attributes:
-    values
-'''
+from hpat.str_arr_ext import StringArrayType
+from hpat.utils import to_array
 
 
 @overload(operator.getitem)
@@ -322,7 +301,7 @@ def hpat_pandas_series_isin(self, values):
 
 @overload_method(SeriesType, 'append')
 def hpat_pandas_series_append(self, to_append):
-    """    
+    """
     Pandas Series method :meth:`pandas.Series.append` implementation.
     
     .. only:: developer
@@ -354,6 +333,81 @@ def hpat_pandas_series_append(self, to_append):
         return pandas.Series(self._data + to_append._data)
 
     return hpat_pandas_series_append_impl
+
+
+@overload_method(SeriesType, 'groupby')
+def hpat_pandas_series_groupby(
+        self,
+        by=None,
+        axis=0,
+        level=None,
+        as_index=True,
+        sort=True,
+        group_keys=True,
+        squeeze=False,
+        observed=False):
+    """
+    Pandas Series method :meth:`pandas.Series.groupby` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_groupby_count
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    by: :obj:`pandas.Series` object
+        Used to determine the groups for the groupby
+    axis:
+        *unsupported*
+    level:
+        *unsupported*
+    as_index:
+        *unsupported*
+    sort:
+        *unsupported*
+    group_keys:
+        *unsupported*
+    squeeze:
+        *unsupported*
+    observed:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.SeriesGroupBy`
+         returns :obj:`pandas.SeriesGroupBy` object
+    """
+
+    _func_name = 'Method Series.groupby().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if by is None and axis is None:
+        raise TypingError("{} You have to supply one of 'by' or 'axis' parameters".format(_func_name))
+
+    if level is not None and not isinstance(level, (types.Integer, types.NoneType, types.Omitted)):
+        raise TypingError("{} 'level' must be an Integer. Given: {}".format(_func_name, level))
+
+    def hpat_pandas_series_groupby_impl(
+            self,
+            by=None,
+            axis=0,
+            level=None,
+            as_index=True,
+            sort=True,
+            group_keys=True,
+            squeeze=False,
+            observed=False):
+        # TODO Needs to implement parameters value check
+        # if level is not None and (level < -1 or level > 0):
+        #     raise ValueError("Method Series.groupby(). level > 0 or level < -1 only valid with MultiIndex")
+
+        return pandas.core.groupby.SeriesGroupBy(self)
+
+    return hpat_pandas_series_groupby_impl
 
 
 @overload_method(SeriesType, 'ne')
@@ -534,6 +588,71 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_sub_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+
+
+@overload_method(SeriesType, 'take')
+def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
+    """
+    Pandas Series method :meth:`pandas.Series.take` implementation.
+
+    .. only:: developer
+
+       Tests: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_default
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_default_unboxing
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_int
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_int_unboxing
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_str
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_take_index_str_unboxing
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    indices: :obj:`array-like`
+         An array of ints indicating which positions to take
+    axis: {0 or `index`, 1 or `columns`, None}, default 0
+        The axis on which to select elements. 0 means that we are selecting rows,
+        1 means that we are selecting columns.
+        *unsupported*
+    is_copy: :obj:`bool`, default True
+        Whether to return a copy of the original object or not.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object containing the elements taken from the object
+    """
+
+    _func_name = 'Method take().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(indices, types.List):
+        raise TypingError('{} The indices must be a List. Given: {}'.format(_func_name, indices))
+
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
+        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
+
+    if not (isinstance(is_copy, (types.Boolean, types.Omitted)) or is_copy == False):
+        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, is_copy))
+
+    if self.index is not types.none:
+        def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
+            local_data = [self._data[i] for i in indices] 
+            local_index = [self._index[i] for i in indices] 
+
+            return pandas.Series(local_data, local_index)
+
+        return hpat_pandas_series_take_impl
+    else:
+        def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
+            local_data = [self._data[i] for i in indices] 
+
+            return pandas.Series(local_data, indices)
+    
+        return hpat_pandas_series_take_noindex_impl
 
 
 @overload_method(SeriesType, 'mul')
@@ -774,6 +893,116 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_pow_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'min')
+def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.min` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_min
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_min_param
+
+    Parameters
+    -----------
+    axis:
+        *unsupported*
+    skipna: :obj:`bool` object
+        Exclude nan values when computing the result
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         returns :obj: scalar
+    """
+
+    _func_name = 'Method min().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, (types.Integer, types.Float)):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_min_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return numpy.nanmin(self._data)
+
+        return self._data.min()
+
+    return hpat_pandas_series_min_impl
+
+
+@overload_method(SeriesType, 'max')
+def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.max` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_max_param
+
+    Parameters
+    -----------
+    axis:
+        *unsupported*
+    skipna: :obj:`bool` object
+        Exclude nan values when computing the result
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         returns :obj: scalar
+    """
+
+    _func_name = 'Method max().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, (types.Integer, types.Float)):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+        if skipna:
+            return numpy.nanmax(self._data)
+
+        return self._data.max()
+
+    return hpat_pandas_series_max_impl
 
 
 @overload_method(SeriesType, 'mod')
@@ -1129,7 +1358,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
-   
+
 @overload_method(SeriesType, 'quantile')
 def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
@@ -1171,4 +1400,96 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
         return np.quantile(self._data, q)
 
     return hpat_pandas_series_quantile_impl
+
+
+@overload_method(SeriesType, 'abs')
+def hpat_pandas_series_abs(self):
+    """
+    Pandas Series method :meth:`pandas.Series.abs` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_abs1
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+          input series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` containing the absolute value of elements
+    """
+
+    _func_name = 'Method abs().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+
+    def hpat_pandas_series_abs_impl(self):
+        return pandas.Series(numpy.abs(self._data))
+
+    return hpat_pandas_series_abs_impl
+
+
+@overload_method(SeriesType, 'unique')
+def hpat_pandas_series_unique(self):
+    """
+    Pandas Series method :meth:`pandas.Series.unique` implementation.
+
+    Note: Return values order is unspecified
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_unique_sorted
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+
+    Returns
+    -------
+    :obj:`numpy.array`
+         returns :obj:`numpy.array` ndarray
+    """
+
+    _func_name = 'Method unique().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if isinstance(self.data, StringArrayType):
+        def hpat_pandas_series_unique_str_impl(self):
+            '''
+            Returns sorted unique elements of an array
+
+            Note: Can't use Numpy due to StringArrayType has no ravel() for noPython mode.
+            Also, NotImplementedError: unicode_type cannot be represented as a Numpy dtype
+            
+            Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_unique_str
+            '''
+
+            str_set = set(self._data)
+            return to_array(str_set)
+
+        return hpat_pandas_series_unique_str_impl
+
+    def hpat_pandas_series_unique_impl(self):
+        '''
+        Returns sorted unique elements of an array
+        
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_unique
+        '''
+
+        return numpy.unique(self._data)
+
+    return hpat_pandas_series_unique_impl
 

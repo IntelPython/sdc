@@ -268,16 +268,6 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
-    def test_unique(self):
-        def test_impl(S):
-            return S.unique()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 1001
-        S = pd.Series(np.arange(n))
-        S[2] = 0
-        self.assertEqual(set(hpat_func(S)), set(test_impl(S)))
-
     def test_unique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -287,15 +277,6 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
-
-    def test_unique_str(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
-            return df.A.unique()
-
-        hpat_func = hpat.jit(test_impl)
-        n = 1001
-        self.assertEqual(set(hpat_func(n)), set(test_impl(n)))
 
     @unittest.skip('AssertionError - fix needed\n'
                    '2 != 1\n')
