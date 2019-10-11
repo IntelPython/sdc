@@ -500,7 +500,7 @@ series_replace_funcs = {
     'min': defaultdict(lambda: _column_min_impl, [(types.NPDatetime('ns'), _column_min_impl_no_isnan)]),
     'var': _column_var_impl,
     'std': _column_std_impl,
-    'nunique': lambda A: hpat.hiframes.api.nunique(A),
+    #'nunique': lambda A: hpat.hiframes.api.nunique(A),
     'unique': lambda A: hpat.hiframes.api.unique(A),
     'describe': _column_describe_impl,
     'fillna_alloc': _column_fillna_alloc_impl,

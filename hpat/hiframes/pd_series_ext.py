@@ -505,9 +505,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_count(self, ary, args, kws):
         return signature(types.intp, *args)
 
-    @bound_function("series.nunique")
-    def resolve_nunique(self, ary, args, kws):
-        return signature(types.intp, *args)
+    # @bound_function("series.nunique")
+    # def resolve_nunique(self, ary, args, kws):
+    #     return signature(types.intp, *args)
 
     # @bound_function("series.unique")
     # def resolve_unique(self, ary, args, kws):

@@ -1448,3 +1448,61 @@ def hpat_pandas_series_unique(self):
         return numpy.unique(self._data)
 
     return hpat_pandas_series_unique_impl
+
+
+@overload_method(SeriesType, 'nunique')
+def hpat_pandas_series_nunique(self, dropna=True):
+    """
+    Pandas Series method :meth:`pandas.Series.nunique` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+          input series
+    dropna:         *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method nunique().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    # if not isinstance(self.dtype, types.Number):
+    #         raise TypingError(
+    #      '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+    if isinstance(self.data, StringArrayType):
+
+
+        def hpat_pandas_series_nunique_str_impl(self, dropna=True):
+            str_set = set(self._data)
+            return len(str_set)
+
+        return hpat_pandas_series_nunique_str_impl
+
+    def hpat_pandas_series_nunique_impl(self, dropna=True):
+        """
+        Returns number of unique elements in the object
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_number
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_with_nan
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_string
+
+        """
+        a = numpy.unique(self._data)
+        a = a[~numpy.isnan(a)]
+        if dropna == False:
+            return len(a) + 1
+        else:
+            return len(a)
+
+    return hpat_pandas_series_nunique_impl

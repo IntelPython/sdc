@@ -2024,6 +2024,37 @@ class TestSeries(unittest.TestCase):
         print("Result Python", ref_result)
         np.testing.assert_array_equal(result, ref_result)
 
+    def test_series_nunique_number(self):
+        def test_impl(S, dropna):
+            return S.nunique(dropna)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([6, 6, 2, 1, 3, 3, 2, 1, 2])
+        dropna = True
+        self.assertEqual(hpat_func(S, dropna), test_impl(S, dropna))
+
+    def test_series_nunique_with_nan(self):
+        def test_impl(S, dropna):
+            return S.nunique(dropna)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([6, np.nan, np.nan, 2, 3, np.nan])
+        dropna = False
+        self.assertEqual(hpat_func(S, dropna), test_impl(S, dropna))
+
+    def test_series_nunique_string(self):
+        def test_impl(S):
+            return S.nunique()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'])
+        # with self.assertRaises(AssertionError):
+        #     hpat_func(S)
+        self.assertEqual(hpat_func(S), test_impl(S))
+
 
 if __name__ == "__main__":
     unittest.main()
