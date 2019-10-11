@@ -1097,7 +1097,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
 
 @overload_method(SeriesType, 'idxmin')
-def hpat_pandas_series_idxmin(self, axis=None, skipna=None, level=None, numeric_only=None):
+def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     """
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
 
@@ -1112,10 +1112,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None, level=None, numeric_
                 *unsupported*
     skipna:  :obj:`bool`, default: True
                 Exclude nan values when computing the result
-    level:  :obj:`int` or level name, default: None
-                *unsupported*
-    numeric_only:  :obj:`bool`, default: None
-                *unsupported*
 
     Returns
     -------
@@ -1136,38 +1132,23 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None, level=None, numeric_
         raise TypingError(
             '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
 
-    if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
-            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
-                                                                                            numeric_only))
-    a = numpy.array([numpy.nan, 2., 3.])
-    def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
-        print("KFLFKLF")
+    if not (isinstance(axis, types.Omitted) or axis is None):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
-
-        #a = self._data
-        # print(a)
-        # print(numpy.min(a))
-        # if numpy.min(self._data) == numpy.min(a):
-        #     print("DO ITTTTT")
-        # else:
-        #     print("((((((((((((((")
-        print(numpy.min(self._data))
-        print(numpy.argmin(self._data))
-        print(self._data[numpy.argmin(self._data)])
-
+    def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=None):
+        print("FJFFFJFJF")
         if skipna is None:
             skipna = True
-
+        #
         if skipna:
             return numpy.argmin(self._data)
-
-        return numpy.argmin(self._data)
+        #
+        # result = numpy.argmin(self._data)
+        # return self._index[result]
+        #
+        return 2
 
     return hpat_pandas_series_idxmin_impl
-
 
 
 @overload_method(SeriesType, 'lt')
