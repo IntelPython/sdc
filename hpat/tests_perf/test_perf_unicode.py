@@ -84,8 +84,8 @@ def usecase_center(input_data):
         start_time = time.time()
 
         for string in input_data:
+            # The width must be an Integer
             new_string_len = int(len(string) * result_str_grow_factor)
-            '''The width must be an Integer'''
 
             string.center(new_string_len, '+')
 
@@ -98,43 +98,44 @@ def usecase_center(input_data):
 
 
 class TestStringMethods(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @classmethod
     def setUpClass(cls):
-        cls.total_data_size_bytes = 1.0E+07
+        cls.total_data_size_bytes = [1.0E+07]
+        cls.width = [16, 64, 512, 1024]
 
     @classmethod
-    def setUpClass(cls):
+    def tearDownClass(cls):
         print_results()
 
     def test_unicode_split(self):
         pyfunc = usecase_split
         hpat_func = numba.njit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            test_data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
-            add_results('unicode_split', 'JIT', len(test_data), data_width, hpat_func(test_data))
-            add_results('unicode_split', 'Reference', len(test_data), data_width, pyfunc(test_data))
+        for data_size in self.total_data_size_bytes:
+            for data_width in self.width:
+                test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
+                add_results('unicode_split', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                add_results('unicode_split', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
     def test_unicode_join(self):
         pyfunc = usecase_join
         hpat_func = numba.njit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            test_data = perf_data_gen(STRIP_CASES, data_width, self.total_data_size_bytes)
-            add_results('unicode_join', 'JIT', len(test_data), data_width, hpat_func(test_data))
-            add_results('unicode_join', 'Reference', len(test_data), data_width, pyfunc(test_data))
+        for data_size in self.total_data_size_bytes:
+            for data_width in self.width:
+                test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
+                add_results('unicode_join', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                add_results('unicode_join', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
     def test_unicode_center(self):
         pyfunc = usecase_center
         hpat_func = numba.njit(pyfunc, parallel=True)
 
-        for data_width in [16, 64, 512, 1024]:
-            test_data = perf_data_gen(STRIP_CASES, 32, self.total_data_size_bytes)
-            add_results('unicode_center', 'JIT', len(test_data), data_width, hpat_func(test_data))
-            add_results('unicode_center', 'Reference', len(test_data), data_width, pyfunc(test_data))
+        for data_size in self.total_data_size_bytes:
+            for data_width in self.width:
+                test_data = perf_data_gen(STRIP_CASES, data_width, data_size)
+                add_results('unicode_center', 'JIT', len(test_data), data_width, hpat_func(test_data))
+                add_results('unicode_center', 'Reference', len(test_data), data_width, pyfunc(test_data))
 
 
 if __name__ == "__main__":

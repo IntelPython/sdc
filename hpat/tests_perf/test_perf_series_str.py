@@ -187,12 +187,10 @@ def calc_results(f, test_data, test_name, test_type, data_size, data_width, comp
 
 
 class TestSeriesStringMethods(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @classmethod
     def setUpClass(cls):
-        cls.total_data_length = 10**5 + 513
+        cls.total_data_length = [10**6 + 513, 10**7 + 2025]
+        cls.width = [16, 64, 512, 1024]
 
     @classmethod
     def tearDownClass(cls):
@@ -202,143 +200,149 @@ class TestSeriesStringMethods(unittest.TestCase):
         pyfunc = usecase_series_len
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_len', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_len', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_len', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_len', 'Reference', test_data.size, data_width)
 
 
     def test_series_str_capitalize(self):
         pyfunc = usecase_series_capitalize
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_capitalize', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_capitalize', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_capitalize', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_capitalize', 'Reference', test_data.size, data_width)
 
     def test_series_str_lower(self):
         pyfunc = usecase_series_lower
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_lower', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_lower', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_lower', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_lower', 'Reference', test_data.size, data_width)
 
     def test_series_str_swapcase(self):
         pyfunc = usecase_series_swapcase
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_swapcase', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_swapcase', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_swapcase', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_swapcase', 'Reference', test_data.size, data_width)
 
     def test_series_str_title(self):
         pyfunc = usecase_series_title
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_title', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_title', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_title', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_title', 'Reference', test_data.size, data_width)
 
     def test_series_str_upper(self):
         pyfunc = usecase_series_upper
         hpat_func = hpat.jit(pyfunc)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+                test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            calc_results(hpat_func, test_data, 'series_str_upper', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_upper', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_upper', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_upper', 'Reference', test_data.size, data_width)
 
     def test_series_str_lstrip(self):
         pyfunc = usecase_series_lstrip
         hpat_func = hpat.jit(pyfunc)
 
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
+                test_data = pd.Series(data)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            calc_results(hpat_func, test_data, 'series_str_lstrip', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_lstrip', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_lstrip', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_lstrip', 'Reference', test_data.size, data_width)
 
     def test_series_str_rstrip(self):
         pyfunc = usecase_series_rstrip
         hpat_func = hpat.jit(pyfunc)
 
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
+                test_data = pd.Series(data)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            calc_results(hpat_func, test_data, 'series_str_rstrip', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_rstrip', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_rstrip', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_rstrip', 'Reference', test_data.size, data_width)
 
     def test_series_str_strip(self):
         pyfunc = usecase_series_strip
         hpat_func = hpat.jit(pyfunc)
 
         strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
+        for data_length in self.total_data_length:
+            for data_width in self.width:
+                data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
+                test_data = pd.Series(data)
 
-        for data_width in [16, 64, 512, 1024]:
-            data = perf_data_gen_fixed_len(strip_cases, data_width, self.total_data_length)
-            test_data = pd.Series(data)
+                compile_results = calc_compilation(pyfunc, test_data)
+                # Warming up
+                hpat_func(test_data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            calc_results(hpat_func, test_data, 'series_str_strip', 'JIT', test_data.size, data_width, compile_results)
-            calc_results(pyfunc, test_data, 'series_str_strip', 'Reference', test_data.size, data_width)
+                calc_results(hpat_func, test_data, 'series_str_strip', 'JIT', test_data.size, data_width, compile_results)
+                calc_results(pyfunc, test_data, 'series_str_strip', 'Reference', test_data.size, data_width)
 
 
 if __name__ == "__main__":

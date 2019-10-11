@@ -94,6 +94,10 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
     while get_size(result) < max_bytes_size:
         result.extend(multiply_data(tmpl, max_item_len))
 
+    # Trim result to max_bytes_size
+    while result and get_size(result) > max_bytes_size:
+        del result[-1]
+
     return result
 
 
@@ -176,7 +180,7 @@ def print_results():
     test_results_data = test_results_data.reset_index()
 
     columns = ['median', 'min', 'max', 'compilation(median)', 'boxing(median)']
-    grouped_data = test_results_data.groupby(index)[columns].first().sort_values(['name', 'type', 'width'])
+    grouped_data = test_results_data.groupby(index)[columns].first().sort_values(index)
     print(grouped_data.to_string())
 
     with pandas.ExcelWriter('perf_results.xlsx') as writer:
