@@ -1276,9 +1276,23 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
         return hpat_pandas_series_index_ctor_impl
 
-    def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
-        return hpat.hiframes.api.init_series(hpat.hiframes.api.fix_df_array(data), index, name)
+    def hpat_pandas_series_index_ctor_impl(
+            data=None,
+            index=None,
+            dtype=None,
+            name=None,
+            copy=False,
+            fastpath=False):
 
-    return hpat_pandas_series_ctor_impl
+        # TODO: Do we need keep the whole Array?
+        index = np.arange(len(data))
+
+        return hpat.hiframes.api.init_series(
+            hpat.hiframes.api.fix_df_array(data),
+            index,
+            name)
+
+    return hpat_pandas_series_index_ctor_impl
+
 
 from hpat.datatypes.hpat_pandas_series_functions import *
