@@ -18,6 +18,7 @@ endif
 
 
 ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS)
+DEV_ALLSPHINXOPTS = -d $(DEVBUILDDIR)/doctrees $(SPHINXOPTS)
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -42,7 +43,7 @@ html:
      
 
 developerhtml:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) devsource -t developer $(DEVBUILDDIR)/html
+	$(SPHINXBUILD) -b html $(DEV_ALLSPHINXOPTS) devsource -t developer $(DEVBUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(DEVBUILDDIR)/html."     
 
