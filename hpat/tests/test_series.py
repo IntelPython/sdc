@@ -2030,33 +2030,53 @@ class TestSeries(unittest.TestCase):
             return S.nunique(dropna)
 
         hpat_func = hpat.jit(test_series_nunique_impl)
-        hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)
 
         the_same_string = "the same string"
-        for input_data in [[6, 6, 2, 1, 3, 3, 2, 1, 2],
-                           [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-                           [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-                           [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-                           [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-                           [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                           ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
-                           # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
-                           ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
-                           # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
-                           [np.nan, np.nan, np.nan],
-                           [np.nan, np.nan, np.inf],
-                           []
-                           ]:
+        test_input_data = []
+        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                       []
+                       ]
+
+        data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                      [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                      [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, np.nan, np.nan],
+                      [np.nan, np.nan, np.inf],
+                      ]
+
+        if hpat.config.config_pipeline_hpat_default:
+            """
+            HPAT pipeline Series.nunique() does not support numpy.nan
+            """
+
+            test_input_data = data_simple
+        else:
+            test_input_data = data_simple + data_extra
+
+        for input_data in test_input_data:
             S = pd.Series(input_data)
 
             result_ref = test_series_nunique_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-            for param1 in [True, False]:
-                result_param1_ref = test_series_nunique_param1_impl(S, param1)
-                result_param1 = hpat_func_param1(S, param1)
-                self.assertEqual(result_param1, result_param1_ref)
+            if not hpat.config.config_pipeline_hpat_default:
+                """
+                HPAT pipeline does not support parameter to Series.nunique(dropna=True)
+                """
+
+                hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)
+
+                for param1 in [True, False]:
+                    result_param1_ref = test_series_nunique_param1_impl(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    self.assertEqual(result_param1, result_param1_ref)
 
 
 if __name__ == "__main__":
