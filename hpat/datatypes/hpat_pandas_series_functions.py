@@ -1419,8 +1419,7 @@ def hpat_pandas_series_unique(self):
     _func_name = 'Method unique().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_unique_str_impl(self):
@@ -1454,16 +1453,18 @@ def hpat_pandas_series_unique(self):
 def hpat_pandas_series_nunique(self, dropna=True):
     """
     Pandas Series method :meth:`pandas.Series.nunique` implementation.
+    
+    Note: Unsupported mixed numeric and string data
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_number
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique
 
     Parameters
     -----------
     self: :obj:`pandas.Series`
-          input series
-    dropna:         *unsupported*
+        input series
+    dropna: :obj:`bool`, default True
 
     Returns
     -------
@@ -1474,31 +1475,36 @@ def hpat_pandas_series_nunique(self, dropna=True):
     _func_name = 'Method nunique().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if isinstance(self.data, StringArrayType):
-
+ 
         def hpat_pandas_series_nunique_str_impl(self, dropna=True):
+            """
+            It is better to merge with Numeric branch
+            Unsupported:
+                ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd']
+                [3, np.nan, 'b', 'b', 5.1, np.nan, 'ddd', 'dd']
+            """
+
             str_set = set(self._data)
             return len(str_set)
-
+ 
         return hpat_pandas_series_nunique_str_impl
 
     def hpat_pandas_series_nunique_impl(self, dropna=True):
         """
-        Returns number of unique elements in the object
-
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_number
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_with_nan
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique_string
-
+        This function for Numeric data because NumPy dosn't support StringArrayType
+        Algo looks a bit ambigous because, currently, set() can not be used with NumPy with Numba JIT
         """
-        a = numpy.unique(self._data)
-        a = a[~numpy.isnan(a)]
-        if dropna == False:
-            return len(a) + 1
+
+        data_mask_for_nan = numpy.isnan(self._data)
+        nan_exists = numpy.any(data_mask_for_nan)
+        data_no_nan = self._data[~data_mask_for_nan]
+        data_set = set(data_no_nan)
+        if dropna or not nan_exists:
+            return len(data_set)
         else:
-            return len(a)
+            return len(data_set) + 1
 
     return hpat_pandas_series_nunique_impl

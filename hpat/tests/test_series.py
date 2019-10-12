@@ -2020,40 +2020,43 @@ class TestSeries(unittest.TestCase):
 
         ref_result = test_impl()
         result = hpat_func()
-        print("Result JIT", result)
-        print("Result Python", ref_result)
         np.testing.assert_array_equal(result, ref_result)
 
-    def test_series_nunique_number(self):
-        def test_impl(S, dropna):
-            return S.nunique(dropna)
-
-        hpat_func = hpat.jit(test_impl)
-
-        S = pd.Series([6, 6, 2, 1, 3, 3, 2, 1, 2])
-        dropna = True
-        self.assertEqual(hpat_func(S, dropna), test_impl(S, dropna))
-
-    def test_series_nunique_with_nan(self):
-        def test_impl(S, dropna):
-            return S.nunique(dropna)
-
-        hpat_func = hpat.jit(test_impl)
-
-        S = pd.Series([6, np.nan, np.nan, 2, 3, np.nan])
-        dropna = False
-        self.assertEqual(hpat_func(S, dropna), test_impl(S, dropna))
-
-    def test_series_nunique_string(self):
-        def test_impl(S):
+    def test_series_nunique(self):
+        def test_series_nunique_impl(S):
             return S.nunique()
 
-        hpat_func = hpat.jit(test_impl)
+        def test_series_nunique_param1_impl(S, dropna):
+            return S.nunique(dropna)
 
-        S = pd.Series(['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'])
-        # with self.assertRaises(AssertionError):
-        #     hpat_func(S)
-        self.assertEqual(hpat_func(S), test_impl(S))
+        hpat_func = hpat.jit(test_series_nunique_impl)
+        hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)
+
+        the_same_string = "the same string"
+        for input_data in [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                           [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                           [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                           [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                           [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                           [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                           ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                           # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                           ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                           # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                           [np.nan, np.nan, np.nan],
+                           [np.nan, np.nan, np.inf],
+                           []
+                           ]:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_nunique_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+            for param1 in [True, False]:
+                result_param1_ref = test_series_nunique_param1_impl(S, param1)
+                result_param1 = hpat_func_param1(S, param1)
+                self.assertEqual(result_param1, result_param1_ref)
 
 
 if __name__ == "__main__":
