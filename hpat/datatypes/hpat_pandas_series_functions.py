@@ -683,6 +683,85 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
+@overload_method(SeriesType, 'sum')
+def hpat_pandas_series_sum(
+    self,
+    axis=None,
+    skipna=None,
+    level=None,
+    numeric_only=None,
+    min_count=0,
+):
+    """
+    Pandas Series method :meth:`pandas.Series.sum` implementation.
+
+    .. only:: developer
+
+        Tests:
+            python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum1
+            # python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum2
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series`
+        input series
+    axis:
+        *unsupported*
+    skipna: :obj:`bool`, default :obj:`True`
+        Exclude NA/null values when computing the result.
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+    min_count:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`float`
+        scalar or Series (if level specified)
+    """
+
+    _func_name = 'Method sum().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == None):
+        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
+
+    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna == None):
+        raise TypingError('{} The skipna must be a Boolean. Given: {}'.format(_func_name, skipna))
+
+    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted)) or level == None):
+        raise TypingError('{} The level must be an Integer or level name. Currently unsupported. Given: {}'.format(_func_name, level))
+
+    if not (isinstance(numeric_only, (types.Boolean, types.Omitted)) or numeric_only == None):
+        raise TypingError('{} The numeric_only must be a Boolean. Currently unsupported. Given: {}'.format(_func_name, numeric_only))
+
+    if not (isinstance(min_count, (types.Integer, types.Omitted)) or min_count == 0):
+        raise TypingError('{} The min_count must be an Integer. Currently unsupported. Given: {}'.format(_func_name, min_count))
+
+    def hpat_pandas_series_sum_impl(
+        self,
+        axis=None,
+        skipna=None,
+        level=None,
+        numeric_only=None,
+        min_count=0,
+    ):
+        """
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum1
+        """
+        if skipna is None:
+            skipna = True
+        if skipna:
+            return numpy.nansum(self._data)
+        return numpy.sum(self._data)
+
+    return hpat_pandas_series_sum_impl
+
+
 @overload_method(SeriesType, 'take')
 def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     """

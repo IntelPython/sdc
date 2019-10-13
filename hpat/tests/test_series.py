@@ -694,7 +694,7 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @unittest.skipIf(platform.system() == 'Windows', 
+    @unittest.skipIf(platform.system() == 'Windows',
                      'Series values are different (20.0 %)'
                      '[left]:  [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, 3486784401, 10000000000]'
                      '[right]: [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, -808182895, 1410065408]')
@@ -1031,7 +1031,15 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
 
-    def test_series_sum1(self):
+    def test_series_sum_default(self):
+        def test_impl(S):
+            return S.sum()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1., 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_sum_nan(self):
         def test_impl(S):
             return S.sum()
         hpat_func = hpat.jit(test_impl)
@@ -1044,6 +1052,16 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Old style Series.sum() does not support parameters")
+    def test_series_sum_skipna_false(self):
+        def test_impl(S):
+            return S.sum(skipna=False)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(np.isnan(hpat_func(S)),np.isnan(test_impl(S)))
+
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default, "Series.sum() operator + is not implemented yet for Numba")
     def test_series_sum2(self):
         def test_impl(S):
             return (S + S).sum()
