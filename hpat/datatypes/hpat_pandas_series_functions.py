@@ -901,11 +901,13 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_number_quantile
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile_q_vector
 
     Parameters
     -----------
     q : :obj: float or array-like object, default 0.5
+        the quantile(s) to compute
     interpolation: 'linear', 'lower', 'higher', 'midpoint', 'nearest', default `linear`
         *unsupported* by Numba
 
@@ -922,7 +924,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
         raise TypingError('{} Unsupported parameters. Given interpolation: {}'.format(_func_name, interpolation))
 
-    if not isinstance(q, (types.Number, types.Omitted)) and q != 0.5:
+    if not isinstance(q, (types.Number, types.Omitted, types.List)) and q != 0.5:
         raise TypingError('{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
 
     def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
