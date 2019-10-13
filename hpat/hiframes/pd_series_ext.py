@@ -505,9 +505,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_count(self, ary, args, kws):
         return signature(types.intp, *args)
 
-    @bound_function("series.nunique")
-    def resolve_nunique(self, ary, args, kws):
-        return signature(types.intp, *args)
+    # @bound_function("series.nunique")
+    # def resolve_nunique(self, ary, args, kws):
+    #     return signature(types.intp, *args)
 
     # @bound_function("series.unique")
     # def resolve_unique(self, ary, args, kws):
@@ -988,7 +988,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_take', 'resolve_max', 'resolve_min']
+                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
