@@ -496,10 +496,10 @@ class SeriesAttribute(AttributeTemplate):
 #         sig.return_type = if_arr_to_series_type(sig.return_type)
 #         return sig
 
-    @bound_function("series.quantile")
-    def resolve_quantile(self, ary, args, kws):
-        # TODO: fix quantile output type if not float64
-        return signature(types.float64, *args)
+    # @bound_function("series.quantile")
+    # def resolve_quantile(self, ary, args, kws):
+    #     # TODO: fix quantile output type if not float64
+    #     return signature(types.float64, *args)
 
     @bound_function("series.count")
     def resolve_count(self, ary, args, kws):

@@ -894,6 +894,45 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
 
+@overload_method(SeriesType, 'quantile')
+def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
+    """
+    Pandas Series method :meth:`pandas.Series.quantile` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile_q_vector
+
+    Parameters
+    -----------
+    q : :obj: float or array-like object, default 0.5
+        the quantile(s) to compute
+    interpolation: 'linear', 'lower', 'higher', 'midpoint', 'nearest', default `linear`
+        *unsupported* by Numba
+
+    Returns
+    -------
+    :obj:`pandas.Series` or float
+    """
+
+    _func_name = 'Method quantile().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+        raise TypingError('{} Unsupported parameters. Given interpolation: {}'.format(_func_name, interpolation))
+
+    if not isinstance(q, (types.Number, types.Omitted, types.List)) and q != 0.5:
+        raise TypingError('{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
+
+    def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
+        return numpy.quantile(self._data, q)
+
+    return hpat_pandas_series_quantile_impl
+
+
 @overload_method(SeriesType, 'min')
 def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
