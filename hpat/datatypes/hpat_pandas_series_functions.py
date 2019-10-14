@@ -1074,6 +1074,67 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     return hpat_pandas_series_max_impl
 
 
+@overload_method(SeriesType, 'mean')
+def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.mean` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_mean
+
+    Parameters
+    -----------
+    axis: {index (0)}
+        Axis for the function to be applied on.
+        *unsupported*
+    skipna: :obj:`bool`, default True
+        Exclude NA/null values when computing the result.
+    level: :obj:`int` or level name, default None
+        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
+        *unsupported*
+    numeric_only: :obj:`bool`, default None
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data. Not implemented for Series.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         Return the mean of the values for the requested axis.
+    """
+
+    _func_name = 'Method mean().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not None:
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_mean_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if skipna is None:
+            skipna = True
+
+        if skipna:
+            return numpy.nanmean(self._data)
+
+        return self._data.mean()
+
+    return hpat_pandas_series_mean_impl
+
+
 @overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     """
