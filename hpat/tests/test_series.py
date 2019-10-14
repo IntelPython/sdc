@@ -303,6 +303,32 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_to_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[1, 2, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
     def test_series_astype_dt_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
