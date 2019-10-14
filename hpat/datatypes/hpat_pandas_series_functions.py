@@ -540,6 +540,15 @@ def hpat_pandas_series_head(self, n=5):
     Pandas Series method :meth:`pandas.Series.head` implementation.
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_default1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index2
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index3
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index4
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_parallel1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index_parallel1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index_parallel2
+
     Parameters
     -----------
     n: :obj:`int`
