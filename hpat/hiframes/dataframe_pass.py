@@ -17,10 +17,11 @@ from numba.typing.templates import Signature, bound_function, signature
 from numba.typing.arraydecl import ArrayAttribute
 from numba.extending import overload
 from numba.typing.templates import infer_global, AbstractTemplate, signature
+from numba.compiler_machinery import FunctionPass, register_pass
 import hpat
 from hpat import hiframes
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-                        is_whole_slice, is_array, is_assign, sanitize_varname)
+                        is_whole_slice, is_array, is_assign, sanitize_varname, update_globals)
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array)
@@ -36,23 +37,33 @@ from hpat.hiframes.pd_rolling_ext import RollingType
 from hpat.hiframes.aggregate import get_agg_func
 
 
-class DataFramePass(object):
+@register_pass(mutates_CFG=True, analysis_only=False)
+class DataFramePass(FunctionPass):
     """Analyze and transform dataframe calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes):
-        self.func_ir = func_ir
-        self.typingctx = typingctx
-        self.typemap = typemap
-        self.calltypes = calltypes
+    _name = "dataframe_pass"
 
-    def run(self):
-        blocks = self.func_ir.blocks
+    def __init__(self):
+        pass
+
+    def run_pass(self, state):
+        return DataFramePassImpl(state).run_pass()
+
+
+class DataFramePassImpl(object):
+
+    def __init__(self, state):
+        self.state = state
+
+    def run_pass(self):
+        blocks = self.state.func_ir.blocks
         # topo_order necessary so DataFrame data replacement optimization can
         # be performed in one pass
         topo_order = find_topo_order(blocks)
         work_list = list((l, blocks[l]) for l in reversed(topo_order))
         dead_labels = []
         while work_list:
+
             label, block = work_list.pop()
             if label in dead_labels:
                 continue
@@ -63,31 +74,31 @@ class DataFramePass(object):
             branch_or_jump = block.body[-1]
             if isinstance(branch_or_jump, ir.Branch):
                 branch = branch_or_jump
-                cond_val = guard(_eval_const_var, self.func_ir, branch.cond)
+                cond_val = guard(_eval_const_var, self.state.func_ir, branch.cond)
                 if cond_val is not None:
                     # replace branch with Jump
                     dead_label = branch.falsebr if cond_val else branch.truebr
                     jmp_label = branch.truebr if cond_val else branch.falsebr
                     jmp = ir.Jump(jmp_label, branch.loc)
                     block.body[-1] = jmp
-                    cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+                    cfg = compute_cfg_from_blocks(self.state.func_ir.blocks)
                     if dead_label in cfg.dead_nodes():
                         dead_labels.append(dead_label)
                         # remove definitions in dead block so const variables can
                         # be found later (pd.merge() example)
                         # TODO: add this to dead_branch_prune pass
-                        for inst in self.func_ir.blocks[dead_label].body:
+                        for inst in self.state.func_ir.blocks[dead_label].body:
                             if is_assign(inst):
-                                self.func_ir._definitions[inst.target.name].remove(
+                                self.state.func_ir._definitions[inst.target.name].remove(
                                     inst.value)
 
-                        del self.func_ir.blocks[dead_label]
+                        del self.state.func_ir.blocks[dead_label]
                     else:
                         # the jmp block overrides some definitions of current
                         # block so remove dead defs and update _definitions
                         # example: test_join_left_seq1
                         jmp_defs = set()
-                        for inst in self.func_ir.blocks[jmp_label].body:
+                        for inst in self.state.func_ir.blocks[jmp_label].body:
                             if is_assign(inst):
                                 jmp_defs.add(inst.target.name)
                         used_vars = set()
@@ -96,7 +107,7 @@ class DataFramePass(object):
                             if (is_assign(inst)
                                     and inst.target.name not in used_vars
                                     and inst.target.name in jmp_defs):
-                                self.func_ir._definitions[inst.target.name].remove(inst.value)
+                                self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                                 continue
                             used_vars.update(v.name for v in inst.list_vars())
                             new_body.append(inst)
@@ -109,7 +120,7 @@ class DataFramePass(object):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
-                    self.func_ir._definitions[inst.target.name].remove(inst.value)
+                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)
@@ -129,17 +140,18 @@ class DataFramePass(object):
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    callee_blocks = inline_closure_call(self.func_ir, rp_func.glbls,
-                                                        block, len(new_body), rp_func.func, self.typingctx,
+                    update_globals(rp_func.func, rp_func.glbls)
+                    callee_blocks = inline_closure_call(self.state.func_ir, rp_func.glbls,
+                                                        block, len(new_body), rp_func.func, self.state.typingctx,
                                                         rp_func.arg_types,
-                                                        self.typemap, self.calltypes)
+                                                        self.state.typemap, self.state.calltypes)
                     # TODO: remove after Numba #3946 is merged
                     if isinstance(callee_blocks, tuple):
                         callee_blocks = callee_blocks[0]
                     # add blocks in reversed topo order to enable dead branch
                     # pruning (merge example)
                     # TODO: fix inline_closure_call()
-                    topo_order = find_topo_order(self.func_ir.blocks)
+                    topo_order = find_topo_order(self.state.func_ir.blocks)
                     for c_label in reversed(topo_order):
                         if c_label in callee_blocks:
                             c_block = callee_blocks[c_label]
@@ -152,27 +164,28 @@ class DataFramePass(object):
                                 if (target_label not in callee_blocks
                                         and target_label not in work_list):
                                     work_list.append((target_label,
-                                                      self.func_ir.blocks[target_label]))
+                                                      self.state.func_ir.blocks[target_label]))
                             work_list.append((c_label, c_block))
                     replaced = True
                     break
                 if isinstance(out_nodes, dict):
                     block.body = new_body + block.body[i:]
-                    inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
+                    inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
                     replaced = True
                     break
 
             if not replaced:
                 blocks[label].body = new_body
 
-        self.func_ir.blocks = ir_utils.simplify_CFG(self.func_ir.blocks)
-        while ir_utils.remove_dead(self.func_ir.blocks, self.func_ir.arg_names,
-                                   self.func_ir, self.typemap):
+        self.state.func_ir.blocks = ir_utils.simplify_CFG(self.state.func_ir.blocks)
+        while ir_utils.remove_dead(self.state.func_ir.blocks, self.state.func_ir.arg_names,
+                                   self.state.func_ir, self.state.typemap):
             pass
 
-        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        dprint_func_ir(self.func_ir, "after hiframes_typed")
-        return
+        self.state.func_ir._definitions = build_definitions(self.state.func_ir.blocks)
+        dprint_func_ir(self.state.func_ir, "after hiframes_typed")
+
+        return True
 
     def _run_assign(self, assign):
         lhs = assign.target
@@ -213,14 +226,14 @@ class DataFramePass(object):
             assert rhs.op == 'static_getitem'
             index_typ = numba.typeof(rhs.index)
             index_var = ir.Var(lhs.scope, mk_unique_var('dummy_index'), lhs.loc)
-            self.typemap[index_var.name] = index_typ
+            self.state.typemap[index_var.name] = index_typ
         else:
-            index_typ = self.typemap[index_var.name]
+            index_typ = self.state.typemap[index_var.name]
 
         # A = df['column'] or df[['C1', 'C2']]
         if rhs.op == 'static_getitem' and self._is_df_var(rhs.value):
             df_var = rhs.value
-            df_typ = self.typemap[df_var.name]
+            df_typ = self.state.typemap[df_var.name]
             index = rhs.index
 
             # A = df['column']
@@ -261,7 +274,7 @@ class DataFramePass(object):
                      or self.is_int_list_or_arr(index_var.name)
                      or isinstance(index_typ, types.SliceType))):
             # TODO: check for errors
-            df_var = guard(get_definition, self.func_ir, rhs.value).value
+            df_var = guard(get_definition, self.state.func_ir, rhs.value).value
             return self._gen_df_filter(df_var, index_var, lhs)
 
         # df.iloc[1:n,0], df.loc[1:n,'A']
@@ -269,9 +282,9 @@ class DataFramePass(object):
                 and isinstance(index_typ, types.Tuple)
                 and len(index_typ) == 2):
             #
-            df_var = guard(get_definition, self.func_ir, rhs.value).value
-            df_typ = self.typemap[df_var.name]
-            ind_def = guard(get_definition, self.func_ir, index_var)
+            df_var = guard(get_definition, self.state.func_ir, rhs.value).value
+            df_typ = self.state.typemap[df_var.name]
+            ind_def = guard(get_definition, self.state.func_ir, index_var)
             # TODO check and report errors
             assert isinstance(ind_def, ir.Expr) and ind_def.op == 'build_tuple'
 
@@ -281,19 +294,19 @@ class DataFramePass(object):
                 if rhs.op == 'static_getitem':
                     col_ind = rhs.index[1]
                 else:
-                    col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                    col_ind = guard(find_const, self.state.func_ir, ind_def.items[1])
                 col_name = df_typ.columns[col_ind]
             else:  # df.loc
-                col_name = guard(find_const, self.func_ir, ind_def.items[1])
+                col_name = guard(find_const, self.state.func_ir, ind_def.items[1])
 
             col_filter_var = ind_def.items[0]
             name_var = ir.Var(lhs.scope, mk_unique_var('df_col_name'), lhs.loc)
-            self.typemap[name_var.name] = types.StringLiteral(col_name)
+            self.state.typemap[name_var.name] = types.StringLiteral(col_name)
             nodes.append(
                 ir.Assign(ir.Const(col_name, lhs.loc), name_var, lhs.loc))
             in_arr = self._get_dataframe_data(df_var, col_name, nodes)
 
-            if guard(is_whole_slice, self.typemap, self.func_ir, col_filter_var):
+            if guard(is_whole_slice, self.state.typemap, self.state.func_ir, col_filter_var):
                 def func(A, ind, name):
                     return hpat.hiframes.api.init_series(A, None, name)
             else:
@@ -304,8 +317,8 @@ class DataFramePass(object):
             return self._replace_func(func, [in_arr, col_filter_var, name_var], pre_nodes=nodes)
 
         if self._is_df_iat_var(rhs.value):
-            df_var = guard(get_definition, self.func_ir, rhs.value).value
-            df_typ = self.typemap[df_var.name]
+            df_var = guard(get_definition, self.state.func_ir, rhs.value).value
+            df_typ = self.state.typemap[df_var.name]
             # df.iat[3,1]
             if (rhs.op == 'static_getitem' and isinstance(rhs.index, tuple)
                     and len(rhs.index) == 2 and isinstance(rhs.index[0], int)
@@ -319,8 +332,8 @@ class DataFramePass(object):
 
             # df.iat[n,1]
             if isinstance(index_typ, types.Tuple) and len(index_typ) == 2:
-                ind_def = guard(get_definition, self.func_ir, index_var)
-                col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                ind_def = guard(get_definition, self.state.func_ir, index_var)
+                col_ind = guard(find_const, self.state.func_ir, ind_def.items[1])
                 col_name = df_typ.columns[col_ind]
                 in_arr = self._get_dataframe_data(df_var, col_name, nodes)
                 row_ind = ind_def.items[0]
@@ -332,13 +345,13 @@ class DataFramePass(object):
 
     def _gen_df_filter(self, df_var, index_var, lhs):
         nodes = []
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         in_vars = {}
         out_vars = {}
         for col in df_typ.columns:
             in_arr = self._get_dataframe_data(df_var, col, nodes)
             out_arr = ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-            self.typemap[out_arr.name] = self.typemap[in_arr.name]
+            self.state.typemap[out_arr.name] = self.state.typemap[in_arr.name]
             in_vars[col] = in_arr
             out_vars[col] = out_arr
 
@@ -351,20 +364,20 @@ class DataFramePass(object):
             _init_df, list(out_vars.values()), pre_nodes=nodes)
 
     def _run_setitem(self, inst):
-        target_typ = self.typemap[inst.target.name]
+        target_typ = self.state.typemap[inst.target.name]
         nodes = []
         index_var = (inst.index_var if isinstance(inst, ir.StaticSetItem)
                      else inst.index)
-        index_typ = self.typemap[index_var.name]
+        index_typ = self.state.typemap[index_var.name]
 
         if self._is_df_iat_var(inst.target):
-            df_var = guard(get_definition, self.func_ir, inst.target).value
-            df_typ = self.typemap[df_var.name]
+            df_var = guard(get_definition, self.state.func_ir, inst.target).value
+            df_typ = self.state.typemap[df_var.name]
             val = inst.value
             # df.iat[n,1] = 3
             if isinstance(index_typ, types.Tuple) and len(index_typ) == 2:
-                ind_def = guard(get_definition, self.func_ir, index_var)
-                col_ind = guard(find_const, self.func_ir, ind_def.items[1])
+                ind_def = guard(get_definition, self.state.func_ir, index_var)
+                col_ind = guard(find_const, self.state.func_ir, ind_def.items[1])
                 col_name = df_typ.columns[col_ind]
                 in_arr = self._get_dataframe_data(df_var, col_name, nodes)
                 row_ind = ind_def.items[0]
@@ -376,7 +389,7 @@ class DataFramePass(object):
         return [inst]
 
     def _run_getattr(self, assign, rhs):
-        rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "df"
+        rhs_type = self.state.typemap[rhs.value.name]  # get type of rhs value "df"
 
         # S = df.A (get dataframe column)
         # TODO: check invalid df.Attr?
@@ -386,7 +399,7 @@ class DataFramePass(object):
             arr = self._get_dataframe_data(rhs.value, col_name, nodes)
             index = self._get_dataframe_index(rhs.value, nodes)
             name = ir.Var(arr.scope, mk_unique_var('df_col_name'), arr.loc)
-            self.typemap[name.name] = types.StringLiteral(col_name)
+            self.state.typemap[name.name] = types.StringLiteral(col_name)
             nodes.append(ir.Assign(ir.Const(col_name, arr.loc), name, arr.loc))
             return self._replace_func(
                 lambda arr, index, name: hpat.hiframes.api.init_series(
@@ -405,7 +418,7 @@ class DataFramePass(object):
         return [assign]
 
     def _handle_df_values(self, lhs, df_var):
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         n_cols = len(df_typ.columns)
         nodes = []
         data_arrs = [self._get_dataframe_data(df_var, c, nodes)
@@ -416,7 +429,7 @@ class DataFramePass(object):
         func_text += "    return np.stack(({}), 1)\n".format(data_args)
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'np': np}, loc_vars)
         f = loc_vars['f']
 
         return self._replace_func(f, data_arrs, pre_nodes=nodes)
@@ -424,7 +437,7 @@ class DataFramePass(object):
     def _run_binop(self, assign, rhs):
 
         arg1, arg2 = rhs.lhs, rhs.rhs
-        typ1, typ2 = self.typemap[arg1.name], self.typemap[arg2.name]
+        typ1, typ2 = self.state.typemap[arg1.name], self.state.typemap[arg2.name]
         if not (isinstance(typ1, DataFrameType) or isinstance(typ2, DataFrameType)):
             return [assign]
 
@@ -441,14 +454,14 @@ class DataFramePass(object):
         # self._convert_series_calltype(rhs)
 
         # # output stays as Array in A += B where A is Array
-        # if isinstance(self.typemap[assign.target.name], types.Array):
-        #     assert isinstance(self.calltypes[rhs].return_type, types.Array)
+        # if isinstance(self.state.typemap[assign.target.name], types.Array):
+        #     assert isinstance(self.state.calltypes[rhs].return_type, types.Array)
         #     nodes.append(assign)
         #     return nodes
 
         # out_data = ir.Var(
         #     arg1.scope, mk_unique_var(assign.target.name+'_data'), rhs.loc)
-        # self.typemap[out_data.name] = self.calltypes[rhs].return_type
+        # self.state.typemap[out_data.name] = self.state.calltypes[rhs].return_type
         # nodes.append(ir.Assign(rhs, out_data, rhs.loc))
         # return self._replace_func(
         #     lambda data: hpat.hiframes.api.init_series(data, None, None),
@@ -458,7 +471,7 @@ class DataFramePass(object):
 
     def _run_unary(self, assign, rhs):
         arg = rhs.value
-        typ = self.typemap[arg.name]
+        typ = self.state.typemap[arg.name]
 
         if isinstance(typ, DataFrameType):
             nodes = []
@@ -467,7 +480,7 @@ class DataFramePass(object):
             # self._convert_series_calltype(rhs)
             # out_data = ir.Var(
             #     arg.scope, mk_unique_var(assign.target.name+'_data'), rhs.loc)
-            # self.typemap[out_data.name] = self.calltypes[rhs].return_type
+            # self.state.typemap[out_data.name] = self.state.calltypes[rhs].return_type
             # nodes.append(ir.Assign(rhs, out_data, rhs.loc))
             # return self._replace_func(
             #     lambda data: hpat.hiframes.api.init_series(data),
@@ -478,11 +491,11 @@ class DataFramePass(object):
         return [assign]
 
     def _run_call(self, assign, lhs, rhs):
-        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        fdef = guard(find_callname, self.state.func_ir, rhs, self.state.typemap)
         if fdef is None:
             from numba.stencil import StencilFunc
             # could be make_function from list comprehension which is ok
-            func_def = guard(get_definition, self.func_ir, rhs.func)
+            func_def = guard(get_definition, self.state.func_ir, rhs.func)
             if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
                 return [assign]
             if isinstance(func_def, ir.Global) and isinstance(func_def.value, StencilFunc):
@@ -500,28 +513,28 @@ class DataFramePass(object):
             return self._run_call_set_df_column(assign, lhs, rhs)
 
         if fdef == ('merge', 'pandas'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.merge_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if fdef == ('merge_asof', 'pandas'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.merge_asof_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if fdef == ('join_dummy', 'hpat.hiframes.api'):
             return self._run_call_join(assign, lhs, rhs)
 
         if (isinstance(func_mod, ir.Var)
-                and isinstance(self.typemap[func_mod.name], DataFrameType)):
+                and isinstance(self.state.typemap[func_mod.name], DataFrameType)):
             return self._run_call_dataframe(
                 assign, assign.target, rhs, func_mod, func_name)
 
@@ -530,13 +543,13 @@ class DataFramePass(object):
             return [assign]
 
         if (isinstance(func_mod, ir.Var)
-                and isinstance(self.typemap[func_mod.name],
+                and isinstance(self.state.typemap[func_mod.name],
                                DataFrameGroupByType)):
             return self._run_call_groupby(
                 assign, assign.target, rhs, func_mod, func_name)
 
         if (isinstance(func_mod, ir.Var)
-                and isinstance(self.typemap[func_mod.name], RollingType)):
+                and isinstance(self.state.typemap[func_mod.name], RollingType)):
             return self._run_call_rolling(
                 assign, assign.target, rhs, func_mod, func_name)
 
@@ -544,28 +557,28 @@ class DataFramePass(object):
             return self._run_call_pivot_table(assign, lhs, rhs)
 
         if fdef == ('crosstab', 'pandas'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.crosstab_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if fdef == ('crosstab_dummy', 'hpat.hiframes.pd_groupby_ext'):
             return self._run_call_crosstab(assign, lhs, rhs)
 
         if fdef == ('concat', 'pandas'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.concat_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if (fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext')
-                and isinstance(self.typemap[lhs.name], DataFrameType)):
+                and isinstance(self.state.typemap[lhs.name], DataFrameType)):
             return self._run_call_concat(assign, lhs, rhs)
 
         if fdef == ('sort_values_dummy', 'hpat.hiframes.pd_dataframe_ext'):
@@ -593,13 +606,13 @@ class DataFramePass(object):
             return self._run_call_reset_index(assign, lhs, rhs)
 
         if fdef == ('drop_inplace', 'hpat.hiframes.api'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.api.drop_inplace_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if fdef == ('drop_dummy', 'hpat.hiframes.pd_dataframe_ext'):
             return self._run_call_drop(assign, lhs, rhs)
@@ -642,8 +655,8 @@ class DataFramePass(object):
     def _run_call_dataframe(self, assign, lhs, rhs, df_var, func_name):
         if func_name == 'merge':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.merge_overload(
                 *arg_typs, **kw_typs)
@@ -653,8 +666,8 @@ class DataFramePass(object):
 
         if func_name == 'pivot_table':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.pivot_table_overload(
                 *arg_typs, **kw_typs)
@@ -667,8 +680,8 @@ class DataFramePass(object):
 
         if func_name == 'rolling':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_rolling_ext.df_rolling_overload(
                 *arg_typs, **kw_typs)
@@ -689,8 +702,8 @@ class DataFramePass(object):
         # df.sort_values()
         if func_name == 'sort_values':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.sort_values_overload(
                 *arg_typs, **kw_typs)
@@ -702,8 +715,8 @@ class DataFramePass(object):
 
         if func_name == 'itertuples':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.itertuples_overload(
                 *arg_typs, **kw_typs)
@@ -714,8 +727,8 @@ class DataFramePass(object):
 
         if func_name == 'head':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.head_overload(
                 *arg_typs, **kw_typs)
@@ -726,8 +739,8 @@ class DataFramePass(object):
 
         if func_name == 'isna':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.isna_overload(
                 *arg_typs, **kw_typs)
@@ -738,8 +751,8 @@ class DataFramePass(object):
 
         if func_name == 'astype':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.astype_overload(
                 *arg_typs, **kw_typs)
@@ -750,8 +763,8 @@ class DataFramePass(object):
 
         if func_name == 'fillna':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.fillna_overload(
                 *arg_typs, **kw_typs)
@@ -763,8 +776,8 @@ class DataFramePass(object):
 
         if func_name == 'dropna':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.dropna_overload(
                 *arg_typs, **kw_typs)
@@ -776,8 +789,8 @@ class DataFramePass(object):
 
         if func_name == 'reset_index':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.reset_index_overload(
                 *arg_typs, **kw_typs)
@@ -789,8 +802,8 @@ class DataFramePass(object):
 
         if func_name == 'drop':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.drop_overload(
                 *arg_typs, **kw_typs)
@@ -802,8 +815,8 @@ class DataFramePass(object):
 
         if func_name == 'isin':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.isin_overload(
                 *arg_typs, **kw_typs)
@@ -814,8 +827,8 @@ class DataFramePass(object):
 
         if func_name == 'append':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.append_overload(
                 *arg_typs, **kw_typs)
@@ -827,8 +840,8 @@ class DataFramePass(object):
 
         if func_name == 'pct_change':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.pct_change_overload(
                 *arg_typs, **kw_typs)
@@ -840,8 +853,8 @@ class DataFramePass(object):
 
         if func_name == 'mean':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.mean_overload(
                 *arg_typs, **kw_typs)
@@ -853,8 +866,8 @@ class DataFramePass(object):
 
         if func_name == 'median':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.median_overload(
                 *arg_typs, **kw_typs)
@@ -866,8 +879,8 @@ class DataFramePass(object):
 
         if func_name == 'std':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.std_overload(
                 *arg_typs, **kw_typs)
@@ -879,8 +892,8 @@ class DataFramePass(object):
 
         if func_name == 'var':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.var_overload(
                 *arg_typs, **kw_typs)
@@ -892,8 +905,8 @@ class DataFramePass(object):
 
         if func_name == 'max':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.max_overload(
                 *arg_typs, **kw_typs)
@@ -905,8 +918,8 @@ class DataFramePass(object):
 
         if func_name == 'min':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.min_overload(
                 *arg_typs, **kw_typs)
@@ -918,8 +931,8 @@ class DataFramePass(object):
 
         if func_name == 'sum':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.sum_overload(
                 *arg_typs, **kw_typs)
@@ -931,8 +944,8 @@ class DataFramePass(object):
 
         if func_name == 'prod':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.prod_overload(
                 *arg_typs, **kw_typs)
@@ -944,8 +957,8 @@ class DataFramePass(object):
 
         if func_name == 'count':
             rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.count_overload(
                 *arg_typs, **kw_typs)
@@ -957,13 +970,13 @@ class DataFramePass(object):
         return [assign]
 
     def _run_call_dataframe_apply(self, assign, lhs, rhs, df_var):
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         # get apply function
         kws = dict(rhs.kws)
         func_var = self._get_arg('apply', rhs.args, kws, 0, 'func')
-        func = guard(get_definition, self.func_ir, func_var)
+        func = guard(get_definition, self.state.func_ir, func_var)
         # TODO: get globals directly from passed lambda if possible?
-        _globals = self.func_ir.func_id.func.__globals__
+        _globals = self.state.func_ir.func_id.func.__globals__
         lambda_ir = compile_to_numba_ir(func, _globals)
 
         # find columns that are actually used if possible
@@ -1014,7 +1027,7 @@ class DataFramePass(object):
         func_text += "  return hpat.hiframes.api.init_series(S)\n"
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'numba': numba, 'Row': Row}, loc_vars)
         f = loc_vars['f']
 
         f_ir = compile_to_numba_ir(
@@ -1032,6 +1045,7 @@ class DataFramePass(object):
                         and stmt.value.op == 'call'):
                     fdef = guard(get_definition, f_ir, stmt.value.func)
                     if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        update_globals(func, _globals)
                         inline_closure_call(f_ir, _globals, block, i, func)
                         # fix the global value to avoid typing errors
                         fdef.value = 1
@@ -1039,10 +1053,10 @@ class DataFramePass(object):
                         break
 
         arg_typs = tuple(df_typ.data[df_typ.columns.index(c)] for c in used_cols)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
-            self.typingctx, f_ir, arg_typs, None)
-        self.typemap.update(f_typemap)
-        self.calltypes.update(f_calltypes)
+        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
+            self.state.typingctx, f_ir, arg_typs, None)
+        self.state.typemap.update(f_typemap)
+        self.state.calltypes.update(f_calltypes)
 
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in used_cols]
@@ -1053,13 +1067,13 @@ class DataFramePass(object):
     def _handle_df_describe(self, assign, lhs, rhs, df_var):
         """translate df.describe() call with no input or just include='all'
         """
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         # check for no arg or just include='all'
         if not (len(rhs.args) == 0
                 and (len(rhs.kws) == 0
                      or (len(rhs.kws) == 1
                          and rhs.kws[0][0] == 'include'
-                         and guard(find_const, self.func_ir, rhs.kws[0][1]) == 'all'))):
+                         and guard(find_const, self.state.func_ir, rhs.kws[0][1]) == 'all'))):
             raise ValueError("only describe() with include='all' supported")
 
         col_name_args = ["c" + str(i) for i in range(len(df_typ.columns))]
@@ -1099,7 +1113,7 @@ class DataFramePass(object):
         func_text += "   'max     ' + {}\n".format(max_strs)
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
         f = loc_vars['f']
 
         nodes = []
@@ -1108,9 +1122,9 @@ class DataFramePass(object):
 
     def _run_call_df_sort_values(self, assign, lhs, rhs):
         df_var, by_var, ascending_var, inplace_var = rhs.args
-        df_typ = self.typemap[df_var.name]
-        ascending = guard(find_const, self.func_ir, ascending_var)
-        inplace = guard(find_const, self.func_ir, inplace_var)
+        df_typ = self.state.typemap[df_var.name]
+        ascending = guard(find_const, self.state.func_ir, ascending_var)
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
 
         # find key array for sort ('by' arg)
         key_names = self._get_const_or_list(by_var)
@@ -1133,7 +1147,7 @@ class DataFramePass(object):
             for k in df_typ.columns:
                 out_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
                 ind = df_typ.columns.index(k)
-                self.typemap[out_var.name] = df_typ.data[ind]
+                self.state.typemap[out_var.name] = df_typ.data[ind]
                 out_vars[k] = out_var
             for k in key_names:
                 out_key_vars.append(out_vars.pop(k))
@@ -1164,7 +1178,7 @@ class DataFramePass(object):
         e.g. get_itertuples("A", "B", A_arr, B_arr)
         """
         df_var = rhs.args[0]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         col_name_args = ', '.join(["c" + str(i) for i in range(len(df_typ.columns))])
         name_consts = ', '.join(["'{}'".format(c) for c in df_typ.columns])
@@ -1174,7 +1188,7 @@ class DataFramePass(object):
             .format(name_consts, col_name_args)
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         f = loc_vars['f']
 
         nodes = []
@@ -1184,7 +1198,7 @@ class DataFramePass(object):
     def _run_call_df_head(self, assign, lhs, rhs):
         df_var = rhs.args[0]
         n = rhs.args[1]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.head(n), get
         # output data and create a new dataframe
@@ -1199,7 +1213,7 @@ class DataFramePass(object):
             ", ".join(d + '_O' for d in data_args),
             ", ".join("'{}'".format(c) for c in df_typ.columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _head_impl = loc_vars['_head_impl']
 
         nodes = []
@@ -1210,7 +1224,7 @@ class DataFramePass(object):
         # TODO: refactor since similar to df.head() and others that call Series
         df_var = rhs.args[0]
         periods = rhs.args[1]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.pct_change(periods), get
         # output data and create a new dataframe
@@ -1225,7 +1239,7 @@ class DataFramePass(object):
             ", ".join(d + '_O' for d in data_args),
             ", ".join("'{}'".format(c) for c in df_typ.columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _pct_change_impl = loc_vars['_pct_change_impl']
 
         nodes = []
@@ -1237,7 +1251,7 @@ class DataFramePass(object):
         a Series like mean, std, max, ..."""
         # TODO: refactor
         df_var = rhs.args[0]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.mean(), get
         # output data and create a new indexed Series
@@ -1254,7 +1268,7 @@ class DataFramePass(object):
             ", ".join("'{}'".format(c) for c in df_typ.columns))
         func_text += "  return hpat.hiframes.api.init_series(data, index)\n"
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
         _reduce_impl = loc_vars['_reduce_impl']
 
         nodes = []
@@ -1265,8 +1279,8 @@ class DataFramePass(object):
         df_var = rhs.args[0]
         value = rhs.args[1]
         inplace_var = rhs.args[2]
-        inplace = guard(find_const, self.func_ir, inplace_var)
-        df_typ = self.typemap[df_var.name]
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.fillna(), get
         # output data and create a new dataframe
@@ -1285,7 +1299,7 @@ class DataFramePass(object):
             ", ".join(d + '_O' for d in data_args),
             ", ".join("'{}'".format(c) for c in df_typ.columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _fillna_impl = loc_vars['_fillna_impl']
 
         nodes = []
@@ -1300,8 +1314,8 @@ class DataFramePass(object):
     def _run_call_df_dropna(self, assign, lhs, rhs):
         df_var = rhs.args[0]
         inplace_var = rhs.args[1]
-        inplace = guard(find_const, self.func_ir, inplace_var)
-        df_typ = self.typemap[df_var.name]
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
+        df_typ = self.state.typemap[df_var.name]
 
         nodes = []
         col_vars = [self._get_dataframe_data(df_var, c, nodes) for c in df_typ.columns]
@@ -1314,15 +1328,15 @@ class DataFramePass(object):
         func_text += "  ({},) = hpat.hiframes.api.dropna(({},), inplace)\n".format(
             out_names, arg_names)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _dropna_imp = loc_vars['_dropna_imp']
 
         f_block = compile_to_numba_ir(_dropna_imp,
                                       {'hpat': hpat},
-                                      self.typingctx,
-                                      df_typ.data + (self.typemap[inplace_var.name],),
-                                      self.typemap,
-                                      self.calltypes
+                                      self.state.typingctx,
+                                      df_typ.data + (self.state.typemap[inplace_var.name],),
+                                      self.state.typemap,
+                                      self.state.calltypes
                                       ).blocks.popitem()[1]
         replace_arg_nodes(f_block, col_vars + [inplace_var])
         nodes += f_block.body[:-3]
@@ -1345,8 +1359,8 @@ class DataFramePass(object):
         # TODO: drop actual index, fix inplace
         df_var = rhs.args[0]
         inplace_var = rhs.args[1]
-        inplace = guard(find_const, self.func_ir, inplace_var)
-        df_typ = self.typemap[df_var.name]
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, copy data and create a new dataframe
         n_cols = len(df_typ.columns)
@@ -1360,7 +1374,7 @@ class DataFramePass(object):
             ", ".join(data_args),
             ", ".join("'{}'".format(c) for c in df_typ.columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _reset_index_impl = loc_vars['_reset_index_impl']
 
         nodes = []
@@ -1374,9 +1388,9 @@ class DataFramePass(object):
 
     def _run_call_drop(self, assign, lhs, rhs):
         df_var, labels_var, axis_var, columns_var, inplace_var = rhs.args
-        inplace = guard(find_const, self.func_ir, inplace_var)
-        df_typ = self.typemap[df_var.name]
-        out_typ = self.typemap[lhs.name]
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
+        df_typ = self.state.typemap[df_var.name]
+        out_typ = self.state.typemap[lhs.name]
         # TODO: reflection for drop inplace
 
         nodes = []
@@ -1389,7 +1403,7 @@ class DataFramePass(object):
 
     def _run_call_df_isna(self, assign, lhs, rhs):
         df_var = rhs.args[0]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.isna(), get
         # output data and create a new dataframe
@@ -1410,7 +1424,7 @@ class DataFramePass(object):
         func_text = '\n'.join(func_lines)
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _isna_impl = loc_vars['_isna_impl']
 
         nodes = []
@@ -1424,7 +1438,7 @@ class DataFramePass(object):
         '''
         df_var = rhs.args[0]
         dtype_var = rhs.args[1]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # impl: for each column, convert data to series, call S.astype(dtype_value), get
         # output data and create a new dataframe
@@ -1456,8 +1470,8 @@ class DataFramePass(object):
 
     def _run_call_isin(self, assign, lhs, rhs):
         df_var, values = rhs.args
-        df_typ = self.typemap[df_var.name]
-        values_typ = self.typemap[values.name]
+        df_typ = self.state.typemap[df_var.name]
+        values_typ = self.state.typemap[values.name]
 
         nodes = []
         other_colmap = {}
@@ -1502,10 +1516,10 @@ class DataFramePass(object):
             f_block = compile_to_numba_ir(
                 func,
                 {'hpat': hpat, 'np': np},
-                self.typingctx,
-                tuple(self.typemap[v.name] for v in args),
-                self.typemap,
-                self.calltypes).blocks.popitem()[1]
+                self.state.typingctx,
+                tuple(self.state.typemap[v.name] for v in args),
+                self.state.typemap,
+                self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-2]
             out_vars.append(nodes[-1].target)
@@ -1523,27 +1537,27 @@ class DataFramePass(object):
             return self._replace_func(_impl, rhs.args)
 
         df_var = rhs.args[0]
-        cname = guard(find_const, self.func_ir, rhs.args[1])
+        cname = guard(find_const, self.state.func_ir, rhs.args[1])
         new_arr = rhs.args[2]
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         nodes = []
 
         # find df['col2'] = df['col1'][arr]
         # since columns should have the same size, output is filled with NaNs
         # TODO: make sure col1 and col2 are in the same df
-        arr_def = guard(get_definition, self.func_ir, new_arr)
+        arr_def = guard(get_definition, self.state.func_ir, new_arr)
         if (isinstance(arr_def, ir.Expr) and arr_def.op == 'getitem'
-                and is_array(self.typemap, arr_def.value.name)
+                and is_array(self.state.typemap, arr_def.value.name)
                 and self.is_bool_arr(arr_def.index.name)):
             orig_arr = arr_def.value
             bool_arr = arr_def.index
             f_block = compile_to_numba_ir(
                 lambda arr, bool_arr: hpat.hiframes.api.series_filter_bool(arr, bool_arr),
                 {'hpat': hpat},
-                self.typingctx,
-                (self.typemap[orig_arr.name], self.typemap[bool_arr.name]),
-                self.typemap,
-                self.calltypes
+                self.state.typingctx,
+                (self.state.typemap[orig_arr.name], self.state.typemap[bool_arr.name]),
+                self.state.typemap,
+                self.state.calltypes
             ).blocks.popitem()[1]
             replace_arg_nodes(f_block, [orig_arr, bool_arr])
             nodes += f_block.body[:-2]
@@ -1578,12 +1592,12 @@ class DataFramePass(object):
         func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             data_args, col_args)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _init_df = loc_vars['_init_df']
         return self._replace_func(_init_df, in_arrs, pre_nodes=nodes)
 
     def _run_call_len(self, lhs, df_var):
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
 
         # empty dataframe has 0 len
         if len(df_typ.columns) == 0:
@@ -1604,8 +1618,8 @@ class DataFramePass(object):
 
         left_on = self._get_const_or_list(left_on_var)
         right_on = self._get_const_or_list(right_on_var)
-        how = guard(find_const, self.func_ir, how_var)
-        out_typ = self.typemap[lhs.name]
+        how = guard(find_const, self.state.func_ir, how_var)
+        out_typ = self.state.typemap[lhs.name]
 
         # convert right join to left join
         if how == 'right':
@@ -1617,13 +1631,13 @@ class DataFramePass(object):
         out_data_vars = {c: ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
                          for c in out_typ.columns}
         for v, t in zip(out_data_vars.values(), out_typ.data):
-            self.typemap[v.name] = t
+            self.state.typemap[v.name] = t
 
         left_arrs = {c: self._get_dataframe_data(left_df, c, nodes)
-                     for c in self.typemap[left_df.name].columns}
+                     for c in self.state.typemap[left_df.name].columns}
 
         right_arrs = {c: self._get_dataframe_data(right_df, c, nodes)
-                      for c in self.typemap[right_df.name].columns}
+                      for c in self.state.typemap[right_df.name].columns}
 
         nodes.append(hiframes.join.Join(lhs.name, left_df.name,
                                         right_df.name,
@@ -1636,10 +1650,10 @@ class DataFramePass(object):
                                   pre_nodes=nodes)
 
     def _run_call_groupby(self, assign, lhs, rhs, grp_var, func_name):
-        grp_typ = self.typemap[grp_var.name]
+        grp_typ = self.state.typemap[grp_var.name]
         df_var = self._get_df_obj_select(grp_var, 'groupby')
-        df_type = self.typemap[df_var.name]
-        out_typ = self.typemap[lhs.name]
+        df_type = self.state.typemap[df_var.name]
+        out_typ = self.state.typemap[lhs.name]
 
         nodes = []
         in_vars = {c: self._get_dataframe_data(df_var, c, nodes)
@@ -1654,18 +1668,18 @@ class DataFramePass(object):
             for k in grp_typ.keys:
                 out_key_var = ir.Var(lhs.scope, mk_unique_var(k), lhs.loc)
                 ind = out_typ.columns.index(k)
-                self.typemap[out_key_var.name] = out_typ.data[ind]
+                self.state.typemap[out_key_var.name] = out_typ.data[ind]
                 out_key_vars.append(out_key_var)
 
         df_col_map = {}
         for c in grp_typ.selection:
             var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
-            self.typemap[var.name] = (out_typ.data
+            self.state.typemap[var.name] = (out_typ.data
                                       if isinstance(out_typ, SeriesType)
                                       else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
 
-        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+        agg_func = get_agg_func(self.state.func_ir, func_name, rhs)
 
         agg_node = hiframes.aggregate.Aggregate(
             lhs.name, df_var.name, grp_typ.keys, out_key_vars, df_col_map,
@@ -1700,13 +1714,13 @@ class DataFramePass(object):
 
     def _run_call_pivot_table(self, assign, lhs, rhs):
         df_var, values, index, columns, aggfunc, _pivot_values = rhs.args
-        func_name = self.typemap[aggfunc.name].literal_value
-        values = self.typemap[values.name].literal_value
-        index = self.typemap[index.name].literal_value
-        columns = self.typemap[columns.name].literal_value
-        pivot_values = self.typemap[_pivot_values.name].meta
-        df_type = self.typemap[df_var.name]
-        out_typ = self.typemap[lhs.name]
+        func_name = self.state.typemap[aggfunc.name].literal_value
+        values = self.state.typemap[values.name].literal_value
+        index = self.state.typemap[index.name].literal_value
+        columns = self.state.typemap[columns.name].literal_value
+        pivot_values = self.state.typemap[_pivot_values.name].meta
+        df_type = self.state.typemap[df_var.name]
+        out_typ = self.state.typemap[lhs.name]
 
         nodes = []
         in_vars = {values: self._get_dataframe_data(df_var, values, nodes)}
@@ -1714,11 +1728,11 @@ class DataFramePass(object):
         df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                        for col in pivot_values})
         for v in df_col_map.values():
-            self.typemap[v.name] = out_typ.data[0]
+            self.state.typemap[v.name] = out_typ.data[0]
 
         pivot_arr = self._get_dataframe_data(df_var, columns, nodes)
         index_arr = self._get_dataframe_data(df_var, index, nodes)
-        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+        agg_func = get_agg_func(self.state.func_ir, func_name, rhs)
 
         agg_node = hiframes.aggregate.Aggregate(
             lhs.name, df_var.name, [index], None, df_col_map,
@@ -1738,15 +1752,15 @@ class DataFramePass(object):
 
     def _run_call_crosstab(self, assign, lhs, rhs):
         index, columns, _pivot_values = rhs.args
-        pivot_values = self.typemap[_pivot_values.name].meta
-        out_typ = self.typemap[lhs.name]
+        pivot_values = self.state.typemap[_pivot_values.name].meta
+        out_typ = self.state.typemap[lhs.name]
 
         in_vars = {}
 
         df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
                        for col in pivot_values})
         for i, v in enumerate(df_col_map.values()):
-            self.typemap[v.name] = out_typ.data[i]
+            self.state.typemap[v.name] = out_typ.data[i]
 
         pivot_arr = columns
 
@@ -1776,31 +1790,31 @@ class DataFramePass(object):
                                   pre_nodes=nodes)
 
     def _run_call_rolling(self, assign, lhs, rhs, rolling_var, func_name):
-        rolling_typ = self.typemap[rolling_var.name]
-        dummy_call = guard(get_definition, self.func_ir, rolling_var)
+        rolling_typ = self.state.typemap[rolling_var.name]
+        dummy_call = guard(get_definition, self.state.func_ir, rolling_var)
         df_var, window, center, on = dummy_call.args
-        df_type = self.typemap[df_var.name]
-        out_typ = self.typemap[lhs.name]
+        df_type = self.state.typemap[df_var.name]
+        out_typ = self.state.typemap[lhs.name]
 
         # handle 'on' arg
-        if self.typemap[on.name] == types.none:
+        if self.state.typemap[on.name] == types.none:
             on = None
         else:
-            assert isinstance(self.typemap[on.name], types.StringLiteral)
-            on = self.typemap[on.name].literal_value
+            assert isinstance(self.state.typemap[on.name], types.StringLiteral)
+            on = self.state.typemap[on.name].literal_value
 
         nodes = []
         # convert string offset window statically to nanos
         # TODO: support dynamic conversion
         # TODO: support other offsets types (time delta, etc.)
         if on is not None:
-            window = guard(find_const, self.func_ir, window)
+            window = guard(find_const, self.state.func_ir, window)
             if not isinstance(window, str):
                 raise ValueError("window argument to rolling should be constant"
                                  "string in the offset case (variable window)")
             window = pd.tseries.frequencies.to_offset(window).nanos
             window_var = ir.Var(lhs.scope, mk_unique_var("window"), lhs.loc)
-            self.typemap[window_var.name] = types.int64
+            self.state.typemap[window_var.name] = types.int64
             nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
             window = window_var
 
@@ -1813,7 +1827,7 @@ class DataFramePass(object):
         df_col_map = {}
         for c in rolling_typ.selection:
             var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
-            self.typemap[var.name] = (out_typ.data
+            self.state.typemap[var.name] = (out_typ.data
                                       if isinstance(out_typ, SeriesType)
                                       else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
@@ -1831,7 +1845,7 @@ class DataFramePass(object):
             in_col_var = in_vars[cname]
             if func_name in ('cov', 'corr'):
                 # TODO: Series as other
-                if cname not in self.typemap[other.name].columns:
+                if cname not in self.state.typemap[other.name].columns:
                     continue  # nan column handled below
                 rhs.args[0] = self._get_dataframe_data(other, cname, nodes)
             nodes += self._gen_rolling_call(
@@ -1840,17 +1854,17 @@ class DataFramePass(object):
 
         # in corr/cov case, Pandas makes non-common columns NaNs
         if func_name in ('cov', 'corr'):
-            nan_cols = list(set(self.typemap[other.name].columns) ^ set(df_type.columns))
+            nan_cols = list(set(self.state.typemap[other.name].columns) ^ set(df_type.columns))
             len_arr = list(in_vars.values())[0]
             for cname in nan_cols:
                 def f(arr):
                     nan_arr = np.full(len(arr), np.nan)
                 f_block = compile_to_numba_ir(f,
                                               {'np': np},
-                                              self.typingctx,
-                                              (self.typemap[len_arr.name],),
-                                              self.typemap,
-                                              self.calltypes).blocks.popitem()[1]
+                                              self.state.typingctx,
+                                              (self.state.typemap[len_arr.name],),
+                                              self.state.typemap,
+                                              self.state.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [len_arr])
                 nodes += f_block.body[:-3]  # remove none return
                 df_col_map[cname] = nodes[-1].target
@@ -1924,13 +1938,13 @@ class DataFramePass(object):
                         arr, w, center, False, _func_name)
                 args = [in_col_var, window, center]
 
-        arg_typs = tuple(self.typemap[v.name] for v in args)
+        arg_typs = tuple(self.state.typemap[v.name] for v in args)
         f_block = compile_to_numba_ir(f,
                                       {'hpat': hpat, '_func_name': func_name},
-                                      self.typingctx,
+                                      self.state.typingctx,
                                       arg_typs,
-                                      self.typemap,
-                                      self.calltypes).blocks.popitem()[1]
+                                      self.state.typemap,
+                                      self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, args)
         nodes += f_block.body[:-3]  # remove none return
         nodes[-1].target = out_col_var
@@ -1939,9 +1953,9 @@ class DataFramePass(object):
     def _run_call_concat(self, assign, lhs, rhs):
         # TODO: handle non-numerical (e.g. string, datetime) columns
         nodes = []
-        out_typ = self.typemap[lhs.name]
+        out_typ = self.state.typemap[lhs.name]
         df_list = self._get_const_tup(rhs.args[0])
-        axis = guard(find_const, self.func_ir, rhs.args[1])
+        axis = guard(find_const, self.state.func_ir, rhs.args[1])
         if axis == 1:
             return self._run_call_concat_columns(df_list, out_typ)
 
@@ -1955,7 +1969,7 @@ class DataFramePass(object):
         func_text += "    return hpat.hiframes.api.concat(({}))\n".format(
             arg_names)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _concat_imp = loc_vars['_concat_imp']
 
         out_vars = []
@@ -1964,15 +1978,15 @@ class DataFramePass(object):
             args = []
             # get input columns
             for df in df_list:
-                df_typ = self.typemap[df.name]
+                df_typ = self.state.typemap[df.name]
                 # generate full NaN column
                 if cname not in df_typ.columns:
                     f_block = compile_to_numba_ir(gen_nan_func,
                                                   {'hpat': hpat, 'np': np},
-                                                  self.typingctx,
+                                                  self.state.typingctx,
                                                   (df_typ.data[0],),
-                                                  self.typemap,
-                                                  self.calltypes).blocks.popitem()[1]
+                                                  self.state.typemap,
+                                                  self.state.calltypes).blocks.popitem()[1]
                     arr = self._get_dataframe_data(df, df_typ.columns[0], nodes)
                     replace_arg_nodes(f_block, [arr])
                     nodes += f_block.body[:-2]
@@ -1981,13 +1995,13 @@ class DataFramePass(object):
                     arr = self._get_dataframe_data(df, cname, nodes)
                     args.append(arr)
 
-            arg_typs = tuple(self.typemap[v.name] for v in args)
+            arg_typs = tuple(self.state.typemap[v.name] for v in args)
             f_block = compile_to_numba_ir(_concat_imp,
                                           {'hpat': hpat, 'np': np},
-                                          self.typingctx,
+                                          self.state.typingctx,
                                           arg_typs,
-                                          self.typemap,
-                                          self.calltypes).blocks.popitem()[1]
+                                          self.state.typemap,
+                                          self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-2]
             out_vars.append(nodes[-1].target)
@@ -2004,10 +2018,10 @@ class DataFramePass(object):
             f_block = compile_to_numba_ir(
                 lambda S: hpat.hiframes.api.get_series_data(S),
                 {'hpat': hpat},
-                self.typingctx,
-                (self.typemap[obj.name],),
-                self.typemap,
-                self.calltypes).blocks.popitem()[1]
+                self.state.typingctx,
+                (self.state.typemap[obj.name],),
+                self.state.typemap,
+                self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, (obj,))
             nodes += f_block.body[:-2]
             out_vars.append(nodes[-1].target)
@@ -2021,13 +2035,13 @@ class DataFramePass(object):
         """get df object for groupby() or rolling()
         e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
         """
-        select_def = guard(get_definition, self.func_ir, obj_var)
+        select_def = guard(get_definition, self.state.func_ir, obj_var)
         if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
             obj_var = select_def.value
 
-        obj_call = guard(get_definition, self.func_ir, obj_var)
+        obj_call = guard(get_definition, self.state.func_ir, obj_var)
         # find dataframe
-        call_def = guard(find_callname, self.func_ir, obj_call)
+        call_def = guard(find_callname, self.state.func_ir, obj_call)
         assert (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1]))
@@ -2036,7 +2050,7 @@ class DataFramePass(object):
         return df_var
 
     def _get_const_tup(self, tup_var):
-        tup_def = guard(get_definition, self.func_ir, tup_var)
+        tup_def = guard(get_definition, self.state.func_ir, tup_var)
         if isinstance(tup_def, ir.Expr):
             if tup_def.op == 'binop' and tup_def.fn in ('+', operator.add):
                 return (self._get_const_tup(tup_def.lhs)
@@ -2050,14 +2064,14 @@ class DataFramePass(object):
         # also, boxed dfs need to be updated
         # HACK assign output df back to input df variables
         # TODO CFG backbone?
-        df_typ = self.typemap[df_var.name]
-        arg_typs = tuple(self.typemap[v.name] for v in out_arrs)
+        df_typ = self.state.typemap[df_var.name]
+        arg_typs = tuple(self.state.typemap[v.name] for v in out_arrs)
         f_block = compile_to_numba_ir(_init_df,
                                       {'hpat': hpat},
-                                      self.typingctx,
+                                      self.state.typingctx,
                                       arg_typs,
-                                      self.typemap,
-                                      self.calltypes).blocks.popitem()[1]
+                                      self.state.typemap,
+                                      self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, out_arrs)
         nodes += f_block.body[:-2]
         new_df = nodes[-1].target
@@ -2067,15 +2081,15 @@ class DataFramePass(object):
             f_block = compile_to_numba_ir(
                 lambda df: hpat.hiframes.pd_dataframe_ext.set_parent_dummy(df),
                 {'hpat': hpat},
-                self.typingctx,
-                (self.typemap[new_df.name],),
-                self.typemap,
-                self.calltypes).blocks.popitem()[1]
+                self.state.typingctx,
+                (self.state.typemap[new_df.name],),
+                self.state.typemap,
+                self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [new_df])
             nodes += f_block.body[:-2]
             new_df = nodes[-1].target
 
-        for other_df_var in self.func_ir._definitions[df_var.name]:
+        for other_df_var in self.state.func_ir._definitions[df_var.name]:
             if isinstance(other_df_var, ir.Var):
                 nodes.append(ir.Assign(new_df, other_df_var, loc))
         ir.Assign(new_df, df_var, loc)
@@ -2088,16 +2102,16 @@ class DataFramePass(object):
         # e.g. A = init_dataframe(A, None, 'A')
         # XXX assuming init_dataframe is the only call to create a dataframe
         # and dataframe._data is never overwritten
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         ind = df_typ.columns.index(col_name)
-        var_def = guard(get_definition, self.func_ir, df_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, df_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
             return var_def.args[ind]
 
         loc = df_var.loc
         ind_var = ir.Var(df_var.scope, mk_unique_var('col_ind'), loc)
-        self.typemap[ind_var.name] = types.IntegerLiteral(ind)
+        self.state.typemap[ind_var.name] = types.IntegerLiteral(ind)
         nodes.append(ir.Assign(ir.Const(ind, loc), ind_var, loc))
         # XXX use get_series_data() for getting data instead of S._data
         # to enable alias analysis
@@ -2105,20 +2119,20 @@ class DataFramePass(object):
             lambda df, c_ind: hpat.hiframes.pd_dataframe_ext.get_dataframe_data(
                 df, c_ind),
             {'hpat': hpat},
-            self.typingctx,
-            (df_typ, self.typemap[ind_var.name]),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (df_typ, self.state.typemap[ind_var.name]),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [df_var, ind_var])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
     def _get_dataframe_index(self, df_var, nodes):
-        df_typ = self.typemap[df_var.name]
+        df_typ = self.state.typemap[df_var.name]
         n_cols = len(df_typ.columns)
-        var_def = guard(get_definition, self.func_ir, df_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, df_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
             return var_def.args[n_cols]
 
@@ -2127,10 +2141,10 @@ class DataFramePass(object):
         f_block = compile_to_numba_ir(
             lambda df: hpat.hiframes.pd_dataframe_ext.get_dataframe_index(df),
             {'hpat': hpat},
-            self.typingctx,
+            self.state.typingctx,
             (df_typ,),
-            self.typemap,
-            self.calltypes
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [df_var])
         nodes += f_block.body[:-2]
@@ -2146,7 +2160,7 @@ class DataFramePass(object):
         # XXX: inine_closure_call() can't handle defaults properly
         if pysig is not None:
             pre_nodes = [] if pre_nodes is None else pre_nodes
-            scope = next(iter(self.func_ir.blocks.values())).scope
+            scope = next(iter(self.state.func_ir.blocks.values())).scope
             loc = scope.loc
 
             def normal_handler(index, param, default):
@@ -2154,7 +2168,7 @@ class DataFramePass(object):
 
             def default_handler(index, param, default):
                 d_var = ir.Var(scope, mk_unique_var('defaults'), loc)
-                self.typemap[d_var.name] = numba.typeof(default)
+                self.state.typemap[d_var.name] = numba.typeof(default)
                 node = ir.Assign(ir.Const(default, loc), d_var, loc)
                 pre_nodes.append(node)
                 return d_var
@@ -2164,12 +2178,12 @@ class DataFramePass(object):
                 pysig, args, kws, normal_handler, default_handler,
                 normal_handler)
 
-        arg_typs = tuple(self.typemap[v.name] for v in args)
+        arg_typs = tuple(self.state.typemap[v.name] for v in args)
 
         if const:
             new_args = []
             for i, arg in enumerate(args):
-                val = guard(find_const, self.func_ir, arg)
+                val = guard(find_const, self.state.func_ir, arg)
                 if val:
                     new_args.append(types.literal(val))
                 else:
@@ -2178,36 +2192,36 @@ class DataFramePass(object):
         return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def _is_df_var(self, var):
-        return isinstance(self.typemap[var.name], DataFrameType)
+        return isinstance(self.state.typemap[var.name], DataFrameType)
 
     def _is_df_loc_var(self, var):
-        return isinstance(self.typemap[var.name], DataFrameLocType)
+        return isinstance(self.state.typemap[var.name], DataFrameLocType)
 
     def _is_df_iloc_var(self, var):
-        return isinstance(self.typemap[var.name], DataFrameILocType)
+        return isinstance(self.state.typemap[var.name], DataFrameILocType)
 
     def _is_df_iat_var(self, var):
-        return isinstance(self.typemap[var.name], DataFrameIatType)
+        return isinstance(self.state.typemap[var.name], DataFrameIatType)
 
     def is_bool_arr(self, varname):
-        typ = self.typemap[varname]
+        typ = self.state.typemap[varname]
         return (isinstance(typ, (SeriesType, types.Array))
                 and typ.dtype == types.bool_)
 
     def is_int_list_or_arr(self, varname):
-        typ = self.typemap[varname]
+        typ = self.state.typemap[varname]
         return (isinstance(typ, (SeriesType, types.Array, types.List))
                 and isinstance(typ.dtype, types.Integer))
 
     def _is_const_none(self, var):
-        var_def = guard(get_definition, self.func_ir, var)
+        var_def = guard(get_definition, self.state.func_ir, var)
         return isinstance(var_def, ir.Const) and var_def.value is None
 
     def _update_definitions(self, node_list):
         loc = ir.Loc("", 0)
         dumm_block = ir.Block(ir.Scope(None, loc), loc)
         dumm_block.body = node_list
-        build_definitions({0: dumm_block}, self.func_ir._definitions)
+        build_definitions({0: dumm_block}, self.state.func_ir._definitions)
         return
 
     def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
@@ -2228,25 +2242,25 @@ class DataFramePass(object):
 
     def _gen_arr_copy(self, in_arr, nodes):
         f_block = compile_to_numba_ir(
-            lambda A: A.copy(), {}, self.typingctx,
-            (self.typemap[in_arr.name],), self.typemap, self.calltypes
+            lambda A: A.copy(), {}, self.state.typingctx,
+            (self.state.typemap[in_arr.name],), self.state.typemap, self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [in_arr])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
     def _get_const_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
-        var_typ = self.typemap[by_arg.name]
+        var_typ = self.state.typemap[by_arg.name]
         if isinstance(var_typ, types.Optional):
             var_typ = var_typ.type
         if hasattr(var_typ, 'consts'):
             return var_typ.consts
 
         typ = str if typ is None else typ
-        by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+        by_arg_def = guard(find_build_sequence, self.state.func_ir, by_arg)
         if by_arg_def is None:
             # try single key column
-            by_arg_def = guard(find_const, self.func_ir, by_arg)
+            by_arg_def = guard(find_const, self.state.func_ir, by_arg)
             if by_arg_def is None:
                 if default is not None:
                     return default
@@ -2260,7 +2274,7 @@ class DataFramePass(object):
                 if default is not None:
                     return default
                 raise ValueError(err_msg)
-            key_colnames = tuple(guard(find_const, self.func_ir, v) for v in by_arg_def[0])
+            key_colnames = tuple(guard(find_const, self.state.func_ir, v) for v in by_arg_def[0])
             if any(not isinstance(v, typ) for v in key_colnames):
                 if default is not None:
                     return default
@@ -2276,7 +2290,7 @@ def _gen_init_df(columns):
     func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
         data_args, ", ".join("'{}'".format(c) for c in columns))
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'hpat': hpat}, loc_vars)
     _init_df = loc_vars['_init_df']
 
     return _init_df

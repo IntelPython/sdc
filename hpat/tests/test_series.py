@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
-
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
