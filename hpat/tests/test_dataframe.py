@@ -602,6 +602,46 @@ class TestDataFrame(unittest.TestCase):
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_astype_str1(self):
+        '''Verifies DataFrame.astype implementation converting various types to string'''
+        def test_impl(df):
+            return df.astype(str)
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: add column with float values when test_series_astype_float_to_str1 is fixed
+        df = pd.DataFrame({'A': [-1, 2, 11, 5, 0, -7],
+                           'B': ['aa', 'bb', 'cc', 'dd', '', 'fff']
+        })
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_astype_float1(self):
+        '''Verifies DataFrame.astype implementation converting various types to float'''
+        def test_impl(df):
+            return df.astype(np.float64)
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: uncomment column with string values when test_series_astype_str_to_float64 is fixed
+        df = pd.DataFrame({'A': [-1, 2, 11, 5, 0, -7],
+        #                   'B': ['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'],
+                           'C': [3.24, 1E+05, -1, -1.3E-01, np.nan, np.inf]
+        })
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_astype_int1(self):
+        '''Verifies DataFrame.astype implementation converting various types to int'''
+        def test_impl(df):
+            return df.astype(np.int32)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 6
+        # TODO: uncomment column with string values when test_series_astype_str_to_int32 is fixed
+        df = pd.DataFrame({'A': np.ones(n, dtype=np.int64),
+                           'B': np.arange(n, dtype=np.int32),
+        #                   'C': ['-1', '2', '3', '0', '-7', '99'],
+                           'D': np.arange(float(n), dtype=np.float32)
+        })
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     def test_sort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
