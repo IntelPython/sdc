@@ -949,18 +949,14 @@ class HiFramesTyped(object):
                 self.typemap[n_arg.name] = types.IntegerLiteral(5)
                 nodes.append(ir.Assign(
                     ir.Const(5, lhs.loc), n_arg, lhs.loc))
-        
             data = self._get_series_data(series_var, nodes)
             func = series_replace_funcs[func_name]
-        
             if self.typemap[series_var.name].index != types.none:
                 index = self._get_series_index(series_var, nodes)
                 func = series_replace_funcs['head_index']
             else:
                 index = self._get_index_values(data, nodes)
-        
             name = self._get_series_name(series_var, nodes)
-        
             return self._replace_func(
                 func, (data, index, n_arg, name), pre_nodes=nodes)
 
