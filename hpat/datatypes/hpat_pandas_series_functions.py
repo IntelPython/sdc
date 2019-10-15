@@ -549,6 +549,7 @@ def hpat_pandas_series_head(self, n=5):
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_parallel1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index_parallel1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head_index_parallel2
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_head
 
     Parameters
     -----------

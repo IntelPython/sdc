@@ -1903,7 +1903,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Enable after fixing index")
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
@@ -1952,7 +1951,75 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Enable after fixing index")
+    @unittest.skip("Need index fix")
+    def test_series_head(self):
+        def test_series_head_impl(S):
+            return S.head()
+
+        def test_series_head_param1_impl(S, n):
+            return S.head(n)
+
+        hpat_func = hpat.jit(test_series_head_impl)
+
+        the_same_string = "the same string"
+        test_input_data = []
+        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd', 'cc'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd'],
+                       []
+                       ]
+
+        data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                      [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                      [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, np.nan, np.nan],
+                      [np.nan, np.nan, np.inf],
+                      ]
+
+        if hpat.config.config_pipeline_hpat_default:
+
+            test_input_data = data_simple
+        else:
+            test_input_data = data_simple + data_extra
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_head_impl(S)
+            result = hpat_func(S)
+            pd.testing.assert_series_equal(result, result_ref)
+
+            if not hpat.config.config_pipeline_hpat_default:
+
+                hpat_func_param1 = hpat.jit(test_series_head_param1_impl)
+
+                for param1 in [0, 3, 10]:
+                    result_param1_ref = test_series_head_param1_impl(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    pd.testing.assert_series_equal(result_param1, result_param1_ref)
+
+        for input_data in data_simple:
+            for index_data in data_simple:
+                S = pd.Series(input_data, index_data)
+
+                result_ref = test_series_head_impl(S)
+                result = hpat_func(S)
+                pd.testing.assert_series_equal(result, result_ref)
+
+                if not hpat.config.config_pipeline_hpat_default:
+
+                    hpat_func_param1 = hpat.jit(test_series_head_param1_impl)
+
+                    for param1 in [0, 3, 10]:
+                        result_param1_ref = test_series_head_param1_impl(S, param1)
+                        result_param1 = hpat_func_param1(S, param1)
+                        pd.testing.assert_series_equal(result_param1, result_param1_ref)
+
+    @unittest.skip("Passed if run single")
     def test_series_head_parallel1(self):
         '''Verifies head method for distributed Series with string data and no index'''
         def test_impl(S):
