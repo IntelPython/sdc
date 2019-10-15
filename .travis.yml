@@ -10,8 +10,9 @@ env:
         - PYTHON_VER=3.7
         - RUN_TEST=--no-test
     matrix:
-        - HPAT_CHECK_STYLE=True
-        - HPAT_RUN_COVERAGE=True
+        include:
+            - HPAT_CHECK_STYLE=True
+            - HPAT_RUN_COVERAGE=True
         allow_failures:
             - HPAT_CONFIG_MPI=False RUN_TEST=""
 
