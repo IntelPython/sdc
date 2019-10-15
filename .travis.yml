@@ -19,8 +19,8 @@ env:
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
-    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then conda install -y coveralls; fi
-    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then conda install -y numpy -c conda-forge; fi
+    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then source activate $CONDA_ENV; conda install -y coveralls; fi
+    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then source activate $CONDA_ENV; conda install -y numpy -c conda-forge; fi
 
 install:
     - export PATH=$HOME/miniconda3/bin:$PATH
