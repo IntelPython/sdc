@@ -13,8 +13,8 @@ env:
         - HPAT_CHECK_STYLE=True
         - HPAT_RUN_COVERAGE=True
         - HPAT_CONFIG_MPI=False RUN_TEST=""
-        allow_failures:
-            - env: HPAT_CONFIG_MPI=False RUN_TEST=""
+    allow_failures:
+        - HPAT_CONFIG_MPI=False RUN_TEST=""
 
 before_install:
     - buildscripts/setup_conda.sh
