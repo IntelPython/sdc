@@ -1074,6 +1074,75 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     return hpat_pandas_series_max_impl
 
 
+@overload_method(SeriesType, 'prod')
+def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+    """
+    Pandas Series method :meth:`pandas.Series.prod` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_prod
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: {index (0)}
+        Axis for the function to be applied on.
+        *unsupported*
+    skipna: :obj:`bool`, default :obj:`True`
+        Exclude nan values when computing the result
+    level: :obj:`int`, :obj:`str`, default :obj:`None`
+        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
+        *unsupported*
+    numeric_only: :obj:`bool`, default :obj:`None`
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data.
+        Not implemented for Series.
+        *unsupported*
+    min_count: :obj:`int`, default 0
+        The required number of valid values to perform the operation.
+        If fewer than min_count non-NA values are present the result will be NA.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+        Returns scalar or Series (if level specified)
+    """
+
+    _func_name = 'Method prod().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, (types.Integer, types.Float)):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is None):
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None) \
+            or not (isinstance(min_count, types.Omitted) or min_count == 0):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}, min_count: {}'.format(
+                _func_name, axis, level, numeric_only, min_count))
+
+    def hpat_pandas_series_prod_impl(self, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+        if skipna is None:
+            skipna = True
+
+        if skipna:
+            return numpy.nanprod(self._data)
+
+        return numpy.prod(self._data)
+
+    return hpat_pandas_series_prod_impl
+
+
 @overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     """
