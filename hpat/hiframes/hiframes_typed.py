@@ -915,7 +915,7 @@ class HiFramesTyped(object):
                     data, index, name),
                 [data, index, name], pre_nodes=nodes)
 
-        if func_name in ('shift', 'pct_change'):
+        if func_name == 'pct_change':
             nodes = []
             data = self._get_series_data(series_var, nodes)
             # TODO: support default period argument

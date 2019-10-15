@@ -536,14 +536,14 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
-    @bound_function("series.shift")
-    def resolve_shift(self, ary, args, kws):
-        # TODO: support default period argument
-        out = ary
-        # integers are converted to float64 to store NaN
-        if isinstance(ary.dtype, types.Integer):
-            out = out.copy(dtype=types.float64)
-        return signature(out, *args)
+    # @bound_function("series.shift")
+    # def resolve_shift(self, ary, args, kws):
+    #     # TODO: support default period argument
+    #     out = ary
+    #     # integers are converted to float64 to store NaN
+    #     if isinstance(ary.dtype, types.Integer):
+    #         out = out.copy(dtype=types.float64)
+    #     return signature(out, *args)
 
     @bound_function("series.pct_change")
     def resolve_pct_change(self, ary, args, kws):
@@ -988,6 +988,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_shift',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
