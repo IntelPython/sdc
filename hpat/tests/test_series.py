@@ -1966,6 +1966,27 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_quantile(self):
+        def test_impl():
+            A = pd.Series([1, 2.5, .5, 3, 5])
+            return A.quantile()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.quantile() parameter as a list unsupported")
+    def test_series_quantile_q_vector(self):
+        def test_series_quantile_q_vector_impl(S, param1):
+            return S.quantile(param1)
+
+        S = pd.Series(np.random.ranf(100))
+        hpat_func = hpat.jit(test_series_quantile_q_vector_impl)
+
+        param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+        result_ref = test_series_quantile_q_vector_impl(S, param1)
+        result = hpat_func(S, param1)
+        np.testing.assert_equal(result, result_ref)
+
     @unittest.skip("Implement unique without sorting like in pandas")
     def test_unique(self):
         def test_impl(S):
@@ -2020,9 +2041,63 @@ class TestSeries(unittest.TestCase):
 
         ref_result = test_impl()
         result = hpat_func()
-        print("Result JIT", result)
-        print("Result Python", ref_result)
         np.testing.assert_array_equal(result, ref_result)
+
+    def test_series_nunique(self):
+        def test_series_nunique_impl(S):
+            return S.nunique()
+
+        def test_series_nunique_param1_impl(S, dropna):
+            return S.nunique(dropna)
+
+        hpat_func = hpat.jit(test_series_nunique_impl)
+
+        the_same_string = "the same string"
+        test_input_data = []
+        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                       []
+                       ]
+
+        data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                      [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                      [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, np.nan, np.nan],
+                      [np.nan, np.nan, np.inf],
+                      ]
+
+        if hpat.config.config_pipeline_hpat_default:
+            """
+            HPAT pipeline Series.nunique() does not support numpy.nan
+            """
+
+            test_input_data = data_simple
+        else:
+            test_input_data = data_simple + data_extra
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_nunique_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+            if not hpat.config.config_pipeline_hpat_default:
+                """
+                HPAT pipeline does not support parameter to Series.nunique(dropna=True)
+                """
+
+                hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)
+
+                for param1 in [True, False]:
+                    result_param1_ref = test_series_nunique_param1_impl(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    self.assertEqual(result_param1, result_param1_ref)
 
 
 if __name__ == "__main__":
