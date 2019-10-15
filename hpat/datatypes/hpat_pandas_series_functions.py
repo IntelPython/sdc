@@ -28,7 +28,7 @@
 | :class:`pandas.Series` functions and operators implementations in HPAT
 | Also, it contains Numba internal operators which are required for Series type handling
 """
-import math
+
 import numpy
 import operator
 import pandas
@@ -166,24 +166,24 @@ def hpat_pandas_series_shape(self):
 
 
 @overload_method(SeriesType, 'std')
-def hapt_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.std` implementation.
+
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unboxing
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_str
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_axis
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_level
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_numeric_only
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_params
+
     Parameters
     ----------
     self: :obj:`pandas.Series`
         input series
     axis: :obj:`int`, :obj:`str`
         Axis along which the operation acts
-        0/None - row-wise operation
-        1      - column-wise operation
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
         *unsupported*
     skipna: :obj:`bool`
         exclude NA/null values
@@ -200,18 +200,21 @@ def hapt_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
         If None, will attempt to use everything, then use only numeric data.
         Not implemented for Series.
         *unsupported*
+
     Returns
     -------
     :obj:`scalar`
          returns :obj:`scalar`
     """
+
     _func_name = 'Method std().'
 
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, types.Number):
-        raise TypingError('{} The object must be a number. Given self.dtype: {}'.format(_func_name, self.dtype))
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not None:
         raise TypingError('{} The object must be a boolean. Given skipna: {}'.format(_func_name, skipna))
@@ -224,7 +227,8 @@ def hapt_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
             raise TypingError('{} Unsupported parameters. Given {}: {}'.format(_func_name, name, arg))
 
     def hpat_pandas_series_std_impl(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
-        return math.sqrt(self.var(axis=axis, skipna=skipna, level=level, ddof=ddof, numeric_only=numeric_only))
+        var = self.var(axis=axis, skipna=skipna, level=level, ddof=ddof, numeric_only=numeric_only)
+        return var ** 0.5
 
     return hpat_pandas_series_std_impl
 

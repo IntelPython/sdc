@@ -2583,7 +2583,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_std(self):
         def pyfunc():
-            series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
             return series.std()
 
         cfunc = hpat.jit(pyfunc)
@@ -2596,56 +2596,43 @@ class TestSeries(unittest.TestCase):
             return series.std(skipna=skipna, ddof=ddof)
 
         cfunc = hpat.jit(pyfunc)
-        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
-        for ddof in [0, 1]:
-            for skipna in [True, False]:
-                ref_result = pyfunc(series, skipna=skipna, ddof=ddof)
-                result = cfunc(series, skipna=skipna, ddof=ddof)
-                np.testing.assert_equal(ref_result, result)
+        for data in test_global_input_data_float64:
+            series = pd.Series(data)
+            for ddof in [0, 1]:
+                for skipna in [True, False]:
+                    ref_result = pyfunc(series, skipna=skipna, ddof=ddof)
+                    result = cfunc(series, skipna=skipna, ddof=ddof)
+                    np.testing.assert_equal(ref_result, result)
 
     def test_series_std_str(self):
         def pyfunc(series):
             return series.std()
 
         cfunc = hpat.jit(pyfunc)
-        series = pd.Series(['test', 'series', 'std', 'str'])
+        series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method std(). The object must be a number. Given self.dtype: {}'
+        msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
-    def test_series_std_unsupported_axis(self):
-        def pyfunc(series, axis):
-            return series.std(axis=axis)
+    def test_series_std_unsupported_params(self):
+        def pyfunc(series, axis, level, numeric_only):
+            return series.std(axis=axis, level=level, numeric_only=numeric_only)
 
         cfunc = hpat.jit(pyfunc)
-        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
+        series = pd.Series(test_global_input_data_float64[0])
+        msg = 'Method std(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=1)
-        msg = 'Method std(). Unsupported parameters. Given axis: int'
-        self.assertIn(msg, str(raises.exception))
+            cfunc(series, axis=1, level=None, numeric_only=None)
+        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
 
-    def test_series_std_unsupported_level(self):
-        def pyfunc(series, level):
-            return series.std(level=level)
-
-        cfunc = hpat.jit(pyfunc)
-        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
         with self.assertRaises(TypingError) as raises:
-            cfunc(series, level=1)
-        msg = 'Method std(). Unsupported parameters. Given level: int'
-        self.assertIn(msg, str(raises.exception))
+            cfunc(series, axis=None, level=1, numeric_only=None)
+        self.assertIn(msg.format('level', 'int'), str(raises.exception))
 
-    def test_series_std_unsupported_numeric_only(self):
-        def pyfunc(series, numeric_only):
-            return series.std(numeric_only=numeric_only)
-
-        cfunc = hpat.jit(pyfunc)
-        series = pd.Series([1.3, -2.7, np.nan, 0.1, 10.9])
         with self.assertRaises(TypingError) as raises:
-            cfunc(series, numeric_only=True)
-        msg = 'Method std(). Unsupported parameters. Given numeric_only: bool'
-        self.assertIn(msg, str(raises.exception))
+            cfunc(series, axis=None, level=None, numeric_only=True)
+        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
 
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
