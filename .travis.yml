@@ -11,10 +11,10 @@ env:
         - RUN_TEST=--no-test
     matrix:
         include:
-            - HPAT_CHECK_STYLE=True
-            - HPAT_RUN_COVERAGE=True
+            - env: HPAT_CHECK_STYLE=True
+            - env: HPAT_RUN_COVERAGE=True
         allow_failures:
-            - HPAT_CONFIG_MPI=False RUN_TEST=""
+            - env: HPAT_CONFIG_MPI=False RUN_TEST=""
 
 before_install:
     - buildscripts/setup_conda.sh
