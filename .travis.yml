@@ -2,18 +2,34 @@
 
 dist: trusty
 
-matrix:
-    include: 
-        - env: CONDA_ENV=travisci PYTHON_VER=3.7
+env:
+    global:
+        - GIT_DESCRIBE_TAG=0.29.2
+        - GIT_DESCRIBE_NUMBER=1
+        - CONDA_ENV=travisci
+        - PYTHON_VER=3.7
+        - RUN_TEST=--no-test
+    matrix:
+        - HPAT_CHECK_STYLE=True
+        - HPAT_RUN_COVERAGE=True
 
-# TODO Remove travis from repository and add code coverage check
-before_install: skip
+before_install:
+    - buildscripts/setup_conda.sh
+    - export PATH=$HOME/miniconda3/bin:$PATH
+    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then conda install -y coveralls
 
-install: skip
+install:
+    - export PATH=$HOME/miniconda3/bin:$PATH
+    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then buildscripts/build.sh; fi
 
-script: skip
+script:
+    - export PATH=$HOME/miniconda3/bin:$PATH
+    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then python ./setup.py style; fi
+    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then buildscripts/coverage.sh; fi
 
-after_success: skip
+after_success:
+    - export PATH=$HOME/miniconda3/bin:$PATH
+    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then coverage combine; coveralls -v; fi
 
 notifications:
     email: false
