@@ -10,7 +10,6 @@ build:
   script_env:
     - HPAT_CONFIG_MPI
     - HPAT_NUM_PES
-    - HPAT_RUN_COVERAGE
 
 requirements:
   build:
@@ -49,7 +48,6 @@ test:
   requires:
     - h5py
     - scipy
-    - coveralls
   imports:
     - hpat
 
