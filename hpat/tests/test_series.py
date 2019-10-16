@@ -1546,7 +1546,6 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enable after fixing index")
     def test_series_idxmin1(self):
         def test_impl(A):
             return A.idxmin()
@@ -1563,9 +1562,22 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        print(hpat_func(S))
+        print(test_impl(S))
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Enable after fixing index")
+    @unittest.skip("Cant return 2 types: string or nan in one case")
+    def test_series_idxmin_str_idx(self):
+        def test_impl(S):
+            return S.idxmin(skipna=False)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        print(hpat_func(S))
+        print(test_impl(S))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_idxmin_no(self):
         def test_impl(S):
             return S.idxmin()
@@ -1581,7 +1593,58 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1, 2, 3], [4, 45, 14])
+        print(hpat_func(S))
+        print(test_impl(S))
         self.assertEqual(hpat_func(S), test_impl(S))
+
+    @unittest.skip("Need index fix")
+    def test_series_idxmin(self):
+        def test_series_idxmin_impl(S):
+            return S.idxmin()
+
+        hpat_func = hpat.jit(test_series_idxmin_impl)
+
+        test_input_data = []
+        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       ]
+
+        data_extra = [[np.nan, np.nan, np.nan, np.nan],
+                      [np.nan, np.nan, np.inf, np.inf],
+                      ]
+
+        test_input_data = data_simple + data_extra
+
+        for input_data in data_simple:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_idxmin_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_idxmin_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+        for input_data in data_simple:
+            for index_data in data_simple:
+                S = pd.Series(input_data, index_data)
+
+                result_ref = test_series_idxmin_impl(S)
+                result = hpat_func(S)
+                self.assertEqual(result, result_ref)
+
+        for input_data in test_input_data:
+            for index_data in test_input_data:
+                S = pd.Series(input_data, index_data)
+
+                result_ref = test_series_idxmin_impl(S)
+                result = hpat_func(S)
+                self.assertEqual(result, result_ref)
 
     def test_series_idxmax1(self):
         def test_impl(A):
