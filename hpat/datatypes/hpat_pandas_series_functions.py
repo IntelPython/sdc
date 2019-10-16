@@ -189,7 +189,7 @@ def hpat_pandas_series_iloc(self):
 
 
 @overload_method(SeriesType, 'var')
-def hapt_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.var` implementation.
 
@@ -205,8 +205,8 @@ def hapt_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
         input series
     axis: :obj:`int`, :obj:`str`
         Axis along which the operation acts
-        0/None - row-wise operation
-        1      - column-wise operation
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
         *unsupported*
     skipna: :obj:`bool`
         exclude NA/null values
@@ -235,8 +235,9 @@ def hapt_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, types.Number):
-        raise TypingError('{} The object must be a number. Given self.dtype: {}'.format(_func_name, self.dtype))
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not None:
         raise TypingError('{} The object must be a boolean. Given skipna: {}'.format(_func_name, skipna))
