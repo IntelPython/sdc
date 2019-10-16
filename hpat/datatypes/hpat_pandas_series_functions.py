@@ -35,7 +35,7 @@ import operator
 import pandas
 
 from numba.errors import TypingError
-from numba.extending import (types, overload, overload_method, overload_attribute)
+from numba.extending import overload, overload_method, overload_attribute
 from numba import types
 
 import hpat
@@ -137,6 +137,103 @@ def hpat_pandas_series_iloc(self):
         return self
 
     return hpat_pandas_series_iloc_impl
+
+
+@overload_method(SeriesType, 'nsmallest')
+def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
+    """
+    Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nsmallest*
+
+    n: :obj:`int`, default 5
+        Return this many ascending sorted values.
+    keep: :obj:`str`, default 'first'
+        When there are duplicate values that cannot all fit in a Series of n elements:
+        first : return the first n occurrences in order of appearance.
+        last : return the last n occurrences in reverse order of appearance.
+        all : keep all occurrences. This can result in a Series of size larger than n.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`series`
+         returns :obj:`series`
+    """
+
+    _func_name = 'Method nsmallest().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object\n given: {}\n expected: {}'.format(_func_name, self, 'series'))
+
+    if not isinstance(n, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object n\n given: {}\n expected: {}'.format(_func_name, n, 'int'))
+
+    if not isinstance(keep, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} The object keep\n given: {}\n expected: {}'.format(_func_name, keep, 'str'))
+
+    def hpat_pandas_series_nsmallest_impl(self, n=5, keep='first'):
+        if keep != 'first':
+            raise ValueError("Method nsmallest(). Unsupported parameter. Given 'keep' != 'first'")
+
+        # mergesort is used for stable sorting of repeated values
+        indices = self._data.argsort(kind='mergesort')[:max(n, 0)]
+
+        return self.take(indices)
+
+    return hpat_pandas_series_nsmallest_impl
+
+
+@overload_method(SeriesType, 'nlargest')
+def hpat_pandas_series_nlargest(self, n=5, keep='first'):
+    """
+    Pandas Series method :meth:`pandas.Series.nlargest` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nlargest*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    n: :obj:`int`, default 5
+        Return this many ascending sorted values.
+    keep: :obj:`str`, default 'first'
+        When there are duplicate values that cannot all fit in a Series of n elements:
+        first : return the first n occurrences in order of appearance.
+        last : return the last n occurrences in reverse order of appearance.
+        all : keep all occurrences. This can result in a Series of size larger than n.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`series`
+         returns :obj:`series`
+    """
+
+    _func_name = 'Method nlargest().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object\n given: {}\n expected: {}'.format(_func_name, self, 'series'))
+
+    if not isinstance(n, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object n\n given: {}\n expected: {}'.format(_func_name, n, 'int'))
+
+    if not isinstance(keep, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} The object keep\n given: {}\n expected: {}'.format(_func_name, keep, 'str'))
+
+    def hpat_pandas_series_nlargest_impl(self, n=5, keep='first'):
+        if keep != 'first':
+            raise ValueError("Method nlargest(). Unsupported parameter. Given 'keep' != 'first'")
+
+        # data: [0, 1, -1, 1, 0] -> [1, 1, 0, 0, -1]
+        # index: [0, 1,  2, 3, 4] -> [1, 3, 0, 4,  2] (not [3, 1, 4, 0, 2])
+        indices = (-self._data - 1).argsort(kind='mergesort')[:max(n, 0)]
+
+        return self.take(indices)
+
+    return hpat_pandas_series_nlargest_impl
 
 
 @overload_attribute(SeriesType, 'shape')
@@ -1185,8 +1282,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not isinstance(indices, types.List):
-        raise TypingError('{} The indices must be a List. Given: {}'.format(_func_name, indices))
+    if not isinstance(indices, (types.List, types.Array)):
+        raise TypingError('{} The indices must be an array-like. Given: {}'.format(_func_name, indices))
 
     if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
         raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
