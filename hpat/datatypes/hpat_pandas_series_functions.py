@@ -1105,8 +1105,11 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
 
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_int
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str_idx
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_no
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_int
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_noidx
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_idx
 
     Parameters
     -----------
@@ -1132,11 +1135,12 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
 
     if not isinstance(self.data.dtype, types.Number):
         raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.dtype))
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
+                                                                                             self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean, bool)):
         raise TypingError(
-            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, type(skipna)))
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
 
     if not (isinstance(axis, types.Omitted) or axis is None):
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
@@ -1148,12 +1152,12 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
             return self._index[int(result)]
 
         return hpat_pandas_series_idxmin_impl
-    else:
-        def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
 
-            return numpy.argmin(self._data)
+    def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
 
-        return hpat_pandas_series_idxmin_impl
+        return numpy.argmin(self._data)
+
+    return hpat_pandas_series_idxmin_impl
 
 
 @overload_method(SeriesType, 'lt')

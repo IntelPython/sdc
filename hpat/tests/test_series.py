@@ -1597,13 +1597,12 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
 
-        test_input_data = []
         data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
-                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-                       [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
-                       [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
-                       [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
-                       ]
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
 
         for input_data in data_test:
             S = pd.Series(input_data)
@@ -1619,7 +1618,6 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
 
-        test_input_data = []
         data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
                      [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
                      [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
