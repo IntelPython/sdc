@@ -11,10 +11,6 @@ from hpat.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
 from numba.errors import TypingError
-<<<<<<< HEAD
-=======
-
->>>>>>> Implement series.cumsum() in new style
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -40,18 +36,22 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     ),
 ]]
 
+min_float64 = np.finfo('float64').min
+max_float64 = np.finfo('float64').max
+
 test_global_input_data_float64 = [
-    [1.0, np.nan, -1.0, 0.0, 5e-324],
+    [1., np.nan, -1., 0., min_float64, max_float64],
     [np.nan, np.inf, np.NINF, np.NZERO]
 ]
 
-min_int64 = -9223372036854775808
-max_int64 = 9223372036854775807
-max_uint64 = 18446744073709551615
+min_int64 = np.iinfo('int64').min
+max_int64 = np.iinfo('int64').max
+max_uint64 = np.iinfo('uint64').max
 
 test_global_input_data_integer64 = [
-    [1, -1, 0, max_uint64],
-    [-0, min_int64, max_int64]
+    [1, -1, 0],
+    [min_int64, max_int64],
+    [max_uint64]
 ]
 
 test_global_input_data_numeric = test_global_input_data_integer64 + test_global_input_data_float64
@@ -2671,7 +2671,7 @@ class TestSeries(unittest.TestCase):
 
     def test_series_cumsum(self):
         def test_impl():
-            series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
             return series.cumsum()
 
         pyfunc = test_impl
@@ -2685,8 +2685,9 @@ class TestSeries(unittest.TestCase):
         pyfunc = test_impl
         cfunc = hpat.jit(pyfunc)
 
-        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
-        pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
@@ -2695,22 +2696,23 @@ class TestSeries(unittest.TestCase):
         pyfunc = test_impl
         cfunc = hpat.jit(pyfunc)
 
-        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
         axis = None
-        for skipna in [True, False]:
-            ref_result = pyfunc(series, axis=axis, skipna=skipna)
-            jit_result = cfunc(series, axis=axis, skipna=skipna)
-            pd.testing.assert_series_equal(ref_result, jit_result)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            for skipna in [True, False]:
+                ref_result = pyfunc(series, axis=axis, skipna=skipna)
+                jit_result = cfunc(series, axis=axis, skipna=skipna)
+                pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_cumsum_str(self):
         def test_impl(s):
             return s.cumsum()
 
         cfunc = hpat.jit(test_impl)
-        series = pd.Series(['test', 'series', 'cumsum', 'str', 'dtype'])
+        series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method cumsum(). The object must be a number. Given self.dtype: {}'
+        msg = 'Method cumsum(). The object must be a number. Given self.data.dtype: {}'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_cumsum_unsupported_axis(self):
@@ -2718,7 +2720,7 @@ class TestSeries(unittest.TestCase):
             return s.cumsum(axis=axis)
 
         cfunc = hpat.jit(test_impl)
-        series = pd.Series([1.0, np.nan, 9.0, -1.0, 7.0])
+        series = pd.Series(test_global_input_data_float64[0])
         for axis in [0, 1]:
             with self.assertRaises(TypingError) as raises:
                 cfunc(series, axis=axis)

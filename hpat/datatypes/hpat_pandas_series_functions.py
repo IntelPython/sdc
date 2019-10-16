@@ -2069,8 +2069,8 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
         input series
     axis: :obj:`int`, :obj:`str`
         Axis along which the operation acts
-        0/None - row-wise operation
-        1      - column-wise operation
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
         *unsupported*
     skipna: :obj:`bool`
         exclude NA/null values
@@ -2079,17 +2079,18 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
 
     Returns
     -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+    :obj:`scalar`, :obj:`pandas.Series`
+         returns :obj:`scalar` or :obj:`pandas.Series` object
     """
 
     _func_name = 'Method cumsum().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, types.Number):
-        raise TypingError('{} The object must be a number. Given self.dtype: {}'.format(_func_name, self.dtype))
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
 
     if not isinstance(axis, (types.Omitted, types.NoneType)) and axis is not None:
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
@@ -2097,9 +2098,9 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
     def hpat_pandas_series_cumsum_impl(self, axis=None, skipna=True):
         if skipna:
             # nampy.nancumsum replaces NANs with 0, series.cumsum does not, so replace back 0 with NANs
-            data = numpy.nancumsum(self._data)
-            data[numpy.isnan(self._data)] = numpy.nan
-            return pandas.Series(data)
+            local_data = numpy.nancumsum(self._data)
+            local_data[numpy.isnan(self._data)] = numpy.nan
+            return pandas.Series(local_data)
 
         return pandas.Series(self._data.cumsum())
 

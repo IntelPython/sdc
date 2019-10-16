@@ -987,8 +987,7 @@ def generic_expand_cumulative_series(self, args, kws):
 
 
 # replacing cumprod since arraydecl.py definition uses types.Array
-for fname in ["cumprod"]:
-    install_array_method(fname, generic_expand_cumulative_series)
+install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
