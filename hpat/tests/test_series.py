@@ -1562,8 +1562,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        print(hpat_func(S))
-        print(test_impl(S))
         self.assertEqual(hpat_func(S), test_impl(S))
 
     @unittest.skip("Cant return 2 types: string or nan in one case")
@@ -1574,8 +1572,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        print(hpat_func(S))
-        print(test_impl(S))
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_idxmin_no(self):
@@ -1593,8 +1589,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1, 2, 3], [4, 45, 14])
-        print(hpat_func(S))
-        print(test_impl(S))
         self.assertEqual(hpat_func(S), test_impl(S))
 
     @unittest.skip("Need index fix")
