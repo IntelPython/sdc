@@ -2099,6 +2099,15 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
+    def test_series_cov(self):
+        def test_series_cov_impl(S1, S2):
+            return S1.cov(S2)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        S1 = pd.Series([.2, .0, .6, .2])
+        S2 = pd.Series([.3, .6, .0, .1])
+        self.assertEqual(hpat_func(S1, S2), test_series_cov_impl(S1, S2))
+
 
 if __name__ == "__main__":
     unittest.main()

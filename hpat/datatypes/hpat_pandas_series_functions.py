@@ -1547,3 +1547,59 @@ def hpat_pandas_series_nunique(self, dropna=True):
             return len(data_set) + 1
 
     return hpat_pandas_series_nunique_impl
+
+
+@overload_method(SeriesType, 'cov')
+def hpat_pandas_series_cov(self, other, min_periods=None):
+    """
+    Pandas Series method :meth:`pandas.Series.cov` implementation.
+
+    Note: Unsupported mixed numeric and string data
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cov
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    other: :obj:`pandas.Series`
+        input series
+    min_periods: :obj:`int`, default None
+
+    Returns
+    -------
+    :obj:`float`
+         returns :obj:`float` object
+    """
+
+    _func_name = 'Method cov().'
+
+    if not isinstance((self,other), SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {} and {}'.format(_func_name, self, other))
+
+    if len(self._data) != len(other):
+        AssertionError(
+            "Operands to pandas.series.corr must have same size.")
+
+    def hpat_pandas_series_cov_impl(self, other, min_periods=None):
+        if len(self._data) == 0:
+            return numpy.nan
+        if min_periods is None:
+            min_periods = 1
+        valid = []
+        for i in range(len(self._data)):
+            if self._data[i] is None or other[i] is None:
+                valid.append(False)
+            else:
+                valid.append(True)
+        if not valid.all():
+            serie1 = self._data[valid]
+            serie2 = other[valid]
+        if len(serie1) < min_periods:
+            return numpy.nan
+
+        return numpy.cov(serie1, serie2)[0, 1]
+
+    return hpat_pandas_series_cov_impl

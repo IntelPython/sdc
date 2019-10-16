@@ -847,9 +847,9 @@ class SeriesRollingAttribute(AttributeTemplate):
         # result is always float64 (see Pandas window.pyx:roll_generic)
         return signature(SeriesType(types.float64), *args)
 
-    @bound_function("rolling.cov")
-    def resolve_cov(self, ary, args, kws):
-        return signature(SeriesType(types.float64), *args)
+    # @bound_function("rolling.cov")
+    # def resolve_cov(self, ary, args, kws):
+    #     return signature(SeriesType(types.float64), *args)
 
     @bound_function("rolling.corr")
     def resolve_corr(self, ary, args, kws):

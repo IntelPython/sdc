@@ -514,7 +514,7 @@ series_replace_funcs = {
     'str_contains_regex': _str_contains_regex_impl,
     'str_contains_noregex': _str_contains_noregex_impl,
     # 'abs': lambda A: hpat.hiframes.api.init_series(np.abs(A)),  # TODO: timedelta
-    'cov': _column_cov_impl,
+    #'cov': _column_cov_impl,
     'corr': _column_corr_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
