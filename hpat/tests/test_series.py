@@ -1591,52 +1591,47 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1, 2, 3], [4, 45, 14])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Need index fix")
-    def test_series_idxmin(self):
-        def test_series_idxmin_impl(S):
+    def test_series_idxmin_noidx(self):
+        def test_impl(S):
             return S.idxmin()
 
-        hpat_func = hpat.jit(test_series_idxmin_impl)
+        hpat_func = hpat.jit(test_impl)
 
         test_input_data = []
-        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
                        [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                       [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                       [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
                        ]
 
-        data_extra = [[np.nan, np.nan, np.nan, np.nan],
-                      [np.nan, np.nan, np.inf, np.inf],
-                      ]
-
-        test_input_data = data_simple + data_extra
-
-        for input_data in data_simple:
+        for input_data in data_test:
             S = pd.Series(input_data)
 
-            result_ref = test_series_idxmin_impl(S)
+            result_ref = test_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-        for input_data in test_input_data:
-            S = pd.Series(input_data)
+    # @unittest.skip("Need index fix")
+    def test_series_idxmin_idx(self):
+        def test_impl(S):
+            return S.idxmin()
 
-            result_ref = test_series_idxmin_impl(S)
-            result = hpat_func(S)
-            self.assertEqual(result, result_ref)
+        hpat_func = hpat.jit(test_impl)
 
-        for input_data in data_simple:
-            for index_data in data_simple:
+        test_input_data = []
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
                 S = pd.Series(input_data, index_data)
 
-                result_ref = test_series_idxmin_impl(S)
-                result = hpat_func(S)
-                self.assertEqual(result, result_ref)
-
-        for input_data in test_input_data:
-            for index_data in test_input_data:
-                S = pd.Series(input_data, index_data)
-
-                result_ref = test_series_idxmin_impl(S)
+                result_ref = test_impl(S)
                 result = hpat_func(S)
                 self.assertEqual(result, result_ref)
 
