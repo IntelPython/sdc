@@ -159,7 +159,7 @@ def _infer_index_type(index):
     need to return instance of the type class
     '''
 
-    if isinstance(index, (types.NoneType, pd.RangeIndex)) or index is None:
+    if isinstance(index, (types.NoneType, pd.RangeIndex, pd.DatetimeIndex)) or index is None:
         return types.none
 
     if index.dtype == np.dtype('O') and len(index) > 0:
