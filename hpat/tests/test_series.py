@@ -1611,7 +1611,7 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    # @unittest.skip("Need index fix")
+    @unittest.skip("Need index fix")
     def test_series_idxmin_idx(self):
         def test_impl(S):
             return S.idxmin()
