@@ -194,6 +194,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         for S, expected in [
             (pd.Series(), 0),
+            (pd.Series([]), 0),
             (pd.Series(np.arange(n)), n),
             (pd.Series([np.nan, 1, 2]), 3),
             (pd.Series(['1', '2', '3']), 3),
