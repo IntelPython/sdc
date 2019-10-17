@@ -154,20 +154,21 @@ def _infer_series_list_dtype(S):
 
 
 def _infer_index_type(index):
-    # TODO: support proper inference
+    '''
+    Convertion input index type into Numba known type
+    need to return instance of the type class
+    '''
 
-    # np.dtype('O') - Python objects
+    if isinstance(index, (types.NoneType, pd.RangeIndex)) or index is None:
+        return types.none
+
     if index.dtype == np.dtype('O') and len(index) > 0:
         first_val = index[0]
         if isinstance(first_val, str):
             return string_array_type
 
-    elif index.dtype == np.int64:
-        # RangeIndex or Int64Index
-        dtype = numba.numpy_support.from_dtype(index.dtype)
-        return types.Array(dtype, 1, 'C')
-
-    return types.none
+    numba_index_type = numpy_support.from_dtype(index.dtype)
+    return types.Array(numba_index_type, 1, 'C')
 
 
 @box(DataFrameType)
