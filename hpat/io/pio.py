@@ -18,7 +18,6 @@ from hpat.io import pio_api, pio_lower
 from hpat.utils import find_str_const, debug_prints
 
 
-
 def remove_h5(rhs, lives, call_list):
     # the call is dead if the read array is dead
     if call_list == ['h5read', 'io', pio_api] and rhs.args[6].name not in lives:
@@ -49,8 +48,7 @@ class PIO(object):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             _h5_read_impl = loc_vars['_h5_read_impl']
-            f_block = compile_to_numba_ir(
-                    _h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
+            f_block = compile_to_numba_ir(_h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
             index_var = rhs.index if rhs.op == 'getitem' else rhs.index_var
             replace_arg_nodes(f_block, [rhs.value, index_var])
             nodes = f_block.body[:-3]  # remove none return

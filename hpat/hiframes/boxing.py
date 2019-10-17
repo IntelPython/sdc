@@ -1,10 +1,11 @@
 
 import pandas as pd
+import pandas.api.types
 import numpy as np
 import datetime
 import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
-    NativeValue, box, intrinsic)
+                             NativeValue, box, intrinsic)
 from numba import numpy_support, types, cgutils
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
@@ -16,15 +17,15 @@ from numba.targets import listobj
 import hpat
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
-    unbox_datetime_date_array, box_datetime_date_array)
+                                            unbox_datetime_date_array, box_datetime_date_array)
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-    box_categorical_array, unbox_categorical_array)
+                                              box_categorical_array, unbox_categorical_array)
 from hpat.hiframes.pd_series_ext import (SeriesType, arr_to_series_type,
-    _get_series_array_type)
+                                         _get_series_array_type)
 from hpat.hiframes.split_impl import (string_array_split_view_type,
-    box_str_arr_split_view)
+                                      box_str_arr_split_view)
 
 from .. import hstr_ext
 import llvmlite.binding as ll
@@ -67,7 +68,7 @@ def unbox_dataframe(typ, val, c):
     """
     n_cols = len(typ.columns)
     column_strs = [numba.unicode.make_string_from_constant(
-                c.context, c.builder, string_type, a) for a in typ.columns]
+        c.context, c.builder, string_type, a) for a in typ.columns]
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(
         typ)(c.context, c.builder)
@@ -76,7 +77,7 @@ def unbox_dataframe(typ, val, c):
         c.builder, types.UniTuple(string_type, n_cols), column_strs)
     zero = c.context.get_constant(types.int8, 0)
     unboxed_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(types.int8, n_cols+1), [zero]*(n_cols+1))
+        c.builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -99,7 +100,7 @@ def get_hiframes_dtypes(df):
     """
     col_names = df.columns.tolist()
     hi_typs = [_get_series_array_type(_infer_series_dtype(df[cname]))
-                for cname in col_names]
+               for cname in col_names]
     return tuple(hi_typs)
 
 
@@ -126,7 +127,8 @@ def _infer_series_dtype(S):
         else:
             raise ValueError(
                 "object dtype infer: data type for column {} not supported".format(S.name))
-
+    elif isinstance(S.dtype, pandas.api.types.CategoricalDtype):
+        return PDCategoricalDtype(S.dtype.categories)
     # regular numpy types
     try:
         return numpy_support.from_dtype(S.dtype)
@@ -148,7 +150,7 @@ def _infer_series_list_dtype(S):
                 raise ValueError(
                     "data type for column {} not supported".format(S.name))
     raise ValueError(
-            "data type for column {} not supported".format(S.name))
+        "data type for column {} not supported".format(S.name))
 
 
 def _infer_index_type(index):
@@ -177,7 +179,7 @@ def box_dataframe(typ, val, c):
     has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
     pyapi = c.pyapi
-    #gil_state = pyapi.gil_ensure()  # acquire GIL
+    # gil_state = pyapi.gil_ensure()  # acquire GIL
 
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
@@ -225,7 +227,7 @@ def box_dataframe(typ, val, c):
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)
-    #pyapi.gil_release(gil_state)    # release GIL
+    # pyapi.gil_release(gil_state)    # release GIL
     return df_obj
 
 
@@ -309,7 +311,7 @@ def box_series(typ, val, c):
     dtype = typ.dtype
 
     series = cgutils.create_struct_proxy(
-            typ)(c.context, c.builder, val)
+        typ)(c.context, c.builder, val)
 
     arr = _box_series_data(dtype, typ.data, series.data, c)
 
@@ -392,7 +394,7 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
         with c.builder.if_then(
                 cgutils.is_null(c.builder, typobj),
                 likely=False,
-                ):
+        ):
             c.builder.store(cgutils.true_bit, errorptr)
             loop.do_break()
         # Mandate that objects all have the same exact type
@@ -404,7 +406,7 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
                 "PyExc_TypeError",
                 "can't unbox heterogeneous list: %S != %S",
                 expected_typobj, typobj,
-                )
+            )
             c.pyapi.decref(typobj)
             loop.do_break()
         c.pyapi.decref(typobj)
@@ -432,7 +434,7 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
                         itemobj = c.builder.call(arr_get_fn, [obj, loop.index])
                         # extra load since we have ptr to object
                         itemobj = c.builder.load(itemobj)
-                        #c.pyapi.print_object(itemobj)
+                        # c.pyapi.print_object(itemobj)
                         # check_element_type(nth, itemobj, expected_typobj)
                         # XXX we don't call native cleanup for each
                         # list element, since that would require keeping
@@ -449,7 +451,7 @@ def _python_array_obj_to_native_list(typ, obj, c, size, listptr, errorptr):
             # Stuff meminfo pointer into the Python object for
             # later reuse.
             with c.builder.if_then(c.builder.not_(c.builder.load(errorptr)),
-                                                  likely=False):
+                                   likely=False):
                 c.pyapi.object_set_private_data(obj, list.meminfo)
             list.set_dirty(False)
             c.builder.store(list.value, listptr)

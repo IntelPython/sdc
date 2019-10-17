@@ -26,7 +26,7 @@ import hpat.io
 from hpat.io import pio, parquet_pio
 from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
-    inline_new_blocks, ReplaceFunc, is_call, is_assign)
+                        inline_new_blocks, ReplaceFunc, is_call, is_assign)
 import hpat.hiframes.api
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
@@ -39,7 +39,7 @@ import math
 import hpat.io
 from hpat.io.parquet_pio import ParquetHandler
 from hpat.hiframes.pd_timestamp_ext import (datetime_date_type,
-                                    datetime_date_to_int, int_to_datetime_date)
+                                            datetime_date_to_int, int_to_datetime_date)
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.hiframes.pd_categorical_ext import PDCategoricalDtype, CategoricalArray
 from hpat.hiframes.rolling import get_rolling_setup_args, supported_rolling_funcs
@@ -60,10 +60,10 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     if (len(call_list) == 4 and call_list[1:] == ['api', 'hiframes', hpat] and
             call_list[0] in ['fix_df_array', 'fix_rolling_array',
-            'concat', 'count', 'mean', 'quantile', 'var',
-            'str_contains_regex', 'str_contains_noregex', 'column_sum',
-            'nunique', 'init_series', 'init_datetime_index',
-            'convert_tup_to_rec', 'convert_rec_to_tup']):
+                             'concat', 'count', 'mean', 'quantile', 'var',
+                             'str_contains_regex', 'str_contains_noregex', 'column_sum',
+                             'nunique', 'init_series', 'init_datetime_index',
+                             'convert_tup_to_rec', 'convert_rec_to_tup']):
         return True
     if (len(call_list) == 4 and call_list[1:] == ['series_kernels', 'hiframes', hpat] and
             call_list[0]
@@ -101,6 +101,7 @@ def remove_hiframes(rhs, lives, call_list):
 
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
+
 class HiFrames(object):
     """analyze and transform hiframes calls"""
 
@@ -125,7 +126,6 @@ class HiFrames(object):
         self.pq_handler = ParquetHandler(
             func_ir, typingctx, args, _locals, self.reverse_copies)
         self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
-
 
     def run(self):
         # FIXME: see why this breaks test_kmeans
@@ -180,7 +180,7 @@ class HiFrames(object):
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     inline_closure_call(self.func_ir, rp_func.glbls,
-                        block, len(new_body), rp_func.func, work_list=work_list)
+                                        block, len(new_body), rp_func.func, work_list=work_list)
                     replaced = True
                     break
                 if isinstance(out_nodes, dict):
@@ -242,7 +242,7 @@ class HiFrames(object):
                 val_def = guard(get_definition, self.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == pd
                         and rhs.attr in ('DataFrame', 'read_csv',
-                                        'read_parquet', 'to_numeric')):
+                                         'read_parquet', 'to_numeric')):
                     # TODO: implement to_numeric in typed pass?
                     # put back the definition removed earlier but remove node
                     # enables function matching without node in IR
@@ -272,7 +272,7 @@ class HiFrames(object):
                 self.func_ir._definitions[lhs].append(rhs)
                 return []
 
-            #if rhs.op in ('build_list', 'build_tuple'): TODO: test tuple
+            # if rhs.op in ('build_list', 'build_tuple'): TODO: test tuple
             if rhs.op == 'build_list':
                 # if build_list items are constant, add the constant values
                 # to the returned list type as metadata. This enables type
@@ -323,7 +323,6 @@ class HiFrames(object):
             pivot_call.kws = list(pivot_call.kws)
             pivot_call.kws.append(('_pivot_values', meta_var))
             self.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
-
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
@@ -411,7 +410,6 @@ class HiFrames(object):
         if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
             return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
 
-
         if config._has_h5py and fdef == ('File', 'h5py'):
             return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
@@ -483,10 +481,10 @@ class HiFrames(object):
                 other_colmap = {c: other for c in df_col_map.keys()}
 
         out_df_map = {}
-        isin_func = lambda A, B: hpat.hiframes.api.df_isin(A, B)
-        isin_vals_func = lambda A, B: hpat.hiframes.api.df_isin_vals(A, B)
+        def isin_func(A, B): return hpat.hiframes.api.df_isin(A, B)
+        def isin_vals_func(A, B): return hpat.hiframes.api.df_isin_vals(A, B)
         # create array of False values used when other col not available
-        bool_arr_func = lambda A: hpat.hiframes.api.init_series(np.zeros(len(A), np.bool_))
+        def bool_arr_func(A): return hpat.hiframes.api.init_series(np.zeros(len(A), np.bool_))
         # use the first array of df to get len. TODO: check for empty df
         false_arr_args = [list(df_col_map.values())[0]]
 
@@ -531,7 +529,7 @@ class HiFrames(object):
         val_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 0, 'value')
         inplace_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
 
-        _fillna_func = lambda A, val, inplace: A.fillna(val, inplace=inplace)
+        def _fillna_func(A, val, inplace): return A.fillna(val, inplace=inplace)
         out_col_map = {}
         for cname, in_var in self._get_df_cols(df_var).items():
             f_block = compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
@@ -592,7 +590,7 @@ class HiFrames(object):
         kws = dict(rhs.kws)
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
         inplace = guard(find_const, self.func_ir, inplace_var)
-        if inplace is not None and inplace == True:
+        if inplace is not None and inplace:
             # TODO: make sure call post dominates df_var definition or df_var
             # is not used in other code paths
             # replace func variable with drop_inplace
@@ -642,14 +640,14 @@ class HiFrames(object):
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
         inplace = guard(find_const, self.func_ir, inplace_var)
 
-        if inplace is not None and inplace == True:
+        if inplace is not None and inplace:
             df_label = self.df_labels[df_var.name]
             cfg = compute_cfg_from_blocks(self.func_ir.blocks)
             # dropping columns inplace possible only when it dominates the df
             # creation to keep schema consistent
             if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
                 raise ValueError("dropping dataframe columns inplace inside "
-                             "conditionals and loops not supported yet")
+                                 "conditionals and loops not supported yet")
             # TODO: rename df name
             # TODO: support dropping columns of input dfs (reflection)
             for cname in columns:
@@ -658,7 +656,7 @@ class HiFrames(object):
 
         in_df_map = self._get_df_cols(df_var)
         nodes = []
-        out_df_map = {c:_gen_arr_copy(in_df_map[c], nodes)
+        out_df_map = {c: _gen_arr_copy(in_df_map[c], nodes)
                       for c in in_df_map.keys() if c not in columns}
         self._create_df(lhs.name, out_df_map, label)
         return nodes
@@ -713,8 +711,8 @@ class HiFrames(object):
         args = data_vars + [index] + col_vars
 
         return self._replace_func(_init_df, args,
-                    pre_nodes=nodes
-                )
+                                  pre_nodes=nodes
+                                  )
 
         # df_nodes, col_map = self._process_df_build_map(items)
         # nodes += df_nodes
@@ -756,7 +754,7 @@ class HiFrames(object):
             fname_const = guard(find_const, self.func_ir, fname)
             if fname_const is None:
                 raise ValueError("pd.read_csv() requires explicit type"
-                    "annotation using 'dtype' if filename is not constant")
+                                 "annotation using 'dtype' if filename is not constant")
             rows_to_read = 100  # TODO: tune this
             df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
             # TODO: string_array, categorical, etc.
@@ -770,7 +768,7 @@ class HiFrames(object):
                 # a row is used for names if not provided
                 skiprows += 1
             col_names = cols
-            dtype_map = {c:d for c,d in zip(col_names, dtypes)}
+            dtype_map = {c: d for c, d in zip(col_names, dtypes)}
         else:
             dtype_map = guard(get_definition, self.func_ir, dtype_var)
             if (not isinstance(dtype_map, ir.Expr)
@@ -834,8 +832,8 @@ class HiFrames(object):
         if isinstance(dtype_map, types.Type):
             typ = dtype_map
             data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
-                        for cname in col_names]
-            return col_names, data_arrs, [typ]*len(col_names)
+                         for cname in col_names]
+            return col_names, data_arrs, [typ] * len(col_names)
 
         columns = []
         data_arrs = []
@@ -872,9 +870,9 @@ class HiFrames(object):
             if (not guard(find_callname, self.func_ir, dtype_def)
                     == ('category', 'pandas.core.dtypes.dtypes')):
                 raise ValueError("pd.read_csv() invalid dtype "
-                    "(built using a call but not Categorical)")
+                                 "(built using a call but not Categorical)")
             cats_var = self._get_arg('CategoricalDtype', dtype_def.args,
-                dict(dtype_def.kws), 0, 'categories')
+                                     dict(dtype_def.kws), 0, 'categories')
             err_msg = "categories should be constant list"
             cats = self._get_str_or_list(cats_var, list_only=True, err_msg=err_msg)
             typ = PDCategoricalDtype(cats)
@@ -904,7 +902,7 @@ class HiFrames(object):
                 == ('list', 'builtins') and len(data_def.args) == 1):
             arg_def = guard(get_definition, self.func_ir, data_def.args[0])
             if (is_call(arg_def) and guard(find_callname, self.func_ir,
-                    arg_def) == ('chain', 'itertools')):
+                                           arg_def) == ('chain', 'itertools')):
                 in_data = arg_def.vararg
                 arg_def.vararg = None  # avoid typing error
                 return self._replace_func(
@@ -975,7 +973,7 @@ class HiFrames(object):
 
         df_list = guard(get_definition, self.func_ir, objs_arg)
         if not isinstance(df_list, ir.Expr) or not (df_list.op
-                                            in ['build_tuple', 'build_list']):
+                                                    in ['build_tuple', 'build_list']):
             raise ValueError("pd.concat input should be constant list or tuple")
 
         # XXX convert build_list to build_tuple since Numba doesn't handle list of
@@ -1002,7 +1000,7 @@ class HiFrames(object):
 
         # generate a concat call for each output column
         # TODO: support non-numericals like string
-        gen_nan_func = lambda A: np.full(len(A), np.nan)
+        def gen_nan_func(A): return np.full(len(A), np.nan)
         # gen concat function
         arg_names = ", ".join(['in{}'.format(i) for i in range(len(df_list))])
         func_text = "def _concat_imp({}):\n".format(arg_names)
@@ -1024,7 +1022,7 @@ class HiFrames(object):
                     # use a df column just for len()
                     len_arr = list(df_col_map.values())[0]
                     f_block = compile_to_numba_ir(gen_nan_func,
-                            {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                                                  {'hpat': hpat, 'np': np}).blocks.popitem()[1]
                     replace_arg_nodes(f_block, [len_arr])
                     nodes += f_block.body[:-2]
                     args.append(nodes[-1].target)
@@ -1032,7 +1030,7 @@ class HiFrames(object):
                     args.append(df_col_map[cname])
 
             f_block = compile_to_numba_ir(_concat_imp,
-                        {'hpat': hpat, 'np': np}).blocks.popitem()[1]
+                                          {'hpat': hpat, 'np': np}).blocks.popitem()[1]
             replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-2]
             done_cols[cname] = nodes[-1].target
@@ -1091,6 +1089,7 @@ class HiFrames(object):
                     raise ValueError(
                         "data frame column names should be constant")
             # cast to series type
+
             def f(arr):  # pragma: no cover
                 df_arr = hpat.hiframes.api.init_series(arr)
             f_block = compile_to_numba_ir(
@@ -1139,7 +1138,7 @@ class HiFrames(object):
         output_var = f_ir.blocks[f_topo_order[-1]].body[-1].value
         first_label = f_topo_order[0]
         replace_arg_nodes(f_ir.blocks[first_label], [col_var])
-        assert first_label != topo_order[0]  #  TODO: check for 0 and handle
+        assert first_label != topo_order[0]  # TODO: check for 0 and handle
         dummy_ir.blocks.update(f_ir.blocks)
         dummy_ir.blocks[0].body.append(ir.Jump(first_label, col_var.loc))
         # dead df code can cause type inference issues
@@ -1159,7 +1158,6 @@ class HiFrames(object):
         out_tp = infer.typevars[output_var.name].getone()
         # typemap, restype, calltypes = numba.compiler.type_inference_stage(self.typingctx, dummy_ir, self.args, None)
         return out_tp
-
 
     def _is_df_obj_call(self, call_var, obj_name):
         """determines whether variable is coming from groupby() or groupby()[],
@@ -1193,6 +1191,7 @@ class HiFrames(object):
         agg_func_dis = numba.njit(agg_func)
         agg_gb_var = ir.Var(lhs.scope, mk_unique_var("agg_gb"), lhs.loc)
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
+
         def to_arr(a, _agg_f):
             b = hpat.hiframes.api.to_arr_from_series(a)
             res = hpat.hiframes.api.init_series(hpat.hiframes.api.agg_typer(b, _agg_f))
@@ -1203,7 +1202,7 @@ class HiFrames(object):
 
         pivot_values = self._get_pivot_values(lhs.name)
         df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                                for col in pivot_values})
+                       for col in pivot_values})
         # df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
         #                         for col in [values_arg]})
         out_df = df_col_map.copy()
@@ -1216,7 +1215,6 @@ class HiFrames(object):
         nodes.append(agg_node)
         return nodes
 
-
     def _get_pivot_values(self, varname):
         if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':pivot') not in self.locals:
             raise ValueError("pivot_table() requires annotation of pivot values")
@@ -1225,7 +1223,7 @@ class HiFrames(object):
         return values
 
     def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
-                                                                 err_msg=None):
+                     err_msg=None):
         arg = None
         if len(args) > arg_no:
             arg = guard(find_const, self.func_ir, args[arg_no])
@@ -1237,12 +1235,12 @@ class HiFrames(object):
                 return default
             if err_msg is None:
                 err_msg = ("{} requires '{}' argument as a "
-                             "constant string").format(f_name, arg_name)
+                           "constant string").format(f_name, arg_name)
             raise ValueError(err_msg)
         return arg
 
     def _get_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
-                                                                 err_msg=None):
+                 err_msg=None):
         arg = None
         if len(args) > arg_no:
             arg = args[arg_no]
@@ -1266,6 +1264,7 @@ class HiFrames(object):
 
         in_vars = {}
         # output of crosstab is array[int64]
+
         def to_arr():
             res = hpat.hiframes.api.init_series(np.empty(1, np.int64))
         f_block = compile_to_numba_ir(to_arr, {'hpat': hpat, 'np': np}).blocks.popitem()[1]
@@ -1275,7 +1274,7 @@ class HiFrames(object):
 
         pivot_values = self._get_pivot_values(lhs.name)
         df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                                for col in pivot_values})
+                       for col in pivot_values})
         out_df = df_col_map.copy()
         self._create_df(lhs.name, out_df, label)
         pivot_arr = columns_arg
@@ -1301,8 +1300,7 @@ class HiFrames(object):
         # TODO: support aggregation functions sum, count, etc.
         if func_name not in supported_agg_funcs:
             raise ValueError("only {} supported in groupby".format(
-                                             ", ".join(supported_agg_funcs)))
-
+                ", ".join(supported_agg_funcs)))
 
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'groupby')
@@ -1316,7 +1314,7 @@ class HiFrames(object):
 
         # find input vars
         in_vars = {out_cname: self.df_vars[df_var.name][out_cname]
-                    for out_cname in out_colnames}
+                   for out_cname in out_colnames}
 
         nodes, agg_func, out_tp_vars = self._handle_agg_func(
             in_vars, out_colnames, func_name, lhs, rhs)
@@ -1336,7 +1334,7 @@ class HiFrames(object):
                     out_df[k] = out_key_var
                     out_key_vars.append(out_key_var)
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                                for col in out_colnames})
+                           for col in out_colnames})
             out_df.update(df_col_map)
 
             self._create_df(lhs.name, out_df, label)
@@ -1361,6 +1359,7 @@ class HiFrames(object):
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         for out_cname in out_colnames:
             in_var = in_vars[out_cname]
+
             def to_arr(a, _agg_f):
                 b = hpat.hiframes.api.to_arr_from_series(a)
                 res = hpat.hiframes.api.init_series(hpat.hiframes.api.agg_typer(b, _agg_f))
@@ -1441,7 +1440,6 @@ class HiFrames(object):
                 raise ValueError(err_msg)
         return key_colnames
 
-
     def _get_df_obj_select(self, obj_var, obj_name):
         """analyze selection of columns in after groupby() or rolling()
         e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
@@ -1452,8 +1450,8 @@ class HiFrames(object):
         if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
             obj_var = select_def.value
             out_colnames = (select_def.index
-                if select_def.op == 'static_getitem'
-                else guard(find_const, self.func_ir, select_def.index))
+                            if select_def.op == 'static_getitem'
+                            else guard(find_const, self.func_ir, select_def.index))
             if not isinstance(out_colnames, (str, tuple)):
                 raise ValueError("{} output column names should be constant".format(obj_name))
             if isinstance(out_colnames, str):
@@ -1470,13 +1468,12 @@ class HiFrames(object):
 
         return df_var, out_colnames, explicit_select, obj_var
 
-
     def _handle_rolling(self, lhs, rhs, obj_var, func_name, label):
         # format df.rolling(w)['B'].sum()
         # TODO: support aggregation functions sum, count, etc.
         if func_name not in supported_rolling_funcs:
             raise ValueError("only ({}) supported in rolling".format(
-                                             ", ".join(supported_rolling_funcs)))
+                ", ".join(supported_rolling_funcs)))
 
         nodes = []
         # find selected output columns
@@ -1488,7 +1485,7 @@ class HiFrames(object):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
-        if not isinstance (window, ir.Var):
+        if not isinstance(window, ir.Var):
             window_var = ir.Var(lhs.scope, mk_unique_var("window"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
             window = window_var
@@ -1524,7 +1521,7 @@ class HiFrames(object):
             df_col_map = {out_colnames[0]: lhs}
         else:
             df_col_map = ({col: ir.Var(lhs.scope, mk_unique_var(col), lhs.loc)
-                                for col in out_colnames})
+                           for col in out_colnames})
             if on is not None:
                 df_col_map[on] = on_arr
             out_df = df_col_map.copy()
@@ -1643,13 +1640,13 @@ class HiFrames(object):
 
         # handle old input flags
         # e.g. {"A:input": "distributed"} -> "A"
-        dist_inputs = { var_name.split(":")[0]
-                    for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":input") and flag == 'distributed'}
+        dist_inputs = {var_name.split(":")[0]
+                       for (var_name, flag) in self.locals.items()
+                       if var_name.endswith(":input") and flag == 'distributed'}
 
-        thread_inputs = { var_name.split(":")[0]
-                    for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":input") and flag == 'threaded'}
+        thread_inputs = {var_name.split(":")[0]
+                         for (var_name, flag) in self.locals.items()
+                         if var_name.endswith(":input") and flag == 'threaded'}
 
         # check inputs to be in actuall args
         for arg_name in dist_inputs | thread_inputs:
@@ -1662,12 +1659,11 @@ class HiFrames(object):
         self.metadata['distributed'] |= dist_inputs
         self.metadata['threaded'] |= thread_inputs
 
-
         # handle old return flags
         # e.g. {"A:return":"distributed"} -> "A"
-        flagged_returns = { var_name.split(":")[0]: flag
-                    for (var_name, flag) in self.locals.items()
-                    if var_name.endswith(":return") }
+        flagged_returns = {var_name.split(":")[0]: flag
+                           for (var_name, flag) in self.locals.items()
+                           if var_name.endswith(":return")}
 
         for v, flag in flagged_returns.items():
             if flag == 'distributed':
@@ -1694,7 +1690,7 @@ class HiFrames(object):
 
         if ret_name in flagged_vars:
             flag = ('distributed' if ret_name in self.metadata['distributed']
-                        else 'threaded')
+                    else 'threaded')
             nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
             new_cast = ir.Expr.cast(new_arr, loc)
@@ -1717,7 +1713,7 @@ class HiFrames(object):
                 vname = v.name.split('.')[0]
                 if vname in flagged_vars:
                     flag = ('distributed' if vname in self.metadata['distributed']
-                        else 'threaded')
+                            else 'threaded')
                     nodes += self._gen_replace_dist_return(v, flag)
                     new_var_list.append(nodes[-1].target)
                 else:
@@ -1785,7 +1781,7 @@ class HiFrames(object):
         cname_var = ir.Var(inst.value.scope, mk_unique_var("$cname_const"), inst.loc)
         nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
 
-        func = lambda df, cname, arr: hpat.hiframes.api.set_df_col(df, cname, arr)
+        def func(df, cname, arr): return hpat.hiframes.api.set_df_col(df, cname, arr)
         f_block = compile_to_numba_ir(func, {'hpat': hpat}).blocks.popitem()[1]
         replace_arg_nodes(f_block, [df_var, cname_var, inst.value])
         nodes += f_block.body[:-2]
@@ -1815,7 +1811,6 @@ class HiFrames(object):
         """
         df_var_renamed = self._get_renamed_df(df_var)
         return cname in self.df_vars[df_var_renamed.name]
-
 
     def _is_df_var(self, var):
         assert isinstance(var, ir.Var)
@@ -1890,7 +1885,7 @@ def simple_block_copy_propagate(block):
                 for k in lhs_kill:
                     var_dict.pop(k, None)
         if (isinstance(stmt, ir.Assign)
-                                    and not isinstance(stmt.value, ir.Var)):
+                and not isinstance(stmt.value, ir.Var)):
             lhs = stmt.target.name
             var_dict.pop(lhs, None)
             # previous t=a is killed if a is killed

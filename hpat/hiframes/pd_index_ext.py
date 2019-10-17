@@ -4,16 +4,16 @@ import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload, make_attribute_wrapper, box)
+                             type_callable, infer, overload, make_attribute_wrapper, box)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-    AttributeTemplate, bound_function)
+                                    AttributeTemplate, bound_function)
 from numba.targets.boxing import box_array
 
 import hpat
 from hpat.str_ext import string_type
 import hpat.hiframes
 from hpat.hiframes.pd_series_ext import (is_str_series_typ, string_array_type,
-    SeriesType)
+                                         SeriesType)
 from hpat.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
 from hpat.hiframes.datetime_date_ext import array_datetime_date
 
@@ -24,6 +24,7 @@ _timedelta_index_data_typ = types.Array(types.NPTimedelta('ns'), 1, 'C')
 class DatetimeIndexType(types.IterableType):
     """Temporary type class for DatetimeIndex objects.
     """
+
     def __init__(self, is_named=False):
         # TODO: support other properties like freq/tz/dtype/yearfirst?
         self.is_named = is_named
@@ -50,7 +51,7 @@ class DatetimeIndexType(types.IterableType):
         return types.iterators.ArrayIterator(_dt_index_data_typ)
 
 
-#@typeof_impl.register(pd.DatetimeIndex)
+# @typeof_impl.register(pd.DatetimeIndex)
 
 @register_model(DatetimeIndexType)
 class DatetimeIndexModel(models.StructModel):
@@ -74,7 +75,7 @@ def box_dt_index(typ, val, c):
     pd_class_obj = c.pyapi.import_module_noblock(mod_name)
 
     dt_index = numba.cgutils.create_struct_proxy(
-            typ)(c.context, c.builder, val)
+        typ)(c.context, c.builder, val)
 
     arr = box_array(_dt_index_data_typ, dt_index.data, c)
 
@@ -116,36 +117,35 @@ def resolve_date_field(self, ary):
     # TODO: return Int64Index
     return SeriesType(types.int64)
 
+
 for field in hpat.hiframes.pd_timestamp_ext.date_fields:
     setattr(DatetimeIndexAttribute, "resolve_" + field, resolve_date_field)
 
 
-
 @overload(pd.DatetimeIndex)
 def pd_datetimeindex_overload(data=None, freq=None, start=None, end=None,
-        periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
-        dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
-        verify_integrity=True):
+                              periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
+                              dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
+                              verify_integrity=True):
     # TODO: check/handle other input
     if data is None:
         raise ValueError("data argument in pd.DatetimeIndex() expected")
 
     if data != string_array_type and not is_str_series_typ(data):
         return (lambda data=None, freq=None, start=None, end=None,
-        periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
-        dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
-        verify_integrity=True: hpat.hiframes.api.init_datetime_index(
-            hpat.hiframes.api.ts_series_to_arr_typ(data), name))
+                periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
+                dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
+                verify_integrity=True: hpat.hiframes.api.init_datetime_index(
+                    hpat.hiframes.api.ts_series_to_arr_typ(data), name))
 
     def f(data=None, freq=None, start=None, end=None,
-        periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
-        dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
-        verify_integrity=True):
+          periods=None, tz=None, normalize=False, closed=None, ambiguous='raise',
+          dayfirst=False, yearfirst=False, dtype=None, copy=False, name=None,
+          verify_integrity=True):
         S = hpat.hiframes.api.parse_datetimes_from_strings(data)
         return hpat.hiframes.api.init_datetime_index(S, name)
 
     return f
-
 
 
 # ----------- Timedelta
@@ -154,6 +154,7 @@ def pd_datetimeindex_overload(data=None, freq=None, start=None, end=None,
 class TimedeltaIndexType(types.IterableType):
     """Temporary type class for TimedeltaIndex objects.
     """
+
     def __init__(self, is_named=False):
         # TODO: support other properties like unit/freq?
         self.is_named = is_named
@@ -189,6 +190,7 @@ class TimedeltaIndexTypeModel(models.StructModel):
         ]
         super(TimedeltaIndexTypeModel, self).__init__(dmm, fe_type, members)
 
+
 @infer_getattr
 class TimedeltaIndexAttribute(AttributeTemplate):
     key = TimedeltaIndexType
@@ -212,6 +214,7 @@ class TimedeltaIndexAttribute(AttributeTemplate):
 def resolve_timedelta_field(self, ary):
     # TODO: return Int64Index
     return types.Array(types.int64, 1, 'C')
+
 
 for field in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
     setattr(TimedeltaIndexAttribute, "resolve_" + field, resolve_timedelta_field)

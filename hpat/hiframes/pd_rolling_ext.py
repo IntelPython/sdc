@@ -4,14 +4,14 @@ import numpy as np
 import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-    type_callable, infer, overload, make_attribute_wrapper, intrinsic,
-    lower_builtin, overload_method)
+                             type_callable, infer, overload, make_attribute_wrapper, intrinsic,
+                             lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
-    AttributeTemplate, bound_function)
+                                    AttributeTemplate, bound_function)
 from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import hpat
 from hpat.hiframes.pd_series_ext import (SeriesType, _get_series_array_type,
-    arr_to_series_type)
+                                         arr_to_series_type)
 from hpat.str_ext import string_type
 from hpat.hiframes.pd_dataframe_ext import DataFrameType
 from hpat.hiframes.rolling import supported_rolling_funcs
@@ -21,6 +21,7 @@ class RollingType(types.Type):
     """Temporary type class for RollingType objects before transformation
     to rolling node.
     """
+
     def __init__(self, df_type, on, selection, explicit_select=False):
 
         self.df_type = df_type
@@ -36,7 +37,7 @@ class RollingType(types.Type):
         # XXX is copy necessary?
         # TODO: key attribute?
         return RollingType(self.df_type, self.on, self.selection,
-            self.explicit_select)
+                           self.explicit_select)
 
 
 # dummy model since info is kept in type
@@ -46,10 +47,10 @@ register_model(RollingType)(models.OpaqueModel)
 
 @overload_method(DataFrameType, 'rolling')
 def df_rolling_overload(df, window, min_periods=None, center=False,
-        win_type=None, on=None, axis=0, closed=None):
+                        win_type=None, on=None, axis=0, closed=None):
 
     def _impl(df, window, min_periods=None, center=False,
-            win_type=None, on=None, axis=0, closed=None):
+              win_type=None, on=None, axis=0, closed=None):
         return hpat.hiframes.pd_rolling_ext.rolling_dummy(
             df, window, center, on)
 
@@ -110,6 +111,7 @@ class GetItemDataFrameRolling2(AbstractTemplate):
                 rolling.df_type, rolling.on, selection, True)
             return signature(ret_rolling, *args)
 
+
 @infer_getattr
 class DataframeRollingAttribute(AttributeTemplate):
     key = RollingType
@@ -117,7 +119,7 @@ class DataframeRollingAttribute(AttributeTemplate):
     def generic_resolve(self, rolling, func_name):
         if func_name not in supported_rolling_funcs:
             raise ValueError("only ({}) supported in rolling".format(
-                                           ", ".join(supported_rolling_funcs)))
+                ", ".join(supported_rolling_funcs)))
         template_key = 'rolling.' + func_name
         # output is always float64
         out_arr = types.Array(types.float64, 1, 'C')
@@ -159,7 +161,7 @@ class DataframeRollingAttribute(AttributeTemplate):
                     # TODO: support pairwise arg
                     out_cols = tuple(sorted(set(columns) | set(other.columns)))
                     return signature(DataFrameType(
-                            (out_arr,)*len(out_cols), None, out_cols), *args)
+                        (out_arr,) * len(out_cols), None, out_cols), *args)
                 return signature(out_typ, *args)
 
         return types.BoundFunction(MethodTemplate, rolling)

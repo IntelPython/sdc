@@ -2,11 +2,12 @@ import unittest
 import itertools
 import os
 import pandas as pd
+import platform
 import numpy as np
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-    count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 from hpat.hiframes.rolling import supported_rolling_funcs
 
 LONG_TEST = (int(os.environ['HPAT_LONG_ROLLING_TEST']) != 0
@@ -87,8 +88,6 @@ class TestRolling(unittest.TestCase):
             df = pd.DataFrame({'B': np.arange(n)})
             pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -108,8 +107,6 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_fixed_parallel_apply1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -132,17 +129,17 @@ class TestRolling(unittest.TestCase):
     def test_variable1(self):
         # test sequentially with manually created dfs
         df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
-                'time': [pd.Timestamp('20130101 09:00:00'),
-                        pd.Timestamp('20130101 09:00:02'),
-                        pd.Timestamp('20130101 09:00:03'),
-                        pd.Timestamp('20130101 09:00:05'),
-                        pd.Timestamp('20130101 09:00:06')]})
+                            'time': [pd.Timestamp('20130101 09:00:00'),
+                                     pd.Timestamp('20130101 09:00:02'),
+                                     pd.Timestamp('20130101 09:00:03'),
+                                     pd.Timestamp('20130101 09:00:05'),
+                                     pd.Timestamp('20130101 09:00:06')]})
         df2 = pd.DataFrame({'B': [0, 1, 2, -2, 4],
-                    'time': [pd.Timestamp('20130101 09:00:01'),
-                        pd.Timestamp('20130101 09:00:02'),
-                        pd.Timestamp('20130101 09:00:03'),
-                        pd.Timestamp('20130101 09:00:04'),
-                        pd.Timestamp('20130101 09:00:09')]})
+                            'time': [pd.Timestamp('20130101 09:00:01'),
+                                     pd.Timestamp('20130101 09:00:02'),
+                                     pd.Timestamp('20130101 09:00:03'),
+                                     pd.Timestamp('20130101 09:00:04'),
+                                     pd.Timestamp('20130101 09:00:09')]})
         wins = ('2s',)
         if LONG_TEST:
             wins = ('1s', '2s', '3s', '4s')
@@ -181,17 +178,17 @@ class TestRolling(unittest.TestCase):
     def test_variable_apply1(self):
         # test sequentially with manually created dfs
         df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
-                'time': [pd.Timestamp('20130101 09:00:00'),
-                        pd.Timestamp('20130101 09:00:02'),
-                        pd.Timestamp('20130101 09:00:03'),
-                        pd.Timestamp('20130101 09:00:05'),
-                        pd.Timestamp('20130101 09:00:06')]})
+                            'time': [pd.Timestamp('20130101 09:00:00'),
+                                     pd.Timestamp('20130101 09:00:02'),
+                                     pd.Timestamp('20130101 09:00:03'),
+                                     pd.Timestamp('20130101 09:00:05'),
+                                     pd.Timestamp('20130101 09:00:06')]})
         df2 = pd.DataFrame({'B': [0, 1, 2, -2, 4],
-                    'time': [pd.Timestamp('20130101 09:00:01'),
-                        pd.Timestamp('20130101 09:00:02'),
-                        pd.Timestamp('20130101 09:00:03'),
-                        pd.Timestamp('20130101 09:00:04'),
-                        pd.Timestamp('20130101 09:00:09')]})
+                            'time': [pd.Timestamp('20130101 09:00:01'),
+                                     pd.Timestamp('20130101 09:00:02'),
+                                     pd.Timestamp('20130101 09:00:03'),
+                                     pd.Timestamp('20130101 09:00:04'),
+                                     pd.Timestamp('20130101 09:00:09')]})
         wins = ('2s',)
         if LONG_TEST:
             wins = ('1s', '2s', '3s', '4s')
@@ -225,8 +222,7 @@ class TestRolling(unittest.TestCase):
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
+    @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
     def test_variable_parallel1(self):
         wins = ('2s',)
         sizes = (121,)
@@ -250,8 +246,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
+    @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
     def test_variable_apply_parallel1(self):
         wins = ('2s',)
         sizes = (121,)
@@ -294,6 +289,7 @@ class TestRolling(unittest.TestCase):
                 pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
                 pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
         # test apply
+
         def apply_test_impl(S, w, c):
             return S.rolling(w, center=c).apply(lambda a: a.sum())
         hpat_func = hpat.jit(apply_test_impl)
@@ -301,8 +297,6 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(S1, *args), apply_test_impl(S1, *args))
             pd.testing.assert_series_equal(hpat_func(S2, *args), apply_test_impl(S2, *args))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_series_cov1(self):
         # test series rolling functions
         # all functions except apply
@@ -312,12 +306,14 @@ class TestRolling(unittest.TestCase):
         if LONG_TEST:
             wins = (2, 3, 5)
         centers = (False, True)
+
         def test_impl(S, S2, w, c):
             return S.rolling(w, center=c).cov(S2)
         hpat_func = hpat.jit(test_impl)
         for args in itertools.product([S1, S2], [S1, S2], wins, centers):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
+
         def test_impl2(S, S2, w, c):
             return S.rolling(w, center=c).corr(S2)
         hpat_func = hpat.jit(test_impl2)
@@ -325,8 +321,6 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_df_cov1(self):
         # test series rolling functions
         # all functions except apply
@@ -336,18 +330,21 @@ class TestRolling(unittest.TestCase):
         if LONG_TEST:
             wins = (2, 3, 5)
         centers = (False, True)
+
         def test_impl(df, df2, w, c):
             return df.rolling(w, center=c).cov(df2)
         hpat_func = hpat.jit(test_impl)
         for args in itertools.product([df1, df2], [df1, df2], wins, centers):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
+
         def test_impl2(df, df2, w, c):
             return df.rolling(w, center=c).corr(df2)
         hpat_func = hpat.jit(test_impl2)
         for args in itertools.product([df1, df2], [df1, df2], wins, centers):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
+
 
 if __name__ == "__main__":
     unittest.main()
