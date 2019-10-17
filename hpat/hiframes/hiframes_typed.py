@@ -853,8 +853,8 @@ class HiFramesTyped(object):
         # single arg functions
         if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max', 'prod'):
             if rhs.args or rhs.kws:
-                raise ValueError("unsupported Series.{}() arguments".format(
-                    func_name))
+                raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
+
             # TODO: handle skipna, min_count arguments
             series_typ = self.typemap[series_var.name]
             series_dtype = series_typ.dtype
@@ -882,11 +882,22 @@ class HiFramesTyped(object):
         if func_name == 'quantile':
             nodes = []
             data = self._get_series_data(series_var, nodes)
-            return self._replace_func(
-                lambda A, q: hpat.hiframes.api.quantile(A, q),
-                [data, rhs.args[0]],
-                pre_nodes=nodes
-            )
+
+            def run_call_series_quantile(A, q):
+                return hpat.hiframes.api.quantile(A, q)
+
+            def run_call_series_quantile_default(A):
+                return hpat.hiframes.api.quantile(A, 0.5)
+
+            if len(rhs.args) == 0:
+                args = [data]
+                replacement_func = run_call_series_quantile_default
+            else:
+                assert len(rhs.args) == 1, "invalid args for " + func_name
+                args = [data, rhs.args[0]]
+                replacement_func = run_call_series_quantile
+
+            return self._replace_func(replacement_func, args, pre_nodes=nodes)
 
         if func_name == 'fillna':
             return self._run_call_series_fillna(assign, lhs, rhs, series_var)

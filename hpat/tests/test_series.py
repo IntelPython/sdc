@@ -4,11 +4,12 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
+
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
-
 from hpat.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
+
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
@@ -185,14 +186,21 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_attr1(self):
-        def test_impl(A):
-            return A.size
+    def test_series_size(self):
+        def test_impl(S):
+            return S.size
         hpat_func = hpat.jit(test_impl)
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        for S, expected in [
+            (pd.Series(), 0),
+            (pd.Series(np.arange(n)), n),
+            (pd.Series([np.nan, 1, 2]), 3),
+            (pd.Series(['1', '2', '3']), 3),
+        ]:
+            with self.subTest(S=S, expected=expected):
+                self.assertEqual(hpat_func(S), expected)
+                self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_attr2(self):
         def test_impl(A):
@@ -256,22 +264,159 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
-    def test_series_astype_str1(self):
-        def test_impl(A):
-            return A.astype(str)
+    def test_series_astype_int_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts integer series to series of strings
+        '''
+        def test_impl(S):
+            return S.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11
         S = pd.Series(np.arange(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_astype_str2(self):
+    def test_series_astype_int_to_str2(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           converts integer series to series of strings
+        '''
+        def test_impl(S):
+            return S.astype('str')
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+        def test_impl(S):
+            return S.astype(str)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str2(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           handles string series not changing it
+        '''
+        def test_impl(S):
+            return S.astype('str')
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: requires str(datetime64) support in Numba')
+    def test_series_astype_dt_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts datetime series to series of strings
+        '''
         def test_impl(A):
             return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series(['aa', 'bb', 'cc'])
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        S = pd.Series([pd.Timestamp('20130101 09:00:00'),
+                       pd.Timestamp('20130101 09:00:02'),
+                       pd.Timestamp('20130101 09:00:03')
+        ])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('AssertionError: Series are different'
+                   '[left]:  [0.000000, 1.000000, 2.000000, 3.000000, ...'
+                   '[right]:  [0.0, 1.0, 2.0, 3.0, ...'
+                   'TODO: needs alignment to NumPy on Numba side')
+    def test_series_astype_float_to_str1(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           converts float series to series of strings
+        '''
+        def test_impl(A):
+            res = A.astype(str)
+            print(res)
+            return res
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_int32_to_int64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series with dtype=int32 to series with dtype=int64
+        '''
+        def test_impl(A):
+            return A.astype(np.int64)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n), dtype=np.int32)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_int_to_float64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts integer series to series of float
+        '''
+        def test_impl(A):
+            return A.astype(np.float64)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_float_to_int32(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts float series to series of integers
+        '''
+        def test_impl(A):
+            return A.astype(np.int32)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support string literal as dtype arg')
+    def test_series_astype_literal_dtype1(self):
+        '''Verifies Series.astype implementation with a string literal dtype argument
+           converts float series to series of integers
+        '''
+        def test_impl(A):
+            return A.astype('int32')
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11.0
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to int')
+    def test_series_astype_str_to_int32(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series of strings to series of integers
+        '''
+        import numba
+        def test_impl(A):
+            return A.astype(np.int32)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series([str(x) for x in np.arange(n) - n // 2])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to float')
+    def test_series_astype_str_to_float64(self):
+        '''Verifies Series.astype implementation with NumPy dtype argument
+           converts series of strings to series of float
+        '''
+        def test_impl(A):
+            return A.astype(np.float64)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_np_call_on_series1(self):
         def test_impl(A):
@@ -908,21 +1053,65 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_series_min1(self):
+    def test_series_min(self):
         def test_impl(S):
             return S.min()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        # TODO type_min/type_max
+        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                           [8, 31, 1123, -1024],
+                           [2., 3., 1, -1000, np.inf]]:
+            S = pd.Series(input_data)
 
-    def test_series_max1(self):
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.min() any parameters unsupported")
+    def test_series_min_param(self):
+        def test_impl(S, param_skipna):
+            return S.min(skipna=param_skipna)
+
+        hpat_func = hpat.jit(test_impl)
+
+        for input_data, param_skipna in [([np.nan, 2., np.nan, 3., 1, -1000, np.inf], True),
+                                         ([2., 3., 1, np.inf, -1000], False)]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
+
+    def test_series_max(self):
         def test_impl(S):
             return S.max()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        # TODO type_min/type_max
+        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                           [8, 31, 1123, -1024],
+                           [2., 3., 1, -1000, np.inf]]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.max() any parameters unsupported")
+    def test_series_max_param(self):
+        def test_impl(S, param_skipna):
+            return S.max(skipna=param_skipna)
+
+        hpat_func = hpat.jit(test_impl)
+
+        for input_data, param_skipna in [([np.nan, 2., np.nan, 3., 1, -1000, np.inf], True),
+                                         ([2., 3., 1, np.inf, -1000], False)]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
 
     def test_series_value_counts(self):
         def test_impl(S):
@@ -1315,6 +1504,15 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', None, 'c', 'cccd'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skip('AssertionError: Series are different')
+    def test_series_dt_isna1(self):
+        def test_impl(S):
+            return S.isna()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_nlargest1(self):
         def test_impl(S):
             return S.nlargest(4)
@@ -1395,7 +1593,6 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
-
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1405,7 +1602,6 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
         np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
-
 
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
@@ -1854,6 +2050,27 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
+    def test_series_quantile(self):
+        def test_impl():
+            A = pd.Series([1, 2.5, .5, 3, 5])
+            return A.quantile()
+
+        hpat_func = hpat.jit(test_impl)
+        np.testing.assert_equal(hpat_func(), test_impl())
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.quantile() parameter as a list unsupported")
+    def test_series_quantile_q_vector(self):
+        def test_series_quantile_q_vector_impl(S, param1):
+            return S.quantile(param1)
+
+        S = pd.Series(np.random.ranf(100))
+        hpat_func = hpat.jit(test_series_quantile_q_vector_impl)
+
+        param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+        result_ref = test_series_quantile_q_vector_impl(S, param1)
+        result = hpat_func(S, param1)
+        np.testing.assert_equal(result, result_ref)
+
     @unittest.skip("Implement unique without sorting like in pandas")
     def test_unique(self):
         def test_impl(S):
@@ -1908,9 +2125,63 @@ class TestSeries(unittest.TestCase):
 
         ref_result = test_impl()
         result = hpat_func()
-        print("Result JIT", result)
-        print("Result Python", ref_result)
         np.testing.assert_array_equal(result, ref_result)
+
+    def test_series_nunique(self):
+        def test_series_nunique_impl(S):
+            return S.nunique()
+
+        def test_series_nunique_param1_impl(S, dropna):
+            return S.nunique(dropna)
+
+        hpat_func = hpat.jit(test_series_nunique_impl)
+
+        the_same_string = "the same string"
+        test_input_data = []
+        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                       ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                       []
+                       ]
+
+        data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                      [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                      [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, np.nan, np.nan],
+                      [np.nan, np.nan, np.inf],
+                      ]
+
+        if hpat.config.config_pipeline_hpat_default:
+            """
+            HPAT pipeline Series.nunique() does not support numpy.nan
+            """
+
+            test_input_data = data_simple
+        else:
+            test_input_data = data_simple + data_extra
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_nunique_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+            if not hpat.config.config_pipeline_hpat_default:
+                """
+                HPAT pipeline does not support parameter to Series.nunique(dropna=True)
+                """
+
+                hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)
+
+                for param1 in [True, False]:
+                    result_param1_ref = test_series_nunique_param1_impl(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    self.assertEqual(result_param1, result_param1_ref)
 
 
 if __name__ == "__main__":
