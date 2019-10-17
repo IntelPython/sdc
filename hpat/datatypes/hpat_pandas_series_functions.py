@@ -230,6 +230,37 @@ def hpat_pandas_series_index(self):
     return hpat_pandas_series_index_impl
 
 
+@overload_attribute(SeriesType, 'size')
+def hpat_pandas_series_size(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.size` implementation
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_size
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        input series
+
+    Returns
+    -------
+    :class:`pandas.Series`
+        Return the number of elements in the underlying data.
+    """
+
+    _func_name = 'Attribute size.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_size_impl(self):
+        return len(self._data)
+
+    return hpat_pandas_series_size_impl
+
+
 @overload(len)
 def hpat_pandas_series_len(self):
     """

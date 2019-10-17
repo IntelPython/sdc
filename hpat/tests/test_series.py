@@ -186,14 +186,21 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_attr1(self):
-        def test_impl(A):
-            return A.size
+    def test_series_size(self):
+        def test_impl(S):
+            return S.size
         hpat_func = hpat.jit(test_impl)
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        for S, expected in [
+            (pd.Series(), 0),
+            (pd.Series(np.arange(n)), n),
+            (pd.Series([np.nan, 1, 2]), 3),
+            (pd.Series(['1', '2', '3']), 3),
+        ]:
+            with self.subTest(S=S, expected=expected):
+                self.assertEqual(hpat_func(S), expected)
+                self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_attr2(self):
         def test_impl(A):
