@@ -230,6 +230,37 @@ def hpat_pandas_series_index(self):
     return hpat_pandas_series_index_impl
 
 
+@overload_attribute(SeriesType, 'size')
+def hpat_pandas_series_size(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.size` implementation
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_size
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        input series
+
+    Returns
+    -------
+    :class:`pandas.Series`
+        Return the number of elements in the underlying data.
+    """
+
+    _func_name = 'Attribute size.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_size_impl(self):
+        return len(self._data)
+
+    return hpat_pandas_series_size_impl
+
+
 @overload(len)
 def hpat_pandas_series_len(self):
     """
@@ -894,6 +925,45 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
 
+@overload_method(SeriesType, 'quantile')
+def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
+    """
+    Pandas Series method :meth:`pandas.Series.quantile` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile
+             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_quantile_q_vector
+
+    Parameters
+    -----------
+    q : :obj: float or array-like object, default 0.5
+        the quantile(s) to compute
+    interpolation: 'linear', 'lower', 'higher', 'midpoint', 'nearest', default `linear`
+        *unsupported* by Numba
+
+    Returns
+    -------
+    :obj:`pandas.Series` or float
+    """
+
+    _func_name = 'Method quantile().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+        raise TypingError('{} Unsupported parameters. Given interpolation: {}'.format(_func_name, interpolation))
+
+    if not isinstance(q, (types.Number, types.Omitted, types.List)) and q != 0.5:
+        raise TypingError('{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
+
+    def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
+        return numpy.quantile(self._data, q)
+
+    return hpat_pandas_series_quantile_impl
+
+
 @overload_method(SeriesType, 'min')
 def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
@@ -1419,8 +1489,7 @@ def hpat_pandas_series_unique(self):
     _func_name = 'Method unique().'
 
     if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_unique_str_impl(self):
@@ -1448,3 +1517,64 @@ def hpat_pandas_series_unique(self):
         return numpy.unique(self._data)
 
     return hpat_pandas_series_unique_impl
+
+
+@overload_method(SeriesType, 'nunique')
+def hpat_pandas_series_nunique(self, dropna=True):
+    """
+    Pandas Series method :meth:`pandas.Series.nunique` implementation.
+    
+    Note: Unsupported mixed numeric and string data
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    dropna: :obj:`bool`, default True
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method nunique().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if isinstance(self.data, StringArrayType):
+ 
+        def hpat_pandas_series_nunique_str_impl(self, dropna=True):
+            """
+            It is better to merge with Numeric branch
+            Unsupported:
+                ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd']
+                [3, np.nan, 'b', 'b', 5.1, np.nan, 'ddd', 'dd']
+            """
+
+            str_set = set(self._data)
+            return len(str_set)
+ 
+        return hpat_pandas_series_nunique_str_impl
+
+    def hpat_pandas_series_nunique_impl(self, dropna=True):
+        """
+        This function for Numeric data because NumPy dosn't support StringArrayType
+        Algo looks a bit ambigous because, currently, set() can not be used with NumPy with Numba JIT
+        """
+
+        data_mask_for_nan = numpy.isnan(self._data)
+        nan_exists = numpy.any(data_mask_for_nan)
+        data_no_nan = self._data[~data_mask_for_nan]
+        data_set = set(data_no_nan)
+        if dropna or not nan_exists:
+            return len(data_set)
+        else:
+            return len(data_set) + 1
+
+    return hpat_pandas_series_nunique_impl
