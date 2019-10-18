@@ -463,11 +463,11 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
     def test_series_astype_str_index_str(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
         '''
+
         def test_impl(S):
             return S.astype(str)
         hpat_func = hpat.jit(test_impl)
@@ -475,7 +475,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'], index=['a', 'b', 'c'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
     def test_series_astype_str_index_int(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
