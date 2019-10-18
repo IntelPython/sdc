@@ -700,10 +700,10 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(types.intp, *args)
 
-    @bound_function("series.idxmax")
-    def resolve_idxmax(self, ary, args, kws):
-        assert not kws
-        return signature(types.intp, *args)
+    # @bound_function("series.idxmax")
+    # def resolve_idxmax(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(types.intp, *args)
 
     # @bound_function("series.max")
     # def resolve_max(self, ary, args, kws):

@@ -748,6 +748,64 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
         return hpat_pandas_series_take_noindex_impl
 
 
+@overload_method(SeriesType, 'idxmax')
+def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
+    """
+    Pandas Series method :meth:`pandas.Series.idxmax` implementation.
+    .. only:: developer
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_str_idx
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_noidx
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_idx
+
+    Parameters
+    -----------
+    axis :  :obj:`int`, :obj:`str`, default: None
+            Axis along which the operation acts
+            0/None - row-wise operation
+            1      - column-wise operation
+            *unsupported*
+    skipna:  :obj:`bool`, default: True
+            exclude NA/null values
+            *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series.index` or nan
+            returns: Label of the minimum value.
+    """
+
+    _func_name = 'Method idxmax().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
+                                                                                             self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean, bool)):
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    if not isinstance(self.index, types.NoneType):
+        def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True):
+
+            result = numpy.argmax(self._data)
+            return self._index[int(result)]
+
+        return hpat_pandas_series_idxmax_impl
+
+    def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True):
+
+        return numpy.argmax(self._data)
+
+    return hpat_pandas_series_idxmax_impl
+
+
 @overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
