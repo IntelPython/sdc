@@ -490,6 +490,31 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['a', 'b', 'c'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[2, 3, 5])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_np_call_on_series1(self):
         def test_impl(A):
             return np.min(A)
@@ -996,6 +1021,27 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_fillna_index_str(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=['a', 'b', 'c', 'd'])
+        pd.testing.assert_series_equal(hpat_func(S),
+                                       test_impl(S), check_names=False)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_fillna_index_int(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=[2, 3, 4, 5])
+        pd.testing.assert_series_equal(hpat_func(S),
+                                       test_impl(S), check_names=False)
+
     def test_series_dropna_float1(self):
         def test_impl(A):
             return A.dropna().values
@@ -1044,6 +1090,28 @@ class TestSeries(unittest.TestCase):
         S1 = pd.Series(['aa', 'b', None, 'ccc'])
         S2 = S1.copy()
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_dropna_index_str(self):
+        def test_impl(S):
+            return S.dropna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=['a', 'b', 'c', 'd'])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_dropna_index_int(self):
+        def test_impl(S):
+            return S.dropna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=[1, 2, 5, 7])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
     @unittest.skip('numba.errors.TypingError - fix needed\n'
                    'Failed in hpat mode pipeline'
@@ -1625,6 +1693,25 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nlargest_index_str(self):
+        def test_impl(S):
+            return S.nlargest(4)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([73, 21, 10005, 5, 1], index=['a', 'b', 'c', 'd', 'e'])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nlargest_index_int(self):
+        def test_impl(S):
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([73, 21, 10005, 5, 1], index=[2, 3, 4, 5, 6])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
     def test_series_nsmallest1(self):
         def test_impl(S):
             return S.nsmallest(4)
@@ -1664,6 +1751,25 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nsmallest_index_str(self):
+        def test_impl(S):
+            return S.nsmallest(3)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([41, 32, 33, 4, 5], index=['a', 'b', 'c', 'd', 'e'])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nsmallest_index_int(self):
+        def test_impl(S):
+            return S.nsmallest(3)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([41, 32, 33, 4, 5], index=[1, 2, 3, 4, 5])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
 
     def test_series_head1(self):
         def test_impl(S):
@@ -1939,6 +2045,25 @@ class TestSeries(unittest.TestCase):
             cfunc(series, freq=None, axis=1)
         msg = 'Method shift(). Unsupported parameters. Given axis != 0'
         self.assertIn(msg, str(raises.exception))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_shift_index_str(self):
+        def test_impl(S):
+            return S.shift()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.], index=['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_shift_index_int(self):
+        def test_impl(S):
+            return S.shift()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.], index=[1, 2, 3, 4, 5, 6, 7])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_index1(self):
         def test_impl():
