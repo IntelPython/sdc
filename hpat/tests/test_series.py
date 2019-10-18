@@ -1823,7 +1823,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([8, 6, 34, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Enable after fixing index")
     def test_series_idxmin_int(self):
         def test_impl(S):
             return S.idxmin()
@@ -1852,7 +1851,6 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    @unittest.skip("Need index fix")
     def test_series_idxmin_idx(self):
         def test_impl(S):
             return S.idxmin()
@@ -1862,17 +1860,19 @@ class TestSeries(unittest.TestCase):
         data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
                      [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
                      [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
-                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
                      [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
                      ]
 
         for input_data in data_test:
             for index_data in data_test:
                 S = pd.Series(input_data, index_data)
-
                 result_ref = test_impl(S)
                 result = hpat_func(S)
-                self.assertEqual(result, result_ref)
+                if np.isnan(result):
+                    self.assertEqual(np.isnan(result), np.isnan(result_ref))
+                else:
+                    self.assertEqual(result, result_ref)
 
     def test_series_idxmax1(self):
         def test_impl(A):
