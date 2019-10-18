@@ -411,6 +411,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
+    # PR135. This needs to be commented out
+    def resolve_T(self, ary):
+        return series_to_array_type(ary, True)
+
 # PR135. This needs to be commented out
     # def resolve_shape(self, ary):
     #     return types.Tuple((types.int64,))
@@ -448,7 +452,7 @@ class SeriesAttribute(AttributeTemplate):
         dtype, = args
         if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
                 or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
-            ret_type = SeriesType(string_type)
+            ret_type = SeriesType(string_type, index=ary.index)
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_astype.__wrapped__

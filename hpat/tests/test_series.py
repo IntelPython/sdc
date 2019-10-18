@@ -194,6 +194,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         for S, expected in [
             (pd.Series(), 0),
+            (pd.Series([]), 0),
             (pd.Series(np.arange(n)), n),
             (pd.Series([np.nan, 1, 2]), 3),
             (pd.Series(['1', '2', '3']), 3),
@@ -256,6 +257,26 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_getattr_ndim(self):
+        '''Verifies getting Series attribute ndim is supported'''
+        def test_impl(S):
+            return S.ndim
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_getattr_T(self):
+        '''Verifies getting Series attribute T is supported'''
+        def test_impl(S):
+            return S.T
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_series_copy_str1(self):
         def test_impl(A):
             return A.copy()
@@ -310,6 +331,32 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_to_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[1, 2, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
     def test_series_astype_dt_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
@@ -334,9 +381,7 @@ class TestSeries(unittest.TestCase):
            converts float series to series of strings
         '''
         def test_impl(A):
-            res = A.astype(str)
-            print(res)
-            return res
+            return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11.0
@@ -1941,7 +1986,6 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
     def test_series_take_index_int_unboxing(self):
         def pyfunc(series, indices):
             return series.take(indices)
