@@ -194,6 +194,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         for S, expected in [
             (pd.Series(), 0),
+            (pd.Series([]), 0),
             (pd.Series(np.arange(n)), n),
             (pd.Series([np.nan, 1, 2]), 3),
             (pd.Series(['1', '2', '3']), 3),
@@ -308,6 +309,32 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[1, 2, 3])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
@@ -1864,7 +1891,6 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
     def test_series_take_index_int_unboxing(self):
         def pyfunc(series, indices):
             return series.take(indices)

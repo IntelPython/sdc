@@ -448,7 +448,7 @@ class SeriesAttribute(AttributeTemplate):
         dtype, = args
         if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
                 or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
-            ret_type = SeriesType(string_type)
+            ret_type = SeriesType(string_type, index=ary.index)
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_astype.__wrapped__
