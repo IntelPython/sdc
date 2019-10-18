@@ -285,6 +285,39 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    def test_series_copy_int1(self):
+        def test_impl(A):
+            return A.copy()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1, 2, 3])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_copy_deep(self):
+        def test_impl(A, deep):
+            return A.copy(deep=deep)
+        hpat_func = hpat.jit(test_impl)
+
+        for S in [
+            pd.Series([1, 2]),
+            pd.Series([1, 2], index=["a", "b"]),
+        ]:
+            with self.subTest(S=S):
+                for deep in (True, False):
+                    with self.subTest(deep=deep):
+                        actual   = hpat_func(S, deep)
+                        expected = test_impl(S, deep)
+
+                        pd.testing.assert_series_equal(actual, expected)
+
+                        self.assertEqual(actual.values is S.values, expected.values is S.values)
+                        self.assertEqual(actual.values is S.values, not deep)
+
+                        # Shallow copy of index is not supported yet
+                        if deep:
+                            self.assertEqual(actual.index is S.index, expected.index is S.index)
+                            self.assertEqual(actual.index is S.index, not deep)
+
     def test_series_astype_int_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            converts integer series to series of strings

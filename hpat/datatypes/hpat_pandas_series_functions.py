@@ -428,6 +428,53 @@ def hpat_pandas_series_append(self, to_append):
     return hpat_pandas_series_append_impl
 
 
+@overload_method(SeriesType, 'copy')
+def hpat_pandas_series_copy(self, deep=True):
+    """
+    Pandas Series method :meth:`pandas.Series.copy` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_str1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_int1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_deep
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    deep: :obj:`bool`, default :obj:`True`
+        Make a deep copy, including a copy of the data and the indices.
+        With deep=False neither the indices nor the data are copied.
+        [HPAT limitations]:
+            - deep=False: shallow copy of index is not supported
+
+    Returns
+    -------
+    :obj:`pandas.Series` or :obj:`pandas.DataFrame`
+        Object type matches caller.
+    """
+    _func_name = 'Method Series.copy().'
+
+    if (isinstance(self, SeriesType) and
+        (isinstance(deep, (types.Omitted, types.Boolean)) or deep == True)
+    ):
+        if isinstance(self.index, types.NoneType):
+            def hpat_pandas_series_copy_impl(self, deep=True):
+                if deep:
+                    return pandas.Series(self._data.copy())
+                else:
+                    return pandas.Series(self._data)
+            return hpat_pandas_series_copy_impl
+        else:
+            def hpat_pandas_series_copy_impl(self, deep=True):
+                if deep:
+                    return pandas.Series(self._data.copy(), index=self._index.copy())
+                else:
+                    return pandas.Series(self._data, index=self._index.copy())
+            return hpat_pandas_series_copy_impl
+
+
 @overload_method(SeriesType, 'groupby')
 def hpat_pandas_series_groupby(
         self,
