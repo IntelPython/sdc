@@ -1951,73 +1951,68 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Need index fix")
-    def test_series_head(self):
-        def test_series_head_impl(S):
+    def test_series_head_noidx(self):
+        def test_impl(S):
             return S.head()
 
-        def test_series_head_param1_impl(S, n):
+        def test_impl_param(S, n):
             return S.head(n)
 
-        hpat_func = hpat.jit(test_series_head_impl)
+        hpat_func = hpat.jit(test_impl)
 
-        the_same_string = "the same string"
-        test_input_data = []
-        data_simple = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
-                       [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-                       [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-                       ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd', 'cc'],
-                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd'],
-                       []
-                       ]
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     ['as', 'b', 'abb', 'sss', 'ytr65', '', 'qw', 'a', 'b'],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
 
-        data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-                      [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-                      [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
-                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
-                      [np.nan, np.nan, np.nan],
-                      [np.nan, np.nan, np.inf],
-                      ]
-
-        if hpat.config.config_pipeline_hpat_default:
-
-            test_input_data = data_simple
-        else:
-            test_input_data = data_simple + data_extra
-
-        for input_data in test_input_data:
+        for input_data in data_test:
             S = pd.Series(input_data)
 
-            result_ref = test_series_head_impl(S)
+            result_ref = test_impl(S)
             result = hpat_func(S)
             pd.testing.assert_series_equal(result, result_ref)
 
-            if not hpat.config.config_pipeline_hpat_default:
+            hpat_func_param1 = hpat.jit(test_impl_param)
 
-                hpat_func_param1 = hpat.jit(test_series_head_param1_impl)
+            for param1 in [0, 3, 10]:
+                result_param1_ref = test_impl_param(S, param1)
+                result_param1 = hpat_func_param1(S, param1)
+                pd.testing.assert_series_equal(result_param1, result_param1_ref)
 
-                for param1 in [0, 3, 10]:
-                    result_param1_ref = test_series_head_param1_impl(S, param1)
-                    result_param1 = hpat_func_param1(S, param1)
-                    pd.testing.assert_series_equal(result_param1, result_param1_ref)
+    def test_series_head_idx(self):
+        def test_impl(S):
+            return S.head()
 
-        for input_data in data_simple:
-            for index_data in data_simple:
+        def test_impl_param(S, n):
+            return S.head(n)
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     ['as', 'b', 'abb', 'sss', 'ytr65', '', 'qw', 'a', 'b'],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
                 S = pd.Series(input_data, index_data)
 
-                result_ref = test_series_head_impl(S)
+                result_ref = test_impl(S)
                 result = hpat_func(S)
                 pd.testing.assert_series_equal(result, result_ref)
 
-                if not hpat.config.config_pipeline_hpat_default:
+                hpat_func_param1 = hpat.jit(test_impl_param)
 
-                    hpat_func_param1 = hpat.jit(test_series_head_param1_impl)
-
-                    for param1 in [0, 3, 10]:
-                        result_param1_ref = test_series_head_param1_impl(S, param1)
-                        result_param1 = hpat_func_param1(S, param1)
-                        pd.testing.assert_series_equal(result_param1, result_param1_ref)
+                for param1 in [0, 3, 10]:
+                    result_param1_ref = test_impl_param(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    pd.testing.assert_series_equal(result_param1, result_param1_ref)
 
     @unittest.skip("Passed if run single")
     def test_series_head_parallel1(self):
