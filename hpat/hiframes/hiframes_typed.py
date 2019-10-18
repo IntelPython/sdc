@@ -972,7 +972,7 @@ class HiFramesTyped(object):
             return self._replace_func(
                 func, (data, index, n_arg, name), pre_nodes=nodes)
 
-        if func_name in ('cov', 'corr'):
+        if func_name in ('corr'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
@@ -1513,9 +1513,9 @@ class HiFramesTyped(object):
                 other = self._get_series_data(rhs.args[0], nodes)
             else:
                 other = data
-            if func_name == 'cov':
-                def f(a, b, w, c):
-                    return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_cov(a, b, w, c))
+            # if func_name == 'cov':
+            #     def f(a, b, w, c):
+            #         return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_cov(a, b, w, c))
             if func_name == 'corr':
                 def f(a, b, w, c):
                     return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_corr(a, b, w, c))

@@ -186,14 +186,22 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_attr1(self):
-        def test_impl(A):
-            return A.size
+    def test_series_size(self):
+        def test_impl(S):
+            return S.size
         hpat_func = hpat.jit(test_impl)
 
         n = 11
-        df = pd.DataFrame({'A': np.arange(n)})
-        self.assertEqual(hpat_func(df.A), test_impl(df.A))
+        for S, expected in [
+            (pd.Series(), 0),
+            (pd.Series([]), 0),
+            (pd.Series(np.arange(n)), n),
+            (pd.Series([np.nan, 1, 2]), 3),
+            (pd.Series(['1', '2', '3']), 3),
+        ]:
+            with self.subTest(S=S, expected=expected):
+                self.assertEqual(hpat_func(S), expected)
+                self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_attr2(self):
         def test_impl(A):
@@ -249,6 +257,26 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_getattr_ndim(self):
+        '''Verifies getting Series attribute ndim is supported'''
+        def test_impl(S):
+            return S.ndim
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_getattr_T(self):
+        '''Verifies getting Series attribute T is supported'''
+        def test_impl(S):
+            return S.T
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_series_copy_str1(self):
         def test_impl(A):
             return A.copy()
@@ -303,6 +331,32 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_to_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[1, 2, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
     def test_series_astype_dt_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
@@ -327,9 +381,7 @@ class TestSeries(unittest.TestCase):
            converts float series to series of strings
         '''
         def test_impl(A):
-            res = A.astype(str)
-            print(res)
-            return res
+            return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11.0
@@ -642,7 +694,7 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @unittest.skipIf(platform.system() == 'Windows', 
+    @unittest.skipIf(platform.system() == 'Windows',
                      'Series values are different (20.0 %)'
                      '[left]:  [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, 3486784401, 10000000000]'
                      '[right]: [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, -808182895, 1410065408]')
@@ -1857,7 +1909,6 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
     def test_series_take_index_int_unboxing(self):
         def pyfunc(series, indices):
             return series.take(indices)
@@ -2099,14 +2150,61 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
-    def test_series_cov(self):
-        def test_series_cov_impl(S1, S2):
+    def test_series_cov1(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        test_input_data1 = [[.2, .0, .6, .2],
+                            [.2, .0, .6, .2, .5, .6, .7, .8],
+                            [],
+                            [2, 0, 6, 2],
+                            [.2, .1, np.nan, .5, .3],
+                            [-1, np.nan, 1, np.inf]]
+        test_input_data2 = [[.3, .6, .0, .1],
+                            [.3, .6, .0, .1, .8],
+                            [],
+                            [3, 6, 0, 1],
+                            [.3, .2, .9, .6, np.nan],
+                            [np.nan, np.nan, np.inf, np.nan]]
+        for input_data1 in test_input_data1:
+            for input_data2 in test_input_data2:
+                S1 = pd.Series(input_data1)
+                S2 = pd.Series(input_data2)
+                for period in [None, 2, 1, 8, -4, 0.1]:
+                    result_ref = test_series_cov_impl(S1, S2, min_periods=period)
+                    result = hpat_func(S1, S2, min_periods=period)
+                    np.testing.assert_allclose(result, result_ref)
+
+    def test_series_cov2(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        S1 = pd.Series([.2, .0, .6, .2])
+        S2 = pd.Series(['abcdefgh', 'a','abcdefg', 'ab', 'abcdef', 'abc'])
+        with self.assertRaises(TypeError):
+            hpat_func(S1, S2, min_periods=5)
+
+    def test_series_cov3(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        S1 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        S2 = pd.Series([.3, .6, .0, .1])
+        with self.assertRaises(TypeError):
+            hpat_func(S1, S2, min_periods=5)
+
+    def test_series_cov4(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
             return S1.cov(S2)
 
         hpat_func = hpat.jit(test_series_cov_impl)
         S1 = pd.Series([.2, .0, .6, .2])
         S2 = pd.Series([.3, .6, .0, .1])
-        self.assertEqual(hpat_func(S1, S2), test_series_cov_impl(S1, S2))
+        with self.assertRaises(TypeError):
+            hpat_func(S1, S2, min_periods='aaaa')
 
 
 if __name__ == "__main__":

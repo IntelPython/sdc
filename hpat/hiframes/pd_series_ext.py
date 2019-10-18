@@ -617,9 +617,9 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = types.complex128 if is_complex_op else types.float64
         return signature(ret_typ, *args)
 
-    @bound_function("series.cov")
-    def resolve_cov(self, ary, args, kws):
-        return self._resolve_cov_func(ary, args, kws)
+    # @bound_function("series.cov")
+    # def resolve_cov(self, ary, args, kws):
+    #     return self._resolve_cov_func(ary, args, kws)
 
     @bound_function("series.corr")
     def resolve_corr(self, ary, args, kws):
@@ -988,7 +988,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
+                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique', 'resolve_cov']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

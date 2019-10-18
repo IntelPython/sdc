@@ -1576,30 +1576,34 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     _func_name = 'Method cov().'
 
-    if not isinstance((self,other), SeriesType):
+    if not (isinstance(self, SeriesType) and isinstance(other, SeriesType)):
         raise TypingError('{} The object must be a pandas.series. Given: {} and {}'.format(_func_name, self, other))
 
-    if len(self._data) != len(other):
-        AssertionError(
-            "Operands to pandas.series.corr must have same size.")
+    if not (isinstance(self.data.dtype, (types.Integer, types.Float, types.Omitted)) and isinstance(other.data.dtype, (types.Integer, types.Float))):
+        raise TypingError('Currently function supports only numeric values. Given: {} and {}'.format(_func_name, self, other))
+
+    if not (isinstance(min_periods, types.Number) or min_periods is None):
+        raise TypingError('{} Unsupported parameter. Given:'.format(_func_name, min_periods))
 
     def hpat_pandas_series_cov_impl(self, other, min_periods=None):
-        if len(self._data) == 0:
-            return numpy.nan
+
         if min_periods is None:
             min_periods = 1
-        valid = []
-        for i in range(len(self._data)):
-            if self._data[i] is None or other[i] is None:
-                valid.append(False)
-            else:
-                valid.append(True)
-        if not valid.all():
-            serie1 = self._data[valid]
-            serie2 = other[valid]
-        if len(serie1) < min_periods:
+
+        if len(self._data) == 0 or len(other._data) == 0:
             return numpy.nan
 
-        return numpy.cov(serie1, serie2)[0, 1]
+        self_arr = self._data[:min(len(self._data), len(other._data))]
+        other_arr = other._data[:min(len(self._data), len(other._data))]
+
+        invalid = numpy.isnan(self_arr) | numpy.isnan(other_arr)
+        if invalid.any():
+            self_arr = self_arr[~invalid]
+            other_arr = other_arr[~invalid]
+
+        if len(self_arr) < min_periods:
+            return numpy.nan
+
+        return numpy.cov(self_arr, other_arr)[0, 1]
 
     return hpat_pandas_series_cov_impl
