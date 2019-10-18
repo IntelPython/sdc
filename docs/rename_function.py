@@ -46,8 +46,9 @@ srcdir_srcfiles = {
 display_names = ['append', 'ne', 'iloc']
 cur_dir = os.getcwd()
 
+
 # This is the dir where all the source files will be copied
-src_copy_dir = os.path.join(cur_dir, "..", "API_Doc")
+src_copy_dir = os.path.join(cur_dir, "API_Doc")
 if not os.path.exists(src_copy_dir):
     os.mkdir(src_copy_dir)
 
@@ -55,8 +56,8 @@ if not os.path.exists(src_copy_dir):
 for dir in srcdir_srcfiles:
     file_list = srcdir_srcfiles[dir]
     for f in file_list:
-        src_file = os.path.join(cur_dir, "..", dir, f)
-        dst_file = os.path.join(cur_dir, "..", "API_Doc", f)
+        src_file = os.path.join(cur_dir, dir, f)
+        dst_file = os.path.join(cur_dir, "API_Doc", f)
         copyfile(src_file, dst_file)
         
 os.chdir(src_copy_dir)
@@ -68,7 +69,6 @@ for filename in srcfiles_srcfuncs:
     with open(filename, 'r') as fn:
         content = fn.read()
         for func in func_list:
-            print(func)
             content = content.replace(func, display_names[i])
             i += 1
     with open(filename, 'w') as fn:
