@@ -532,6 +532,7 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
+    # PR135. This needs to be commented out (for new-style impl to be called)
     @bound_function("series.dropna")
     def resolve_dropna(self, ary, args, kws):
         out = ary
@@ -994,7 +995,7 @@ for fname in ["cumsum", "cumprod"]:
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count']
+                           'resolve_prod', 'resolve_count', 'resolve_dropna']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

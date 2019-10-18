@@ -2218,3 +2218,77 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
         return numpy.median(self._data)
 
     return hpat_pandas_series_median_impl
+
+
+@overload_method(SeriesType, 'dropna')
+def hpat_pandas_series_dropna(self, axis=0, inplace=False):
+    """
+    Pandas Series method :meth:`pandas.Series.dropna` implementation.
+
+    .. only:: developer
+
+       Tests: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis2
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis3
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_index2
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index2
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index3
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_inplace_no_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_inplace_no_index2
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_inplace_no_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_inplace_no_index2
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_parallel1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_dt_no_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_bool_no_index1
+              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_int_no_index1
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int` or :obj:`string` {0 or `index`}, default 0
+        There is only one axis to drop values from.
+    inplace: :obj:`bool`, default False
+        If True, do operation inplace and return None.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object with NA entries dropped from it.
+    """
+
+    _func_name = 'Method dropna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType, types.Omitted)) or axis == 0):
+        raise TypingError('{} The axis must be an Integer or String. Given: {}'.format(_func_name, axis))
+
+    if not (inplace is False or isinstance(inplace, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
+
+    # TODO: handle inplace argument (currently supported with old-style impl only via assign.target)
+    # Find a way to assign back to self._data and return None
+    if isinstance(self.dtype, (types.Number, types.Boolean)):
+        def hpat_pandas_series_np_arrays_dropna_impl(self, axis=0, inplace=False):
+            # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
+            na_data_arr = numpy.isnan(self._data)
+            data = self._data[~na_data_arr]
+            index = self.index[~na_data_arr]
+            return pandas.Series(data, index, self._name)
+
+        return hpat_pandas_series_np_arrays_dropna_impl
+    else:
+        # For other cases (StringArrayType, dtype datetime64) use implementation based on HPAT isna overload
+        def hpat_pandas_series_default_dropna_impl(self, axis=0, inplace=False):
+            # generate Series index if needed by using SeriesType.index (i.e. not self._index)
+            na_data_arr = numpy.array([hpat.hiframes.api.isna(self._data, i) for i in numpy.arange(len(self._data))])
+            data = self._data[~na_data_arr]
+            index = self.index[~na_data_arr]
+            return pandas.Series(data, index, self._name)
+
+        return hpat_pandas_series_default_dropna_impl
