@@ -8,6 +8,9 @@ export PYTHONFAULTHANDLER=1
 
 python -m hpat.tests.gen_test_data
 
+#Link check for Documentation using Sphinx's in-built linkchecker
+#sphinx-build -b linkcheck -j1 usersource _build/html
+
 # TODO investigate root cause of NumbaPerformanceWarning
 # http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
 if [ -z "$HPAT_NUM_PES" ]; then
