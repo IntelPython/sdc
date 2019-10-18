@@ -261,6 +261,69 @@ def hpat_pandas_series_size(self):
     return hpat_pandas_series_size_impl
 
 
+@overload_attribute(SeriesType, 'ndim')
+def hpat_pandas_series_ndim(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.ndim` implementation
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_ndim
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :obj:`int`
+           Number of dimensions of the underlying data, by definition 1
+    """
+
+    _func_name = 'Attribute ndim.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_ndim_impl(self):
+        return 1
+
+    return hpat_pandas_series_ndim_impl
+
+
+@overload_attribute(SeriesType, 'T')
+def hpat_pandas_series_T(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.T` implementation
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_T
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :obj:`numpy.ndarray`
+         An array representing the underlying data
+    """
+
+    _func_name = 'Attribute T.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_T_impl(self):
+        return self._data
+
+    return hpat_pandas_series_T_impl
+
+
+
 @overload(len)
 def hpat_pandas_series_len(self):
     """

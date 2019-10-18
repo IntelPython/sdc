@@ -411,6 +411,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
+    # PR135. This needs to be commented out
+    def resolve_T(self, ary):
+        return series_to_array_type(ary, True)
+
 # PR135. This needs to be commented out
     # def resolve_shape(self, ary):
     #     return types.Tuple((types.int64,))
