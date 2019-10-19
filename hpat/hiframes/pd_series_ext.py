@@ -460,18 +460,18 @@ class SeriesAttribute(AttributeTemplate):
             sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
-    @bound_function("array.copy")
-    def resolve_copy(self, ary, args, kws):
-        # TODO: copy other types like list(str)
-        dtype = ary.dtype
-        if dtype == string_type:
-            ret_type = SeriesType(string_type)
-            sig = signature(ret_type, *args)
-        else:
-            resolver = ArrayAttribute.resolve_copy.__wrapped__
-            sig = resolver(self, ary.data, args, kws)
-            sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.copy")
+    # def resolve_copy(self, ary, args, kws):
+    #     # TODO: copy other types like list(str)
+    #     dtype = ary.dtype
+    #     if dtype == string_type:
+    #         ret_type = SeriesType(string_type)
+    #         sig = signature(ret_type, *args)
+    #     else:
+    #         resolver = ArrayAttribute.resolve_copy.__wrapped__
+    #         sig = resolver(self, ary.data, args, kws)
+    #         sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
     @bound_function("series.rolling")
     def resolve_rolling(self, ary, args, kws):
@@ -992,7 +992,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_shift', 'resolve_sum',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
