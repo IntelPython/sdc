@@ -8,7 +8,9 @@ import hpat
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
+from numba import types
 from numba.config import IS_32BITS
+from numba.errors import TypingError
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -33,6 +35,31 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
         [complex(-4.5, 1.0), complex(3.0, 1.0)],
     ),
 ]]
+
+test_global_input_data_float64 = [
+    [1.0, np.nan, -1.0, 0.0, 5e-324],
+    [np.nan, np.inf, np.NINF, np.NZERO]
+]
+
+min_int64 = -9223372036854775808
+max_int64 = 9223372036854775807
+max_uint64 = 18446744073709551615
+
+test_global_input_data_integer64 = [
+    [1, -1, 0, max_uint64],
+    [-0, min_int64, max_int64]
+]
+
+test_global_input_data_numeric = test_global_input_data_integer64 + test_global_input_data_float64
+
+test_global_input_data_unicode_kind4 = [
+    'ascii',
+    '12345',
+    '1234567890',
+    '¡Y tú quién te crees?',
+    '🐍⚡',
+    '大处着眼，小处着手。',
+]
 
 
 def _make_func_from_text(func_text, func_name='test_impl'):
@@ -1967,13 +1994,75 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    def test_series_shift_default1(self):
-        def test_impl(S):
-            return S.shift()
-        hpat_func = hpat.jit(test_impl)
+    def test_series_shift(self):
+        def pyfunc():
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
+            return series.shift()
 
-        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        cfunc = hpat.jit(pyfunc)
+        pd.testing.assert_series_equal(cfunc(), pyfunc())
+
+    def test_series_shift_unboxing(self):
+        def pyfunc(series):
+            return series.shift()
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_float64:
+            series = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(series), pyfunc(series))
+
+    def test_series_shift_full(self):
+        def pyfunc(series, periods, freq, axis, fill_value):
+            return series.shift(periods=periods, freq=freq, axis=axis, fill_value=fill_value)
+
+        cfunc = hpat.jit(pyfunc)
+        freq = None
+        axis = 0
+        for data in test_global_input_data_float64:
+            series = pd.Series(data)
+            for periods in [-2, 0, 3]:
+                for fill_value in [9.1, np.nan, -3.3, None]:
+                    jit_result = cfunc(series, periods, freq, axis, fill_value)
+                    ref_result = pyfunc(series, periods, freq, axis, fill_value)
+                    pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_shift_str(self):
+        def pyfunc(series):
+            return series.shift()
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method shift(). The object must be a number. Given self.data.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_shift_fill_str(self):
+        def pyfunc(series, fill_value):
+            return series.shift(fill_value=fill_value)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, fill_value='unicode')
+        msg = 'Method shift(). The object must be a number. Given fill_value: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_shift_unsupported_params(self):
+        def pyfunc(series, freq, axis):
+            return series.shift(freq=freq, axis=axis)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, freq='12H', axis=0)
+        msg = 'Method shift(). Unsupported parameters. Given freq: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, freq=None, axis=1)
+        msg = 'Method shift(). Unsupported parameters. Given axis != 0'
+        self.assertIn(msg, str(raises.exception))
 
     @unittest.skip('Unsupported functionality: failed to handle index')
     def test_series_shift_index_str(self):
