@@ -356,22 +356,13 @@ class HiFramesTyped(object):
             if rhs.attr in hpat.hiframes.pd_timestamp_ext.timedelta_fields:
                 return self._run_Timedelta_field(assign, assign.target, rhs)
 
-        if isinstance(rhs_type, SeriesType) and rhs.attr in ('size', 'shape'):
+        if isinstance(rhs_type, SeriesType) and rhs.attr == 'size':
             # simply return the column
             nodes = []
             var = self._get_series_data(rhs.value, nodes)
             rhs.value = var
             nodes.append(assign)
             return nodes
-
-        # TODO: test ndim and T
-        if isinstance(rhs_type, SeriesType) and rhs.attr == 'ndim':
-            rhs.value = ir.Const(1, rhs.loc)
-            return [assign]
-
-        if isinstance(rhs_type, SeriesType) and rhs.attr == 'T':
-            rhs = rhs.value
-            return [assign]
 
         return [assign]
 
@@ -865,7 +856,7 @@ class HiFramesTyped(object):
             data = self._get_series_data(series_var, nodes)
             return self._replace_func(func, [data], pre_nodes=nodes)
 
-        if func_name in ('std', 'nunique', 'describe', 'isna',
+        if func_name in ('std', 'nunique', 'describe',
                          'isnull', 'median', 'idxmin', 'idxmax', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
@@ -915,7 +906,7 @@ class HiFramesTyped(object):
                     data, index, name),
                 [data, index, name], pre_nodes=nodes)
 
-        if func_name in ('shift', 'pct_change'):
+        if func_name == 'pct_change':
             nodes = []
             data = self._get_series_data(series_var, nodes)
             # TODO: support default period argument
@@ -1052,7 +1043,7 @@ class HiFramesTyped(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'astype')
+        _conv_to_np_funcs = ('cumsum', 'cumprod', 'astype')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):
