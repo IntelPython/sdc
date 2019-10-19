@@ -354,6 +354,79 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
+@overload_method(SeriesType, 'shift')
+def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None):
+    """
+    Pandas Series method :meth:`pandas.Series.shift` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_full
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_fill_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unsupported_params
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    periods: :obj:`int`
+        Number of periods to shift. Can be positive or negative.
+    freq: :obj:`DateOffset`, :obj:`tseries.offsets`, :obj:`timedelta`, :obj:`str`
+        Offset to use from the tseries module or time rule (e.g. ‘EOM’).
+        *unsupported*
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
+        *unsupported*
+    fill_value : :obj:`int`, :obj:`float`
+        The scalar value to use for newly introduced missing values.
+
+    Returns
+    -------
+    :obj:`scalar`
+         returns :obj:`series` object
+    """
+
+    _func_name = 'Method shift().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    if not isinstance(fill_value, (types.Omitted, types.Number, types.NoneType)) and fill_value is not None:
+        raise TypingError('{} The object must be a number. Given fill_value: {}'.format(_func_name, fill_value))
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)) and freq is not None:
+        raise TypingError('{} Unsupported parameters. Given freq: {}'.format(_func_name, freq))
+
+    if not isinstance(axis, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    def hpat_pandas_series_shift_impl(self, periods=1, freq=None, axis=0, fill_value=None):
+        if axis != 0:
+            raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
+
+        arr = numpy.empty_like(self._data)
+        if periods > 0:
+            arr[:periods] = fill_value or numpy.nan
+            arr[periods:] = self._data[:-periods]
+        elif periods < 0:
+            arr[periods:] = fill_value or numpy.nan
+            arr[:periods] = self._data[-periods:]
+        else:
+            arr[:] = self._data
+
+        return pandas.Series(arr)
+
+    return hpat_pandas_series_shift_impl
+
+
 @overload_method(SeriesType, 'isin')
 def hpat_pandas_series_isin(self, values):
     """
@@ -548,6 +621,58 @@ def hpat_pandas_series_groupby(
         return pandas.core.groupby.SeriesGroupBy(self)
 
     return hpat_pandas_series_groupby_impl
+
+
+@overload_method(SeriesType, 'isna')
+def hpat_pandas_series_isna(self):
+    """
+    Pandas Series method :meth:`pandas.Series.isna` implementation.
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+               input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method isna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if isinstance(self.dtype, (types.Integer, types.Float)):
+
+        def hpat_pandas_series_isna_impl(self):
+
+            return pandas.Series(numpy.isnan(self._data))
+
+        return hpat_pandas_series_isna_impl
+
+    if isinstance(self.dtype, types.UnicodeType):
+
+        def hpat_pandas_series_isna_impl(self):
+            result = numpy.empty(len(self._data), numpy.bool_)
+            byte_size = 8
+            # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
+            for i in range(len(self._data)):
+                bmap_idx = i // byte_size
+                bit_idx = i % byte_size
+                bmap = self._data.null_bitmap[bmap_idx]
+                bit_value = (bmap >> bit_idx) & 1
+                result[i] = bit_value == 0
+            return pandas.Series(result)
+
+        return hpat_pandas_series_isna_impl
 
 
 @overload_method(SeriesType, 'ne')
