@@ -1245,6 +1245,71 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
 
 
+@overload_method(SeriesType, 'prod')
+def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
+    """
+    Pandas Series method :meth:`pandas.Series.prod` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_prod
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: {index (0)}
+        Axis for the function to be applied on.
+        *unsupported*
+    skipna: :obj:`bool`, default :obj:`True`
+        Exclude nan values when computing the result
+    level: :obj:`int`, :obj:`str`, default :obj:`None`
+        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
+        *unsupported*
+    numeric_only: :obj:`bool`, default :obj:`None`
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data.
+        Not implemented for Series.
+        *unsupported*
+    min_count: :obj:`int`, default 0
+        The required number of valid values to perform the operation.
+        If fewer than min_count non-NA values are present the result will be NA.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+        Returns scalar or Series (if level specified)
+    """
+
+    _func_name = 'Method prod().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, (types.Integer, types.Float)):
+        raise TypingError('{} Non numeric values unsupported. Given: {}'.format(_func_name, self.data.data.dtype))
+
+    if not (isinstance(skipna, (types.Omitted, types.Boolean)) or skipna is True):
+        raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None) \
+            or not (isinstance(min_count, types.Omitted) or min_count == 0):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}, min_count: {}'.format(
+                _func_name, axis, level, numeric_only, min_count))
+
+    def hpat_pandas_series_prod_impl(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
+        if skipna:
+            return numpy.nanprod(self._data)
+        else:
+            return numpy.prod(self._data)
+
+    return hpat_pandas_series_prod_impl
+
+
 @overload_method(SeriesType, 'quantile')
 def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
@@ -1630,6 +1695,70 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_ge_impl
 
     raise TypingError('{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(_func_name, self, other))
+
+
+@overload_method(SeriesType, 'idxmin')
+def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
+    """
+    Pandas Series method :meth:`pandas.Series.idxmin` implementation.
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str_idx
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_no
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_int
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_noidx
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_idx
+
+    Parameters
+    -----------
+    axis :  :obj:`int`, :obj:`str`, default: None
+            Axis along which the operation acts
+            0/None - row-wise operation
+            1      - column-wise operation
+            *unsupported*
+    skipna:  :obj:`bool`, default: True
+            exclude NA/null values
+            *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series.index` or nan
+            returns: Label of the minimum value.
+    """
+
+    _func_name = 'Method idxmin().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
+
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
+        raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None):
+        raise TypingError("{} 'axis' unsupported. Given: {}".format(_func_name, axis))
+
+    if not (isinstance(skipna, types.Omitted) or skipna is True):
+        raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
+
+    if isinstance(self.index, types.NoneType) or self.index is None:
+        def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
+
+            return numpy.argmin(self._data)
+
+        return hpat_pandas_series_idxmin_impl
+    else:
+        def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True):
+            # no numpy.nanargmin is supported by Numba at this time
+            result = numpy.argmin(self._data)
+            return self._index[int(result)]
+
+        return hpat_pandas_series_idxmin_index_impl
 
 
 @overload_method(SeriesType, 'lt')

@@ -695,10 +695,10 @@ class SeriesAttribute(AttributeTemplate):
         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
         return signature(dtype, *args)
 
-    @bound_function("series.idxmin")
-    def resolve_idxmin(self, ary, args, kws):
-        assert not kws
-        return signature(types.intp, *args)
+    # @bound_function("series.idxmin")
+    # def resolve_idxmin(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(types.intp, *args)
 
     @bound_function("series.idxmax")
     def resolve_idxmax(self, ary, args, kws):
@@ -993,7 +993,8 @@ for fname in ["cumsum", "cumprod"]:
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
-                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
+                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
+                           'resolve_prod']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
