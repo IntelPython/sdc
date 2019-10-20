@@ -1352,30 +1352,30 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
-                                                                                             self.data.dtype))
+        raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean, bool)):
-        raise TypingError(
-            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
+        raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
 
     if not (isinstance(axis, types.Omitted) or axis is None):
-        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+        raise TypingError("{} 'axis' unsupported. Given: {}".format(_func_name, axis))
 
-    if not isinstance(self.index, types.NoneType):
+    if not (isinstance(skipna, types.Omitted) or skipna is True):
+        raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
+
+    if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
 
+            return numpy.argmin(self._data)
+
+        return hpat_pandas_series_idxmin_impl
+    else:
+        def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True):
+            # no numpy.nanargmin is supported by Numba at this time
             result = numpy.argmin(self._data)
             return self._index[int(result)]
 
-        return hpat_pandas_series_idxmin_impl
-
-    def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
-
-        return numpy.argmin(self._data)
-
-    return hpat_pandas_series_idxmin_impl
+        return hpat_pandas_series_idxmin_index_impl
 
 
 @overload_method(SeriesType, 'lt')

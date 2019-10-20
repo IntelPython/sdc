@@ -1286,4 +1286,3 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     return hpat_pandas_series_ctor_impl
 
 from hpat.datatypes.hpat_pandas_series_functions import *
-
