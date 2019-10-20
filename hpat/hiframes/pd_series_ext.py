@@ -992,7 +992,7 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_shift', 'resolve_sum', 'resolve_copy',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
