@@ -2170,7 +2170,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enable after fixing distributed for get_series_index")
     def test_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
@@ -2302,7 +2301,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Implement indexing by RangeIndex for Series")
     def test_series_default_index(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])

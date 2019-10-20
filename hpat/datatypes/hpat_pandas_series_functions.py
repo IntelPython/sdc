@@ -224,10 +224,16 @@ def hpat_pandas_series_index(self):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    def hpat_pandas_series_index_impl(self):
-        return self._index
+    if isinstance(self.index, types.NoneType) or self.index is None:
+        def hpat_pandas_series_index_none_impl(self):
+            return numpy.arange(len(self._data))
 
-    return hpat_pandas_series_index_impl
+        return hpat_pandas_series_index_none_impl
+    else:
+        def hpat_pandas_series_index_impl(self):
+            return self._index
+
+        return hpat_pandas_series_index_impl
 
 
 @overload_attribute(SeriesType, 'size')
