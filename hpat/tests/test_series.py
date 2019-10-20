@@ -1201,17 +1201,41 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_series_prod1(self):
+    def test_series_prod(self):
+        def test_impl(S, skipna):
+            return S.prod(skipna=skipna)
+        hpat_func = hpat.jit(test_impl)
+
+        data_samples = [
+            [6, 6, 2, 1, 3, 3, 2, 1, 2],
+            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+            [np.nan, np.nan, np.nan],
+            [np.nan, np.nan, np.inf],
+        ]
+
+        for data in data_samples:
+            S = pd.Series(data)
+
+            for skipna_var in [True, False]:
+                actual = hpat_func(S, skipna=skipna_var)
+                expected = test_impl(S, skipna=skipna_var)
+
+                if np.isnan(actual) or np.isnan(expected):
+                    # con not compare Nan != Nan directly
+                    self.assertEqual(np.isnan(actual), np.isnan(expected))
+                else:
+                    self.assertEqual(actual, expected)
+
+    def test_series_prod_skipna_default(self):
         def test_impl(S):
             return S.prod()
         hpat_func = hpat.jit(test_impl)
 
-        # column with NA
-        S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
-
-        # all NA case should produce 1
-        S = pd.Series([np.nan, np.nan])
+        S = pd.Series([np.nan, 2, 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_count1(self):
