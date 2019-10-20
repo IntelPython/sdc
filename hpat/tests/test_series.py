@@ -8,7 +8,9 @@ import hpat
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
+from numba import types
 from numba.config import IS_32BITS
+from numba.errors import TypingError
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -33,6 +35,31 @@ _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
         [complex(-4.5, 1.0), complex(3.0, 1.0)],
     ),
 ]]
+
+test_global_input_data_float64 = [
+    [1.0, np.nan, -1.0, 0.0, 5e-324],
+    [np.nan, np.inf, np.NINF, np.NZERO]
+]
+
+min_int64 = -9223372036854775808
+max_int64 = 9223372036854775807
+max_uint64 = 18446744073709551615
+
+test_global_input_data_integer64 = [
+    [1, -1, 0, max_uint64],
+    [-0, min_int64, max_int64]
+]
+
+test_global_input_data_numeric = test_global_input_data_integer64 + test_global_input_data_float64
+
+test_global_input_data_unicode_kind4 = [
+    'ascii',
+    '12345',
+    '1234567890',
+    '¡Y tú quién te crees?',
+    '🐍⚡',
+    '大处着眼，小处着手。',
+]
 
 
 def _make_func_from_text(func_text, func_name='test_impl'):
@@ -86,10 +113,10 @@ class TestSeries(unittest.TestCase):
     def test_create_series1(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
-            return A.values
+            return A
         hpat_func = hpat.jit(test_impl)
 
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_create_series_index1(self):
         # create and box an indexed Series
@@ -194,6 +221,7 @@ class TestSeries(unittest.TestCase):
         n = 11
         for S, expected in [
             (pd.Series(), 0),
+            (pd.Series([]), 0),
             (pd.Series(np.arange(n)), n),
             (pd.Series([np.nan, 1, 2]), 3),
             (pd.Series(['1', '2', '3']), 3),
@@ -256,13 +284,66 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_getattr_ndim(self):
+        '''Verifies getting Series attribute ndim is supported'''
+        def test_impl(S):
+            return S.ndim
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_getattr_T(self):
+        '''Verifies getting Series attribute T is supported'''
+        def test_impl(S):
+            return S.T
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
     def test_series_copy_str1(self):
         def test_impl(A):
             return A.copy()
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series(['aa', 'bb', 'cc'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_copy_int1(self):
+        def test_impl(A):
+            return A.copy()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1, 2, 3])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_copy_deep(self):
+        def test_impl(A, deep):
+            return A.copy(deep=deep)
+        hpat_func = hpat.jit(test_impl)
+
+        for S in [
+            pd.Series([1, 2]),
+            pd.Series([1, 2], index=["a", "b"]),
+        ]:
+            with self.subTest(S=S):
+                for deep in (True, False):
+                    with self.subTest(deep=deep):
+                        actual   = hpat_func(S, deep)
+                        expected = test_impl(S, deep)
+
+                        pd.testing.assert_series_equal(actual, expected)
+
+                        self.assertEqual(actual.values is S.values, expected.values is S.values)
+                        self.assertEqual(actual.values is S.values, not deep)
+
+                        # Shallow copy of index is not supported yet
+                        if deep:
+                            self.assertEqual(actual.index is S.index, expected.index is S.index)
+                            self.assertEqual(actual.index is S.index, not deep)
 
     def test_series_astype_int_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
@@ -310,6 +391,32 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_to_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_to_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[1, 2, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
     def test_series_astype_dt_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
@@ -334,9 +441,7 @@ class TestSeries(unittest.TestCase):
            converts float series to series of strings
         '''
         def test_impl(A):
-            res = A.astype(str)
-            print(res)
-            return res
+            return A.astype(str)
         hpat_func = hpat.jit(test_impl)
 
         n = 11.0
@@ -418,6 +523,31 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_astype_str_index_str(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=['a', 'b', 'c'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_str_index_int(self):
+        '''Verifies Series.astype implementation with function 'str' as argument
+           handles string series not changing it
+        '''
+
+        def test_impl(S):
+            return S.astype(str)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[2, 3, 5])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_np_call_on_series1(self):
         def test_impl(A):
             return np.min(A)
@@ -485,7 +615,7 @@ class TestSeries(unittest.TestCase):
         A2 = df.A
         hpat_func(A1, 0)
         test_impl(A2, 0)
-        np.testing.assert_array_equal(A1.values, A2.values)
+        pd.testing.assert_series_equal(A1, A2)
 
     @unittest.skip("enable after remove dead in hiframes is removed")
     def test_setitem_series3(self):
@@ -513,7 +643,7 @@ class TestSeries(unittest.TestCase):
         A2 = df.A
         hpat_func(A1)
         test_impl(A2)
-        np.testing.assert_array_equal(A1.values, A2.values)
+        pd.testing.assert_series_equal(A1, A2)
 
     def test_setitem_series_bool2(self):
         def test_impl(A, B):
@@ -526,7 +656,7 @@ class TestSeries(unittest.TestCase):
         A2 = df.A
         hpat_func(A1, df.B)
         test_impl(A2, df.B)
-        np.testing.assert_array_equal(A1.values, A2.values)
+        pd.testing.assert_series_equal(A1, A2)
 
     def test_static_getitem_series1(self):
         def test_impl(A):
@@ -649,7 +779,7 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @unittest.skipIf(platform.system() == 'Windows', 
+    @unittest.skipIf(platform.system() == 'Windows',
                      'Series values are different (20.0 %)'
                      '[left]:  [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, 3486784401, 10000000000]'
                      '[right]: [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, -808182895, 1410065408]')
@@ -924,6 +1054,27 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_fillna_index_str(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=['a', 'b', 'c', 'd'])
+        pd.testing.assert_series_equal(hpat_func(S),
+                                       test_impl(S), check_names=False)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_fillna_index_int(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=[2, 3, 4, 5])
+        pd.testing.assert_series_equal(hpat_func(S),
+                                       test_impl(S), check_names=False)
+
     def test_series_dropna_float1(self):
         def test_impl(A):
             return A.dropna().values
@@ -973,6 +1124,28 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_dropna_index_str(self):
+        def test_impl(S):
+            return S.dropna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=['a', 'b', 'c', 'd'])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_dropna_index_int(self):
+        def test_impl(S):
+            return S.dropna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=[1, 2, 5, 7])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
     @unittest.skip('numba.errors.TypingError - fix needed\n'
                    'Failed in hpat mode pipeline'
                    '(step: convert to distributed)\n'
@@ -986,7 +1159,15 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
 
-    def test_series_sum1(self):
+    def test_series_sum_default(self):
+        def test_impl(S):
+            return S.sum()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1., 2., 3.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_sum_nan(self):
         def test_impl(S):
             return S.sum()
         hpat_func = hpat.jit(test_impl)
@@ -999,6 +1180,16 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Old style Series.sum() does not support parameters")
+    def test_series_sum_skipna_false(self):
+        def test_impl(S):
+            return S.sum(skipna=False)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 2., 3.])
+        self.assertEqual(np.isnan(hpat_func(S)),np.isnan(test_impl(S)))
+
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default, "Series.sum() operator + is not implemented yet for Numba")
     def test_series_sum2(self):
         def test_impl(S):
             return (S + S).sum()
@@ -1061,13 +1252,59 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_series_mean1(self):
+    def test_series_mean(self):
         def test_impl(S):
             return S.mean()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        data_samples = [
+            [6, 6, 2, 1, 3, 3, 2, 1, 2],
+            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+            [np.nan, np.nan, np.nan],
+            [np.nan, np.nan, np.inf],
+        ]
+
+        for data in data_samples:
+            with self.subTest(data=data):
+                S = pd.Series(data)
+                actual = hpat_func(S)
+                expected = test_impl(S)
+                if np.isnan(actual) or np.isnan(expected):
+                    self.assertEqual(np.isnan(actual), np.isnan(expected))
+                else:
+                    self.assertEqual(actual, expected)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default, "Series.mean() any parameters unsupported")
+    def test_series_mean_skipna(self):
+        def test_impl(S, skipna):
+            return S.mean(skipna=skipna)
+        hpat_func = hpat.jit(test_impl)
+
+        data_samples = [
+            [6, 6, 2, 1, 3, 3, 2, 1, 2],
+            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+            [np.nan, np.nan, np.nan],
+            [np.nan, np.nan, np.inf],
+        ]
+
+        for skipna in [True, False]:
+            for data in data_samples:
+                S = pd.Series(data)
+                actual = hpat_func(S, skipna)
+                expected = test_impl(S, skipna)
+                if np.isnan(actual) or np.isnan(expected):
+                    self.assertEqual(np.isnan(actual), np.isnan(expected))
+                else:
+                    self.assertEqual(actual, expected)
+
 
     def test_series_var1(self):
         def test_impl(S):
@@ -1499,7 +1736,7 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         # column with NA
-        S = pd.Series([np.nan, 2., 3.])
+        S = pd.Series([np.nan, 2., 3., np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_isnull1(self):
@@ -1577,6 +1814,25 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nlargest_index_str(self):
+        def test_impl(S):
+            return S.nlargest(4)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([73, 21, 10005, 5, 1], index=['a', 'b', 'c', 'd', 'e'])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nlargest_index_int(self):
+        def test_impl(S):
+            return S.nlargest(4)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([73, 21, 10005, 5, 1], index=[2, 3, 4, 5, 6])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
     def test_series_nsmallest1(self):
         def test_impl(S):
             return S.nsmallest(4)
@@ -1617,6 +1873,25 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func().values, test_impl().values)
 
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nsmallest_index_str(self):
+        def test_impl(S):
+            return S.nsmallest(3)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([41, 32, 33, 4, 5], index=['a', 'b', 'c', 'd', 'e'])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_nsmallest_index_int(self):
+        def test_impl(S):
+            return S.nsmallest(3)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([41, 32, 33, 4, 5], index=[1, 2, 3, 4, 5])
+        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -1625,7 +1900,7 @@ class TestSeries(unittest.TestCase):
         m = 100
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
@@ -1636,7 +1911,7 @@ class TestSeries(unittest.TestCase):
         m = 100
         np.random.seed(0)
         S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_head_index1(self):
         '''Verifies head method for Series with integer index created inside jitted function'''
@@ -1656,10 +1931,6 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @unittest.skip('Failed due to lack of Int64Index support. Error:'
-                   'Series.index values are different (66.66667 %)'
-                   '[left]:  RangeIndex(start=0, stop=3, step=1)'
-                   '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index3(self):
         '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):
@@ -1694,10 +1965,6 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
             self.assertTrue(count_array_OneDs() > 0)
 
-    @unittest.skip('Failed due to lack of Int64Index support. Error:'
-                   'Series.index values are different (66.66667 %)'
-                   '[left]:  RangeIndex(start=0, stop=3, step=1)'
-                   '[right]: Int64Index([8, 1, 6], dtype=\'int64\')')
     def test_series_head_index_parallel1(self):
         '''Verifies head method for distributed Series with integer index'''
         def test_impl(S):
@@ -1822,12 +2089,93 @@ class TestSeries(unittest.TestCase):
 
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    def test_series_shift_default1(self):
+    def test_series_shift(self):
+        def pyfunc():
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
+            return series.shift()
+
+        cfunc = hpat.jit(pyfunc)
+        pd.testing.assert_series_equal(cfunc(), pyfunc())
+
+    def test_series_shift_unboxing(self):
+        def pyfunc(series):
+            return series.shift()
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_float64:
+            series = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(series), pyfunc(series))
+
+    def test_series_shift_full(self):
+        def pyfunc(series, periods, freq, axis, fill_value):
+            return series.shift(periods=periods, freq=freq, axis=axis, fill_value=fill_value)
+
+        cfunc = hpat.jit(pyfunc)
+        freq = None
+        axis = 0
+        for data in test_global_input_data_float64:
+            series = pd.Series(data)
+            for periods in [-2, 0, 3]:
+                for fill_value in [9.1, np.nan, -3.3, None]:
+                    jit_result = cfunc(series, periods, freq, axis, fill_value)
+                    ref_result = pyfunc(series, periods, freq, axis, fill_value)
+                    pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_shift_str(self):
+        def pyfunc(series):
+            return series.shift()
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method shift(). The object must be a number. Given self.data.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_shift_fill_str(self):
+        def pyfunc(series, fill_value):
+            return series.shift(fill_value=fill_value)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, fill_value='unicode')
+        msg = 'Method shift(). The object must be a number. Given fill_value: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_shift_unsupported_params(self):
+        def pyfunc(series, freq, axis):
+            return series.shift(freq=freq, axis=axis)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, freq='12H', axis=0)
+        msg = 'Method shift(). Unsupported parameters. Given freq: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, freq=None, axis=1)
+        msg = 'Method shift(). Unsupported parameters. Given axis != 0'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_shift_index_str(self):
         def test_impl(S):
             return S.shift()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.])
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.], index=['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('Unsupported functionality: failed to handle index')
+    def test_series_shift_index_int(self):
+        def test_impl(S):
+            return S.shift()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([np.nan, 2., 3., 5., np.nan, 6., 7.], index=[1, 2, 3, 4, 5, 6, 7])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_index1(self):
@@ -1888,7 +2236,6 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.skip('Unboxing of integer Series.index as pd.Index is not implemented yet')
     def test_series_take_index_int_unboxing(self):
         def pyfunc(series, indices):
             return series.take(indices)
@@ -1995,7 +2342,7 @@ class TestSeries(unittest.TestCase):
             return A.drop_duplicates()
 
         hpat_func = hpat.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_quantile(self):
         def test_impl():
@@ -2025,7 +2372,7 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         S = pd.Series([2, 1, 3, 3])
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_unique_sorted(self):
         def test_impl(S):
@@ -2059,7 +2406,7 @@ class TestSeries(unittest.TestCase):
 
         ref_result = test_impl()
         result = hpat_func()
-        np.testing.assert_array_equal(result, ref_result)
+        pd.testing.assert_series_equal(result, ref_result)
 
     @unittest.skip("getiter for this type is not implemented yet")
     def test_series_groupby_iterator_int(self):

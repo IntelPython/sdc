@@ -261,6 +261,69 @@ def hpat_pandas_series_size(self):
     return hpat_pandas_series_size_impl
 
 
+@overload_attribute(SeriesType, 'ndim')
+def hpat_pandas_series_ndim(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.ndim` implementation
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_ndim
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :obj:`int`
+           Number of dimensions of the underlying data, by definition 1
+    """
+
+    _func_name = 'Attribute ndim.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_ndim_impl(self):
+        return 1
+
+    return hpat_pandas_series_ndim_impl
+
+
+@overload_attribute(SeriesType, 'T')
+def hpat_pandas_series_T(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.T` implementation
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_T
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+           input series
+
+    Returns
+    -------
+    :obj:`numpy.ndarray`
+         An array representing the underlying data
+    """
+
+    _func_name = 'Attribute T.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    def hpat_pandas_series_T_impl(self):
+        return self._data
+
+    return hpat_pandas_series_T_impl
+
+
+
 @overload(len)
 def hpat_pandas_series_len(self):
     """
@@ -289,6 +352,79 @@ def hpat_pandas_series_len(self):
         return len(self._data)
 
     return hpat_pandas_series_len_impl
+
+
+@overload_method(SeriesType, 'shift')
+def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None):
+    """
+    Pandas Series method :meth:`pandas.Series.shift` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_full
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_fill_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unsupported_params
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    periods: :obj:`int`
+        Number of periods to shift. Can be positive or negative.
+    freq: :obj:`DateOffset`, :obj:`tseries.offsets`, :obj:`timedelta`, :obj:`str`
+        Offset to use from the tseries module or time rule (e.g. ‘EOM’).
+        *unsupported*
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
+        *unsupported*
+    fill_value : :obj:`int`, :obj:`float`
+        The scalar value to use for newly introduced missing values.
+
+    Returns
+    -------
+    :obj:`scalar`
+         returns :obj:`series` object
+    """
+
+    _func_name = 'Method shift().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    if not isinstance(fill_value, (types.Omitted, types.Number, types.NoneType)) and fill_value is not None:
+        raise TypingError('{} The object must be a number. Given fill_value: {}'.format(_func_name, fill_value))
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)) and freq is not None:
+        raise TypingError('{} Unsupported parameters. Given freq: {}'.format(_func_name, freq))
+
+    if not isinstance(axis, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    def hpat_pandas_series_shift_impl(self, periods=1, freq=None, axis=0, fill_value=None):
+        if axis != 0:
+            raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
+
+        arr = numpy.empty_like(self._data)
+        if periods > 0:
+            arr[:periods] = fill_value or numpy.nan
+            arr[periods:] = self._data[:-periods]
+        elif periods < 0:
+            arr[periods:] = fill_value or numpy.nan
+            arr[:periods] = self._data[-periods:]
+        else:
+            arr[:] = self._data
+
+        return pandas.Series(arr)
+
+    return hpat_pandas_series_shift_impl
 
 
 @overload_method(SeriesType, 'isin')
@@ -365,6 +501,53 @@ def hpat_pandas_series_append(self, to_append):
     return hpat_pandas_series_append_impl
 
 
+@overload_method(SeriesType, 'copy')
+def hpat_pandas_series_copy(self, deep=True):
+    """
+    Pandas Series method :meth:`pandas.Series.copy` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_str1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_int1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_deep
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    deep: :obj:`bool`, default :obj:`True`
+        Make a deep copy, including a copy of the data and the indices.
+        With deep=False neither the indices nor the data are copied.
+        [HPAT limitations]:
+            - deep=False: shallow copy of index is not supported
+
+    Returns
+    -------
+    :obj:`pandas.Series` or :obj:`pandas.DataFrame`
+        Object type matches caller.
+    """
+    _func_name = 'Method Series.copy().'
+
+    if (isinstance(self, SeriesType) and
+        (isinstance(deep, (types.Omitted, types.Boolean)) or deep == True)
+    ):
+        if isinstance(self.index, types.NoneType):
+            def hpat_pandas_series_copy_impl(self, deep=True):
+                if deep:
+                    return pandas.Series(self._data.copy())
+                else:
+                    return pandas.Series(self._data)
+            return hpat_pandas_series_copy_impl
+        else:
+            def hpat_pandas_series_copy_impl(self, deep=True):
+                if deep:
+                    return pandas.Series(self._data.copy(), index=self._index.copy())
+                else:
+                    return pandas.Series(self._data, index=self._index.copy())
+            return hpat_pandas_series_copy_impl
+
+
 @overload_method(SeriesType, 'groupby')
 def hpat_pandas_series_groupby(
         self,
@@ -438,6 +621,58 @@ def hpat_pandas_series_groupby(
         return pandas.core.groupby.SeriesGroupBy(self)
 
     return hpat_pandas_series_groupby_impl
+
+
+@overload_method(SeriesType, 'isna')
+def hpat_pandas_series_isna(self):
+    """
+    Pandas Series method :meth:`pandas.Series.isna` implementation.
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+               input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method isna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if isinstance(self.dtype, (types.Integer, types.Float)):
+
+        def hpat_pandas_series_isna_impl(self):
+
+            return pandas.Series(numpy.isnan(self._data))
+
+        return hpat_pandas_series_isna_impl
+
+    if isinstance(self.dtype, types.UnicodeType):
+
+        def hpat_pandas_series_isna_impl(self):
+            result = numpy.empty(len(self._data), numpy.bool_)
+            byte_size = 8
+            # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
+            for i in range(len(self._data)):
+                bmap_idx = i // byte_size
+                bit_idx = i % byte_size
+                bmap = self._data.null_bitmap[bmap_idx]
+                bit_value = (bmap >> bit_idx) & 1
+                result[i] = bit_value == 0
+            return pandas.Series(result)
+
+        return hpat_pandas_series_isna_impl
 
 
 @overload_method(SeriesType, 'ne')
@@ -618,6 +853,85 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_sub_number_impl
 
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+
+
+@overload_method(SeriesType, 'sum')
+def hpat_pandas_series_sum(
+    self,
+    axis=None,
+    skipna=None,
+    level=None,
+    numeric_only=None,
+    min_count=0,
+):
+    """
+    Pandas Series method :meth:`pandas.Series.sum` implementation.
+
+    .. only:: developer
+
+        Tests:
+            python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum1
+            # python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum2
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series`
+        input series
+    axis:
+        *unsupported*
+    skipna: :obj:`bool`, default :obj:`True`
+        Exclude NA/null values when computing the result.
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+    min_count:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`float`
+        scalar or Series (if level specified)
+    """
+
+    _func_name = 'Method sum().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == None):
+        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
+
+    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna == None):
+        raise TypingError('{} The skipna must be a Boolean. Given: {}'.format(_func_name, skipna))
+
+    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted)) or level == None):
+        raise TypingError('{} The level must be an Integer or level name. Currently unsupported. Given: {}'.format(_func_name, level))
+
+    if not (isinstance(numeric_only, (types.Boolean, types.Omitted)) or numeric_only == None):
+        raise TypingError('{} The numeric_only must be a Boolean. Currently unsupported. Given: {}'.format(_func_name, numeric_only))
+
+    if not (isinstance(min_count, (types.Integer, types.Omitted)) or min_count == 0):
+        raise TypingError('{} The min_count must be an Integer. Currently unsupported. Given: {}'.format(_func_name, min_count))
+
+    def hpat_pandas_series_sum_impl(
+        self,
+        axis=None,
+        skipna=None,
+        level=None,
+        numeric_only=None,
+        min_count=0,
+    ):
+        """
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum1
+        """
+        if skipna is None:
+            skipna = True
+        if skipna:
+            return numpy.nansum(self._data)
+        return numpy.sum(self._data)
+
+    return hpat_pandas_series_sum_impl
 
 
 @overload_method(SeriesType, 'take')
@@ -1137,6 +1451,67 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
         return self._data.max()
 
     return hpat_pandas_series_max_impl
+
+
+@overload_method(SeriesType, 'mean')
+def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.mean` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_mean
+
+    Parameters
+    -----------
+    axis: {index (0)}
+        Axis for the function to be applied on.
+        *unsupported*
+    skipna: :obj:`bool`, default True
+        Exclude NA/null values when computing the result.
+    level: :obj:`int` or level name, default None
+        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
+        *unsupported*
+    numeric_only: :obj:`bool`, default None
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data. Not implemented for Series.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:
+         Return the mean of the values for the requested axis.
+    """
+
+    _func_name = 'Method mean().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not None:
+        raise TypingError(
+            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+
+    if not (isinstance(axis, types.Omitted) or axis is None) \
+            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
+                                                                                            numeric_only))
+
+    def hpat_pandas_series_mean_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if skipna is None:
+            skipna = True
+
+        if skipna:
+            return numpy.nanmean(self._data)
+
+        return self._data.mean()
+
+    return hpat_pandas_series_mean_impl
 
 
 @overload_method(SeriesType, 'mod')
