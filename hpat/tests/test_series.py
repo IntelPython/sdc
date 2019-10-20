@@ -2043,6 +2043,83 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(n))
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    def test_series_idxmin_str(self):
+        def test_impl(S):
+            return S.idxmin()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    @unittest.skip("Skipna is not implemented")
+    def test_series_idxmin_str_idx(self):
+        def test_impl(S):
+            return S.idxmin(skipna=False)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_idxmin_no(self):
+        def test_impl(S):
+            return S.idxmin()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([8, 6, 34, np.nan])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_idxmin_int(self):
+        def test_impl(S):
+            return S.idxmin()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], [4, 45, 14])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_idxmin_noidx(self):
+        def test_impl(S):
+            return S.idxmin()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    def test_series_idxmin_idx(self):
+        def test_impl(S):
+            return S.idxmin()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, -np.inf, np.nan, np.inf, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
+                S = pd.Series(input_data, index_data)
+                result_ref = test_impl(S)
+                result = hpat_func(S)
+                if np.isnan(result) or np.isnan(result_ref):
+                    self.assertEqual(np.isnan(result), np.isnan(result_ref))
+                else:
+                    self.assertEqual(result, result_ref)
+
     def test_series_idxmax1(self):
         def test_impl(A):
             return A.idxmax()
