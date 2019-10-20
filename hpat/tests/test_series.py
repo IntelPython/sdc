@@ -1026,18 +1026,18 @@ class TestSeries(unittest.TestCase):
             [np.nan, np.nan, np.inf],
         ]
 
-        for skipna in [True, False, None]:
-            with self.subTest(skipna=skipna):
-                kwargs = {'skipna': skipna}
-                for data in data_samples:
-                    with self.subTest(data=data):
-                        S = pd.Series(data)
-                        actual = hpat_func(S, **kwargs)
-                        expected = test_impl(S, **kwargs)
-                        if np.isnan(actual) or np.isnan(expected):
-                            self.assertEqual(np.isnan(actual), np.isnan(expected))
-                        else:
-                            self.assertEqual(actual, expected)
+        for data in data_samples:
+            S = pd.Series(data)
+
+            for skipna_var in [True, False]:
+                actual = hpat_func(S, skipna=skipna_var)
+                expected = test_impl(S, skipna=skipna_var)
+
+                if np.isnan(actual) or np.isnan(expected):
+                    # con not compare Nan != Nan directly
+                    self.assertEqual(np.isnan(actual), np.isnan(expected))
+                else:
+                    self.assertEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
         def test_impl(S):
