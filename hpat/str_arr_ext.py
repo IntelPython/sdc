@@ -106,7 +106,7 @@ str_arr_model_members = [
     ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
 ]
 
-
+make_attribute_wrapper(StringArrayType, 'null_bitmap', 'null_bitmap')
 @register_model(StringArrayType)
 class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
@@ -572,7 +572,7 @@ def is_str_arr_typ(typ):
 # XXX can't use this with overload_method
 @infer_getattr
 class StrArrayAttribute(AttributeTemplate):
-    key = string_array_type
+    key = StringArrayType
 
     def resolve_size(self, ctflags):
         return types.intp
