@@ -687,13 +687,13 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(ary, *args)
 
-    @bound_function("series.median")
-    def resolve_median(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        # median converts integer output to float
-        dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
-        return signature(dtype, *args)
+#     @bound_function("series.median")
+#     def resolve_median(self, ary, args, kws):
+#         assert not kws
+#         dtype = ary.dtype
+#         # median converts integer output to float
+#         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
+#         return signature(dtype, *args)
 
     # @bound_function("series.idxmin")
     # def resolve_idxmin(self, ary, args, kws):
