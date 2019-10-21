@@ -9,7 +9,7 @@ if errorlevel 1 exit 1
 
 IF "%HPAT_WHEELS%" == "True" (
     conda remove -y hpat
-    pip install "%HPAT_WHEELS_DIR%\hpat*.whl"
+    pip install %HPAT_WHEELS_DIR%\hpat*.whl
     python -c "import hpat"
     )
 if errorlevel 1 exit 1

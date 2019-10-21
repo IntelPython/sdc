@@ -14,8 +14,10 @@ env:
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
         - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
     allow_failures:
-        - HPAT_CONFIG_MPI=False RUN_TEST=True
+        - HPAT_CHECK_STYLE=True
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
+        - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
+        - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
 
 before_install:
     - buildscripts/setup_conda.sh
@@ -35,7 +37,6 @@ install:
 script:
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          export PATH=/usr/lib/llvm-6.0/bin:$PATH;
           chmod 777 buildscripts/code_style.sh;
           buildscripts/code_style.sh;
       fi
