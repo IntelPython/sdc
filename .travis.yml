@@ -24,8 +24,8 @@ before_install:
 
 install:
     - export PATH=$HOME/miniconda3/bin:$PATH
-    - export HPAT_SRC_DIR="$(pwd)/hpat"
-    - env | grep HPAT_SRC_DIR
+    - export HPAT_SOURCE_DIR="$(pwd)/hpat"
+    - env | grep HPAT_SOURCE_DIR
     - export HPAT_WHEELS_DIR="$(pwd)/hpat_wheels"
     - env | grep HPAT_WHEELS_DIR
     - mkdir $HPAT_WHEELS_DIR

@@ -11,7 +11,7 @@ build:
     - HPAT_CONFIG_MPI
     - HPAT_NUM_PES
     - HPAT_RUN_COVERAGE
-    - HPAT_SRC_DIR
+    - HPAT_SOURCE_DIR
     - HPAT_WHEELS
     - HPAT_WHEELS_DIR
 
