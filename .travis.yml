@@ -8,12 +8,11 @@ env:
         - GIT_DESCRIBE_NUMBER=1
         - CONDA_ENV=travisci
         - PYTHON_VER=3.7
-        - CONDA_RUN_TEST=False
     matrix:
         - HPAT_CHECK_STYLE=True
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
-        - HPAT_RUN_BUILD=True CONDA_RUN_TEST=True HPAT_CONFIG_MPI=False
+        - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
     allow_failures:
         - HPAT_CONFIG_MPI=False RUN_TEST=True
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
@@ -36,6 +35,7 @@ install:
 script:
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
+          export PATH=/usr/lib/llvm-6.0/bin:$PATH
           chmod 777 buildscripts/code_style.sh;
           buildscripts/code_style.sh;
       fi
