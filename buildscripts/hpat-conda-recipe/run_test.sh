@@ -16,7 +16,7 @@ fi
 
 if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
   coverage erase
-  coverage run --source=${HPAT_SOURCE_DIR} --omit ${HPAT_SOURCE_DIR}/ml/*,${HPAT_SOURCE_DIR}/xenon_ext.py,${HPAT_SOURCE_DIR}/ros.py,${HPAT_SOURCE_DIR}/cv_ext.py,${HPAT_SOURCE_DIR}/tests/* ${HPAT_SOURCE_DIR}/runtests.py
+  coverage run --source=${PREFIX}/lib/python3.7/site-packages/hpat --omit ${PREFIX}/lib/python3.7/site-packages/hpat/ml/*,${PREFIX}/lib/python3.7/site-packages/hpat/xenon_ext.py,${PREFIX}/lib/python3.7/site-packages/hpat/ros.py,${PREFIX}/lib/python3.7/site-packages/hpat/cv_ext.py,${PREFIX}/lib/python3.7/site-packages/hpat/tests/* ${PREFIX}/lib/python3.7/site-packages/hpat/runtests.py
   coveralls -v
 else
   #Link check for Documentation using Sphinx's in-built linkchecker
