@@ -23,9 +23,8 @@ before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -;
-        sudo apt-add-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-6.0 main";
-        sudo apt update && sudo apt install clang-6.0;
+        sudo apt-get update -y;
+        sudo apt-get install -y clang-format-6.0;
       fi
 
 install:
