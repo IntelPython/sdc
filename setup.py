@@ -31,7 +31,6 @@ from distutils.command import build
 from distutils.spawn import spawn
 
 
-
 # Note we don't import Numpy at the toplevel, since setup.py
 # should be able to run without Numpy for pip to discover the
 # build dependencies
@@ -45,24 +44,32 @@ np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
 
-#Sphinx User's Documentation Build
+# Sphinx User's Documentation Build
+
+
 class build_doc(build.build):
     description = "Build user's documentation"
-    
+
     def run(self):
         spawn(['rm', '-rf', 'docs/_build', 'API_doc', 'docs/usersource/api/'])
         spawn(['python', 'docs/rename_function.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees', '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
+        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
+               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
         spawn(['python', 'docs/CleanRSTfiles.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees', '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
-       
-#Sphinx Developer's Documentation Build
+        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
+               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
+
+# Sphinx Developer's Documentation Build
+
+
 class build_devdoc(build.build):
     description = "Build developer's documentation"
-    
+
     def run(self):
         spawn(['rm', '-rf', 'docs/_builddev'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees', '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
+        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
+               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
+
 
 def readme():
     with open('README.rst', encoding='utf-8') as f:

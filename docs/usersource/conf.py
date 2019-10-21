@@ -27,7 +27,7 @@ except ImportError:
     sys.path.insert(0, os.path.abspath('../..'))
     import hpat
 
-	
+
 sys.path.insert(0, os.path.abspath('../..'))
 import API_Doc
 
@@ -45,13 +45,13 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.todo',
               'sphinx.ext.mathjax',
               'sphinx.ext.githubpages',
-			  'sphinx.ext.napoleon',
-			  'sphinx.ext.autosectionlabel',
-			  'sphinx.ext.autosummary'
-]
+              'sphinx.ext.napoleon',
+              'sphinx.ext.autosectionlabel',
+              'sphinx.ext.autosummary'
+              ]
 
 
-#Numpy and Google docstring options
+# Numpy and Google docstring options
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = True
@@ -68,11 +68,11 @@ napoleon_use_rtype = True
 autosectionlabel_prefix_document = True
 
 
-add_module_names = False						
+add_module_names = False
 suppress_warnings = ['autosectionlabel.*']
 autodoc_docstring_signature = True
 
-autosummary_generate = True   
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -131,7 +131,7 @@ html_theme = 'bootstrap'
 # documentation.
 #
 html_theme_options = {
-   'bootswatch_theme': "paper",
+    'bootswatch_theme': "paper",
 }
 
 html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
@@ -177,7 +177,7 @@ latex_documents = [
 ]
 
 pdf_documents = [
-('index', u'HPATDocumentation', u'HPAT Documentation', u'Rujal Desai'),
+    ('index', u'HPATDocumentation', u'HPAT Documentation', u'Rujal Desai'),
 ]
 
 # -- Options for manual page output ---------------------------------------
@@ -203,10 +203,10 @@ texinfo_documents = [
 
 numfig = True
 
-#configuration for intersphinx
+# configuration for intersphinx
 intersphinx_mapping = {
-	'python': ('https://docs.python.org/', None),
-	'numba': ('https://numba.pydata.org/numba-doc/dev', None),
-	'numpy': ('http://docs.scipy.org/doc/numpy', None),
-	'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'python': ('https://docs.python.org/', None),
+    'numba': ('https://numba.pydata.org/numba-doc/dev', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
 }
