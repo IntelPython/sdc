@@ -35,7 +35,7 @@ install:
 script:
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          export PATH=/usr/lib/llvm-6.0/bin:$PATH
+          export PATH=/usr/lib/llvm-6.0/bin:$PATH;
           chmod 777 buildscripts/code_style.sh;
           buildscripts/code_style.sh;
       fi
