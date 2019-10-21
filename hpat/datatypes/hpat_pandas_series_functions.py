@@ -718,7 +718,6 @@ def hpat_pandas_series_notna(self):
     if isinstance(self.data.dtype, types.UnicodeType):
 
         def hpat_pandas_series_notna_impl(self):
-            print("KDKDKDKD")
             result = numpy.empty(len(self._data), numpy.bool_)
             byte_size = 8
             # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
