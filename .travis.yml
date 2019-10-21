@@ -8,27 +8,27 @@ env:
         - GIT_DESCRIBE_NUMBER=1
         - CONDA_ENV=travisci
         - PYTHON_VER=3.7
-        - RUN_TEST=--no-test
+        - CONDA_RUN_TEST=False
     matrix:
         - HPAT_CHECK_STYLE=True
+        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
-        - HPAT_RUN_BUILD=True RUN_TEST="" HPAT_CONFIG_MPI=False 
+        - HPAT_RUN_BUILD=True CONDA_RUN_TEST=True HPAT_CONFIG_MPI=False
     allow_failures:
-        - HPAT_CONFIG_MPI=False RUN_TEST=""
+        - HPAT_CONFIG_MPI=False RUN_TEST=True
+        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
 
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
-    - source activate $CONDA_ENV
-    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          conda install -y numpy -c conda-forge;
-      fi
-    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
-          conda install -y coveralls;
-      fi
 
 install:
     - export PATH=$HOME/miniconda3/bin:$PATH
+    - export HPAT_SRC_DIR="$(pwd)/hpat"
+    - env | grep HPAT_SRC_DIR
+    - export HPAT_WHEELS_DIR="$(pwd)/hpat_wheels"
+    - env | grep HPAT_WHEELS_DIR
+    - mkdir $HPAT_WHEELS_DIR
     - if [ "$HPAT_RUN_BUILD" == "True" ]; then
           buildscripts/build.sh;
       fi
@@ -36,21 +36,11 @@ install:
 script:
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          source activate $CONDA_ENV;
-          python ./setup.py style;
-      fi
-    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
-          chmod 777 buildscripts/coverage.sh;
-          buildscripts/coverage.sh;
+          chmod 777 buildscripts/code_style.sh;
+          buildscripts/code_style.sh;
       fi
 
-after_success:
-    - export PATH=$HOME/miniconda3/bin:$PATH
-    - if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
-          source activate $CONDA_ENV;
-          coverage combine;
-          coveralls -v;
-      fi
+after_success: skip
 
 notifications:
     email: false

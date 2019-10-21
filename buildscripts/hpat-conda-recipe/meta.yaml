@@ -10,6 +10,10 @@ build:
   script_env:
     - HPAT_CONFIG_MPI
     - HPAT_NUM_PES
+    - HPAT_RUN_COVERAGE
+    - HPAT_SRC_DIR
+    - HPAT_WHEELS
+    - HPAT_WHEELS_DIR
 
 requirements:
   build:
@@ -31,6 +35,7 @@ requirements:
     - impi_rt # [win]
     - impi-devel # [win]
     - conda-package-handling ==1.3.11 #[win]
+    - wheel
 
   run:
     - python
@@ -48,6 +53,8 @@ test:
   requires:
     - h5py
     - scipy
+    - coveralls
+    - pip
   imports:
     - hpat
 
