@@ -1989,6 +1989,7 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(count_array_OneDs() > 0)
 
     def test_series_median1(self):
+        '''Verifies median implementation for float and integer series of random data'''
         def test_impl(S):
             return S.median()
         hpat_func = hpat.jit(test_impl)
@@ -2009,6 +2010,34 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style median implementation doesn't filter NaNs")
+    def test_series_median_skipna_default1(self):
+        '''Verifies median implementation with default skipna=True argument on a series with NA values'''
+        def test_impl(S):
+            return S.median()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Skipna argument is not supported in old-style")
+    def test_series_median_skipna_false1(self):
+        '''Verifies median implementation with skipna=False on a series with NA values'''
+        def test_impl(S):
+            return S.median(skipna=False)
+        hpat_func = hpat.jit(test_impl)
+
+        # np.inf is not NaN, so verify that a correct number is returned
+        S1 = pd.Series([2., 3., 5., np.inf, 5., 6., 7.])
+        self.assertEqual(hpat_func(S1), test_impl(S1))
+
+        # TODO: both return values are 'nan', but HPAT's is not np.nan, hence checking with
+        # assertIs() doesn't work - check if it's Numba relatated
+        S2 = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
+        self.assertEqual(np.isnan(hpat_func(S2)), np.isnan(test_impl(S2)))
+
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -2020,6 +2049,9 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
     def test_series_argsort_parallel(self):
         # create `kde.parquet` file
