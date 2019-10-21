@@ -14,6 +14,7 @@ env:
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
         - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
+matrix:
     allow_failures:
         - env: HPAT_CHECK_STYLE=True
         - env: HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
@@ -22,9 +23,9 @@ before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
     - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y;
-        sudo apt-get update -q;
-        sudo apt-get install clang -y;
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -;
+        sudo apt-add-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-6.0 main";
+        sudo apt update && sudo apt install clang-6.0;
       fi
 
 install:

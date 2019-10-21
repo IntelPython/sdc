@@ -2,10 +2,12 @@
 
 source activate $CONDA_ENV
 
-find / -name clang-format
-ls /usr/lib/ | grep clang
-ls /usr/bin/ | grep clang-format
-
+echo "======================================================================"
+echo Executing clang-format-6.0 style:
+echo "======================================================================"
 python ./setup.py style
 
+echo "======================================================================"
+echo Executing python flake8:
+echo "======================================================================"
 flake8 ./
