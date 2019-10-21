@@ -611,7 +611,7 @@ class TestDataFrame(unittest.TestCase):
         # TODO: add column with float values when test_series_astype_float_to_str1 is fixed
         df = pd.DataFrame({'A': [-1, 2, 11, 5, 0, -7],
                            'B': ['aa', 'bb', 'cc', 'dd', '', 'fff']
-        })
+                           })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_df_astype_float1(self):
@@ -622,9 +622,9 @@ class TestDataFrame(unittest.TestCase):
 
         # TODO: uncomment column with string values when test_series_astype_str_to_float64 is fixed
         df = pd.DataFrame({'A': [-1, 2, 11, 5, 0, -7],
-        #                   'B': ['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'],
+                           #                   'B': ['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'],
                            'C': [3.24, 1E+05, -1, -1.3E-01, np.nan, np.inf]
-        })
+                           })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_df_astype_int1(self):
@@ -637,9 +637,9 @@ class TestDataFrame(unittest.TestCase):
         # TODO: uncomment column with string values when test_series_astype_str_to_int32 is fixed
         df = pd.DataFrame({'A': np.ones(n, dtype=np.int64),
                            'B': np.arange(n, dtype=np.int32),
-        #                   'C': ['-1', '2', '3', '0', '-7', '99'],
+                           #                   'C': ['-1', '2', '3', '0', '-7', '99'],
                            'D': np.arange(float(n), dtype=np.float32)
-        })
+                           })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_sort_parallel(self):
@@ -797,6 +797,7 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default, "DataFrame.sum() not implemented in new style")
     def test_sum1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):

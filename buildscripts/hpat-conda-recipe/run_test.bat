@@ -21,3 +21,8 @@ IF "%HPAT_NUM_PES%" == "" (
     ) ELSE (
     mpiexec -localonly -n %HPAT_NUM_PES% python -W ignore -u -m hpat.runtests -v)
 if errorlevel 1 exit 1
+
+REM Link check for Documentation using Sphinx's in-built linkchecker
+REM sphinx-build -b linkcheck -j1 usersource _build/html
+REM if errorlevel 1 exit 1
+

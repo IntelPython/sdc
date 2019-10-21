@@ -518,7 +518,7 @@ series_replace_funcs = {
     'corr': _column_corr_impl,
     'append_single': _series_append_single_impl,
     'append_tuple': _series_append_tuple_impl,
-    'isna': _series_isna_impl,
+    # 'isna': _series_isna_impl,
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
     'astype_str': _series_astype_str_impl,
@@ -530,6 +530,6 @@ series_replace_funcs = {
     'head_index': lambda A, I, k, name: hpat.hiframes.api.init_series(A[:k], I[:k], name),
     'median': lambda A: hpat.hiframes.api.median(A),
     # TODO: handle NAs in argmin/argmax
-    'idxmin': lambda A: A.argmin(),
+    # 'idxmin': lambda A: A.argmin(),
     'idxmax': lambda A: A.argmax(),
 }

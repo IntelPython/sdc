@@ -6,7 +6,6 @@
 """
 
 
-
 import os
 import itertools
 from shutil import copyfile
@@ -15,29 +14,29 @@ from shutil import copyfile
     Add the function names with the src file in this dictionary
     If the file is already present, just add the func name in the respective values
     Create new entry if the srcfile is not present
-    
+
     srcfiles_srcfuncs = { srcfile : [func1, func2..]}
     srcfile : file containing the function that should be renamed
     [func1, func2..] : list of function names that should be changed
 
 """
 srcfiles_srcfuncs = {
-    "hpat_pandas_series_functions.py" : ["hpat_pandas_series_append", "hpat_pandas_series_ne", "hpat_pandas_series_iloc"]
+    "hpat_pandas_series_functions.py": ["hpat_pandas_series_append", "hpat_pandas_series_ne", "hpat_pandas_series_iloc"]
 }
 
 """
      Add the filenames and the parent directory in this dictionary
      If the dir is already present in this list, just add the filename in the respective values
      Create a new entry if the dir is not present in this dictionary
-     
+
      srcdir_srcfiles = { parentdir : [filename1, filename2..]}
      parentdir : Parent directory for the file
      [filename1, filename2 ..] : List of files that have the functions to be renamed
 
  """
 srcdir_srcfiles = {
-    "hpat/datatypes" : ["hpat_pandas_series_functions.py"],
-    "hpat/hiframes"  : ["aggregate.py", "boxing.py"]
+    "hpat/datatypes": ["hpat_pandas_series_functions.py"],
+    "hpat/hiframes": ["aggregate.py", "boxing.py"]
 }
 
 
@@ -59,7 +58,7 @@ for dir in srcdir_srcfiles:
         src_file = os.path.join(cur_dir, dir, f)
         dst_file = os.path.join(cur_dir, "API_Doc", f)
         copyfile(src_file, dst_file)
-        
+
 os.chdir(src_copy_dir)
 
 # Change the function names in copied files

@@ -26,7 +26,7 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.abspath('../..'))
     import hpat
-	
+
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.append(os.path.abspath('../../hpat/'))
 
@@ -44,14 +44,14 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.todo',
               'sphinx.ext.mathjax',
               'sphinx.ext.githubpages',
-			  'sphinx.ext.napoleon',
-			  'sphinx.ext.autosectionlabel',
-			  'sphinx.ext.autosummary',
+              'sphinx.ext.napoleon',
+              'sphinx.ext.autosectionlabel',
+              'sphinx.ext.autosummary',
               'sphinx.ext.viewcode'
-]
+              ]
 
 
-#Numpy and Google docstring options
+# Numpy and Google docstring options
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = True
@@ -67,32 +67,32 @@ napoleon_use_rtype = True
 
 #autosummary_generate = True
 autosectionlabel_prefix_document = True
-'''autodoc_mock_imports = ['numba', 
-						'llvmlite',
-						'hpat.hstr_ext',
-						'hpat.dict_ext',
-						'hpat.str_ext',
-						'hpat.str_arr_ext',
-						'hpat.utils',
-						'hpat.hset_ext',
-						'hpat.set_ext',
-						'hpat.config',
-						'hpat.timsort',
-						'hpat.io',
-						'hpat.hdist',
-						'hpat.transport_seq',
-						'hpat.distributed_lower',
-						'hpat.distributed_analysis',
-						'hpat.hdatetime_ext',
-						'hpat.hiframes',
-						'hpat.compiler',
-						'pandas',
-						'numpy',
+'''autodoc_mock_imports = ['numba',
+'llvmlite',
+'hpat.hstr_ext',
+'hpat.dict_ext',
+'hpat.str_ext',
+'hpat.str_arr_ext',
+'hpat.utils',
+'hpat.hset_ext',
+'hpat.set_ext',
+'hpat.config',
+'hpat.timsort',
+'hpat.io',
+'hpat.hdist',
+'hpat.transport_seq',
+'hpat.distributed_lower',
+'hpat.distributed_analysis',
+'hpat.hdatetime_ext',
+'hpat.hiframes',
+'hpat.compiler',
+'pandas',
+'numpy',
 ]'''
 
-add_module_names = False					
+add_module_names = False
 suppress_warnings = ['autosectionlabel.*'
-]
+                     ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -151,7 +151,7 @@ html_theme = 'bootstrap'
 # documentation.
 #
 html_theme_options = {
-   'bootswatch_theme': "paper",
+    'bootswatch_theme': "paper",
 }
 
 html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
@@ -197,7 +197,7 @@ latex_documents = [
 ]
 
 pdf_documents = [
-('index', u'HPATDocumentation', u'HPAT Documentation', u'Rujal Desai'),
+    ('index', u'HPATDocumentation', u'HPAT Documentation', u'Rujal Desai'),
 ]
 
 # -- Options for manual page output ---------------------------------------
@@ -223,10 +223,10 @@ texinfo_documents = [
 
 numfig = True
 
-#configuration for intersphinx
+# configuration for intersphinx
 intersphinx_mapping = {
-	'python': ('https://docs.python.org/', None),
-	'numba': ('https://numba.pydata.org/numba-doc/dev', None),
-	'numpy': ('http://docs.scipy.org/doc/numpy', None),
-	'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'python': ('https://docs.python.org/', None),
+    'numba': ('https://numba.pydata.org/numba-doc/dev', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
 }

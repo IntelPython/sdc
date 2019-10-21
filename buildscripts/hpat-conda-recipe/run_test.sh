@@ -20,6 +20,9 @@ if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
   coverage combine
   coveralls -v
 else
+  #Link check for Documentation using Sphinx's in-built linkchecker
+  #sphinx-build -b linkcheck -j1 usersource _build/html
+
   # TODO investigate root cause of NumbaPerformanceWarning
   # http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
   if [ -z "$HPAT_NUM_PES" ]; then
