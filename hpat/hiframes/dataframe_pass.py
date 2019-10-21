@@ -743,7 +743,7 @@ class DataFramePass(object):
                        for name, v in dict(rhs.kws).items()}
             impl = hpat.hiframes.pd_dataframe_ext.astype_overload(
                 *arg_typs, **kw_typs)
-            stub = (lambda df, dtype, copy=True, errors='raise' : None)
+            stub = (lambda df, dtype, copy=True, errors='raise': None)
             return self._replace_func(impl, rhs.args,
                                       pysig=numba.utils.pysignature(stub),
                                       kws=dict(rhs.kws))
@@ -1437,7 +1437,9 @@ class DataFramePass(object):
         func_lines.append("def _astype_impl({}, new_dtype):\n".format(", ".join(data_args)))
         for d in data_args:
             func_lines.append("  {} = hpat.hiframes.api.init_series({})\n".format(d + '_S', d))
-            func_lines.append("  {} = hpat.hiframes.api.get_series_data({}.astype(new_dtype))\n".format(d + '_O', d + '_S'))
+            func_lines.append(
+                "  {} = hpat.hiframes.api.get_series_data({}.astype(new_dtype))\n".format(
+                    d + '_O', d + '_S'))
         func_lines.append("  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             init_df_args_data,
             init_df_args_cols

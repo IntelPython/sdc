@@ -594,6 +594,7 @@ class HiFramesTyped(object):
             new_lhs = ir.Var(scope, mk_unique_var(lhs + '_data'), rhs.loc)
             self.typemap[new_lhs.name] = self.calltypes[rhs].return_type
             nodes.append(ir.Assign(rhs, new_lhs, rhs.loc))
+
             def _replace_func_param_impl(A):
                 return hpat.hiframes.api.init_series(A)
             return self._replace_func(_replace_func_param_impl, [new_lhs], pre_nodes=nodes)
