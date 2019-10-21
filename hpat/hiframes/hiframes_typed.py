@@ -857,7 +857,7 @@ class HiFramesTyped(object):
             return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in ('std', 'nunique', 'describe', 'isna',
-                         'isnull', 'median', 'idxmin', 'unique'):
+                         'isnull', 'median', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))

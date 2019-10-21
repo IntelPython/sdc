@@ -1913,7 +1913,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(n))
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip("Cant return 2 types: string or nan in one case")
+    @unittest.skip("Skipna is not implemented")
     def test_series_idxmax_str_idx(self):
         def test_impl(S):
             return S.idxmax(skipna=False)
@@ -1932,7 +1932,7 @@ class TestSeries(unittest.TestCase):
         data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
                      [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
                      [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
-                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.inf, np.nan],
                      [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
                      ]
 
