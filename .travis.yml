@@ -11,19 +11,21 @@ env:
         - NUMPY_VER=1.16
     matrix:
         - HPAT_CHECK_STYLE=True
-        - HPAT_RUN_BUILD=True
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
         - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
     allow_failures:
-        - HPAT_CHECK_STYLE=True
-        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
-        - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
-        - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
+        - env: HPAT_CHECK_STYLE=True
+        - env: HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
 
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
+    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y;
+        sudo apt-get update -q;
+        sudo apt-get install clang -y;
+      fi
 
 install:
     - export PATH=$HOME/miniconda3/bin:$PATH
