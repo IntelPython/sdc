@@ -71,7 +71,7 @@ class ValueCounts:
     def _value_counts(series):
         return series.value_counts()
 
-    def time_value_counts(self,  size, implementation):
+    def time_value_counts(self, size, implementation):
         """Time both interpreted and compiled Series.value_counts"""
         if implementation == Impl.compiled_python.value:
             return self._value_counts(self.series)
@@ -195,7 +195,7 @@ class Count:
         if implementation == Impl.interpreted_python.value:
             return self.series.count()
 
-              
+
 class Nlargest:
     params = [
         [5 * 10 ** 7 + 513],
@@ -216,6 +216,7 @@ class Nlargest:
             return self._nlargest(self.series)
         if implementation == Impl.interpreted_python.value:
             return self.series.nlargest()
+
 
 class Nsmallest:
     params = [
