@@ -411,6 +411,10 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_values(self, ary):
         return series_to_array_type(ary, True)
 
+    # PR135. This needs to be commented out
+    def resolve_T(self, ary):
+        return series_to_array_type(ary, True)
+
 # PR135. This needs to be commented out
     # def resolve_shape(self, ary):
     #     return types.Tuple((types.int64,))
@@ -446,8 +450,9 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_astype(self, ary, args, kws):
         # TODO: handle other types like datetime etc.
         dtype, = args
-        if isinstance(dtype, types.Function) and dtype.typing_key == str:
-            ret_type = SeriesType(string_type)
+        if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+                or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+            ret_type = SeriesType(string_type, index=ary.index)
             sig = signature(ret_type, *args)
         else:
             resolver = ArrayAttribute.resolve_astype.__wrapped__
@@ -455,18 +460,18 @@ class SeriesAttribute(AttributeTemplate):
             sig.return_type = if_arr_to_series_type(sig.return_type)
         return sig
 
-    @bound_function("array.copy")
-    def resolve_copy(self, ary, args, kws):
-        # TODO: copy other types like list(str)
-        dtype = ary.dtype
-        if dtype == string_type:
-            ret_type = SeriesType(string_type)
-            sig = signature(ret_type, *args)
-        else:
-            resolver = ArrayAttribute.resolve_copy.__wrapped__
-            sig = resolver(self, ary.data, args, kws)
-            sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.copy")
+    # def resolve_copy(self, ary, args, kws):
+    #     # TODO: copy other types like list(str)
+    #     dtype = ary.dtype
+    #     if dtype == string_type:
+    #         ret_type = SeriesType(string_type)
+    #         sig = signature(ret_type, *args)
+    #     else:
+    #         resolver = ArrayAttribute.resolve_copy.__wrapped__
+    #         sig = resolver(self, ary.data, args, kws)
+    #         sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
     @bound_function("series.rolling")
     def resolve_rolling(self, ary, args, kws):
@@ -495,18 +500,18 @@ class SeriesAttribute(AttributeTemplate):
 #         sig.return_type = if_arr_to_series_type(sig.return_type)
 #         return sig
 
-    @bound_function("series.quantile")
-    def resolve_quantile(self, ary, args, kws):
-        # TODO: fix quantile output type if not float64
-        return signature(types.float64, *args)
+    # @bound_function("series.quantile")
+    # def resolve_quantile(self, ary, args, kws):
+    #     # TODO: fix quantile output type if not float64
+    #     return signature(types.float64, *args)
 
     @bound_function("series.count")
     def resolve_count(self, ary, args, kws):
         return signature(types.intp, *args)
 
-    @bound_function("series.nunique")
-    def resolve_nunique(self, ary, args, kws):
-        return signature(types.intp, *args)
+    # @bound_function("series.nunique")
+    # def resolve_nunique(self, ary, args, kws):
+    #     return signature(types.intp, *args)
 
     # @bound_function("series.unique")
     # def resolve_unique(self, ary, args, kws):
@@ -535,14 +540,14 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
-    @bound_function("series.shift")
-    def resolve_shift(self, ary, args, kws):
-        # TODO: support default period argument
-        out = ary
-        # integers are converted to float64 to store NaN
-        if isinstance(ary.dtype, types.Integer):
-            out = out.copy(dtype=types.float64)
-        return signature(out, *args)
+    # @bound_function("series.shift")
+    # def resolve_shift(self, ary, args, kws):
+    #     # TODO: support default period argument
+    #     out = ary
+    #     # integers are converted to float64 to store NaN
+    #     if isinstance(ary.dtype, types.Integer):
+    #         out = out.copy(dtype=types.float64)
+    #     return signature(out, *args)
 
     @bound_function("series.pct_change")
     def resolve_pct_change(self, ary, args, kws):
@@ -648,11 +653,11 @@ class SeriesAttribute(AttributeTemplate):
         ret_typ = if_arr_to_series_type(ret_typ)
         return signature(ret_typ, *args)
 
-    @bound_function("series.isna")
-    def resolve_isna(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.isna")
+    # def resolve_isna(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     # alias of isna
     @bound_function("series.isnull")
@@ -682,39 +687,39 @@ class SeriesAttribute(AttributeTemplate):
         assert not kws
         return signature(ary, *args)
 
-    @bound_function("series.median")
-    def resolve_median(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        # median converts integer output to float
-        dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
-        return signature(dtype, *args)
+#     @bound_function("series.median")
+#     def resolve_median(self, ary, args, kws):
+#         assert not kws
+#         dtype = ary.dtype
+#         # median converts integer output to float
+#         dtype = types.float64 if isinstance(dtype, types.Integer) else dtype
+#         return signature(dtype, *args)
 
-    @bound_function("series.idxmin")
-    def resolve_idxmin(self, ary, args, kws):
-        assert not kws
-        return signature(types.intp, *args)
+    # @bound_function("series.idxmin")
+    # def resolve_idxmin(self, ary, args, kws):
+    #     assert not kws
+    #     return signature(types.intp, *args)
 
     @bound_function("series.idxmax")
     def resolve_idxmax(self, ary, args, kws):
         assert not kws
         return signature(types.intp, *args)
 
-    @bound_function("series.max")
-    def resolve_max(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.max")
+    # def resolve_max(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
-    @bound_function("series.min")
-    def resolve_min(self, ary, args, kws):
-        assert not kws
-        dtype = ary.dtype
-        dtype = (pandas_timestamp_type
-                 if isinstance(dtype, types.NPDatetime) else dtype)
-        return signature(dtype, *args)
+    # @bound_function("series.min")
+    # def resolve_min(self, ary, args, kws):
+    #     assert not kws
+    #     dtype = ary.dtype
+    #     dtype = (pandas_timestamp_type
+    #              if isinstance(dtype, types.NPDatetime) else dtype)
+    #     return signature(dtype, *args)
 
     @bound_function("series.value_counts")
     def resolve_value_counts(self, ary, args, kws):
@@ -986,7 +991,10 @@ for fname in ["cumsum", "cumprod"]:
     install_array_method(fname, generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
-_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten', 'resolve_take']
+_not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
+                           'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
+                           'resolve_prod']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

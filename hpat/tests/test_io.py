@@ -353,7 +353,7 @@ class TestIO(unittest.TestCase):
 
     def test_csv1(self):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
-        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit 
+        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
         if platform.system() == 'Windows' and not IS_32BITS:
             def test_impl():
                 return pd.read_csv("csv_data1.csv",
