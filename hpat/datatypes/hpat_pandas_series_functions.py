@@ -681,6 +681,58 @@ def hpat_pandas_series_isna(self):
         return hpat_pandas_series_isna_impl
 
 
+@overload_method(SeriesType, 'notna')
+def hpat_pandas_series_notna(self):
+    """
+    Pandas Series method :meth:`pandas.Series.notna` implementation.
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna_noidx
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+               input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method notna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if isinstance(self.data.dtype, types.Number):
+
+        def hpat_pandas_series_notna_impl(self):
+
+            return pandas.Series(numpy.invert(numpy.isnan(self._data)))
+
+        return hpat_pandas_series_notna_impl
+
+    if isinstance(self.data.dtype, types.UnicodeType):
+
+        def hpat_pandas_series_notna_impl(self):
+            print("KDKDKDKD")
+            result = numpy.empty(len(self._data), numpy.bool_)
+            byte_size = 8
+            # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
+            for i in range(len(self._data)):
+                bmap_idx = i // byte_size
+                bit_idx = i % byte_size
+                bmap = self._data.null_bitmap[bmap_idx]
+                bit_value = (bmap >> bit_idx) & 1
+                result[i] = bit_value == 0
+            return pandas.Series(numpy.invert(result))
+
+        return hpat_pandas_series_notna_impl
+
+
 @overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """

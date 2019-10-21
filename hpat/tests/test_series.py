@@ -1757,6 +1757,26 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_notna_noidx(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            pd.testing.assert_series_equal(result, result_ref)
+
     def test_series_str_isna1(self):
         def test_impl(S):
             return S.isna()

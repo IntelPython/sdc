@@ -995,10 +995,10 @@ class HiFramesTyped(object):
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [data, other], pre_nodes=nodes)
 
-        if func_name == 'notna':
-            # TODO: make sure this is fused and optimized properly
-            return self._replace_func(
-                lambda S: S.isna() == False, [series_var])
+        # if func_name == 'notna':
+        #     # TODO: make sure this is fused and optimized properly
+        #     return self._replace_func(
+        #         lambda S: S.isna() == False, [series_var])
 
         if func_name == 'value_counts':
             nodes = []
