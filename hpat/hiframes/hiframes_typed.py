@@ -594,6 +594,7 @@ class HiFramesTyped(object):
             new_lhs = ir.Var(scope, mk_unique_var(lhs + '_data'), rhs.loc)
             self.typemap[new_lhs.name] = self.calltypes[rhs].return_type
             nodes.append(ir.Assign(rhs, new_lhs, rhs.loc))
+
             def _replace_func_param_impl(A):
                 return hpat.hiframes.api.init_series(A)
             return self._replace_func(_replace_func_param_impl, [new_lhs], pre_nodes=nodes)
@@ -842,7 +843,7 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max', 'prod'):
+        if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max'):
             if rhs.args or rhs.kws:
                 raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
 
@@ -856,7 +857,7 @@ class HiFramesTyped(object):
             data = self._get_series_data(series_var, nodes)
             return self._replace_func(func, [data], pre_nodes=nodes)
 
-        if func_name in ('std', 'nunique', 'describe', 'isna',
+        if func_name in ('std', 'nunique', 'describe',
                          'isnull', 'median', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
@@ -906,7 +907,7 @@ class HiFramesTyped(object):
                     data, index, name),
                 [data, index, name], pre_nodes=nodes)
 
-        if func_name in ('shift', 'pct_change'):
+        if func_name == 'pct_change':
             nodes = []
             data = self._get_series_data(series_var, nodes)
             # TODO: support default period argument
@@ -1043,7 +1044,7 @@ class HiFramesTyped(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('copy', 'cumsum', 'cumprod', 'astype')
+        _conv_to_np_funcs = ('cumsum', 'cumprod', 'astype')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):

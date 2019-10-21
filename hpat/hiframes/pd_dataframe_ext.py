@@ -1514,7 +1514,7 @@ class SumDummyTyper(AbstractTemplate):
         df = args[0]
         # TODO: ignore non-numerics
         # get series sum output types
-        dtypes = tuple(hpat.hiframes.pd_series_ext.SeriesAttribute.resolve_sum(
+        dtypes = tuple(numba.typing.arraydecl.ArrayAttribute.resolve_sum(
             self, SeriesType(d.dtype)).get_call_type(self, (), {}).return_type
             for d in df.data)
 
@@ -1554,7 +1554,7 @@ class ProdDummyTyper(AbstractTemplate):
         df = args[0]
         # TODO: ignore non-numerics
         # get series prod output types
-        dtypes = tuple(hpat.hiframes.pd_series_ext.SeriesAttribute.resolve_prod(
+        dtypes = tuple(numba.typing.arraydecl.ArrayAttribute.resolve_prod(
             self, SeriesType(d.dtype)).get_call_type(self, (), {}).return_type
             for d in df.data)
 
