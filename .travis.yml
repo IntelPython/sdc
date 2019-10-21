@@ -8,8 +8,10 @@ env:
         - GIT_DESCRIBE_NUMBER=1
         - CONDA_ENV=travisci
         - PYTHON_VER=3.7
+        - NUMPY_VER=1.16
     matrix:
         - HPAT_CHECK_STYLE=True
+        - HPAT_RUN_BUILD=True
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
         - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
@@ -27,7 +29,7 @@ install:
     - export PATH=$HOME/miniconda3/bin:$PATH
     - export HPAT_SOURCE_DIR="$(pwd)/hpat"
     - env | grep HPAT_SOURCE_DIR
-    - export HPAT_WHEELS_DIR="$(pwd)/hpat_wheels"
+    - export HPAT_WHEELS_DIR="$(pwd)/hpat-wheels"
     - env | grep HPAT_WHEELS_DIR
     - mkdir $HPAT_WHEELS_DIR
     - if [ "$HPAT_RUN_BUILD" == "True" ]; then

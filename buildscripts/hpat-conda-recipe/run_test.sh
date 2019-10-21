@@ -16,7 +16,7 @@ fi
 
 if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
   coverage erase
-  coverage run --source=${HPAT_SOURCE_DIR} --omit ${HPAT_SOURCE_DIR}/ml/*,${HPAT_SOURCE_DIR}/xenon_ext.py,${HPAT_SOURCE_DIR}/ros.py,${HPAT_SOURCE_DIR}/cv_ext.py,${HPAT_SOURCE_DIR}/tests/* -m hpat.runtests
+  coverage run --source=${HPAT_SOURCE_DIR} --omit ${HPAT_SOURCE_DIR}/ml/*,${HPAT_SOURCE_DIR}/xenon_ext.py,${HPAT_SOURCE_DIR}/ros.py,${HPAT_SOURCE_DIR}/cv_ext.py,${HPAT_SOURCE_DIR}/tests/* ${HPAT_SOURCE_DIR}/runtests.py
   coverage combine
   coveralls -v
 else

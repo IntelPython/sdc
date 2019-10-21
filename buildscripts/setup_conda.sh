@@ -26,5 +26,7 @@ source activate $CONDA_ENV
 # Install conda-build and numpy with pycodestyle (required for style check)
 $CONDA_INSTALL conda-build numpy pycodestyle clang pip -c conda-forge
 if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-  $CONDA_INSTALL clang-format -c sarcasm
+  sudo apt-get install clang-format
+  clang-format --version
+  which clang-format
 fi

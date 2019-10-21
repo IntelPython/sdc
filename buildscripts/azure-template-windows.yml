@@ -5,7 +5,7 @@ parameters:
 
 jobs:
 - job: ${{ parameters.name }}
-  timeoutInMinutes: 240
+  timeoutInMinutes: 120
   pool: 
     vmImage: ${{ parameters.vmImage }}
   strategy:
@@ -22,5 +22,8 @@ jobs:
 
     - script: |
         call activate %CONDA_ENV%
-        conda build --python %PYTHON_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
+        %HPAT_WHEELS_DIR% = %~dp0\hpat-wheels
+        echo %HPAT_WHEELS_DIR%
+        mkdir %HPAT_WHEELS_DIR%
+        conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
       displayName: conda build
