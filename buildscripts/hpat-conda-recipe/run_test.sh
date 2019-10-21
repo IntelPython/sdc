@@ -10,13 +10,13 @@ python -m hpat.tests.gen_test_data
 
 if [ "$HPAT_WHEELS" == "True" ]; then
   conda remove -y hpat
-  pip install "$HPAT_WHEELS_DIR/hpat*.whl"
+  pip install "${HPAT_WHEELS_DIR}/hpat*.whl"
   python -c 'import hpat'
 fi
 
 if [ "$HPAT_RUN_COVERAGE" == "True" ]; then
   coverage erase
-  coverage run --source="$HPAT_SRC_DIR" --omit "$HPAT_SRC_DIR/ml/*","$HPAT_SRC_DIR/xenon_ext.py","$HPAT_SRC_DIR/ros.py","$HPAT_SRC_DIR/cv_ext.py","$HPAT_SRC_DIR/tests/*" -m hpat.runtests
+  coverage run --source="${HPAT_SRC_DIR}" --omit "${HPAT_SRC_DIR}/ml/*","${HPAT_SRC_DIR}/xenon_ext.py","${HPAT_SRC_DIR}/ros.py","${HPAT_SRC_DIR}/cv_ext.py","${HPAT_SRC_DIR}/tests/*" -m hpat.runtests
   coverage combine
   coveralls -v
 else
