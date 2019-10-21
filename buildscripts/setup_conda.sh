@@ -23,4 +23,5 @@ export PATH=$HOME/miniconda3/bin:$PATH
 conda create -n $CONDA_ENV -q -y python=$PYTHON_VER
 source activate $CONDA_ENV
 # Install conda-build and numpy with pycodestyle (required for style check)
-$CONDA_INSTALL conda-build numpy pycodestyle -c conda-forge
+$CONDA_INSTALL conda-build numpy pycodestyle pip -c conda-forge
+pip install clang
