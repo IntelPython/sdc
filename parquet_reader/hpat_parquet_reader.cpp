@@ -391,10 +391,11 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader,
 {
     // std::cout << "string read file" << '\n';
     //
-    std::shared_ptr<::arrow::Array> arr;
-    arrow_reader->ReadColumn(column_idx, &arr);
-    if (arr == NULL)
+    std::shared_ptr<::arrow::ChunkedArray> chunked_arr;
+    arrow_reader->ReadColumn(column_idx, &chunked_arr);
+    if (chunked_arr == NULL)
         return -1;
+    auto arr = chunked_arr->chunk(0);
     int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
     std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
