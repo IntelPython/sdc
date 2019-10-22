@@ -635,11 +635,15 @@ void pq_init_reader(const char* file_name, std::shared_ptr<FileReader>* a_reader
         ::arrow::io::HadoopFileSystem::Connect(&hfs_config, &fs);
         std::shared_ptr<::arrow::io::HdfsReadableFile> file;
         fs->OpenReadable(f_name, &file);
-        a_reader->reset(new FileReader(pool, ParquetFileReader::Open(file)));
+        std::unique_ptr<FileReader> arrow_reader;
+        FileReader::Make(pool, ParquetFileReader::Open(file), &arrow_reader);
+        *a_reader = std::move(arrow_reader);
     }
     else // regular file system
     {
-        a_reader->reset(new FileReader(pool, ParquetFileReader::OpenFile(f_name, false)));
+        std::unique_ptr<FileReader> arrow_reader;
+        FileReader::Make(pool, ParquetFileReader::OpenFile(f_name, false), &arrow_reader);
+        *a_reader = std::move(arrow_reader);
     }
     // printf("file open for arrow reader done\n");
     // fflush(stdout);
