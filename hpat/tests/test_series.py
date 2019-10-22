@@ -266,6 +266,54 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    def test_series_argsort2(self):
+        def test_impl(S):
+            return S.argsort()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([5, np.nan, 3, 3, np.nan])
+        pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
+
+    def test_series_argsort_noidx(self):
+        def test_impl(S):
+            return S.argsort()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, 33.2, 56.3, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            pd.testing.assert_series_equal(result, result_ref)
+
+    def test_series_argsort_idx(self):
+        def test_impl(S):
+            return S.argsort()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
+                S = pd.Series(input_data, index_data)
+                result_ref = test_impl(S)
+                result = hpat_func(S)
+                pd.testing.assert_series_equal(result, result_ref)
+
     def test_series_attr6(self):
         def test_impl(A):
             return A.take([2, 3]).values

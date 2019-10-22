@@ -477,12 +477,12 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
 
-    @bound_function("array.argsort")
-    def resolve_argsort(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_argsort.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.argsort")
+    # def resolve_argsort(self, ary, args, kws):
+    #     resolver = ArrayAttribute.resolve_argsort.__wrapped__
+    #     sig = resolver(self, ary.data, args, kws)
+    #     sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
     @bound_function("series.sort_values")
     def resolve_sort_values(self, ary, args, kws):
@@ -994,7 +994,8 @@ for fname in ["cumsum", "cumprod"]:
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count']
+                           'resolve_prod', 'resolve_count', 'resolve_argsort']
+
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

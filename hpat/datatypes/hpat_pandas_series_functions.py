@@ -2160,3 +2160,105 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
         return numpy.median(self._data)
 
     return hpat_pandas_series_median_impl
+
+
+@overload_method(SeriesType, 'argsort')
+def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
+    """
+    Pandas Series method :meth:`pandas.Series.argsort` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort2
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_noidx
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_idx
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_parallel
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input arg
+    axis: :obj:`int`
+        Has no effect but is accepted for compatibility with numpy.
+    kind: {‘mergesort’, ‘quicksort’, ‘heapsort’}, default ‘quicksort’
+        Choice of sorting algorithm. See np.sort for more information. ‘mergesort’ is the only stable algorithm
+    order: None
+        Has no effect but is accepted for compatibility with numpy.
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns: Positions of values within the sort order with -1 indicating nan values.
+    """
+
+    _func_name = 'Method argsort().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
+                                                                                             self.data.dtype))
+
+    if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    if not isinstance(self.index, types.NoneType):
+        def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
+
+            sort = numpy.argsort(self._data)
+            series_data = pandas.Series(self._data)
+            na = 0
+            for i in series_data.isna():
+                if i:
+                    na += 1
+            id = 0
+            i = 0
+            list_no_nan = numpy.empty(len(self._data) - na)
+            for bool_value in series_data.isna():
+                if not bool_value:
+                    list_no_nan[id] = self._data[i]
+                    id += 1
+                i += 1
+            sort_no_nan = numpy.argsort(list_no_nan)
+            ne_na = sort[:len(sort) - na]
+            num = 0
+            result = numpy.full((len(self._data)), -1)
+            for i in numpy.sort(ne_na):
+                result[i] = sort_no_nan[num]
+                num += 1
+
+            return pandas.Series(result, self._index)
+
+        return hpat_pandas_series_argsort_impl
+
+    def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
+
+        sort = numpy.argsort(self._data)
+        series_data = pandas.Series(self._data)
+        na = 0
+        for i in series_data.isna():
+            if i:
+                na += 1
+        id = 0
+        i = 0
+        list_no_nan = numpy.empty(len(self._data) - na)
+        for bool_value in series_data.isna():
+            if not bool_value:
+                list_no_nan[id] = self._data[i]
+                id += 1
+            i += 1
+        sort_no_nan = numpy.argsort(list_no_nan)
+        ne_na = sort[:len(sort) - na]
+        num = 0
+        result = numpy.full((len(self._data)), -1)
+        for i in numpy.sort(ne_na):
+            result[i] = sort_no_nan[num]
+            num += 1
+
+        return pandas.Series(result)
+
+    return hpat_pandas_series_argsort_impl
+
+
