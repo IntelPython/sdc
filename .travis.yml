@@ -19,7 +19,7 @@ env:
 matrix:
     allow_failures:
         - env: HPAT_CHECK_STYLE=True
-        - evn: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
+        - env: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
 
 before_install:
     - buildscripts/setup_conda.sh
