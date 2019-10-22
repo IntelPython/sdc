@@ -86,7 +86,7 @@ int64_t pq_get_size_single_file(std::shared_ptr<FileReader> arrow_reader, int64_
 int64_t
     pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx, uint8_t* out_data, int out_dtype)
 {
-    std::shared_ptr<::arrow::Array> arr;
+    std::shared_ptr<::arrow::ChunkedArray> arr;
     arrow_reader->ReadColumn(column_idx, &arr);
     if (arr == NULL)
         return 0;
