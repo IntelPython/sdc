@@ -156,8 +156,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader,
         /* -------- read row group ---------- */
         std::shared_ptr<::arrow::Table> table;
         arrow_reader->ReadRowGroup(row_group_index, column_indices, &table);
-        std::shared_ptr<::arrow::Column> column = table->column(0);
-        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = column->data();
+        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = table->column(0);
         // std::cout << chunked_arr->num_chunks() << std::endl;
         if (chunked_arr->num_chunks() != 1)
         {
@@ -511,8 +510,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         /* -------- read row group ---------- */
         std::shared_ptr<::arrow::Table> table;
         arrow_reader->ReadRowGroup(row_group_index, column_indices, &table);
-        std::shared_ptr<::arrow::Column> column = table->column(0);
-        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = column->data();
+        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = table->column(0);
         // std::cout << chunked_arr->num_chunks() << std::endl;
         if (chunked_arr->num_chunks() != 1)
         {
