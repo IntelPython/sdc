@@ -531,5 +531,5 @@ series_replace_funcs = {
     'median': lambda A: hpat.hiframes.api.median(A),
     # TODO: handle NAs in argmin/argmax
     # 'idxmin': lambda A: A.argmin(),
-    'idxmax': lambda A: A.argmax(),
+    # 'idxmax': lambda A: A.argmax(),
 }
