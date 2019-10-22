@@ -2637,6 +2637,33 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
+    def test_series_count(self):
+        def test_series_count_impl(S):
+            return S.count()
+
+        hpat_func = hpat.jit(test_series_count_impl)
+
+        the_same_string = "the same string"
+        test_input_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                           [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                           [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                           ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                           ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd',
+                            'copy aa', 'copy aa'],
+                           [],
+                           [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                           [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                           [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                           [np.nan, np.nan, np.nan],
+                           [np.nan, np.nan, np.inf]
+                        ]
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_count_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
 
 if __name__ == "__main__":
     unittest.main()
