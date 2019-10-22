@@ -22,8 +22,5 @@ jobs:
 
     - script: |
         call activate %CONDA_ENV%
-        %HPAT_WHEELS_DIR% = %~dp0\hpat-wheels
-        echo %HPAT_WHEELS_DIR%
-        mkdir %HPAT_WHEELS_DIR%
         conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
       displayName: conda build

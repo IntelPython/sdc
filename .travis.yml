@@ -11,21 +11,19 @@ env:
         - NUMPY_VER=1.16
     matrix:
         - HPAT_CHECK_STYLE=True
+        - HPAT_RUN_BUILD=True HPAT_NUM_PES=1
+        - HPAT_RUN_BUILD=True HPAT_NUM_PES=2
+        - HPAT_RUN_BUILD=True HPAT_NUM_PES=3
         - HPAT_RUN_BUILD=True HPAT_WHEELS=True
         - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
-        - HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
 matrix:
     allow_failures:
         - env: HPAT_CHECK_STYLE=True
-        - env: HPAT_RUN_BUILD=True HPAT_CONFIG_MPI=False
+        - evn: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
 
 before_install:
     - buildscripts/setup_conda.sh
     - export PATH=$HOME/miniconda3/bin:$PATH
-    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-        sudo apt-get update -y;
-        sudo apt-get install -y clang-format-6.0;
-      fi
 
 install:
     - export PATH=$HOME/miniconda3/bin:$PATH
