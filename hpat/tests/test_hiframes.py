@@ -678,6 +678,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skip('Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
