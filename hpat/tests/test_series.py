@@ -1054,79 +1054,270 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    def test_series_fillna1(self):
-        def test_impl(A):
-            return A.fillna(5.0)
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis1(self):
+        '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
+        def test_impl(S):
+            return S.fillna(5.0, axis='index')
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis2(self):
+        '''Verifies Series.fillna() implementation handles 0 as axis argument'''
+        def test_impl(S):
+            print("Original series:\n", S)
+            return S.fillna(5.0, axis=0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis3(self):
+        '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
+        def test_impl(S, axis):
+            return S.fillna(5.0, axis=axis)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        axis_values = [0, 'index']
+        for value in axis_values:
+            pd.testing.assert_series_equal(hpat_func(S, value), test_impl(S, value))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_from_df(self):
+        '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: check_names must be fixed
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index1(self):
+        '''Verifies Series.fillna() implementation for float series with default index'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_float64:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index2(self):
+        '''Verifies Series.fillna() implementation for float series with string index'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index3(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], index=[1, 2, 5, 7, 10])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_from_df(self):
+        '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
+        def test_impl(S):
+            return S.fillna("dd")
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: check_names must be fixed
+        df = pd.DataFrame({'A': ['aa', 'b', None, 'cccd', '']})
         pd.testing.assert_series_equal(hpat_func(df.A),
                                        test_impl(df.A), check_names=False)
 
-    # test inplace fillna for named numeric series (obtained from DataFrame)
-    def test_series_fillna_inplace1(self):
-        def test_impl(A):
-            A.fillna(5.0, inplace=True)
-            return A
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index1(self):
+        '''Verifies Series.fillna() implementation for series of strings with default index'''
+        def test_impl(S):
+            return S.fillna("dd")
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
-        pd.testing.assert_series_equal(hpat_func(df.A),
-                                       test_impl(df.A), check_names=False)
+        S = pd.Series(['aa', 'b', None, 'cccd', ''])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_fillna_str1(self):
-        def test_impl(A):
-            return A.fillna("dd")
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index2(self):
+        '''Verifies Series.fillna() implementation for series of strings with string index'''
+        def test_impl(S):
+            return S.fillna("dd")
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
-        pd.testing.assert_series_equal(hpat_func(df.A),
-                                       test_impl(df.A), check_names=False)
+        S = pd.Series(['aa', 'b', None, 'cccd', ''], ['a', 'b', 'c', 'd', 'e'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_fillna_str_inplace1(self):
-        def test_impl(A):
-            A.fillna("dd", inplace=True)
-            return A
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index3(self):
+        def test_impl(S):
+            return S.fillna("dd")
+
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S = pd.Series(['aa', 'b', None, 'cccd', ''], index=[1, 2, 5, 7, 10])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_inplace1(self):
+        '''Verifies Series.fillna() implementation for float series with default index and inplace argument True'''
+        def test_impl(S):
+            S.fillna(5.0, inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
-        # TODO: handle string array reflection
-        # hpat_func(S1)
-        # test_impl(S2)
-        # np.testing.assert_array_equal(S1, S2)
 
+    @unittest.skip('TODO: add reflection support and check method return value')
+    def test_series_fillna_float_inplace2(self):
+        '''Verifies Series.fillna(inplace=True) results are reflected back in the original float series'''
+        def test_impl(S):
+            return S.fillna(inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
+
+    def test_series_fillna_float_inplace3(self):
+        '''Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S1))
+        pd.testing.assert_series_equal(S1, S2)
+
+    def test_series_fillna_inplace_non_literal(self):
+        '''Verifies Series.fillna() implementation handles only Boolean literals as inplace argument'''
+        def test_impl(S, param):
+            S.fillna(5.0, inplace=param)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        expected = ValueError if hpat.config.config_pipeline_hpat_default else TypingError
+        self.assertRaises(expected, hpat_func, S, True)
+
+    @unittest.skipUnless(hpat.config.config_pipeline_hpat_default,
+                         'TODO: investigate why Numba types inplace as bool (non-literal value)')
+    def test_series_fillna_str_inplace1(self):
+        '''Verifies Series.fillna() implementation for series of strings
+           with default index and inplace argument True
+        '''
+        def test_impl(S):
+            S.fillna("dd", inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('TODO (both): support StringArrayType reflection'
+                   'TODO (new-style): investigate why Numba infers inplace type as bool (non-literal value)')
+    def test_series_fillna_str_inplace2(self):
+        '''Verifies Series.fillna(inplace=True) results are reflected back in the original string series'''
+        def test_impl(S):
+            return S.fillna("dd", inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
+
+    @unittest.skipUnless(hpat.config.config_pipeline_hpat_default,
+                         'TODO: investigate why Numba types inplace as bool (non-literal value)')
     def test_series_fillna_str_inplace_empty1(self):
         def test_impl(A):
             A.fillna("", inplace=True)
             return A
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_fillna_index_str(self):
-        def test_impl(S):
-            return S.fillna(5.0)
+    @unittest.skip('AssertionError: Series are different\n'
+                   'Series length are different\n'
+                   '[left]:  [NaT, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]\n'
+                   '[right]: [2020-05-03T00:00:00.000000000, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]')
+    def test_series_fillna_dt_no_index1(self):
+        '''Verifies Series.fillna() implementation for datetime series and np.datetime64 value'''
+        def test_impl(S, value):
+            return S.fillna(value)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=['a', 'b', 'c', 'd'])
-        pd.testing.assert_series_equal(hpat_func(S),
-                                       test_impl(S), check_names=False)
+        value = np.datetime64('2020-05-03', 'ns')
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25'), None])
+        pd.testing.assert_series_equal(hpat_func(S, value), test_impl(S, value))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_fillna_index_int(self):
+    @unittest.skip('TODO: change unboxing of pd.Timestamp Series or support conversion between PandasTimestampType and datetime64')
+    def test_series_fillna_dt_no_index2(self):
+        '''Verifies Series.fillna() implementation for datetime series and pd.Timestamp value'''
         def test_impl(S):
-            return S.fillna(5.0)
-
+            value = pd.Timestamp('2020-05-03')
+            return S.fillna(value)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=[2, 3, 4, 5])
-        pd.testing.assert_series_equal(hpat_func(S),
-                                       test_impl(S), check_names=False)
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_fillna_bool_no_index1(self):
+        '''Verifies Series.fillna() implementation for bool series with default index'''
+        def test_impl(S):
+            return S.fillna(True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([True, False, False, True])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_int_no_index1(self):
+        '''Verifies Series.fillna() implementation for integer series with default index'''
+        def test_impl(S):
+            return S.fillna(7)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S1 = pd.Series(np.arange(n, dtype=np.int64))
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'No support of axis argument in old-style Series.dropna() impl')
