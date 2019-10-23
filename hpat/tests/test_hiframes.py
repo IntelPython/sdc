@@ -7,6 +7,7 @@ import string
 import pyarrow.parquet as pq
 import numba
 import hpat
+import os
 from hpat import hiframes
 from hpat.str_arr_ext import StringArray
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -678,7 +679,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
+    @unittest.skipIf(int(os.getenv('HPAT_NUM_PES', '0')) > 1, 'Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100

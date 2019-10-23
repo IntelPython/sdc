@@ -19,7 +19,6 @@ env:
 matrix:
     allow_failures:
         - env: HPAT_CHECK_STYLE=True
-        - env: HPAT_RUN_BUILD=True HPAT_NUM_PES=2
         - env: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
 
 before_install:
