@@ -1777,6 +1777,14 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             pd.testing.assert_series_equal(result, result_ref)
 
+    def test_series_str_notna(self):
+        def test_impl(S):
+            return S.notna()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', None, 'c', 'cccd'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_str_isna1(self):
         def test_impl(S):
             return S.isna()
