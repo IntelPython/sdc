@@ -1989,6 +1989,7 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(count_array_OneDs() > 0)
 
     def test_series_median1(self):
+        '''Verifies median implementation for float and integer series of random data'''
         def test_impl(S):
             return S.median()
         hpat_func = hpat.jit(test_impl)
@@ -2009,6 +2010,34 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(m))
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style median implementation doesn't filter NaNs")
+    def test_series_median_skipna_default1(self):
+        '''Verifies median implementation with default skipna=True argument on a series with NA values'''
+        def test_impl(S):
+            return S.median()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Skipna argument is not supported in old-style")
+    def test_series_median_skipna_false1(self):
+        '''Verifies median implementation with skipna=False on a series with NA values'''
+        def test_impl(S):
+            return S.median(skipna=False)
+        hpat_func = hpat.jit(test_impl)
+
+        # np.inf is not NaN, so verify that a correct number is returned
+        S1 = pd.Series([2., 3., 5., np.inf, 5., 6., 7.])
+        self.assertEqual(hpat_func(S1), test_impl(S1))
+
+        # TODO: both return values are 'nan', but HPAT's is not np.nan, hence checking with
+        # assertIs() doesn't work - check if it's Numba relatated
+        S2 = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
+        self.assertEqual(np.isnan(hpat_func(S2)), np.isnan(test_impl(S2)))
+
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -2020,6 +2049,9 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
     def test_series_argsort_parallel(self):
         # create `kde.parquet` file
@@ -2129,6 +2161,59 @@ class TestSeries(unittest.TestCase):
         np.random.seed(0)
         S = pd.Series(np.random.ranf(n))
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip("Skipna is not implemented")
+    def test_series_idxmax_str_idx(self):
+        def test_impl(S):
+            return S.idxmax(skipna=False)
+
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    def test_series_idxmax_noidx(self):
+        def test_impl(S):
+            return S.idxmax()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.inf, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
+
+    def test_series_idxmax_idx(self):
+        def test_impl(S):
+            return S.idxmax()
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
+                S = pd.Series(input_data, index_data)
+                result_ref = test_impl(S)
+                result = hpat_func(S)
+                if np.isnan(result) or np.isnan(result_ref):
+                    self.assertEqual(np.isnan(result), np.isnan(result_ref))
+                else:
+                    self.assertEqual(result, result_ref)
 
     def test_series_sort_values1(self):
         def test_impl(A):
@@ -2271,7 +2356,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Enable after fixing distributed for get_series_index")
     def test_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3])
@@ -2403,7 +2487,6 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Implement indexing by RangeIndex for Series")
     def test_series_default_index(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])
@@ -2554,6 +2637,33 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
+    def test_series_count(self):
+        def test_series_count_impl(S):
+            return S.count()
+
+        hpat_func = hpat.jit(test_series_count_impl)
+
+        the_same_string = "the same string"
+        test_input_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                           [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                           [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                           ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
+                           ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd',
+                            'copy aa', 'copy aa'],
+                           [],
+                           [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                           [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                           [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                           [np.nan, np.nan, np.nan],
+                           [np.nan, np.nan, np.inf]
+                        ]
+
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+
+            result_ref = test_series_count_impl(S)
+            result = hpat_func(S)
+            self.assertEqual(result, result_ref)
 
 if __name__ == "__main__":
     unittest.main()
