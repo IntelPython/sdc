@@ -20,6 +20,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         HPAT_WHEELS: 'True'
+        HPAT_WHEELS_DIR: 'D:\a\1\s\hpat-wheels'
 
 
 - template: buildscripts/azure-template-linux-macos.yml
