@@ -21,6 +21,9 @@ jobs:
       displayName: Create Anaconda environment
 
     - script: |
+        SET %HPAT_WHEELS_DIR% = "%CD%\hpat-wheels"
+        echo "HPAT_WHEELS_DIR"
+        echo %HPAT_WHEELS_DIR%
         call activate %CONDA_ENV%
         conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
       displayName: conda build

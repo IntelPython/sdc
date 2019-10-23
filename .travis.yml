@@ -11,37 +11,37 @@ env:
         - NUMPY_VER=1.16
     matrix:
         - HPAT_CHECK_STYLE=True
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=1
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=2
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=3
-        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
-        - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
+#        - HPAT_RUN_BUILD=True HPAT_NUM_PES=1
+#        - HPAT_RUN_BUILD=True HPAT_NUM_PES=2
+#        - HPAT_RUN_BUILD=True HPAT_NUM_PES=3
+#        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
+#        - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
 matrix:
     allow_failures:
         - env: HPAT_CHECK_STYLE=True
         - env: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
 
-before_install:
-    - buildscripts/setup_conda.sh
-    - export PATH=$HOME/miniconda3/bin:$PATH
+before_install: skip
+#    - buildscripts/setup_conda.sh
+#    - export PATH=$HOME/miniconda3/bin:$PATH
 
-install:
-    - export PATH=$HOME/miniconda3/bin:$PATH
-    - export HPAT_SOURCE_DIR="$(pwd)/hpat"
-    - env | grep HPAT_SOURCE_DIR
-    - export HPAT_WHEELS_DIR="$(pwd)/hpat-wheels"
-    - env | grep HPAT_WHEELS_DIR
-    - mkdir $HPAT_WHEELS_DIR
-    - if [ "$HPAT_RUN_BUILD" == "True" ]; then
-          buildscripts/build.sh;
-      fi
+install: skip
+#    - export PATH=$HOME/miniconda3/bin:$PATH
+#    - export HPAT_SOURCE_DIR="$(pwd)/hpat"
+#    - env | grep HPAT_SOURCE_DIR
+#    - export HPAT_WHEELS_DIR="$(pwd)/hpat-wheels"
+#    - env | grep HPAT_WHEELS_DIR
+#    - mkdir $HPAT_WHEELS_DIR
+#    - if [ "$HPAT_RUN_BUILD" == "True" ]; then
+#          buildscripts/build.sh;
+#      fi
 
-script:
-    - export PATH=$HOME/miniconda3/bin:$PATH
-    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          chmod 777 buildscripts/code_style.sh;
-          buildscripts/code_style.sh;
-      fi
+script: skip
+#    - export PATH=$HOME/miniconda3/bin:$PATH
+#    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
+#          chmod 777 buildscripts/code_style.sh;
+#          buildscripts/code_style.sh;
+#      fi
 
 after_success: skip
 
