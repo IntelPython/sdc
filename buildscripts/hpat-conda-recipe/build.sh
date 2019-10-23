@@ -1,9 +1,15 @@
-# LDSHARED="mpicxx -cxx=$GXX -shared" LD="mpicxx -cxx=$GXX" \
-# CC="mpicxx -cxx=$GXX -std=c++11" GXX="mpicxx -cxx=$GXX -std=c++11" \
-# OPENCV_DIR="${PREFIX}" DAALROOT="${PREFIX}"
+set -ex
+
 HDF5_DIR="${PREFIX}" MACOSX_DEPLOYMENT_TARGET=10.9 \
 $PYTHON setup.py build install --single-version-externally-managed --record=record.txt
 
-#Build Documentation
-#$PYTHON setup.py build_doc
-#$PYTHON setup.py build_devdoc
+if [ "$HPAT_WHEELS" == "True" ]; then
+  if [ -z "$HPAT_WHEELS_DIR" ]; then
+    echo "Please set HPAT_WHEELS_DIR to build HPAT wheels"
+  else
+    # Build HPAT wheel
+    echo Build HPAT wheel
+    $PYTHON setup.py bdist_wheel
+    cp dist/hpat*.whl "$HPAT_WHEELS_DIR"
+  fi
+fi
