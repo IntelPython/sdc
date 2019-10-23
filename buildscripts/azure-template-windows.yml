@@ -25,5 +25,5 @@ jobs:
         echo "HPAT_WHEELS_DIR"
         echo %HPAT_WHEELS_DIR%
         call activate %CONDA_ENV%
-        conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
+        conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c https://metachannel.conda-forge.org/conda-forge/python,setuptools,numpy,pandas,pyarrow,arrow-cpp,boost,hdf5,h5py,conda-package-handling,wheel,coveralls,pip -c defaults -c intel buildscripts/hpat-conda-recipe/
       displayName: conda build
