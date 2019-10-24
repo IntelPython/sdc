@@ -255,7 +255,13 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
 
         if skipna:
             valuable_length = len(self._data) - numpy.sum(numpy.isnan(self._data))
+            if valuable_length <= ddof:
+                return numpy.nan
+
             return numpy.nanvar(self._data) * valuable_length / (valuable_length - ddof)
+
+        if len(self._data) <= ddof:
+            return numpy.nan
 
         return self._data.var() * len(self._data) / (len(self._data) - ddof)
 
