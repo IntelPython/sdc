@@ -2669,6 +2669,8 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
         def test_impl():
             series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
@@ -2678,6 +2680,8 @@ class TestSeries(unittest.TestCase):
         cfunc = hpat.jit(pyfunc)
         pd.testing.assert_series_equal(pyfunc(), cfunc())
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
             return s.cumsum()
@@ -2689,6 +2693,8 @@ class TestSeries(unittest.TestCase):
             series = pd.Series(data)
             pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
             return s.cumsum(axis=axis, skipna=skipna)
@@ -2704,6 +2710,8 @@ class TestSeries(unittest.TestCase):
                 jit_result = cfunc(series, axis=axis, skipna=skipna)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() strings as input data unsupported')
     def test_series_cumsum_str(self):
         def test_impl(s):
             return s.cumsum()
@@ -2715,6 +2723,8 @@ class TestSeries(unittest.TestCase):
         msg = 'Method cumsum(). The object must be a number. Given self.data.dtype: {}'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() parameter "axis" unsupported')
     def test_series_cumsum_unsupported_axis(self):
         def test_impl(s, axis):
             return s.cumsum(axis=axis)
