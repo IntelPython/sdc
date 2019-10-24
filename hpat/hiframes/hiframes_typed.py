@@ -843,7 +843,7 @@ class HiFramesTyped(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ('sum', 'count', 'mean', 'min', 'max'):
+        if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max'):
             if rhs.args or rhs.kws:
                 raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
 

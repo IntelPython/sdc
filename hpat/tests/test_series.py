@@ -2647,11 +2647,20 @@ class TestSeries(unittest.TestCase):
             return series.var()
 
         cfunc = hpat.jit(pyfunc)
-        ref_result = pyfunc()
-        result = cfunc()
-        np.testing.assert_equal(ref_result, result)
+        np.testing.assert_equal(pyfunc(), cfunc())
 
     def test_series_var_unboxing(self):
+        def pyfunc(series):
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            np.testing.assert_equal(pyfunc(series), cfunc(series))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.var() parameters "ddof" and "skipna" unsupported')
+    def test_series_var_full(self):
         def pyfunc(series, skipna, ddof):
             return series.var(skipna=skipna, ddof=ddof)
 
