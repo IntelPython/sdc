@@ -3,6 +3,8 @@ jobs:
   parameters:
     name: Windows
     vmImage: vs2017-win2016
+    # allow failure for wheel build
+    allowFailureWheelBuild: true
     matrix:
 #      py37_np116_numpes0:
 #        CONDA_ENV: 'travisci'
@@ -23,15 +25,15 @@ jobs:
         HPAT_WHEELS_DIR: 'D:\a\1\s\hpat-wheels'
 
 
-- template: buildscripts/azure-template-linux-macos.yml
-  parameters:
-    name: macOS
-    vmImage: xcode9-macos10.13
-    matrix:
-      py37_np116_numpes0:
-        CONDA_ENV: 'travisci'
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+#- template: buildscripts/azure-template-linux-macos.yml
+#  parameters:
+#    name: macOS
+#    vmImage: xcode9-macos10.13
+#    matrix:
+#      py37_np116_numpes0:
+#        CONDA_ENV: 'travisci'
+#        PYTHON_VER: '3.7'
+#        NUMPY_VER: '1.16'
 #
 #      py37_np116_numpes2:
 #        CONDA_ENV: 'travisci'

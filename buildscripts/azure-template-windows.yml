@@ -2,6 +2,7 @@ parameters:
   name: ''
   vmImage: ''
   matrix: []
+  allowFailureWheelBuild: ''
 
 jobs:
 - job: ${{ parameters.name }}
@@ -26,3 +27,4 @@ jobs:
         call activate %CONDA_ENV%
         conda build --python %PYTHON_VER% --numpy=%NUMPY_VER% --override-channels -c numba -c conda-forge -c defaults -c intel buildscripts/hpat-conda-recipe/
       displayName: conda build
+      continueOnError: ${{ parameters.allowFailureWheelBuild }}

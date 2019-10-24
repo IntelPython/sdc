@@ -8,9 +8,11 @@ python -m hpat.tests.gen_test_data
 if errorlevel 1 exit 1
 
 IF "%HPAT_WHEELS%" == "True" (
-    conda remove -y hpat
-    pip install %HPAT_WHEELS_DIR%\hpat*.whl
-    python -c "import hpat"
+    for %%f in (%HPAT_WHEELS_DIR%\*) do set hpat_wheel=%%f
+	)
+if errorlevel 1 exit 1
+IF "%HPAT_WHEELS%" == "True" (
+    conda remove -y hpat && pip install %hpat_wheel% && python -c "import hpat"
     )
 if errorlevel 1 exit 1
 
