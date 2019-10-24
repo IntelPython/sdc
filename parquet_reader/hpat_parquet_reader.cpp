@@ -654,20 +654,10 @@ void pq_init_reader(const char* file_name, std::shared_ptr<FileReader>* a_reader
 // TODO: handle more complex types
 std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
 {
-    // TODO: error checking
-    // std::vector<int> column_indices;
-    // column_indices.push_back(column_idx);
-
+    // TODO: error checking (column_idx out of bounds)
     std::shared_ptr<::arrow::Schema> col_schema;
-    // auto descr = arrow_reader->parquet_reader()->metadata()->schema();
-    // auto parquet_key_value_metadata = arrow_reader->parquet_reader()->metadata()->key_value_metadata();
-    // parquet::arrow::FromParquetSchema(descr, column_indices, parquet_key_value_metadata, &col_schema);
     arrow_reader->GetSchema(&col_schema);
-    // std::cout<< col_schema->ToString() << std::endl;
-    // std::shared_ptr<::arrow::DataType> arrow_dtype = col_schema->field(0)->type();
-    std::shared_ptr<::arrow::DataType> arrow_dtype = col_schema->field(column_idx)->type();
-
-    return arrow_dtype;
+    return col_schema->field(column_idx)->type();
 }
 
 bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type)
