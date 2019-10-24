@@ -528,4 +528,10 @@ setup(name='hpat',
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
       cmdclass=hpat_build_commands,
-      ext_modules=_ext_mods)
+      ext_modules=_ext_mods,
+      entry_points={
+          "numba_extensions": [
+              "init = hpat:_init_extension",
+          ],
+      },
+)
