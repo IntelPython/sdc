@@ -2595,6 +2595,8 @@ class TestSeries(unittest.TestCase):
         result = cfunc()
         np.testing.assert_equal(ref_result, result)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() parameters "skipna" and "ddof" unsupported')
     def test_series_std_unboxing(self):
         def pyfunc(series, skipna, ddof):
             return series.std(skipna=skipna, ddof=ddof)
@@ -2608,6 +2610,8 @@ class TestSeries(unittest.TestCase):
                     result = cfunc(series, skipna=skipna, ddof=ddof)
                     np.testing.assert_equal(ref_result, result)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() strings as input data unsupported')
     def test_series_std_str(self):
         def pyfunc(series):
             return series.std()
@@ -2619,6 +2623,8 @@ class TestSeries(unittest.TestCase):
         msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_std_unsupported_params(self):
         def pyfunc(series, axis, level, numeric_only):
             return series.std(axis=axis, level=level, numeric_only=numeric_only)

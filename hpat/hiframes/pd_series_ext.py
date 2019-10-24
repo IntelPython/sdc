@@ -992,10 +992,11 @@ for fname in ["cumsum", "cumprod"]:
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_shift', 'resolve_std',
-                           'resolve_sum', 'resolve_copy', 'resolve_mean',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_prod', 'resolve_count']
+if not hpat.config.config_pipeline_hpat_default:
+    _not_series_array_attrs.append('resolve_std')
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
