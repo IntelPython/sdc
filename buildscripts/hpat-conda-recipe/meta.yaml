@@ -1,5 +1,5 @@
-{% set PYARROW_VERSION = ">=0.14.0,<0.15.0a0" %}
-{% set ARROW_CPP_VERSION = ">=0.14.0,<0.15.0a0" %}
+{% set PYARROW_VERSION = "==0.15.0" %}
+{% set ARROW_CPP_VERSION = "==0.15.0" %}
 
 package:
   name: hpat
