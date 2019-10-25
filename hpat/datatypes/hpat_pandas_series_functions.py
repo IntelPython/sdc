@@ -2181,10 +2181,13 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         input arg
     axis: :obj:`int`
         Has no effect but is accepted for compatibility with numpy.
-    kind: {‘mergesort’, ‘quicksort’, ‘heapsort’}, default ‘quicksort’
-        Choice of sorting algorithm. See np.sort for more information. ‘mergesort’ is the only stable algorithm
+        *unsupported*
+    kind: {'mergesort', 'quicksort', 'heapsort'}, default 'quicksort'
+        Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
+        *unsupported, uses python func - sorted()*
     order: None
         Has no effect but is accepted for compatibility with numpy.
+        *unsupported*
 
     Returns
     -------
@@ -2262,3 +2265,219 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     return hpat_pandas_series_argsort_impl
 
 
+@overload_method(SeriesType, 'sort_values')
+def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
+    """
+    Pandas Series method :meth:`pandas.Series.sort_values` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values2
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_index1
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_noidx
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_idx
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_parallel1
+
+    Parameters
+    -----------
+    self: :class:'pandas.Series'
+        input arg
+    axis: 0 or :obj:'pandas.Series.index'
+        Axis to direct sorting.
+        *unsupported*
+    ascending: :obj:'bool', default: True
+        If True, sort values in ascending order, otherwise descending.
+    kind: {'mergesort', 'quicksort', 'heapsort'}, default 'quicksort'
+        Choice of sorting algorithm.
+        *unsupported, uses python func - sorted()*
+    na_position: {'first' or 'last'}, default 'last'
+        Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns: Series ordered by values.
+    """
+
+    _func_name = 'Method sort_values().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(ascending, types.Omitted) or isinstance(ascending, types.Boolean) or ascending is True or False):
+        raise TypingError('{} Unsupported parameters. Given ascending: {}'.format(_func_name, ascending))
+
+    if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+
+            index = numpy.arange(len(self._data))
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = sorted(self._data)
+            cycle = range(len(self._data))
+            if ascending is False:
+                result = result[::-1]
+                cycle = range(len(self._data) - 1, -1, -1)
+            result_index = index.copy()
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+
+            na = 0
+            for i in self.isna():
+                if i:
+                    na += 1
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_impl
+
+    if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
+        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+
+            na = 0
+            for i in self.isna():
+                if i:
+                    na += 1
+            index = numpy.arange(len(self._data))
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = numpy.sort(self._data)
+            i = len(self._data) - na
+            cycle = range(len(self._data))
+            if ascending is False:
+                result[:i] = result[:i][::-1]
+                cycle = range(len(self._data), -1, -1)
+            result_index = index.copy()
+
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+
+
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_impl
+
+    if isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+
+            index = self._index
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = sorted(self._data)
+            cycle = range(len(self._data))
+            if ascending is False:
+                result = result[::-1]
+                cycle = range(len(self._data) - 1, -1, -1)
+            result_index = self._index.copy()
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+
+            na = 0
+            for i in self.isna():
+                if i:
+                    na += 1
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_impl
+
+    if isinstance(self.data.dtype, types.Number):
+        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+
+            na = 0
+            for i in self.isna():
+                if i:
+                    na += 1
+            i = len(self._data) - na
+            index = self._index
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = numpy.sort(self._data)
+            cycle = range(len(self._data))
+            if ascending is False:
+                result[:i] = result[:i][::-1]
+                cycle = range(len(self._data), -1, -1)
+            result_index = self._index.copy()
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+
+
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_impl

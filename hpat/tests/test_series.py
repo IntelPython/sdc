@@ -2220,6 +2220,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_sort_values2(self):
+        def test_impl(S):
+            return S.sort_values(ascending=False)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([6, 6, 2, 1, 3, 3, 2, 1, 2])
+        pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
+
     def test_series_sort_values_index1(self):
         def test_impl(A, B):
             S = pd.Series(A, B)
@@ -2233,6 +2241,63 @@ class TestSeries(unittest.TestCase):
         A = np.random.ranf(n)
         B = np.random.ranf(n)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    def test_series_sort_values_noidx(self):
+        def test_impl_true(S):
+            return S.sort_values(ascending=True)
+
+        def test_impl_false(S):
+            return S.sort_values(ascending=False)
+
+        hpat_func1 = hpat.jit(test_impl_true)
+        hpat_func2 = hpat.jit(test_impl_false)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, 33.2, 56.3, 4.4, 3.7, 8.9],
+                     ['a', 's', 'dd', 'm', 'll', '345', 'xrt', 'kd', 'qq'],
+                     ['dh', 'a', '', 'cv', 'b', '', 'b', 'b', 'p']
+                     ]
+
+        for input_data in data_test:
+            S = pd.Series(input_data)
+            result_ref = test_impl_true(S)
+            result = hpat_func1(S)
+            pd.testing.assert_series_equal(result, result_ref)
+            result_ref = test_impl_false(S)
+            result = hpat_func2(S)
+            pd.testing.assert_series_equal(result, result_ref)
+
+    def test_series_sort_values_idx(self):
+        def test_impl_true(S):
+            return S.sort_values(ascending=True)
+
+        def test_impl_false(S):
+            return S.sort_values(ascending=False)
+
+        hpat_func1 = hpat.jit(test_impl_true)
+        hpat_func2 = hpat.jit(test_impl_false)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     [6, 6, 2, 1, 3, np.nan, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9],
+                     ['a', 's', 'dd', 'm', 'll', '345', 'xrt', 'kd', 'qq'],
+                     ['dh', 'a', '', 'cv', 'b', '', 'b', 'b', 'p']
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
+                S = pd.Series(input_data, index_data)
+                result_ref = test_impl_true(S)
+                result = hpat_func1(S)
+                pd.testing.assert_series_equal(result, result_ref)
+                result_ref = test_impl_false(S)
+                result = hpat_func2(S)
+                pd.testing.assert_series_equal(result, result_ref)
 
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file

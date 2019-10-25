@@ -484,14 +484,14 @@ class SeriesAttribute(AttributeTemplate):
     #     sig.return_type = if_arr_to_series_type(sig.return_type)
     #     return sig
 
-    @bound_function("series.sort_values")
-    def resolve_sort_values(self, ary, args, kws):
-        # output will have permuted input index
-        out_index = ary.index
-        if out_index == types.none:
-            out_index = types.Array(types.intp, 1, 'C')
-        out = SeriesType(ary.dtype, ary.data, out_index)
-        return signature(out, *args)
+    # @bound_function("series.sort_values")
+    # def resolve_sort_values(self, ary, args, kws):
+    #     # output will have permuted input index
+    #     out_index = ary.index
+    #     if out_index == types.none:
+    #         out_index = types.Array(types.intp, 1, 'C')
+    #     out = SeriesType(ary.dtype, ary.data, out_index)
+    #     return signature(out, *args)
 
 #     @bound_function("array.take")
 #     def resolve_take(self, ary, args, kws):
@@ -994,7 +994,7 @@ for fname in ["cumsum", "cumprod"]:
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count', 'resolve_argsort']
+                           'resolve_prod', 'resolve_count', 'resolve_argsort', 'resolve_sort_values']
 
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
