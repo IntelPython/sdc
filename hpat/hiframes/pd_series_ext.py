@@ -996,6 +996,7 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_prod', 'resolve_count']
 
+
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
     if (attr.startswith('resolve_')
