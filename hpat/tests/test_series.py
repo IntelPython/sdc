@@ -1121,9 +1121,10 @@ class TestSeries(unittest.TestCase):
             return S.dropna()
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
-        S2 = S1.copy()
-        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+        for data in test_global_input_data_float64:
+            S1 = pd.Series(data)
+            S2 = S1.copy()
+            pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'BUG: old-style dropna impl returns series without index')
@@ -2795,6 +2796,7 @@ class TestSeries(unittest.TestCase):
             result_ref = test_series_count_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
+
 
 if __name__ == "__main__":
     unittest.main()

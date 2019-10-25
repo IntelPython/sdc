@@ -2227,22 +2227,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 
     .. only:: developer
 
-       Tests: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis2
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_axis3
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_index2
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index2
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_index3
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_inplace_no_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_float_inplace_no_index2
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_inplace_no_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_inplace_no_index2
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_str_parallel1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_dt_no_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_bool_no_index1
-              python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_dropna_int_no_index1
+       Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
 
     Parameters
     ----------
@@ -2271,24 +2256,11 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
 
-    # TODO: handle inplace argument (currently supported with old-style impl only via assign.target)
-    # Find a way to assign back to self._data and return None
-    if isinstance(self.dtype, (types.Number, types.Boolean)):
-        def hpat_pandas_series_np_arrays_dropna_impl(self, axis=0, inplace=False):
-            # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
-            na_data_arr = numpy.isnan(self._data)
-            data = self._data[~na_data_arr]
-            index = self.index[~na_data_arr]
-            return pandas.Series(data, index, self._name)
+    def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
+        # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
+        na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+        data = self._data[~na_data_arr]
+        index = self.index[~na_data_arr]
+        return pandas.Series(data, index, self._name)
 
-        return hpat_pandas_series_np_arrays_dropna_impl
-    else:
-        # For other cases (StringArrayType, dtype datetime64) use implementation based on HPAT isna overload
-        def hpat_pandas_series_default_dropna_impl(self, axis=0, inplace=False):
-            # generate Series index if needed by using SeriesType.index (i.e. not self._index)
-            na_data_arr = numpy.array([hpat.hiframes.api.isna(self._data, i) for i in numpy.arange(len(self._data))])
-            data = self._data[~na_data_arr]
-            index = self.index[~na_data_arr]
-            return pandas.Series(data, index, self._name)
-
-        return hpat_pandas_series_default_dropna_impl
+    return hpat_pandas_series_dropna_impl
