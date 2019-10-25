@@ -426,7 +426,7 @@ def join_distributed_run(join_node, array_dists, typemap, calltypes, typingctx, 
         func_text += "    {} = right_{}\n".format(out_names[i + 2 * n_keys + len(left_other_names)], i)
 
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'hpat': hpat}, loc_vars)
     join_impl = loc_vars['f']
 
     # print(func_text)

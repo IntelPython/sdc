@@ -46,7 +46,7 @@ class PIO(object):
             # TODO: index arg?
             func_text += "  arr = hpat.io.pio_api.h5_read_dummy(dset, {}, '{}', index)\n".format(tp.ndim, dtype_str)
             loc_vars = {}
-            exec(func_text, {}, loc_vars)
+            exec(func_text, {'hpat': hpat}, loc_vars)
             _h5_read_impl = loc_vars['_h5_read_impl']
             f_block = compile_to_numba_ir(_h5_read_impl, {'hpat': hpat}).blocks.popitem()[1]
             index_var = rhs.index if rhs.op == 'getitem' else rhs.index_var
