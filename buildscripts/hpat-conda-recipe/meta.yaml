@@ -26,7 +26,7 @@ requirements:
   host:
     - python
     - setuptools
-    - numba ==0.45
+    - numba ==0.46
     - numpy
     - pandas >=0.23
     - pyarrow {{ PYARROW_VERSION }}
@@ -47,7 +47,7 @@ requirements:
     - pyarrow {{ PYARROW_VERSION }}
     - arrow-cpp {{ ARROW_CPP_VERSION }}
     - boost
-    - numba ==0.45
+    - numba ==0.46
     - mpich # [not win]
     - impi_rt # [win]
     - conda-package-handling ==1.3.11 #[win]

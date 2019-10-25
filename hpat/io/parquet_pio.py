@@ -173,7 +173,7 @@ def get_column_read_nodes(c_type, cvar, arrow_readers_var, i):
             i, _type_to_pq_dtype_number[el_type])
 
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
     size_func = loc_vars['f']
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_parquet': get_column_size_parquet,

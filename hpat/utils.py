@@ -18,6 +18,7 @@ import hpat
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 from enum import Enum
+import types as pytypes
 
 
 # int values for types to pass to C code
@@ -531,3 +532,7 @@ def dump_node_list(node_list):
 
 def debug_prints():
     return numba.config.DEBUG_ARRAY_OPT == 1
+
+def update_globals(func, glbls):
+    if isinstance(func, pytypes.FunctionType):
+        func.__globals__.update(glbls)

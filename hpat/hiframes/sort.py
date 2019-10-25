@@ -315,7 +315,7 @@ def sort_distributed_run(sort_node, array_dists, typemap, calltypes, typingctx,
     func_text += "  return key_arrs, data\n"
 
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'hpat': hpat}, loc_vars)
     sort_impl = loc_vars['f']
 
     key_typ = types.Tuple([typemap[v.name] for v in key_arrs])

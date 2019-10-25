@@ -6,7 +6,7 @@ from functools import reduce
 import copy
 import numpy as np
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, compiler
+from numba import typeinfer, ir, ir_utils, config, types, compiler, typed_passes
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
@@ -1047,51 +1047,54 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
 
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
+    state = namedtuple('State',
+                            ['typingctx', 'targetctx', 'args', 'func_ir', 'typemap', 'return_type',
+                                'calltypes', 'metadata'])
+
     # XXX are outside function's globals needed?
     code = func.code if hasattr(func, 'code') else func.__code__
-    f_ir = get_ir_of_code({'numba': numba, 'np': np, 'hpat': hpat}, code)
+    state.func_ir = get_ir_of_code({'numba': numba, 'np': np, 'hpat': hpat}, code)
+
+    state.typingctx = typingctx
+    state.args = arg_typs
+    state.locals = {}
+    state.metadata = {}
 
     # rename all variables to avoid conflict (init and eval nodes)
-    var_table = get_name_var_table(f_ir.blocks)
+    var_table = get_name_var_table(state.func_ir.blocks)
     new_var_dict = {}
     for name, _ in var_table.items():
         new_var_dict[name] = mk_unique_var(name)
-    replace_var_names(f_ir.blocks, new_var_dict)
-    f_ir._definitions = build_definitions(f_ir.blocks)
+    replace_var_names(state.func_ir.blocks, new_var_dict)
+    state.func_ir._definitions = build_definitions(state.func_ir.blocks)
 
-    assert f_ir.arg_count == 1, "agg function should have one input"
-    input_name = f_ir.arg_names[0]
-    df_pass = hpat.hiframes.hiframes_untyped.HiFrames(
-        f_ir, typingctx, arg_typs, {}, {})
-    df_pass.run()
-    remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
-    typemap, return_type, calltypes = compiler.type_inference_stage(
-        typingctx, f_ir, arg_typs, None)
+    assert state.func_ir.arg_count == 1, "agg function should have one input"
+    input_name = state.func_ir.arg_names[0]
+    df_pass = hpat.hiframes.hiframes_untyped.HiFramesPass()
+    df_pass.run_pass(state)
+    remove_dead(state.func_ir.blocks, state.func_ir.arg_names, state.func_ir)
+    state.typemap, return_type, state.calltypes = typed_passes.type_inference_stage(
+        typingctx, state.func_ir, arg_typs, None)
 
     options = numba.targets.cpu.ParallelOptions(True)
     flags = compiler.Flags()
-    targetctx = numba.targets.cpu.CPUContext(typingctx)
+    state.targetctx = numba.targets.cpu.CPUContext(typingctx)
 
-    DummyPipeline = namedtuple('DummyPipeline',
-                               ['typingctx', 'targetctx', 'args', 'func_ir', 'typemap', 'return_type',
-                                'calltypes'])
-    pm = DummyPipeline(typingctx, targetctx, None, f_ir, typemap, return_type,
-                       calltypes)
-    preparfor_pass = numba.parfor.PreParforPass(f_ir, typemap, calltypes, typingctx, options)
+    preparfor_pass = numba.parfor.PreParforPass(state.func_ir, state.typemap, state.calltypes, state.typingctx, options)
     preparfor_pass.run()
-    f_ir._definitions = build_definitions(f_ir.blocks)
-    df_t_pass = hpat.hiframes.hiframes_typed.HiFramesTyped(f_ir, typingctx, typemap, calltypes)
-    df_t_pass.run()
-    numba.rewrites.rewrite_registry.apply('after-inference', pm, f_ir)
-    parfor_pass = numba.parfor.ParforPass(f_ir, typemap,
-                                          calltypes, return_type, typingctx,
+    state.func_ir._definitions = build_definitions(state.func_ir.blocks)
+    df_t_pass = hpat.hiframes.hiframes_typed.HiFramesTypedPass()
+    df_t_pass.run_pass(state)
+    numba.rewrites.rewrite_registry.apply('after-inference', state)
+    parfor_pass = numba.parfor.ParforPass(state.func_ir, state.typemap,
+                                          state.calltypes, return_type, state.typingctx,
                                           options, flags)
     parfor_pass.run()
-    remove_dels(f_ir.blocks)
+    remove_dels(state.func_ir.blocks)
     # make sure eval nodes are after the parfor for easier extraction
     # TODO: extract an eval func more robustly
-    numba.parfor.maximize_fusion(f_ir, f_ir.blocks, typemap, False)
-    return f_ir, pm
+    numba.parfor.maximize_fusion(state.func_ir, state.func_ir.blocks, state.typemap, False)
+    return state.func_ir, state
 
 
 def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
