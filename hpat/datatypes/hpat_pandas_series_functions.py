@@ -688,13 +688,12 @@ def hpat_pandas_series_notna(self):
 
     .. only:: developer
 
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna1
-        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna_noidx
+        Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna*
 
     Parameters
     -----------
     self : :obj:`pandas.Series` object
-               input argument
+        input series
 
     Returns
     -------
@@ -708,15 +707,12 @@ def hpat_pandas_series_notna(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if isinstance(self.data.dtype, types.Number):
-
         def hpat_pandas_series_notna_impl(self):
-
             return pandas.Series(numpy.invert(numpy.isnan(self._data)))
 
         return hpat_pandas_series_notna_impl
 
     if isinstance(self.data.dtype, types.UnicodeType):
-
         def hpat_pandas_series_notna_impl(self):
             result = self.isna()
             return pandas.Series(numpy.invert(result._data))
