@@ -19,6 +19,7 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
 
 from numba.inline_closurecall import inline_closure_call
 from numba.analysis import compute_cfg_from_blocks
+from numba.compiler_machinery import FunctionPass, register_pass
 
 import hpat
 from hpat import utils, config
@@ -26,7 +27,7 @@ import hpat.io
 from hpat.io import pio, parquet_pio
 from hpat.hiframes import filter, join, aggregate, sort
 from hpat.utils import (get_constant, NOT_CONSTANT, debug_prints,
-                        inline_new_blocks, ReplaceFunc, is_call, is_assign)
+                        inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
 import hpat.hiframes.api
 from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
@@ -102,16 +103,22 @@ def remove_hiframes(rhs, lives, call_list):
 numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 
 
-class HiFrames(object):
+@register_pass(mutates_CFG=True, analysis_only=False)
+class HiFramesPass(FunctionPass):
     """analyze and transform hiframes calls"""
 
-    def __init__(self, func_ir, typingctx, args, _locals, metadata):
-        self.func_ir = func_ir
-        self.typingctx = typingctx
-        self.args = args
-        self.locals = _locals
-        self.metadata = metadata
-        ir_utils._max_label = max(func_ir.blocks.keys())
+    _name = "hi_frames_pass"
+
+    def __init__(self):
+        pass
+
+    def run_pass(self, state):
+        return HiFramesPassImpl(state).run_pass()
+
+
+class HiFramesPassImpl(object):
+
+    def __init__(self, state):
         # replace inst variables as determined previously during the pass
         # currently use to keep lhs of Arg nodes intact
         self.replace_var_dict = {}
@@ -123,19 +130,24 @@ class HiFrames(object):
 
         self.arrow_tables = {}
         self.reverse_copies = {}
-        self.pq_handler = ParquetHandler(
-            func_ir, typingctx, args, _locals, self.reverse_copies)
-        self.h5_handler = pio.PIO(self.func_ir, _locals, self.reverse_copies)
 
-    def run(self):
+        self.state = state
+
+    def run_pass(self):
+        ir_utils._max_label = max(self.state.func_ir.blocks.keys())
+
+        self.pq_handler = ParquetHandler(
+            self.state.func_ir, self.state.typingctx, self.state.args, self.state.locals, self.reverse_copies)
+        self.h5_handler = pio.PIO(self.state.func_ir, self.state.locals, self.reverse_copies)
+
         # FIXME: see why this breaks test_kmeans
-        # remove_dels(self.func_ir.blocks)
-        dprint_func_ir(self.func_ir, "starting hiframes")
+        # remove_dels(self.state.func_ir.blocks)
+        dprint_func_ir(self.state.func_ir, "starting hiframes")
         self._handle_metadata()
-        blocks = self.func_ir.blocks
+        blocks = self.state.func_ir.blocks
         # call build definition since rewrite pass doesn't update definitions
         # e.g. getitem to static_getitem in test_column_list_select2
-        self.func_ir._definitions = build_definitions(blocks)
+        self.state.func_ir._definitions = build_definitions(blocks)
         # topo_order necessary since df vars need to be found before use
         topo_order = find_topo_order(blocks)
         work_list = list((l, blocks[l]) for l in reversed(topo_order))
@@ -158,7 +170,7 @@ class HiFrames(object):
                     cfg = compute_cfg_from_blocks(blocks)
                     out_nodes = self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
-                    self.func_ir._definitions[inst.target.name].remove(inst.value)
+                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst, label)
                 elif isinstance(inst, ir.Return):
                     out_nodes = self._run_return(inst)
@@ -179,7 +191,8 @@ class HiFrames(object):
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    inline_closure_call(self.func_ir, rp_func.glbls,
+                    update_globals(rp_func.func, rp_func.glbls)
+                    inline_closure_call(self.state.func_ir, rp_func.glbls,
                                         block, len(new_body), rp_func.func, work_list=work_list)
                     replaced = True
                     break
@@ -188,38 +201,39 @@ class HiFrames(object):
                     # TODO: insert new blocks in current spot of work_list
                     # instead of append?
                     # TODO: rename variables, fix scope/loc
-                    inline_new_blocks(self.func_ir, block, len(new_body), out_nodes, work_list)
+                    inline_new_blocks(self.state.func_ir, block, len(new_body), out_nodes, work_list)
                     replaced = True
                     break
             if not replaced:
                 blocks[label].body = new_body
 
-        self.func_ir.blocks = ir_utils.simplify_CFG(self.func_ir.blocks)
-        # self.func_ir._definitions = build_definitions(blocks)
+        self.state.func_ir.blocks = ir_utils.simplify_CFG(self.state.func_ir.blocks)
+        # self.state.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
-        # while remove_dead(blocks, self.func_ir.arg_names, self.func_ir):
+        # while remove_dead(blocks, self.state.func_ir.arg_names, self.state.func_ir):
         #     pass
-        self.func_ir._definitions = build_definitions(blocks)
-        dprint_func_ir(self.func_ir, "after hiframes")
+        self.state.func_ir._definitions = build_definitions(blocks)
+        dprint_func_ir(self.state.func_ir, "after hiframes")
         if debug_prints():  # pragma: no cover
             print("df_vars: ", self.df_vars)
-        return
+
+        return True
 
     def _replace_vars(self, inst):
         # variable replacement can affect definitions so handling assignment
         # values specifically
         if is_assign(inst):
             lhs = inst.target.name
-            self.func_ir._definitions[lhs].remove(inst.value)
+            self.state.func_ir._definitions[lhs].remove(inst.value)
 
         ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
 
         if is_assign(inst):
-            self.func_ir._definitions[lhs].append(inst.value)
+            self.state.func_ir._definitions[lhs].append(inst.value)
             # if lhs changed, TODO: test
             if inst.target.name != lhs:
-                self.func_ir._definitions[inst.target.name] = self.func_ir._definitions[lhs]
+                self.state.func_ir._definitions[inst.target.name] = self.state.func_ir._definitions[lhs]
 
     def _run_assign(self, assign, label):
         lhs = assign.target.name
@@ -239,37 +253,37 @@ class HiFrames(object):
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
             if rhs.op == 'getattr':
-                val_def = guard(get_definition, self.func_ir, rhs.value)
+                val_def = guard(get_definition, self.state.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == pd
                         and rhs.attr in ('DataFrame', 'read_csv',
                                          'read_parquet', 'to_numeric')):
                     # TODO: implement to_numeric in typed pass?
                     # put back the definition removed earlier but remove node
                     # enables function matching without node in IR
-                    self.func_ir._definitions[lhs].append(rhs)
+                    self.state.func_ir._definitions[lhs].append(rhs)
                     return []
 
             if rhs.op == 'getattr':
-                val_def = guard(get_definition, self.func_ir, rhs.value)
+                val_def = guard(get_definition, self.state.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == np
                         and rhs.attr == 'fromfile'):
                     # put back the definition removed earlier but remove node
-                    self.func_ir._definitions[lhs].append(rhs)
+                    self.state.func_ir._definitions[lhs].append(rhs)
                     return []
 
             # HACK: delete pyarrow.parquet.read_table() to avoid typing errors
             if rhs.op == 'getattr' and rhs.attr == 'read_table':
                 import pyarrow.parquet as pq
-                val_def = guard(get_definition, self.func_ir, rhs.value)
+                val_def = guard(get_definition, self.state.func_ir, rhs.value)
                 if isinstance(val_def, ir.Global) and val_def.value == pq:
                     # put back the definition removed earlier but remove node
-                    self.func_ir._definitions[lhs].append(rhs)
+                    self.state.func_ir._definitions[lhs].append(rhs)
                     return []
 
             if (rhs.op == 'getattr' and rhs.value.name in self.arrow_tables
                     and rhs.attr == 'to_pandas'):
                 # put back the definition removed earlier but remove node
-                self.func_ir._definitions[lhs].append(rhs)
+                self.state.func_ir._definitions[lhs].append(rhs)
                 return []
 
             # if rhs.op in ('build_list', 'build_tuple'): TODO: test tuple
@@ -282,7 +296,7 @@ class HiFrames(object):
                 # XXX: when constants are used, all the uses of the list object
                 # have to be checked since lists are mutable
                 try:
-                    vals = tuple(find_const(self.func_ir, v) for v in rhs.items)
+                    vals = tuple(find_const(self.state.func_ir, v) for v in rhs.items)
                     # a = ['A', 'B'] ->
                     # tmp = ['A', 'B']
                     # a = add_consts_to_type(tmp, 'A', 'B')
@@ -303,17 +317,17 @@ class HiFrames(object):
 
             if rhs.op == 'make_function':
                 # HACK make globals availabe for typing in series.map()
-                rhs.globals = self.func_ir.func_id.func.__globals__
+                rhs.globals = self.state.func_ir.func_id.func.__globals__
 
         # pass pivot values to df.pivot_table() calls using a meta
         # variable passed as argument. The meta variable's type
         # is set to MetaType with pivot values baked in.
         pivot_key = lhs + ":pivot"
-        if pivot_key in self.locals:
-            pivot_values = self.locals.pop(pivot_key)
+        if pivot_key in self.state.locals:
+            pivot_values = self.state.locals.pop(pivot_key)
             # put back the definition removed earlier
-            self.func_ir._definitions[lhs].append(rhs)
-            pivot_call = guard(get_definition, self.func_ir, lhs)
+            self.state.func_ir._definitions[lhs].append(rhs)
+            pivot_call = guard(get_definition, self.state.func_ir, lhs)
             assert pivot_call is not None
             meta_var = ir.Var(
                 assign.target.scope, mk_unique_var('pivot_meta'), rhs.loc)
@@ -322,7 +336,7 @@ class HiFrames(object):
             self._working_body.insert(0, meta_assign)
             pivot_call.kws = list(pivot_call.kws)
             pivot_call.kws.append(('_pivot_values', meta_var))
-            self.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
+            self.state.locals[meta_var.name] = hpat.hiframes.api.MetaType(pivot_values)
 
         # handle copies lhs = f
         if isinstance(rhs, ir.Var) and rhs.name in self.df_vars:
@@ -332,7 +346,7 @@ class HiFrames(object):
         if isinstance(rhs, ir.Var) and rhs.name in self.arrow_tables:
             self.arrow_tables[lhs] = self.arrow_tables[rhs.name]
             # enables function matching without node in IR
-            self.func_ir._definitions[lhs].append(rhs)
+            self.state.func_ir._definitions[lhs].append(rhs)
             return []
         return [assign]
 
@@ -344,10 +358,10 @@ class HiFrames(object):
 
         func_name = ""
         func_mod = ""
-        fdef = guard(find_callname, self.func_ir, rhs)
+        fdef = guard(find_callname, self.state.func_ir, rhs)
         if fdef is None:
             # could be make_function from list comprehension which is ok
-            func_def = guard(get_definition, self.func_ir, rhs.func)
+            func_def = guard(get_definition, self.state.func_ir, rhs.func)
             if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
                 return [assign]
             warnings.warn(
@@ -417,7 +431,7 @@ class HiFrames(object):
             return hpat.io.np_io._handle_np_fromfile(assign, lhs, rhs)
 
         if fdef == ('read_xenon', 'hpat.xenon_ext'):
-            col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.func_ir)
+            col_items, nodes = hpat.xenon_ext._handle_read(assign, lhs, rhs, self.state.func_ir)
             df_nodes, col_map = self._process_df_build_map(col_items)
             self._create_df(lhs.name, col_map, label)
             nodes += df_nodes
@@ -464,11 +478,11 @@ class HiFrames(object):
                 if cname in arg_df_map:
                     other_colmap[cname] = arg_df_map[cname]
         else:
-            other_def = guard(get_definition, self.func_ir, other)
+            other_def = guard(get_definition, self.state.func_ir, other)
             # dict case
             if isinstance(other_def, ir.Expr) and other_def.op == 'build_map':
                 for c, v in other_def.items:
-                    cname = guard(find_const, self.func_ir, c)
+                    cname = guard(find_const, self.state.func_ir, c)
                     if not isinstance(cname, str):
                         raise ValueError("dictionary argument to isin() should have constant keys")
                     other_colmap[cname] = v
@@ -516,7 +530,7 @@ class HiFrames(object):
         if self._is_df_var(other):
             return self._handle_concat_df(lhs, [df_var, other], label)
         # list of dfs
-        df_list = guard(get_definition, self.func_ir, other)
+        df_list = guard(get_definition, self.state.func_ir, other)
         if len(df_list.items) > 0 and self._is_df_var(df_list.items[0]):
             return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
         raise ValueError("invalid df.append() input. Only dataframe and list"
@@ -539,7 +553,7 @@ class HiFrames(object):
 
         # create output df if not inplace
         if (inplace_var.name == inplace_default.name
-                or guard(find_const, self.func_ir, inplace_var) == False):
+                or guard(find_const, self.state.func_ir, inplace_var) == False):
             self._create_df(lhs.name, out_col_map, label)
         return nodes
 
@@ -558,7 +572,7 @@ class HiFrames(object):
         func_text += "  ({},) = hpat.hiframes.api.dropna(({},), inplace)\n".format(
             out_names, arg_names)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _dropna_imp = loc_vars['_dropna_imp']
 
         f_block = compile_to_numba_ir(_dropna_imp, {'hpat': hpat}).blocks.popitem()[1]
@@ -572,7 +586,7 @@ class HiFrames(object):
 
         # create output df if not inplace
         if (inplace_var.name == inplace_default.name
-                or guard(find_const, self.func_ir, inplace_var) == False):
+                or guard(find_const, self.state.func_ir, inplace_var) == False):
             self._create_df(lhs.name, out_col_map, label)
         else:
             # assign back to column vars for inplace case
@@ -589,7 +603,7 @@ class HiFrames(object):
         """
         kws = dict(rhs.kws)
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
-        inplace = guard(find_const, self.func_ir, inplace_var)
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
         if inplace is not None and inplace:
             # TODO: make sure call post dominates df_var definition or df_var
             # is not used in other code paths
@@ -625,7 +639,7 @@ class HiFrames(object):
         labels_var = self._get_arg('drop', rhs.args, kws, 0, 'labels', '')
         axis_var = self._get_arg('drop', rhs.args, kws, 1, 'axis', '')
         labels = self._get_str_or_list(labels_var, default='')
-        axis = guard(find_const, self.func_ir, axis_var)
+        axis = guard(find_const, self.state.func_ir, axis_var)
 
         if labels != '' and axis is not None:
             if axis != 1:
@@ -638,11 +652,11 @@ class HiFrames(object):
             columns = self._get_str_or_list(columns_var, err_msg=err_msg)
 
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
-        inplace = guard(find_const, self.func_ir, inplace_var)
+        inplace = guard(find_const, self.state.func_ir, inplace_var)
 
         if inplace is not None and inplace:
             df_label = self.df_labels[df_var.name]
-            cfg = compute_cfg_from_blocks(self.func_ir.blocks)
+            cfg = compute_cfg_from_blocks(self.state.func_ir.blocks)
             # dropping columns inplace possible only when it dominates the df
             # creation to keep schema consistent
             if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
@@ -682,7 +696,7 @@ class HiFrames(object):
                     "data argument in pd.DataFrame() expected")
             data = rhs.args[0]
 
-        arg_def = guard(get_definition, self.func_ir, data)
+        arg_def = guard(get_definition, self.state.func_ir, data)
         if (not isinstance(arg_def, ir.Expr)
                 or arg_def.op != 'build_map'):  # pragma: no cover
             raise ValueError(
@@ -700,7 +714,7 @@ class HiFrames(object):
         func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, index, {})\n".format(
             data_args, col_args)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _init_df = loc_vars['_init_df']
 
         # TODO: support index var
@@ -751,7 +765,7 @@ class HiFrames(object):
         col_names = self._get_str_or_list(names_var, default=0)
         if dtype_var is '':
             # infer column names and types from constant filename
-            fname_const = guard(find_const, self.func_ir, fname)
+            fname_const = guard(find_const, self.state.func_ir, fname)
             if fname_const is None:
                 raise ValueError("pd.read_csv() requires explicit type"
                                  "annotation using 'dtype' if filename is not constant")
@@ -770,7 +784,7 @@ class HiFrames(object):
             col_names = cols
             dtype_map = {c: d for c, d in zip(col_names, dtypes)}
         else:
-            dtype_map = guard(get_definition, self.func_ir, dtype_var)
+            dtype_map = guard(get_definition, self.state.func_ir, dtype_var)
             if (not isinstance(dtype_map, ir.Expr)
                     or dtype_map.op != 'build_map'):  # pragma: no cover
                 # try single type for all columns case
@@ -779,7 +793,7 @@ class HiFrames(object):
                 new_dtype_map = {}
                 for n_var, t_var in dtype_map.items:
                     # find constant column name
-                    c = guard(find_const, self.func_ir, n_var)
+                    c = guard(find_const, self.state.func_ir, n_var)
                     if c is None:  # pragma: no cover
                         raise ValueError("dtype column names should be constant")
                     new_dtype_map[c] = self._get_const_dtype(t_var)
@@ -818,7 +832,7 @@ class HiFrames(object):
         func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             data_args, ", ".join("'{}'".format(c) for c in columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _init_df = loc_vars['_init_df']
 
         f_block = compile_to_numba_ir(
@@ -851,7 +865,7 @@ class HiFrames(object):
         return columns, data_arrs, out_types
 
     def _get_const_dtype(self, dtype_var):
-        dtype_def = guard(get_definition, self.func_ir, dtype_var)
+        dtype_def = guard(get_definition, self.state.func_ir, dtype_var)
         if isinstance(dtype_def, ir.Const) and isinstance(dtype_def.value, str):
             typ_name = dtype_def.value
             if typ_name == 'str':
@@ -867,7 +881,7 @@ class HiFrames(object):
             return string_array_type
         # categorical case
         if isinstance(dtype_def, ir.Expr) and dtype_def.op == 'call':
-            if (not guard(find_callname, self.func_ir, dtype_def)
+            if (not guard(find_callname, self.state.func_ir, dtype_def)
                     == ('category', 'pandas.core.dtypes.dtypes')):
                 raise ValueError("pd.read_csv() invalid dtype "
                                  "(built using a call but not Categorical)")
@@ -879,7 +893,7 @@ class HiFrames(object):
             return CategoricalArray(typ)
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
-        glob_def = guard(get_definition, self.func_ir, dtype_def.value)
+        glob_def = guard(get_definition, self.state.func_ir, dtype_def.value)
         if not isinstance(glob_def, ir.Global) or glob_def.value != np:
             raise ValueError("pd.read_csv() invalid dtype")
         # TODO: extend to other types like string and date, check error
@@ -897,11 +911,11 @@ class HiFrames(object):
         data = self._get_arg('pd.Series', rhs.args, kws, 0, 'data')
 
         # match flatmap pd.Series(list(itertools.chain(*A))) and flatten
-        data_def = guard(get_definition, self.func_ir, data)
-        if (is_call(data_def) and guard(find_callname, self.func_ir, data_def)
+        data_def = guard(get_definition, self.state.func_ir, data)
+        if (is_call(data_def) and guard(find_callname, self.state.func_ir, data_def)
                 == ('list', 'builtins') and len(data_def.args) == 1):
-            arg_def = guard(get_definition, self.func_ir, data_def.args[0])
-            if (is_call(arg_def) and guard(find_callname, self.func_ir,
+            arg_def = guard(get_definition, self.state.func_ir, data_def.args[0])
+            if (is_call(arg_def) and guard(find_callname, self.state.func_ir,
                                            arg_def) == ('chain', 'itertools')):
                 in_data = arg_def.vararg
                 arg_def.vararg = None  # avoid typing error
@@ -921,13 +935,13 @@ class HiFrames(object):
         has to be specified in locals and applied
         """
         kws = dict(rhs.kws)
-        if 'errors' not in kws or guard(find_const, self.func_ir, kws['errors']) != 'coerce':
+        if 'errors' not in kws or guard(find_const, self.state.func_ir, kws['errors']) != 'coerce':
             raise ValueError("pd.to_numeric() only supports errors='coerce'")
 
-        if lhs.name not in self.reverse_copies or (self.reverse_copies[lhs.name]) not in self.locals:
+        if lhs.name not in self.reverse_copies or (self.reverse_copies[lhs.name]) not in self.state.locals:
             raise ValueError("pd.to_numeric() requires annotation of output type")
 
-        typ = self.locals.pop(self.reverse_copies[lhs.name])
+        typ = self.state.locals.pop(self.reverse_copies[lhs.name])
         dtype = numba.numpy_support.as_dtype(typ.dtype)
         arg = rhs.args[0]
 
@@ -939,7 +953,7 @@ class HiFrames(object):
         if len(rhs.args) != 1:  # pragma: no cover
             raise ValueError("Invalid read_table() arguments")
         # put back the definition removed earlier but remove node
-        self.func_ir._definitions[lhs.name].append(rhs)
+        self.state.func_ir._definitions[lhs.name].append(rhs)
         self.arrow_tables[lhs.name] = rhs.args[0]
         return []
 
@@ -956,7 +970,7 @@ class HiFrames(object):
         func_text += "  return hpat.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             data_args, ", ".join("'{}'".format(c) for c in columns))
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _init_df = loc_vars['_init_df']
 
         return self._replace_func(_init_df, data_arrs, pre_nodes=nodes)
@@ -971,7 +985,7 @@ class HiFrames(object):
         kws = dict(rhs.kws)
         objs_arg = self._get_arg('concat', rhs.args, kws, 0, 'objs')
 
-        df_list = guard(get_definition, self.func_ir, objs_arg)
+        df_list = guard(get_definition, self.state.func_ir, objs_arg)
         if not isinstance(df_list, ir.Expr) or not (df_list.op
                                                     in ['build_tuple', 'build_list']):
             raise ValueError("pd.concat input should be constant list or tuple")
@@ -1007,7 +1021,7 @@ class HiFrames(object):
         func_text += "    return hpat.hiframes.api.init_series(hpat.hiframes.api.concat(({})))\n".format(
             arg_names)
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat}, loc_vars)
         _concat_imp = loc_vars['_concat_imp']
 
         done_cols = {}
@@ -1071,8 +1085,8 @@ class HiFrames(object):
         return nodes, new_list
 
     def _fix_df_list_of_array(self, col_arr):
-        list_call = guard(get_definition, self.func_ir, col_arr)
-        if guard(find_callname, self.func_ir, list_call) == ('list', 'builtins'):
+        list_call = guard(get_definition, self.state.func_ir, col_arr)
+        if guard(find_callname, self.state.func_ir, list_call) == ('list', 'builtins'):
             return list_call.args[0]
         return col_arr
 
@@ -1084,7 +1098,7 @@ class HiFrames(object):
             if isinstance(col_var, str):
                 col_name = col_var
             else:
-                col_name = get_constant(self.func_ir, col_var)
+                col_name = get_constant(self.state.func_ir, col_var)
                 if col_name is NOT_CONSTANT:  # pragma: no cover
                     raise ValueError(
                         "data frame column names should be constant")
@@ -1103,7 +1117,7 @@ class HiFrames(object):
     def _get_func_output_typ(self, col_var, func, wrapper_func, label):
         # stich together all blocks before the current block for type inference
         # XXX: does control flow affect type inference in Numba?
-        dummy_ir = self.func_ir.copy()
+        dummy_ir = self.state.func_ir.copy()
         dummy_ir.blocks[label].body.append(ir.Return(0, col_var.loc))
         topo_order = find_topo_order(dummy_ir.blocks)
         all_body = []
@@ -1117,7 +1131,7 @@ class HiFrames(object):
         dummy_ir.blocks = {0: ir.Block(col_var.scope, col_var.loc)}
         dummy_ir.blocks[0].body = all_body
 
-        _globals = self.func_ir.func_id.func.__globals__
+        _globals = self.state.func_ir.func_id.func.__globals__
         _globals.update({'hpat': hpat, 'numba': numba, 'np': np})
         f_ir = compile_to_numba_ir(wrapper_func, {'hpat': hpat})
         # fix definitions to enable finding sentinel
@@ -1129,6 +1143,7 @@ class HiFrames(object):
                     and stmt.value.op == 'call'):
                 fdef = guard(get_definition, f_ir, stmt.value.func)
                 if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                    update_globals(func, _globals)
                     inline_closure_call(f_ir, _globals, f_ir.blocks[first_label], i, func)
                     break
 
@@ -1150,26 +1165,26 @@ class HiFrames(object):
 
         # run type inference on the dummy IR
         warnings = numba.errors.WarningsFixer(numba.errors.NumbaWarning)
-        infer = numba.typeinfer.TypeInferer(self.typingctx, dummy_ir, warnings)
-        for index, (name, ty) in enumerate(zip(dummy_ir.arg_names, self.args)):
+        infer = numba.typeinfer.TypeInferer(self.state.typingctx, dummy_ir, warnings)
+        for index, (name, ty) in enumerate(zip(dummy_ir.arg_names, self.state.args)):
             infer.seed_argument(name, index, ty)
         infer.build_constraint()
         infer.propagate()
         out_tp = infer.typevars[output_var.name].getone()
-        # typemap, restype, calltypes = numba.compiler.type_inference_stage(self.typingctx, dummy_ir, self.args, None)
+        # typemap, restype, calltypes = numba.typed_passes.type_inference_stage(self.state.typingctx, dummy_ir, self.state.args, None)
         return out_tp
 
     def _is_df_obj_call(self, call_var, obj_name):
         """determines whether variable is coming from groupby() or groupby()[],
         rolling(), rolling()[]
         """
-        var_def = guard(get_definition, self.func_ir, call_var)
+        var_def = guard(get_definition, self.state.func_ir, call_var)
         # groupby()['B'] case
         if (isinstance(var_def, ir.Expr)
                 and var_def.op in ['getitem', 'static_getitem']):
             return self._is_df_obj_call(var_def.value, obj_name)
         # groupby() called on column or df
-        call_def = guard(find_callname, self.func_ir, var_def)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1])):
@@ -1184,7 +1199,7 @@ class HiFrames(object):
         columns_arg = self._get_str_arg('pivot_table', rhs.args, kws, 2, 'columns')
         agg_func_arg = self._get_str_arg('pivot_table', rhs.args, kws, 3, 'aggfunc', 'mean')
 
-        agg_func = get_agg_func(self.func_ir, agg_func_arg, rhs)
+        agg_func = get_agg_func(self.state.func_ir, agg_func_arg, rhs)
 
         in_vars = {values_arg: self.df_vars[df_var.name][values_arg]}
         # get output type
@@ -1216,19 +1231,19 @@ class HiFrames(object):
         return nodes
 
     def _get_pivot_values(self, varname):
-        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':pivot') not in self.locals:
+        if varname not in self.reverse_copies or (self.reverse_copies[varname] + ':pivot') not in self.state.locals:
             raise ValueError("pivot_table() requires annotation of pivot values")
         new_name = self.reverse_copies[varname]
-        values = self.locals.pop(new_name + ":pivot")
+        values = self.state.locals.pop(new_name + ":pivot")
         return values
 
     def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None,
                      err_msg=None):
         arg = None
         if len(args) > arg_no:
-            arg = guard(find_const, self.func_ir, args[arg_no])
+            arg = guard(find_const, self.state.func_ir, args[arg_no])
         elif arg_name in kws:
-            arg = guard(find_const, self.func_ir, kws[arg_name])
+            arg = guard(find_const, self.state.func_ir, kws[arg_name])
 
         if arg is None:
             if default is not None:
@@ -1349,7 +1364,7 @@ class HiFrames(object):
         return nodes
 
     def _handle_agg_func(self, in_vars, out_colnames, func_name, lhs, rhs):
-        agg_func = get_agg_func(self.func_ir, func_name, rhs)
+        agg_func = get_agg_func(self.state.func_ir, func_name, rhs)
         out_tp_vars = {}
 
         # hpat.jit() instead of numba.njit() to handle str arrs etc
@@ -1371,12 +1386,12 @@ class HiFrames(object):
 
     def _get_agg_obj_args(self, agg_var):
         # find groupby key and as_index
-        groubpy_call = guard(get_definition, self.func_ir, agg_var)
+        groubpy_call = guard(get_definition, self.state.func_ir, agg_var)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
         kws = dict(groubpy_call.kws)
         as_index = True
         if 'as_index' in kws:
-            as_index = guard(find_const, self.func_ir, kws['as_index'])
+            as_index = guard(find_const, self.state.func_ir, kws['as_index'])
             if as_index is None:
                 raise ValueError(
                     "groupby as_index argument should be constant")
@@ -1395,34 +1410,34 @@ class HiFrames(object):
 
     def _get_str_or_list(self, by_arg, list_only=False, default=None, err_msg=None, typ=None):
         typ = str if typ is None else typ
-        by_arg_def = guard(find_build_sequence, self.func_ir, by_arg)
+        by_arg_def = guard(find_build_sequence, self.state.func_ir, by_arg)
 
         if by_arg_def is None:
             # try add_consts_to_type
-            by_arg_call = guard(get_definition, self.func_ir, by_arg)
-            if guard(find_callname, self.func_ir, by_arg_call) == ('add_consts_to_type', 'hpat.hiframes.api'):
-                by_arg_def = guard(find_build_sequence, self.func_ir, by_arg_call.args[0])
+            by_arg_call = guard(get_definition, self.state.func_ir, by_arg)
+            if guard(find_callname, self.state.func_ir, by_arg_call) == ('add_consts_to_type', 'hpat.hiframes.api'):
+                by_arg_def = guard(find_build_sequence, self.state.func_ir, by_arg_call.args[0])
 
         if by_arg_def is None:
             # try dict.keys()
-            by_arg_call = guard(get_definition, self.func_ir, by_arg)
-            call_name = guard(find_callname, self.func_ir, by_arg_call)
+            by_arg_call = guard(get_definition, self.state.func_ir, by_arg)
+            call_name = guard(find_callname, self.state.func_ir, by_arg_call)
             if (call_name is not None and len(call_name) == 2
                     and call_name[0] == 'keys'
                     and isinstance(call_name[1], ir.Var)):
-                var_def = guard(get_definition, self.func_ir, call_name[1])
+                var_def = guard(get_definition, self.state.func_ir, call_name[1])
                 if isinstance(var_def, ir.Expr) and var_def.op == 'build_map':
                     by_arg_def = [v[0] for v in var_def.items], 'build_map'
                     # HACK replace dict.keys getattr to avoid typing errors
                     keys_getattr = guard(
-                        get_definition, self.func_ir, by_arg_call.func)
+                        get_definition, self.state.func_ir, by_arg_call.func)
                     assert isinstance(
                         keys_getattr, ir.Expr) and keys_getattr.attr == 'keys'
                     keys_getattr.attr = 'copy'
 
         if by_arg_def is None:
             # try single key column
-            by_arg_def = guard(find_const, self.func_ir, by_arg)
+            by_arg_def = guard(find_const, self.state.func_ir, by_arg)
             if by_arg_def is None:
                 if default is not None:
                     return default
@@ -1433,7 +1448,7 @@ class HiFrames(object):
                 if default is not None:
                     return default
                 raise ValueError(err_msg)
-            key_colnames = [guard(find_const, self.func_ir, v) for v in by_arg_def[0]]
+            key_colnames = [guard(find_const, self.state.func_ir, v) for v in by_arg_def[0]]
             if any(not isinstance(v, typ) for v in key_colnames):
                 if default is not None:
                     return default
@@ -1444,23 +1459,23 @@ class HiFrames(object):
         """analyze selection of columns in after groupby() or rolling()
         e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
         """
-        select_def = guard(get_definition, self.func_ir, obj_var)
+        select_def = guard(get_definition, self.state.func_ir, obj_var)
         out_colnames = None
         explicit_select = False
         if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
             obj_var = select_def.value
             out_colnames = (select_def.index
                             if select_def.op == 'static_getitem'
-                            else guard(find_const, self.func_ir, select_def.index))
+                            else guard(find_const, self.state.func_ir, select_def.index))
             if not isinstance(out_colnames, (str, tuple)):
                 raise ValueError("{} output column names should be constant".format(obj_name))
             if isinstance(out_colnames, str):
                 out_colnames = [out_colnames]
             explicit_select = True
 
-        obj_call = guard(get_definition, self.func_ir, obj_var)
+        obj_call = guard(get_definition, self.state.func_ir, obj_var)
         # find dataframe
-        call_def = guard(find_callname, self.func_ir, obj_call)
+        call_def = guard(find_callname, self.state.func_ir, obj_call)
         assert (call_def is not None and call_def[0] == obj_name
                 and isinstance(call_def[1], ir.Var)
                 and self._is_df_var(call_def[1]))
@@ -1478,8 +1493,8 @@ class HiFrames(object):
         nodes = []
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
-        rolling_call = guard(get_definition, self.func_ir, obj_var)
-        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        rolling_call = guard(get_definition, self.state.func_ir, obj_var)
+        window, center, on = get_rolling_setup_args(self.state.func_ir, rolling_call, False)
         on_arr = self.df_vars[df_var.name][on] if on is not None else None
         if not isinstance(center, ir.Var):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
@@ -1630,57 +1645,57 @@ class HiFrames(object):
     def _handle_metadata(self):
         """remove distributed input annotation from locals and add to metadata
         """
-        if 'distributed' not in self.metadata:
+        if 'distributed' not in self.state.metadata:
             # TODO: keep updated in variable renaming?
-            self.metadata['distributed'] = self.locals.pop(
+            self.state.metadata['distributed'] = self.state.locals.pop(
                 '##distributed', set())
 
-        if 'threaded' not in self.metadata:
-            self.metadata['threaded'] = self.locals.pop('##threaded', set())
+        if 'threaded' not in self.state.metadata:
+            self.state.metadata['threaded'] = self.state.locals.pop('##threaded', set())
 
         # handle old input flags
         # e.g. {"A:input": "distributed"} -> "A"
         dist_inputs = {var_name.split(":")[0]
-                       for (var_name, flag) in self.locals.items()
+                       for (var_name, flag) in self.state.locals.items()
                        if var_name.endswith(":input") and flag == 'distributed'}
 
         thread_inputs = {var_name.split(":")[0]
-                         for (var_name, flag) in self.locals.items()
+                         for (var_name, flag) in self.state.locals.items()
                          if var_name.endswith(":input") and flag == 'threaded'}
 
         # check inputs to be in actuall args
         for arg_name in dist_inputs | thread_inputs:
-            if arg_name not in self.func_ir.arg_names:
+            if arg_name not in self.state.func_ir.arg_names:
                 raise ValueError(
                     "distributed input {} not found in arguments".format(
                         arg_name))
-            self.locals.pop(arg_name + ":input")
+            self.state.locals.pop(arg_name + ":input")
 
-        self.metadata['distributed'] |= dist_inputs
-        self.metadata['threaded'] |= thread_inputs
+        self.state.metadata['distributed'] |= dist_inputs
+        self.state.metadata['threaded'] |= thread_inputs
 
         # handle old return flags
         # e.g. {"A:return":"distributed"} -> "A"
         flagged_returns = {var_name.split(":")[0]: flag
-                           for (var_name, flag) in self.locals.items()
+                           for (var_name, flag) in self.state.locals.items()
                            if var_name.endswith(":return")}
 
         for v, flag in flagged_returns.items():
             if flag == 'distributed':
-                self.metadata['distributed'].add(v)
+                self.state.metadata['distributed'].add(v)
             elif flag == 'threaded':
-                self.metadata['threaded'].add(v)
+                self.state.metadata['threaded'].add(v)
 
-            self.locals.pop(v + ":return")
+            self.state.locals.pop(v + ":return")
 
         return
 
     def _run_return(self, ret_node):
         # TODO: handle distributed analysis, requires handling variable name
         # change in simplify() and replace_var_names()
-        flagged_vars = self.metadata['distributed'] | self.metadata['threaded']
+        flagged_vars = self.state.metadata['distributed'] | self.state.metadata['threaded']
         nodes = [ret_node]
-        cast = guard(get_definition, self.func_ir, ret_node.value)
+        cast = guard(get_definition, self.state.func_ir, ret_node.value)
         assert cast is not None, "return cast not found"
         assert isinstance(cast, ir.Expr) and cast.op == 'cast'
         scope = cast.value.scope
@@ -1689,7 +1704,7 @@ class HiFrames(object):
         ret_name = cast.value.name.split('.')[0]
 
         if ret_name in flagged_vars:
-            flag = ('distributed' if ret_name in self.metadata['distributed']
+            flag = ('distributed' if ret_name in self.state.metadata['distributed']
                     else 'threaded')
             nodes = self._gen_replace_dist_return(cast.value, flag)
             new_arr = nodes[-1].target
@@ -1704,7 +1719,7 @@ class HiFrames(object):
         if len(flagged_vars) == 0:
             return nodes
 
-        cast_def = guard(get_definition, self.func_ir, cast.value)
+        cast_def = guard(get_definition, self.state.func_ir, cast.value)
         if (cast_def is not None and isinstance(cast_def, ir.Expr)
                 and cast_def.op == 'build_tuple'):
             nodes = []
@@ -1712,7 +1727,7 @@ class HiFrames(object):
             for v in cast_def.items:
                 vname = v.name.split('.')[0]
                 if vname in flagged_vars:
-                    flag = ('distributed' if vname in self.metadata['distributed']
+                    flag = ('distributed' if vname in self.state.metadata['distributed']
                             else 'threaded')
                     nodes += self._gen_replace_dist_return(v, flag)
                     new_var_list.append(nodes[-1].target)
@@ -1847,7 +1862,7 @@ class HiFrames(object):
         loc = ir.Loc("", 0)
         dumm_block = ir.Block(ir.Scope(None, loc), loc)
         dumm_block.body = node_list
-        build_definitions({0: dumm_block}, self.func_ir._definitions)
+        build_definitions({0: dumm_block}, self.state.func_ir._definitions)
         return
 
 

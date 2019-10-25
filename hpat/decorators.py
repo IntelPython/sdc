@@ -90,7 +90,4 @@ def jit(signature_or_function=None, **options):
     else:
         hpat.config.config_transport_mpi = False
 
-    # this is for previous version of pipeline manipulation (numba hpat_req <0.38)
-    # from .compiler import add_hpat_stages
-    # return numba.jit(signature_or_function, user_pipeline_funcs=[add_hpat_stages], **options)
     return numba.jit(signature_or_function, pipeline_class=hpat.compiler.HPATPipeline, **options)
