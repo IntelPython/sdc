@@ -86,10 +86,12 @@ int64_t pq_get_size_single_file(std::shared_ptr<FileReader> arrow_reader, int64_
 int64_t
     pq_read_single_file(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx, uint8_t* out_data, int out_dtype)
 {
-    std::shared_ptr<::arrow::Array> arr;
-    arrow_reader->ReadColumn(column_idx, &arr);
-    if (arr == NULL)
+    std::shared_ptr<::arrow::ChunkedArray> chunked_array;
+    arrow_reader->ReadColumn(column_idx, &chunked_array);
+    if (chunked_array == NULL)
         return 0;
+
+    auto arr = chunked_array->chunk(0);
 
     int64_t num_values = arr->length();
     // std::cout << "arr: " << arr->ToString() << std::endl;
@@ -154,8 +156,7 @@ int pq_read_parallel_single_file(std::shared_ptr<FileReader> arrow_reader,
         /* -------- read row group ---------- */
         std::shared_ptr<::arrow::Table> table;
         arrow_reader->ReadRowGroup(row_group_index, column_indices, &table);
-        std::shared_ptr<::arrow::Column> column = table->column(0);
-        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = column->data();
+        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = table->column(0);
         // std::cout << chunked_arr->num_chunks() << std::endl;
         if (chunked_arr->num_chunks() != 1)
         {
@@ -390,10 +391,11 @@ int64_t pq_read_string_single_file(std::shared_ptr<FileReader> arrow_reader,
 {
     // std::cout << "string read file" << '\n';
     //
-    std::shared_ptr<::arrow::Array> arr;
-    arrow_reader->ReadColumn(column_idx, &arr);
-    if (arr == NULL)
+    std::shared_ptr<::arrow::ChunkedArray> chunked_arr;
+    arrow_reader->ReadColumn(column_idx, &chunked_arr);
+    if (chunked_arr == NULL)
         return -1;
+    auto arr = chunked_arr->chunk(0);
     int64_t num_values = arr->length();
     // std::cout << arr->ToString() << std::endl;
     std::shared_ptr<arrow::DataType> arrow_type = get_arrow_type(arrow_reader, column_idx);
@@ -509,8 +511,7 @@ int pq_read_string_parallel_single_file(std::shared_ptr<FileReader> arrow_reader
         /* -------- read row group ---------- */
         std::shared_ptr<::arrow::Table> table;
         arrow_reader->ReadRowGroup(row_group_index, column_indices, &table);
-        std::shared_ptr<::arrow::Column> column = table->column(0);
-        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = column->data();
+        std::shared_ptr<::arrow::ChunkedArray> chunked_arr = table->column(0);
         // std::cout << chunked_arr->num_chunks() << std::endl;
         if (chunked_arr->num_chunks() != 1)
         {
@@ -634,11 +635,15 @@ void pq_init_reader(const char* file_name, std::shared_ptr<FileReader>* a_reader
         ::arrow::io::HadoopFileSystem::Connect(&hfs_config, &fs);
         std::shared_ptr<::arrow::io::HdfsReadableFile> file;
         fs->OpenReadable(f_name, &file);
-        a_reader->reset(new FileReader(pool, ParquetFileReader::Open(file)));
+        std::unique_ptr<FileReader> arrow_reader;
+        FileReader::Make(pool, ParquetFileReader::Open(file), &arrow_reader);
+        *a_reader = std::move(arrow_reader);
     }
     else // regular file system
     {
-        a_reader->reset(new FileReader(pool, ParquetFileReader::OpenFile(f_name, false)));
+        std::unique_ptr<FileReader> arrow_reader;
+        FileReader::Make(pool, ParquetFileReader::OpenFile(f_name, false), &arrow_reader);
+        *a_reader = std::move(arrow_reader);
     }
     // printf("file open for arrow reader done\n");
     // fflush(stdout);
@@ -649,17 +654,10 @@ void pq_init_reader(const char* file_name, std::shared_ptr<FileReader>* a_reader
 // TODO: handle more complex types
 std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arrow_reader, int64_t column_idx)
 {
-    // TODO: error checking
-    std::vector<int> column_indices;
-    column_indices.push_back(column_idx);
-
+    // TODO: error checking (column_idx out of bounds)
     std::shared_ptr<::arrow::Schema> col_schema;
-    auto descr = arrow_reader->parquet_reader()->metadata()->schema();
-    auto parquet_key_value_metadata = arrow_reader->parquet_reader()->metadata()->key_value_metadata();
-    parquet::arrow::FromParquetSchema(descr, column_indices, parquet_key_value_metadata, &col_schema);
-    // std::cout<< col_schema->ToString() << std::endl;
-    std::shared_ptr<::arrow::DataType> arrow_dtype = col_schema->field(0)->type();
-    return arrow_dtype;
+    arrow_reader->GetSchema(&col_schema);
+    return col_schema->field(column_idx)->type();
 }
 
 bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type)
