@@ -100,7 +100,7 @@ Building on Linux with setuptools
 ::
 
     PYVER=<3.6 or 3.7>
-    conda create -n HPAT -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow=0.14.1 arrow-cpp=0.14.1 gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
+    conda create -n HPAT -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow=0.15.0 arrow-cpp=0.15.0 gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
     source activate HPAT
     git clone https://github.com/IntelPython/hpat
     cd hpat
@@ -136,7 +136,7 @@ Building on Windows with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
-    conda create -n HPAT -c numba -c defaults -c intel python=<3.6 or 3.7> numba impi-devel pyarrow=0.14.1 arrow-cpp=0.14.1 scipy pandas boost
+    conda create -n HPAT -c numba -c defaults -c intel -c conda-forge python=<3.6 or 3.7> numba impi-devel pyarrow=0.15.0 arrow-cpp=0.15.0 scipy pandas boost
     conda activate HPAT
     git clone https://github.com/IntelPython/hpat.git
     cd hpat
