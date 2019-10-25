@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import unittest
 import platform
 import pandas as pd
@@ -103,6 +105,48 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+
+    @unittest.skip('Feature request: implement Series::ctor with list(list(type))')
+    def test_create_list_list_unicode(self):
+        def test_impl():
+            S = pd.Series([
+                          [ 'abc', 'defg', 'ijk'],
+                          [ 'lmn', 'opq', 'rstuvwxyz']
+                          ])
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        result_ref = test_impl()
+        result = hpat_func()
+        pd.testing.assert_series_equal(result, result_ref)
+
+    @unittest.skip('Feature request: implement Series::ctor with list(list(type))')
+    def test_create_list_list_integer(self):
+        def test_impl():
+            S = pd.Series([
+                          [ 123, 456, -789],
+                          [ -112233, 445566, 778899]
+                          ])
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        result_ref = test_impl()
+        result = hpat_func()
+        pd.testing.assert_series_equal(result, result_ref)
+
+    @unittest.skip('Feature request: implement Series::ctor with list(list(type))')
+    def test_create_list_list_float(self):
+        def test_impl():
+            S = pd.Series([
+                          [ 1.23, -4.56, 7.89],
+                          [ 11.2233, 44.5566, -778.899]
+                          ])
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        result_ref = test_impl()
+        result = hpat_func()
+        pd.testing.assert_series_equal(result, result_ref)
 
     def test_create2(self):
         def test_impl(n):
