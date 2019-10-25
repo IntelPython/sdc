@@ -567,7 +567,7 @@ def hpat_pandas_series_head(self, n=5):
         return hpat_pandas_series_head_impl
     else:
         def hpat_pandas_series_head_index_impl(self, n=5):
-            return pandas.Series(self._data[:n], self._index[:n])
+            return pandas.Series(self._data[:n], self._index[:n], self._name)
 
         return hpat_pandas_series_head_index_impl
 

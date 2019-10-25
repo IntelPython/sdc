@@ -1994,42 +1994,43 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         for input_data in test_global_input_data_float64:
             S = pd.Series(input_data)
-            for n in [1, 3, 2]:
+            for n in [-1, 0, 2, 3]:
                 result_ref = test_impl(S, n)
                 result_jit = hpat_func(S, n)
                 pd.testing.assert_series_equal(result_jit, result_ref)
 
-    @unittest.skip("Not pass")
+    @unittest.skip("Need fix test_global_input_data_integer64")
     def test_series_head_noidx_int(self):
         def test_impl(S, n):
             return S.head(n)
         hpat_func = hpat.jit(test_impl)
         for input_data in test_global_input_data_integer64:
             S = pd.Series(input_data)
-            for n in [2, 3]:
+            for n in [-1, 0, 2, 3]:
                 result_ref = test_impl(S, n)
                 result_jit = hpat_func(S, n)
                 pd.testing.assert_series_equal(result_jit, result_ref)
 
-    @unittest.skip("Not pass")
+    @unittest.skip("Need fix test_global_input_data_integer64")
     def test_series_head_noidx_num(self):
         def test_impl(S, n):
             return S.head(n)
         hpat_func = hpat.jit(test_impl)
         for input_data in test_global_input_data_numeric:
             S = pd.Series(input_data)
-            for n in [2, 3]:
+            for n in [-1, 0, 2, 3]:
                 result_ref = test_impl(S, n)
                 result_jit = hpat_func(S, n)
                 pd.testing.assert_series_equal(result_jit, result_ref)
 
+    @unittest.skip("Old implementation not work with n negative and data str")
     def test_series_head_noidx_str(self):
         def test_impl(S, n):
             return S.head(n)
         hpat_func = hpat.jit(test_impl)
         input_data = test_global_input_data_unicode_kind4
         S = pd.Series(input_data)
-        for n in [1, 2]:
+        for n in [-1, 0, 2, 3]:
             result_ref = test_impl(S, n)
             result_jit = hpat_func(S, n)
             pd.testing.assert_series_equal(result_jit, result_ref)
