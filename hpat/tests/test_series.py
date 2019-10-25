@@ -1070,7 +1070,6 @@ class TestSeries(unittest.TestCase):
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
         def test_impl(S):
-            print("Original series:\n", S)
             return S.fillna(5.0, axis=0)
         hpat_func = hpat.jit(test_impl)
 
@@ -1086,9 +1085,8 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
-        axis_values = [0, 'index']
-        for value in axis_values:
-            pd.testing.assert_series_equal(hpat_func(S, value), test_impl(S, value))
+        for axis in [0, 'index']:
+            pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'BUG: old-style fillna impl returns series without index')
@@ -1353,9 +1351,8 @@ class TestSeries(unittest.TestCase):
 
         S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
-        axis_values = [0, 'index']
-        for value in axis_values:
-            pd.testing.assert_series_equal(hpat_func(S1, value), test_impl(S2, value))
+        for axis in [0, 'index']:
+            pd.testing.assert_series_equal(hpat_func(S1, axis), test_impl(S2, axis))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'BUG: old-style dropna impl returns series without index')

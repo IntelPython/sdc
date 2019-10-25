@@ -29,6 +29,7 @@
 | Also, it contains Numba internal operators which are required for Series type handling
 """
 
+import numba
 import numpy
 import operator
 import pandas
@@ -2496,8 +2497,8 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
         raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, skipna))
 
     if not ((level is None or isinstance(level, types.Omitted))
-            or (numeric_only is None or isinstance(numeric_only, types.Omitted))
-            or (axis is None or isinstance(axis, types.Omitted))
+            and (numeric_only is None or isinstance(numeric_only, types.Omitted))
+            and (axis is None or isinstance(axis, types.Omitted))
             ):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, numeric_only: {}, axis: {}'.format(
@@ -2599,12 +2600,12 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not (isinstance(axis, (types.Integer, types.UnicodeType, types.Omitted)) or axis is None):
+    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType, types.Omitted)) or axis is None):
         raise TypingError('{} The axis must be an Integer or String. Given: {}'.format(_func_name, axis))
 
     if not (isinstance(inplace, types.Literal) and isinstance(inplace, types.Boolean)
             or isinstance(inplace, types.Omitted)
-            or inplace == False):
+            or inplace is False):
         raise TypingError('{} The inplace must be a literal Boolean constant. Given: {}'.format(_func_name, inplace))
 
     if not ((method is None or isinstance(method, types.Omitted))
@@ -2620,29 +2621,23 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
         # do operation inplace, fill the NA/NaNs in the same array and return None
         if isinstance(self.dtype, types.UnicodeType):
             # TODO: StringArrayType cannot resize inplace, and assigning a copy back to self._data is not possible now
-            return None
+            raise TypingError('{} Not implemented when Series dtype is {} and inplace={}'.format(_func_name, self.dtype, inplace))
+
         elif isinstance(self.dtype, (types.Integer, types.Boolean)):
             def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+                # no NaNs in series of Integers or Booleans
                 return None
 
             return hpat_pandas_series_no_nan_fillna_impl
-        elif isinstance(self.dtype, types.Float):
-            def hpat_pandas_series_np_arrays_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                na_data_arr = numpy.isnan(self._data)
-                self._data[na_data_arr] = value
-                return None
-
-            return hpat_pandas_series_np_arrays_fillna_impl
         else:
-            def hpat_pandas_series_default_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                na_data_arr = numpy.array([hpat.hiframes.api.isna(self._data, i) for i in numpy.arange(len(self._data))])
+            def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+                na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
                 self._data[na_data_arr] = value
                 return None
 
-            return hpat_pandas_series_default_fillna_impl
+            return hpat_pandas_series_fillna_impl
     else:
-        # not inplace implementations, copy array, fill the NA/NaN and return a new Series
-        # TODO: should we copy index too (can it mutate unlike pandas index)?
+        # non inplace implementations, copy array, fill the NA/NaN and return a new Series
         if isinstance(self.dtype, types.UnicodeType):
             # For StringArrayType implementation is taken from _series_fillna_str_alloc_impl
             # (can be called directly when it's index handling is fixed)
@@ -2667,25 +2662,18 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                 return pandas.Series(filled_data, self._index, self._name)
 
             return hpat_pandas_series_str_fillna_impl
+
         elif isinstance(self.dtype, (types.Integer, types.Boolean)):
             def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
                 return pandas.Series(numpy.copy(self._data), self._index, self._name)
 
             return hpat_pandas_series_no_nan_fillna_impl
-        elif isinstance(self.dtype, types.Float):
-            def hpat_pandas_series_np_arrays_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                na_data_arr = numpy.isnan(self._data)
-                filled_data = numpy.copy(self._data)
-                filled_data[na_data_arr] = value
-                return pandas.Series(filled_data, self._index, self._name)
 
-            return hpat_pandas_series_np_arrays_fillna_impl
         else:
-            # For other datatypes (e.g. datetime64) use implementation based on HPAT isna overload
-            def hpat_pandas_series_default_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                na_data_arr = numpy.array([hpat.hiframes.api.isna(self._data, i) for i in numpy.arange(len(self._data))])
+            def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+                na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
                 filled_data = numpy.copy(self._data)
                 filled_data[na_data_arr] = value
                 return pandas.Series(filled_data, self._index, self._name)
 
-            return hpat_pandas_series_default_fillna_impl
+            return hpat_pandas_series_fillna_impl
