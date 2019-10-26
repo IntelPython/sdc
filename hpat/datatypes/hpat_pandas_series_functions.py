@@ -2312,3 +2312,49 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
         return numpy.median(self._data)
 
     return hpat_pandas_series_median_impl
+
+
+@overload_method(SeriesType, 'dropna')
+def hpat_pandas_series_dropna(self, axis=0, inplace=False):
+    """
+    Pandas Series method :meth:`pandas.Series.dropna` implementation.
+
+    .. only:: developer
+
+       Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int` or :obj:`string` {0 or `index`}, default 0
+        There is only one axis to drop values from.
+    inplace: :obj:`bool`, default False
+        If True, do operation inplace and return None.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object with NA entries dropped from it.
+    """
+
+    _func_name = 'Method dropna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType, types.Omitted)) or axis == 0):
+        raise TypingError('{} The axis must be an Integer or String. Given: {}'.format(_func_name, axis))
+
+    if not (inplace is False or isinstance(inplace, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
+
+    def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
+        # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
+        na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+        data = self._data[~na_data_arr]
+        index = self.index[~na_data_arr]
+        return pandas.Series(data, index, self._name)
+
+    return hpat_pandas_series_dropna_impl
