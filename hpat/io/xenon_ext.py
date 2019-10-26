@@ -180,7 +180,7 @@ def get_column_read_nodes(c_type, cvar, xe_connect_var, xe_dset_var, i, schema_a
         func_text += '  column = np.empty(col_size, dtype=np.{})\n'.format(el_type)
         func_text += '  status = read_xenon_col(xe_connect_var, xe_dset_var, {}, column, schema_arr)\n'.format(i)
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, {'np': np}, loc_vars)
     size_func = loc_vars['f']
     _, f_block = compile_to_numba_ir(size_func,
                                      {'get_column_size_xenon': get_column_size_xenon,
