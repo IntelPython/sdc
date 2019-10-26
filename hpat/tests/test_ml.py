@@ -7,7 +7,7 @@ import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains)
+                                   dist_IR_contains, check_numba_version)
 
 
 class TestML(unittest.TestCase):
@@ -90,6 +90,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 2)
 
+    @unittest.skipIf(check_numba_version('0.46.0'), "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_kmeans(self):
         def test_impl(numCenter, numIter, N, D):
             A = np.ones((N, D))

@@ -532,6 +532,7 @@ class SeriesAttribute(AttributeTemplate):
             out = types.none
         return signature(out, *args)
 
+    # PR135. This needs to be commented out (for new-style impl to be called)
     @bound_function("series.dropna")
     def resolve_dropna(self, ary, args, kws):
         out = ary
@@ -571,7 +572,7 @@ class SeriesAttribute(AttributeTemplate):
             _globals = args[0].literal_value.globals
 
         f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
             self.context, f_ir, (dtype,), None)
 
         return signature(SeriesType(f_return_type), *args)
@@ -595,7 +596,7 @@ class SeriesAttribute(AttributeTemplate):
             dtype2 = pandas_timestamp_type
         code = args[1].literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.compiler.type_inference_stage(
+        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
             self.context, f_ir, (dtype1, dtype2,), None)
         return signature(SeriesType(f_return_type), *args)
 
@@ -986,15 +987,15 @@ def generic_expand_cumulative_series(self, args, kws):
     return signature(return_type, recvr=self.this)
 
 
-# replacing cumsum/cumprod since arraydecl.py definition uses types.Array
-for fname in ["cumsum", "cumprod"]:
-    install_array_method(fname, generic_expand_cumulative_series)
+# replacing cumprod since arraydecl.py definition uses types.Array
+install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
+                           'resolve_cumsum',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count']
+                           'resolve_prod', 'resolve_count', 'resolve_dropna']
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 

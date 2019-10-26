@@ -602,6 +602,44 @@ def hpat_pandas_series_copy(self, deep=True):
             return hpat_pandas_series_copy_impl
 
 
+@overload_method(SeriesType, 'head')
+def hpat_pandas_series_head(self, n=5):
+    """
+    Pandas Series method :meth:`pandas.Series.head` implementation.
+
+    .. only:: developer
+       Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_head*
+
+    Parameters
+    -----------
+    n: :obj:`int`, default 5
+        input argument, default 5
+    Returns
+    -------
+    :obj:`pandas.Series`
+        returns: The first n rows of the caller object.
+    """
+
+    _func_name = 'Method head().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
+        raise TypingError('{} The parameter must be an integer type. Given type n: {}'.format(_func_name, n))
+
+    if isinstance(self.index, types.NoneType):
+        def hpat_pandas_series_head_impl(self, n=5):
+            return pandas.Series(self._data[:n])
+
+        return hpat_pandas_series_head_impl
+    else:
+        def hpat_pandas_series_head_index_impl(self, n=5):
+            return pandas.Series(self._data[:n], self._index[:n], self._name)
+
+        return hpat_pandas_series_head_index_impl
+
+
 @overload_method(SeriesType, 'groupby')
 def hpat_pandas_series_groupby(
         self,
@@ -2119,6 +2157,62 @@ def hpat_pandas_series_unique(self):
     return hpat_pandas_series_unique_impl
 
 
+@overload_method(SeriesType, 'cumsum')
+def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
+    """
+    Pandas Series method :meth:`pandas.Series.cumsum` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_full
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unsupported_axis
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
+        *unsupported*
+    skipna: :obj:`bool`
+        exclude NA/null values
+    *args:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`scalar`, :obj:`pandas.Series`
+         returns :obj:`scalar` or :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method cumsum().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    if not isinstance(axis, (types.Omitted, types.NoneType)) and axis is not None:
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    def hpat_pandas_series_cumsum_impl(self, axis=None, skipna=True):
+        if skipna:
+            # nampy.nancumsum replaces NANs with 0, series.cumsum does not, so replace back 0 with NANs
+            local_data = numpy.nancumsum(self._data)
+            local_data[numpy.isnan(self._data)] = numpy.nan
+            return pandas.Series(local_data)
+
+        return pandas.Series(self._data.cumsum())
+
+    return hpat_pandas_series_cumsum_impl
+
+
 @overload_method(SeriesType, 'nunique')
 def hpat_pandas_series_nunique(self, dropna=True):
     """
@@ -2286,3 +2380,49 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
         return numpy.median(self._data)
 
     return hpat_pandas_series_median_impl
+
+
+@overload_method(SeriesType, 'dropna')
+def hpat_pandas_series_dropna(self, axis=0, inplace=False):
+    """
+    Pandas Series method :meth:`pandas.Series.dropna` implementation.
+
+    .. only:: developer
+
+       Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int` or :obj:`string` {0 or `index`}, default 0
+        There is only one axis to drop values from.
+    inplace: :obj:`bool`, default False
+        If True, do operation inplace and return None.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object with NA entries dropped from it.
+    """
+
+    _func_name = 'Method dropna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType, types.Omitted)) or axis == 0):
+        raise TypingError('{} The axis must be an Integer or String. Given: {}'.format(_func_name, axis))
+
+    if not (inplace is False or isinstance(inplace, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
+
+    def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
+        # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
+        na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+        data = self._data[~na_data_arr]
+        index = self.index[~na_data_arr]
+        return pandas.Series(data, index, self._name)
+
+    return hpat_pandas_series_dropna_impl
