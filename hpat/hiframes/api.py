@@ -47,6 +47,7 @@ from hpat.hiframes.sort import (
     alloc_pre_shuffle_metadata)
 from hpat.hiframes.join import write_send_buff
 from hpat.hiframes.split_impl import string_array_split_view_type
+from numba.errors import TypingError
 
 # XXX: used in agg func output to avoid mutating filter, agg, join, etc.
 # TODO: fix type inferrer and remove this
@@ -531,6 +532,31 @@ def isna_overload(arr, i):
 
     # XXX integers don't have nans, extend to boolean
     return lambda arr, i: False
+
+
+def get_nan_mask(arr):
+    return np.zeros(len(arr), np.bool_)
+
+
+@overload(get_nan_mask)
+def get_nan_mask_overload(arr):
+
+    def get_nan_mask_via_isna_impl(arr):
+        return np.array([isna(arr, i) for i in np.arange(len(arr))])
+
+    if isinstance(arr, types.Array):
+        dtype = arr.dtype
+        if isinstance(dtype, types.Float):
+            return lambda arr: np.isnan(arr)
+        elif isinstance(dtype, (types.Boolean, types.Integer)):
+            return lambda arr: np.zeros(len(arr), np.bool_)
+        elif isinstance(dtype, (types.NPDatetime, types.NPTimedelta)):
+            return get_nan_mask_via_isna_impl
+        else:
+            raise TypingError('{} Not implemented for arrays with dtype: {}'.format(_func_name, dtype))
+    else:
+        # for StringArrayType and other cases rely on isna implementation
+        return get_nan_mask_via_isna_impl
 
 
 @numba.njit
