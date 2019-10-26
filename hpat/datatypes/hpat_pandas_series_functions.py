@@ -165,6 +165,74 @@ def hpat_pandas_series_shape(self):
     return hpat_pandas_series_shape_impl
 
 
+@overload_method(SeriesType, 'std')
+def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.std` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_params
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
+        *unsupported*
+    skipna: :obj:`bool`
+        exclude NA/null values
+    level: :obj:`int`, :obj:`str`
+        If the axis is a MultiIndex (hierarchical),
+        count along a particular level, collapsing into a scalar
+        *unsupported*
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+        The divisor used in calculations is N - ddof,
+        where N represents the number of elements.
+    numeric_only: :obj:`bool`
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data.
+        Not implemented for Series.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`scalar`
+         returns :obj:`scalar`
+    """
+
+    _func_name = 'Method std().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not None:
+        raise TypingError('{} The object must be a boolean. Given skipna: {}'.format(_func_name, skipna))
+
+    if not isinstance(ddof, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object must be an integer. Given ddof: {}'.format(_func_name, ddof))
+
+    for name, arg in [('axis', axis), ('level', level), ('numeric_only', numeric_only)]:
+        if not isinstance(arg, (types.Omitted, types.NoneType)) and arg is not None:
+            raise TypingError('{} Unsupported parameters. Given {}: {}'.format(_func_name, name, arg))
+
+    def hpat_pandas_series_std_impl(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+        var = self.var(axis=axis, skipna=skipna, level=level, ddof=ddof, numeric_only=numeric_only)
+        return var ** 0.5
+
+    return hpat_pandas_series_std_impl
+
+
 @overload_attribute(SeriesType, 'values')
 def hpat_pandas_series_iloc(self):
     """
