@@ -9,7 +9,7 @@ import numpy as np
 import numba
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end)
+                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version)
 
 from hpat.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -133,6 +133,7 @@ class TestDataFrame(unittest.TestCase):
                                           dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
+    @unittest.skipIf(check_numba_version('0.46.0'), "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})

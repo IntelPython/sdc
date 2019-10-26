@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
-
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
@@ -1079,25 +1078,159 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S),
                                        test_impl(S), check_names=False)
 
-    def test_series_dropna_float1(self):
-        def test_impl(A):
-            return A.dropna().values
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.dropna() impl')
+    def test_series_dropna_axis1(self):
+        '''Verifies Series.dropna() implementation handles 'index' as axis argument'''
+        def test_impl(S):
+            return S.dropna(axis='index')
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series([1.0, 2.0, np.nan, 1.0])
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
-        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    def test_series_dropna_str1(self):
-        def test_impl(A):
-            return A.dropna().values
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.dropna() impl')
+    def test_series_dropna_axis2(self):
+        '''Verifies Series.dropna() implementation handles 0 as axis argument'''
+        def test_impl(S):
+            return S.dropna(axis=0)
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
-        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.dropna() impl')
+    def test_series_dropna_axis3(self):
+        '''Verifies Series.dropna() implementation handles correct non-literal axis argument'''
+        def test_impl(S, axis):
+            return S.dropna(axis=axis)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        axis_values = [0, 'index']
+        for value in axis_values:
+            pd.testing.assert_series_equal(hpat_func(S1, value), test_impl(S2, value))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_float_index1(self):
+        '''Verifies Series.dropna() implementation for float series with default index'''
+        def test_impl(S):
+            return S.dropna()
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_float64:
+            S1 = pd.Series(data)
+            S2 = S1.copy()
+            pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_float_index2(self):
+        '''Verifies Series.dropna() implementation for float series with string index'''
+        def test_impl(S):
+            return S.dropna()
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_str_index1(self):
+        '''Verifies Series.dropna() implementation for series of strings with default index'''
+        def test_impl(S):
+            return S.dropna()
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_str_index2(self):
+        '''Verifies Series.dropna() implementation for series of strings with string index'''
+        def test_impl(S):
+            return S.dropna()
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''], ['a', 'b', 'c', 'd', 'e'])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_str_index3(self):
+        def test_impl(S):
+            return S.dropna()
+
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''], index=[1, 2, 5, 7, 10])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('BUG: old-style dropna impl returns series without index, in new-style inplace is unsupported')
+    def test_series_dropna_float_inplace_no_index1(self):
+        '''Verifies Series.dropna() implementation for float series with default index and inplace argument True'''
+        def test_impl(S):
+            S.dropna(inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('TODO: add reflection support and check method return value')
+    def test_series_dropna_float_inplace_no_index2(self):
+        '''Verifies Series.dropna(inplace=True) results are reflected back in the original float series'''
+        def test_impl(S):
+            return S.dropna(inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
+
+    @unittest.skip('BUG: old-style dropna impl returns series without index, in new-style inplace is unsupported')
+    def test_series_dropna_str_inplace_no_index1(self):
+        '''Verifies Series.dropna() implementation for series of strings
+           with default index and inplace argument True
+        '''
+        def test_impl(S):
+            S.dropna(inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('TODO: add reflection support and check method return value')
+    def test_series_dropna_str_inplace_no_index2(self):
+        '''Verifies Series.dropna(inplace=True) results are reflected back in the original string series'''
+        def test_impl(S):
+            return S.dropna(inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
 
     def test_series_dropna_str_parallel1(self):
+        '''Verifies Series.dropna() distributed work for series of strings with default index'''
         def test_impl(A):
             B = A.dropna()
             return (B == 'gg').sum()
@@ -1107,46 +1240,44 @@ class TestSeries(unittest.TestCase):
         start, end = get_start_end(len(S1))
         # TODO: gatherv
         self.assertEqual(hpat_func(S1[start:end]), test_impl(S1))
+        self.assertEqual(count_array_REPs(), 0)
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
-    def test_series_dropna_float_inplace1(self):
-        def test_impl(A):
-            A.dropna(inplace=True)
-            return A.values
-        hpat_func = hpat.jit(test_impl)
-
-        S1 = pd.Series([1.0, 2.0, np.nan, 1.0])
-        S2 = S1.copy()
-        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
-
-    def test_series_dropna_str_inplace1(self):
-        def test_impl(A):
-            A.dropna(inplace=True)
-            return A.values
-        hpat_func = hpat.jit(test_impl)
-
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
-        S2 = S1.copy()
-        np.testing.assert_array_equal(hpat_func(S1), test_impl(S2))
-
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_dropna_index_str(self):
+    @unittest.skip('AssertionError: Series are different\n'
+                   'Series length are different\n'
+                   '[left]:  3, Int64Index([0, 1, 2], dtype=\'int64\')\n'
+                   '[right]: 2, Int64Index([1, 2], dtype=\'int64\')')
+    def test_series_dropna_dt_no_index1(self):
+        '''Verifies Series.dropna() implementation for datetime series with default index'''
         def test_impl(S):
             return S.dropna()
-
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=['a', 'b', 'c', 'd'])
+        S1 = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_dropna_index_int(self):
+    def test_series_dropna_bool_no_index1(self):
+        '''Verifies Series.dropna() implementation for bool series with default index'''
         def test_impl(S):
             return S.dropna()
-
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'], index=[1, 2, 5, 7])
+        S1 = pd.Series([True, False, False, True])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style dropna impl returns series without index')
+    def test_series_dropna_int_no_index1(self):
+        '''Verifies Series.dropna() implementation for integer series with default index'''
+        def test_impl(S):
+            return S.dropna()
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S1 = pd.Series(np.arange(n, dtype=np.int64))
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
@@ -1992,6 +2123,86 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
         self.assertTrue(count_array_OneDs() > 0)
 
+    def test_series_head_noidx_float(self):
+        def test_impl(S, n):
+            return S.head(n)
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_float64:
+            S = pd.Series(input_data)
+            for n in [-1, 0, 2, 3]:
+                result_ref = test_impl(S, n)
+                result_jit = hpat_func(S, n)
+                pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Need fix test_global_input_data_integer64")
+    def test_series_head_noidx_int(self):
+        def test_impl(S, n):
+            return S.head(n)
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_integer64:
+            S = pd.Series(input_data)
+            for n in [-1, 0, 2, 3]:
+                result_ref = test_impl(S, n)
+                result_jit = hpat_func(S, n)
+                pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Need fix test_global_input_data_integer64")
+    def test_series_head_noidx_num(self):
+        def test_impl(S, n):
+            return S.head(n)
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_numeric:
+            S = pd.Series(input_data)
+            for n in [-1, 0, 2, 3]:
+                result_ref = test_impl(S, n)
+                result_jit = hpat_func(S, n)
+                pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Old implementation not work with n negative and data str")
+    def test_series_head_noidx_str(self):
+        def test_impl(S, n):
+            return S.head(n)
+        hpat_func = hpat.jit(test_impl)
+        input_data = test_global_input_data_unicode_kind4
+        S = pd.Series(input_data)
+        for n in [-1, 0, 2, 3]:
+            result_ref = test_impl(S, n)
+            result_jit = hpat_func(S, n)
+            pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Broke another three tests")
+    def test_series_head_idx(self):
+        def test_impl(S):
+            return S.head()
+
+        def test_impl_param(S, n):
+            return S.head(n)
+
+        hpat_func = hpat.jit(test_impl)
+
+        data_test = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 0, 2.2, 1, 2],
+                     ['as', 'b', 'abb', 'sss', 'ytr65', '', 'qw', 'a', 'b'],
+                     [6, 6, 2, 1, 3, np.inf, np.nan, np.nan, np.nan],
+                     [3., 5.3, np.nan, np.nan, np.inf, np.inf, 4.4, 3.7, 8.9]
+                     ]
+
+        for input_data in data_test:
+            for index_data in data_test:
+                S = pd.Series(input_data, index_data)
+
+                result_ref = test_impl(S)
+                result = hpat_func(S)
+                pd.testing.assert_series_equal(result, result_ref)
+
+                hpat_func_param1 = hpat.jit(test_impl_param)
+
+                for param1 in [1, 3, 7]:
+                    result_param1_ref = test_impl_param(S, param1)
+                    result_param1 = hpat_func_param1(S, param1)
+                    pd.testing.assert_series_equal(result_param1, result_param1_ref)
+
     def test_series_median1(self):
         '''Verifies median implementation for float and integer series of random data'''
         def test_impl(S):
@@ -2585,6 +2796,65 @@ class TestSeries(unittest.TestCase):
         result = hpat_func()
         np.testing.assert_array_equal(result, ref_result)
 
+    def test_series_std(self):
+        def pyfunc():
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
+            return series.std()
+
+        cfunc = hpat.jit(pyfunc)
+        ref_result = pyfunc()
+        result = cfunc()
+        np.testing.assert_equal(ref_result, result)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() parameters "skipna" and "ddof" unsupported')
+    def test_series_std_unboxing(self):
+        def pyfunc(series, skipna, ddof):
+            return series.std(skipna=skipna, ddof=ddof)
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            for ddof in [0, 1]:
+                for skipna in [True, False]:
+                    ref_result = pyfunc(series, skipna=skipna, ddof=ddof)
+                    result = cfunc(series, skipna=skipna, ddof=ddof)
+                    np.testing.assert_equal(ref_result, result)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() strings as input data unsupported')
+    def test_series_std_str(self):
+        def pyfunc(series):
+            return series.std()
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.std() parameters "axis", "level", "numeric_only" unsupported')
+    def test_series_std_unsupported_params(self):
+        def pyfunc(series, axis, level, numeric_only):
+            return series.std(axis=axis, level=level, numeric_only=numeric_only)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        msg = 'Method std(). Unsupported parameters. Given {}: {}'
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=1, level=None, numeric_only=None)
+        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=1, numeric_only=None)
+        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=None, numeric_only=True)
+        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
             return S.nunique()
@@ -2730,6 +3000,74 @@ class TestSeries(unittest.TestCase):
             result_ref = test_series_count_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() np.nan as input data unsupported')
+    def test_series_cumsum(self):
+        def test_impl():
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
+            return series.cumsum()
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+        pd.testing.assert_series_equal(pyfunc(), cfunc())
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() np.nan as input data unsupported')
+    def test_series_cumsum_unboxing(self):
+        def test_impl(s):
+            return s.cumsum()
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() parameters "axis", "skipna" unsupported')
+    def test_series_cumsum_full(self):
+        def test_impl(s, axis, skipna):
+            return s.cumsum(axis=axis, skipna=skipna)
+
+        pyfunc = test_impl
+        cfunc = hpat.jit(pyfunc)
+
+        axis = None
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            for skipna in [True, False]:
+                ref_result = pyfunc(series, axis=axis, skipna=skipna)
+                jit_result = cfunc(series, axis=axis, skipna=skipna)
+                pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() strings as input data unsupported')
+    def test_series_cumsum_str(self):
+        def test_impl(s):
+            return s.cumsum()
+
+        cfunc = hpat.jit(test_impl)
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method cumsum(). The object must be a number. Given self.data.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cumsum() parameter "axis" unsupported')
+    def test_series_cumsum_unsupported_axis(self):
+        def test_impl(s, axis):
+            return s.cumsum(axis=axis)
+
+        cfunc = hpat.jit(test_impl)
+        series = pd.Series(test_global_input_data_float64[0])
+        for axis in [0, 1]:
+            with self.assertRaises(TypingError) as raises:
+                cfunc(series, axis=axis)
+            msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
+            self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":
