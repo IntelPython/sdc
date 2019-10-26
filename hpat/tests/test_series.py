@@ -2911,6 +2911,68 @@ class TestSeries(unittest.TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
+    def test_series_var(self):
+        def pyfunc():
+            series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        np.testing.assert_equal(pyfunc(), cfunc())
+
+    def test_series_var_unboxing(self):
+        def pyfunc(series):
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            np.testing.assert_equal(pyfunc(series), cfunc(series))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.var() parameters "ddof" and "skipna" unsupported')
+    def test_series_var_full(self):
+        def pyfunc(series, skipna, ddof):
+            return series.var(skipna=skipna, ddof=ddof)
+
+        cfunc = hpat.jit(pyfunc)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data)
+            for ddof in [0, 1]:
+                for skipna in [True, False]:
+                    ref_result = pyfunc(series, skipna=skipna, ddof=ddof)
+                    result = cfunc(series, skipna=skipna, ddof=ddof)
+                    np.testing.assert_equal(ref_result, result)
+
+    def test_series_var_str(self):
+        def pyfunc(series):
+            return series.var()
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'Method var(). The object must be a number. Given self.data.dtype: {}'
+        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+    def test_series_var_unsupported_params(self):
+        def pyfunc(series, axis, level, numeric_only):
+            return series.var(axis=axis, level=level, numeric_only=numeric_only)
+
+        cfunc = hpat.jit(pyfunc)
+        series = pd.Series(test_global_input_data_float64[0])
+        msg = 'Method var(). Unsupported parameters. Given {}: {}'
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=1, level=None, numeric_only=None)
+        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=1, numeric_only=None)
+        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series, axis=None, level=None, numeric_only=True)
+        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+
     def test_series_count(self):
         def test_series_count_impl(S):
             return S.count()
