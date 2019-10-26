@@ -667,11 +667,11 @@ class SeriesAttribute(AttributeTemplate):
         assert not args
         return signature(SeriesType(types.boolean))
 
-    @bound_function("series.notna")
-    def resolve_notna(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.notna")
+    # def resolve_notna(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     @bound_function("series.nlargest")
     def resolve_nlargest(self, ary, args, kws):

@@ -1892,6 +1892,60 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_notna_noidx_float(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_float64:
+            S = pd.Series(input_data)
+            result_ref = test_impl(S)
+            result_jit = hpat_func(S)
+            pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Need fix test_global_input_data_integer64")
+    def test_series_notna_noidx_int(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_integer64:
+            S = pd.Series(input_data)
+            result_ref = test_impl(S)
+            result_jit = hpat_func(S)
+            pd.testing.assert_series_equal(result_jit, result_ref)
+
+    @unittest.skip("Need fix test_global_input_data_integer64")
+    def test_series_notna_noidx_num(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        for input_data in test_global_input_data_numeric:
+            S = pd.Series(input_data)
+            result_ref = test_impl(S)
+            result_jit = hpat_func(S)
+            pd.testing.assert_series_equal(result_jit, result_ref)
+
+    def test_series_notna_noidx_str(self):
+        def test_impl(S):
+            return S.notna()
+
+        hpat_func = hpat.jit(test_impl)
+        input_data = test_global_input_data_unicode_kind4
+        S = pd.Series(input_data)
+        result_ref = test_impl(S)
+        result_jit = hpat_func(S)
+        pd.testing.assert_series_equal(result_jit, result_ref)
+
+    def test_series_str_notna(self):
+        def test_impl(S):
+            return S.notna()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['aa', None, 'c', 'cccd'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_str_isna1(self):
         def test_impl(S):
             return S.isna()
