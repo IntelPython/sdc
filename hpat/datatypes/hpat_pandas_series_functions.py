@@ -256,6 +256,86 @@ def hpat_pandas_series_iloc(self):
     return hpat_pandas_series_values_impl
 
 
+@overload_method(SeriesType, 'var')
+def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+    """
+    Pandas Series method :meth:`pandas.Series.var` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_unboxing
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_unsupported_params
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    axis: :obj:`int`, :obj:`str`
+        Axis along which the operation acts
+        0/None/'index' - row-wise operation
+        1/'columns'    - column-wise operation
+        *unsupported*
+    skipna: :obj:`bool`
+        exclude NA/null values
+    level: :obj:`int`, :obj:`str`
+        If the axis is a MultiIndex (hierarchical),
+        count along a particular level, collapsing into a scalar
+        *unsupported*
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+        The divisor used in calculations is N - ddof,
+        where N represents the number of elements.
+    numeric_only: :obj:`bool`
+        Include only float, int, boolean columns.
+        If None, will attempt to use everything, then use only numeric data.
+        Not implemented for Series.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`scalar`
+         returns :obj:`scalar`
+    """
+
+    _func_name = 'Method var().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        msg = '{} The object must be a number. Given self.data.dtype: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not None:
+        raise TypingError('{} The object must be a boolean. Given skipna: {}'.format(_func_name, skipna))
+
+    if not isinstance(ddof, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object must be an integer. Given ddof: {}'.format(_func_name, ddof))
+
+    for name, arg in [('axis', axis), ('level', level), ('numeric_only', numeric_only)]:
+        if not isinstance(arg, (types.Omitted, types.NoneType)) and arg is not None:
+            raise TypingError('{} Unsupported parameters. Given {}: {}'.format(_func_name, name, arg))
+
+    def hpat_pandas_series_var_impl(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+        if skipna is None:
+            skipna = True
+
+        if skipna:
+            valuable_length = len(self._data) - numpy.sum(numpy.isnan(self._data))
+            if valuable_length <= ddof:
+                return numpy.nan
+
+            return numpy.nanvar(self._data) * valuable_length / (valuable_length - ddof)
+
+        if len(self._data) <= ddof:
+            return numpy.nan
+
+        return self._data.var() * len(self._data) / (len(self._data) - ddof)
+
+    return hpat_pandas_series_var_impl
+
+
 @overload_attribute(SeriesType, 'index')
 def hpat_pandas_series_index(self):
     """
@@ -761,6 +841,45 @@ def hpat_pandas_series_isna(self):
             return pandas.Series(result)
 
         return hpat_pandas_series_isna_impl
+
+
+@overload_method(SeriesType, 'notna')
+def hpat_pandas_series_notna(self):
+    """
+    Pandas Series method :meth:`pandas.Series.notna` implementation.
+
+    .. only:: developer
+
+        Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna*
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+        input series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method notna().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if isinstance(self.data.dtype, types.Number):
+        def hpat_pandas_series_notna_impl(self):
+            return pandas.Series(numpy.invert(numpy.isnan(self._data)))
+
+        return hpat_pandas_series_notna_impl
+
+    if isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_notna_impl(self):
+            result = self.isna()
+            return pandas.Series(numpy.invert(result._data))
+
+        return hpat_pandas_series_notna_impl
 
 
 @overload_method(SeriesType, 'ne')

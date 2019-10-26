@@ -667,11 +667,11 @@ class SeriesAttribute(AttributeTemplate):
         assert not args
         return signature(SeriesType(types.boolean))
 
-    @bound_function("series.notna")
-    def resolve_notna(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.notna")
+    # def resolve_notna(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     @bound_function("series.nlargest")
     def resolve_nlargest(self, ary, args, kws):
@@ -992,7 +992,7 @@ install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_cumsum',
+                           'resolve_cumsum', 'resolve_var',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_prod', 'resolve_count', 'resolve_dropna']
