@@ -533,6 +533,7 @@ def dump_node_list(node_list):
 def debug_prints():
     return numba.config.DEBUG_ARRAY_OPT == 1
 
+
 def update_globals(func, glbls):
     if isinstance(func, pytypes.FunctionType):
         func.__globals__.update(glbls)

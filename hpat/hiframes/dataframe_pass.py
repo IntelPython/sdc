@@ -1675,8 +1675,8 @@ class DataFramePassImpl(object):
         for c in grp_typ.selection:
             var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
             self.state.typemap[var.name] = (out_typ.data
-                                      if isinstance(out_typ, SeriesType)
-                                      else out_typ.data[out_typ.columns.index(c)])
+                                            if isinstance(out_typ, SeriesType)
+                                            else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
 
         agg_func = get_agg_func(self.state.func_ir, func_name, rhs)
@@ -1828,8 +1828,8 @@ class DataFramePassImpl(object):
         for c in rolling_typ.selection:
             var = ir.Var(lhs.scope, mk_unique_var(c), lhs.loc)
             self.state.typemap[var.name] = (out_typ.data
-                                      if isinstance(out_typ, SeriesType)
-                                      else out_typ.data[out_typ.columns.index(c)])
+                                            if isinstance(out_typ, SeriesType)
+                                            else out_typ.data[out_typ.columns.index(c)])
             df_col_map[c] = var
 
         if on is not None:

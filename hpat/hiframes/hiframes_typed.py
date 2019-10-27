@@ -80,6 +80,7 @@ _binop_to_str = {
     '**': '**',
 }
 
+
 @register_pass(mutates_CFG=True, analysis_only=False)
 class HiFramesTypedPass(FunctionPass):
     """Analyze and transform hiframes calls after typing"""

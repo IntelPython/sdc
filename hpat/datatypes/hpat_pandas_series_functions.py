@@ -463,7 +463,6 @@ def hpat_pandas_series_T(self):
     return hpat_pandas_series_T_impl
 
 
-
 @overload(len)
 def hpat_pandas_series_len(self):
     """
@@ -663,9 +662,7 @@ def hpat_pandas_series_copy(self, deep=True):
     """
     _func_name = 'Method Series.copy().'
 
-    if (isinstance(self, SeriesType) and
-        (isinstance(deep, (types.Omitted, types.Boolean)) or deep == True)
-    ):
+    if (isinstance(self, SeriesType) and (isinstance(deep, (types.Omitted, types.Boolean)) or deep)):
         if isinstance(self.index, types.NoneType):
             def hpat_pandas_series_copy_impl(self, deep=True):
                 if deep:
@@ -1110,20 +1107,26 @@ def hpat_pandas_series_sum(
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == None):
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis is None):
         raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
 
-    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna == None):
+    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna is None):
         raise TypingError('{} The skipna must be a Boolean. Given: {}'.format(_func_name, skipna))
 
-    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted)) or level == None):
-        raise TypingError('{} The level must be an Integer or level name. Currently unsupported. Given: {}'.format(_func_name, level))
+    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted)) or level is None):
+        raise TypingError(
+            '{} The level must be an Integer or level name. Currently unsupported. Given: {}'.format(
+                _func_name, level))
 
-    if not (isinstance(numeric_only, (types.Boolean, types.Omitted)) or numeric_only == None):
-        raise TypingError('{} The numeric_only must be a Boolean. Currently unsupported. Given: {}'.format(_func_name, numeric_only))
+    if not (isinstance(numeric_only, (types.Boolean, types.Omitted)) or numeric_only is None):
+        raise TypingError(
+            '{} The numeric_only must be a Boolean. Currently unsupported. Given: {}'.format(
+                _func_name, numeric_only))
 
     if not (isinstance(min_count, (types.Integer, types.Omitted)) or min_count == 0):
-        raise TypingError('{} The min_count must be an Integer. Currently unsupported. Given: {}'.format(_func_name, min_count))
+        raise TypingError(
+            '{} The min_count must be an Integer. Currently unsupported. Given: {}'.format(
+                _func_name, min_count))
 
     def hpat_pandas_series_sum_impl(
         self,
@@ -1634,8 +1637,9 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
-        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
-                                                                                                           self.data.dtype))
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(
+                _func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
         raise TypingError(
@@ -1686,8 +1690,9 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
-        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
-                                                                                                           self.data.dtype))
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(
+                _func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
         raise TypingError(
@@ -1745,7 +1750,9 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name, self.data.dtype))
+        raise TypingError(
+            '{} Currently function supports only numeric values. Given data type: {}'.format(
+                _func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not None:
         raise TypingError(
@@ -2390,7 +2397,6 @@ def hpat_pandas_series_nunique(self, dropna=True):
 
 @overload_method(SeriesType, 'count')
 def hpat_pandas_series_count(self, level=None):
-
     """
     Pandas Series method :meth:`pandas.Series.count` implementation.
     .. only:: developer
@@ -2477,20 +2483,24 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
 
     if not isinstance(self.dtype, types.Number):
         raise TypingError(
-            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.dtype))
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(
+                _func_name, self.dtype))
 
     if not (isinstance(axis, (types.Integer, types.UnicodeType, types.Omitted)) or axis is None):
-        raise TypingError('{} The axis must be an Integer or a String. Currently unsupported. Given: {}'.format(_func_name, axis))
+        raise TypingError(
+            '{} The axis must be an Integer or a String. Currently unsupported. Given: {}'.format(
+                _func_name, axis))
 
-    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna == True):
+    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna):
         raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, skipna))
 
     if not ((level is None or isinstance(level, types.Omitted))
             or (numeric_only is None or isinstance(numeric_only, types.Omitted))
             or (axis is None or isinstance(axis, types.Omitted))
-    ):
-        raise TypingError('{} Unsupported parameters. Given level: {}, numeric_only: {}, axis: {}'.format(_func_name, level, numeric_only, axis))
-
+            ):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, numeric_only: {}, axis: {}'.format(
+                _func_name, level, numeric_only, axis))
 
     def hpat_pandas_series_median_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
         if skipna:
@@ -2538,7 +2548,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
 
     def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
-        # generate Series index if needed by using SeriesType.index (i.e. not self._index) 
+        # generate Series index if needed by using SeriesType.index (i.e. not self._index)
         na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
         data = self._data[~na_data_arr]
         index = self.index[~na_data_arr]
