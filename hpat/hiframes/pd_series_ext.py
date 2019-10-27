@@ -54,6 +54,7 @@ from numba.targets.imputils import (impl_ret_new_ref, iternext_impl, RefType)
 from numba.targets.arrayobj import (make_array, _getitem_array1d)
 
 import hpat
+from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from hpat.hiframes.rolling import supported_rolling_funcs
@@ -425,8 +426,7 @@ class SeriesAttribute(AttributeTemplate):
 
     def resolve_str(self, ary):
         assert ary.dtype in (string_type, types.List(string_type))
-        # TODO: add dtype to series_str_methods_type
-        return series_str_methods_type
+        return StringMethodsType(ary)
 
     def resolve_dt(self, ary):
         assert ary.dtype == types.NPDatetime('ns')
@@ -752,22 +752,30 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
-str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
-                   'strip', 'swapcase', 'title', 'upper')
+str2str_methods = ('capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title')
+"""
+    Functions which are still overloaded by HPAT compiler pipeline
+"""
+
+str2str_methods_excluded = ('upper', 'lower')
+"""
+    Functions which are used from Numba directly by calling from StringMethodsType
+    
+    Test: HPAT_CONFIG_PIPELINE_HPAT=0 python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str2str
+"""
+
+# class SeriesStrMethodType(types.Type):
+#     def __init__(self):
+#         name = "SeriesStrMethodType"
+#         super(SeriesStrMethodType, self).__init__(name)
 
 
-class SeriesStrMethodType(types.Type):
-    def __init__(self):
-        name = "SeriesStrMethodType"
-        super(SeriesStrMethodType, self).__init__(name)
-
-
-series_str_methods_type = SeriesStrMethodType()
+#series_str_methods_type = SeriesStrMethodType
 
 
 @infer_getattr
 class SeriesStrMethodAttribute(AttributeTemplate):
-    key = SeriesStrMethodType
+    key = StringMethodsType
 
     @bound_function("strmethod.contains")
     def resolve_contains(self, ary, args, kws):
@@ -796,8 +804,10 @@ class SeriesStrMethodAttribute(AttributeTemplate):
 
     def generic_resolve(self, s_str, func_name):
         if func_name not in str2str_methods:
-            raise ValueError("Series.str.{} is not supported yet".format(
-                func_name))
+            if func_name in str2str_methods_excluded:
+                return
+            else:
+                raise ValueError("Series.str.{} is not supported yet".format(func_name))
 
         template_key = 'strmethod.' + func_name
         out_typ = SeriesType(string_type)

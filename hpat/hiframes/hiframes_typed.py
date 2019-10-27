@@ -47,6 +47,7 @@ from numba.typing.templates import Signature, bound_function, signature, infer_g
 from numba.compiler_machinery import FunctionPass, register_pass
 
 import hpat
+from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
                         is_whole_slice, is_array, update_globals)
 from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
@@ -58,7 +59,7 @@ from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
                                          series_to_array_type, is_dt64_series_typ,
                                          if_series_to_array_type, is_series_type,
-                                         series_str_methods_type, SeriesRollingType, SeriesIatType,
+                                         SeriesRollingType, SeriesIatType,
                                          explicit_binop_funcs, series_dt_methods_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType
 from hpat.hiframes.rolling import get_rolling_setup_args
@@ -483,9 +484,7 @@ class HiFramesTypedPassImpl(object):
         else:
             func_name, func_mod = fdef
 
-        if (isinstance(func_mod, ir.Var)
-                and self.state.typemap[func_mod.name]
-                == series_str_methods_type):
+        if (isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], StringMethodsType)):
             f_def = guard(get_definition, self.state.func_ir, rhs.func)
             str_def = guard(get_definition, self.state.func_ir, f_def.value)
             if str_def is None:  # TODO: check for errors
@@ -493,7 +492,10 @@ class HiFramesTypedPassImpl(object):
 
             series_var = str_def.value
 
-            return self._run_series_str_method(assign, assign.target, series_var, func_name, rhs)
+            # functions which are used from Numba directly by calling from StringMethodsType
+            # other functions (for example, 'capitalize' is not presented in Numba) goes to be replaced here
+            if func_name not in hpat.hiframes.pd_series_ext.str2str_methods_excluded:
+                return self._run_series_str_method(assign, assign.target, series_var, func_name, rhs)
 
         # replace _get_type_max_value(arr.dtype) since parfors
         # arr.dtype transformation produces invalid code for dt64
@@ -1716,8 +1718,7 @@ class HiFramesTypedPassImpl(object):
         supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods
                              + ('len', 'replace', 'split', 'get', 'contains'))
         if func_name not in supported_methods:
-            raise NotImplementedError(
-                "Series.str.{} not supported yet".format(func_name))
+            raise NotImplementedError("Series.str.{} is not supported yet".format(func_name))
 
         nodes = []
         arr = self._get_series_data(series_var, nodes)
