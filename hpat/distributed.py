@@ -79,6 +79,7 @@ distributed_run_extensions = {}
 dist_analysis = None
 fir_text = None
 
+
 @register_pass(mutates_CFG=True, analysis_only=False)
 class DistributedPass(FunctionPass):
     """The summary of the class should be here for example below is the summary line for this class
@@ -87,6 +88,7 @@ class DistributedPass(FunctionPass):
     """
 
     _name = "distributed_pass"
+
     def __init__(self):
         pass
 
@@ -1954,7 +1956,8 @@ class DistributedPassImpl(object):
             slice_type = self.state.typemap[slice_var.name]
             arg_typs = (slice_type, types.intp,)
         _globals = self.state.func_ir.func_id.func.__globals__
-        f_ir = compile_to_numba_ir(f, _globals, self.state.typingctx, arg_typs, self.state.typemap, self.state.calltypes)
+        f_ir = compile_to_numba_ir(f, _globals, self.state.typingctx, arg_typs,
+                                   self.state.typemap, self.state.calltypes)
         _, block = f_ir.blocks.popitem()
         replace_arg_nodes(block, args)
         return block.body[:-2]  # ignore return nodes
@@ -2035,7 +2038,8 @@ class DistributedPassImpl(object):
         def f():  # pragma: no cover
             return hpat.distributed_api.barrier()
 
-        f_blocks = compile_to_numba_ir(f, {'hpat': hpat}, self.state.typingctx, {}, self.state.typemap, self.state.calltypes).blocks
+        f_blocks = compile_to_numba_ir(f, {'hpat': hpat}, self.state.typingctx, {},
+                                       self.state.typemap, self.state.calltypes).blocks
         block = f_blocks[min(f_blocks.keys())]
         return block.body[:-2]  # remove return
 
@@ -2047,8 +2051,12 @@ class DistributedPassImpl(object):
         def f(val, op):  # pragma: no cover
             hpat.distributed_api.dist_reduce(val, op)
 
-        f_ir = compile_to_numba_ir(f, {'hpat': hpat}, self.state.typingctx,
-                                   (self.state.typemap[reduce_var.name], types.int32), self.state.typemap, self.state.calltypes)
+        f_ir = compile_to_numba_ir(f,
+                                   {'hpat': hpat},
+                                   self.state.typingctx,
+                                   (self.state.typemap[reduce_var.name], types.int32),
+                                   self.state.typemap,
+                                   self.state.calltypes)
         _, block = f_ir.blocks.popitem()
 
         replace_arg_nodes(block, [reduce_var, op_var])
@@ -2120,8 +2128,12 @@ class DistributedPassImpl(object):
         exec(f_text, {'hpat': hpat}, loc_vars)
         f = loc_vars['f']
 
-        f_block = compile_to_numba_ir(f, {'hpat': hpat, 'numba': numba, 'np': np},
-                                      self.state.typingctx, (red_var_typ,), self.state.typemap, self.state.calltypes).blocks.popitem()[1]
+        f_block = compile_to_numba_ir(f,
+                                      {'hpat': hpat, 'numba': numba, 'np': np},
+                                      self.state.typingctx,
+                                      (red_var_typ,),
+                                      self.state.typemap,
+                                      self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [reduce_var])
         nodes = f_block.body[:-3]
         nodes[-1].target = reduce_var

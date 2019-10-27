@@ -1,6 +1,7 @@
 import hpat
 import numba
 
+
 def count_array_REPs():
     from hpat.distributed import Distribution
     vals = hpat.distributed.dist_analysis.array_dists.values()
@@ -53,6 +54,7 @@ def get_start_end(n):
     start = hpat.distributed_api.get_start(n, n_pes, rank)
     end = hpat.distributed_api.get_end(n, n_pes, rank)
     return start, end
+
 
 def check_numba_version(version):
     return numba.__version__ == version

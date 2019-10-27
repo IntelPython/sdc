@@ -110,8 +110,8 @@ class TestSeries(unittest.TestCase):
     def test_create_list_list_unicode(self):
         def test_impl():
             S = pd.Series([
-                          [ 'abc', 'defg', 'ijk'],
-                          [ 'lmn', 'opq', 'rstuvwxyz']
+                          ['abc', 'defg', 'ijk'],
+                          ['lmn', 'opq', 'rstuvwxyz']
                           ])
             return S
         hpat_func = hpat.jit(test_impl)
@@ -124,8 +124,8 @@ class TestSeries(unittest.TestCase):
     def test_create_list_list_integer(self):
         def test_impl():
             S = pd.Series([
-                          [ 123, 456, -789],
-                          [ -112233, 445566, 778899]
+                          [123, 456, -789],
+                          [-112233, 445566, 778899]
                           ])
             return S
         hpat_func = hpat.jit(test_impl)
@@ -138,8 +138,8 @@ class TestSeries(unittest.TestCase):
     def test_create_list_list_float(self):
         def test_impl():
             S = pd.Series([
-                          [ 1.23, -4.56, 7.89],
-                          [ 11.2233, 44.5566, -778.899]
+                          [1.23, -4.56, 7.89],
+                          [11.2233, 44.5566, -778.899]
                           ])
             return S
         hpat_func = hpat.jit(test_impl)
@@ -379,7 +379,7 @@ class TestSeries(unittest.TestCase):
             with self.subTest(S=S):
                 for deep in (True, False):
                     with self.subTest(deep=deep):
-                        actual   = hpat_func(S, deep)
+                        actual = hpat_func(S, deep)
                         expected = test_impl(S, deep)
 
                         pd.testing.assert_series_equal(actual, expected)
@@ -476,7 +476,7 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([pd.Timestamp('20130101 09:00:00'),
                        pd.Timestamp('20130101 09:00:02'),
                        pd.Timestamp('20130101 09:00:03')
-        ])
+                       ])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('AssertionError: Series are different'
@@ -550,6 +550,7 @@ class TestSeries(unittest.TestCase):
            converts series of strings to series of integers
         '''
         import numba
+
         def test_impl(A):
             return A.astype(np.int32)
         hpat_func = hpat.jit(test_impl)
@@ -826,8 +827,7 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @unittest.skipIf(platform.system() == 'Windows',
-                     'Series values are different (20.0 %)'
+    @unittest.skipIf(platform.system() == 'Windows', 'Series values are different (20.0 %)'
                      '[left]:  [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, 3486784401, 10000000000]'
                      '[right]: [1, 1024, 59049, 1048576, 9765625, 60466176, 282475249, 1073741824, -808182895, 1410065408]')
     def test_series_op5_integer_scalar(self):
@@ -1366,9 +1366,10 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         S = pd.Series([np.nan, 2., 3.])
-        self.assertEqual(np.isnan(hpat_func(S)),np.isnan(test_impl(S)))
+        self.assertEqual(np.isnan(hpat_func(S)), np.isnan(test_impl(S)))
 
-    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default, "Series.sum() operator + is not implemented yet for Numba")
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default,
+                     "Series.sum() operator + is not implemented yet for Numba")
     def test_series_sum2(self):
         def test_impl(S):
             return (S + S).sum()
@@ -1483,7 +1484,6 @@ class TestSeries(unittest.TestCase):
                     self.assertEqual(np.isnan(actual), np.isnan(expected))
                 else:
                     self.assertEqual(actual, expected)
-
 
     def test_series_var1(self):
         def test_impl(S):
@@ -3090,7 +3090,7 @@ class TestSeries(unittest.TestCase):
                            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
                            [np.nan, np.nan, np.nan],
                            [np.nan, np.nan, np.inf]
-                        ]
+                           ]
 
         for input_data in test_input_data:
             S = pd.Series(input_data)

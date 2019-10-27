@@ -27,6 +27,7 @@ from numba.compiler_machinery import FunctionPass, register_pass
 # workaround for Numba #3876 issue with large labels in mortgage benchmark
 binding.set_option("tmp", "-non-global-value-max-name-size=2048")
 
+
 def inline_calls(func_ir, _locals):
     work_list = list(func_ir.blocks.items())
     while work_list:
@@ -63,7 +64,7 @@ def inline_calls(func_ir, _locals):
     # CFG simplification fixes this case
     func_ir.blocks = ir_utils.simplify_CFG(func_ir.blocks)
 
-#TODO: remove these helper functions when Numba provide appropriate way to manipulate passes
+# TODO: remove these helper functions when Numba provide appropriate way to manipulate passes
 def pass_position(pm, location):
     assert pm.passes
     pm._validate_pass(location)
@@ -83,6 +84,7 @@ def add_pass_before(pm, pass_cls, location):
     # if a pass has been added, it's not finalized
     pm._finalized = False
 
+
 def replace_pass(pm, pass_cls, location):
     assert pm.passes
     pm._validate_pass(pass_cls)
@@ -91,6 +93,7 @@ def replace_pass(pm, pass_cls, location):
 
     # if a pass has been added, it's not finalized
     pm._finalized = False
+
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class InlinePass(FunctionPass):
@@ -103,6 +106,7 @@ class InlinePass(FunctionPass):
         inline_calls(state.func_ir, state.locals)
         return True
 
+
 @register_pass(mutates_CFG=True, analysis_only=False)
 class PostprocessorPass(FunctionPass):
     _name = "hpat_postprocessor_pass"
@@ -114,6 +118,7 @@ class PostprocessorPass(FunctionPass):
         post_proc = postproc.PostProcessor(state.func_ir)
         post_proc.run()
         return True
+
 
 class HPATPipeline(numba.compiler.CompilerBase):
     """HPAT compiler pipeline
@@ -147,13 +152,14 @@ class ParforSeqPass(FunctionPass):
 
         return True
 
+
 class HPATPipelineSeq(HPATPipeline):
     """HPAT pipeline without the distributed pass (used in rolling kernels)
     """
 
     def define_pipelines(self):
         name = 'hpat_seq'
-        pm   = DefaultPassBuilder.define_nopython_pipeline(self.state)
+        pm = DefaultPassBuilder.define_nopython_pipeline(self.state)
 
         add_pass_before(pm, InlinePass, InlineClosureLikes)
         pm.add_pass_after(HiFramesPass, InlinePass)

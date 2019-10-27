@@ -1048,8 +1048,8 @@ def gen_top_level_agg_func(key_names, return_key, red_var_typs, out_typs,
 
 def compile_to_optimized_ir(func, arg_typs, typingctx):
     state = namedtuple('State',
-                            ['typingctx', 'targetctx', 'args', 'func_ir', 'typemap', 'return_type',
-                                'calltypes', 'metadata'])
+                       ['typingctx', 'targetctx', 'args', 'func_ir', 'typemap', 'return_type',
+                        'calltypes', 'metadata'])
 
     # XXX are outside function's globals needed?
     code = func.code if hasattr(func, 'code') else func.__code__
