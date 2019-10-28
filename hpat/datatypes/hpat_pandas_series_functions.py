@@ -2169,23 +2169,20 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort1
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort2
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_noidx
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_idx
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort_parallel
+       Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort*
 
     Parameters
     -----------
     self: :class:`pandas.Series`
-        input arg
+        input series
     axis: :obj:`int`
         Has no effect but is accepted for compatibility with numpy.
         *unsupported*
-    kind: {'mergesort', 'quicksort', 'heapsort'}, default 'quicksort'
+    kind: {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
-        *unsupported, uses python func - sorted()*
-    order: None
+        *uses python func - sorted() for str and numpy func - sort() for num*
+        *unsupported*
+    order: :obj:`str` or  :obj:`list of str`, default: None
         Has no effect but is accepted for compatibility with numpy.
         *unsupported*
 
@@ -2202,14 +2199,13 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     if not isinstance(self.data.dtype, types.Number):
         raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
-                                                                                             self.data.dtype))
+                                                                                                           self.data.dtype))
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
     if not isinstance(self.index, types.NoneType):
         def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
-
             sort = numpy.argsort(self._data)
             series_data = pandas.Series(self._data)
             na = 0
@@ -2237,7 +2233,6 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         return hpat_pandas_series_argsort_impl
 
     def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
-
         sort = numpy.argsort(self._data)
         series_data = pandas.Series(self._data)
         na = 0
@@ -2272,17 +2267,12 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values1
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values2
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_index1
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_noidx
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_idx
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values_parallel1
+       Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values*
 
     Parameters
     -----------
     self: :class:'pandas.Series'
-        input arg
+        input series
     axis: 0 or :obj:'pandas.Series.index'
         Axis to direct sorting.
         *unsupported*
@@ -2290,7 +2280,8 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         If True, sort values in ascending order, otherwise descending.
     kind: {'mergesort', 'quicksort', 'heapsort'}, default 'quicksort'
         Choice of sorting algorithm.
-        *unsupported, uses python func - sorted()*
+        *uses python func - sorted() for str and numpy func - sort() for num*
+        *unsupported*
     na_position: {'first' or 'last'}, default 'last'
         Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
         *unsupported*
@@ -2312,7 +2303,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-
             index = numpy.arange(len(self._data))
             my_index = numpy.arange(len(self._data))
             used_index = numpy.full((len(self._data)), -1)
@@ -2333,7 +2323,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-
             na = 0
             for i in self.isna():
                 if i:
@@ -2354,7 +2343,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-
             na = 0
             for i in self.isna():
                 if i:
@@ -2369,7 +2357,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                 result[:i] = result[:i][::-1]
                 cycle = range(len(self._data), -1, -1)
             result_index = index.copy()
-
             for i in range(len(result_index)):
                 find = 0
                 for search in cycle:
@@ -2381,8 +2368,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-
-
             num = 0
             for i in self.isna():
                 j = len(result_index) - na
@@ -2399,7 +2384,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-
             index = self._index
             my_index = numpy.arange(len(self._data))
             used_index = numpy.full((len(self._data)), -1)
@@ -2420,7 +2404,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-
             na = 0
             for i in self.isna():
                 if i:
@@ -2441,7 +2424,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-
             na = 0
             for i in self.isna():
                 if i:
@@ -2467,8 +2449,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-
-
             num = 0
             for i in self.isna():
                 j = len(result_index) - na
