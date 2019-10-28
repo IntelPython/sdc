@@ -34,7 +34,7 @@ from contextlib import contextmanager
 import pandas as pd
 
 import hpat
-from hpat.tests_perf.test_perf_utils import *
+from hpat.tests.tests_perf.test_perf_utils import *
 
 
 STRIP_CASES = [

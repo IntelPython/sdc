@@ -29,7 +29,7 @@ import unittest
 import time
 import numba
 
-from hpat.tests_perf.test_perf_utils import *
+from hpat.tests.tests_perf.test_perf_utils import *
 
 
 STRIP_CASES = [

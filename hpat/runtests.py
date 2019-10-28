@@ -1,6 +1,7 @@
 import os
 import unittest
 import hpat.tests
+from hpat.tests.test_basic import get_rank
 
 """
     Every test in suite can be executed specified times using
@@ -34,4 +35,6 @@ def load_tests(loader, tests, pattern):
 
 
 if __name__ == '__main__':
+    # initialize MPI
+    get_rank()
     unittest.main()
