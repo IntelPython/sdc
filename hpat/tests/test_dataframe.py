@@ -569,6 +569,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_sort_parallel_single_col(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -644,6 +645,7 @@ class TestDataFrame(unittest.TestCase):
                            })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_sort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()

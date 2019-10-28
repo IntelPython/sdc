@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import numba
+import platform
 import hpat
 from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
@@ -149,6 +150,7 @@ class TestGroupBy(unittest.TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
             df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
@@ -171,6 +173,7 @@ class TestGroupBy(unittest.TestCase):
         p_res = test_impl(p_A, p_B, p_C)
         self.assertEqual(h_res, p_res)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -183,6 +186,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_sum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -195,6 +199,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_count(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -207,6 +212,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_mean(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -219,6 +225,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_min(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -231,6 +238,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_max(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -243,6 +251,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_var(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -255,6 +264,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_std(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -280,6 +290,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_all_col(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -292,6 +303,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_agg_parallel_as_index(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -351,6 +363,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_pivot_parallel(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
@@ -373,6 +386,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_crosstab_parallel1(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")

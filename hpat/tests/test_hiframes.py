@@ -6,6 +6,7 @@ import random
 import string
 import pyarrow.parquet as pq
 import numba
+import platform
 import hpat
 import os
 from hpat import hiframes
@@ -214,6 +215,7 @@ class TestHiFrames(unittest.TestCase):
         A = np.arange(0, n, 1, np.float64)
         np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_nunique(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -227,6 +229,7 @@ class TestHiFrames(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_nunique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -269,6 +272,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_unique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -705,6 +709,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    @unittest.skipIf(platform.system() == 'Windows', 'Hangs on Windows')
     def test_var_dist1(self):
         def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
