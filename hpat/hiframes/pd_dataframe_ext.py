@@ -170,7 +170,7 @@ class DataFrameAttribute(AttributeTemplate):
         row_typ = types.NamedTuple(dtypes, Row)
         code = func.literal_value.code
         f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        _, f_return_type, _ = numba.compiler.type_inference_stage(
+        _, f_return_type, _ = numba.typed_passes.type_inference_stage(
             self.context, f_ir, (row_typ,), None)
 
         return signature(SeriesType(f_return_type), *args)

@@ -140,7 +140,7 @@ class DataframeGroupByAttribute(AttributeTemplate):
             out_columns.append(c)
             ind = grp.df_type.columns.index(c)
             data = grp.df_type.data[ind]
-            _, out_dtype, _ = numba.compiler.type_inference_stage(
+            _, out_dtype, _ = numba.typed_passes.type_inference_stage(
                 self.context, f_ir, (data,), None)
             out_arr = _get_series_array_type(out_dtype)
             out_data.append(out_arr)
@@ -228,7 +228,7 @@ class PivotTyper(AbstractTemplate):
         func = get_agg_func(None, aggfunc.literal_value, None)
         f_ir = numba.ir_utils.get_ir_of_code(
             {'np': np, 'numba': numba, 'hpat': hpat}, func.__code__)
-        _, out_dtype, _ = numba.compiler.type_inference_stage(
+        _, out_dtype, _ = numba.typed_passes.type_inference_stage(
             self.context, f_ir, (data,), None)
         out_arr_typ = _get_series_array_type(out_dtype)
 
