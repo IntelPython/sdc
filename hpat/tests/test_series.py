@@ -66,6 +66,12 @@ test_global_input_data_unicode_kind4 = [
     '大处着眼，小处着手。',
 ]
 
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
+]
+
 
 def _make_func_from_text(func_text, func_name='test_impl'):
     loc_vars = {}
@@ -1926,6 +1932,18 @@ class TestSeries(unittest.TestCase):
         # column with NA
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_isnull_full(self):
+        def test_impl(series):
+            return series.isnull()
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_numeric + [test_global_input_data_unicode_kind4]:
+            series = pd.Series(data * 3)
+            ref_result = test_impl(series)
+            jit_result = hpat_func(series)
+            pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_notna1(self):
         def test_impl(S):
