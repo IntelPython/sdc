@@ -17,10 +17,11 @@ from numba.extending import overload
 from numba.inline_closurecall import inline_closure_call
 from numba.typing.arraydecl import ArrayAttribute
 from numba.typing.templates import Signature, bound_function, signature, infer_global, AbstractTemplate, signature
+from numba.compiler_machinery import FunctionPass, register_pass
 
 import hpat
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-                        is_whole_slice, is_array)
+                        is_whole_slice, is_array, update_globals)
 from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
                           list_string_array_type)
 from hpat.str_arr_ext import (string_array_type, StringArrayType,
@@ -80,19 +81,28 @@ _binop_to_str = {
 }
 
 
-class HiFramesTyped(object):
+@register_pass(mutates_CFG=True, analysis_only=False)
+class HiFramesTypedPass(FunctionPass):
     """Analyze and transform hiframes calls after typing"""
 
-    def __init__(self, func_ir, typingctx, typemap, calltypes):
-        self.func_ir = func_ir
-        self.typingctx = typingctx
-        self.typemap = typemap
-        self.calltypes = calltypes
+    _name = "hi_frames_typed_pass"
+
+    def __init__(self):
+        pass
+
+    def run_pass(self, state):
+        return HiFramesTypedPassImpl(state).run_pass()
+
+
+class HiFramesTypedPassImpl(object):
+
+    def __init__(self, state):
         # keep track of tuple variables change by to_const_tuple
         self._type_changed_vars = []
+        self.state = state
 
-    def run(self):
-        blocks = self.func_ir.blocks
+    def run_pass(self):
+        blocks = self.state.func_ir.blocks
         # topo_order necessary so Series data replacement optimization can be
         # performed in one pass
         topo_order = find_topo_order(blocks)
@@ -105,7 +115,7 @@ class HiFramesTyped(object):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
-                    self.func_ir._definitions[inst.target.name].remove(inst.value)
+                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)
@@ -129,15 +139,16 @@ class HiFramesTyped(object):
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    inline_closure_call(self.func_ir, rp_func.glbls,
-                                        block, len(new_body), rp_func.func, self.typingctx,
+                    update_globals(rp_func.func, rp_func.glbls)
+                    inline_closure_call(self.state.func_ir, rp_func.glbls,
+                                        block, len(new_body), rp_func.func, self.state.typingctx,
                                         rp_func.arg_types,
-                                        self.typemap, self.calltypes, work_list)
+                                        self.state.typemap, self.state.calltypes, work_list)
                     replaced = True
                     break
                 if isinstance(out_nodes, dict):
                     block.body = new_body + block.body[i:]
-                    inline_new_blocks(self.func_ir, block, i, out_nodes, work_list)
+                    inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
                     replaced = True
                     break
 
@@ -145,14 +156,15 @@ class HiFramesTyped(object):
                 blocks[label].body = new_body
 
         # XXX remove slice() of h5 read due to Numba's #3380 bug
-        self.func_ir.blocks = ir_utils.simplify_CFG(self.func_ir.blocks)
-        while ir_utils.remove_dead(self.func_ir.blocks, self.func_ir.arg_names,
-                                   self.func_ir, self.typemap):
+        self.state.func_ir.blocks = ir_utils.simplify_CFG(self.state.func_ir.blocks)
+        while ir_utils.remove_dead(self.state.func_ir.blocks, self.state.func_ir.arg_names,
+                                   self.state.func_ir, self.state.typemap):
             pass
 
-        self.func_ir._definitions = build_definitions(self.func_ir.blocks)
-        dprint_func_ir(self.func_ir, "after hiframes_typed")
-        return
+        self.state.func_ir._definitions = build_definitions(self.state.func_ir.blocks)
+        dprint_func_ir(self.state.func_ir, "after hiframes_typed")
+
+        return True
 
     def _run_assign(self, assign):
         lhs = assign.target.name
@@ -160,8 +172,8 @@ class HiFramesTyped(object):
 
         # fix type of lhs if type of rhs has been changed
         if isinstance(rhs, ir.Var) and rhs.name in self._type_changed_vars:
-            self.typemap.pop(lhs)
-            self.typemap[lhs] = self.typemap[rhs.name]
+            self.state.typemap.pop(lhs)
+            self.state.typemap[lhs] = self.state.typemap[rhs.name]
             self._type_changed_vars.append(lhs)
 
         if isinstance(rhs, ir.Expr):
@@ -194,18 +206,18 @@ class HiFramesTyped(object):
         nodes = []
         # Series(bool) as index
         if (rhs.op == 'getitem'
-                and self.typemap[rhs.index.name] == SeriesType(types.bool_)):
+                and self.state.typemap[rhs.index.name] == SeriesType(types.bool_)):
             rhs.index = self._get_series_data(rhs.index, nodes)
 
-        if isinstance(self.typemap[rhs.value.name], SeriesIatType):
-            val_def = guard(get_definition, self.func_ir, rhs.value)
+        if isinstance(self.state.typemap[rhs.value.name], SeriesIatType):
+            val_def = guard(get_definition, self.state.func_ir, rhs.value)
             assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
                     and val_def.attr in ('iat', 'iloc', 'loc'))
             series_var = val_def.value
             rhs.value = series_var
 
         # replace getitems on dt_index/dt64 series with Timestamp function
-        if is_dt64_series_typ(self.typemap[rhs.value.name]):
+        if is_dt64_series_typ(self.state.typemap[rhs.value.name]):
             if rhs.op == 'getitem':
                 ind_var = rhs.index
             else:
@@ -219,27 +231,27 @@ class HiFramesTyped(object):
                 return hpat.hiframes.pd_timestamp_ext.convert_datetime64_to_timestamp(s)
 
             data = self._get_series_data(in_arr, nodes)
-            assert isinstance(self.typemap[ind_var.name],
+            assert isinstance(self.state.typemap[ind_var.name],
                               (types.Integer, types.IntegerLiteral))
             f_block = compile_to_numba_ir(f, {'numba': numba, 'np': np,
-                                              'hpat': hpat}, self.typingctx,
-                                          (self.typemap[data.name], types.intp),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
+                                              'hpat': hpat}, self.state.typingctx,
+                                          (self.state.typemap[data.name], types.intp),
+                                          self.state.typemap, self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, [data, ind_var])
             nodes += f_block.body[:-2]
             nodes[-1].target = assign.target
             return nodes
 
-        if isinstance(self.typemap[rhs.value.name], SeriesType):
+        if isinstance(self.state.typemap[rhs.value.name], SeriesType):
             rhs.value = self._get_series_data(rhs.value, nodes)
             self._convert_series_calltype(rhs)
             lhs = assign.target
             # convert output to Series from Array
-            if isinstance(self.typemap[lhs.name], SeriesType):
+            if isinstance(self.state.typemap[lhs.name], SeriesType):
                 new_lhs = ir.Var(
                     lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-                self.typemap[new_lhs.name] = series_to_array_type(
-                    self.typemap[lhs.name])
+                self.state.typemap[new_lhs.name] = series_to_array_type(
+                    self.state.typemap[lhs.name])
                 nodes.append(ir.Assign(rhs, new_lhs, lhs.loc))
                 return self._replace_func(
                     lambda A: hpat.hiframes.api.init_series(A), [new_lhs],
@@ -252,23 +264,23 @@ class HiFramesTyped(object):
         return nodes
 
     def _run_setitem(self, inst):
-        target_typ = self.typemap[inst.target.name]
+        target_typ = self.state.typemap[inst.target.name]
         # Series as index
         # TODO: handle all possible cases
         nodes = []
         if (isinstance(inst, ir.SetItem)
-                and isinstance(self.typemap[inst.index.name], SeriesType)):
+                and isinstance(self.state.typemap[inst.index.name], SeriesType)):
             inst.index = self._get_series_data(inst.index, nodes)
 
         if (isinstance(inst, ir.SetItem)
-                and isinstance(self.typemap[inst.value.name], SeriesType)):
+                and isinstance(self.state.typemap[inst.value.name], SeriesType)):
             inst.value = self._get_series_data(inst.value, nodes)
 
         if target_typ == h5dataset_type:
             return self._handle_h5_write(inst.target, inst.index, inst.value)
 
         if isinstance(target_typ, SeriesIatType):
-            val_def = guard(get_definition, self.func_ir, inst.target)
+            val_def = guard(get_definition, self.state.func_ir, inst.target)
             assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
                     and val_def.attr in ('iat', 'iloc', 'loc'))
             series_var = val_def.value
@@ -287,7 +299,7 @@ class HiFramesTyped(object):
         return nodes
 
     def _run_getattr(self, assign, rhs):
-        rhs_type = self.typemap[rhs.value.name]  # get type of rhs value "S"
+        rhs_type = self.state.typemap[rhs.value.name]  # get type of rhs value "S"
 
         # replace arr.dtype for dt64 since PA replaces with
         # np.datetime64[ns] which invalid, TODO: fix PA
@@ -343,7 +355,7 @@ class HiFramesTyped(object):
                 return self._run_DatetimeIndex_date(assign, assign.target, rhs)
 
         if rhs_type == series_dt_methods_type:
-            dt_def = guard(get_definition, self.func_ir, rhs.value)
+            dt_def = guard(get_definition, self.state.func_ir, rhs.value)
             if dt_def is None:  # TODO: check for errors
                 raise ValueError("invalid series.dt")
             rhs.value = dt_def.value
@@ -375,7 +387,7 @@ class HiFramesTyped(object):
             return self._handle_dt_index_binop(assign, rhs)
 
         arg1, arg2 = rhs.lhs, rhs.rhs
-        typ1, typ2 = self.typemap[arg1.name], self.typemap[arg2.name]
+        typ1, typ2 = self.state.typemap[arg1.name], self.state.typemap[arg2.name]
         if not (isinstance(typ1, SeriesType) or isinstance(typ2, SeriesType)):
             return [assign]
 
@@ -392,14 +404,14 @@ class HiFramesTyped(object):
         self._convert_series_calltype(rhs)
 
         # output stays as Array in A += B where A is Array
-        if isinstance(self.typemap[assign.target.name], types.Array):
-            assert isinstance(self.calltypes[rhs].return_type, types.Array)
+        if isinstance(self.state.typemap[assign.target.name], types.Array):
+            assert isinstance(self.state.calltypes[rhs].return_type, types.Array)
             nodes.append(assign)
             return nodes
 
         out_data = ir.Var(
             arg1.scope, mk_unique_var(assign.target.name + '_data'), rhs.loc)
-        self.typemap[out_data.name] = self.calltypes[rhs].return_type
+        self.state.typemap[out_data.name] = self.state.calltypes[rhs].return_type
         nodes.append(ir.Assign(rhs, out_data, rhs.loc))
         return self._replace_func(
             lambda data: hpat.hiframes.api.init_series(data, None, None),
@@ -409,7 +421,7 @@ class HiFramesTyped(object):
 
     def _run_unary(self, assign, rhs):
         arg = rhs.value
-        typ = self.typemap[arg.name]
+        typ = self.state.typemap[arg.name]
 
         if isinstance(typ, SeriesType):
             nodes = []
@@ -418,7 +430,7 @@ class HiFramesTyped(object):
             self._convert_series_calltype(rhs)
             out_data = ir.Var(
                 arg.scope, mk_unique_var(assign.target.name + '_data'), rhs.loc)
-            self.typemap[out_data.name] = self.calltypes[rhs].return_type
+            self.state.typemap[out_data.name] = self.state.calltypes[rhs].return_type
             nodes.append(ir.Assign(rhs, out_data, rhs.loc))
             return self._replace_func(
                 lambda data: hpat.hiframes.api.init_series(data),
@@ -429,11 +441,11 @@ class HiFramesTyped(object):
         return [assign]
 
     def _run_call(self, assign, lhs, rhs):
-        fdef = guard(find_callname, self.func_ir, rhs, self.typemap)
+        fdef = guard(find_callname, self.state.func_ir, rhs, self.state.typemap)
         if fdef is None:
             from numba.stencil import StencilFunc
             # could be make_function from list comprehension which is ok
-            func_def = guard(get_definition, self.func_ir, rhs.func)
+            func_def = guard(get_definition, self.state.func_ir, rhs.func)
             if isinstance(func_def, ir.Expr) and func_def.op == 'make_function':
                 return [assign]
             if isinstance(func_def, ir.Global) and isinstance(func_def.value, StencilFunc):
@@ -445,10 +457,10 @@ class HiFramesTyped(object):
             func_name, func_mod = fdef
 
         if (isinstance(func_mod, ir.Var)
-                and self.typemap[func_mod.name]
+                and self.state.typemap[func_mod.name]
                 == series_str_methods_type):
-            f_def = guard(get_definition, self.func_ir, rhs.func)
-            str_def = guard(get_definition, self.func_ir, f_def.value)
+            f_def = guard(get_definition, self.state.func_ir, rhs.func)
+            str_def = guard(get_definition, self.state.func_ir, f_def.value)
             if str_def is None:  # TODO: check for errors
                 raise ValueError("invalid series.str")
 
@@ -460,7 +472,7 @@ class HiFramesTyped(object):
         # arr.dtype transformation produces invalid code for dt64
         # TODO: min
         if fdef == ('_get_type_max_value', 'hpat.hiframes.hiframes_typed'):
-            if self.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
+            if self.state.typemap[rhs.args[0].name] == types.DType(types.NPDatetime('ns')):
                 return self._replace_func(
                     lambda: hpat.hiframes.pd_timestamp_ext.integer_to_dt64(
                         numba.targets.builtins.get_type_max_value(
@@ -470,18 +482,18 @@ class HiFramesTyped(object):
                     d), rhs.args)
 
         if fdef == ('h5_read_dummy', 'hpat.io.pio_api'):
-            ndim = guard(find_const, self.func_ir, rhs.args[1])
-            dtype_str = guard(find_const, self.func_ir, rhs.args[2])
+            ndim = guard(find_const, self.state.func_ir, rhs.args[1])
+            dtype_str = guard(find_const, self.state.func_ir, rhs.args[2])
             index_var = rhs.args[3]
             filter_read = False
 
             func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
-            if guard(is_whole_slice, self.typemap, self.func_ir, index_var):
+            if guard(is_whole_slice, self.state.typemap, self.state.func_ir, index_var):
                 func_text += "  size_0 = hpat.io.pio_api.h5size(dset_id, np.int32(0))\n"
             else:
                 # TODO: check index format for this case
                 filter_read = True
-                assert isinstance(self.typemap[index_var.name], types.BaseTuple)
+                assert isinstance(self.state.typemap[index_var.name], types.BaseTuple)
                 func_text += "  read_indices = hpat.io.pio_api.get_filter_read_indices(index[0])\n"
                 func_text += "  size_0 = len(read_indices)\n"
             for i in range(1, ndim):
@@ -500,7 +512,7 @@ class HiFramesTyped(object):
             func_text += "  return A\n"
 
             loc_vars = {}
-            exec(func_text, {}, loc_vars)
+            exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
             _h5_read_impl = loc_vars['_h5_read_impl']
             return self._replace_func(_h5_read_impl, rhs.args)
 
@@ -508,14 +520,14 @@ class HiFramesTyped(object):
             return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
 
         if fdef == ('Series', 'pandas'):
-            arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.typemap[v.name]
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
                        for name, v in dict(rhs.kws).items()}
 
             impl = hpat.hiframes.pd_series_ext.pd_series_overload(
                 *arg_typs, **kw_typs)
             return self._replace_func(impl, rhs.args,
-                                      pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                      pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
         if func_mod == 'hpat.hiframes.api':
             return self._run_call_hiframes(assign, assign.target, rhs, func_name)
@@ -527,23 +539,23 @@ class HiFramesTyped(object):
             return self._handle_empty_like(assign, lhs, rhs)
 
         if (isinstance(func_mod, ir.Var)
-                and is_series_type(self.typemap[func_mod.name])):
+                and is_series_type(self.state.typemap[func_mod.name])):
             return self._run_call_series(
                 assign, assign.target, rhs, func_mod, func_name)
 
         if (isinstance(func_mod, ir.Var) and isinstance(
-                self.typemap[func_mod.name], SeriesRollingType)):
+                self.state.typemap[func_mod.name], SeriesRollingType)):
             return self._run_call_series_rolling(
                 assign, assign.target, rhs, func_mod, func_name)
 
         if (isinstance(func_mod, ir.Var)
                 and isinstance(
-                    self.typemap[func_mod.name], DatetimeIndexType)):
+                    self.state.typemap[func_mod.name], DatetimeIndexType)):
             return self._run_call_dt_index(
                 assign, assign.target, rhs, func_mod, func_name)
 
         if (fdef == ('concat_dummy', 'hpat.hiframes.pd_dataframe_ext')
-                and isinstance(self.typemap[lhs], SeriesType)):
+                and isinstance(self.state.typemap[lhs], SeriesType)):
             return self._run_call_concat(assign, lhs, rhs)
 
         # handle sorted() with key lambda input
@@ -558,19 +570,19 @@ class HiFramesTyped(object):
         # example: test_sort_parallel
         if fdef == ('get_dataframe_data', 'hpat.hiframes.pd_dataframe_ext'):
             df_var = rhs.args[0]
-            df_typ = self.typemap[df_var.name]
-            ind = guard(find_const, self.func_ir, rhs.args[1])
-            var_def = guard(get_definition, self.func_ir, df_var)
-            call_def = guard(find_callname, self.func_ir, var_def)
+            df_typ = self.state.typemap[df_var.name]
+            ind = guard(find_const, self.state.func_ir, rhs.args[1])
+            var_def = guard(get_definition, self.state.func_ir, df_var)
+            call_def = guard(find_callname, self.state.func_ir, var_def)
             if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
                 assign.value = var_def.args[ind]
 
         if fdef == ('get_dataframe_index', 'hpat.hiframes.pd_dataframe_ext'):
             df_var = rhs.args[0]
-            df_typ = self.typemap[df_var.name]
+            df_typ = self.state.typemap[df_var.name]
             n_cols = len(df_typ.columns)
-            var_def = guard(get_definition, self.func_ir, df_var)
-            call_def = guard(find_callname, self.func_ir, var_def)
+            var_def = guard(get_definition, self.state.func_ir, df_var)
+            call_def = guard(find_callname, self.state.func_ir, var_def)
             if call_def == ('init_dataframe', 'hpat.hiframes.pd_dataframe_ext'):
                 assign.value = var_def.args[n_cols]
 
@@ -579,7 +591,7 @@ class HiFramesTyped(object):
         nodes = []
         new_args = []
         for arg in rhs.args:
-            if isinstance(self.typemap[arg.name], SeriesType):
+            if isinstance(self.state.typemap[arg.name], SeriesType):
                 new_args.append(self._get_series_data(arg, nodes))
             else:
                 new_args.append(arg)
@@ -589,10 +601,10 @@ class HiFramesTyped(object):
 
         # Second condition is to avoid chenging SeriesGroupBy class members
         # test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_groupby_count
-        if isinstance(self.typemap[lhs], SeriesType) and not isinstance(func_mod, ir.Var):
+        if isinstance(self.state.typemap[lhs], SeriesType) and not isinstance(func_mod, ir.Var):
             scope = assign.target.scope
             new_lhs = ir.Var(scope, mk_unique_var(lhs + '_data'), rhs.loc)
-            self.typemap[new_lhs.name] = self.calltypes[rhs].return_type
+            self.state.typemap[new_lhs.name] = self.state.calltypes[rhs].return_type
             nodes.append(ir.Assign(rhs, new_lhs, rhs.loc))
 
             def _replace_func_param_impl(A):
@@ -611,15 +623,15 @@ class HiFramesTyped(object):
         # remove the call since it is invalid for analysis here
         # XXX remove when df pass is typed? (test_pass_series2)
         if func_name == 'init_series' and isinstance(
-                self.typemap[rhs.args[0].name], SeriesType):
+                self.state.typemap[rhs.args[0].name], SeriesType):
             assign.value = rhs.args[0]
             return [assign]
 
         if func_name == 'get_index_data':
             # fix_df_array() calls get_index_data() for DatetimeIndex
             # but it can be removed sometimes
-            var_def = guard(get_definition, self.func_ir, rhs.args[0])
-            call_def = guard(find_callname, self.func_ir, var_def)
+            var_def = guard(get_definition, self.state.func_ir, rhs.args[0])
+            call_def = guard(find_callname, self.state.func_ir, var_def)
             if call_def == ('init_datetime_index', 'hpat.hiframes.api'):
                 assign.value = var_def.args[0]
                 return [assign]
@@ -627,8 +639,8 @@ class HiFramesTyped(object):
         if func_name == 'get_series_data':
             # fix_df_array() calls get_series_data() (e.g. for dataframes)
             # but it can be removed sometimes
-            var_def = guard(get_definition, self.func_ir, rhs.args[0])
-            call_def = guard(find_callname, self.func_ir, var_def)
+            var_def = guard(get_definition, self.state.func_ir, rhs.args[0])
+            call_def = guard(find_callname, self.state.func_ir, var_def)
             if call_def == ('init_series', 'hpat.hiframes.api'):
                 assign.value = var_def.args[0]
                 return [assign]
@@ -638,23 +650,23 @@ class HiFramesTyped(object):
 
         # arr = fix_df_array(col) -> arr=col if col is array
         if func_name == 'fix_df_array':
-            in_typ = self.typemap[rhs.args[0].name]
+            in_typ = self.state.typemap[rhs.args[0].name]
             impl = hpat.hiframes.api.fix_df_array_overload(in_typ)
             return self._replace_func(impl, rhs.args)
 
         # arr = fix_rolling_array(col) -> arr=col if col is float array
         if func_name == 'fix_rolling_array':
             in_arr = rhs.args[0]
-            if isinstance(self.typemap[in_arr.name].dtype, types.Float):
+            if isinstance(self.state.typemap[in_arr.name].dtype, types.Float):
                 assign.value = rhs.args[0]
                 return [assign]
             else:
                 def f(column):  # pragma: no cover
                     a = column.astype(np.float64)
                 f_block = compile_to_numba_ir(f,
-                                              {'hpat': hpat, 'np': np}, self.typingctx,
-                                              (if_series_to_array_type(self.typemap[in_arr.name]),),
-                                              self.typemap, self.calltypes).blocks.popitem()[1]
+                                              {'hpat': hpat, 'np': np}, self.state.typingctx,
+                                              (if_series_to_array_type(self.state.typemap[in_arr.name]),),
+                                              self.state.typemap, self.state.calltypes).blocks.popitem()[1]
                 replace_arg_nodes(f_block, [in_arr])
                 nodes = f_block.body[:-3]
                 nodes[-1].target = assign.target
@@ -669,16 +681,16 @@ class HiFramesTyped(object):
             new_tup = ir.Expr.build_tuple(tup_items, tup.loc)
             assign.value = new_tup
             # fix type and definition of lhs
-            self.typemap.pop(lhs.name)
+            self.state.typemap.pop(lhs.name)
             self._type_changed_vars.append(lhs.name)
-            self.typemap[lhs.name] = types.Tuple(tuple(
-                self.typemap[a.name] for a in tup_items))
+            self.state.typemap[lhs.name] = types.Tuple(tuple(
+                self.state.typemap[a.name] for a in tup_items))
             return [assign]
 
         if func_name == 'series_tup_to_arr_tup':
-            in_typ = self.typemap[rhs.args[0].name]
+            in_typ = self.state.typemap[rhs.args[0].name]
             assert isinstance(in_typ, types.BaseTuple), 'tuple expected'
-            series_vars = guard(get_definition, self.func_ir, rhs.args[0]).items
+            series_vars = guard(get_definition, self.state.func_ir, rhs.args[0]).items
             nodes = []
             tup_items = [self._get_series_data(v, nodes) for v in series_vars]
             new_tup = ir.Expr.build_tuple(tup_items, lhs.loc)
@@ -689,29 +701,29 @@ class HiFramesTyped(object):
         if func_name == 'concat':
             # concat() case where tuple type changes by to_const_type()
             if any([a.name in self._type_changed_vars for a in rhs.args]):
-                argtyps = tuple(self.typemap[a.name] for a in rhs.args)
-                old_sig = self.calltypes.pop(rhs)
-                new_sig = self.typemap[rhs.func.name].get_call_type(
-                    self.typingctx, argtyps, rhs.kws)
-                self.calltypes[rhs] = new_sig
+                argtyps = tuple(self.state.typemap[a.name] for a in rhs.args)
+                old_sig = self.state.calltypes.pop(rhs)
+                new_sig = self.state.typemap[rhs.func.name].get_call_type(
+                    self.state.typingctx, argtyps, rhs.kws)
+                self.state.calltypes[rhs] = new_sig
 
             # replace tuple of Series with tuple of Arrays
-            in_vars, _ = guard(find_build_sequence, self.func_ir, rhs.args[0])
+            in_vars, _ = guard(find_build_sequence, self.state.func_ir, rhs.args[0])
             nodes = []
             s_arrs = [self._get_series_data(v, nodes) if isinstance(
-                self.typemap[v.name], SeriesType) else v for v in in_vars]
+                self.state.typemap[v.name], SeriesType) else v for v in in_vars]
             new_tup = ir.Expr.build_tuple(s_arrs, lhs.loc)
             new_arg = ir.Var(lhs.scope, mk_unique_var(
                 rhs.args[0].name + '_arrs'), lhs.loc)
-            self.typemap[new_arg.name] = if_series_to_array_type(
-                self.typemap[rhs.args[0].name])
+            self.state.typemap[new_arg.name] = if_series_to_array_type(
+                self.state.typemap[rhs.args[0].name])
             nodes.append(ir.Assign(new_tup, new_arg, lhs.loc))
             rhs.args[0] = new_arg
             nodes.append(assign)
-            self.calltypes.pop(rhs)
-            new_sig = self.typemap[rhs.func.name].get_call_type(
-                self.typingctx, (self.typemap[new_arg.name],), rhs.kws)
-            self.calltypes[rhs] = new_sig
+            self.state.calltypes.pop(rhs)
+            new_sig = self.state.typemap[rhs.func.name].get_call_type(
+                self.state.typingctx, (self.state.typemap[new_arg.name],), rhs.kws)
+            self.state.calltypes[rhs] = new_sig
             return nodes
 
         # replace isna early to enable more optimization in PA
@@ -719,7 +731,7 @@ class HiFramesTyped(object):
         if func_name == 'isna':
             arr = rhs.args[0]
             ind = rhs.args[1]
-            arr_typ = self.typemap[arr.name]
+            arr_typ = self.state.typemap[arr.name]
             if isinstance(arr_typ, (types.Array, SeriesType)):
                 if isinstance(arr_typ.dtype, types.Float):
                     def func(arr, i):
@@ -770,7 +782,7 @@ class HiFramesTyped(object):
 
         if func_name == 'flatten_to_series':
             arg = rhs.args[0]
-            in_typ = self.typemap[arg.name]
+            in_typ = self.state.typemap[arg.name]
             nodes = []
             if isinstance(in_typ, SeriesType):
                 arg = self._get_series_data(arg, nodes)
@@ -789,7 +801,7 @@ class HiFramesTyped(object):
             return self._replace_func(_flatten_impl, [arg], pre_nodes=nodes)
 
         if func_name == 'to_numeric':
-            out_dtype = self.typemap[lhs.name].dtype
+            out_dtype = self.state.typemap[lhs.name].dtype
             assert out_dtype == types.int64 or out_dtype == types.float64
 
             # TODO: handle non-Series input
@@ -828,7 +840,7 @@ class HiFramesTyped(object):
             nodes = []
             new_args = []
             for arg in rhs.args:
-                if isinstance(self.typemap[arg.name], SeriesType):
+                if isinstance(self.state.typemap[arg.name], SeriesType):
                     new_args.append(self._get_series_data(arg, nodes))
                 else:
                     new_args.append(arg)
@@ -848,7 +860,7 @@ class HiFramesTyped(object):
                 raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
 
             # TODO: handle skipna, min_count arguments
-            series_typ = self.typemap[series_var.name]
+            series_typ = self.state.typemap[series_var.name]
             series_dtype = series_typ.dtype
             func = series_replace_funcs[func_name]
             if isinstance(func, dict):
@@ -858,7 +870,7 @@ class HiFramesTyped(object):
             return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in ('std', 'nunique', 'describe',
-                         'isnull', 'median', 'idxmax', 'unique'):
+                         'isnull', 'median', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
@@ -946,14 +958,14 @@ class HiFramesTyped(object):
             if n_arg is False:
                 n_arg = ir.Var(lhs.scope, mk_unique_var('head_n'), lhs.loc)
                 # default is 5
-                self.typemap[n_arg.name] = types.IntegerLiteral(5)
+                self.state.typemap[n_arg.name] = types.IntegerLiteral(5)
                 nodes.append(ir.Assign(
                     ir.Const(5, lhs.loc), n_arg, lhs.loc))
 
             data = self._get_series_data(series_var, nodes)
             func = series_replace_funcs[func_name]
 
-            if self.typemap[series_var.name].index != types.none:
+            if self.state.typemap[series_var.name].index != types.none:
                 index = self._get_series_index(series_var, nodes)
                 func = series_replace_funcs['head_index']
             else:
@@ -975,7 +987,7 @@ class HiFramesTyped(object):
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
-            self.func_ir._definitions[lhs.name].append(rhs)
+            self.state.func_ir._definitions[lhs.name].append(rhs)
             return []
 
         if func_name == 'combine':
@@ -988,17 +1000,17 @@ class HiFramesTyped(object):
             nodes = []
             data = self._get_series_data(series_var, nodes)
             other = rhs.args[0]
-            if isinstance(self.typemap[other.name], SeriesType):
+            if isinstance(self.state.typemap[other.name], SeriesType):
                 func = series_replace_funcs['append_single']
                 other = self._get_series_data(other, nodes)
             else:
                 func = series_replace_funcs['append_tuple']
             return self._replace_func(func, [data, other], pre_nodes=nodes)
 
-        if func_name == 'notna':
-            # TODO: make sure this is fused and optimized properly
-            return self._replace_func(
-                lambda S: S.isna() == False, [series_var])
+        # if func_name == 'notna':
+        #     # TODO: make sure this is fused and optimized properly
+        #     return self._replace_func(
+        #         lambda S: S.isna() == False, [series_var])
 
         if func_name == 'value_counts':
             nodes = []
@@ -1008,9 +1020,9 @@ class HiFramesTyped(object):
             # data of input becomes both key and data for aggregate input
             # data of output is the counts
             out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-            self.typemap[out_key_var.name] = self.typemap[data.name]
+            self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
             out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-            self.typemap[out_data_var.name] = self.typemap[lhs.name].data
+            self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
             agg_func = series_replace_funcs['count']
             agg_node = hiframes.aggregate.Aggregate(
                 lhs.name, 'series', ['series'], [out_key_var], {
@@ -1024,9 +1036,9 @@ class HiFramesTyped(object):
             return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
-        if func_name == 'astype' and is_str_series_typ(self.typemap[lhs.name]):
+        if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
             # just return input if string
-            if is_str_series_typ(self.typemap[series_var.name]):
+            if is_str_series_typ(self.state.typemap[series_var.name]):
                 return self._replace_func(lambda a: a, [series_var])
             func = series_replace_funcs['astype_str']
             nodes = []
@@ -1063,7 +1075,7 @@ class HiFramesTyped(object):
                           ).format(func_name, arg_names)
 
             loc_vars = {}
-            exec(func_text, {}, loc_vars)
+            exec(func_text, {'hpat': hpat}, loc_vars)
             _func_impl = loc_vars['_func_impl']
             return self._replace_func(_func_impl, [data] + rhs.args,
                                       pre_nodes=nodes)
@@ -1078,16 +1090,16 @@ class HiFramesTyped(object):
         data = self._get_series_data(series_var, nodes)
 
         # get index array
-        if self.typemap[series_var.name].index != types.none:
+        if self.state.typemap[series_var.name].index != types.none:
             index_var = self._get_series_index(series_var, nodes)
         else:
             index_var = self._get_index_values(data, nodes)
 
         # output data arrays for results, before conversion to Series
         out_data = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-        self.typemap[out_data.name] = self.typemap[lhs.name].data
+        self.state.typemap[out_data.name] = self.state.typemap[lhs.name].data
         out_index = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-        self.typemap[out_index.name] = self.typemap[index_var.name]
+        self.state.typemap[out_index.name] = self.state.typemap[index_var.name]
 
         # indexes are input/output Sort data
         in_df = {'inds': index_var}
@@ -1100,7 +1112,7 @@ class HiFramesTyped(object):
         if is_argsort:
             # output of argsort doesn't have new index so assign None
             none_index = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-            self.typemap[none_index.name] = types.none
+            self.state.typemap[none_index.name] = types.none
             nodes.append(ir.Assign(
                 ir.Const(None, lhs.loc), none_index, lhs.loc))
             args = [out_index, none_index]
@@ -1111,7 +1123,7 @@ class HiFramesTyped(object):
                 'sort_values', rhs.args, dict(rhs.kws), 1, 'ascending',
                 default=True)
             if isinstance(ascending, ir.Var):  # TODO: check error
-                ascending = find_const(self.func_ir, ascending)
+                ascending = find_const(self.state.func_ir, ascending)
 
         # Sort node
         nodes.append(hiframes.sort.Sort(data.name, lhs.name, in_keys,
@@ -1124,7 +1136,7 @@ class HiFramesTyped(object):
             pre_nodes=nodes)
 
     def _run_call_series_fillna(self, assign, lhs, rhs, series_var):
-        dtype = self.typemap[series_var.name].dtype
+        dtype = self.state.typemap[series_var.name].dtype
         val = rhs.args[0]
         nodes = []
         data = self._get_series_data(series_var, nodes)
@@ -1132,14 +1144,14 @@ class HiFramesTyped(object):
         kws = dict(rhs.kws)
         inplace = False
         if 'inplace' in kws:
-            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            inplace = guard(find_const, self.state.func_ir, kws['inplace'])
             if inplace is None:  # pragma: no cover
                 raise ValueError("inplace arg to fillna should be constant")
 
         if inplace:
             if dtype == string_type:
                 # optimization: just set null bit if fill is empty
-                if guard(find_const, self.func_ir, val) == "":
+                if guard(find_const, self.state.func_ir, val) == "":
                     return self._replace_func(
                         lambda A: hpat.str_arr_ext.set_null_bits(A),
                         [data],
@@ -1170,11 +1182,11 @@ class HiFramesTyped(object):
             return self._replace_func(func, [data, val, name], pre_nodes=nodes)
 
     def _run_call_series_dropna(self, assign, lhs, rhs, series_var):
-        dtype = self.typemap[series_var.name].dtype
+        dtype = self.state.typemap[series_var.name].dtype
         kws = dict(rhs.kws)
         inplace = False
         if 'inplace' in kws:
-            inplace = guard(find_const, self.func_ir, kws['inplace'])
+            inplace = guard(find_const, self.state.func_ir, kws['inplace'])
             if inplace is None:  # pragma: no cover
                 raise ValueError("inplace arg to dropna should be constant")
 
@@ -1210,15 +1222,15 @@ class HiFramesTyped(object):
         # error checking: make sure there is function input only
         if len(rhs.args) != 1:
             raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.func_ir, rhs.args[0])
+        func = guard(get_definition, self.state.func_ir, rhs.args[0])
         if func is None or not (isinstance(func, ir.Expr)
                                 and func.op == 'make_function'):
             raise ValueError("lambda for map not found")
 
-        dtype = self.typemap[series_var.name].dtype
+        dtype = self.state.typemap[series_var.name].dtype
         nodes = []
         data = self._get_series_data(series_var, nodes)
-        out_typ = self.typemap[lhs.name].dtype
+        out_typ = self.state.typemap[lhs.name].dtype
 
         # TODO: handle non numpy alloc types like string array
         # prange func to inline
@@ -1243,10 +1255,10 @@ class HiFramesTyped(object):
         #func_text += "  return ret\n"
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
-        _globals = self.func_ir.func_id.func.__globals__
+        _globals = self.state.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
 
         # fix definitions to enable finding sentinel
@@ -1262,21 +1274,22 @@ class HiFramesTyped(object):
                         and stmt.value.op == 'call'):
                     fdef = guard(get_definition, f_ir, stmt.value.func)
                     if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        update_globals(func, _globals)
                         inline_closure_call(f_ir, _globals, block, i, func)
                         break
 
         # remove sentinel global to avoid type inference issues
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
         f_ir._definitions = build_definitions(f_ir.blocks)
-        arg_typs = (self.typemap[data.name],)
-        f_typemap, _f_ret_t, f_calltypes = numba.compiler.type_inference_stage(
-            self.typingctx, f_ir, arg_typs, None)
+        arg_typs = (self.state.typemap[data.name],)
+        f_typemap, _f_ret_t, f_calltypes = numba.typed_passes.type_inference_stage(
+            self.state.typingctx, f_ir, arg_typs, None)
         # remove argument entries like arg.a from typemap
         arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
         for a in arg_names:
             f_typemap.pop(a)
-        self.typemap.update(f_typemap)
-        self.calltypes.update(f_calltypes)
+        self.state.typemap.update(f_typemap)
+        self.state.calltypes.update(f_calltypes)
         replace_arg_nodes(f_ir.blocks[topo_order[0]], [data])
         f_ir.blocks[topo_order[0]].body = nodes + f_ir.blocks[topo_order[0]].body
         return f_ir.blocks
@@ -1286,7 +1299,7 @@ class HiFramesTyped(object):
         nodes = []
         new_args = []
         for arg in rhs.args:
-            if isinstance(self.typemap[arg.name], SeriesType):
+            if isinstance(self.state.typemap[arg.name], SeriesType):
                 new_args.append(self._get_series_data(arg, nodes))
             else:
                 new_args.append(arg)
@@ -1326,12 +1339,12 @@ class HiFramesTyped(object):
                 rolling_cov_impl, rhs.args, pre_nodes=nodes)
         # replace apply function with dispatcher obj, now the type is known
         if (func_name == 'rolling_fixed' and isinstance(
-                self.typemap[rhs.args[4].name], types.MakeFunctionLiteral)):
+                self.state.typemap[rhs.args[4].name], types.MakeFunctionLiteral)):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
-            dtype = self.typemap[rhs.args[0].name].dtype
-            out_dtype = self.typemap[lhs.name].dtype
-            func_node = guard(get_definition, self.func_ir, rhs.args[4])
+            dtype = self.state.typemap[rhs.args[0].name].dtype
+            out_dtype = self.state.typemap[lhs.name].dtype
+            func_node = guard(get_definition, self.state.func_ir, rhs.args[4])
             imp_dis = self._handle_rolling_apply_func(
                 func_node, dtype, out_dtype)
 
@@ -1339,20 +1352,20 @@ class HiFramesTyped(object):
                 df_arr = hpat.hiframes.rolling.rolling_fixed(
                     arr, w, center, False, _func)
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
-                                          self.typingctx,
-                                          tuple(self.typemap[v.name] for v in rhs.args[:-2]),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
+                                          self.state.typingctx,
+                                          tuple(self.state.typemap[v.name] for v in rhs.args[:-2]),
+                                          self.state.typemap, self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args[:-2])
             nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
             return nodes
         elif (func_name == 'rolling_variable' and isinstance(
-                self.typemap[rhs.args[5].name], types.MakeFunctionLiteral)):
+                self.state.typemap[rhs.args[5].name], types.MakeFunctionLiteral)):
             # for apply case, create a dispatcher for the kernel and pass it
             # TODO: automatically handle lambdas in Numba
-            dtype = self.typemap[rhs.args[0].name].dtype
-            out_dtype = self.typemap[lhs.name].dtype
-            func_node = guard(get_definition, self.func_ir, rhs.args[5])
+            dtype = self.state.typemap[rhs.args[0].name].dtype
+            out_dtype = self.state.typemap[lhs.name].dtype
+            func_node = guard(get_definition, self.state.func_ir, rhs.args[5])
             imp_dis = self._handle_rolling_apply_func(
                 func_node, dtype, out_dtype)
 
@@ -1360,9 +1373,9 @@ class HiFramesTyped(object):
                 df_arr = hpat.hiframes.rolling.rolling_variable(
                     arr, on_arr, w, center, False, _func)
             f_block = compile_to_numba_ir(f, {'hpat': hpat, '_func': imp_dis},
-                                          self.typingctx,
-                                          tuple(self.typemap[v.name] for v in rhs.args[:-2]),
-                                          self.typemap, self.calltypes).blocks.popitem()[1]
+                                          self.state.typingctx,
+                                          tuple(self.state.typemap[v.name] for v in rhs.args[:-2]),
+                                          self.state.typemap, self.state.calltypes).blocks.popitem()[1]
             replace_arg_nodes(f_block, rhs.args[:-2])
             nodes += f_block.body[:-3]  # remove none return
             nodes[-1].target = lhs
@@ -1379,12 +1392,12 @@ class HiFramesTyped(object):
             raise ValueError("not enough arguments in call to combine")
         if len(rhs.args) > 3:
             raise ValueError("too many arguments in call to combine")
-        func = guard(get_definition, self.func_ir, rhs.args[1])
+        func = guard(get_definition, self.state.func_ir, rhs.args[1])
         if func is None or not (isinstance(func, ir.Expr)
                                 and func.op == 'make_function'):
             raise ValueError("lambda for combine not found")
 
-        out_typ = self.typemap[lhs.name].dtype
+        out_typ = self.state.typemap[lhs.name].dtype
         other = rhs.args[0]
         nodes = []
         data = self._get_series_data(series_var, nodes)
@@ -1402,14 +1415,14 @@ class HiFramesTyped(object):
         func_text += "  n1 = len(A)\n"
         func_text += "  n2 = len(B)\n"
         func_text += "  n = max(n1, n2)\n"
-        if not isinstance(self.typemap[series_var.name].dtype, types.Float) and use_nan:
+        if not isinstance(self.state.typemap[series_var.name].dtype, types.Float) and use_nan:
             func_text += "  assert n1 == n, 'can not use NAN for non-float series, with different length'\n"
-        if not isinstance(self.typemap[other.name].dtype, types.Float) and use_nan:
+        if not isinstance(self.state.typemap[other.name].dtype, types.Float) and use_nan:
             func_text += "  assert n2 == n, 'can not use NAN for non-float series, with different length'\n"
         func_text += "  numba.parfor.init_prange()\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
         func_text += "  for i in numba.parfor.internal_prange(n):\n"
-        if use_nan and isinstance(self.typemap[series_var.name].dtype, types.Float):
+        if use_nan and isinstance(self.state.typemap[series_var.name].dtype, types.Float):
             func_text += "    t1 = np.nan\n"
             func_text += "    if i < n1:\n"
             func_text += "      t1 = A[i]\n"
@@ -1421,7 +1434,7 @@ class HiFramesTyped(object):
             func_text += "    if i < n1:\n"
             func_text += "      t1 = A[i]\n"
         # same, but for 2nd argument
-        if use_nan and isinstance(self.typemap[other.name].dtype, types.Float):
+        if use_nan and isinstance(self.state.typemap[other.name].dtype, types.Float):
             func_text += "    t2 = np.nan\n"
             func_text += "    if i < n2:\n"
             func_text += "      t2 = B[i]\n"
@@ -1435,10 +1448,10 @@ class HiFramesTyped(object):
         func_text += "  return hpat.hiframes.api.init_series(S)\n"
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
-        _globals = self.func_ir.func_id.func.__globals__
+        _globals = self.state.func_ir.func_id.func.__globals__
         f_ir = compile_to_numba_ir(f, {'numba': numba, 'np': np, 'hpat': hpat})
 
         # fix definitions to enable finding sentinel
@@ -1454,23 +1467,24 @@ class HiFramesTyped(object):
                         and stmt.value.op == 'call'):
                     fdef = guard(get_definition, f_ir, stmt.value.func)
                     if isinstance(fdef, ir.Global) and fdef.name == 'map_func':
+                        update_globals(func, _globals)
                         inline_closure_call(f_ir, _globals, block, i, func)
                         break
 
         # remove sentinel global to avoid type inference issues
         ir_utils.remove_dead(f_ir.blocks, f_ir.arg_names, f_ir)
         f_ir._definitions = build_definitions(f_ir.blocks)
-        arg_typs = (self.typemap[data.name], self.typemap[other_data.name],)
+        arg_typs = (self.state.typemap[data.name], self.state.typemap[other_data.name],)
         if not use_nan:
-            arg_typs += (self.typemap[rhs.args[2].name],)
-        f_typemap, _f_ret_t, f_calltypes = numba.compiler.type_inference_stage(
-            self.typingctx, f_ir, arg_typs, None)
+            arg_typs += (self.state.typemap[rhs.args[2].name],)
+        f_typemap, _f_ret_t, f_calltypes = numba.typed_passes.type_inference_stage(
+            self.state.typingctx, f_ir, arg_typs, None)
         # remove argument entries like arg.a from typemap
         arg_names = [vname for vname in f_typemap if vname.startswith("arg.")]
         for a in arg_names:
             f_typemap.pop(a)
-        self.typemap.update(f_typemap)
-        self.calltypes.update(f_calltypes)
+        self.state.typemap.update(f_typemap)
+        self.state.calltypes.update(f_calltypes)
         func_args = [data, other_data]
         if not use_nan:
             func_args.append(rhs.args[2])
@@ -1484,18 +1498,18 @@ class HiFramesTyped(object):
         Handle Series rolling calls like:
           A = df.column.rolling(3).sum()
         """
-        rolling_call = guard(get_definition, self.func_ir, rolling_var)
+        rolling_call = guard(get_definition, self.state.func_ir, rolling_var)
         assert isinstance(rolling_call, ir.Expr) and rolling_call.op == 'call'
-        call_def = guard(get_definition, self.func_ir, rolling_call.func)
+        call_def = guard(get_definition, self.state.func_ir, rolling_call.func)
         assert isinstance(call_def, ir.Expr) and call_def.op == 'getattr'
         series_var = call_def.value
         nodes = []
         data = self._get_series_data(series_var, nodes)
 
-        window, center, on = get_rolling_setup_args(self.func_ir, rolling_call, False)
+        window, center, on = get_rolling_setup_args(self.state.func_ir, rolling_call, False)
         if not isinstance(center, ir.Var):
             center_var = ir.Var(lhs.scope, mk_unique_var("center"), lhs.loc)
-            self.typemap[center_var.name] = types.bool_
+            self.state.typemap[center_var.name] = types.bool_
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
 
@@ -1514,9 +1528,9 @@ class HiFramesTyped(object):
             return self._replace_func(f, [data, other, window, center],
                                       pre_nodes=nodes)
         elif func_name == 'apply':
-            func_node = guard(get_definition, self.func_ir, rhs.args[0])
-            dtype = self.typemap[data.name].dtype
-            out_dtype = self.typemap[lhs.name].dtype
+            func_node = guard(get_definition, self.state.func_ir, rhs.args[0])
+            dtype = self.state.typemap[data.name].dtype
+            out_dtype = self.state.typemap[lhs.name].dtype
             func_global = self._handle_rolling_apply_func(func_node, dtype, out_dtype)
         else:
             func_global = func_name
@@ -1536,7 +1550,7 @@ class HiFramesTyped(object):
         if func_node.defaults is not None:
             raise ValueError("rolling apply kernel functions cannot have default arguments")
         # create a function from the code object
-        glbs = self.func_ir.func_id.func.__globals__
+        glbs = self.state.func_ir.func_id.func.__globals__
         lcs = {}
         exec("def f(A): return A", glbs, lcs)
         kernel_func = lcs['f']
@@ -1557,7 +1571,7 @@ class HiFramesTyped(object):
         """transform DatetimeIndex.<field> and Series.dt.<field>
         """
         nodes = []
-        in_typ = self.typemap[rhs.value.name]
+        in_typ = self.state.typemap[rhs.value.name]
         if isinstance(in_typ, DatetimeIndexType):
             arr = self._get_dt_index_data(rhs.value, nodes)
             is_dt_index = True
@@ -1581,7 +1595,7 @@ class HiFramesTyped(object):
         else:
             func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
         return self._replace_func(f, [arr], pre_nodes=nodes)
@@ -1590,7 +1604,7 @@ class HiFramesTyped(object):
         """transform DatetimeIndex.date and Series.dt.date
         """
         nodes = []
-        in_typ = self.typemap[rhs.value.name]
+        in_typ = self.state.typemap[rhs.value.name]
         if isinstance(in_typ, DatetimeIndexType):
             arr = self._get_dt_index_data(rhs.value, nodes)
             is_dt_index = True
@@ -1613,7 +1627,7 @@ class HiFramesTyped(object):
         else:
             func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
         return self._replace_func(f, [arr], pre_nodes=nodes)
@@ -1654,7 +1668,7 @@ class HiFramesTyped(object):
             assert(0)
         func_text += '    return S\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
         return self._replace_func(f, [arr], pre_nodes=nodes)
@@ -1662,13 +1676,13 @@ class HiFramesTyped(object):
     def _run_pd_DatetimeIndex(self, assign, lhs, rhs):
         """transform pd.DatetimeIndex() call with string array argument
         """
-        arg_typs = tuple(self.typemap[v.name] for v in rhs.args)
-        kw_typs = {name: self.typemap[v.name]
+        arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+        kw_typs = {name: self.state.typemap[v.name]
                    for name, v in dict(rhs.kws).items()}
         impl = hpat.hiframes.pd_index_ext.pd_datetimeindex_overload(
             *arg_typs, **kw_typs)
         return self._replace_func(impl, rhs.args,
-                                  pysig=self.calltypes[rhs].pysig, kws=dict(rhs.kws))
+                                  pysig=self.state.calltypes[rhs].pysig, kws=dict(rhs.kws))
 
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
@@ -1699,7 +1713,7 @@ class HiFramesTyped(object):
             func_text += '    return hpat.hiframes.api.init_series(S)\n'
             loc_vars = {}
             # print(func_text)
-            exec(func_text, {}, loc_vars)
+            exec(func_text, {'hpat': hpat, 'numba': numba}, loc_vars)
             f = loc_vars['f']
             return self._replace_func(f, [arr], pre_nodes=nodes,
                                       extra_globals={
@@ -1733,7 +1747,7 @@ class HiFramesTyped(object):
         func_text += '        S[i] = len(val)\n'
         func_text += '    return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         f = loc_vars['f']
 
         return self._replace_func(f, [arr], pre_nodes=nodes)
@@ -1743,7 +1757,7 @@ class HiFramesTyped(object):
         # TODO: refactor arg parsing
         kws = dict(rhs.kws)
         if 'regex' in kws:
-            regex = guard(find_const, self.func_ir, kws['regex'])
+            regex = guard(find_const, self.state.func_ir, kws['regex'])
             if regex is None:
                 raise ValueError(
                     "str.replace regex argument should be constant")
@@ -1767,11 +1781,11 @@ class HiFramesTyped(object):
         if sep is False:
             sep = ir.Var(lhs.scope, mk_unique_var('split_sep'), lhs.loc)
             sep_typ = types.none
-            self.typemap[sep.name] = types.none
+            self.state.typemap[sep.name] = types.none
             nodes.append(ir.Assign(
                 ir.Const(None, lhs.loc), sep, lhs.loc))
         else:
-            sep_typ = self.typemap[sep.name]
+            sep_typ = self.state.typemap[sep.name]
 
         def _str_split_impl(str_arr, sep):
             numba.parfor.init_prange()
@@ -1792,7 +1806,7 @@ class HiFramesTyped(object):
         return self._replace_func(_str_split_impl, [arr, sep], pre_nodes=nodes)
 
     def _run_series_str_get(self, assign, lhs, arr, rhs, nodes):
-        arr_typ = self.typemap[arr.name]
+        arr_typ = self.state.typemap[arr.name]
         # XXX only supports get for list(list(str)) input and split view
         assert (arr_typ == types.List(types.List(string_type))
                 or arr_typ == string_array_split_view_type)
@@ -1849,7 +1863,7 @@ class HiFramesTyped(object):
         if rhs.fn not in _dt_index_binops:
             return False
 
-        arg1, arg2 = self.typemap[rhs.lhs.name], self.typemap[rhs.rhs.name]
+        arg1, arg2 = self.state.typemap[rhs.lhs.name], self.state.typemap[rhs.rhs.name]
         # one of them is dt_index but not both
         if ((is_dt64_series_typ(arg1) or is_dt64_series_typ(arg2))
                 and not (is_dt64_series_typ(arg1) and is_dt64_series_typ(arg2))):
@@ -1868,15 +1882,15 @@ class HiFramesTyped(object):
             return is_dt64_series_typ(t) or t == string_type
 
         # TODO: this has to be more generic to support all combinations.
-        if (is_dt64_series_typ(self.typemap[arg1.name])
-                and self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type
+        if (is_dt64_series_typ(self.state.typemap[arg1.name])
+                and self.state.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type
                 and rhs.fn in ('-', operator.sub)):
             return self._replace_func(
                 series_kernels._column_sub_impl_datetime_series_timestamp,
                 [arg1, arg2])
 
-        if (isinstance(self.typemap[arg1.name], DatetimeIndexType)
-                and self.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type
+        if (isinstance(self.state.typemap[arg1.name], DatetimeIndexType)
+                and self.state.typemap[arg2.name] == hpat.hiframes.pd_timestamp_ext.pandas_timestamp_type
                 and rhs.fn in ('-', operator.sub)):
             nodes = []
             arg1 = self._get_dt_index_data(arg1, nodes)
@@ -1884,14 +1898,14 @@ class HiFramesTyped(object):
                 series_kernels._column_sub_impl_datetimeindex_timestamp, [
                     arg1, arg2], pre_nodes=nodes)
 
-        if (not _is_allowed_type(types.unliteral(self.typemap[arg1.name]))
-                or not _is_allowed_type(types.unliteral(self.typemap[arg2.name]))):
+        if (not _is_allowed_type(types.unliteral(self.state.typemap[arg1.name]))
+                or not _is_allowed_type(types.unliteral(self.state.typemap[arg2.name]))):
             raise ValueError("DatetimeIndex operation not supported")
 
         # string comparison with DatetimeIndex
         op_str = _binop_to_str[rhs.fn]
-        typ1 = self.typemap[arg1.name]
-        typ2 = self.typemap[arg2.name]
+        typ1 = self.state.typemap[arg1.name]
+        typ2 = self.state.typemap[arg2.name]
         nodes = []
         is_out_series = False
 
@@ -1922,7 +1936,7 @@ class HiFramesTyped(object):
         else:
             func_text += '  return S\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'numba': numba}, loc_vars)
         f = loc_vars['f']
         # print(func_text)
         return self._replace_func(f, [arg1, arg2])
@@ -1930,33 +1944,33 @@ class HiFramesTyped(object):
     def _handle_string_array_expr(self, assign, rhs):
         # convert str_arr==str into parfor
         if (rhs.fn in _string_array_comp_ops
-                and is_str_arr_typ(self.typemap[rhs.lhs.name])
-                or is_str_arr_typ(self.typemap[rhs.rhs.name])):
+                and is_str_arr_typ(self.state.typemap[rhs.lhs.name])
+                or is_str_arr_typ(self.state.typemap[rhs.rhs.name])):
             nodes = []
             arg1 = rhs.lhs
             arg2 = rhs.rhs
             is_series = False
-            if is_str_series_typ(self.typemap[arg1.name]):
+            if is_str_series_typ(self.state.typemap[arg1.name]):
                 arg1 = self._get_series_data(arg1, nodes)
                 is_series = True
-            if is_str_series_typ(self.typemap[arg2.name]):
+            if is_str_series_typ(self.state.typemap[arg2.name]):
                 arg2 = self._get_series_data(arg2, nodes)
                 is_series = True
 
             arg1_access = 'A'
             arg2_access = 'B'
             len_call = 'len(A)'
-            if is_str_arr_typ(self.typemap[arg1.name]):
+            if is_str_arr_typ(self.state.typemap[arg1.name]):
                 arg1_access = 'A[i]'
                 # replace type now for correct typing of len, etc.
-                self.typemap.pop(arg1.name)
-                self.typemap[arg1.name] = string_array_type
+                self.state.typemap.pop(arg1.name)
+                self.state.typemap[arg1.name] = string_array_type
 
-            if is_str_arr_typ(self.typemap[arg2.name]):
+            if is_str_arr_typ(self.state.typemap[arg2.name]):
                 arg1_access = 'B[i]'
                 len_call = 'len(B)'
-                self.typemap.pop(arg2.name)
-                self.typemap[arg2.name] = string_array_type
+                self.state.typemap.pop(arg2.name)
+                self.state.typemap[arg2.name] = string_array_type
 
             op_str = _binop_to_str[rhs.fn]
 
@@ -1972,7 +1986,7 @@ class HiFramesTyped(object):
                 func_text += '  return S\n'
 
             loc_vars = {}
-            exec(func_text, {}, loc_vars)
+            exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
             f = loc_vars['f']
             return self._replace_func(f, [arg1, arg2], pre_nodes=nodes)
 
@@ -1987,7 +2001,7 @@ class HiFramesTyped(object):
         pat = rhs.args[0]
         regex = True  # default regex arg is True
         if 'regex' in kws:
-            regex = guard(find_const, self.func_ir, kws['regex'])
+            regex = guard(find_const, self.state.func_ir, kws['regex'])
             if regex is None:
                 raise ValueError("str.contains expects constant regex argument")
         if regex:
@@ -2002,7 +2016,7 @@ class HiFramesTyped(object):
         # B = empty_like(A) -> B = empty(len(A), dtype)
         in_arr = rhs.args[0]
 
-        if self.typemap[in_arr.name].ndim == 1:
+        if self.state.typemap[in_arr.name].ndim == 1:
             # generate simpler len() for 1D case
             def f(_in_arr):  # pragma: no cover
                 _alloc_size = len(_in_arr)
@@ -2012,8 +2026,8 @@ class HiFramesTyped(object):
                 _alloc_size = _in_arr.shape
                 _out_arr = np.empty(_alloc_size, _in_arr.dtype)
 
-        f_block = compile_to_numba_ir(f, {'np': np}, self.typingctx, (if_series_to_array_type(
-            self.typemap[in_arr.name]),), self.typemap, self.calltypes).blocks.popitem()[1]
+        f_block = compile_to_numba_ir(f, {'np': np}, self.state.typingctx, (if_series_to_array_type(
+            self.state.typemap[in_arr.name]),), self.state.typemap, self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [in_arr])
         nodes = f_block.body[:-3]  # remove none return
         nodes[-1].target = assign.target
@@ -2035,7 +2049,7 @@ class HiFramesTyped(object):
         func_text += '    S[i] = {}(str_arr[i], pat)\n'.format(comp_func)
         func_text += '  return hpat.hiframes.api.init_series(S)\n'
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         f = loc_vars['f']
         return self._replace_func(f, rhs.args)
 
@@ -2043,9 +2057,9 @@ class HiFramesTyped(object):
         nodes = []
         in_arr = rhs.args[0]
         bool_arr = rhs.args[1]
-        if is_series_type(self.typemap[in_arr.name]):
+        if is_series_type(self.state.typemap[in_arr.name]):
             in_arr = self._get_series_data(in_arr, nodes)
-        if is_series_type(self.typemap[bool_arr.name]):
+        if is_series_type(self.state.typemap[bool_arr.name]):
             bool_arr = self._get_series_data(bool_arr, nodes)
 
         return self._replace_func(series_kernels._column_filter_impl,
@@ -2068,9 +2082,9 @@ class HiFramesTyped(object):
 
         if func_name == 'dropna':
             # df.dropna case
-            if isinstance(self.typemap[rhs.args[0].name], types.BaseTuple):
+            if isinstance(self.state.typemap[rhs.args[0].name], types.BaseTuple):
                 return self._handle_df_dropna(assign, lhs, rhs)
-            dtype = self.typemap[rhs.args[0].name].dtype
+            dtype = self.state.typemap[rhs.args[0].name].dtype
             if dtype == string_type:
                 func = series_replace_funcs['dropna_str_alloc']
             elif isinstance(dtype, types.Float):
@@ -2093,9 +2107,9 @@ class HiFramesTyped(object):
         return [assign]
 
     def _handle_df_dropna(self, assign, lhs, rhs):
-        in_typ = self.typemap[rhs.args[0].name]
+        in_typ = self.state.typemap[rhs.args[0].name]
 
-        in_vars, _ = guard(find_build_sequence, self.func_ir, rhs.args[0])
+        in_vars, _ = guard(find_build_sequence, self.state.func_ir, rhs.args[0])
         in_names = [mk_unique_var(in_vars[i].name).replace('.', '_') for i in range(len(in_vars))]
         out_names = [mk_unique_var(in_vars[i].name).replace('.', '_') for i in range(len(in_vars))]
         str_colnames = [in_names[i] for i, t in enumerate(in_typ.types) if is_str_arr_typ(t)]
@@ -2135,16 +2149,16 @@ class HiFramesTyped(object):
         func_text += "  return ({},)\n".format(", ".join(out_names))
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np, 'numba': numba}, loc_vars)
         _dropna_impl = loc_vars['_dropna_impl']
         return self._replace_func(_dropna_impl, rhs.args)
 
     def _run_call_concat(self, assign, lhs, rhs):
         nodes = []
-        series_list = guard(get_definition, self.func_ir, rhs.args[0]).items
+        series_list = guard(get_definition, self.state.func_ir, rhs.args[0]).items
         arrs = [self._get_series_data(v, nodes) for v in series_list]
         arr_tup = ir.Var(rhs.args[0].scope, mk_unique_var('arr_tup'), rhs.args[0].loc)
-        self.typemap[arr_tup.name] = types.Tuple([self.typemap[a.name] for a in arrs])
+        self.state.typemap[arr_tup.name] = types.Tuple([self.state.typemap[a.name] for a in arrs])
         tup_expr = ir.Expr.build_tuple(arrs, arr_tup.loc)
         nodes.append(ir.Assign(tup_expr, arr_tup, arr_tup.loc))
         return self._replace_func(
@@ -2154,8 +2168,8 @@ class HiFramesTyped(object):
     def _handle_h5_write(self, dset, index, arr):
         if index != slice(None):
             raise ValueError("Only HDF5 write of full array supported")
-        assert isinstance(self.typemap[arr.name], types.Array)
-        ndim = self.typemap[arr.name].ndim
+        assert isinstance(self.state.typemap[arr.name], types.Array)
+        ndim = self.state.typemap[arr.name].ndim
 
         func_text = "def _h5_write_impl(dset_id, arr):\n"
         func_text += "  zero_tup = ({},)\n".format(", ".join(["0"] * ndim))
@@ -2165,16 +2179,16 @@ class HiFramesTyped(object):
         func_text += "                                zero_tup, arr_shape, 0, arr)\n"
 
         loc_vars = {}
-        exec(func_text, {}, loc_vars)
+        exec(func_text, {'hpat': hpat, 'np': np}, loc_vars)
         _h5_write_impl = loc_vars['_h5_write_impl']
         f_block = compile_to_numba_ir(_h5_write_impl,
                                       {'np': np,
                                        'hpat': hpat},
-                                      self.typingctx,
-                                      (self.typemap[dset.name],
-                                       self.typemap[arr.name]),
-                                      self.typemap,
-                                      self.calltypes).blocks.popitem()[1]
+                                      self.state.typingctx,
+                                      (self.state.typemap[dset.name],
+                                       self.state.typemap[arr.name]),
+                                      self.state.typemap,
+                                      self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [dset, arr])
         nodes = f_block.body[:-3]  # remove none return
         return nodes
@@ -2186,7 +2200,7 @@ class HiFramesTyped(object):
         from numba.targets import quicksort
         # get key lambda
         key_lambda_var = dict(rhs.kws)['key']
-        key_lambda = guard(get_definition, self.func_ir, key_lambda_var)
+        key_lambda = guard(get_definition, self.state.func_ir, key_lambda_var)
         if key_lambda is None or not (isinstance(key_lambda, ir.Expr) and key_lambda.op == 'make_function'):
             raise ValueError("sorted(): lambda for key not found")
 
@@ -2206,7 +2220,7 @@ class HiFramesTyped(object):
             extra_globals={'_sort_func': numba.njit(sort_func)})
 
     def _get_const_tup(self, tup_var):
-        tup_def = guard(get_definition, self.func_ir, tup_var)
+        tup_def = guard(get_definition, self.state.func_ir, tup_var)
         if isinstance(tup_def, ir.Expr):
             if tup_def.op == 'binop' and tup_def.fn in ('+', operator.add):
                 return (self._get_const_tup(tup_def.lhs) + self._get_const_tup(tup_def.rhs))
@@ -2215,18 +2229,18 @@ class HiFramesTyped(object):
         raise ValueError("constant tuple expected")
 
     def _get_dt_index_data(self, dt_var, nodes):
-        var_def = guard(get_definition, self.func_ir, dt_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, dt_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if call_def == ('init_datetime_index', 'hpat.hiframes.api'):
             return var_def.args[0]
 
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_index_data(S),
             {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[dt_var.name],),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (self.state.typemap[dt_var.name],),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [dt_var])
         nodes += f_block.body[:-2]
@@ -2238,8 +2252,8 @@ class HiFramesTyped(object):
         # e.g. S = init_series(A, None)
         # XXX assuming init_series() is the only call to create a series
         # and series._data is never overwritten
-        var_def = guard(get_definition, self.func_ir, series_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, series_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if call_def == ('init_series', 'hpat.hiframes.api'):
             return var_def.args[0]
 
@@ -2248,10 +2262,10 @@ class HiFramesTyped(object):
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_series_data(S),
             {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[series_var.name],),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (self.state.typemap[series_var.name],),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_var])
         nodes += f_block.body[:-2]
@@ -2260,8 +2274,8 @@ class HiFramesTyped(object):
     def _get_series_index(self, series_var, nodes):
         # XXX assuming init_series is the only call to create a series
         # and series._index is never overwritten
-        var_def = guard(get_definition, self.func_ir, series_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, series_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if (call_def == ('init_series', 'hpat.hiframes.api')
                 and (len(var_def.args) >= 2
                      and not self._is_const_none(var_def.args[1]))):
@@ -2272,10 +2286,10 @@ class HiFramesTyped(object):
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_series_index(S),
             {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[series_var.name],),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (self.state.typemap[series_var.name],),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_var])
         nodes += f_block.body[:-2]
@@ -2295,16 +2309,16 @@ class HiFramesTyped(object):
             return np.arange(n)
 
         f_block = compile_to_numba_ir(
-            _gen_arange, {'np': np}, self.typingctx,
-            (self.typemap[series_data.name],),
-            self.typemap, self.calltypes).blocks.popitem()[1]
+            _gen_arange, {'np': np}, self.state.typingctx,
+            (self.state.typemap[series_data.name],),
+            self.state.typemap, self.state.calltypes).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_data])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
     def _get_series_name(self, series_var, nodes):
-        var_def = guard(get_definition, self.func_ir, series_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, series_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if (call_def == ('init_series', 'hpat.hiframes.api')
                 and len(var_def.args) == 3):
             return var_def.args[2]
@@ -2312,28 +2326,28 @@ class HiFramesTyped(object):
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_series_name(S),
             {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[series_var.name],),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (self.state.typemap[series_var.name],),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [series_var])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
     def _get_timedelta_index_data(self, dt_var, nodes):
-        var_def = guard(get_definition, self.func_ir, dt_var)
-        call_def = guard(find_callname, self.func_ir, var_def)
+        var_def = guard(get_definition, self.state.func_ir, dt_var)
+        call_def = guard(find_callname, self.state.func_ir, var_def)
         if call_def == ('init_timedelta_index', 'hpat.hiframes.api'):
             return var_def.args[0]
 
         f_block = compile_to_numba_ir(
             lambda S: hpat.hiframes.api.get_index_data(S),
             {'hpat': hpat},
-            self.typingctx,
-            (self.typemap[dt_var.name],),
-            self.typemap,
-            self.calltypes
+            self.state.typingctx,
+            (self.state.typemap[dt_var.name],),
+            self.state.typemap,
+            self.state.calltypes
         ).blocks.popitem()[1]
         replace_arg_nodes(f_block, [dt_var])
         nodes += f_block.body[:-2]
@@ -2349,7 +2363,7 @@ class HiFramesTyped(object):
         # XXX: inine_closure_call() can't handle defaults properly
         if pysig is not None:
             pre_nodes = [] if pre_nodes is None else pre_nodes
-            scope = next(iter(self.func_ir.blocks.values())).scope
+            scope = next(iter(self.state.func_ir.blocks.values())).scope
             loc = scope.loc
 
             def normal_handler(index, param, default):
@@ -2357,7 +2371,7 @@ class HiFramesTyped(object):
 
             def default_handler(index, param, default):
                 d_var = ir.Var(scope, mk_unique_var('defaults'), loc)
-                self.typemap[d_var.name] = numba.typeof(default)
+                self.state.typemap[d_var.name] = numba.typeof(default)
                 node = ir.Assign(ir.Const(default, loc), d_var, loc)
                 pre_nodes.append(node)
                 return d_var
@@ -2367,12 +2381,12 @@ class HiFramesTyped(object):
                 pysig, args, kws, normal_handler, default_handler,
                 normal_handler)
 
-        arg_typs = tuple(self.typemap[v.name] for v in args)
+        arg_typs = tuple(self.state.typemap[v.name] for v in args)
 
         if const:
             new_args = []
             for i, arg in enumerate(args):
-                val = guard(find_const, self.func_ir, arg)
+                val = guard(find_const, self.state.func_ir, arg)
                 if val:
                     new_args.append(types.literal(val))
                 else:
@@ -2381,7 +2395,7 @@ class HiFramesTyped(object):
         return ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def _convert_series_calltype(self, call):
-        sig = self.calltypes[call]
+        sig = self.state.calltypes[call]
         if sig is None:
             return
         assert isinstance(sig, Signature)
@@ -2396,15 +2410,15 @@ class HiFramesTyped(object):
             # StencilFunc requires kws for typing so sig.args can't be used
             # reusing sig.args since some types become Const in sig
             argtyps = new_sig.args[:len(call.args)]
-            kwtyps = {name: self.typemap[v.name] for name, v in call.kws}
+            kwtyps = {name: self.state.typemap[v.name] for name, v in call.kws}
             sig = new_sig
-            new_sig = self.typemap[call.func.name].get_call_type(
-                self.typingctx, argtyps, kwtyps)
+            new_sig = self.state.typemap[call.func.name].get_call_type(
+                self.state.typingctx, argtyps, kwtyps)
             # calltypes of things like BoundFunction (array.call) need to
             # be updated for lowering to work
             # XXX: new_sig could be None for things like np.int32()
-            if call in self.calltypes and new_sig is not None:
-                old_sig = self.calltypes[call]
+            if call in self.state.calltypes and new_sig is not None:
+                old_sig = self.state.calltypes[call]
                 # fix types with undefined dtypes in empty_inferred, etc.
                 return_type = _fix_typ_undefs(new_sig.return_type, old_sig.return_type)
                 args = tuple(_fix_typ_undefs(a, b) for a, b in zip(new_sig.args, old_sig.args))
@@ -2413,17 +2427,17 @@ class HiFramesTyped(object):
         if new_sig is not None:
             # XXX sometimes new_sig is None for some reason
             # FIXME e.g. test_series_nlargest_parallel1 np.int32()
-            self.calltypes.pop(call)
-            self.calltypes[call] = new_sig
+            self.state.calltypes.pop(call)
+            self.state.calltypes[call] = new_sig
         return
 
     def is_bool_arr(self, varname):
-        typ = self.typemap[varname]
+        typ = self.state.typemap[varname]
         return (isinstance(if_series_to_array_type(typ), types.Array)
                 and typ.dtype == types.bool_)
 
     def _is_const_none(self, var):
-        var_def = guard(get_definition, self.func_ir, var)
+        var_def = guard(get_definition, self.state.func_ir, var)
         return isinstance(var_def, ir.Const) and var_def.value is None
 
     def _handle_hiframes_nodes(self, inst):
@@ -2455,7 +2469,7 @@ class HiFramesTyped(object):
         else:
             assert isinstance(inst, hiframes.filter.Filter)
             use_vars = list(inst.df_in_vars.values())
-            if isinstance(self.typemap[inst.bool_arr.name], SeriesType):
+            if isinstance(self.state.typemap[inst.bool_arr.name], SeriesType):
                 use_vars.append(inst.bool_arr)
             def_vars = list(inst.df_out_vars.values())
             apply_copies_func = hiframes.filter.apply_copies_filter
@@ -2469,7 +2483,7 @@ class HiFramesTyped(object):
         loc = ir.Loc("", 0)
         dumm_block = ir.Block(ir.Scope(None, loc), loc)
         dumm_block.body = node_list
-        build_definitions({0: dumm_block}, self.func_ir._definitions)
+        build_definitions({0: dumm_block}, self.state.func_ir._definitions)
         return
 
     def _convert_series_hiframes_nodes(self, inst, use_vars, def_vars,
@@ -2477,26 +2491,26 @@ class HiFramesTyped(object):
         #
         out_nodes = []
         varmap = {v.name: self._get_series_data(v, out_nodes) for v in use_vars
-                  if isinstance(self.typemap[v.name], SeriesType)}
+                  if isinstance(self.state.typemap[v.name], SeriesType)}
         apply_copies_func(inst, varmap, None, None, None, None)
         out_nodes.append(inst)
 
         for v in def_vars:
-            self.func_ir._definitions[v.name].remove(inst)
+            self.state.func_ir._definitions[v.name].remove(inst)
         varmap = {}
         for v in def_vars:
-            if not isinstance(self.typemap[v.name], SeriesType):
+            if not isinstance(self.state.typemap[v.name], SeriesType):
                 continue
             data_var = ir.Var(
                 v.scope, mk_unique_var(v.name + 'data'), v.loc)
-            self.typemap[data_var.name] = series_to_array_type(self.typemap[v.name])
+            self.state.typemap[data_var.name] = series_to_array_type(self.state.typemap[v.name])
             f_block = compile_to_numba_ir(
                 lambda A: hpat.hiframes.api.init_series(A),
                 {'hpat': hpat},
-                self.typingctx,
-                (self.typemap[data_var.name],),
-                self.typemap,
-                self.calltypes
+                self.state.typingctx,
+                (self.state.typemap[data_var.name],),
+                self.state.typemap,
+                self.state.calltypes
             ).blocks.popitem()[1]
             replace_arg_nodes(f_block, [data_var])
             out_nodes += f_block.body[:-2]

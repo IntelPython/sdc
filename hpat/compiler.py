@@ -4,114 +4,28 @@ import hpat
 import hpat.hiframes
 import hpat.hiframes.hiframes_untyped
 import hpat.hiframes.hiframes_typed
-from hpat.hiframes.hiframes_untyped import HiFrames
-from hpat.hiframes.hiframes_typed import HiFramesTyped
+from hpat.hiframes.hiframes_untyped import HiFramesPass
+from hpat.hiframes.hiframes_typed import HiFramesTypedPass
 from hpat.hiframes.dataframe_pass import DataFramePass
 import numba
 import numba.compiler
+from numba.compiler import DefaultPassBuilder
 from numba import ir_utils, ir, postproc
 from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
 from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
+from numba.typed_passes import (NopythonTypeInference, AnnotateTypes, ParforPass, IRLegalization)
+from numba.untyped_passes import (DeadBranchPrune, InlineInlinables, InlineClosureLikes)
 from hpat import config
+from hpat.distributed import DistributedPass
 import hpat.io
 if config._has_h5py:
     from hpat.io import pio
 
+from numba.compiler_machinery import FunctionPass, register_pass
+
 # workaround for Numba #3876 issue with large labels in mortgage benchmark
 binding.set_option("tmp", "-non-global-value-max-name-size=2048")
-
-# this is for previous version of pipeline manipulation (numba hpat_req <0.38)
-# def stage_io_pass(pipeline):
-#     """
-#     Convert IO calls
-#     """
-#     # Ensure we have an IR and type information.
-#     assert pipeline.func_ir
-#     if config._has_h5py:
-#         io_pass = pio.PIO(pipeline.func_ir, pipeline.locals)
-#         io_pass.run()
-#
-#
-# def stage_distributed_pass(pipeline):
-#     """
-#     parallelize for distributed-memory
-#     """
-#     # Ensure we have an IR and type information.
-#     assert pipeline.func_ir
-#     dist_pass = DistributedPass(pipeline.func_ir, pipeline.typingctx,
-#                                 pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
-#     dist_pass.run()
-#
-#
-# def stage_df_pass(pipeline):
-#     """
-#     Convert DataFrame calls
-#     """
-#     # Ensure we have an IR and type information.
-#     assert pipeline.func_ir
-#     df_pass = HiFrames(pipeline.func_ir, pipeline.typingctx,
-#                        pipeline.args, pipeline.locals)
-#     df_pass.run()
-#
-#
-# def stage_df_typed_pass(pipeline):
-#     """
-#     Convert HiFrames after typing
-#     """
-#     # Ensure we have an IR and type information.
-#     assert pipeline.func_ir
-#     df_pass = HiFramesTyped(pipeline.func_ir, pipeline.typingctx,
-#                             pipeline.type_annotation.typemap, pipeline.type_annotation.calltypes)
-#     df_pass.run()
-#
-#
-# def stage_inline_pass(pipeline):
-#     """
-#     Inline function calls (to enable distributed pass analysis)
-#     """
-#     # Ensure we have an IR and type information.
-#     assert pipeline.func_ir
-#     inline_calls(pipeline.func_ir)
-#
-#
-# def stage_repeat_inline_closure(pipeline):
-#     assert pipeline.func_ir
-#     inline_pass = InlineClosureCallPass(
-#         pipeline.func_ir, pipeline.flags.auto_parallel)
-#     inline_pass.run()
-#     post_proc = postproc.PostProcessor(pipeline.func_ir)
-#     post_proc.run()
-#
-#
-# def add_hpat_stages(pipeline_manager, pipeline):
-#     pp = pipeline_manager.pipeline_stages['nopython']
-#     new_pp = []
-#     for (func, desc) in pp:
-#         if desc == 'nopython frontend':
-#             # before type inference: add inline calls pass,
-#             # untyped hiframes pass, hdf5 io
-#             # also repeat inline closure pass to inline df stencils
-#             new_pp.append(
-#                 (lambda: stage_inline_pass(pipeline), "inline funcs"))
-#             new_pp.append((lambda: stage_df_pass(
-#                 pipeline), "convert DataFrames"))
-#             new_pp.append((lambda: stage_io_pass(
-#                 pipeline), "replace IO calls"))
-#             new_pp.append((lambda: stage_repeat_inline_closure(
-#                 pipeline), "repeat inline closure"))
-#         # need to handle string array exprs before nopython rewrites converts
-#         # them to arrayexpr.
-#         # since generic_rewrites has the same description, we check func name
-#         if desc == 'nopython rewrites' and 'generic_rewrites' not in str(func):
-#             new_pp.append((lambda: stage_df_typed_pass(
-#                 pipeline), "typed hiframes pass"))
-#         if desc == 'nopython mode backend':
-#             # distributed pass after parfor pass and before lowering
-#             new_pp.append((lambda: stage_distributed_pass(
-#                 pipeline), "convert to distributed"))
-#         new_pp.append((func, desc))
-#     pipeline_manager.pipeline_stages['nopython'] = new_pp
 
 
 def inline_calls(func_ir, _locals):
@@ -150,145 +64,109 @@ def inline_calls(func_ir, _locals):
     # CFG simplification fixes this case
     func_ir.blocks = ir_utils.simplify_CFG(func_ir.blocks)
 
+# TODO: remove these helper functions when Numba provide appropriate way to manipulate passes
+def pass_position(pm, location):
+    assert pm.passes
+    pm._validate_pass(location)
+    for idx, (x, _) in enumerate(pm.passes):
+        if x == location:
+            return idx
 
-class HPATPipeline(numba.compiler.BasePipeline):
+    raise ValueError("Could not find pass %s" % location)
+
+
+def add_pass_before(pm, pass_cls, location):
+    assert pm.passes
+    pm._validate_pass(pass_cls)
+    position = pass_position(pm, location)
+    pm.passes.insert(position, (pass_cls, str(pass_cls)))
+
+    # if a pass has been added, it's not finalized
+    pm._finalized = False
+
+
+def replace_pass(pm, pass_cls, location):
+    assert pm.passes
+    pm._validate_pass(pass_cls)
+    position = pass_position(pm, location)
+    pm[position] = (pass_cls, str(pass_cls))
+
+    # if a pass has been added, it's not finalized
+    pm._finalized = False
+
+
+@register_pass(mutates_CFG=True, analysis_only=False)
+class InlinePass(FunctionPass):
+    _name = "hpat_inline_pass"
+
+    def __init__(self):
+        pass
+
+    def run_pass(self, state):
+        inline_calls(state.func_ir, state.locals)
+        return True
+
+
+@register_pass(mutates_CFG=True, analysis_only=False)
+class PostprocessorPass(FunctionPass):
+    _name = "hpat_postprocessor_pass"
+
+    def __init__(self):
+        pass
+
+    def run_pass(self, state):
+        post_proc = postproc.PostProcessor(state.func_ir)
+        post_proc.run()
+        return True
+
+
+class HPATPipeline(numba.compiler.CompilerBase):
     """HPAT compiler pipeline
     """
 
-    def define_pipelines(self, pm):
+    def define_pipelines(self):
         name = 'hpat'
-        pm.create_pipeline(name)
-        self.add_preprocessing_stage(pm)
-        self.add_with_handling_stage(pm)
-        self.add_pre_typing_stage(pm)
-        pm.add_stage(self.stage_inline_pass, "inline funcs")
-        pm.add_stage(self.stage_df_pass, "convert DataFrames")
-        # pm.add_stage(self.stage_io_pass, "replace IO calls")
-        # repeat inline closure pass to inline df stencils
-        pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
-        self.add_typing_stage(pm)
-        # breakup optimization stage since df_typed needs to run before
-        # rewrites
-        # e.g. need to handle string array exprs before nopython rewrites
-        # converts them to arrayexpr.
-        # self.add_optimization_stage(pm)
-        # hiframes typed pass should be before pre_parfor since variable types
-        # need updating, and A.call to np.call transformation is invalid for
-        # Series (e.g. S.var is not the same as np.var(S))
-        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
-        pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
-        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
-        if not self.flags.no_rewrites:
-            pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
-        if self.flags.auto_parallel.enabled:
-            pm.add_stage(self.stage_parfor_pass, "convert to parfors")
-        pm.add_stage(self.stage_distributed_pass, "convert to distributed")
-        pm.add_stage(self.stage_ir_legalization,
-                     "ensure IR is legal prior to lowering")
-        self.add_lowering_stage(pm)
-        self.add_cleanup_stage(pm)
+        pm = DefaultPassBuilder.define_nopython_pipeline(self.state)
 
-    def stage_inline_pass(self):
-        """
-        Inline function calls (to enable distributed pass analysis)
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        inline_calls(self.func_ir, self.locals)
+        add_pass_before(pm, InlinePass, InlineClosureLikes)
+        pm.add_pass_after(HiFramesPass, InlinePass)
+        pm.add_pass_after(DataFramePass, AnnotateTypes)
+        pm.add_pass_after(PostprocessorPass, AnnotateTypes)
+        pm.add_pass_after(HiFramesTypedPass, DataFramePass)
+        pm.add_pass_after(DistributedPass, ParforPass)
+        pm.finalize()
 
-    def stage_df_pass(self):
-        """
-        Convert DataFrame calls
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        df_pass = HiFrames(self.func_ir, self.typingctx,
-                           self.args, self.locals, self.metadata)
-        df_pass.run()
+        return [pm]
 
-    def stage_io_pass(self):
-        """
-        Convert IO calls
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        if config._has_h5py:
-            io_pass = pio.PIO(self.func_ir, self.locals)
-            io_pass.run()
 
-    def stage_repeat_inline_closure(self):
-        assert self.func_ir
-        inline_pass = InlineClosureCallPass(
-            self.func_ir, self.flags.auto_parallel, typed=True)
-        inline_pass.run()
-        post_proc = postproc.PostProcessor(self.func_ir)
-        post_proc.run()
+@register_pass(mutates_CFG=True, analysis_only=False)
+class ParforSeqPass(FunctionPass):
+    _name = "hpat_parfor_seq_pass"
 
-    def stage_distributed_pass(self):
-        """
-        parallelize for distributed-memory
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        from hpat.distributed import DistributedPass
-        dist_pass = DistributedPass(
-            self.func_ir, self.typingctx, self.targetctx,
-            self.type_annotation.typemap, self.type_annotation.calltypes,
-            self.metadata)
-        dist_pass.run()
+    def __init__(self):
+        pass
 
-    def stage_df_typed_pass(self):
-        """
-        Convert HiFrames after typing
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        df_pass = HiFramesTyped(self.func_ir, self.typingctx,
-                                self.type_annotation.typemap,
-                                self.type_annotation.calltypes)
-        df_pass.run()
+    def run_pass(self, state):
+        numba.parfor.lower_parfor_sequential(
+            state.typingctx, state.func_ir, state.typemap, state.calltypes)
 
-    def stage_dataframe_pass(self):
-        """
-        Convert DataFrames after typing
-        """
-        # Ensure we have an IR and type information.
-        assert self.func_ir
-        df_pass = DataFramePass(self.func_ir, self.typingctx,
-                                self.type_annotation.typemap,
-                                self.type_annotation.calltypes)
-        df_pass.run()
+        return True
 
 
 class HPATPipelineSeq(HPATPipeline):
     """HPAT pipeline without the distributed pass (used in rolling kernels)
     """
 
-    def define_pipelines(self, pm):
+    def define_pipelines(self):
         name = 'hpat_seq'
-        pm.create_pipeline(name)
-        self.add_preprocessing_stage(pm)
-        self.add_with_handling_stage(pm)
-        self.add_pre_typing_stage(pm)
-        pm.add_stage(self.stage_inline_pass, "inline funcs")
-        pm.add_stage(self.stage_df_pass, "convert DataFrames")
-        pm.add_stage(self.stage_repeat_inline_closure, "repeat inline closure")
-        self.add_typing_stage(pm)
-        # TODO: dataframe pass needed?
-        pm.add_stage(self.stage_dataframe_pass, "typed dataframe pass")
-        pm.add_stage(self.stage_df_typed_pass, "typed hiframes pass")
-        pm.add_stage(self.stage_pre_parfor_pass, "Preprocessing for parfors")
-        if not self.flags.no_rewrites:
-            pm.add_stage(self.stage_nopython_rewrites, "nopython rewrites")
-        if self.flags.auto_parallel.enabled:
-            pm.add_stage(self.stage_parfor_pass, "convert to parfors")
-        # pm.add_stage(self.stage_distributed_pass, "convert to distributed")
-        pm.add_stage(self.stage_lower_parfor_seq, "parfor seq lower")
-        pm.add_stage(self.stage_ir_legalization,
-                     "ensure IR is legal prior to lowering")
-        self.add_lowering_stage(pm)
-        self.add_cleanup_stage(pm)
+        pm = DefaultPassBuilder.define_nopython_pipeline(self.state)
 
-    def stage_lower_parfor_seq(self):
-        numba.parfor.lower_parfor_sequential(
-            self.typingctx, self.func_ir, self.typemap, self.calltypes)
+        add_pass_before(pm, InlinePass, InlineClosureLikes)
+        pm.add_pass_after(HiFramesPass, InlinePass)
+        pm.add_pass_after(DataFramePass, AnnotateTypes)
+        pm.add_pass_after(PostprocessorPass, AnnotateTypes)
+        pm.add_pass_after(HiFramesTypedPass, DataFramePass)
+        add_pass_before(pm, ParforSeqPass, IRLegalization)
+        pm.finalize()
+
+        return [pm]
