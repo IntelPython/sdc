@@ -661,11 +661,11 @@ class SeriesAttribute(AttributeTemplate):
     #     return signature(SeriesType(types.boolean))
 
     # alias of isna
-    @bound_function("series.isnull")
-    def resolve_isnull(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.isnull")
+    # def resolve_isnull(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     # @bound_function("series.notna")
     # def resolve_notna(self, ary, args, kws):

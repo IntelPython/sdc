@@ -788,15 +788,17 @@ def hpat_pandas_series_groupby(
     return hpat_pandas_series_groupby_impl
 
 
+@overload_method(SeriesType, 'isnull')
 @overload_method(SeriesType, 'isna')
 def hpat_pandas_series_isna(self):
     """
-    Pandas Series method :meth:`pandas.Series.isna` implementation.
+    Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
 
     .. only:: developer
 
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
+        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isnull1
 
     Parameters
     -----------
@@ -809,7 +811,7 @@ def hpat_pandas_series_isna(self):
          returns :obj:`pandas.Series` object
     """
 
-    _func_name = 'Method isna().'
+    _func_name = 'Method isna/isnull().'
 
     if not isinstance(self, SeriesType):
         raise TypingError(
@@ -818,7 +820,6 @@ def hpat_pandas_series_isna(self):
     if isinstance(self.dtype, (types.Integer, types.Float)):
 
         def hpat_pandas_series_isna_impl(self):
-
             return pandas.Series(numpy.isnan(self._data))
 
         return hpat_pandas_series_isna_impl
