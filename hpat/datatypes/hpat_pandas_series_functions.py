@@ -817,14 +817,14 @@ def hpat_pandas_series_isna(self):
         raise TypingError(
             '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
-    if isinstance(self.dtype, (types.Integer, types.Float)):
+    if isinstance(self.data.dtype, (types.Integer, types.Float)):
 
         def hpat_pandas_series_isna_impl(self):
             return pandas.Series(numpy.isnan(self._data))
 
         return hpat_pandas_series_isna_impl
 
-    if isinstance(self.dtype, types.UnicodeType):
+    if isinstance(self.data.dtype, types.UnicodeType):
 
         def hpat_pandas_series_isna_impl(self):
             result = numpy.empty(len(self._data), numpy.bool_)
