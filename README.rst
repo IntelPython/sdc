@@ -1,5 +1,5 @@
 *****
-Intel® SDC
+Intel® Scalable Dataframe Compiler
 *****
 
 .. image:: https://travis-ci.com/IntelPython/sdc.svg?branch=master
@@ -15,10 +15,10 @@ Intel Scalable Dataframe Compiler (Intel® SDC) scales analytics/ML codes in Pyt
 to bare-metal cluster/cloud performance automatically.
 It compiles a subset of Python (Pandas/Numpy) to efficient parallel binaries
 with MPI, requiring only minimal code changes.
-SDC is orders of magnitude faster than
+Intel SDC is orders of magnitude faster than
 alternatives like `Apache Spark <http://spark.apache.org/>`_.
 
-SDC's documentation can be found `here <https://intellabs.github.io/sdc-doc/>`_.
+Intel SDC's documentation can be found `here <https://intellabs.github.io/sdc-doc/>`_.
 
 Installing Binary Packages (conda)
 ----------------------------------
@@ -30,7 +30,7 @@ Installing Binary Packages (conda)
 Example
 #######
 
-Here is a Pi calculation example in SDC:
+Here is a Pi calculation example in Intel SDC:
 
 .. code:: python
 
@@ -60,10 +60,10 @@ without `@sdc.jit` and `mpiexec`.
 References
 ##########
 
-These academic papers describe the underlying methods in SDC:
+These academic papers describe the underlying methods in Intel SDC:
 
-- `SDC paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
-- `SDC at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
+- `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
+- `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
 - `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
 
 
@@ -71,7 +71,7 @@ Building Intel® SDC from Source on Linux
 ----------------------------------
 
 We use `Anaconda <https://www.anaconda.com/download/>`_ distribution of
-Python for setting up SDC build environment.
+Python for setting up Intel SDC build environment.
 
 If you do not have conda, we recommend using Miniconda3::
 
@@ -80,8 +80,8 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-It is possible to build SDC via conda-build or setuptools. Follow one of the
-cases below to install SDC and its dependencies on Linux.
+It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
+cases below to install Intel SDC and its dependencies on Linux.
 
 Building on Linux with conda-build
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,7 +92,7 @@ Building on Linux with conda-build
     source activate CBLD
     git clone https://github.com/IntelPython/sdc
     cd sdc
-    # build SDC
+    # build Intel SDC
     conda build --python $PYVER --override-channels -c numba -c conda-forge -c defaults buildscripts/sdc-conda-recipe
 
 Building on Linux with setuptools
@@ -118,8 +118,8 @@ Building Intel® SDC on Windows requires Build Tools for Visual Studio 2019 (wit
 * Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
 * Start 'Anaconda prompt'
 
-It is possible to build SDC via conda-build or setuptools. Follow one of the
-cases below to install SDC and its dependencies on Windows.
+It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
+cases below to install Intel SDC and its dependencies on Windows.
 
 Building on Windows with conda-build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -156,7 +156,7 @@ Troubleshooting Windows Build
 * For setting up Visual Studio, one might need go to registry at
   ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
   and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
-* Sometimes if the conda version or visual studio version being used are not latest then building SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
+* Sometimes if the conda version or visual studio version being used are not latest then building Intel SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
 
 Running unit tests
 ------------------
