@@ -2622,7 +2622,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     -----------
     self: :class:'pandas.Series'
         input series
-    axis: 0 or :obj:'pandas.Series.index'
+    axis: 0 or :obj:'pandas.Series.index', default: 0
         Axis to direct sorting.
         *unsupported*
     ascending: :obj:'bool', default: True
@@ -2656,7 +2656,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             used_index = numpy.full((len(self._data)), -1)
             result = sorted(self._data)
             cycle = range(len(self._data))
-            if ascending is False:
+            if not ascending:
                 result = result[::-1]
                 cycle = range(len(self._data) - 1, -1, -1)
             result_index = index.copy()
@@ -2695,37 +2695,18 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             for i in self.isna():
                 if i:
                     na += 1
-            index = numpy.arange(len(self._data))
-            my_index = numpy.arange(len(self._data))
-            used_index = numpy.full((len(self._data)), -1)
+            indices = numpy.arange(len(self._data))
+            index_result = numpy.argsort(self._data, kind='mergesort')
             result = numpy.sort(self._data)
             i = len(self._data) - na
-            cycle = range(len(self._data))
-            if ascending is False:
+            index_result[i:] = index_result[i:][::-1]
+            if not ascending:
+                index_result[:i] = index_result[:i][::-1]
                 result[:i] = result[:i][::-1]
-                cycle = range(len(self._data), -1, -1)
-            result_index = index.copy()
-            for i in range(len(result_index)):
-                find = 0
-                for search in cycle:
-                    check = 0
-                    for j in used_index:
-                        if my_index[search] == j:
-                            check = 1
-                    if (self._data[search] == result[i]) and check == 0 and find == 0:
-                        result_index[i] = index[search]
-                        used_index[i] = my_index[search]
-                        find = 1
-            num = 0
-            for i in self.isna():
-                j = len(result_index) - na
-                if i and used_index[j] == -1:
-                    result_index[j] = index[num]
-                    used_index[j] = my_index[num]
-                    na -= 1
-                num += 1
+            for i in range(len(index_result)):
+                indices[i] = index_result[i]
 
-            return pandas.Series(result, result_index)
+            return pandas.Series(result, indices)
 
         return hpat_pandas_series_sort_values_impl
 
@@ -2737,7 +2718,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             used_index = numpy.full((len(self._data)), -1)
             result = sorted(self._data)
             cycle = range(len(self._data))
-            if ascending is False:
+            if not ascending:
                 result = result[::-1]
                 cycle = range(len(self._data) - 1, -1, -1)
             result_index = self._index.copy()
@@ -2776,37 +2757,18 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             for i in self.isna():
                 if i:
                     na += 1
-            i = len(self._data) - na
-            index = self._index
-            my_index = numpy.arange(len(self._data))
-            used_index = numpy.full((len(self._data)), -1)
+            indices = self._index.copy()
+            index_result = numpy.argsort(self._data, kind='mergesort')
             result = numpy.sort(self._data)
-            cycle = range(len(self._data))
-            if ascending is False:
+            i = len(self._data) - na
+            index_result[i:] = index_result[i:][::-1]
+            if not ascending:
+                index_result[:i] = index_result[:i][::-1]
                 result[:i] = result[:i][::-1]
-                cycle = range(len(self._data), -1, -1)
-            result_index = self._index.copy()
-            for i in range(len(result_index)):
-                find = 0
-                for search in cycle:
-                    check = 0
-                    for j in used_index:
-                        if my_index[search] == j:
-                            check = 1
-                    if (self._data[search] == result[i]) and check == 0 and find == 0:
-                        result_index[i] = index[search]
-                        used_index[i] = my_index[search]
-                        find = 1
-            num = 0
-            for i in self.isna():
-                j = len(result_index) - na
-                if i and used_index[j] == -1:
-                    result_index[j] = index[num]
-                    used_index[j] = my_index[num]
-                    na -= 1
-                num += 1
+            for i in range(len(index_result)):
+                indices[i] = self._index[index_result[i]]
 
-            return pandas.Series(result, result_index)
+            return pandas.Series(result, indices)
 
         return hpat_pandas_series_sort_values_impl
 
