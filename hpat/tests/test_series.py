@@ -82,8 +82,8 @@ def gen_srand_array(size, nchars=8):
 
 def gen_frand_array(size, min=-100, max=100):
     """Generate array of float of specified size based on [-100-100]"""
-    float_list = (max - min) * np.random.sample(size) + min
-    return float_list
+    np.random.seed(100)
+    return (max - min) * np.random.sample(size) + min
 
 def _make_func_from_text(func_text, func_name='test_impl'):
     loc_vars = {}

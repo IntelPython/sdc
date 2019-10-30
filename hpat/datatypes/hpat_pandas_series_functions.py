@@ -2528,7 +2528,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     axis: :obj:`int`
         Has no effect but is accepted for compatibility with numpy.
         *unsupported*
-    kind: {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
+    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
         *uses python func - sorted() for str and numpy func - sort() for num*
         *unsupported*
@@ -2628,7 +2628,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         *unsupported*
     ascending: :obj:'bool', default: True
         If True, sort values in ascending order, otherwise descending.
-    kind: {'mergesort', 'quicksort', 'heapsort'}, default 'quicksort'
+    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm.
         *uses python func - sorted() for str and numpy func - sort() for num*
         *unsupported*
