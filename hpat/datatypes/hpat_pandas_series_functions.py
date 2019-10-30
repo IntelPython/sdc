@@ -40,7 +40,7 @@ from numba import types
 
 import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
-from hpat.str_arr_ext import StringArrayType
+from hpat.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from hpat.utils import to_array
 
 
@@ -753,37 +753,107 @@ def hpat_pandas_series_isin(self, values):
 
 
 @overload_method(SeriesType, 'append')
-def hpat_pandas_series_append(self, to_append):
+def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integrity=False):
     """
     Pandas Series method :meth:`pandas.Series.append` implementation.
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_append1
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_append*
+
     Parameters
     -----------
-    to_append : :obj:`pandas.Series` object
-               input argument
-    ignore_index:
-                 *unsupported*
-    verify_integrity:
-                     *unsupported*
+    self: :obj:`pandas.Series`
+           input series
+    to_append : :obj:`pandas.Series` object or :obj:`list` or :obj:`set`
+                Series (or list or tuple of Series) to append with self
+    ignore_index: :obj:`bool`, default False
+                If True, do not use the index labels.
+                Supported as literal value only
+    verify_integrity: :obj:`bool`, default False
+                If True, raise Exception on creating index with duplicates.
+                *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series`
          returns :obj:`pandas.Series` object
+         Concatenated Series
+
     """
 
     _func_name = 'Method append().'
 
-    if not isinstance(self, SeriesType) or not isinstance(to_append, SeriesType):
+    if not isinstance(self, SeriesType):
         raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}, to_append: {}'.format(_func_name, self, to_append))
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
 
-    def hpat_pandas_series_append_impl(self, to_append):
-        return pandas.Series(self._data + to_append._data)
+    if not (isinstance(to_append, SeriesType)
+            or (isinstance(to_append, (types.UniTuple, types.List)) and isinstance(to_append.dtype, SeriesType))):
+        raise TypingError(
+            '{} The argument must be a pandas.series or list/tuple of pandas.series. \
+            Given to_append: {}'.format(_func_name, to_append))
 
-    return hpat_pandas_series_append_impl
+    # currently we will always raise this in the end, i.e. if no impl was found
+    # TODO: find a way to stop compilation early and not proceed with unliteral step
+    if not (isinstance(ignore_index, types.Literal) and isinstance(ignore_index, types.Boolean)
+            or isinstance(ignore_index, types.Omitted)
+            or ignore_index is False):
+        raise TypingError(
+            '{} The ignore_index must be a literal Boolean constant. Given: {}'.format(_func_name, ignore_index))
+
+    if not (verify_integrity is False or isinstance(verify_integrity, types.Omitted)):
+        raise TypingError(
+            '{} Unsupported parameters. Given verify_integrity: {}'.format(_func_name, verify_integrity))
+
+    # ignore_index value has to be known at compile time to select between implementations with different signatures
+    if ((isinstance(ignore_index, types.Literal) and ignore_index.literal_value is True)
+            or (isinstance(ignore_index, bool) and ignore_index is True)):
+        # implementations that ignore series index
+        if isinstance(to_append, SeriesType):
+            def hpat_pandas_series_append_single_impl(self, to_append, ignore_index=False, verify_integrity=False):
+
+                new_data = hpat.hiframes.api._append(self._data, to_append._data)
+                new_index = numpy.arange(len(self._data) + len(to_append._data))
+                return pandas.Series(new_data, new_index)
+
+            return hpat_pandas_series_append_single_impl
+
+        elif isinstance(to_append, (types.UniTuple, types.List)):
+            def hpat_pandas_series_append_list_impl(self, to_append, ignore_index=False, verify_integrity=False):
+
+                arrays_to_append = [series._data for series in to_append]
+                sum_of_sizes = numpy.array([len(arr) for arr in arrays_to_append]).sum()
+                new_data = hpat.hiframes.api._append(self._data, arrays_to_append)
+                new_index = numpy.arange(len(self._data) + sum_of_sizes)
+                return pandas.Series(new_data, new_index)
+
+            return hpat_pandas_series_append_list_impl
+
+    elif ((isinstance(ignore_index, types.Literal) and ignore_index.literal_value is False)
+            or (isinstance(ignore_index, bool) and ignore_index is False)
+            or isinstance(ignore_index, types.Omitted)):
+        # implementations that handle series index (ignore_index is False)
+        if isinstance(to_append, SeriesType):
+            def hpat_pandas_series_append_single_impl(self, to_append, ignore_index=False, verify_integrity=False):
+
+                new_data = hpat.hiframes.api._append(self._data, to_append._data)
+                new_index = hpat.hiframes.api._append(self.index, to_append.index)
+                return pandas.Series(new_data, new_index)
+
+            return hpat_pandas_series_append_single_impl
+
+        elif isinstance(to_append, (types.UniTuple, types.List)):
+            def hpat_pandas_series_append_list_impl(self, to_append, ignore_index=False, verify_integrity=False):
+
+                data_arrays_to_append = [series._data for series in to_append]
+                index_arrays_to_append = [series.index for series in to_append]
+
+                new_data = hpat.hiframes.api._append(self._data, data_arrays_to_append)
+                new_index = hpat.hiframes.api._append(self.index, index_arrays_to_append)
+                return pandas.Series(new_data, new_index)
+
+            return hpat_pandas_series_append_list_impl
 
 
 @overload_method(SeriesType, 'copy')
