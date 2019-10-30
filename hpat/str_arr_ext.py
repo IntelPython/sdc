@@ -1419,3 +1419,17 @@ def lower_glob(context, builder, sig, args):
     # context.nrt.decref(builder, ty, ret)
 
     return impl_ret_new_ref(context, builder, typ, ret)
+
+
+@numba.njit(no_cpython_wrapper=True)
+def append_string_array_to(result, pos, A):
+    # precondition: result is allocated with the size enough to contain A
+    i, j = 0, pos
+    for str in A:
+        result[j] = str
+        if str_arr_is_na(A, i):
+            hpat.str_arr_ext.str_arr_set_na(result, j)
+        i += 1
+        j += 1
+
+    return i

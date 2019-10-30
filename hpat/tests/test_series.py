@@ -1405,7 +1405,6 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'No support of axis argument in old-style Series.dropna() impl')
     def test_series_dropna_axis1(self):
@@ -2114,13 +2113,13 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_single_ignore_index(self):
-        '''Verify Series.append() concatenates Series with other single Series ignoring index'''
+        '''Verify Series.append() concatenates Series with other single Series ignoring indexes'''
         def test_impl(S, other):
             return S.append(other, ignore_index=True)
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0]],
-                         'string': [['a', 'b', 'q'], ['d', 'e']]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1]],
+                         'string': [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]}
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2130,14 +2129,14 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_list_ignore_index(self):
-        '''Verify Series.append() concatenates Series with list of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with list of other Series ignoring indexes'''
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3], ignore_index=True)
         hpat_func = hpat.jit(test_impl)
 
         dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
+            dtype_to_data['string'] = [['a', None, ''], ['d', None], ['']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2146,14 +2145,14 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_ignore_index(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with tuple of other Series ignoring indexes'''
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ), ignore_index=True)
         hpat_func = hpat.jit(test_impl)
 
         dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
+            dtype_to_data['string'] = [['a', None, ''], ['d', None], ['']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2163,14 +2162,14 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_default(self):
-        '''Verify Series.append() concatenates Series with other single Series supporting default index'''
+        '''Verify Series.append() concatenates Series with other single Series respecting default indexes'''
         def test_impl(S, other):
             return S.append(other)
         hpat_func = hpat.jit(test_impl)
 
         dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e']]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2180,7 +2179,7 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_default(self):
-        '''Verify Series.append() concatenates Series with list of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with list of other Series respecting default indexes'''
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = hpat.jit(test_impl)
@@ -2196,7 +2195,7 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_default(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting default indexes'''
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = hpat.jit(test_impl)
@@ -2213,15 +2212,15 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_int(self):
-        '''Verify Series.append() concatenates Series with other single Series supporting default index'''
+        '''Verify Series.append() concatenates Series with other single Series respecting integer indexes'''
         def test_impl(S, other):
             return S.append(other)
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e']]
-        indexes = [[1, 2, 3], [7, 8]]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3, 4]]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2231,15 +2230,15 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_int(self):
-        '''Verify Series.append() concatenates Series with list of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with list of other Series respecting integer indexes'''
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
-        indexes = [[1, 2, 3], [7, 8], [11]]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3], [4]]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2248,15 +2247,15 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_int(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting integer indexes'''
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
-        indexes = [[1, 2, 3], [7, 8], [11]]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3], [4]]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2266,15 +2265,15 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_str(self):
-        '''Verify Series.append() concatenates Series with other single Series supporting default index'''
+        '''Verify Series.append() concatenates Series with other single Series respecting string indexes'''
         def test_impl(S, other):
             return S.append(other)
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e']]
-        indexes = [['a', 'bb', 'ccc'], ['q', 't']]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['a1', 'a2', 'a3', 'a4', 'a5']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2284,15 +2283,15 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_str(self):
-        '''Verify Series.append() concatenates Series with list of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with list of other Series respecting string indexes'''
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
-        indexes = [['a', 'bb', 'ccc'], ['q', 't'], ['dd']]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['q', 't', 'a', 'x'], ['dd']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2301,15 +2300,15 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_str(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series ignoring index'''
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting string indexes'''
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = hpat.jit(test_impl)
 
-        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
         if not hpat.config.config_pipeline_hpat_default:
-            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
-        indexes = [['a', 'bb', 'ccc'], ['q', 't'], ['dd']]
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['q', 't', 'a', 'x'], ['dd']]
 
         for dtype, data_list in dtype_to_data.items():
             with self.subTest(series_dtype=dtype, concatenated_data=data_list):
@@ -2346,7 +2345,7 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
-    def test_series_append_single_dtype_mismatch(self):
+    def test_series_append_single_dtype_promotion(self):
         '''Verify Series.append() implementation handles appending single Series with different dtypes'''
         def test_impl(S, other):
             return S.append(other)
@@ -2358,7 +2357,7 @@ class TestSeries(unittest.TestCase):
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "BUG: old-style append implementation doesn't handle series index")
-    def test_series_append_list_dtype_mismatch(self):
+    def test_series_append_list_dtype_promotion(self):
         '''Verify Series.append() implementation handles appending list of Series with different dtypes'''
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])

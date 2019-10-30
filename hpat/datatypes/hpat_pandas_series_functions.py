@@ -39,10 +39,10 @@ from numba.extending import overload, overload_method, overload_attribute
 from numba import types
 
 import hpat
+import hpat.datatypes.common_functions as common_functions
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from hpat.utils import to_array
-
 
 class TypeChecker:
     """
@@ -759,26 +759,26 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 
     .. only:: developer
 
-       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_append*
+        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_append*
 
     Parameters
     -----------
     self: :obj:`pandas.Series`
-           input series
+        input series
     to_append : :obj:`pandas.Series` object or :obj:`list` or :obj:`set`
-                Series (or list or tuple of Series) to append with self
+        Series (or list or tuple of Series) to append with self
     ignore_index: :obj:`bool`, default False
-                If True, do not use the index labels.
-                Supported as literal value only
+        If True, do not use the index labels.
+        Supported as literal value only
     verify_integrity: :obj:`bool`, default False
-                If True, raise Exception on creating index with duplicates.
-                *unsupported*
+        If True, raise Exception on creating index with duplicates.
+        *unsupported*
 
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-         Concatenated Series
+        returns :obj:`pandas.Series` object
+        Concatenated Series
 
     """
 
@@ -807,53 +807,38 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
             '{} Unsupported parameters. Given verify_integrity: {}'.format(_func_name, verify_integrity))
 
     # ignore_index value has to be known at compile time to select between implementations with different signatures
-    if ((isinstance(ignore_index, types.Literal) and ignore_index.literal_value is True)
-            or (isinstance(ignore_index, bool) and ignore_index is True)):
-        # implementations that ignore series index
-        if isinstance(to_append, SeriesType):
-            def hpat_pandas_series_append_single_impl(self, to_append, ignore_index=False, verify_integrity=False):
+    ignore_index_is_false = (common_functions.has_literal_value(ignore_index, False)
+                             or common_functions.has_python_value(ignore_index, False)
+                             or isinstance(ignore_index, types.Omitted))
+    to_append_is_series = isinstance(to_append, SeriesType)
 
-                new_data = hpat.hiframes.api._append(self._data, to_append._data)
-                new_index = numpy.arange(len(self._data) + len(to_append._data))
-                return pandas.Series(new_data, new_index)
-
-            return hpat_pandas_series_append_single_impl
-
-        elif isinstance(to_append, (types.UniTuple, types.List)):
-            def hpat_pandas_series_append_list_impl(self, to_append, ignore_index=False, verify_integrity=False):
-
-                arrays_to_append = [series._data for series in to_append]
-                sum_of_sizes = numpy.array([len(arr) for arr in arrays_to_append]).sum()
-                new_data = hpat.hiframes.api._append(self._data, arrays_to_append)
-                new_index = numpy.arange(len(self._data) + sum_of_sizes)
-                return pandas.Series(new_data, new_index)
-
-            return hpat_pandas_series_append_list_impl
-
-    elif ((isinstance(ignore_index, types.Literal) and ignore_index.literal_value is False)
-            or (isinstance(ignore_index, bool) and ignore_index is False)
-            or isinstance(ignore_index, types.Omitted)):
-        # implementations that handle series index (ignore_index is False)
-        if isinstance(to_append, SeriesType):
-            def hpat_pandas_series_append_single_impl(self, to_append, ignore_index=False, verify_integrity=False):
-
-                new_data = hpat.hiframes.api._append(self._data, to_append._data)
-                new_index = hpat.hiframes.api._append(self.index, to_append.index)
-                return pandas.Series(new_data, new_index)
-
-            return hpat_pandas_series_append_single_impl
-
-        elif isinstance(to_append, (types.UniTuple, types.List)):
-            def hpat_pandas_series_append_list_impl(self, to_append, ignore_index=False, verify_integrity=False):
-
+    if ignore_index_is_false:
+        def hpat_pandas_series_append_impl(self, to_append, ignore_index=False, verify_integrity=False):
+            if to_append_is_series == True:  # noqa
+                new_data = common_functions.hpat_arrays_append(self._data, to_append._data)
+                new_index = common_functions.hpat_arrays_append(self.index, to_append.index)
+            else:
                 data_arrays_to_append = [series._data for series in to_append]
                 index_arrays_to_append = [series.index for series in to_append]
+                new_data = common_functions.hpat_arrays_append(self._data, data_arrays_to_append)
+                new_index = common_functions.hpat_arrays_append(self.index, index_arrays_to_append)
 
-                new_data = hpat.hiframes.api._append(self._data, data_arrays_to_append)
-                new_index = hpat.hiframes.api._append(self.index, index_arrays_to_append)
-                return pandas.Series(new_data, new_index)
+            return pandas.Series(new_data, new_index)
 
-            return hpat_pandas_series_append_list_impl
+        return hpat_pandas_series_append_impl
+
+    else:
+        def hpat_pandas_series_append_ignore_index_impl(self, to_append, ignore_index=False, verify_integrity=False):
+
+            if to_append_is_series == True:  # noqa
+                new_data = common_functions.hpat_arrays_append(self._data, to_append._data)
+            else:
+                arrays_to_append = [series._data for series in to_append]
+                new_data = common_functions.hpat_arrays_append(self._data, arrays_to_append)
+
+            return pandas.Series(new_data, None)
+
+        return hpat_pandas_series_append_ignore_index_impl
 
 
 @overload_method(SeriesType, 'copy')

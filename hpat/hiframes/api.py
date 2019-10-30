@@ -56,7 +56,12 @@ import hpat
 from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.set_ext import build_set
-from hpat.str_arr_ext import (StringArrayType, string_array_type, is_str_arr_typ, cp_str_list_to_array, num_total_chars)
+from hpat.str_arr_ext import (
+    StringArrayType,
+    string_array_type,
+    is_str_arr_typ,
+    num_total_chars,
+    append_string_array_to)
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower)
 from hpat.hiframes.pd_series_ext import (
     SeriesType,
@@ -1790,68 +1795,3 @@ def _analyze_op_pair_first(self, scope, equiv_set, expr):
 
 
 numba.array_analysis.ArrayAnalysis._analyze_op_pair_first = _analyze_op_pair_first
-
-
-def _append(A, B):
-    return None
-
-
-@overload(_append)
-def _append_overload(A, B):
-    '''Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A'''
-
-    if isinstance(A, types.Array):
-        if isinstance(B, types.Array):
-            def _append_single_numeric_impl(A, B):
-                return np.concatenate((A, B,))
-
-            return _append_single_numeric_impl
-        elif isinstance(B, (types.UniTuple, types.List)):
-            # TODO: this heavily relies on B being a homogeneous tuple/list - find a better way
-            # to resolve common dtype of heterogeneous sequence of arrays
-            np_dtypes = [numpy_support.as_dtype(A.dtype), numpy_support.as_dtype(B.dtype.dtype)]
-            np_common_dtype = np.find_common_type([], np_dtypes)
-            numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
-
-            # TODO: refactor to use np.concatenate when Numba supports building a tuple at runtime
-            def _append_list_numeric_impl(A, B):
-
-                total_length = len(A) + np.array([len(arr) for arr in B]).sum()
-                new_data = np.empty(total_length, numba_common_dtype)
-
-                stop = len(A)
-                new_data[:stop] = A
-                for arr in B:
-                    start = stop
-                    stop = start + len(arr)
-                    new_data[start:stop] = arr
-                return new_data
-
-            return _append_list_numeric_impl
-
-    elif A == string_array_type:
-        if B == string_array_type:
-            def _append_single_string_array_impl(A, B):
-                total_size = len(A) + len(B)
-                total_chars = num_total_chars(A) + num_total_chars(B)
-                new_data = hpat.str_arr_ext.pre_alloc_string_array(total_size, total_chars)
-
-                list_of_strings = list(A) + list(B)
-                hpat.str_arr_ext.cp_str_list_to_array(new_data, list_of_strings)
-                return new_data
-
-            return _append_single_string_array_impl
-        elif (isinstance(B, (types.UniTuple, types.List)) and B.dtype == string_array_type):
-            def _append_list_string_array_impl(A, B):
-                array_list = [A] + list(B)
-                total_size = np.array([len(arr) for arr in array_list]).sum()
-                total_chars = np.array([num_total_chars(arr) for arr in array_list]).sum()
-
-                new_data = hpat.str_arr_ext.pre_alloc_string_array(total_size, total_chars)
-                list_of_strings = list(A)
-                for arr in B:
-                    list_of_strings.extend(list(arr))
-                hpat.str_arr_ext.cp_str_list_to_array(new_data, list_of_strings)
-                return new_data
-
-            return _append_list_string_array_impl
