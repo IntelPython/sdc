@@ -2366,16 +2366,17 @@ def hpat_pandas_series_nunique(self, dropna=True):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if isinstance(self.data, StringArrayType):
+
         def hpat_pandas_series_nunique_str_impl(self, dropna=True):
             """
             It is better to merge with Numeric branch
-            Unsupported:
-                ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd']
-                [3, np.nan, 'b', 'b', 5.1, np.nan, 'ddd', 'dd']
             """
 
             str_set = set(self._data)
-            return len(str_set)
+            if dropna == False:
+                return len(str_set) - 1
+            else:
+                return len(str_set)
 
         return hpat_pandas_series_nunique_str_impl
 
