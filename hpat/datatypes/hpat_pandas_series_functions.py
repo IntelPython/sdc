@@ -33,6 +33,8 @@ import numba
 import numpy
 import operator
 import pandas
+from collections.abc import Iterable
+from enum import Enum
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
@@ -42,6 +44,76 @@ import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import StringArrayType
 from hpat.utils import to_array
+
+
+class AcceptedType(Enum):
+    series = (SeriesType,),
+    omitted = (types.Omitted,),
+    int_ = (int, types.Integer),
+    float_ = (float, types.Float),
+    number = (int, float, types.Number),
+    bool_ = (bool, types.Boolean),
+    str_ = (str, types.UnicodeType, types.StringLiteral)
+    list_ = (list, types.List)
+
+
+class TypeChecker:
+    """
+        Validate object type and raise TypingError if the type is invalid, e.g.:
+            Method nsmallest(). The object n
+             given: bool
+             expected: int
+        """
+    msg_template = '{} The object {}\n given: {}\n expected: {}'
+
+    def __init__(self, func_name):
+        """
+        Parameters
+        ----------
+        func_name: :obj:`str`
+            name of the function where types checking
+        """
+        self.func_name = func_name
+
+    def msg(self, val, ty, name=''):
+        """
+        Message of the exception in the special format
+        Parameters
+        ----------
+        val: :obj:`any`
+            real type of the data
+        ty: :obj:`str`
+            expected type of the data
+        name: :obj:`str`
+            name of the parameter
+        Returns
+        -------
+        :class:`str`
+            message of the exception in the special format
+        """
+        return self.msg_template.format(self.func_name, name, val, ty)
+
+    def check(self, data, accepted_types, name=''):
+        """
+        Check data type belongs to specified type or list of types
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        accepted_types: :obj:`tuple` or :obj:`AcceptedType`
+            accepted types
+        name: :obj:`str`
+            name of the parameter
+        """
+        if not isinstance(accepted_types, Iterable):
+            accepted_types = (accepted_types,)
+
+        for ty in accepted_types:
+            if isinstance(data, ty.value):
+                return True
+
+        expected_types = ', '.join([ty.name for ty in accepted_types])
+        raise TypingError(self.msg(data, expected_types, name=name))
 
 
 @overload(operator.getitem)
@@ -1280,8 +1352,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     _func_name = 'Method take().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, AcceptedType.series)
 
     if not isinstance(indices, (types.List, types.Array)):
         raise TypingError('{} The indices must be an array-like. Given: {}'.format(_func_name, indices))
