@@ -721,14 +721,6 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         self.assertEqual(hpat_func(A), test_impl(A))
 
-    def test_series_get(self):
-        def test_impl():
-            S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
-            return S[3]
-        hpat_func = hpat.jit(test_impl)
-
-        self.assertEqual(hpat_func(), test_impl())
-
     def test_getitem_series1(self):
         def test_impl(A, i):
             return A[i]
@@ -745,6 +737,41 @@ class TestSeries(unittest.TestCase):
 
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+
+    def test_setitem_series_full(self):
+        def test_impl(series):
+            series[1] = 3
+            return series[1]
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric
+
+        for data in all_data:
+            series = pd.Series(data * 3)
+            ref_result = test_impl(series)
+            jit_result = hpat_func(series)
+            if np.isnan(jit_result) or np.isnan(ref_result):
+                self.assertEqual(np.isnan(ref_result), np.isnan(jit_result))
+            else:
+                self.assertEqual(ref_result, jit_result)
+
+    def test_setitem_series_iat(self):
+        def test_impl(series):
+            return series[1]
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric
+
+        for data in all_data:
+            series = pd.Series(data * 3)
+            ref_result = test_impl(series)
+            jit_result = hpat_func(series)
+            if np.isnan(jit_result) or np.isnan(ref_result):
+                self.assertEqual(np.isnan(ref_result), np.isnan(jit_result))
+            else:
+                self.assertEqual(ref_result, jit_result)
 
     def test_series_iat1(self):
         def test_impl(A):

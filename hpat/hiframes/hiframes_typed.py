@@ -177,8 +177,8 @@ class HiFramesTypedPassImpl(object):
             self._type_changed_vars.append(lhs)
 
         if isinstance(rhs, ir.Expr):
-            if rhs.op == 'getattr':
-                return self._run_getattr(assign, rhs)
+            # if rhs.op == 'getattr':
+            #     return self._run_getattr(assign, rhs)
 
             if rhs.op == 'binop':
                 return self._run_binop(assign, rhs)

@@ -49,19 +49,22 @@ def hpat_pandas_series_getitem(self, idx):
     Pandas Series operator :attr:`pandas.Series.get` implementation
     **Algorithm**: result = series[idx]
 
-    **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
+    .. only:: developer
+
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_getitem_series*
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_setitem_series*
 
     Parameters
     ----------
-    series: :obj:`pandas.Series`
-           input series
+    self: :obj:`pandas.Series`
+        input series
     idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
         input index
 
     Returns
     -------
     :class:`pandas.Series` or an element of the underneath type
-            object of :class:`pandas.Series`
+        object of :class:`pandas.Series`
     """
     _func_name = 'Operator getitem().'
 
@@ -70,9 +73,6 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.Integer):
         def hpat_pandas_series_getitem_idx_integer_impl(self, idx):
-            """
-            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
-            """
             result = self._data[idx]
             return result
 
@@ -80,21 +80,17 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, types.SliceType):
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            """
-            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
-            """
             result = pandas.Series(self._data[idx])
+
             return result
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            """
-            **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_setitem_series_bool2
-            """
             super_index = idx._data
             result = self._data[super_index]
+
             return result
 
         return hpat_pandas_series_getitem_idx_series_impl
@@ -104,27 +100,61 @@ def hpat_pandas_series_getitem(self, idx):
 
 @overload_attribute(SeriesType, 'at')
 @overload_attribute(SeriesType, 'iat')
-@overload_attribute(SeriesType, 'iloc')
-@overload_attribute(SeriesType, 'loc')
-def hpat_pandas_series_iloc(self):
+def hpat_pandas_series_iat(self, idx):
     """
-    Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
+    Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat` implementation.
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_at_series*
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_iat_series*
 
     Parameters
     ----------
-    series: :class:`pandas.Series`
-           input series
+    self: :obj:`pandas.Series`
+        input series
 
     Returns
     -------
     :obj:`pandas.Series`
-         returns an object of :obj:`pandas.Series`
+        returns an object of :obj:`pandas.Series`
     """
 
-    _func_name = 'Operator at/iat/iloc/loc().'
+    _func_name = 'Operator at/iat().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(idx, types.Integer):
+        raise TypingError('{} The index must be an Integer. Given: {}'.format(_func_name, idx))
+
+    def hpat_pandas_series_iat_impl(self):
+        return self
+
+    return hpat_pandas_series_iat_impl
+
+
+@overload_attribute(SeriesType, 'iloc')
+@overload_attribute(SeriesType, 'loc')
+def hpat_pandas_series_iloc(self):
+    """
+    Pandas Series operators :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
+    .. only:: developer
+
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_loc_series*
+        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_iloc_series*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        returns an object of :obj:`pandas.Series`
+    """
+
+    _func_name = 'Operator iloc/loc().'
 
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))

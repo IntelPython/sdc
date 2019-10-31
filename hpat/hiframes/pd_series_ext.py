@@ -995,7 +995,9 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_cumsum', 'resolve_var',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_iat']
+                           'resolve_iat', 'resolve_at', 'resolve_iloc', 'resolve_loc'
+                           'resolve_prod', 'resolve_count', 'resolve_dropna']
+
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 
