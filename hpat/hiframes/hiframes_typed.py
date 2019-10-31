@@ -194,8 +194,8 @@ class HiFramesTypedPassImpl(object):
                 return self._run_unary(assign, rhs)
 
             # replace getitems on Series.iat
-            if rhs.op in ('getitem', 'static_getitem'):
-                return self._run_getitem(assign, rhs)
+            # if rhs.op in ('getitem', 'static_getitem'):
+            #     return self._run_getitem(assign, rhs)
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)

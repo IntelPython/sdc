@@ -63,7 +63,6 @@ def hpat_pandas_series_getitem(self, idx):
     :class:`pandas.Series` or an element of the underneath type
             object of :class:`pandas.Series`
     """
-
     _func_name = 'Operator getitem().'
 
     if not isinstance(self, SeriesType):
@@ -74,7 +73,6 @@ def hpat_pandas_series_getitem(self, idx):
             """
             **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
             """
-
             result = self._data[idx]
             return result
 
@@ -85,7 +83,6 @@ def hpat_pandas_series_getitem(self, idx):
             """
             **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
             """
-
             result = pandas.Series(self._data[idx])
             return result
 

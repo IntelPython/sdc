@@ -721,6 +721,14 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    def test_series_get(self):
+        def test_impl():
+            S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
+            return S[3]
+        hpat_func = hpat.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_getitem_series1(self):
         def test_impl(A, i):
             return A[i]
