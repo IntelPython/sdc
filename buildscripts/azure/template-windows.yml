@@ -1,0 +1,24 @@
+parameters:
+  name: ''
+  vmImage: ''
+  matrix: []
+
+jobs:
+- job: ${{ parameters.name }}
+  timeoutInMinutes: 120
+  pool: 
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    maxParallel: 11
+    matrix:
+      ${{ insert }}: ${{ parameters.matrix }}
+
+  steps:
+    - script: buildscripts\install_conda.bat "%CONDA_PREFIX_PATH%"
+      displayName: 'Install conda'
+
+    - script: %CONDA_PREFIX_PATH%\python.exe buildscripts\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%CONDA_PREFIX_PATH%"
+      displayName: 'Build conda and wheel packages'
+
+    - script: %CONDA_PREFIX_PATH%\python.exe buildscripts\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%CONDA_PREFIX_PATH%"
+      displayName: 'Test conda package'
