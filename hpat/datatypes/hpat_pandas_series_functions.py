@@ -98,16 +98,13 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Pandas Series operator :attr:`pandas.Series.get` implementation
     **Algorithm**: result = series[idx]
-
     **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
-
     Parameters
     ----------
     series: :obj:`pandas.Series`
            input series
     idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
         input index
-
     Returns
     -------
     :class:`pandas.Series` or an element of the underneath type
@@ -163,14 +160,11 @@ def hpat_pandas_series_iloc(self):
     """
     Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc2
-
     Parameters
     ----------
     series: :class:`pandas.Series`
            input series
-
     Returns
     -------
     :obj:`pandas.Series`
@@ -192,10 +186,8 @@ def hpat_pandas_series_iloc(self):
 def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
     """
     Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nsmallest*
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -208,7 +200,6 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
         last : return the last n occurrences in reverse order of appearance.
         all : keep all occurrences. This can result in a Series of size larger than n.
         *unsupported*
-
     Returns
     -------
     :obj:`series`
@@ -242,10 +233,8 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 def hpat_pandas_series_nlargest(self, n=5, keep='first'):
     """
     Pandas Series method :meth:`pandas.Series.nlargest` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nlargest*
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -258,7 +247,6 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
         last : return the last n occurrences in reverse order of appearance.
         all : keep all occurrences. This can result in a Series of size larger than n.
         *unsupported*
-
     Returns
     -------
     :obj:`series`
@@ -321,13 +309,11 @@ def hpat_pandas_series_shape(self):
 def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.std` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unboxing
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_str
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_std_unsupported_params
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -352,7 +338,6 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
         If None, will attempt to use everything, then use only numeric data.
         Not implemented for Series.
         *unsupported*
-
     Returns
     -------
     :obj:`scalar`
@@ -413,9 +398,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     """
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_value_counts*
-
     Parameters
     -----------
     self: :obj:`pandas.Series`
@@ -431,7 +414,6 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     dropna: :obj:`boolean`, default True
         Skip counts of NaN
         *unsupported* for String
-
     Returns
     -------
     :returns :obj:`pandas.Series`
@@ -524,13 +506,11 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.var` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_unboxing
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_str
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_var_unsupported_params
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -555,7 +535,6 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
         If None, will attempt to use everything, then use only numeric data.
         Not implemented for Series.
         *unsupported*
-
     Returns
     -------
     :obj:`scalar`
@@ -638,16 +617,12 @@ def hpat_pandas_series_index(self):
 def hpat_pandas_series_size(self):
     """
     Pandas Series attribute :attr:`pandas.Series.size` implementation
-
     .. only:: developer
-
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_size
-
     Parameters
     ----------
     series: :obj:`pandas.Series`
         input series
-
     Returns
     -------
     :class:`pandas.Series`
@@ -669,16 +644,12 @@ def hpat_pandas_series_size(self):
 def hpat_pandas_series_ndim(self):
     """
     Pandas Series attribute :attr:`pandas.Series.ndim` implementation
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_ndim
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
            input series
-
     Returns
     -------
     :obj:`int`
@@ -700,16 +671,12 @@ def hpat_pandas_series_ndim(self):
 def hpat_pandas_series_T(self):
     """
     Pandas Series attribute :attr:`pandas.Series.T` implementation
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_T
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
            input series
-
     Returns
     -------
     :obj:`numpy.ndarray`
@@ -731,15 +698,11 @@ def hpat_pandas_series_T(self):
 def hpat_pandas_series_len(self):
     """
     Pandas Series operator :func:`len` implementation
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_len
-
     Parameters
     ----------
     series: :class:`pandas.Series`
-
     Returns
     -------
     :obj:`int`
@@ -761,7 +724,6 @@ def hpat_pandas_series_len(self):
 def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None):
     """
     Pandas Series method :meth:`pandas.Series.shift` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unboxing
@@ -769,7 +731,6 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_str
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_fill_str
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_shift_unsupported_params
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -786,7 +747,6 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
         *unsupported*
     fill_value : :obj:`int`, :obj:`float`
         The scalar value to use for newly introduced missing values.
-
     Returns
     -------
     :obj:`scalar`
@@ -868,11 +828,8 @@ def hpat_pandas_series_isin(self, values):
 def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integrity=False):
     """
     Pandas Series method :meth:`pandas.Series.append` implementation.
-
     .. only:: developer
-
         Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_append*
-
     Parameters
     -----------
     self: :obj:`pandas.Series`
@@ -885,13 +842,11 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
     verify_integrity: :obj:`bool`, default False
         If True, raise Exception on creating index with duplicates.
         *unsupported*
-
     Returns
     -------
     :obj:`pandas.Series`
         returns :obj:`pandas.Series` object
         Concatenated Series
-
     """
 
     _func_name = 'Method append().'
@@ -957,13 +912,10 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 def hpat_pandas_series_copy(self, deep=True):
     """
     Pandas Series method :meth:`pandas.Series.copy` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_str1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_int1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_copy_deep
-
     Parameters
     -----------
     self: :class:`pandas.Series`
@@ -973,7 +925,6 @@ def hpat_pandas_series_copy(self, deep=True):
         With deep=False neither the indices nor the data are copied.
         [SDC limitations]:
             - deep=False: shallow copy of index is not supported
-
     Returns
     -------
     :obj:`pandas.Series` or :obj:`pandas.DataFrame`
@@ -1002,15 +953,11 @@ def hpat_pandas_series_copy(self, deep=True):
 def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     """
     Pandas Series method :meth:`pandas.Series.corr` implementation.
-
     Note: Unsupported mixed numeric and string data
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr_unsupported_period
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -1020,7 +967,6 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     method:
         *unsupported
     min_periods: :obj:`int`, default None
-
     Returns
     -------
     :obj:`float`
@@ -1070,10 +1016,8 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 def hpat_pandas_series_head(self, n=5):
     """
     Pandas Series method :meth:`pandas.Series.head` implementation.
-
     .. only:: developer
        Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_head*
-
     Parameters
     -----------
     n: :obj:`int`, default 5
@@ -1180,18 +1124,14 @@ def hpat_pandas_series_groupby(
 def hpat_pandas_series_isna(self):
     """
     Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
-
     .. only:: developer
-
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isna1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str_isna1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_isnull1
-
     Parameters
     -----------
     self : :obj:`pandas.Series` object
                input argument
-
     Returns
     -------
     :obj:`pandas.Series`
@@ -1232,16 +1172,12 @@ def hpat_pandas_series_isna(self):
 def hpat_pandas_series_notna(self):
     """
     Pandas Series method :meth:`pandas.Series.notna` implementation.
-
     .. only:: developer
-
         Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_notna*
-
     Parameters
     -----------
     self : :obj:`pandas.Series` object
         input series
-
     Returns
     -------
     :obj:`pandas.Series`
@@ -1272,9 +1208,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.ne` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op8
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1334,9 +1268,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.add` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1396,9 +1328,7 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.sub` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1462,13 +1392,10 @@ def hpat_pandas_series_sum(
 ):
     """
     Pandas Series method :meth:`pandas.Series.sum` implementation.
-
     .. only:: developer
-
         Tests:
             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum1
             # python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_sum2
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1483,7 +1410,6 @@ def hpat_pandas_series_sum(
         *unsupported*
     min_count:
         *unsupported*
-
     Returns
     -------
     :obj:`float`
@@ -1605,7 +1531,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_str_idx
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_noidx
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmax_idx
-
     Parameters
     -----------
     axis :  :obj:`int`, :obj:`str`, default: None
@@ -1659,9 +1584,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.mul` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1720,9 +1643,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.div` and :meth:`pandas.Series.truediv` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1780,9 +1701,7 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
     """
     Pandas Series method :meth:`pandas.Series.floordiv` implementation.
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
-
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -1899,11 +1818,8 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
     """
     Pandas Series method :meth:`pandas.Series.prod` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_prod
-
     Parameters
     -----------
     self: :obj:`pandas.Series`
@@ -1925,7 +1841,6 @@ def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_on
         The required number of valid values to perform the operation.
         If fewer than min_count non-NA values are present the result will be NA.
         *unsupported*
-
     Returns
     -------
     :obj:
@@ -2105,11 +2020,8 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
 def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.mean` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_mean
-
     Parameters
     -----------
     axis: {index (0)}
@@ -2124,7 +2036,6 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
         Include only float, int, boolean columns.
         If None, will attempt to use everything, then use only numeric data. Not implemented for Series.
         *unsupported*
-
     Returns
     -------
     :obj:
@@ -2348,9 +2259,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
     """
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
-
     .. only:: developer
-
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin1
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_str_idx
@@ -2358,7 +2267,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_int
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_noidx
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_idxmin_idx
-
     Parameters
     -----------
     axis :  :obj:`int`, :obj:`str`, default: None
@@ -2369,7 +2277,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
     skipna:  :obj:`bool`, default: True
             exclude NA/null values
             *unsupported*
-
     Returns
     -------
     :obj:`pandas.Series.index` or nan
@@ -2649,7 +2556,6 @@ def hpat_pandas_series_unique(self):
             Returns sorted unique elements of an array
             Note: Can't use Numpy due to StringArrayType has no ravel() for noPython mode.
             Also, NotImplementedError: unicode_type cannot be represented as a Numpy dtype
-
             Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_unique_str
             '''
 
@@ -2661,7 +2567,6 @@ def hpat_pandas_series_unique(self):
     def hpat_pandas_series_unique_impl(self):
         '''
         Returns sorted unique elements of an array
-
         Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_unique
         '''
 
@@ -2674,14 +2579,12 @@ def hpat_pandas_series_unique(self):
 def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
     """
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
-
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unboxing
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_full
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_str
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_cumsum_unsupported_axis
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -2695,7 +2598,6 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
         exclude NA/null values
     *args:
         *unsupported*
-
     Returns
     -------
     :obj:`scalar`, :obj:`pandas.Series`
@@ -2730,7 +2632,6 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
 def hpat_pandas_series_nunique(self, dropna=True):
     """
     Pandas Series method :meth:`pandas.Series.nunique` implementation.
-
     Note: Unsupported mixed numeric and string data
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_nunique
@@ -2790,7 +2691,6 @@ def hpat_pandas_series_count(self, level=None):
     .. only:: developer
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_count
     Parameters
-
     -----------
     self: :obj:`pandas.Series`
           input series
@@ -2835,13 +2735,10 @@ def hpat_pandas_series_count(self, level=None):
 def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.median` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median_skipna_default1
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_median_skipna_false1
-
     Parameters
     -----------
     self: :obj:`pandas.Series`
@@ -2855,12 +2752,10 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
          *unsupported*
     numeric_only: :obj:`bool` or None, default None
          *unsupported*
-
     Returns
     -------
     :obj:`float` or :obj:`pandas.Series` (if level is specified)
          median of values in the series
-
     """
 
     _func_name = 'Method median().'
@@ -2903,11 +2798,8 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
 def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     """
     Pandas Series method :meth:`pandas.Series.argsort` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_argsort*
-
     Parameters
     -----------
     self: :class:`pandas.Series`
@@ -2922,7 +2814,6 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     order: :obj:`str` or  :obj:`list of str`, default: None
         Has no effect but is accepted for compatibility with numpy.
         *unsupported*
-
     Returns
     -------
     :obj:`pandas.Series`
@@ -2984,11 +2875,8 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
     """
     Pandas Series method :meth:`pandas.Series.sort_values` implementation.
-
     .. only:: developer
-
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_sort_values*
-
     Parameters
     -----------
     self: :class:'pandas.Series'
@@ -3005,7 +2893,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     na_position: {'first' or 'last'}, default 'last'
         Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
         *unsupported*
-
     Returns
     -------
     :obj:`pandas.Series`
@@ -3136,10 +3023,8 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     """
     Pandas Series method :meth:`pandas.Series.dropna` implementation.
-
     .. only:: developer
        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -3180,11 +3065,8 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
     """
     Pandas Series method :meth:`pandas.Series.fillna` implementation.
-
     .. only:: developer
-
        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_fillna*
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -3300,13 +3182,9 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 def hpat_pandas_series_cov(self, other, min_periods=None):
     """
     Pandas Series method :meth:`pandas.Series.cov` implementation.
-
     Note: Unsupported mixed numeric and string data
-
     .. only:: developer
-
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_cov
-
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -3314,7 +3192,6 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     other: :obj:`pandas.Series`
         input series
     min_periods: :obj:`int`, default None
-
     Returns
     -------
     :obj:`float`
@@ -3357,3 +3234,116 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         return numpy.cov(self_arr, other_arr)[0, 1]
 
     return hpat_pandas_series_cov_impl
+
+
+@overload_method(SeriesType, 'pct_change')
+def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
+    """
+    Pandas Series method :meth:`pandas.Series.pct_change` implementation.
+
+    Note: Unsupported mixed numeric and string data
+
+    .. only:: developer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_str
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_period_not_integer
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_fill_method_not_string
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_fill_method_not_supported
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_limit_not_supported
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_freq_not_supported
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    periods: :obj:`int`, default 1
+        Periods to shift for forming percent change.
+    fill_method: :obj:`str`, default 'pad'
+        How to handle NAs before computing percent changes.
+    limit: :obj:`int`, default Nogne
+        The number of consecutive NAs to fill before stopping.
+    freq: :obj: DateOffset, timedelta, or offset alias string, optional
+            Increment to use from time series API (e.g. 'M' or BDay()).
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method pct_change().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError(
+            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError(
+            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.data.dtype))
+
+    if not isinstance(periods, (types.Integer, types.Omitted)):
+        raise TypingError(
+            '{} The function uses only periods is integer. Given periods type: {}'.format(_func_name, periods))
+
+    if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
+        raise TypingError(
+            '{} The function uses only fill_method is string. Given fill_method type: {}'.format(_func_name, fill_method))
+
+    if not isinstance(limit, (types.Omitted, types.NoneType)):
+        raise TypingError(
+            '{} The function unsupport limit is not None.'.format(_func_name))
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)):
+        raise TypingError(
+            '{} The function unsupport freq is not None.'.format(_func_name))
+
+    def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
+        if not (fill_method is None or fill_method in ["pad", "ffill", "backfill", "bfill"]):
+            raise ValueError(
+                "Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.")
+        local_series = self.copy()
+        if fill_method is not None:
+            # replacement method fillna for given method
+            # =========================================
+            # Example:
+            # s = [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
+            # result = [1.1, 0.3, 0.3, 1, inf, 0, 1.1, 1.1, 2.2, inf, 2, 2]
+            # ==========================================
+            for i in range(len(local_series._data)):
+                # check each element on numpy.nan
+                if numpy.isnan(local_series._data[i]):
+                    if fill_method in ["pad", "ffill"]:
+                        # if it first element is nan, element will be is nan
+                        # if it not first element, element will be is nearest is not nan element
+                        # take a step back while will not find is not nan element
+                        # if before the first element you did not find one, the element will be equal nan
+                        if i == 0:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i - k]):
+                                if i - k == 0:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i - k]
+                    elif fill_method in ["backfill", "bfill"]:
+                        # if it last element is nan, element will be is nan
+                        # if it not last element, element will be is nearest is not nan element
+                        # take a step front while will not find is not nan element
+                        # if before the last element you did not find one, the element will be equal nan
+                        if i == len(local_series._data)-1:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i + k]):
+                                if i + k == len(local_series._data) - 1:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i + k]
+        rshift = local_series.shift(periods=periods, freq=freq)
+        rdiv = local_series.div(rshift)
+        result = rdiv._data - 1
+        return pandas.Series(result)
+
+    return hpat_pandas_series_pct_change_impl
