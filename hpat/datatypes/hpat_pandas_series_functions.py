@@ -229,6 +229,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
         # data: [0, 1, -1, 1, 0] -> [1, 1, 0, 0, -1]
         # index: [0, 1,  2, 3, 4] -> [1, 3, 0, 4,  2] (not [3, 1, 4, 0, 2])
+        # subtract 1 to ensure reverse ordering at boundaries
         indices = (-self._data - 1).argsort(kind='mergesort')[:max(n, 0)]
 
         return self.take(indices)

@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
+from itertools import islice, permutations
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
@@ -73,13 +74,12 @@ test_global_input_data_unicode_kind1 = [
 ]
 
 
-def gen_srand_array(size, nchars=8):
-    """Generate array of strings of specified size based on [a-zA-Z] + [0-9]"""
-    accepted_chars = list(string.ascii_letters + string.digits)
-    rands_chars = np.array(accepted_chars, dtype=(np.str_, 1))
+def gen_strlist(size, nchars=8):
+    """Generate list of strings of specified size based on [a-zA-Z] + [0-9]"""
+    accepted_chars = string.ascii_letters + string.digits
+    generated_chars = islice(permutations(accepted_chars, nchars), size)
 
-    np.random.seed(100)
-    return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
+    return [''.join(chars) for chars in generated_chars]
 
 
 def _make_func_from_text(func_text, func_name='test_impl'):
@@ -2282,25 +2282,31 @@ class TestSeries(unittest.TestCase):
                 jit_result = hpat_func(series, n, keep)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nlargest() index unsupported')
     def test_series_nlargest_index(self):
         def test_impl(series, n):
             return series.nlargest(n)
         hpat_func = hpat.jit(test_impl)
 
-        # TODO: check data == [] when index fixed
+        # TODO: check data == [] after index is fixed
         for data in test_global_input_data_numeric:
             data *= 3
-            for index in [gen_srand_array(len(data)), range(len(data))]:
+            # TODO: add integer index not equal to range after index is fixed
+            indexes = [range(len(data))]
+            if not hpat.config.config_pipeline_hpat_default:
+                indexes.append(gen_strlist(len(data)))
+
+            for index in indexes:
                 series = pd.Series(data, index)
                 for n in range(-1, 10):
                     ref_result = test_impl(series, n)
                     jit_result = hpat_func(series, n)
-                    pd.testing.assert_series_equal(ref_result, jit_result)
+                    if hpat.config.config_pipeline_hpat_default:
+                        np.testing.assert_array_equal(ref_result, jit_result)
+                    else:
+                        pd.testing.assert_series_equal(ref_result, jit_result)
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nlargest() types validation unsupported')
+                     'Series.nlargest() does not raise an exception')
     def test_series_nlargest_typing(self):
         _func_name = 'Method nlargest().'
 
@@ -2324,7 +2330,7 @@ class TestSeries(unittest.TestCase):
             self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nlargest() values validation unsupported')
+                     'Series.nlargest() does not raise an exception')
     def test_series_nlargest_unsupported(self):
         msg = "Method nlargest(). Unsupported parameter. Given 'keep' != 'first'"
 
@@ -2402,25 +2408,31 @@ class TestSeries(unittest.TestCase):
                 jit_result = hpat_func(series, n, keep)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nsmallest() index unsupported')
     def test_series_nsmallest_index(self):
         def test_impl(series, n):
             return series.nsmallest(n)
         hpat_func = hpat.jit(test_impl)
 
-        # TODO: check data == [] when index fixed
+        # TODO: check data == [] after index is fixed
         for data in test_global_input_data_numeric:
             data *= 3
-            for index in [gen_srand_array(len(data)), range(len(data))]:
+            # TODO: add integer index not equal to range after index is fixed
+            indexes = [range(len(data))]
+            if not hpat.config.config_pipeline_hpat_default:
+                indexes.append(gen_strlist(len(data)))
+
+            for index in indexes:
                 series = pd.Series(data, index)
                 for n in range(-1, 10):
                     ref_result = test_impl(series, n)
                     jit_result = hpat_func(series, n)
-                    pd.testing.assert_series_equal(ref_result, jit_result)
+                    if hpat.config.config_pipeline_hpat_default:
+                        np.testing.assert_array_equal(ref_result, jit_result)
+                    else:
+                        pd.testing.assert_series_equal(ref_result, jit_result)
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nsmallest() types validation unsupported')
+                     'Series.nsmallest() does not raise an exception')
     def test_series_nsmallest_typing(self):
         _func_name = 'Method nsmallest().'
 
@@ -2444,7 +2456,7 @@ class TestSeries(unittest.TestCase):
             self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.nsmallest() values validation unsupported')
+                     'Series.nsmallest() does not raise an exception')
     def test_series_nsmallest_unsupported(self):
         msg = "Method nsmallest(). Unsupported parameter. Given 'keep' != 'first'"
 
