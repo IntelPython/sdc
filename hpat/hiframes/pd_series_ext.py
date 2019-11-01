@@ -524,6 +524,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: return namedtuple or labeled Series
         return signature(string_type, *args)
 
+    # PR135. This needs to be commented out (for the new impl to be called)
     @bound_function("series.fillna")
     def resolve_fillna(self, ary, args, kws):
         out = ary
@@ -995,7 +996,9 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_cumsum', 'resolve_var',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_argsort', 'resolve_sort_values']
+                           'resolve_argsort', 'resolve_sort_values',
+                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
+
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 
