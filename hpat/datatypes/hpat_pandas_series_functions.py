@@ -1354,31 +1354,38 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, AcceptedType.series)
+    ty_checker.check(indices, AcceptedType.list_)
+    ty_checker.check(axis, (AcceptedType.omitted, AcceptedType.int_, AcceptedType.str_))
+    ty_checker.check(is_copy, (AcceptedType.omitted, AcceptedType.bool_))
 
     if not isinstance(indices, (types.List, types.Array)):
         raise TypingError('{} The indices must be an array-like. Given: {}'.format(_func_name, indices))
 
-    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
-        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
-
-    if not (isinstance(is_copy, (types.Boolean, types.Omitted)) or is_copy == False):
-        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, is_copy))
-
-    if self.index is not types.none:
-        def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
-            local_data = [self._data[i] for i in indices]
-            local_index = [self._index[i] for i in indices]
-
-            return pandas.Series(local_data, local_index)
-
-        return hpat_pandas_series_take_impl
-    else:
+    if self.index is types.none:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
+            if int(axis) != 0 and str(axis) != 'index':
+                raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
+            if is_copy != False:
+                raise ValueError("Method take(). The object is_copy\n expected: False")
+
             local_data = [self._data[i] for i in indices]
 
             return pandas.Series(local_data, indices)
 
         return hpat_pandas_series_take_noindex_impl
+
+    def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
+        if int(axis) != 0 and str(axis) != 'index':
+            raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
+        if is_copy != False:
+            raise ValueError("Method take(). The object is_copy\n expected: False")
+
+        local_data = [self._data[i] for i in indices]
+        local_index = [self._index[i] for i in indices]
+
+        return pandas.Series(local_data, local_index)
+
+    return hpat_pandas_series_take_impl
 
 
 @overload_method(SeriesType, 'idxmax')
