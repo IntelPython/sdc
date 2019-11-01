@@ -1756,13 +1756,129 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
-    def test_series_value_counts(self):
+    def test_series_value_counts_numbers(self):
         def test_impl(S):
             return S.value_counts()
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
+
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series(['AA', 'BB', 'C', 'AA', 'C', 'AA'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_numbers_all_unique(self):
+        ''' Pandas and SDC results are slightly different because of sorting unique values '''
+        def test_impl(S):
+            return S.value_counts()
+
+        data_to_test = [[1, 2, 3, 4, 5],
+                        [5, 2, 1, 3, 4],
+                        [10, 9, 8, np.nan, np.inf],
+                        [0.1, 0.2, 0.3, 0.4, 0.5],
+                        [1., 2., 3., 4., 5., np.nan, np.inf]]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+
+    def test_series_value_counts_sort(self):
+        def test_impl(S):
+            return S.value_counts(sort=True, ascending=False)
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_sort_ascending(self):
+        def test_impl(S):
+            return S.value_counts(sort=True, ascending=True)
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('Unimplemented: need handling of numpy.nan comparison')
+    def test_series_value_counts_dropna_false(self):
+        def test_impl(S):
+            return S.value_counts(dropna=False)
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_str(self):
+        def test_impl(S):
+            return S.value_counts()
+
+        data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
+                        ['dog', 'cat', 'cat', 'cat', 'dog']]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_str_sort_ascending(self):
+        def test_impl(S):
+            return S.value_counts(sort=True, ascending=True)
+
+        data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
+                        ['dog', 'cat', 'cat', 'cat', 'dog']]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_index(self):
+        def test_impl(S):
+            return S.value_counts()
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3],
+                        [0.1, 3., np.nan, 3., 0.1, 3.]]
+
+        index = [11, 12, 13, 14, 15, 16]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data, index=index)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_no_unboxing(self):
+        def test_impl():
+            S = pd.Series([1, 2, 3, 1, 1, 3])
+            return S.value_counts()
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_dist_input1(self):
         '''Verify distribution of a Series without index'''

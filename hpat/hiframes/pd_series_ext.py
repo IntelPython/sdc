@@ -723,12 +723,12 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    @bound_function("series.value_counts")
-    def resolve_value_counts(self, ary, args, kws):
-        # output is int series with original data as index
-        out = SeriesType(
-            types.int64, types.Array(types.int64, 1, 'C'), ary.data)
-        return signature(out, *args)
+    # @bound_function("series.value_counts")
+    # def resolve_value_counts(self, ary, args, kws):
+    #     # output is int series with original data as index
+    #     out = SeriesType(
+    #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
+    #     return signature(out, *args)
 
     @bound_function("series.rename")
     def resolve_rename(self, ary, args, kws):
