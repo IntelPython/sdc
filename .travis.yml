@@ -18,7 +18,7 @@ env:
           env: SDC_RUN_COVERAGE=True
 
 before_install:
-    - buildscripts/setup_conda.sh $CONDA_PREFIX_PATH
+    - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
 
 install:
     - if [ "$SDC_RUN_COVERAGE" == "True" ]; then
