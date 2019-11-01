@@ -2519,7 +2519,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. only:: developer
 
-       Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_argsort*
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_argsort*
 
     Parameters
     -----------
@@ -2548,62 +2548,45 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError('{} Currently function supports only numeric values. Given data type: {}'.format(_func_name,
-                                                                                                           self.data.dtype))
+        raise TypingError('{} Non-numeric type unsupported. Given: {}'.format(_func_name, self.data.dtype))
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
     if not isinstance(self.index, types.NoneType):
-        def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
-            sort = numpy.argsort(self._data)
-            series_data = pandas.Series(self._data)
-            na = 0
-            for i in series_data.isna():
-                if i:
-                    na += 1
-            id = 0
-            i = 0
-            list_no_nan = numpy.empty(len(self._data) - na)
-            for bool_value in series_data.isna():
-                if not bool_value:
-                    list_no_nan[id] = self._data[i]
-                    id += 1
-                i += 1
-            sort_no_nan = numpy.argsort(list_no_nan)
-            ne_na = sort[:len(sort) - na]
-            num = 0
-            result = numpy.full((len(self._data)), -1)
-            for i in numpy.sort(ne_na):
-                result[i] = sort_no_nan[num]
-                num += 1
+        def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
+            sort = numpy.argsort(self._data, kind='mergesort')
+            na = self.isna().sum()
+            result = numpy.empty(len(self._data), dtype=numpy.int64)
+            na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+            sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+            q = 0
+            for id, i in enumerate(sort):
+                if id not in list(sort[len(self._data) - na:]):
+                    result[id] = sort_nona[id-q]
+                else:
+                    q += 1
+            for i in sort[len(self._data) - na:]:
+                result[i] = -1
 
             return pandas.Series(result, self._index)
 
-        return hpat_pandas_series_argsort_impl
+        return hpat_pandas_series_argsort_idx_impl
 
     def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
-        sort = numpy.argsort(self._data)
-        series_data = pandas.Series(self._data)
-        na = 0
-        for i in series_data.isna():
-            if i:
-                na += 1
-        id = 0
-        i = 0
-        list_no_nan = numpy.empty(len(self._data) - na)
-        for bool_value in series_data.isna():
-            if not bool_value:
-                list_no_nan[id] = self._data[i]
-                id += 1
-            i += 1
-        sort_no_nan = numpy.argsort(list_no_nan)
-        ne_na = sort[:len(sort) - na]
-        num = 0
-        result = numpy.full((len(self._data)), -1)
-        for i in numpy.sort(ne_na):
-            result[i] = sort_no_nan[num]
-            num += 1
+        sort = numpy.argsort(self._data, kind='mergesort')
+        na = self.isna().sum()
+        result = numpy.empty(len(self._data), dtype=numpy.int64)
+        na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+        sort_nona = numpy.argsort(self._data[~na_data_arr])
+        q = 0
+        for id, i in enumerate(sort):
+            if id not in list(sort[len(self._data) - na:]):
+                result[id] = sort_nona[id - q]
+            else:
+                q += 1
+        for i in sort[len(self._data) - na:]:
+            result[i] = -1
 
         return pandas.Series(result)
 
@@ -2617,7 +2600,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     .. only:: developer
 
-       Test: python -m -k hpat.runtests hpat.tests.test_series.TestSeries.test_series_sort_values*
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_sort_values*
 
     Parameters
     -----------
@@ -2672,10 +2655,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-            na = 0
-            for i in self.isna():
-                if i:
-                    na += 1
+            na = self.isna().sum()
             num = 0
             for i in self.isna():
                 j = len(result_index) - na
@@ -2692,10 +2672,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-            na = 0
-            for i in self.isna():
-                if i:
-                    na += 1
+            na = self.isna().sum()
             indices = numpy.arange(len(self._data))
             index_result = numpy.argsort(self._data, kind='mergesort')
             result = numpy.sort(self._data)
@@ -2734,10 +2711,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
                         result_index[i] = index[search]
                         used_index[i] = my_index[search]
                         find = 1
-            na = 0
-            for i in self.isna():
-                if i:
-                    na += 1
+            na = self.isna().sum()
             num = 0
             for i in self.isna():
                 j = len(result_index) - na
@@ -2754,10 +2728,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
-            na = 0
-            for i in self.isna():
-                if i:
-                    na += 1
+            na = self.isna().sum()
             indices = self._index.copy()
             index_result = numpy.argsort(self._data, kind='mergesort')
             result = numpy.sort(self._data)
@@ -2778,8 +2749,10 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     """
     Pandas Series method :meth:`pandas.Series.dropna` implementation.
+
     .. only:: developer
        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
+
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -2814,4 +2787,3 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         return pandas.Series(data, index, self._name)
 
     return hpat_pandas_series_dropna_impl
-

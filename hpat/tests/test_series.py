@@ -336,7 +336,7 @@ class TestSeries(unittest.TestCase):
             return S.argsort()
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([5, np.nan, 3, 3, np.nan])
+        S = pd.Series([1, -1, 0, 1, np.nan], [1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
     def test_series_argsort_full(self):
