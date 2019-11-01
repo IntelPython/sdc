@@ -524,6 +524,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: return namedtuple or labeled Series
         return signature(string_type, *args)
 
+    # PR135. This needs to be commented out (for the new impl to be called)
     @bound_function("series.fillna")
     def resolve_fillna(self, ary, args, kws):
         out = ary
@@ -661,11 +662,11 @@ class SeriesAttribute(AttributeTemplate):
     #     return signature(SeriesType(types.boolean))
 
     # alias of isna
-    @bound_function("series.isnull")
-    def resolve_isnull(self, ary, args, kws):
-        assert not kws
-        assert not args
-        return signature(SeriesType(types.boolean))
+    # @bound_function("series.isnull")
+    # def resolve_isnull(self, ary, args, kws):
+    #     assert not kws
+    #     assert not args
+    #     return signature(SeriesType(types.boolean))
 
     # @bound_function("series.notna")
     # def resolve_notna(self, ary, args, kws):
@@ -995,7 +996,7 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_cumsum', 'resolve_var',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count', 'resolve_dropna']
+                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 
@@ -1270,23 +1271,18 @@ type_callable(operator.sub)(type_sub)
 @overload(pd.Series)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
-    if index is not None:
-        def hpat_pandas_series_index_ctor_impl(
-                data=None,
-                index=None,
-                dtype=None,
-                name=None,
-                copy=False,
-                fastpath=False):
-            return hpat.hiframes.api.init_series(
-                hpat.hiframes.api.fix_df_array(data),
-                hpat.hiframes.api.fix_df_array(index),
-                name)
-
-        return hpat_pandas_series_index_ctor_impl
+    is_index_none = isinstance(index, types.NoneType) or index is None
 
     def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
-        return hpat.hiframes.api.init_series(hpat.hiframes.api.fix_df_array(data), index, name)
+
+        '''' use binop here as otherwise Numba's dead branch pruning doesn't work
+        TODO: replace with 'if not is_index_none' when resolved '''
+        if is_index_none == False:
+            fix_index = hpat.hiframes.api.fix_df_array(index)
+        else:
+            fix_index = index
+
+        return hpat.hiframes.api.init_series(hpat.hiframes.api.fix_df_array(data), fix_index, name)
 
     return hpat_pandas_series_ctor_impl
 
