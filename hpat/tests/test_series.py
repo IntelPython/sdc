@@ -4122,7 +4122,7 @@ class TestSeries(unittest.TestCase):
         for input_data in test_input_data:
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
-                for method in [None, "pad", "ffill", "backfill", "bfill"]:
+                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
                     result_ref = test_series_pct_change_impl(S, periods, method)
                     result = hpat_func(S, periods, method)
                     pd.testing.assert_series_equal(result, result_ref)
@@ -4161,36 +4161,24 @@ class TestSeries(unittest.TestCase):
         msg = 'Method pct_change(). The function uses only fill_method is string. Given fill_method type: float64'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_pct_change_fill_method_not_supported(self):
-        def test_series_pct_change_impl(S, fill_method):
-            return S.pct_change(periods=1, fill_method=fill_method, limit=None, freq=None)
+    def test_series_pct_change_not_supported(self):
+        def test_series_pct_change_impl(S, fill_method='pad', limit=None, freq=None):
+            return S.pct_change(periods=1, fill_method=fill_method, limit=limit, freq=freq)
 
         hpat_func = hpat.jit(test_series_pct_change_impl)
         S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(ValueError) as raises:
-            hpat_func(S, "ababa")
+            hpat_func(S, fill_method='ababa')
         msg = 'Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_pct_change_limit_not_supported(self):
-        def test_series_pct_change_impl(S, limit):
-            return S.pct_change(periods=1, fill_method='pad', limit=limit, freq=None)
-
-        hpat_func = hpat.jit(test_series_pct_change_impl)
-        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S, 5)
+            hpat_func(S, limit=5)
         msg = 'Method pct_change(). The function unsupport limit is not None.'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_pct_change_freq_not_supported(self):
-        def test_series_pct_change_impl(S, freq):
-            return S.pct_change(periods=1, fill_method='pad', limit=None, freq=freq)
-
-        hpat_func = hpat.jit(test_series_pct_change_impl)
-        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S, 5)
+            hpat_func(S, freq=5)
         msg = 'Method pct_change(). The function unsupport freq is not None.'
         self.assertIn(msg, str(raises.exception))
 

@@ -3244,13 +3244,12 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     Note: Unsupported mixed numeric and string data
 
     .. only:: developer
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_str
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_period_not_integer
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_fill_method_not_string
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_fill_method_not_supported
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_limit_not_supported
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_pct_change_freq_not_supported
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_str
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_period_not_integer
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_fill_method_not_string
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_not_supported
 
     Parameters
     -----------
@@ -3262,8 +3261,10 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         How to handle NAs before computing percent changes.
     limit: :obj:`int`, default Nogne
         The number of consecutive NAs to fill before stopping.
+        *unsupported*
     freq: :obj: DateOffset, timedelta, or offset alias string, optional
-            Increment to use from time series API (e.g. 'M' or BDay()).
+        Increment to use from time series API (e.g. 'M' or BDay()).
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
@@ -3297,7 +3298,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
             '{} The function unsupport freq is not None.'.format(_func_name))
 
     def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
-        if not (fill_method is None or fill_method in ["pad", "ffill", "backfill", "bfill"]):
+        if not (fill_method is None or fill_method in ['pad', 'ffill', 'backfill', 'bfill']):
             raise ValueError(
                 "Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.")
         local_series = self.copy()
@@ -3311,7 +3312,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
             for i in range(len(local_series._data)):
                 # check each element on numpy.nan
                 if numpy.isnan(local_series._data[i]):
-                    if fill_method in ["pad", "ffill"]:
+                    if fill_method in ['pad', 'ffill']:
                         # if it first element is nan, element will be is nan
                         # if it not first element, element will be is nearest is not nan element
                         # take a step back while will not find is not nan element
@@ -3326,7 +3327,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
                                     break
                                 k += 1
                             local_series._data[i] = local_series._data[i - k]
-                    elif fill_method in ["backfill", "bfill"]:
+                    elif fill_method in ['backfill', 'bfill']:
                         # if it last element is nan, element will be is nan
                         # if it not last element, element will be is nearest is not nan element
                         # take a step front while will not find is not nan element
