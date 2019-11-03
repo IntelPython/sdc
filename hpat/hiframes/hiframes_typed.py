@@ -1003,7 +1003,7 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(
                 func, (data, index, n_arg, name), pre_nodes=nodes)
 
-        if func_name in ('cov', 'corr'):
+        if func_name in ('cov'):
             S2 = rhs.args[0]
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
@@ -1334,17 +1334,17 @@ class HiFramesTypedPassImpl(object):
         self._convert_series_calltype(rhs)
         rhs.args = new_args
 
-        if func_name == 'rolling_corr':
-            def rolling_corr_impl(arr, other, win, center):
-                cov = hpat.hiframes.rolling.rolling_cov(
-                    arr, other, win, center)
-                a_std = hpat.hiframes.rolling.rolling_fixed(
-                    arr, win, center, False, 'std')
-                b_std = hpat.hiframes.rolling.rolling_fixed(
-                    other, win, center, False, 'std')
-                return cov / (a_std * b_std)
-            return self._replace_func(
-                rolling_corr_impl, rhs.args, pre_nodes=nodes)
+        # if func_name == 'rolling_corr':
+        #     def rolling_corr_impl(arr, other, win, center):
+        #         cov = hpat.hiframes.rolling.rolling_cov(
+        #             arr, other, win, center)
+        #         a_std = hpat.hiframes.rolling.rolling_fixed(
+        #             arr, win, center, False, 'std')
+        #         b_std = hpat.hiframes.rolling.rolling_fixed(
+        #             other, win, center, False, 'std')
+        #         return cov / (a_std * b_std)
+        #     return self._replace_func(
+        #         rolling_corr_impl, rhs.args, pre_nodes=nodes)
         if func_name == 'rolling_cov':
             def rolling_cov_impl(arr, other, w, center):  # pragma: no cover
                 ddof = 1
@@ -1540,7 +1540,7 @@ class HiFramesTypedPassImpl(object):
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
 
-        if func_name in ('cov', 'corr'):
+        if func_name == 'cov':
             # TODO: variable window
             if len(rhs.args) == 1:
                 other = self._get_series_data(rhs.args[0], nodes)

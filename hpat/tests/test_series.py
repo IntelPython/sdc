@@ -3660,6 +3660,32 @@ class TestSeries(unittest.TestCase):
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
 
+    def test_series_corr1(self):
+        def test_series_corr_impl(S1, S2, method='pearson', min_periods=None):
+            return S1.corr(S2, method, min_periods)
+
+        hpat_func = hpat.jit(test_series_corr_impl)
+        test_input_data1 = [[.2, .0, .6, .2],
+                            [.2, .0, .6, .2, .5, .6, .7, .8],
+                            [],
+                            [2, 0, 6, 2],
+                            [.2, .1, np.nan, .5, .3],
+                            [-1, np.nan, 1, np.inf]]
+        test_input_data2 = [[.3, .6, .0, .1],
+                            [.3, .6, .0, .1, .8],
+                            [],
+                            [3, 6, 0, 1],
+                            [.3, .2, .9, .6, np.nan],
+                            [np.nan, np.nan, np.inf, np.nan]]
+        for input_data1 in test_input_data1:
+            for input_data2 in test_input_data2:
+                S1 = pd.Series(input_data1)
+                S2 = pd.Series(input_data2)
+                for period in [None, 2, 1, 8, -4, 0.1]:
+                    result_ref = test_series_corr_impl(S1, S2, min_periods=period)
+                    result = hpat_func(S1, S2, min_periods=period)
+                    np.testing.assert_allclose(result, result_ref)
+
 
 if __name__ == "__main__":
     unittest.main()
