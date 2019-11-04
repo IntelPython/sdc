@@ -2289,14 +2289,14 @@ class TestSeries(unittest.TestCase):
 
         # TODO: check data == [] after index is fixed
         for data in test_global_input_data_numeric:
-            data *= 3
+            data_duplicated = data * 3
             # TODO: add integer index not equal to range after index is fixed
-            indexes = [range(len(data))]
+            indexes = [range(len(data_duplicated))]
             if not hpat.config.config_pipeline_hpat_default:
-                indexes.append(gen_strlist(len(data)))
+                indexes.append(gen_strlist(len(data_duplicated)))
 
             for index in indexes:
-                series = pd.Series(data, index)
+                series = pd.Series(data_duplicated, index)
                 for n in range(-1, 10):
                     ref_result = test_impl(series, n)
                     jit_result = hpat_func(series, n)
@@ -2415,14 +2415,14 @@ class TestSeries(unittest.TestCase):
 
         # TODO: check data == [] after index is fixed
         for data in test_global_input_data_numeric:
-            data *= 3
+            data_duplicated = data * 3
             # TODO: add integer index not equal to range after index is fixed
-            indexes = [range(len(data))]
+            indexes = [range(len(data_duplicated))]
             if not hpat.config.config_pipeline_hpat_default:
-                indexes.append(gen_strlist(len(data)))
+                indexes.append(gen_strlist(len(data_duplicated)))
 
             for index in indexes:
-                series = pd.Series(data, index)
+                series = pd.Series(data_duplicated, index)
                 for n in range(-1, 10):
                     ref_result = test_impl(series, n)
                     jit_result = hpat_func(series, n)
