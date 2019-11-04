@@ -1000,6 +1000,8 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest']
+
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
     if (attr.startswith('resolve_')
@@ -1007,6 +1009,11 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
 
+# remove some attributes from SeriesAttribute for non-hpat pipeline
+if not hpat.config.config_pipeline_hpat_default:
+    for attr in _non_hpat_pipeline_attrs:
+        if attr in SeriesAttribute.__dict__:
+            delattr(SeriesAttribute, attr)
 
 # PR135. This needs to be commented out
 @infer_global(operator.getitem)
