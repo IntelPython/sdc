@@ -1330,10 +1330,11 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     ty_checker = TypeChecker('Method take().')
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(axis, (int, types.Integer, str, types.UnicodeType, types.StringLiteral, types.Omitted)):
+    if (not isinstance(axis, (int, types.Integer, str, types.UnicodeType, types.StringLiteral, types.Omitted))
+        and axis not in (0, 'index')):
         ty_checker.raise_exc(axis, 'integer or string', 'axis')
 
-    if not isinstance(is_copy, (bool, types.Boolean, types.Omitted)):
+    if not isinstance(is_copy, (bool, types.Boolean, types.Omitted)) and is_copy is not False:
         ty_checker.raise_exc(is_copy, 'boolean', 'is_copy')
 
     if not isinstance(indices, (types.List, types.Array)):
@@ -1341,11 +1342,6 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
-            if int(axis) != 0 and str(axis) != 'index':
-                raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
-            if is_copy != False: # noqa
-                raise ValueError("Method take(). The object is_copy\n expected: False")
-
             local_data = [self._data[i] for i in indices]
 
             return pandas.Series(local_data, indices)
@@ -1353,11 +1349,6 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
         return hpat_pandas_series_take_noindex_impl
 
     def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
-        if int(axis) != 0 and str(axis) != 'index':
-            raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
-        if is_copy != False: # noqa
-            raise ValueError("Method take(). The object is_copy\n expected: False")
-
         local_data = [self._data[i] for i in indices]
         local_index = [self._index[i] for i in indices]
 
