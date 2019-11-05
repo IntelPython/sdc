@@ -361,25 +361,27 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_value_counts*
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_value_counts*
 
     Parameters
     -----------
-    normalize: :obj: boolean, default False
+    self: :obj:`pandas.Series`
+        input series
+    normalize: :obj: `boolean`, default False
         If True then the object returned will contain the relative frequencies of the unique values
-    sort: :obj: boolean, default True
+    sort: :obj: `boolean`, default True
         Sort by frequencies
-    ascending: :obj: boolean, default False
+    ascending: :obj: `boolean`, default False
         Sort in ascending order
-    bins: :obj: integer, default None
+    bins: :obj: `integer`, default None
         *unsupported*
-    dropna: :obj: boolean, default True
+    dropna: :obj: `boolean`, default True
         Skip counts of NaN
         *unsupported* for String
 
     Returns
     -------
-    :obj:`pandas.Series`
+    :returns :obj:`pandas.Series`
     """
 
     _func_name = 'Method value_counts().'
@@ -404,9 +406,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
-            if dropna:
-            # TODO: add nan handling
-                print("Not supported yet")
+            # TODO: if dropna add nan handling
 
             value_counts_dict = {}
 
