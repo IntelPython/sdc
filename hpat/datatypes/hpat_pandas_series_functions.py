@@ -367,15 +367,15 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     -----------
     self: :obj:`pandas.Series`
         input series
-    normalize: :obj: `boolean`, default False
+    normalize: :obj:`boolean`, default False
         If True then the object returned will contain the relative frequencies of the unique values
     sort: :obj: `boolean`, default True
         Sort by frequencies
-    ascending: :obj: `boolean`, default False
+    ascending: :obj:`boolean`, default False
         Sort in ascending order
-    bins: :obj: `integer`, default None
+    bins: :obj:`integer`, default None
         *unsupported*
-    dropna: :obj: `boolean`, default True
+    dropna: :obj:`boolean`, default True
         Skip counts of NaN
         *unsupported* for String
 
@@ -428,7 +428,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
             # Take initial order as default
             indexes_order = numpy.arange(unique_values_len)
             if sort:
-                indexes_order = numpy.array(value_counts).argsort()
+                # TODO: consider order of values with the same frequency
+                indexes_order = value_counts.argsort()
                 if not ascending:
                     indexes_order = indexes_order[::-1]
 
@@ -454,7 +455,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
         # Series.unique() returns values in ascending order
         indexes_order = numpy.arange(len(unique_values))
         if sort:
-            indexes_order = numpy.array(value_counts).argsort()
+            indexes_order = value_counts.argsort()
             if not ascending:
                 indexes_order = indexes_order[::-1]
 

@@ -42,7 +42,7 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
-    [1., np.nan, -1., 0., min_float64, max_float64],
+    [0.1, 1., np.nan, -1., 0., min_float64, max_float64, 0.1],
     [np.nan, np.inf, np.NINF, np.NZERO]
 ]
 
@@ -51,7 +51,7 @@ max_int64 = np.iinfo('int64').max
 max_uint64 = np.iinfo('uint64').max
 
 test_global_input_data_integer64 = [
-    [1, -1, 0],
+    [1, -1, 0, 1, 2, 3, 1, 1, 3],
     [min_int64, max_int64],
     [max_uint64]
 ]
@@ -1756,64 +1756,37 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
-    def test_series_value_counts_numbers(self):
+    def test_series_value_counts_int(self):
         def test_impl(S):
             return S.value_counts()
 
-        data_to_test = [[1, 2, 3, 1, 1, 3],
-                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
-                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
-
         hpat_func = hpat.jit(test_impl)
 
-        for data in data_to_test:
+        for data in test_global_input_data_integer64:
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_value_counts_numbers_all_unique(self):
-        ''' Pandas and SDC results are slightly different because of sorting unique values '''
+    def test_series_value_counts_float(self):
         def test_impl(S):
             return S.value_counts()
 
-        data_to_test = [[1, 2, 3, 4, 5],
-                        [5, 2, 1, 3, 4],
-                        [10, 9, 8, np.nan, np.inf],
-                        [0.1, 0.2, 0.3, 0.4, 0.5],
-                        [1., 2., 3., 4., 5., np.nan, np.inf]]
-
         hpat_func = hpat.jit(test_impl)
 
-        for data in data_to_test:
+        for data in test_global_input_data_float64:
             S = pd.Series(data)
+            # Remove sort_index() after implementing sorting with the same number of frequency
             pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_sort(self):
-        def test_impl(S):
-            return S.value_counts(sort=True, ascending=False)
-
-        data_to_test = [[1, 2, 3, 1, 1, 3],
-                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
-                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
+        def test_impl(S, asceding):
+            return S.value_counts(sort=True, ascending=asceding)
 
         hpat_func = hpat.jit(test_impl)
 
-        for data in data_to_test:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_value_counts_sort_ascending(self):
-        def test_impl(S):
-            return S.value_counts(sort=True, ascending=True)
-
-        data_to_test = [[1, 2, 3, 1, 1, 3],
-                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
-                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf]]
-
-        hpat_func = hpat.jit(test_impl)
-
-        for data in data_to_test:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        for asceding in (True, False):
+            for data in test_global_input_data_integer64:
+                S = pd.Series(data)
+                pd.testing.assert_series_equal(hpat_func(S, asceding), test_impl(S, asceding))
 
     @unittest.skip('Unimplemented: need handling of numpy.nan comparison')
     def test_series_value_counts_dropna_false(self):
@@ -1860,15 +1833,11 @@ class TestSeries(unittest.TestCase):
         def test_impl(S):
             return S.value_counts()
 
-        data_to_test = [[1, 2, 3, 1, 1, 3],
-                        [1, 2, 3, np.nan, 1, 3],
-                        [0.1, 3., np.nan, 3., 0.1, 3.]]
-
         index = [11, 12, 13, 14, 15, 16]
 
         hpat_func = hpat.jit(test_impl)
 
-        for data in data_to_test:
+        for data in test_global_input_data_integer64:
             S = pd.Series(data, index=index)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
