@@ -147,6 +147,10 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
     .. only:: developer
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nsmallest*
 
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
     n: :obj:`int`, default 5
         Return this many ascending sorted values.
     keep: :obj:`str`, default 'first'
