@@ -33,22 +33,13 @@ from contextlib import contextmanager
 
 import pandas as pd
 
-import hpat
+from hpat.tests.test_utils import *
 from hpat.tests.tests_perf.test_perf_utils import *
-
-
-STRIP_CASES = [
-    'ascii',
-    'tú quiénc te crees?',
-    '大处 着眼，c小处着手c。大大c大处'
-]
 
 
 def usecase_series_len(input_data):
     start_time = time.time()
-
     input_data.str.len()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -56,9 +47,7 @@ def usecase_series_len(input_data):
 
 def usecase_series_capitalize(input_data):
     start_time = time.time()
-
     input_data.str.capitalize()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -66,9 +55,7 @@ def usecase_series_capitalize(input_data):
 
 def usecase_series_lower(input_data):
     start_time = time.time()
-
     input_data.str.lower()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -76,9 +63,7 @@ def usecase_series_lower(input_data):
 
 def usecase_series_swapcase(input_data):
     start_time = time.time()
-
     input_data.str.swapcase()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -86,9 +71,7 @@ def usecase_series_swapcase(input_data):
 
 def usecase_series_title(input_data):
     start_time = time.time()
-
     input_data.str.title()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -96,9 +79,7 @@ def usecase_series_title(input_data):
 
 def usecase_series_upper(input_data):
     start_time = time.time()
-
     input_data.str.upper()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -106,9 +87,7 @@ def usecase_series_upper(input_data):
 
 def usecase_series_lstrip(input_data):
     start_time = time.time()
-
     input_data.str.lstrip()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -116,9 +95,7 @@ def usecase_series_lstrip(input_data):
 
 def usecase_series_rstrip(input_data):
     start_time = time.time()
-
     input_data.str.rstrip()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -126,9 +103,7 @@ def usecase_series_rstrip(input_data):
 
 def usecase_series_strip(input_data):
     start_time = time.time()
-
     input_data.str.strip()
-
     finish_time = time.time()
 
     return finish_time - start_time
@@ -144,44 +119,40 @@ def do_jit(f):
         del cfunc
 
 
-def calc_time(f, data):
+def calc_time(func, *args, **kwargs):
     """Calculate execution time of specified function."""
     start_time = time.time()
-    f(data)
+    func(*args, **kwargs)
     finish_time = time.time()
 
     return finish_time - start_time
 
 
-def calc_compile_time(f, data):
+def calc_compile_time(func, *args, **kwargs):
     """Calculate compile time as difference between first 2 runs."""
-    return calc_time(f, data) - calc_time(f, data)
+    return calc_time(func, *args, **kwargs) - calc_time(func, *args, **kwargs)
 
 
-def calc_compilation(pyfunc, data):
+def calc_compilation(pyfunc, data, iter_number=5):
     """Calculate compile time several times."""
-    compile_iteration_number = 5
-
     compile_times = []
-    for _ in range(compile_iteration_number):
+    for _ in range(iter_number):
         with do_jit(pyfunc) as cfunc:
-            compile_times.append(calc_compile_time(cfunc, data))
+            compile_time = calc_compile_time(cfunc, data)
+            compile_times.append(compile_time)
 
     return compile_times
 
 
-def calc_results(f, test_data):
-    """Calculate time of boxing+unboxing and internal execution"""
-    test_iteration_number = 5
-
+def get_times(f, test_data, iter_number=5):
+    """Get time of boxing+unboxing and internal execution"""
     exec_times = []
     boxing_times = []
-    for _ in range(test_iteration_number):
+    for _ in range(iter_number):
         ext_start = time.time()
-
         int_result = f(test_data)
-
         ext_finish = time.time()
+
         exec_times.append(int_result)
         boxing_times.append(max(ext_finish - ext_start - int_result, 0))
 
@@ -189,194 +160,71 @@ def calc_results(f, test_data):
 
 
 class TestSeriesStringMethods(unittest.TestCase):
+    iter_number = 5
+
     @classmethod
     def setUpClass(cls):
         cls.test_results = TestResults()
-        cls.test_results.load()
+        if is_true(os.environ.get('LOAD_PREV_RESULTS')):
+            cls.test_results.load()
 
         cls.total_data_length = [10**4 + 513, 10**5 + 2025]
         cls.width = [16, 64, 512, 1024]
-        cls.num_thread = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
+        cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
+        cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
 
     @classmethod
     def tearDownClass(cls):
         cls.test_results.print()
         cls.test_results.dump()
 
-    def test_series_str_len(self):
-        pyfunc = usecase_series_len
+    def _test_series_str(self, pyfunc, name, input_data=None):
+        input_data = input_data or test_global_input_data_unicode_kind4
         hpat_func = hpat.jit(pyfunc)
-
         for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
+            data = perf_data_gen_fixed_len(input_data, data_width, data_length)
             test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data)
+            compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
             # Warming up
             hpat_func(test_data)
 
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_len', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_len', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+            exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
+            self.test_results.add(name, 'JIT', test_data.size, data_width, exec_times,
+                                  boxing_times, compile_results=compile_results, num_threads=self.num_threads)
+            exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
+            self.test_results.add(name, 'Reference', test_data.size, data_width, exec_times,
+                                  num_threads=self.num_threads)
 
+    def test_series_str_len(self):
+        self._test_series_str(usecase_series_len, 'series_str_len')
 
     def test_series_str_capitalize(self):
-        pyfunc = usecase_series_capitalize
-        hpat_func = hpat.jit(pyfunc)
-
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_capitalize', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_capitalize', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        self._test_series_str(usecase_series_capitalize, 'series_str_capitalize')
 
     def test_series_str_lower(self):
-        pyfunc = usecase_series_lower
-        hpat_func = hpat.jit(pyfunc)
-
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_lower', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_lower', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        self._test_series_str(usecase_series_lower, 'series_str_lower')
 
     def test_series_str_swapcase(self):
-        pyfunc = usecase_series_swapcase
-        hpat_func = hpat.jit(pyfunc)
-
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_swapcase', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_swapcase', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        self._test_series_str(usecase_series_swapcase, 'series_str_swapcase')
 
     def test_series_str_title(self):
-        pyfunc = usecase_series_title
-        hpat_func = hpat.jit(pyfunc)
-
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_title', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_title', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        self._test_series_str(usecase_series_title, 'series_str_title')
 
     def test_series_str_upper(self):
-        pyfunc = usecase_series_upper
-        hpat_func = hpat.jit(pyfunc)
-
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(STRIP_CASES, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_upper', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_upper', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        self._test_series_str(usecase_series_upper, 'series_str_upper')
 
     def test_series_str_lstrip(self):
-        pyfunc = usecase_series_lstrip
-        hpat_func = hpat.jit(pyfunc)
-
-        strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_lstrip', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_lstrip', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
+        self._test_series_str(usecase_series_lstrip, 'series_str_lstrip', input_data=input_data)
 
     def test_series_str_rstrip(self):
-        pyfunc = usecase_series_rstrip
-        hpat_func = hpat.jit(pyfunc)
-
-        strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_rstrip', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_rstrip', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
+        self._test_series_str(usecase_series_rstrip, 'series_str_rstrip', input_data=input_data)
 
     def test_series_str_strip(self):
-        pyfunc = usecase_series_strip
-        hpat_func = hpat.jit(pyfunc)
-
-        strip_cases = ['\t{}  '.format(case) for case in STRIP_CASES]
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
-            data = perf_data_gen_fixed_len(strip_cases, data_width, data_length)
-            test_data = pd.Series(data)
-
-            compile_results = calc_compilation(pyfunc, test_data)
-            # Warming up
-            hpat_func(test_data)
-
-            exec_times, boxing_times = calc_results(hpat_func, test_data)
-            self.test_results.add('series_str_strip', 'JIT', test_data.size, data_width, exec_times,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_thread)
-            exec_times, _ = calc_results(pyfunc, test_data)
-            self.test_results.add('series_str_strip', 'Reference', test_data.size, data_width, exec_times,
-                                  num_threads=self.num_thread)
+        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
+        self._test_series_str(usecase_series_strip, 'series_str_strip', input_data=input_data)
 
 
 if __name__ == "__main__":

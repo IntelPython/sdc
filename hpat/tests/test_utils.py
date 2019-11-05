@@ -2,6 +2,13 @@ import hpat
 import numba
 
 
+test_global_input_data_unicode_kind4 = [
+    '¡Y tú quién te crees?',
+    '🐍⚡',
+    '大处 着眼，c小处着手c。大大c大处',
+]
+
+
 def count_array_REPs():
     from hpat.distributed import Distribution
     vals = hpat.distributed.dist_analysis.array_dists.values()

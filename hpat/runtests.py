@@ -35,6 +35,8 @@ def load_tests(loader, tests, pattern):
 
 
 if __name__ == '__main__':
-    # initialize MPI
-    get_rank()
+    if hpat.config.config_pipeline_hpat_default:
+        # initialize MPI
+        get_rank()
+
     unittest.main()

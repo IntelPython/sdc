@@ -48,6 +48,12 @@ Data handling:
 """
 
 
+def is_true(input_string):
+    if isinstance(input_string, str):
+        input_string = input_string.lower()
+    return input_string in ['yes', 'y', 'true', 't', '1', True]
+
+
 def get_size(obj):
     """Sum size of object and its members."""
     size = 0
@@ -120,7 +126,7 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
     return result[:max_obj_len]
 
 
-class  TestResults:
+class TestResults:
     perf_results_xlsx = 'perf_results.xlsx'
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
     index = ['name', 'N', 'type', 'size', 'width']
@@ -148,18 +154,18 @@ class  TestResults:
         median_col = self.test_results_data.groupby(self.index)['Time(s)'].median()
         min_col = self.test_results_data.groupby(self.index)['Time(s)'].min()
         max_col = self.test_results_data.groupby(self.index)['Time(s)'].max()
-        compilation_col = self.test_results_data.groupby(self.index)['Compilation(s)'].median(skipna=False)
+        compilation_col = self.test_results_data.groupby(self.index)['Compile(s)'].median(skipna=False)
         boxing_col = self.test_results_data.groupby(self.index)['Boxing(s)'].median(skipna=False)
 
         test_results_data = self.test_results_data.set_index(self.index)
         test_results_data['median'] = median_col
         test_results_data['min'] = min_col
         test_results_data['max'] = max_col
-        test_results_data['compilation(median)'] = compilation_col
-        test_results_data['boxing(median)'] = boxing_col
+        test_results_data['compile'] = compilation_col
+        test_results_data['boxing'] = boxing_col
         test_results_data = test_results_data.reset_index()
 
-        columns = ['median', 'min', 'max', 'compilation(median)', 'boxing(median)']
+        columns = ['median', 'min', 'max', 'compile', 'boxing']
         return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
 
     def add(self, test_name, test_type, data_size, data_width, test_results,
@@ -180,10 +186,9 @@ class  TestResults:
                                           'size': data_size,
                                           'width': data_width,
                                           'Time(s)': test_results,
-                                          'Compilation(s)': compile_results,
+                                          'Compile(s)': compile_results,
                                           'Boxing(s)': boxing_results}, index=self.index)
         self.test_results_data = self.test_results_data.append(local_results, sort=False)
-
 
     def print(self):
         """
