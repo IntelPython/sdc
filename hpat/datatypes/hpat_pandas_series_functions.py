@@ -75,23 +75,20 @@ class TypeChecker:
         """
         self.func_name = func_name
 
-    def msg(self, val, ty, name=''):
+    def raise_exc(self, data, expected_types, name=''):
         """
-        Message of the exception in the special format
+        Raise exception with unified message
         Parameters
         ----------
-        val: :obj:`any`
+        data: :obj:`any`
             real type of the data
-        ty: :obj:`str`
-            expected type of the data
+        expected_types: :obj:`str`
+            expected types inserting directly to the exception
         name: :obj:`str`
             name of the parameter
-        Returns
-        -------
-        :class:`str`
-            message of the exception in the special format
         """
-        return self.msg_template.format(self.func_name, name, val, ty)
+        msg = self.msg_template.format(self.func_name, name, data, expected_types)
+        raise TypingError(msg)
 
     def check(self, data, accepted_types, name=''):
         """
@@ -113,7 +110,7 @@ class TypeChecker:
                 return True
 
         expected_types = ', '.join([ty.name for ty in accepted_types])
-        raise TypingError(self.msg(data, expected_types, name=name))
+        self.raise_exc(data, expected_types, name=name)
 
 
 @overload(operator.getitem)
@@ -1350,22 +1347,19 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
          returns :obj:`pandas.Series` object containing the elements taken from the object
     """
 
-    _func_name = 'Method take().'
-
-    ty_checker = TypeChecker(_func_name)
+    ty_checker = TypeChecker('Method take().')
     ty_checker.check(self, AcceptedType.series)
-    ty_checker.check(indices, AcceptedType.list_)
     ty_checker.check(axis, (AcceptedType.omitted, AcceptedType.int_, AcceptedType.str_))
     ty_checker.check(is_copy, (AcceptedType.omitted, AcceptedType.bool_))
 
     if not isinstance(indices, (types.List, types.Array)):
-        raise TypingError('{} The indices must be an array-like. Given: {}'.format(_func_name, indices))
+        ty_checker.raise_exc(indices, 'array-like', 'indices')
 
     if self.index is types.none:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
             if int(axis) != 0 and str(axis) != 'index':
                 raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
-            if is_copy != False:
+            if is_copy != False: # noqa
                 raise ValueError("Method take(). The object is_copy\n expected: False")
 
             local_data = [self._data[i] for i in indices]
@@ -1377,7 +1371,7 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
         if int(axis) != 0 and str(axis) != 'index':
             raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
-        if is_copy != False:
+        if is_copy != False: # noqa
             raise ValueError("Method take(). The object is_copy\n expected: False")
 
         local_data = [self._data[i] for i in indices]
