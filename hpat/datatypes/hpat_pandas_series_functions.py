@@ -33,8 +33,6 @@ import numba
 import numpy
 import operator
 import pandas
-from collections.abc import Iterable
-from enum import Enum
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
@@ -44,17 +42,6 @@ import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import StringArrayType
 from hpat.utils import to_array
-
-
-class AcceptedType(Enum):
-    series = (SeriesType,),
-    omitted = (types.Omitted,),
-    int_ = (int, types.Integer),
-    float_ = (float, types.Float),
-    number = (int, float, types.Number),
-    bool_ = (bool, types.Boolean),
-    str_ = (str, types.UnicodeType, types.StringLiteral)
-    list_ = (list, types.List)
 
 
 class TypeChecker:
@@ -90,27 +77,20 @@ class TypeChecker:
         msg = self.msg_template.format(self.func_name, name, data, expected_types)
         raise TypingError(msg)
 
-    def check(self, data, accepted_types, name=''):
+    def check(self, data, accepted_type, name=''):
         """
-        Check data type belongs to specified type or list of types
+        Check data type belongs to specified type
         Parameters
         ----------
         data: :obj:`any`
             real type of the data
-        accepted_types: :obj:`tuple` or :obj:`AcceptedType`
-            accepted types
+        accepted_type: :obj:`type`
+            accepted type
         name: :obj:`str`
             name of the parameter
         """
-        if not isinstance(accepted_types, Iterable):
-            accepted_types = (accepted_types,)
-
-        for ty in accepted_types:
-            if isinstance(data, ty.value):
-                return True
-
-        expected_types = ', '.join([ty.name for ty in accepted_types])
-        self.raise_exc(data, expected_types, name=name)
+        if not isinstance(data, accepted_type):
+            self.raise_exc(data, accepted_type.__name__, name=name)
 
 
 @overload(operator.getitem)
@@ -1348,9 +1328,13 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     """
 
     ty_checker = TypeChecker('Method take().')
-    ty_checker.check(self, AcceptedType.series)
-    ty_checker.check(axis, (AcceptedType.omitted, AcceptedType.int_, AcceptedType.str_))
-    ty_checker.check(is_copy, (AcceptedType.omitted, AcceptedType.bool_))
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(axis, (int, types.Integer, str, types.UnicodeType, types.StringLiteral, types.Omitted)):
+        ty_checker.raise_exc(axis, 'integer or string', 'axis')
+
+    if not isinstance(is_copy, (bool, types.Boolean, types.Omitted)):
+        ty_checker.raise_exc(is_copy, 'boolean', 'is_copy')
 
     if not isinstance(indices, (types.List, types.Array)):
         ty_checker.raise_exc(indices, 'array-like', 'indices')
