@@ -477,21 +477,21 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
 
-    @bound_function("array.argsort")
-    def resolve_argsort(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_argsort.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.argsort")
+    # def resolve_argsort(self, ary, args, kws):
+    #     resolver = ArrayAttribute.resolve_argsort.__wrapped__
+    #     sig = resolver(self, ary.data, args, kws)
+    #     sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
-    @bound_function("series.sort_values")
-    def resolve_sort_values(self, ary, args, kws):
-        # output will have permuted input index
-        out_index = ary.index
-        if out_index == types.none:
-            out_index = types.Array(types.intp, 1, 'C')
-        out = SeriesType(ary.dtype, ary.data, out_index)
-        return signature(out, *args)
+    # @bound_function("series.sort_values")
+    # def resolve_sort_values(self, ary, args, kws):
+    #     # output will have permuted input index
+    #     out_index = ary.index
+    #     if out_index == types.none:
+    #         out_index = types.Array(types.intp, 1, 'C')
+    #     out = SeriesType(ary.dtype, ary.data, out_index)
+    #     return signature(out, *args)
 
 #     @bound_function("array.take")
 #     def resolve_take(self, ary, args, kws):
@@ -996,7 +996,9 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_cumsum', 'resolve_var',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
+                           'resolve_argsort', 'resolve_sort_values',
                            'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
+
 if not hpat.config.config_pipeline_hpat_default:
     _not_series_array_attrs.append('resolve_std')
 
