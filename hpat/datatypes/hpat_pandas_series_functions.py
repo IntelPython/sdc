@@ -1339,7 +1339,7 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     if not isinstance(indices, (types.List, types.Array)):
         ty_checker.raise_exc(indices, 'array-like', 'indices')
 
-    if self.index is types.none:
+    if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
             if int(axis) != 0 and str(axis) != 'index':
                 raise ValueError("Method take(). The object axis\n expected: 0, 'index'")
