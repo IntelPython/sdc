@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-
+import string
 import unittest
 import platform
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import hpat
+from itertools import islice, permutations
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
@@ -65,6 +66,20 @@ test_global_input_data_unicode_kind4 = [
     '🐍⚡',
     '大处着眼，小处着手。',
 ]
+
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
+]
+
+
+def gen_strlist(size, nchars=8):
+    """Generate list of strings of specified size based on [a-zA-Z] + [0-9]"""
+    accepted_chars = string.ascii_letters + string.digits
+    generated_chars = islice(permutations(accepted_chars, nchars), size)
+
+    return [''.join(chars) for chars in generated_chars]
 
 
 def _make_func_from_text(func_text, func_name='test_impl'):
@@ -1048,79 +1063,268 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    def test_series_fillna1(self):
-        def test_impl(A):
-            return A.fillna(5.0)
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis1(self):
+        '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
+        def test_impl(S):
+            return S.fillna(5.0, axis='index')
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis2(self):
+        '''Verifies Series.fillna() implementation handles 0 as axis argument'''
+        def test_impl(S):
+            return S.fillna(5.0, axis=0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'No support of axis argument in old-style Series.fillna() impl')
+    def test_series_fillna_axis3(self):
+        '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
+        def test_impl(S, axis):
+            return S.fillna(5.0, axis=axis)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        for axis in [0, 'index']:
+            pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_from_df(self):
+        '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: check_names must be fixed
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
+        pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index1(self):
+        '''Verifies Series.fillna() implementation for float series with default index'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_float64:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index2(self):
+        '''Verifies Series.fillna() implementation for float series with string index'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_index3(self):
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], index=[1, 2, 5, 7, 10])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_from_df(self):
+        '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
+        def test_impl(S):
+            return S.fillna("dd")
+        hpat_func = hpat.jit(test_impl)
+
+        # TODO: check_names must be fixed
+        df = pd.DataFrame({'A': ['aa', 'b', None, 'cccd', '']})
         pd.testing.assert_series_equal(hpat_func(df.A),
                                        test_impl(df.A), check_names=False)
 
-    # test inplace fillna for named numeric series (obtained from DataFrame)
-    def test_series_fillna_inplace1(self):
-        def test_impl(A):
-            A.fillna(5.0, inplace=True)
-            return A
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index1(self):
+        '''Verifies Series.fillna() implementation for series of strings with default index'''
+        def test_impl(S):
+            return S.fillna("dd")
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
-        pd.testing.assert_series_equal(hpat_func(df.A),
-                                       test_impl(df.A), check_names=False)
+        S = pd.Series(['aa', 'b', None, 'cccd', ''])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_fillna_str1(self):
-        def test_impl(A):
-            return A.fillna("dd")
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index2(self):
+        '''Verifies Series.fillna() implementation for series of strings with string index'''
+        def test_impl(S):
+            return S.fillna("dd")
         hpat_func = hpat.jit(test_impl)
 
-        df = pd.DataFrame({'A': ['aa', 'b', None, 'ccc']})
-        pd.testing.assert_series_equal(hpat_func(df.A),
-                                       test_impl(df.A), check_names=False)
+        S = pd.Series(['aa', 'b', None, 'cccd', ''], ['a', 'b', 'c', 'd', 'e'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_fillna_str_inplace1(self):
-        def test_impl(A):
-            A.fillna("dd", inplace=True)
-            return A
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_str_index3(self):
+        def test_impl(S):
+            return S.fillna("dd")
+
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S = pd.Series(['aa', 'b', None, 'cccd', ''], index=[1, 2, 5, 7, 10])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_float_inplace1(self):
+        '''Verifies Series.fillna() implementation for float series with default index and inplace argument True'''
+        def test_impl(S):
+            S.fillna(5.0, inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
-        # TODO: handle string array reflection
-        # hpat_func(S1)
-        # test_impl(S2)
-        # np.testing.assert_array_equal(S1, S2)
 
+    @unittest.skip('TODO: add reflection support and check method return value')
+    def test_series_fillna_float_inplace2(self):
+        '''Verifies Series.fillna(inplace=True) results are reflected back in the original float series'''
+        def test_impl(S):
+            return S.fillna(inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
+
+    def test_series_fillna_float_inplace3(self):
+        '''Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False'''
+        def test_impl(S):
+            return S.fillna(5.0)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S1))
+        pd.testing.assert_series_equal(S1, S2)
+
+    def test_series_fillna_inplace_non_literal(self):
+        '''Verifies Series.fillna() implementation handles only Boolean literals as inplace argument'''
+        def test_impl(S, param):
+            S.fillna(5.0, inplace=param)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
+        expected = ValueError if hpat.config.config_pipeline_hpat_default else TypingError
+        self.assertRaises(expected, hpat_func, S, True)
+
+    @unittest.skipUnless(hpat.config.config_pipeline_hpat_default,
+                         'TODO: investigate why Numba types inplace as bool (non-literal value)')
+    def test_series_fillna_str_inplace1(self):
+        '''Verifies Series.fillna() implementation for series of strings
+           with default index and inplace argument True
+        '''
+        def test_impl(S):
+            S.fillna("dd", inplace=True)
+            return S
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skip('TODO (both): support StringArrayType reflection'
+                   'TODO (new-style): investigate why Numba infers inplace type as bool (non-literal value)')
+    def test_series_fillna_str_inplace2(self):
+        '''Verifies Series.fillna(inplace=True) results are reflected back in the original string series'''
+        def test_impl(S):
+            return S.fillna("dd", inplace=True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
+        S2 = S1.copy()
+        self.assertIsNone(hpat_func(S1))
+        self.assertIsNone(test_impl(S2))
+        pd.testing.assert_series_equal(S1, S2)
+
+    @unittest.skipUnless(hpat.config.config_pipeline_hpat_default,
+                         'TODO: investigate why Numba types inplace as bool (non-literal value)')
     def test_series_fillna_str_inplace_empty1(self):
         def test_impl(A):
             A.fillna("", inplace=True)
             return A
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series(['aa', 'b', None, 'ccc'])
+        S1 = pd.Series(['aa', 'b', None, 'cccd', ''])
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_fillna_index_str(self):
-        def test_impl(S):
-            return S.fillna(5.0)
+    @unittest.skip('AssertionError: Series are different\n'
+                   'Series length are different\n'
+                   '[left]:  [NaT, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]\n'
+                   '[right]: [2020-05-03T00:00:00.000000000, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]')
+    def test_series_fillna_dt_no_index1(self):
+        '''Verifies Series.fillna() implementation for datetime series and np.datetime64 value'''
+        def test_impl(S, value):
+            return S.fillna(value)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=['a', 'b', 'c', 'd'])
-        pd.testing.assert_series_equal(hpat_func(S),
-                                       test_impl(S), check_names=False)
+        value = np.datetime64('2020-05-03', 'ns')
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25'), None])
+        pd.testing.assert_series_equal(hpat_func(S, value), test_impl(S, value))
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_fillna_index_int(self):
+    @unittest.skip('TODO: change unboxing of pd.Timestamp Series or support conversion between PandasTimestampType and datetime64')
+    def test_series_fillna_dt_no_index2(self):
+        '''Verifies Series.fillna() implementation for datetime series and pd.Timestamp value'''
         def test_impl(S):
-            return S.fillna(5.0)
-
+            value = pd.Timestamp('2020-05-03')
+            return S.fillna(value)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([1.0, 2.0, np.nan, 1.0], index=[2, 3, 4, 5])
-        pd.testing.assert_series_equal(hpat_func(S),
-                                       test_impl(S), check_names=False)
+        S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_fillna_bool_no_index1(self):
+        '''Verifies Series.fillna() implementation for bool series with default index'''
+        def test_impl(S):
+            return S.fillna(True)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([True, False, False, True])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'BUG: old-style fillna impl returns series without index')
+    def test_series_fillna_int_no_index1(self):
+        '''Verifies Series.fillna() implementation for integer series with default index'''
+        def test_impl(S):
+            return S.fillna(7)
+        hpat_func = hpat.jit(test_impl)
+
+        n = 11
+        S1 = pd.Series(np.arange(n, dtype=np.int64))
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'No support of axis argument in old-style Series.dropna() impl')
@@ -1156,9 +1360,8 @@ class TestSeries(unittest.TestCase):
 
         S1 = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         S2 = S1.copy()
-        axis_values = [0, 'index']
-        for value in axis_values:
-            pd.testing.assert_series_equal(hpat_func(S1, value), test_impl(S2, value))
+        for axis in [0, 'index']:
+            pd.testing.assert_series_equal(hpat_func(S1, axis), test_impl(S2, axis))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'BUG: old-style dropna impl returns series without index')
@@ -1927,6 +2130,18 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_isnull_full(self):
+        def test_impl(series):
+            return series.isnull()
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_numeric + [test_global_input_data_unicode_kind4]:
+            series = pd.Series(data * 3)
+            ref_result = test_impl(series)
+            jit_result = hpat_func(series)
+            pd.testing.assert_series_equal(ref_result, jit_result)
+
     def test_series_notna1(self):
         def test_impl(S):
             return S.notna()
@@ -2007,35 +2222,35 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_nlargest1(self):
-        def test_impl(S):
-            return S.nlargest(4)
+    def test_series_nlargest(self):
+        def test_impl():
+            series = pd.Series([1., np.nan, -1., 0., min_float64, max_float64])
+            return series.nlargest(4)
         hpat_func = hpat.jit(test_impl)
 
-        m = 100
-        np.random.seed(0)
-        S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        if hpat.config.config_pipeline_hpat_default:
+            np.testing.assert_array_equal(test_impl(), hpat_func())
+        else:
+            pd.testing.assert_series_equal(test_impl(), hpat_func())
 
-    def test_series_nlargest_default1(self):
-        def test_impl(S):
-            return S.nlargest()
+    def test_series_nlargest_unboxing(self):
+        def test_impl(series, n):
+            return series.nlargest(n)
         hpat_func = hpat.jit(test_impl)
 
-        m = 100
-        np.random.seed(0)
-        S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data * 3)
+            for n in range(-1, 10):
+                ref_result = test_impl(series, n)
+                jit_result = hpat_func(series, n)
+                if hpat.config.config_pipeline_hpat_default:
+                    np.testing.assert_array_equal(ref_result, jit_result)
+                else:
+                    pd.testing.assert_series_equal(ref_result, jit_result)
 
-    def test_series_nlargest_nan1(self):
-        def test_impl(S):
-            return S.nlargest(4)
-        hpat_func = hpat.jit(test_impl)
-
-        S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
-
-    def test_series_nlargest_parallel1(self):
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default,
+                     'Series.nlargest() parallelism unsupported')
+    def test_series_nlargest_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
 
@@ -2045,56 +2260,123 @@ class TestSeries(unittest.TestCase):
             return S.nlargest(4)
         hpat_func = hpat.jit(test_impl)
 
-        np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+        if hpat.config.config_pipeline_hpat_default:
+            np.testing.assert_array_equal(test_impl(), hpat_func())
+        else:
+            pd.testing.assert_series_equal(test_impl(), hpat_func())
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_nlargest_index_str(self):
-        def test_impl(S):
-            return S.nlargest(4)
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nlargest() parameter keep unsupported')
+    def test_series_nlargest_full(self):
+        def test_impl(series, n, keep):
+            return series.nlargest(n, keep)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([73, 21, 10005, 5, 1], index=['a', 'b', 'c', 'd', 'e'])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        keep = 'first'
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data * 3)
+            for n in range(-1, 10):
+                ref_result = test_impl(series, n, keep)
+                jit_result = hpat_func(series, n, keep)
+                pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_nlargest_index_int(self):
-        def test_impl(S):
-            return S.nlargest(4)
-
+    def test_series_nlargest_index(self):
+        def test_impl(series, n):
+            return series.nlargest(n)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([73, 21, 10005, 5, 1], index=[2, 3, 4, 5, 6])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        # TODO: check data == [] after index is fixed
+        for data in test_global_input_data_numeric:
+            data_duplicated = data * 3
+            # TODO: add integer index not equal to range after index is fixed
+            indexes = [range(len(data_duplicated))]
+            if not hpat.config.config_pipeline_hpat_default:
+                indexes.append(gen_strlist(len(data_duplicated)))
 
-    def test_series_nsmallest1(self):
-        def test_impl(S):
-            return S.nsmallest(4)
+            for index in indexes:
+                series = pd.Series(data_duplicated, index)
+                for n in range(-1, 10):
+                    ref_result = test_impl(series, n)
+                    jit_result = hpat_func(series, n)
+                    if hpat.config.config_pipeline_hpat_default:
+                        np.testing.assert_array_equal(ref_result, jit_result)
+                    else:
+                        pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nlargest() does not raise an exception')
+    def test_series_nlargest_typing(self):
+        _func_name = 'Method nlargest().'
+
+        def test_impl(series, n, keep):
+            return series.nlargest(n, keep)
         hpat_func = hpat.jit(test_impl)
 
-        m = 100
-        np.random.seed(0)
-        S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        series = pd.Series(test_global_input_data_float64[0])
+        for n, ntype in [(True, types.boolean), (None, types.none),
+                         (0.1, 'float64'), ('n', types.unicode_type)]:
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(series, n=n, keep='first')
+            msg = '{} The object n\n given: {}\n expected: int'
+            self.assertIn(msg.format(_func_name, ntype), str(raises.exception))
 
-    def test_series_nsmallest_default1(self):
-        def test_impl(S):
-            return S.nsmallest()
+        for keep, dtype in [(True, types.boolean), (None, types.none),
+                            (0.1, 'float64'), (1, 'int64')]:
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(series, n=5, keep=keep)
+            msg = '{} The object keep\n given: {}\n expected: str'
+            self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nlargest() does not raise an exception')
+    def test_series_nlargest_unsupported(self):
+        msg = "Method nlargest(). Unsupported parameter. Given 'keep' != 'first'"
+
+        def test_impl(series, n, keep):
+            return series.nlargest(n, keep)
         hpat_func = hpat.jit(test_impl)
 
-        m = 100
-        np.random.seed(0)
-        S = pd.Series(np.random.randint(-30, 30, m))
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        series = pd.Series(test_global_input_data_float64[0])
+        for keep in ['last', 'all', '']:
+            with self.assertRaises(ValueError) as raises:
+                hpat_func(series, n=5, keep=keep)
+            self.assertIn(msg, str(raises.exception))
 
-    def test_series_nsmallest_nan1(self):
-        def test_impl(S):
-            return S.nsmallest(4)
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, n=5, keep='last')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_nsmallest(self):
+        def test_impl():
+            series = pd.Series([1., np.nan, -1., 0., min_float64, max_float64])
+            return series.nsmallest(4)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([1.0, np.nan, 3.0, 2.0, np.nan, 4.0])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        if hpat.config.config_pipeline_hpat_default:
+            np.testing.assert_array_equal(test_impl(), hpat_func())
+        else:
+            pd.testing.assert_series_equal(test_impl(), hpat_func())
 
-    def test_series_nsmallest_parallel1(self):
+    def test_series_nsmallest_unboxing(self):
+        def test_impl(series, n):
+            return series.nsmallest(n)
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data * 3)
+            for n in range(-1, 10):
+                ref_result = test_impl(series, n)
+                jit_result = hpat_func(series, n)
+                if hpat.config.config_pipeline_hpat_default:
+                    np.testing.assert_array_equal(ref_result, jit_result)
+                else:
+                    pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @unittest.skipIf(not hpat.config.config_pipeline_hpat_default,
+                     'Series.nsmallest() parallelism unsupported')
+    def test_series_nsmallest_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
 
@@ -2104,26 +2386,93 @@ class TestSeries(unittest.TestCase):
             return S.nsmallest(4)
         hpat_func = hpat.jit(test_impl)
 
-        np.testing.assert_array_equal(hpat_func().values, test_impl().values)
+        if hpat.config.config_pipeline_hpat_default:
+            np.testing.assert_array_equal(test_impl(), hpat_func())
+        else:
+            pd.testing.assert_series_equal(test_impl(), hpat_func())
+        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_nsmallest_index_str(self):
-        def test_impl(S):
-            return S.nsmallest(3)
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nsmallest() parameter keep unsupported')
+    def test_series_nsmallest_full(self):
+        def test_impl(series, n, keep):
+            return series.nsmallest(n, keep)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([41, 32, 33, 4, 5], index=['a', 'b', 'c', 'd', 'e'])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        keep = 'first'
+        for data in test_global_input_data_numeric + [[]]:
+            series = pd.Series(data * 3)
+            for n in range(-1, 10):
+                ref_result = test_impl(series, n, keep)
+                jit_result = hpat_func(series, n, keep)
+                pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @unittest.skip('Unsupported functionality: failed to handle index')
-    def test_series_nsmallest_index_int(self):
-        def test_impl(S):
-            return S.nsmallest(3)
-
+    def test_series_nsmallest_index(self):
+        def test_impl(series, n):
+            return series.nsmallest(n)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([41, 32, 33, 4, 5], index=[1, 2, 3, 4, 5])
-        np.testing.assert_array_equal(hpat_func(S).values, test_impl(S).values)
+        # TODO: check data == [] after index is fixed
+        for data in test_global_input_data_numeric:
+            data_duplicated = data * 3
+            # TODO: add integer index not equal to range after index is fixed
+            indexes = [range(len(data_duplicated))]
+            if not hpat.config.config_pipeline_hpat_default:
+                indexes.append(gen_strlist(len(data_duplicated)))
+
+            for index in indexes:
+                series = pd.Series(data_duplicated, index)
+                for n in range(-1, 10):
+                    ref_result = test_impl(series, n)
+                    jit_result = hpat_func(series, n)
+                    if hpat.config.config_pipeline_hpat_default:
+                        np.testing.assert_array_equal(ref_result, jit_result)
+                    else:
+                        pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nsmallest() does not raise an exception')
+    def test_series_nsmallest_typing(self):
+        _func_name = 'Method nsmallest().'
+
+        def test_impl(series, n, keep):
+            return series.nsmallest(n, keep)
+        hpat_func = hpat.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_float64[0])
+        for n, ntype in [(True, types.boolean), (None, types.none),
+                         (0.1, 'float64'), ('n', types.unicode_type)]:
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(series, n=n, keep='first')
+            msg = '{} The object n\n given: {}\n expected: int'
+            self.assertIn(msg.format(_func_name, ntype), str(raises.exception))
+
+        for keep, dtype in [(True, types.boolean), (None, types.none),
+                            (0.1, 'float64'), (1, 'int64')]:
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(series, n=5, keep=keep)
+            msg = '{} The object keep\n given: {}\n expected: str'
+            self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.nsmallest() does not raise an exception')
+    def test_series_nsmallest_unsupported(self):
+        msg = "Method nsmallest(). Unsupported parameter. Given 'keep' != 'first'"
+
+        def test_impl(series, n, keep):
+            return series.nsmallest(n, keep)
+        hpat_func = hpat.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_float64[0])
+        for keep in ['last', 'all', '']:
+            with self.assertRaises(ValueError) as raises:
+                hpat_func(series, n=5, keep=keep)
+            self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, n=5, keep='last')
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_head1(self):
         def test_impl(S):
@@ -2975,8 +3324,8 @@ class TestSeries(unittest.TestCase):
         data_extra = [[6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
                       [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
                       [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                      # unsupported ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
-                      # unsupported [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
+                      [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
                       [np.nan, np.nan, np.nan],
                       [np.nan, np.nan, np.inf],
                       ]

@@ -585,13 +585,13 @@ def select_k_nonan_overload(A, m, k):
     dtype = A.dtype
     if isinstance(dtype, types.Integer):
         # ints don't have nans
-        return lambda A, m, k: (A[:k].copy(), k)
+        return lambda A, m, k: (A[:max(k, 0)].copy(), k)
 
     assert isinstance(dtype, types.Float)
 
     def select_k_nonan_float(A, m, k):
         # select the first k elements but ignore NANs
-        min_heap_vals = np.empty(k, A.dtype)
+        min_heap_vals = np.empty(max(k, 0), A.dtype)
         i = 0
         ind = 0
         while i < m and ind < k:
