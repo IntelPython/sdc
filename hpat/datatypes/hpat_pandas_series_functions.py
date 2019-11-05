@@ -44,6 +44,55 @@ from hpat.str_arr_ext import StringArrayType
 from hpat.utils import to_array
 
 
+class TypeChecker:
+    """
+        Validate object type and raise TypingError if the type is invalid, e.g.:
+            Method nsmallest(). The object n
+             given: bool
+             expected: int
+        """
+    msg_template = '{} The object {}\n given: {}\n expected: {}'
+
+    def __init__(self, func_name):
+        """
+        Parameters
+        ----------
+        func_name: :obj:`str`
+            name of the function where types checking
+        """
+        self.func_name = func_name
+
+    def raise_exc(self, data, expected_types, name=''):
+        """
+        Raise exception with unified message
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        expected_types: :obj:`str`
+            expected types inserting directly to the exception
+        name: :obj:`str`
+            name of the parameter
+        """
+        msg = self.msg_template.format(self.func_name, name, data, expected_types)
+        raise TypingError(msg)
+
+    def check(self, data, accepted_type, name=''):
+        """
+        Check data type belongs to specified type
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        accepted_type: :obj:`type`
+            accepted type
+        name: :obj:`str`
+            name of the parameter
+        """
+        if not isinstance(data, accepted_type):
+            self.raise_exc(data, accepted_type.__name__, name=name)
+
+
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
@@ -1278,35 +1327,34 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
          returns :obj:`pandas.Series` object containing the elements taken from the object
     """
 
-    _func_name = 'Method take().'
+    ty_checker = TypeChecker('Method take().')
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    if (not isinstance(axis, (int, types.Integer, str, types.UnicodeType, types.StringLiteral, types.Omitted))
+        and axis not in (0, 'index')):
+        ty_checker.raise_exc(axis, 'integer or string', 'axis')
+
+    if not isinstance(is_copy, (bool, types.Boolean, types.Omitted)) and is_copy is not False:
+        ty_checker.raise_exc(is_copy, 'boolean', 'is_copy')
 
     if not isinstance(indices, (types.List, types.Array)):
-        raise TypingError('{} The indices must be an array-like. Given: {}'.format(_func_name, indices))
+        ty_checker.raise_exc(indices, 'array-like', 'indices')
 
-    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
-        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
-
-    if not (isinstance(is_copy, (types.Boolean, types.Omitted)) or is_copy == False):
-        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, is_copy))
-
-    if self.index is not types.none:
-        def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
-            local_data = [self._data[i] for i in indices]
-            local_index = [self._index[i] for i in indices]
-
-            return pandas.Series(local_data, local_index)
-
-        return hpat_pandas_series_take_impl
-    else:
+    if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
             local_data = [self._data[i] for i in indices]
 
             return pandas.Series(local_data, indices)
 
         return hpat_pandas_series_take_noindex_impl
+
+    def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
+        local_data = [self._data[i] for i in indices]
+        local_index = [self._index[i] for i in indices]
+
+        return pandas.Series(local_data, local_index)
+
+    return hpat_pandas_series_take_impl
 
 
 @overload_method(SeriesType, 'idxmax')
