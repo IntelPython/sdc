@@ -2573,7 +2573,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
         return hpat_pandas_series_argsort_idx_impl
 
-    def hpat_pandas_series_argsort_impl(self, axis=0, kind='quicksort', order=None):
+    def hpat_pandas_series_argsort_noidx_impl(self, axis=0, kind='quicksort', order=None):
         sort = numpy.argsort(self._data, kind='mergesort')
         na = self.isna().sum()
         result = numpy.empty(len(self._data), dtype=numpy.int64)
@@ -2590,7 +2590,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
         return pandas.Series(result)
 
-    return hpat_pandas_series_argsort_impl
+    return hpat_pandas_series_argsort_noidx_impl
 
 
 @overload_method(SeriesType, 'sort_values')
@@ -2633,7 +2633,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         raise TypingError('{} Unsupported parameters. Given ascending: {}'.format(_func_name, ascending))
 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
-        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+        def hpat_pandas_series_sort_values_str_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
             index = numpy.arange(len(self._data))
             my_index = numpy.arange(len(self._data))
@@ -2667,10 +2667,10 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
             return pandas.Series(result, result_index)
 
-        return hpat_pandas_series_sort_values_impl
+        return hpat_pandas_series_sort_values_str_noidx_impl
 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
-        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+        def hpat_pandas_series_sort_values_num_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
             na = self.isna().sum()
             indices = numpy.arange(len(self._data))
@@ -2686,10 +2686,10 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
             return pandas.Series(result, indices)
 
-        return hpat_pandas_series_sort_values_impl
+        return hpat_pandas_series_sort_values_num_noidx_impl
 
     if isinstance(self.data.dtype, types.UnicodeType):
-        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+        def hpat_pandas_series_sort_values_str_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
             index = self._index
             my_index = numpy.arange(len(self._data))
@@ -2723,10 +2723,10 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
             return pandas.Series(result, result_index)
 
-        return hpat_pandas_series_sort_values_impl
+        return hpat_pandas_series_sort_values_str_idx_impl
 
     if isinstance(self.data.dtype, types.Number):
-        def hpat_pandas_series_sort_values_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+        def hpat_pandas_series_sort_values_num_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
             na = self.isna().sum()
             indices = self._index.copy()
@@ -2742,7 +2742,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
             return pandas.Series(result, indices)
 
-        return hpat_pandas_series_sort_values_impl
+        return hpat_pandas_series_sort_values_num_idx_impl
 
 
 @overload_method(SeriesType, 'dropna')

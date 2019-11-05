@@ -2613,7 +2613,7 @@ class TestSeries(unittest.TestCase):
             return S.sort_values(ascending=False)
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series([6, 6, 2, 1, 3, 3, 2, 1, 2])
+        S = pd.Series(['a', 'd', 'r', 'cc'])
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
     def test_series_sort_values_index1(self):
