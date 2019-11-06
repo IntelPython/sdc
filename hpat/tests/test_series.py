@@ -73,6 +73,19 @@ test_global_input_data_unicode_kind1 = [
     '1234567890',
 ]
 
+def gen_srand_array(size, nchars=8):
+    """Generate array of strings of specified size based on [a-zA-Z] + [0-9]"""
+    accepted_chars = list(string.ascii_letters + string.digits)
+    rands_chars = np.array(accepted_chars, dtype=(np.str_, 1))
+
+    np.random.seed(100)
+    return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
+
+
+def gen_frand_array(size, min=-100, max=100):
+    """Generate array of float of specified size based on [-100-100]"""
+    np.random.seed(100)
+    return (max - min) * np.random.sample(size) + min
 
 def gen_strlist(size, nchars=8):
     """Generate list of strings of specified size based on [a-zA-Z] + [0-9]"""
@@ -327,6 +340,46 @@ class TestSeries(unittest.TestCase):
         n = 11
         A = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
+
+    def test_series_argsort2(self):
+        def test_impl(S):
+            return S.argsort()
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series([1, -1, 0, 1, np.nan], [1, 2, 3, 4, 5])
+        pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
+
+    def test_series_argsort_full(self):
+        def test_impl(series):
+            return series.argsort()
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric
+
+        for data in all_data:
+            series = pd.Series(data * 3)
+            ref_result = test_impl(series)
+            jit_result = hpat_func(series)
+            pd.testing.assert_series_equal(ref_result, jit_result)
+
+
+    def test_series_argsort_full_idx(self):
+        def test_impl(series):
+            return series.argsort()
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric
+
+        for data in all_data:
+            data = data * 3
+            for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
+                series = pd.Series(data, index)
+                ref_result = test_impl(series)
+                jit_result = hpat_func(series)
+                pd.testing.assert_series_equal(ref_result, jit_result)
+
 
     def test_series_attr6(self):
         def test_impl(A):
@@ -2972,6 +3025,14 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_sort_values2(self):
+        def test_impl(S):
+            return S.sort_values(ascending=False)
+        hpat_func = hpat.jit(test_impl)
+
+        S = pd.Series(['a', 'd', 'r', 'cc'])
+        pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
+
     def test_series_sort_values_index1(self):
         def test_impl(A, B):
             S = pd.Series(A, B)
@@ -2985,6 +3046,56 @@ class TestSeries(unittest.TestCase):
         A = np.random.ranf(n)
         B = np.random.ranf(n)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    def test_series_sort_values_full(self):
+        def test_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric + [test_global_input_data_unicode_kind1]
+
+        for data in all_data:
+            data = data * 3
+            for ascending in [True, False]:
+                series = pd.Series(data)
+                ref_result = test_impl(series, ascending)
+                jit_result = hpat_func(series, ascending)
+                pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @unittest.skip("Creating Python string/unicode object failed")
+    def test_series_sort_values_full_unicode4(self):
+        def test_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = [test_global_input_data_unicode_kind1]
+
+        for data in all_data:
+            data = data * 3
+            for ascending in [True, False]:
+                series = pd.Series(data)
+                ref_result = test_impl(series, ascending)
+                jit_result = hpat_func(series, ascending)
+                pd.testing.assert_series_equal(ref_result, jit_result)
+
+    def test_series_sort_values_full_idx(self):
+        def test_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
+
+        hpat_func = hpat.jit(test_impl)
+
+        all_data = test_global_input_data_numeric + [test_global_input_data_unicode_kind1]
+
+        for data in all_data:
+            data = data * 3
+            for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
+                for ascending in [True, False]:
+                    series = pd.Series(data, index)
+                    ref_result = test_impl(series, ascending)
+                    jit_result = hpat_func(series, ascending)
+                    pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file
