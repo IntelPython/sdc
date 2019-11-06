@@ -24,12 +24,10 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-
-| :class:`pandas.Series` functions and operators implementations in HPAT
-| Also, it contains Numba internal operators which are required for Series type handling
-
-"""
+'''
+| :class:`pandas.DataFrame` functions and operators implementations in Intel SDC
+| Also, it contains Numba internal operators which are required for DataFrame type handling
+'''
 
 import operator
 import pandas
@@ -39,12 +37,6 @@ from numba.extending import (overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 
 from hpat.datatypes.hpat_pandas_dataframe_types import DataFrameType
-
-
-'''
-| :class:`pandas.DataFrame` functions and operators implementations in Intel SDC
-| Also, it contains Numba internal operators which are required for DataFrame type handling
-'''
 
 
 @overload_method(DataFrameType, 'count')
