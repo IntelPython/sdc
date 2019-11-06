@@ -8,7 +8,7 @@ import numpy as np
 This file is used to generate file employees.csv used elsewhere in Pandas API examples for
 Intel(R) Scalable Dataframe Compiler.
 
-script gen_employees_csv.py [-h] [--nrows N] [--fname FILE_NAME] 
+script gen_employees_csv.py [-h] [--nrows N] [--fname FILE_NAME]
 """
 
 # Constants
