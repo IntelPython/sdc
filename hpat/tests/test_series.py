@@ -2748,7 +2748,7 @@ class TestSeries(unittest.TestCase):
         S1 = pd.Series([2., 3., 5., np.inf, 5., 6., 7.])
         self.assertEqual(hpat_func(S1), test_impl(S1))
 
-        # TODO: both return values are 'nan', but HPAT's is not np.nan, hence checking with
+        # TODO: both return values are 'nan', but SDC's is not np.nan, hence checking with
         # assertIs() doesn't work - check if it's Numba relatated
         S2 = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
         self.assertEqual(np.isnan(hpat_func(S2)), np.isnan(test_impl(S2)))
@@ -3443,7 +3443,7 @@ class TestSeries(unittest.TestCase):
 
         if hpat.config.config_pipeline_hpat_default:
             """
-            HPAT pipeline Series.nunique() does not support numpy.nan
+            SDC pipeline Series.nunique() does not support numpy.nan
             """
 
             test_input_data = data_simple
@@ -3459,7 +3459,7 @@ class TestSeries(unittest.TestCase):
 
             if not hpat.config.config_pipeline_hpat_default:
                 """
-                HPAT pipeline does not support parameter to Series.nunique(dropna=True)
+                SDC pipeline does not support parameter to Series.nunique(dropna=True)
                 """
 
                 hpat_func_param1 = hpat.jit(test_series_nunique_param1_impl)

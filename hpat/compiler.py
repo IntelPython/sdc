@@ -120,8 +120,8 @@ class PostprocessorPass(FunctionPass):
         return True
 
 
-class HPATPipeline(numba.compiler.CompilerBase):
-    """HPAT compiler pipeline
+class SDCPipeline(numba.compiler.CompilerBase):
+    """SDC compiler pipeline
     """
 
     def define_pipelines(self):
@@ -153,8 +153,8 @@ class ParforSeqPass(FunctionPass):
         return True
 
 
-class HPATPipelineSeq(HPATPipeline):
-    """HPAT pipeline without the distributed pass (used in rolling kernels)
+class SDCPipelineSeq(SDCPipeline):
+    """SDC pipeline without the distributed pass (used in rolling kernels)
     """
 
     def define_pipelines(self):

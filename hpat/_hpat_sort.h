@@ -1,7 +1,7 @@
-#ifndef HPAT_SORT_H_
-#define HPAT_SORT_H_
+#ifndef SDC_SORT_H_
+#define SDC_SORT_H_
 
-#define __HPAT_MIN_MERGE_SIZE 64
+#define __SDC_MIN_MERGE_SIZE 64
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 #include <vector>
@@ -10,19 +10,19 @@ typedef struct
 {
     uint64_t start;
     uint64_t length;
-} __HPAT_TIMSORT_RUN;
+} __SDC_TIMSORT_RUN;
 
 typedef struct
 {
-    __HPAT_TIMSORT_RUN _stack[100];
+    __SDC_TIMSORT_RUN _stack[100];
     uint64_t size;
-} __HPAT_TIMSORT_RUN_STACK;
+} __SDC_TIMSORT_RUN_STACK;
 
 typedef struct
 {
     size_t size;
     int64_t* buffer;
-} __HPAT_TIMSORT_TEMP_BUFFER;
+} __SDC_TIMSORT_TEMP_BUFFER;
 
 int __hpat_sort_compare(int64_t x, int64_t y)
 {
@@ -50,7 +50,7 @@ void __hpat_sort_swap(int64_t* x, int64_t* y)
 int64_t __hpat_timsort_calcuate_minrun(int64_t size)
 {
     int64_t ratio = 0;
-    while (size >= __HPAT_MIN_MERGE_SIZE)
+    while (size >= __SDC_MIN_MERGE_SIZE)
     {
         ratio |= (size & 1);
         size >>= 1;
@@ -62,30 +62,30 @@ int64_t __hpat_timsort_calcuate_minrun(int64_t size)
 static void __hpat_binary_insertionsort_index(
     int64_t* comp_arr, const size_t start, const size_t size, int64_t** all_arrs, const size_t all_arrs_len);
 static int64_t __hpat_binary_insertionsort_search(int64_t* comp_arr, const int64_t x, const size_t size);
-static void __hpat_timsort_resize_buffer(__HPAT_TIMSORT_TEMP_BUFFER* store, const size_t new_size);
+static void __hpat_timsort_resize_buffer(__SDC_TIMSORT_TEMP_BUFFER* store, const size_t new_size);
 void __hpat_timsort(int64_t* comp_arr, const size_t size, int64_t** all_arrs, const size_t all_arrs_len);
 static void __hpat_timsort_reverse_run(
     int64_t* comp_arr, int64_t start, int64_t end, int64_t** all_arrs, const size_t all_arrs_len);
 static int __hpat_timsort_getrun(int64_t* comp_arr,
                                  const size_t size,
-                                 __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                 __SDC_TIMSORT_TEMP_BUFFER* store,
                                  const uint64_t minrun,
-                                 __HPAT_TIMSORT_RUN_STACK* run_stack,
+                                 __SDC_TIMSORT_RUN_STACK* run_stack,
                                  uint64_t* curr,
                                  int64_t** all_arrs,
                                  const size_t all_arrs_len);
-static int __hpat_timsort_checkrules(__HPAT_TIMSORT_RUN_STACK* run_stack);
+static int __hpat_timsort_checkrules(__SDC_TIMSORT_RUN_STACK* run_stack);
 static int __hpat_timsort_applyrules(int64_t* comp_arr,
-                                     __HPAT_TIMSORT_RUN_STACK* stack,
-                                     __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                     __SDC_TIMSORT_RUN_STACK* stack,
+                                     __SDC_TIMSORT_TEMP_BUFFER* store,
                                      const size_t size,
                                      int64_t** all_arrs,
                                      const size_t all_arrs_len);
 static int64_t __hpat_timsort_count_run(
     int64_t* comp_arr, const uint64_t start, const size_t size, int64_t** all_arrs, const size_t all_arrs_len);
 static void __hpat_timsort_merge_run(int64_t* comp_arr,
-                                     const __HPAT_TIMSORT_RUN_STACK* run_stack,
-                                     __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                     const __SDC_TIMSORT_RUN_STACK* run_stack,
+                                     __SDC_TIMSORT_TEMP_BUFFER* store,
                                      int64_t** all_arrs,
                                      const size_t all_arrs_len);
 
@@ -174,15 +174,15 @@ void __hpat_timsort(int64_t* comp_arr, const size_t size, int64_t** all_arrs, co
     {
         return;
     }
-    if (size < __HPAT_MIN_MERGE_SIZE)
+    if (size < __SDC_MIN_MERGE_SIZE)
     {
         __hpat_binary_insertionsort_index(comp_arr, 1, size, all_arrs, all_arrs_len);
         return;
     }
 
     uint64_t minrun;
-    __HPAT_TIMSORT_TEMP_BUFFER _store, *store;
-    __HPAT_TIMSORT_RUN_STACK run_stack;
+    __SDC_TIMSORT_TEMP_BUFFER _store, *store;
+    __SDC_TIMSORT_RUN_STACK run_stack;
     run_stack.size = 0;
     uint64_t curr = 0;
 
@@ -220,7 +220,7 @@ void __hpat_timsort(int64_t* comp_arr, const size_t size, int64_t** all_arrs, co
     }
 }
 
-static int __hpat_timsort_checkrules(__HPAT_TIMSORT_RUN_STACK* run_stack)
+static int __hpat_timsort_checkrules(__SDC_TIMSORT_RUN_STACK* run_stack)
 {
     /*
       Rules are taken from https://en.wikipedia.org/wiki/Timsort
@@ -320,9 +320,9 @@ static int64_t __hpat_timsort_count_run(
 
 static int __hpat_timsort_getrun(int64_t* comp_arr,
                                  const size_t size,
-                                 __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                 __SDC_TIMSORT_TEMP_BUFFER* store,
                                  const uint64_t minrun,
-                                 __HPAT_TIMSORT_RUN_STACK* run_stack,
+                                 __SDC_TIMSORT_RUN_STACK* run_stack,
                                  uint64_t* curr,
                                  int64_t** all_arrs,
                                  const size_t all_arrs_len)
@@ -369,8 +369,8 @@ static int __hpat_timsort_getrun(int64_t* comp_arr,
 }
 
 static int __hpat_timsort_applyrules(int64_t* comp_arr,
-                                     __HPAT_TIMSORT_RUN_STACK* run_stack,
-                                     __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                     __SDC_TIMSORT_RUN_STACK* run_stack,
+                                     __SDC_TIMSORT_TEMP_BUFFER* store,
                                      const size_t size,
                                      int64_t** all_arrs,
                                      const size_t all_arrs_len)
@@ -448,7 +448,7 @@ static int __hpat_timsort_applyrules(int64_t* comp_arr,
     return run_stack->size;
 }
 
-static void __hpat_timsort_resize_buffer(__HPAT_TIMSORT_TEMP_BUFFER* store, const size_t new_size)
+static void __hpat_timsort_resize_buffer(__SDC_TIMSORT_TEMP_BUFFER* store, const size_t new_size)
 {
     if (store->size < new_size)
     {
@@ -625,8 +625,8 @@ static void __hpat_timsort_mergeright_run(int64_t* comp_arr,
 }
 
 static void __hpat_timsort_merge_run(int64_t* comp_arr,
-                                     const __HPAT_TIMSORT_RUN_STACK* run_stack,
-                                     __HPAT_TIMSORT_TEMP_BUFFER* store,
+                                     const __SDC_TIMSORT_RUN_STACK* run_stack,
+                                     __SDC_TIMSORT_TEMP_BUFFER* store,
                                      int64_t** all_arrs,
                                      const size_t all_arrs_len)
 {
@@ -704,4 +704,4 @@ void __hpat_quicksort(int64_t** arr, int size, int64_t* comp_arr, int low, int h
     }
 }
 
-#endif /* HPAT_SORT_H_ */
+#endif /* SDC_SORT_H_ */

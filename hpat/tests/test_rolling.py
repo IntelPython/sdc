@@ -10,8 +10,8 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
 from hpat.hiframes.rolling import supported_rolling_funcs
 
-LONG_TEST = (int(os.environ['HPAT_LONG_ROLLING_TEST']) != 0
-             if 'HPAT_LONG_ROLLING_TEST' in os.environ else False)
+LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
+             if 'SDC_LONG_ROLLING_TEST' in os.environ else False)
 
 test_funcs = ('mean', 'max',)
 if LONG_TEST:

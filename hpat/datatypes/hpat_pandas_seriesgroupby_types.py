@@ -26,7 +26,7 @@
 
 """
 
-| :class:`pandas.SeriesGroupBy` type implementation in HPAT
+| :class:`pandas.SeriesGroupBy` type implementation in SDC
 | Also, it contains related types and iterators for SeriesGroupBy type handling
 
 """

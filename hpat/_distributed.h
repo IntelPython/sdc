@@ -16,7 +16,7 @@
 #define ROOT_PE 0
 
 // XXX same as distributed_api.py:Reduce_Type
-struct HPAT_ReduceOps
+struct SDC_ReduceOps
 {
     enum ReduceOpsEnum
     {

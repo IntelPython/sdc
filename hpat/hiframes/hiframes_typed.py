@@ -857,7 +857,7 @@ class HiFramesTypedPassImpl(object):
         # single arg functions
         if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max'):
             if rhs.args or rhs.kws:
-                raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
+                raise ValueError("SDC pipeline does not support arguments for Series.{}()".format(func_name))
 
             # TODO: handle skipna, min_count arguments
             series_typ = self.state.typemap[series_var.name]
@@ -1560,7 +1560,7 @@ class HiFramesTypedPassImpl(object):
         # XXX seq pipeline used since dist pass causes a hang
         m = numba.ir_utils._max_label
         impl_disp = numba.njit(
-            kernel_func, pipeline_class=hpat.compiler.HPATPipelineSeq)
+            kernel_func, pipeline_class=hpat.compiler.SDCPipelineSeq)
         # precompile to avoid REP counting conflict in testing
         sig = out_dtype(types.Array(dtype, 1, 'C'))
         impl_disp.compile(sig)
