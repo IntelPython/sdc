@@ -35,3 +35,12 @@ multithread_mode = False
 
 __version__ = get_versions()['version']
 del get_versions
+
+
+def _init_extension():
+    '''Register Pandas classes and functions with Numba.
+
+    This exntry_point is called by Numba when it initializes.
+    '''
+    # Importing SDC is already happened
+    pass
