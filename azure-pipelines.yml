@@ -1,7 +1,7 @@
 jobs:
 - template: buildscripts/azure/template-windows.yml
   parameters:
-    name: Windows-2016
+    name: Windows_2016
     vmImage: vs2017-win2016
     matrix:
       vs2017_py3.7_numpy1.16_np0:
@@ -17,7 +17,7 @@ jobs:
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: OSX-10.13
+    name: OSX_10_13
     vmImage: xcode9-macos10.13
     matrix:
       xcode9_py3.7_numpy1.16_np0:
