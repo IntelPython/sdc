@@ -43,7 +43,7 @@ max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
     [1., np.nan, -1., 0., min_float64, max_float64],
-    [np.nan, np.inf, np.NINF, np.NZERO]
+    [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
 
 min_int64 = np.iinfo('int64').min
@@ -52,8 +52,8 @@ max_uint64 = np.iinfo('uint64').max
 
 test_global_input_data_integer64 = [
     [1, -1, 0],
-    [min_int64, max_int64],
-    [max_uint64]
+    [min_int64, max_int64, max_int64, min_int64],
+    [max_uint64, max_uint64]
 ]
 
 test_global_input_data_numeric = test_global_input_data_integer64 + test_global_input_data_float64
