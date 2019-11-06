@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# HPAT documentation build configuration file, created by
+# Intel(R) SDC documentation build configuration file, created by
 # sphinx-quickstart on Wed Sep  6 09:29:19 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -107,7 +107,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'HPAT'
+project = 'Intel(R) SDC'
 #copyright = '2017, Ehsan Totoni'
 author = 'Intel'
 
@@ -164,7 +164,7 @@ html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'HPATdoc'
+htmlhelp_basename = 'SDCdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------

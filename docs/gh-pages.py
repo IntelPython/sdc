@@ -34,7 +34,7 @@ from subprocess import Popen, PIPE, CalledProcessError, check_call
 pages_dir = 'gh-pages'
 html_dir = '_build/html'
 pdf_dir = '_build/latex'
-pages_repo = 'https://github.com/IntelPython/hpat-doc.git'
+pages_repo = 'https://github.com/IntelPython/sdc-doc.git'
 
 # -----------------------------------------------------------------------------
 # Functions

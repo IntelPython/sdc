@@ -1,16 +1,16 @@
 .. _overview:
 
-Quick Introduction to HPAT
+Quick Introduction to Intel(R) SDC
 ==========================
 
 .. todo:: Change content here considering Developer's perspective
 
-High Performance Analytics Toolkit (HPAT) is a big data analytics and machine
+High Performance Analytics Toolkit (Intel(R) SDC) is a big data analytics and machine
 learning framework that provides Python's ease of use but is extremely fast.
 
-HPAT scales analytics programs in python to cluster/cloud environments
+Intel(R) SDC scales analytics programs in python to cluster/cloud environments
 automatically, requiring only minimal code changes. Here is a logistic
-regression program using HPAT::
+regression program using Intel(R) SDC::
 
     @hpat.jit
     def logistic_regression(iterations):
@@ -29,9 +29,9 @@ This code runs on cluster and cloud environments using a simple command like::
 
     mpiexec -n 1024 python logistic_regression.py
 
-HPAT compiles the source code to efficient native parallel code
+Intel(R) SDC compiles the source code to efficient native parallel code
 (with `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_).
 This is in contrast to other frameworks such as Apache Spark which are
-master-executor libraries. Hence, HPAT is typically 100x or more faster.
-HPAT is built on top of `Numba <https://github.com/numba/numba>`_
+master-executor libraries. Hence, Intel(R) SDC is typically 100x or more faster.
+Intel(R) SDC is built on top of `Numba <https://github.com/numba/numba>`_
 and `LLVM <https://llvm.org/>`_ compilers.
