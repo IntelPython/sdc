@@ -7,7 +7,7 @@ set -e
 
 echo "Install Miniconda3"
 
-prefix="$HOME/miniconda"
+prefix="$HOME/miniconda3"
 if [ "$1" == "" ]; then
   echo "Conda prefix is empy; Conda will be installed to $HOME"
   echo "To set prefix use setup_conda.sh <prefix>"

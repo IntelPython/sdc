@@ -16,13 +16,13 @@ jobs:
   steps:
     - script: |
         chmod 777 buildscripts/install_conda.sh
-        buildscripts/install_conda.sh $CONDA_PREFIX_PATH
+        buildscripts/install_conda.sh $HOME/miniconda3
       displayName: 'Install conda'
 
     - script: |
-        $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
+        $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3
       displayName: 'Build conda and wheel packages'
 
     - script: |
-        $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
+        $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3
       displayName: 'Test conda package'

@@ -8,7 +8,10 @@ env:
         - GIT_DESCRIBE_NUMBER=1
         - PYTHON_VER=3.7
         - NUMPY_VER=1.16
-        - CONDA_PREFIX_PATH=$HOME/miniconda
+        - CONDA_PREFIX_PATH=$HOME/miniconda3
+        - SDC_RUN_COVERAGE=""
+        - BUILD_MODE=package
+        - TEST_MODE=conda
     matrix:
         - name: Ubuntu-16.04_py3.7_numpy1.16_np1
           env: SDC_NP_MPI=1
@@ -17,23 +20,17 @@ env:
         - name: Ubuntu-16.04_py3.7_numpy1.16_np3
           env: SDC_NP_MPI=3
         - name: Ubuntu-16.04_py3.7_numpy1.16_np0_coverage
-          env: SDC_RUN_COVERAGE=True
+          env: BUILD_MODE=develop TEST_MODE=develop SDC_RUN_COVERAGE="--run-coverage"
 
 before_install:
     - chmod 777 buildscripts/install_conda.sh
     - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
 
 install:
-    - if [ $SDC_RUN_COVERAGE == 'True' ];
-      then travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=develop --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH;
-      else travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH;
-      fi
+    - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
 
 script:
-    - if [ $SDC_RUN_COVERAGE == 'True' ];
-      then travis_wait $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=develop --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage;
-      else travis_wait $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH;
-      fi
+    - travis_wait $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH $SDC_RUN_COVERAGE
 
 after_success: skip
 

@@ -15,13 +15,13 @@ jobs:
 
   steps:
     - script: |
-        buildscripts\\install_conda.bat "%CONDA_PREFIX_PATH%"
+        buildscripts\\install_conda.bat "%UserProfile%\\Miniconda3"
       displayName: 'Install conda'
 
     - script: |
-        %CONDA_PREFIX_PATH%\\python.exe buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%CONDA_PREFIX_PATH%"
+        "%UserProfile%\\Miniconda3\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%UserProfile%\\Miniconda3"
       displayName: 'Build conda and wheel packages'
 
     - script: |
-        %CONDA_PREFIX_PATH%\\python.exe buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%CONDA_PREFIX_PATH%"
+        "%UserProfile%\\Miniconda3\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%UserProfile%\\Miniconda3"
       displayName: 'Test conda package'
