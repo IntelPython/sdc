@@ -1549,11 +1549,11 @@ class HiFramesTypedPassImpl(object):
             if func_name == 'cov':
                 def f(a, b, w, c):
                     return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_cov(a, b, w, c))
-            if func_name == 'corr':
-                def f(a, b, w, c):
-                    return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_corr(a, b, w, c))
-            return self._replace_func(f, [data, other, window, center],
-                                      pre_nodes=nodes)
+            # if func_name == 'corr':
+            #     def f(a, b, w, c):
+            #         return hpat.hiframes.api.init_series(hpat.hiframes.rolling.rolling_corr(a, b, w, c))
+            # return self._replace_func(f, [data, other, window, center],
+            #                           pre_nodes=nodes)
         elif func_name == 'apply':
             func_node = guard(get_definition, self.state.func_ir, rhs.args[0])
             dtype = self.state.typemap[data.name].dtype

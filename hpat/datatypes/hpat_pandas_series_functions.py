@@ -3119,6 +3119,37 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.corrcoef(self_arr, other_arr)[0, 1]
+        if method == 'pearson':
+            return numpy.corrcoef(self_arr, other_arr)[0, 1]
+
+        if method == 'kendall':
+            length = len(self_arr)
+            nc = 0
+            nd = 0
+            for i in range(length):
+                for j in range(i, length):
+                    if self_arr[i] == self_arr[j] or other_arr[i] == other_arr[j]:
+                        continue
+                    if (self_arr[i] < self_arr[j] and other_arr[i] < other_arr[j]) or (self_arr[i] > self_arr[j]
+                                                                                       and other_arr[i] > other_arr[j]):
+                        nc += 1
+                    if (self_arr[i] < self_arr[j] and other_arr[i] > other_arr[j]) or (self_arr[i] > self_arr[j]
+                                                                                       and other_arr[i] < other_arr[j]):
+                        nd += 1
+            b = (length * (length - 1)) / 2
+            k = (nc - nd) / b
+            return k
+
+        if method == 'spearman':
+            length = len(self_arr)
+            self_arr_sort = numpy.sort(self_arr)
+            other_arr_sort = numpy.sort(other_arr)
+            d = 0
+            for i in range(length):
+                ri = list(self_arr_sort).index(self_arr[i])
+                si = list(other_arr_sort).index(other_arr[i])
+                d += (ri - si) ** 2
+            s = 1 - 6 / (length * (length ** 2 - 1)) * d
+            return s
 
     return hpat_pandas_series_corr_impl
