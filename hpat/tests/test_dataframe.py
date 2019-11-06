@@ -820,6 +820,15 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+    def test_count(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
+            return df.count()
+
+        hpat_func = hpat.jit(test_impl)
+        n = 11
+        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+
     def test_count1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
