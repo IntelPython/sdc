@@ -1841,10 +1841,11 @@ class TestSeries(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
 
-        for asceding in (True, False):
-            for data in test_global_input_data_integer64:
-                S = pd.Series(data)
-                pd.testing.assert_series_equal(hpat_func(S, asceding), test_impl(S, asceding))
+        data = [1, 0, 0, 1, 1, -1, 0, -1, 0]
+
+        for asceding in (False, True):
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S, asceding), test_impl(S, asceding))
 
     @unittest.skip('Unimplemented: need handling of numpy.nan comparison')
     def test_series_value_counts_dropna_false(self):
@@ -1896,7 +1897,7 @@ class TestSeries(unittest.TestCase):
         for data in test_global_input_data_integer64:
             index = np.arange(start=1, stop=len(data) + 1)
             S = pd.Series(data, index=index)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_no_unboxing(self):
         def test_impl():
