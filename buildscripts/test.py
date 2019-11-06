@@ -5,19 +5,21 @@ import subprocess
 import sys
 import traceback
 
-from utilities import render_sdc_env
-from utilities import run_command
 from utilities import create_conda_env
-from utilities import get_sdc_built_packages
+from utilities import get_sdc_env
+from utilities import get_sdc_build_packages
+from utilities import get_activate_env_cmd
+from utilities import get_conda_activate_cmd
+from utilities import run_command
 
 
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
-    sdc_meta_file = os.path.join(sdc_recipe, 'meta.yaml')
 
     os.chdir(sdc_src)
 
+    # Parse input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--test-mode', default='conda',
                         help="""Test mode: 
@@ -48,40 +50,38 @@ if __name__ == '__main__':
 
     # Init variables
     conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
-    build_env = 'sdc-build-env-py{}-numpy{}'.format(python, numpy)
     test_env = 'sdc-test-env-py{}-numpy{}'.format(python, numpy)
     develop_env = 'sdc-develop-env-py{}-numpy{}'.format(python, numpy)
-    build_env_activate = get_activate_env_cmd(conda_activate, build_env)
     test_env_activate = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
+    conda_channels = '-c numba -c conda-forge -c defaults -c intel'
+
+    cmd_delimiter = '&&'
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')
         conda_channels = '-c numba -c conda-forge -c defaults -c intel'
-
-        mpi_vars = os.path.join(conda_prefix, 'Library', 'bin', 'mpivars.bat')
-        develop_env_activate = '{} && {} quiet'.format(develop_env_activate, mpi_vars)
-
+        """
+        For develop build vs-2015 and vs-2017 runtime is installed.
+        If Visual Studio 2017 is not installed, activation returns non-zero code
+        thus next command executed with && fails.
+        This delimited is used for develop build and after-build smoke tests.
+        """
+        cmd_delimiter = '&'
     else:
         test_script = os.path.join(sdc_recipe, 'run_test.sh')
-        conda_channels = '-c numba -c conda-forge -c defaults'
 
 
-    if run_coverage == True or test_mode == 'develop':
-        print('='*80)
-        print('Check that SDC installed in develop mode')
-        try:
-            run_command('{} && python -c "import hpat"'.format(build_env_activate))
-        except:
-            print('SDC does not installed in developer mode in {} env. Please use "python build.py --build-mode=develop" to do this'.format(build_env))
-            sys.exit(1)
-
-    if run_coverage == True
+    if run_coverage == True:
         print('='*80)
         print('Run coverage')
+        print(f'Assume that SDC is installed in develop build-mode to {develop_env} environment')
+        print('='*80)
+        print('Install scipy and coveralls')
+        run_command(f'{develop_env_activate} {cmd_delimiter} conda install -y scipy coveralls {conda_channels}')
         os.environ['PYTHONPATH'] = '.'
         try:
-            run_command('{} && coverage erase && coverage run -m hpat.runtests && coveralls -v')
+            run_command(f'{develop_env_activate} {cmd_delimiter} coverage erase && coverage run -m hpat.runtests && coveralls -v')
         except:
             print('='*80)
             print('Coverage fails')
@@ -90,37 +90,61 @@ if __name__ == '__main__':
 
     if test_mode == 'develop':
         print('='*80)
-        print('Run tests in develop mode')
-        run_command('{} && {}'.format(build_env_activate, test_script))
+        print(f'Run tests for sdc installed in {develop_env}')
+        """
+        os.chdir(../sdc_src) is a workaround for the following error:
+        Traceback (most recent call last):
+            File "<string>", line 1, in <module>
+            File "hpat/hpat/__init__.py", line 9, in <module>
+                import hpat.dict_ext
+            File "hpat/hpat/dict_ext.py", line 12, in <module>
+                from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
+            File "hpat/hpat/str_ext.py", line 18, in <module>
+                from . import hstr_ext
+        ImportError: cannot import name 'hstr_ext' from 'hpat' (hpat/hpat/__init__.py)
+        """
+        os.chdir(os.path.dirname(sdc_src))
+        run_command(f'{develop_env_activate} {cmd_delimiter} {test_script}')
 
-
-    sdc_packages = get_sdc_built_packages(build_folder)
-    try:
-        sdc_conda_pkg = sdc_packages[0]
-        sdc_wheel_pkg = sdc_packages[1]
-    except:
-        print('='*80)
-        print('ERROR: Built sdc packages not found in {} folder'.format(build_folder))
-        print(traceback.format_exc())
-        sys.exit(1)
-
-
+    # Test conda package using conda build
     if test_mode == 'conda':
-        create_conda_env(test_env, python, ['conda-build'], conda_channels)
-        test_cmd = '{} && {}'.format(test_env_activate,
-                                    ' '.join(['conda build --test',
-                                                          ' --override-channels {} {}'.format(conda_channels, sdc_conda_pkg)]))
+        create_conda_env(conda_activate, test_env, python, ['conda-build'])
+        sdc_packages = get_sdc_build_packages(build_folder)
+        for package in sdc_packages:
+            if '.tar.bz2' in package:
+                run_command(f'{test_env_activate} && conda build --test --override-channels {conda_channels} {package}')
 
+    # Get sdc build and test environment
+    sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
+
+    # Test specified package type
     if test_mode == 'package':
-        if package_type == 'conda':
-            print('='*80)
-            print('Run tests for sdc conda package: {}'.format(package_type, sdc_conda_pkg))
-            create_conda_env(test_env, python, sdc_env['test'], conda_channels)
-            run_command('{} && conda install -y {}'.format(sdc_conda_pkg))
-        else:
-            print('='*80)
-            print('Run tests for sdc wheel package: {}'.format(sdc_wheel_pkg))
-            create_conda_env(test_env, python, sdc_env['test'].append('pip'), conda_channels)
-            run_command('{} && pip install {}'.format(sdc_wheel_pkg))
-
-        run_command('{} && {}'.format(test_env_activate, test_script))
+        print('='*80)
+        print(f'Run tests for {package_type} package type')
+        """
+        os.chdir(../sdc_src) is a workaround for the following error:
+        Traceback (most recent call last):
+            File "<string>", line 1, in <module>
+            File "hpat/hpat/__init__.py", line 9, in <module>
+                import hpat.dict_ext
+            File "hpat/hpat/dict_ext.py", line 12, in <module>
+                from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
+            File "hpat/hpat/str_ext.py", line 18, in <module>
+                from . import hstr_ext
+        ImportError: cannot import name 'hstr_ext' from 'hpat' (hpat/hpat/__init__.py)
+        """
+        os.chdir(os.path.dirname(sdc_src))
+        sdc_packages = get_sdc_build_packages(build_folder)
+        for package in sdc_packages:
+            if '.tar.bz2' in package and package_type == 'conda':
+                print('='*80)
+                print(f'Run tests for sdc conda package: {package}')
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
+                run_command(f'{test_env_activate} && conda install -y {package}')
+                run_command(f'{test_env_activate} {cmd_delimiter} {test_script}')
+            elif '.whl' in package and package_type == 'wheel':
+                print('='*80)
+                print(f'Run tests for sdc wheel package: {package}')
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'], conda_channels)
+                run_command(f'{test_env_activate} && pip install {package}')
+                run_command(f'{test_env_activate} {cmd_delimiter} {test_script}')

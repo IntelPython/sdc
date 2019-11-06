@@ -25,7 +25,6 @@ fi
 # Download Miniconda
 echo "Download Miniconda3 installer to ~/miniconda.sh"
 unamestr=`uname`
-CONDA_INSTALL="conda install -q -y"
 if [[ "$unamestr" == 'Linux' ]]; then
   wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
 elif [[ "$unamestr" == 'Darwin' ]]; then
@@ -38,5 +37,4 @@ fi
 echo "Install Miniconda3 to $prefix"
 chmod +x ~/miniconda.sh
 ~/miniconda.sh -b -p "$prefix"
-export PATH=$prefix/bin:$PATH
 echo "Done"

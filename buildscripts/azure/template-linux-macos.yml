@@ -15,6 +15,7 @@ jobs:
 
   steps:
     - script: |
+        chmod 777 buildscripts/install_conda.sh
         buildscripts/install_conda.sh $CONDA_PREFIX_PATH
       displayName: 'Install conda'
 

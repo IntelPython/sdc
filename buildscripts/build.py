@@ -16,14 +16,13 @@ from utilities import set_environment_variable
 
 def run_smoke_tests(sdc_src, test_env_activate, cmd_delimiter):
         sdc_pi_example = os.path.join(sdc_src, 'buildscripts', 'sdc_pi_example.py')
-        run_command('{} {} python -c "import hpat"'.format(test_env_activate, cmd_delimiter))
-        run_command('{} {} python {}'.format(test_env_activate, cmd_delimiter, sdc_pi_example))
+        run_command(f'{test_env_activate} {cmd_delimiter} python -c "import hpat"')
+        run_command(f'{test_env_activate} {cmd_delimiter} python {sdc_pi_example}')
 
 
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
-    sdc_meta_yaml = os.path.join(sdc_recipe, 'meta.yaml')
 
     os.chdir(sdc_src)
 
@@ -53,9 +52,9 @@ if __name__ == '__main__':
     
     # Init variables
     conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
-    build_env = 'sdc-build-env-py{}-numpy{}'.format(python, numpy)
-    test_env = 'sdc-test-env-py{}-numpy{}'.format(python, numpy)
-    develop_env = 'sdc-develop-env-py{}-numpy{}'.format(python, numpy)
+    build_env = f'sdc-build-env-py{python}-numpy{numpy}'
+    test_env = f'sdc-test-env-py{python}-numpy{numpy}'
+    develop_env = f'sdc-develop-env-py{python}-numpy{numpy}'
     build_env_activate = get_activate_env_cmd(conda_activate, build_env)
     test_env_activate = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
@@ -85,10 +84,10 @@ if __name__ == '__main__':
                                                             '--python {}'.format(python),
                                                             '--numpy={}'.format(numpy),
                                                             '--output-folder {}'.format(output_folder),
-                                                            ' --override-channels {} {}'.format(conda_channels, sdc_recipe)]))
+                                                            '--override-channels {} {}'.format(conda_channels, sdc_recipe)]))
     else:
         create_conda_env(conda_activate, develop_env, python, sdc_env['build'], conda_channels)
-        build_cmd = '{} {} python setup.py {}'.format(develop_env_activate, cmd_delimiter, build_mode)
+        build_cmd = f'{develop_env_activate} {cmd_delimiter} python setup.py {build_mode}'
 
     # Start build
     print('='*80)
@@ -127,16 +126,16 @@ if __name__ == '__main__':
             if '.tar.bz2' in package:
                 # Start test for conda package
                 print('='*80)
-                print('Run tests for sdc conda package: {}'.format(package))
+                print(f'Run tests for sdc conda package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
-                run_command('{} && conda install -y {}'.format(test_env_activate, package))
+                run_command(f'{test_env_activate} && conda install -y {package}')
                 run_smoke_tests(sdc_src, test_env_activate, cmd_delimiter)
             elif '.whl' in package:
                 # Start test for wheel package
                 print('='*80)
-                print('Run tests for sdc wheel package: {}'.format(package))
+                print(f'Run tests for sdc wheel package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'], conda_channels)
-                run_command('{} && pip install {}'.format(test_env_activate, package))
+                run_command(f'{test_env_activate} && pip install {package}')
                 run_smoke_tests(sdc_src, test_env_activate, cmd_delimiter)
     else:
         print('='*80)

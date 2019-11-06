@@ -7,24 +7,23 @@ import traceback
 """
 Create conda environment with desired python and packages
 """
-def create_conda_env(conda_activate, env_name, python='3.7', packages=None, channels=''):
+def create_conda_env(conda_activate, env_name, python, packages=None, channels=''):
     print('='*80)
-    print('Setup conda {} environment'.format(env_name), flush=True)
-    run_command('{}conda remove -y --name {} --all'.format(conda_activate, env_name))
-    run_command('{}conda create -y -n {} python={}'.format(conda_activate, env_name, python))
+    print(f'Setup conda {env_name} environment', flush=True)
+    run_command(f'{conda_activate}conda remove -y --name {env_name} --all')
+    run_command(f'{conda_activate}conda create -y -n {env_name} python={python}')
     if packages:
+        packages_list = ' '.join(packages)
         if platform.system() == 'Windows':
-            run_command('{}activate {} && conda install -y {} {}'.format(conda_activate, env_name,
-                                                                         ' '.join(packages), channels))
+            run_command(f'{conda_activate}activate {env_name} && conda install -y {packages_list} {channels}')
         else:
-            run_command('{}source activate {} && conda install -y {} {}'.format(conda_activate, env_name,
-                                                                                ' '.join(packages), channels))
+            run_command(f'{conda_activate}source activate {env_name} && conda install -y {packages_list} {channels}')
 
 
 """
 Create list of packages required for build and test from conda recipe
 """
-def get_sdc_env(conda_activate, sdc_src, sdc_recipe, python='3.7', numpy='1.16', channels=''):
+def get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, channels):
     build_env = []
     test_env  = []
     build_env_set = set()
@@ -78,7 +77,7 @@ def get_sdc_env(conda_activate, sdc_src, sdc_recipe, python='3.7', numpy='1.16',
                         test_env_set.add(package)
     except:
         print('='*80)
-        print('WARNING: Render environment for sdc from {} recipe failed'.format(sdc_recipe))
+        print(f'ERROR: Render environment for sdc from {sdc_recipe} recipe failed')
         print(traceback.format_exc())
 
     return {'build': build_env, 'test': test_env}
@@ -110,9 +109,9 @@ Return platform specific activation cmd
 """
 def get_activate_env_cmd(conda_activate, env_name):
     if platform.system() == 'Windows':
-        return '{}activate {}'.format(conda_activate, env_name)
+        return f'{conda_activate}activate {env_name}'
     else:
-        return '{}source activate {}'.format(conda_activate, env_name)
+        return f'{conda_activate}source activate {env_name}'
 
 
 """

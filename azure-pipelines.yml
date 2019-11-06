@@ -1,15 +1,15 @@
 jobs:
 - template: buildscripts/azure/template-windows.yml
   parameters:
-    name: Windows
+    name: Windows-2016
     vmImage: vs2017-win2016
     matrix:
-      win-2016_vs2017_py3.7_numpy1.16_np0:
+      vs2017_py3.7_numpy1.16_np0:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         CONDA_PREFIX_PATH: '%UserProfile%\Miniconda3'
 
-      win-2016_vs2017_py3.7_numpy1.16_np2:
+      vs2017_py3.7_numpy1.16_np2:
         SDC_NP_MPI: '2'
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
@@ -17,27 +17,16 @@ jobs:
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: macOS
+    name: OSX-10.13
     vmImage: xcode9-macos10.13
     matrix:
-      OSX-10.13_xcode9_py3.7_numoy1.16_np0:
+      xcode9_py3.7_numpy1.16_np0:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         CONDA_PREFIX_PATH: '$HOME/miniconda'
 
-      OSX-10.13_xcode9_py3.7_numoy1.16_np2:
+      xcode9_py3.7_numpy1.16_np2:
         SDC_NP_MPI: '2'
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
-        CONDA_PREFIX_PATH: '$HOME/miniconda'
-
-- template: buildscripts/azure/template-linux-macos.yml
-  parameters:
-    name: Linux
-    vmImage: ubuntu-16.04
-    matrix:
-      ubuntu-16.04_py3.7_numpy1.16_np3:
-        SDC_NP_MPI: '3'
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         CONDA_PREFIX_PATH: '$HOME/miniconda'
