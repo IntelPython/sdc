@@ -439,23 +439,23 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     _func_name = 'Method value_counts().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('Method value_counts().')
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(normalize, types.Omitted) and normalize:
-        raise TypingError('{} Unsupported parameters. Given normalize: {}'.format(_func_name, normalize))
+        ty_checker.raise_exc(normalize, 'boolean', 'normalize')
 
     if not isinstance(sort, (types.Omitted, types.Boolean, bool)):
-        raise TypingError('{} The object must be boolean. Given sort: {}'.format(_func_name, sort))
+        ty_checker.raise_exc(sort, 'boolean', 'sort')
 
     if not isinstance(ascending, (types.Omitted, types.Boolean, bool)):
-        raise TypingError('{} The object must be boolean. Given ascending: {}'.format(_func_name, ascending))
+        ty_checker.raise_exc(ascending, 'boolean', 'ascending')
 
     if not isinstance(bins, (types.Omitted, types.NoneType)) and bins is not None:
-        raise TypingError('{} Unsupported parameters. Given bins: {}'.format(_func_name, bins))
+        ty_checker.raise_exc(bins, 'boolean', 'bins')
 
     if not isinstance(dropna, (types.Omitted, types.Boolean, bool)):
-        raise TypingError('{} The object must be boolean. Given dropna:{}'.format(_func_name, dropna))
+        ty_checker.raise_exc(dropna, 'boolean', 'dropna')
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):

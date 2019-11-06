@@ -1886,11 +1886,10 @@ class TestSeries(unittest.TestCase):
         def test_impl(S):
             return S.value_counts()
 
-        index = [11, 12, 13, 14, 15, 16]
-
         hpat_func = hpat.jit(test_impl)
 
         for data in test_global_input_data_integer64:
+            index = np.arange(start=1, stop=len(data) + 1)
             S = pd.Series(data, index=index)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
