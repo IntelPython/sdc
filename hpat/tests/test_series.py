@@ -42,7 +42,7 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
-    [0.1, 1., np.nan, -1., 0., min_float64, max_float64, 0.1],
+    [1., np.nan, -1., 0., min_float64, max_float64],
     [np.nan, np.inf, np.NINF, np.NZERO]
 ]
 
@@ -51,7 +51,7 @@ max_int64 = np.iinfo('int64').max
 max_uint64 = np.iinfo('uint64').max
 
 test_global_input_data_integer64 = [
-    [1, -1, 0, 1, 2, 3, 1, 1, 3],
+    [1, -1, 0],
     [min_int64, max_int64],
     [max_uint64]
 ]
@@ -1813,20 +1813,25 @@ class TestSeries(unittest.TestCase):
         def test_impl(S):
             return S.value_counts()
 
+        additional_data = [1, 2, 3, 1, 1, 3]
+
         hpat_func = hpat.jit(test_impl)
 
         for data in test_global_input_data_integer64:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            S = pd.Series(data + additional_data)
+            # Remove sort_index() after implementing sorting with the same number of frequency
+            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_float(self):
         def test_impl(S):
             return S.value_counts()
 
+        additional_data = [0.1, 0., 0.1, 0.1]
+
         hpat_func = hpat.jit(test_impl)
 
         for data in test_global_input_data_float64:
-            S = pd.Series(data)
+            S = pd.Series(data + additional_data)
             # Remove sort_index() after implementing sorting with the same number of frequency
             pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
