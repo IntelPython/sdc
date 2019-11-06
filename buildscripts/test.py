@@ -42,30 +42,29 @@ if __name__ == '__main__':
     conda_prefix  = os.getenv('CONDA_PREFIX', args.conda_prefix)
     run_coverage  = args.run_coverage
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
+
     if package_type == 'wheel' and test_mode == 'conda':
         test_mode = 'package'
 
+    # Init variables
+    conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
     build_env = 'sdc-build-env-py{}-numpy{}'.format(python, numpy)
     test_env = 'sdc-test-env-py{}-numpy{}'.format(python, numpy)
-
-    sdc_env = render_sdc_env(sdc_meta_file, python, numpy)
+    develop_env = 'sdc-develop-env-py{}-numpy{}'.format(python, numpy)
+    build_env_activate = get_activate_env_cmd(conda_activate, build_env)
+    test_env_activate = get_activate_env_cmd(conda_activate, test_env)
+    develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')
         conda_channels = '-c numba -c conda-forge -c defaults -c intel'
 
-        build_env_activate = 'activate {}'.format(build_env)
-        test_env_activate = 'activate {}'.format(test_env)
+        mpi_vars = os.path.join(conda_prefix, 'Library', 'bin', 'mpivars.bat')
+        develop_env_activate = '{} && {} quiet'.format(develop_env_activate, mpi_vars)
 
-        os.environ['PATH'] = conda_prefix + os.pathsep + os.path.join(conda_prefix, 'Scripts') + os.pathsep + os.environ['PATH']
     else:
         test_script = os.path.join(sdc_recipe, 'run_test.sh')
         conda_channels = '-c numba -c conda-forge -c defaults'
-
-        build_env_activate = 'source activate {}'.format(build_env)
-        test_env_activate = 'source activate {}'.format(test_env)
-
-        os.environ['PATH'] = os.path.join(conda_prefix, 'bin') + os.pathsep + os.environ['PATH']
 
 
     if run_coverage == True or test_mode == 'develop':

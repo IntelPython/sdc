@@ -42,7 +42,7 @@ requirements:
     - mpich                           # [not win]
     - impi_rt                         # [win]
     - impi-devel                      # [win]
-    - conda-package-handling ==1.3.11 #[win]
+    - conda-package-handling ==1.3.11 # [win]
     - wheel
 
   run:
@@ -65,52 +65,10 @@ test:
     - hpat
 
 outputs:
-  - name: hpat
-    requirements:
-      build:
-        - {{ compiler('c') }}
-        - {{ compiler('cxx') }}
-        - python
-        - conda-verify   # [win]
-        - vc             # [win]
-        - vs2015_runtime # [win]
-        - vs2015_win-64  # [win]
-      host:
-        - python
-        - setuptools
-        - numba {{ NUMBA_VERSION }}
-        - numpy
-        - pandas {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - arrow-cpp {{ PYARROW_VERSION }}
-        - boost
-        - hdf5
-        - h5py
-        - mpich                           # [not win]
-        - impi_rt                         # [win]
-        - impi-devel                      # [win]
-        - conda-package-handling ==1.3.11 # [win]
-
-      run:
-        - python
-        - {{ pin_compatible('numpy') }}
-        - pandas {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - arrow-cpp {{ PYARROW_VERSION }}
-        - boost
-        - numba {{ NUMBA_VERSION }}
-        - mpich # [not win]
-        - impi_rt # [win]
-        - conda-package-handling ==1.3.11 # [win]
-
-    test:
-      requires:
-        - h5py
-        - scipy
-      imports:
-        - hpat
-
+  - type: conda
+    name: hpat
   - type: wheel
+    name: hpat
     requirements:
       build:
         - {{ compiler('c') }}
@@ -134,35 +92,6 @@ outputs:
         - vc                              # [win]
         - vs2015_runtime                  # [win]
         - vs2015_win-64                   # [win]
-
-      host:
-        - python
-        - setuptools
-        - numba {{ NUMBA_VERSION }}
-        - numpy
-        - pandas {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - arrow-cpp {{ PYARROW_VERSION }}
-        - boost
-        - hdf5
-        - h5py
-        - mpich                           # [not win]
-        - impi_rt                         # [win]
-        - impi-devel                      # [win]
-        - conda-package-handling ==1.3.11 # [win]
-        - wheel
-
-      run:
-        - python
-        - {{ pin_compatible('numpy') }}
-        - pandas {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - arrow-cpp {{ PYARROW_VERSION }}
-        - boost
-        - numba {{ NUMBA_VERSION }}
-        - mpich                           # [not win]
-        - impi_rt                         # [win]
-        - conda-package-handling ==1.3.11 # [win]
 
 about:
   home: https://github.com/IntelPython/sdc

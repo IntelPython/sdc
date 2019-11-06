@@ -18,6 +18,7 @@ env:
           env: SDC_RUN_COVERAGE=True
 
 before_install:
+    - chmod 777 buildscripts/install_conda.sh
     - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
 
 install:

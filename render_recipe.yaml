@@ -1,0 +1,174 @@
+package:
+    name: hpat
+    version: 0.29.2
+source:
+    path: ../..
+build:
+    noarch: false
+    number: '255'
+    script_env:
+        - SDC_CONFIG_MPI
+        - SDC_CONFIG_PIPELINE_SDC
+        - SDC_NP_MPI
+requirements:
+    build:
+        - arrow-cpp ==0.15.0
+        - boost
+        - conda-package-handling ==1.3.11
+        - conda-verify
+        - h5py
+        - hdf5
+        - impi-devel
+        - impi_rt
+        - numba ==0.46
+        - numpy 1.16.*
+        - pandas >=0.23
+        - pyarrow ==0.15.0
+        - python 3.7.*
+        - setuptools
+        - vc 14.*
+        - vs2015_runtime
+        - vs2015_win-64
+        - vs2017_win-64
+        - wheel
+        - pip
+        - python 3.7
+    host:
+        - python 3.7.*
+        - setuptools
+        - numba ==0.46
+        - numpy 1.16.*
+        - pandas >=0.23
+        - pyarrow ==0.15.0
+        - arrow-cpp ==0.15.0
+        - boost
+        - hdf5
+        - h5py
+        - impi_rt
+        - impi-devel
+        - conda-package-handling ==1.3.11
+        - wheel
+    run:
+        - python
+        - numpy
+        - pandas >=0.23
+        - pyarrow ==0.15.0
+        - arrow-cpp ==0.15.0
+        - boost
+        - numba ==0.46
+        - impi_rt
+        - conda-package-handling ==1.3.11
+test:
+    requires:
+        - h5py
+        - scipy
+outputs:
+    -   about:
+            home: https://github.com/IntelPython/sdc
+            license: BSD
+            license_file: LICENSE.md
+            summary: A compiler-based big data framework in Python
+        build:
+            noarch: false
+            number: '255'
+            script_env:
+                - SDC_CONFIG_MPI
+                - SDC_CONFIG_PIPELINE_SDC
+                - SDC_NP_MPI
+        name: hpat
+        requirements:
+            build:
+                - conda-verify
+                - python 3.7.*
+                - vc 14.*
+                - vs2015_runtime
+                - vs2015_win-64
+                - vs2017_win-64
+            host:
+                - arrow-cpp ==0.15.0
+                - boost
+                - conda-package-handling ==1.3.11
+                - h5py
+                - hdf5
+                - impi-devel
+                - impi_rt
+                - numba ==0.46
+                - numpy 1.16.*
+                - pandas >=0.23
+                - pyarrow ==0.15.0
+                - python 3.7.*
+                - setuptools
+            run:
+                - arrow-cpp ==0.15.0
+                - boost
+                - conda-package-handling ==1.3.11
+                - impi_rt
+                - numba ==0.46
+                - numpy
+                - pandas >=0.23
+                - pyarrow ==0.15.0
+                - python
+        test:
+            imports:
+                - hpat
+            requires:
+                - h5py
+                - scipy
+    -   requirements:
+            build:
+                - vs2017_win-64
+                - vs2017_win-64
+                - python 3.7.*
+                - wheel
+                - setuptools
+                - numba ==0.46
+                - numpy 1.16.*
+                - pandas >=0.23
+                - pyarrow ==0.15.0
+                - arrow-cpp ==0.15.0
+                - boost
+                - hdf5
+                - h5py
+                - impi_rt
+                - impi-devel
+                - conda-package-handling ==1.3.11
+                - conda-verify
+                - vc 14.*
+                - vs2015_runtime
+                - vs2015_win-64
+            host:
+                - python 3.7.*
+                - setuptools
+                - numba ==0.46
+                - numpy 1.16.*
+                - pandas >=0.23
+                - pyarrow ==0.15.0
+                - arrow-cpp ==0.15.0
+                - boost
+                - hdf5
+                - h5py
+                - impi_rt
+                - impi-devel
+                - conda-package-handling ==1.3.11
+                - wheel
+            run:
+                - python
+                - numpy
+                - pandas >=0.23
+                - pyarrow ==0.15.0
+                - arrow-cpp ==0.15.0
+                - boost
+                - numba ==0.46
+                - impi_rt
+                - conda-package-handling ==1.3.11
+        type: wheel
+about:
+    home: https://github.com/IntelPython/sdc
+    license: BSD
+    license_file: LICENSE.md
+    summary: A compiler-based big data framework in Python
+extra:
+    parent_recipe:
+        name: hpat
+        path: C:\Users\vssmirno\Desktop\work\my_hpat\hpat\buildscripts\sdc-conda-recipe
+        version: 0.29.2
