@@ -3477,6 +3477,8 @@ class TestSeries(unittest.TestCase):
         cfunc = hpat.jit(pyfunc)
         np.testing.assert_equal(pyfunc(), cfunc())
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.var() data [max_uint64, max_uint64] unsupported')
     def test_series_var_unboxing(self):
         def pyfunc(series):
             return series.var()
@@ -3501,6 +3503,8 @@ class TestSeries(unittest.TestCase):
                     result = cfunc(series, skipna=skipna, ddof=ddof)
                     np.testing.assert_equal(ref_result, result)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.var() strings as input data unsupported')
     def test_series_var_str(self):
         def pyfunc(series):
             return series.var()
@@ -3512,6 +3516,8 @@ class TestSeries(unittest.TestCase):
         msg = 'Method var(). The object must be a number. Given self.data.dtype: {}'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.var() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_var_unsupported_params(self):
         def pyfunc(series, axis, level, numeric_only):
             return series.var(axis=axis, level=level, numeric_only=numeric_only)
