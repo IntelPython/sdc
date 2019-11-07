@@ -377,11 +377,8 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
     def test_series_argsort_full(self):
-        def test_impl(series):
-            return series.argsort()
-
-        def pandas_impl(series):
-            return series.argsort(kind='mergesort')
+        def test_impl(series, kind):
+            return series.argsort(axis=0, kind=kind, order=None)
 
         hpat_func = hpat.jit(test_impl)
 
@@ -389,16 +386,13 @@ class TestSeries(unittest.TestCase):
 
         for data in all_data:
             series = pd.Series(data * 3)
-            ref_result = pandas_impl(series)
-            jit_result = hpat_func(series)
+            ref_result = test_impl(series, kind='mergesort')
+            jit_result = hpat_func(series, kind='quicksort')
             pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_argsort_full_idx(self):
-        def test_impl(series):
-            return series.argsort()
-
-        def pandas_impl(series):
-            return series.argsort(kind='mergesort')
+        def test_impl(series, kind):
+            return series.argsort(axis=0, kind=kind, order=None)
 
         hpat_func = hpat.jit(test_impl)
 
@@ -408,8 +402,8 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 series = pd.Series(data, index)
-                ref_result = pandas_impl(series)
-                jit_result = hpat_func(series)
+                ref_result = test_impl(series, kind='mergesort')
+                jit_result = hpat_func(series, kind='quicksort')
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
 
@@ -2995,11 +2989,8 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
     def test_series_sort_values_full(self):
-        def test_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
-
-        def pandas_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
+        def test_impl(series, ascending, kind):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -3009,17 +3000,14 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = pandas_impl(series, ascending)
-                jit_result = hpat_func(series, ascending)
+                ref_result = test_impl(series, ascending, kind='mergesort')
+                jit_result = hpat_func(series, ascending, kind='quicksort')
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
     @unittest.skip("Creating Python string/unicode object failed")
     def test_series_sort_values_full_unicode4(self):
-        def test_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
-
-        def pandas_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
+        def test_impl(series, ascending, kind):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -3029,16 +3017,13 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = pandas_impl(series, ascending)
-                jit_result = hpat_func(series, ascending)
+                ref_result = test_impl(series, ascending, kind='mergesort')
+                jit_result = hpat_func(series, ascending, kind='quicksort')
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_sort_values_full_idx(self):
-        def test_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
-
-        def pandas_impl(series, ascending):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
+        def test_impl(series, ascending, kind):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -3049,8 +3034,8 @@ class TestSeries(unittest.TestCase):
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 for ascending in [True, False]:
                     series = pd.Series(data, index)
-                    ref_result = pandas_impl(series, ascending)
-                    jit_result = hpat_func(series, ascending)
+                    ref_result = test_impl(series, ascending, kind='mergesort')
+                    jit_result = hpat_func(series, ascending, kind='quicksort')
                     pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_sort_values_parallel1(self):
