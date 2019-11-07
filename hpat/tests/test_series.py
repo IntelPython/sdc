@@ -3627,131 +3627,74 @@ class TestSeries(unittest.TestCase):
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
 
-    def test_series_getitem_value_int(self):
-        def test_impl(S):
-            return S[2]
+    def test_series_getitem(self):
+        def test_impl(S, key):
+            return S[key]
 
         jit_impl = hpat.jit(test_impl)
 
-        S = pd.Series([11, 22, 33], [2, 3, 5])
-        self.assertEqual(jit_impl(S), test_impl(S))
+        keys = [2, 2, '2']
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        for key, index in zip(keys, indices):
+            S = pd.Series([11, 22, 33], index)
+            self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
-    def test_series_getitem_value_str1(self):
-        def test_impl(S):
-            return S[2]
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_getitem_value_str2(self):
-        def test_impl(S):
-            return S['2']
+    def test_series_getitem_slice(self):
+        def test_impl(S, start, end):
+            return S[start:end]
 
         jit_impl = hpat.jit(test_impl)
 
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
+        starts = [0, 0, '2']
+        ends = [2, 2, '5']
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        for start, end, index in zip(starts, ends, indices):
+            S = pd.Series([11, 22, 33], index)
+            ref_result = test_impl(S, start, end)
+            print(type(ref_result))
+            jit_result = jit_impl(S, start, end)
+            pd.testing.assert_series_equal(jit_result, ref_result)
 
-    def test_series_getitem_slice_int(self):
-        def test_impl(S):
-            return S[0:2]
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], [2, 3, 5])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_getitem_slice_str1(self):
-        def test_impl(S):
-            return S[0:2]
+    def test_series_at(self):
+        def test_impl(S, key):
+            return S.at[key]
 
         jit_impl = hpat.jit(test_impl)
 
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
+        keys = [2, '2', '2']
+        all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33, 17, 63]]
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5', '2', '2']]
+        for key, data, index in zip(keys, all_data, indices):
+            S = pd.Series(data, index)
+            self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
-    def test_series_getitem_slice_str2(self):
-        def test_impl(S):
-            return S['2':'5']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_at_value_int(self):
-        def test_impl(S):
-            return S.at[2]
+    def test_series_loc(self):
+        def test_impl(S, key):
+            return S.loc[key]
 
         jit_impl = hpat.jit(test_impl)
 
-        S = pd.Series([11, 22, 33], [2, 3, 5])
-        self.assertEqual(jit_impl(S), test_impl(S))
+        keys = [2, '2', '2']
+        all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33, 17, 63]]
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5', '2', '2']]
+        for key, data, index in zip(keys, all_data, indices):
+            S = pd.Series(data, index)
+            self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
-    def test_series_at_value_str(self):
-        def test_impl(S):
-            return S.at['2']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_loc_value_int(self):
-        def test_impl(S):
-            return S.loc[2]
+    def test_series_loc_slice(self):
+        def test_impl(S, start, end):
+            return S.loc[start:end]
 
         jit_impl = hpat.jit(test_impl)
 
-        S = pd.Series([11, 22, 33], [2, 3, 5])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_loc_value_str(self):
-        def test_impl(S):
-            return S.loc['2']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_loc_slice_int(self):
-        def test_impl(S):
-            return S.loc[2:5]
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], [2, 3, 5])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_loc_slice_str(self):
-        def test_impl(S):
-            return S.loc['2':'5']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        self.assertEqual(jit_impl(S), test_impl(S))
-
-    def test_series_at_double_idx(self):
-        def test_impl(S):
-            return S.at['2']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33, 17, 63], ['2', '3', '5', '2', '2'])
-        np.testing.assert_array_equal(jit_impl(S), test_impl(S))
-
-    def test_series_loc_double_idx(self):
-        def test_impl(S):
-            return S.loc['2']
-
-        jit_impl = hpat.jit(test_impl)
-
-        S = pd.Series([11, 22, 33, 17, 63], ['2', '3', '5', '2', '2'])
-        pd.testing.assert_series_equal(jit_impl(S), test_impl(S))
+        starts = [0, '2']
+        ends = [2, '5']
+        indices = [[2, 3, 5], ['2', '3', '5']]
+        for start, end, index in zip(starts, ends, indices):
+            S = pd.Series([11, 22, 33], index)
+            ref_result = test_impl(S, start, end)
+            jit_result = jit_impl(S, start, end)
+            pd.testing.assert_series_equal(jit_result, ref_result)
 
 
 if __name__ == "__main__":
