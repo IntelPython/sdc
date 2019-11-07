@@ -1,4 +1,4 @@
-HPAT Developer's Guide
+Intel(R) SDC Developer's Guide
 =======================
    
 .. toctree::
@@ -10,4 +10,4 @@ HPAT Developer's Guide
    DevelopersGuide
    api
 
-To download HPAT documentation PDF click here :download:`pdf <../_builddev/latex/HPAT.pdf>`
+To download Intel(R) SDC documentation PDF click here :download:`pdf <../_builddev/latex/SDC.pdf>`
