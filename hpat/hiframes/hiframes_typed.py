@@ -199,7 +199,6 @@ class HiFramesTypedPassImpl(object):
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)
-
         return [assign]
 
     def _run_getitem(self, assign, rhs):

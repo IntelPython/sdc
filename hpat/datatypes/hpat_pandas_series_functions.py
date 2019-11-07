@@ -40,8 +40,6 @@ from numba import types
 
 import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
-from hpat.hiframes.pd_series_ext import SeriesMyType
-from hpat.hiframes.pd_series_ext import SeriesIatType
 from hpat.str_arr_ext import StringArrayType
 from hpat.utils import to_array
 
@@ -126,7 +124,6 @@ def hpat_pandas_series_getitem(self, idx):
             """
             **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_iloc1
             """
-            print("NEW GETITEM")
             result = self._data[idx]
             return result
 
@@ -185,8 +182,7 @@ def hpat_pandas_series_iloc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iloc_impl(self):
-        # return self
-        return SeriesMyType(self)
+        return self
 
     return hpat_pandas_series_iloc_impl
 

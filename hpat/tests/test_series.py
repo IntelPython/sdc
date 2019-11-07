@@ -3634,8 +3634,6 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], [2, 3, 5])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
 
     def test_series_getitem_value_str1(self):
@@ -3645,8 +3643,6 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
 
     def test_series_getitem_value_str2(self):
@@ -3656,8 +3652,6 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
 
     def test_series_getitem_slice_int(self):
@@ -3667,8 +3661,6 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], [2, 3, 5])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
 
     def test_series_getitem_slice_str1(self):
@@ -3678,8 +3670,6 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
 
     def test_series_getitem_slice_str2(self):
@@ -3689,9 +3679,79 @@ class TestSeries(unittest.TestCase):
         jit_impl = hpat.jit(test_impl)
 
         S = pd.Series([11, 22, 33], ['2', '3', '5'])
-        print(jit_impl(S))
-        print(test_impl(S))
         self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_at_value_int(self):
+        def test_impl(S):
+            return S.at[2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], [2, 3, 5])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_at_value_str(self):
+        def test_impl(S):
+            return S.at['2']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_loc_value_int(self):
+        def test_impl(S):
+            return S.loc[2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], [2, 3, 5])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_loc_value_str(self):
+        def test_impl(S):
+            return S.loc['2']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_loc_slice_int(self):
+        def test_impl(S):
+            return S.loc[2:5]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], [2, 3, 5])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_loc_slice_str(self):
+        def test_impl(S):
+            return S.loc['2':'5']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_at_double_idx(self):
+        def test_impl(S):
+            return S.at['2']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33, 17, 63], ['2', '3', '5', '2', '2'])
+        np.testing.assert_array_equal(jit_impl(S), test_impl(S))
+
+    def test_series_loc_double_idx(self):
+        def test_impl(S):
+            return S.loc['2']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33, 17, 63], ['2', '3', '5', '2', '2'])
+        pd.testing.assert_series_equal(jit_impl(S), test_impl(S))
 
 
 if __name__ == "__main__":

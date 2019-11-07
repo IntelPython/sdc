@@ -69,44 +69,6 @@ from hpat.str_arr_ext import (
 from hpat.str_ext import string_type, list_string_array_type
 
 
-class SeriesMyType(types.IterableType):
-    """Temporary type class for Series objects.
-    """
-
-    def __init__(self, dtype, data=None, index=None, is_named=False):
-        # keeping data array in type since operators can make changes such
-        # as making array unaligned etc.
-        data = _get_series_array_type(dtype) if data is None else data
-        # convert Record to tuple (for tuple output of map)
-        # TODO: handle actual Record objects in Series?
-        self.dtype = (types.Tuple(list(dict(dtype.members).values()))
-                      if isinstance(dtype, types.Record) else dtype)
-        self.data = data
-        if index is None:
-            index = types.none
-        self.index = index
-        # keep is_named in type to enable boxing
-        self.is_named = is_named
-        super(SeriesMyType, self).__init__(
-            name="series({}, {}, {}, {})".format(dtype, data, index, is_named))
-
-@register_model(SeriesMyType)
-class SeriesMyModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        name_typ = string_type if fe_type.is_named else types.none
-        members = [
-            ('data', fe_type.data),
-            ('index', fe_type.index),
-            ('name', name_typ),
-        ]
-        super(SeriesMyModel, self).__init__(dmm, fe_type, members)
-
-
-make_attribute_wrapper(SeriesMyType, 'data', '_data')
-make_attribute_wrapper(SeriesMyType, 'index', '_index')
-make_attribute_wrapper(SeriesMyType, 'name', '_name')
-
-
 class SeriesType(types.IterableType):
     """Temporary type class for Series objects.
     """
@@ -475,9 +437,9 @@ class SeriesAttribute(AttributeTemplate):
 #         return SeriesIatType(ary)
 #
 # # PR135. This needs to be commented out
-#     def resolve_iloc(self, ary):
-#         # TODO: support iat/iloc differences
-#         return SeriesIatType(ary)
+    def resolve_iloc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
 #
 # # PR135. This needs to be commented out
 #     def resolve_loc(self, ary):
@@ -926,7 +888,6 @@ class SeriesIatType(types.Type):
         self.stype = stype
         name = "SeriesIatType({})".format(stype)
         super(SeriesIatType, self).__init__(name)
-
 
 # PR135. This needs to be commented out
 # @infer_global(operator.getitem)
