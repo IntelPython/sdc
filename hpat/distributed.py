@@ -120,13 +120,13 @@ class DistributedPass(FunctionPass):
         pass
 
     def run_pass(self, state):
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        state.func_ir.dump()
-        print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
+        # print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        # state.func_ir.dump()
+        # print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
         res = DistributedPassImpl(state).run_pass()
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        state.func_ir.dump()
-        print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
+        # print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
+        # state.func_ir.dump()
+        # print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
         return res
 
 class DistributedPassImpl(object):
@@ -219,7 +219,7 @@ class DistributedPassImpl(object):
                                   self.state.targetctx, self)
                 elif isinstance(inst, Parfor):
                     print('********** process parfor **********')
-                    out_nodes = self._run_parfor(inst, namevar_table, 0 == depth)
+                    out_nodes = self._run_parfor(inst, namevar_table, depth)
                     # run dist pass recursively
                     p_blocks = wrap_parfor_blocks(inst)
                     # build_definitions(p_blocks, self.state.func_ir._definitions)
@@ -286,6 +286,9 @@ class DistributedPassImpl(object):
 
             if not replaced:
                 blocks[label].body = new_body
+                # print('******************** new_body')
+                # print('\n'.join([str(a) for a in new_body]))
+                # print('********************')
 
         return blocks
 
@@ -1700,12 +1703,16 @@ class DistributedPassImpl(object):
 
         return out
 
-    def _run_parfor(self, parfor, namevar_table, distribute):
+    def _run_parfor(self, parfor, namevar_table, depth):
         # stencil_accesses, neighborhood = get_stencil_accesses(
         #     parfor, self.state.typemap)
 
-        if not distribute:
-            parfor.no_sequential_lowering = True
+        dist_depth = 0
+
+        if depth > dist_depth:
+            # Do not distribute
+            if depth == (dist_depth + 1):
+                parfor.no_sequential_lowering = True
             return [parfor]
 
         # Thread and 1D parfors turn to gufunc in multithread mode
@@ -1718,7 +1725,7 @@ class DistributedPassImpl(object):
             return self._run_parfor_1D_Var(parfor, namevar_table)
 
         if self._dist_analysis.parfor_dists[parfor.id] != Distribution.OneD:
-            if debug_prints():  # pragma: no cover
+            if True or debug_prints():  # pragma: no cover
                 print("parfor " + str(parfor.id) + " not parallelized.")
             return [parfor]
 
@@ -1896,12 +1903,12 @@ class DistributedPassImpl(object):
         _, reductions = get_parfor_reductions(
             parfor, parfor.params, self.state.calltypes)
 
-        print('aaaaaaaaaaaaaaaaaaa')
-        parfor.dump()
-        print('aaaaaaaaaaaaaaaaaaa')
+        # print('aaaaaaaaaaaaaaaaaaa')
+        # parfor.dump()
+        # print('aaaaaaaaaaaaaaaaaaa')
         for reduce_varname, (init_val, reduce_nodes) in reductions.items():
-            print(len(reduce_nodes))
-            print('\n'.join([str(a) for a in reduce_nodes]))
+            # print(len(reduce_nodes))
+            # print('\n'.join([str(a) for a in reduce_nodes]))
             reduce_op = guard(self._get_reduce_op, reduce_nodes)
             # TODO: initialize reduction vars (arrays)
             reduce_var = namevar_table[reduce_varname]
@@ -2106,9 +2113,9 @@ class DistributedPassImpl(object):
         replace_arg_nodes(block, [reduce_var, op_var])
         dist_reduce_nodes = [op_assign] + block.body[:-3]
         dist_reduce_nodes[-1].target = reduce_var
-        print('*****************************')
-        print('\n'.join([str(a) for a in dist_reduce_nodes]))
-        print('*****************************')
+        # print('*****************************')
+        # print('\n'.join([str(a) for a in dist_reduce_nodes]))
+        # print('*****************************')
         return dist_reduce_nodes
 
     def _get_reduce_op(self, reduce_nodes):
