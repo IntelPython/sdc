@@ -752,12 +752,12 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
-str2str_methods = ('capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title')
+str2str_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
 """
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ('upper', 'lower')
+str2str_methods_excluded = ['upper', 'lower']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
     
@@ -803,22 +803,22 @@ class SeriesStrMethodAttribute(AttributeTemplate):
         return signature(SeriesType(string_type), *args)
 
     def generic_resolve(self, s_str, func_name):
-        if func_name not in str2str_methods:
-            if func_name in str2str_methods_excluded:
-                return
-            else:
-                raise ValueError("Series.str.{} is not supported yet".format(func_name))
+        if hpat.config.config_pipeline_hpat_default and func_name in str2str_methods:
+            template_key = 'strmethod.' + func_name
+            out_typ = SeriesType(string_type)
 
-        template_key = 'strmethod.' + func_name
-        out_typ = SeriesType(string_type)
+            class MethodTemplate(AbstractTemplate):
+                key = template_key
 
-        class MethodTemplate(AbstractTemplate):
-            key = template_key
+                def generic(self, args, kws):
+                    return signature(out_typ, *args)
 
-            def generic(self, args, kws):
-                return signature(out_typ, *args)
+            return types.BoundFunction(MethodTemplate, s_str)
 
-        return types.BoundFunction(MethodTemplate, s_str)
+        if func_name in str2str_methods_excluded:
+            return
+
+        raise NotImplementedError('Series.str.{} is not supported yet'.format(func_name))
 
 
 class SeriesDtMethodType(types.Type):

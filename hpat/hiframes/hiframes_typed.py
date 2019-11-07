@@ -1716,7 +1716,7 @@ class HiFramesTypedPassImpl(object):
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
         supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods
-                             + ('len', 'replace', 'split', 'get', 'contains'))
+                             + ['len', 'replace', 'split', 'get', 'contains'])
         if func_name not in supported_methods:
             raise NotImplementedError("Series.str.{} is not supported yet".format(func_name))
 
