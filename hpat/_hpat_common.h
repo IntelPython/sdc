@@ -24,8 +24,8 @@
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //*****************************************************************************
 
-#ifndef HPAT_COMMON_H_
-#define HPAT_COMMON_H_
+#ifndef SDC_COMMON_H_
+#define SDC_COMMON_H_
 
 #if defined(__GNUC__)
 #define __UNUSED__ __attribute__((unused))
@@ -33,19 +33,9 @@
 #define __UNUSED__
 #endif
 
-// class CTypeEnum(Enum):
-//     Int8 = 0
-//     UInt8 = 1
-//     Int32 = 2
-//     UInt32 = 3
-//     Int64 = 4
-//     UInt64 = 5
-//     Float32 = 6
-//     Float64 = 7
-
-struct HPAT_CTypes
+struct SDC_CTypes
 {
-    enum HPAT_CTypeEnum
+    enum SDC_CTypeEnum
     {
         INT8 = 0,
         UINT8 = 1,
@@ -60,4 +50,4 @@ struct HPAT_CTypes
     };
 };
 
-#endif /* HPAT_COMMON_H_ */
+#endif /* SDC_COMMON_H_ */

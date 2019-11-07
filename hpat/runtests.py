@@ -31,7 +31,7 @@ import hpat.tests
 
 """
     Every test in suite can be executed specified times using
-    desired value for HPAT_REPEAT_TEST_NUMBER environment variable.
+    desired value for SDC_REPEAT_TEST_NUMBER environment variable.
     This can be used to locate scpecific failures occured
     on next execution of affected test.
 
@@ -46,7 +46,7 @@ import hpat.tests
 def load_tests(loader, tests, pattern):
     suite = unittest.TestSuite()
     hpat_tests = loader.loadTestsFromModule(hpat.tests)
-    repeat_test_number = int(os.getenv('HPAT_REPEAT_TEST_NUMBER', '1'))
+    repeat_test_number = int(os.getenv('SDC_REPEAT_TEST_NUMBER', '1'))
 
     if repeat_test_number > 1:
         for i, test_case in enumerate(hpat_tests):

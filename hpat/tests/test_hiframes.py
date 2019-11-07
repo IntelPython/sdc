@@ -45,7 +45,7 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
 class TestHiFrames(unittest.TestCase):
 
     def test_column_list_select2(self):
-        # make sure HPAT copies the columns like Pandas does
+        # make sure SDC copies the columns like Pandas does
         def test_impl(df):
             df2 = df[['A']]
             df2['A'] += 10
@@ -706,7 +706,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skipIf(int(os.getenv('HPAT_NUM_PES', '0')) > 1, 'Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
+    @unittest.skipIf(int(os.getenv('SDC_NUM_PES', '0')) > 1, 'Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100

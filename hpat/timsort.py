@@ -1119,7 +1119,7 @@ def test():  # pragma: no cover
     df2 = df.sort_values('A', inplace=False)
     t2 = time.time()
     sort((A,), 0, n, data)
-    print("HPAT", time.time() - t2, "Numpy", t2 - t1)
+    print("SDC", time.time() - t2, "Numpy", t2 - t1)
     # print(df2.B)
     # print(data)
     np.testing.assert_almost_equal(data[0], df2.B.values)

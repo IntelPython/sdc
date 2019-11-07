@@ -688,7 +688,7 @@ std::shared_ptr<arrow::DataType> get_arrow_type(std::shared_ptr<FileReader> arro
 
 bool arrowPqTypesEqual(std::shared_ptr<arrow::DataType> arrow_type, ::parquet::Type::type pq_type)
 {
-    // TODO: remove parquet types, use HPAT Ctypes, handle more types
+    // TODO: remove parquet types, use SDC Ctypes, handle more types
     if (arrow_type->id() == Type::BOOL && pq_type == ::parquet::Type::BOOLEAN)
         return true;
     if (arrow_type->id() == Type::UINT8 && pq_type == ::parquet::Type::BYTE_ARRAY)

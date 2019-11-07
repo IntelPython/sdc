@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 """
-| :class:`pandas.Series` functions and operators implementations in HPAT
+| :class:`pandas.Series` functions and operators implementations in SDC
 | Also, it contains Numba internal operators which are required for Series type handling
 """
 
@@ -804,7 +804,7 @@ def hpat_pandas_series_copy(self, deep=True):
     deep: :obj:`bool`, default :obj:`True`
         Make a deep copy, including a copy of the data and the indices.
         With deep=False neither the indices nor the data are copied.
-        [HPAT limitations]:
+        [SDC limitations]:
             - deep=False: shallow copy of index is not supported
 
     Returns
