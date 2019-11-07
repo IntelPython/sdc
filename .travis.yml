@@ -10,14 +10,10 @@ env:
         - NUMPY_VER=1.16
         - CONDA_PREFIX_PATH=$HOME/miniconda3
     matrix:
-        - name: Ubuntu-16.04_py3.7_numpy1.16_np1
-          env:  BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
-        - name: Ubuntu-16.04_py3.7_numpy1.16_np2
-          env:  BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=2
-        - name: Ubuntu-16.04_py3.7_numpy1.16_np3
-          env:  BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=3
-        - name: Ubuntu-16.04_py3.7_numpy1.16_np0_coverage
-          env:  BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=2
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=3
+        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
 
 before_install:
     - chmod 777 buildscripts/install_conda.sh
