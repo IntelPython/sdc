@@ -1,4 +1,4 @@
-HPAT User's Guide
+Intel(R) SDC User's Guide
 ===================
    
 .. toctree::
@@ -14,4 +14,4 @@ HPAT User's Guide
    apireference
    developers
 
-To download HPAT documentation PDF click here :download:`pdf <../HPAT.pdf>`
+To download Intel(R) SDC documentation PDF click here :download:`pdf <../SDC.pdf>`

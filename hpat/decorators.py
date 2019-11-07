@@ -36,7 +36,7 @@ def jit(signature_or_function=None, **options):
 
     if 'nopython' not in options:
         '''
-        Always use @jit(noPython=True) in HPAT by default
+        Always use @jit(noPython=True) in SDC by default
         '''
         options['nopython'] = True
 
@@ -83,11 +83,11 @@ def jit(signature_or_function=None, **options):
     # it means MPI transport will be used
     mpi_transport_requested = options.pop('MPI', hpat.config.config_transport_mpi_default)
     if not isinstance(mpi_transport_requested, (int, bool)):
-        raise ValueError("Option MPI or HPAT_CONFIG_MPI environment variable should be boolean")
+        raise ValueError("Option MPI or SDC_CONFIG_MPI environment variable should be boolean")
 
     if mpi_transport_requested:
         hpat.config.config_transport_mpi = True
     else:
         hpat.config.config_transport_mpi = False
 
-    return numba.jit(signature_or_function, pipeline_class=hpat.compiler.HPATPipeline, **options)
+    return numba.jit(signature_or_function, pipeline_class=hpat.compiler.SDCPipeline, **options)

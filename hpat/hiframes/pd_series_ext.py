@@ -477,21 +477,21 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
 
-    @bound_function("array.argsort")
-    def resolve_argsort(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_argsort.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.argsort")
+    # def resolve_argsort(self, ary, args, kws):
+    #     resolver = ArrayAttribute.resolve_argsort.__wrapped__
+    #     sig = resolver(self, ary.data, args, kws)
+    #     sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
-    @bound_function("series.sort_values")
-    def resolve_sort_values(self, ary, args, kws):
-        # output will have permuted input index
-        out_index = ary.index
-        if out_index == types.none:
-            out_index = types.Array(types.intp, 1, 'C')
-        out = SeriesType(ary.dtype, ary.data, out_index)
-        return signature(out, *args)
+    # @bound_function("series.sort_values")
+    # def resolve_sort_values(self, ary, args, kws):
+    #     # output will have permuted input index
+    #     out_index = ary.index
+    #     if out_index == types.none:
+    #         out_index = types.Array(types.intp, 1, 'C')
+    #     out = SeriesType(ary.dtype, ary.data, out_index)
+    #     return signature(out, *args)
 
 #     @bound_function("array.take")
 #     def resolve_take(self, ary, args, kws):
@@ -524,6 +524,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: return namedtuple or labeled Series
         return signature(string_type, *args)
 
+    # PR135. This needs to be commented out (for the new impl to be called)
     @bound_function("series.fillna")
     def resolve_fillna(self, ary, args, kws):
         out = ary
@@ -992,12 +993,18 @@ install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_cumsum', 'resolve_var',
+                           'resolve_cumsum',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_prod', 'resolve_count', 'resolve_dropna']
+                           'resolve_argsort', 'resolve_sort_values',
+                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
+
+# disable using of some Array attributes in non-hpat pipeline only
 if not hpat.config.config_pipeline_hpat_default:
-    _not_series_array_attrs.append('resolve_std')
+    for attr in ['resolve_std', 'resolve_var']:
+        _not_series_array_attrs.append(attr)
+
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
@@ -1006,6 +1013,11 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
 
+# remove some attributes from SeriesAttribute for non-hpat pipeline
+if not hpat.config.config_pipeline_hpat_default:
+    for attr in _non_hpat_pipeline_attrs:
+        if attr in SeriesAttribute.__dict__:
+            delattr(SeriesAttribute, attr)
 
 # PR135. This needs to be commented out
 @infer_global(operator.getitem)
