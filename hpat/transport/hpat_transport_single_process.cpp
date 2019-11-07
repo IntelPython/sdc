@@ -67,25 +67,25 @@ static size_t get_type_size_bytes(int typ_enum)
 {
     switch (typ_enum)
     {
-    case HPAT_CTypes::INT8:
-    case HPAT_CTypes::UINT8:
+    case SDC_CTypes::INT8:
+    case SDC_CTypes::UINT8:
     {
         return 1;
     }
-    case HPAT_CTypes::INT16:
-    case HPAT_CTypes::UINT16:
+    case SDC_CTypes::INT16:
+    case SDC_CTypes::UINT16:
     {
         return 2;
     }
-    case HPAT_CTypes::INT32:
-    case HPAT_CTypes::UINT32:
-    case HPAT_CTypes::FLOAT32:
+    case SDC_CTypes::INT32:
+    case SDC_CTypes::UINT32:
+    case SDC_CTypes::FLOAT32:
     {
         return 4;
     }
-    case HPAT_CTypes::INT64:
-    case HPAT_CTypes::UINT64:
-    case HPAT_CTypes::FLOAT64:
+    case SDC_CTypes::INT64:
+    case SDC_CTypes::UINT64:
+    case SDC_CTypes::FLOAT64:
     {
         return 8;
     }
@@ -366,42 +366,42 @@ static void nth_sequential(void* res, void* data, int64_t local_size, int64_t k,
 {
     switch (type_enum)
     {
-    case HPAT_CTypes::INT8:
+    case SDC_CTypes::INT8:
     {
         get_nth<char>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::UINT8:
+    case SDC_CTypes::UINT8:
     {
         get_nth<unsigned char>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::INT32:
+    case SDC_CTypes::INT32:
     {
         get_nth<int>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::UINT32:
+    case SDC_CTypes::UINT32:
     {
         get_nth<uint32_t>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::INT64:
+    case SDC_CTypes::INT64:
     {
         get_nth<int64_t>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::UINT64:
+    case SDC_CTypes::UINT64:
     {
         get_nth<uint64_t>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::FLOAT32:
+    case SDC_CTypes::FLOAT32:
     {
         get_nth<float>(res, data, local_size, k);
         break;
     }
-    case HPAT_CTypes::FLOAT64:
+    case SDC_CTypes::FLOAT64:
     {
         get_nth<double>(res, data, local_size, k);
         break;

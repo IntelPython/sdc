@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 '''
-This is a set of configuration variables in HPAT initialized at startup
+This is a set of configuration variables in SDC initialized at startup
 '''
 
 
@@ -71,7 +71,7 @@ else:
     _has_xenon = True
     import hpat.io.xenon_ext
 
-config_transport_mpi_default = distutils_util.strtobool(os.getenv('HPAT_CONFIG_MPI', 'True'))
+config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
 '''
 Default value for transport used if no function decorator controls the transport
 '''
@@ -82,7 +82,7 @@ Current value for transport controlled by decorator need to initialize this here
 because decorator called later then modules have been initialized
 '''
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('HPAT_CONFIG_PIPELINE_HPAT', 'True'))
+config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'True'))
 '''
 Default value used to select compiler pipeline in a function decorator
 '''

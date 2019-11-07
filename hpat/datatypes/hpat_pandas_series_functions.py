@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 """
-| :class:`pandas.Series` functions and operators implementations in HPAT
+| :class:`pandas.Series` functions and operators implementations in SDC
 | Also, it contains Numba internal operators which are required for Series type handling
 """
 
@@ -35,13 +35,62 @@ import operator
 import pandas
 
 from numba.errors import TypingError
-from numba.extending import (types, overload, overload_method, overload_attribute)
+from numba.extending import overload, overload_method, overload_attribute
 from numba import types
 
 import hpat
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import StringArrayType
 from hpat.utils import to_array
+
+
+class TypeChecker:
+    """
+        Validate object type and raise TypingError if the type is invalid, e.g.:
+            Method nsmallest(). The object n
+             given: bool
+             expected: int
+        """
+    msg_template = '{} The object {}\n given: {}\n expected: {}'
+
+    def __init__(self, func_name):
+        """
+        Parameters
+        ----------
+        func_name: :obj:`str`
+            name of the function where types checking
+        """
+        self.func_name = func_name
+
+    def raise_exc(self, data, expected_types, name=''):
+        """
+        Raise exception with unified message
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        expected_types: :obj:`str`
+            expected types inserting directly to the exception
+        name: :obj:`str`
+            name of the parameter
+        """
+        msg = self.msg_template.format(self.func_name, name, data, expected_types)
+        raise TypingError(msg)
+
+    def check(self, data, accepted_type, name=''):
+        """
+        Check data type belongs to specified type
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        accepted_type: :obj:`type`
+            accepted type
+        name: :obj:`str`
+            name of the parameter
+        """
+        if not isinstance(data, accepted_type):
+            self.raise_exc(data, accepted_type.__name__, name=name)
 
 
 @overload(operator.getitem)
@@ -137,6 +186,108 @@ def hpat_pandas_series_iloc(self):
         return self
 
     return hpat_pandas_series_iloc_impl
+
+
+@overload_method(SeriesType, 'nsmallest')
+def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
+    """
+    Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nsmallest*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    n: :obj:`int`, default 5
+        Return this many ascending sorted values.
+    keep: :obj:`str`, default 'first'
+        When there are duplicate values that cannot all fit in a Series of n elements:
+        first : return the first n occurrences in order of appearance.
+        last : return the last n occurrences in reverse order of appearance.
+        all : keep all occurrences. This can result in a Series of size larger than n.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`series`
+         returns :obj:`series`
+    """
+
+    _func_name = 'Method nsmallest().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object\n given: {}\n expected: {}'.format(_func_name, self, 'series'))
+
+    if not isinstance(n, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object n\n given: {}\n expected: {}'.format(_func_name, n, 'int'))
+
+    if not isinstance(keep, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} The object keep\n given: {}\n expected: {}'.format(_func_name, keep, 'str'))
+
+    def hpat_pandas_series_nsmallest_impl(self, n=5, keep='first'):
+        if keep != 'first':
+            raise ValueError("Method nsmallest(). Unsupported parameter. Given 'keep' != 'first'")
+
+        # mergesort is used for stable sorting of repeated values
+        indices = self._data.argsort(kind='mergesort')[:max(n, 0)]
+
+        return self.take(indices)
+
+    return hpat_pandas_series_nsmallest_impl
+
+
+@overload_method(SeriesType, 'nlargest')
+def hpat_pandas_series_nlargest(self, n=5, keep='first'):
+    """
+    Pandas Series method :meth:`pandas.Series.nlargest` implementation.
+
+    .. only:: developer
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_nlargest*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        input series
+    n: :obj:`int`, default 5
+        Return this many ascending sorted values.
+    keep: :obj:`str`, default 'first'
+        When there are duplicate values that cannot all fit in a Series of n elements:
+        first : return the first n occurrences in order of appearance.
+        last : return the last n occurrences in reverse order of appearance.
+        all : keep all occurrences. This can result in a Series of size larger than n.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`series`
+         returns :obj:`series`
+    """
+
+    _func_name = 'Method nlargest().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object\n given: {}\n expected: {}'.format(_func_name, self, 'series'))
+
+    if not isinstance(n, (types.Omitted, int, types.Integer)):
+        raise TypingError('{} The object n\n given: {}\n expected: {}'.format(_func_name, n, 'int'))
+
+    if not isinstance(keep, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} The object keep\n given: {}\n expected: {}'.format(_func_name, keep, 'str'))
+
+    def hpat_pandas_series_nlargest_impl(self, n=5, keep='first'):
+        if keep != 'first':
+            raise ValueError("Method nlargest(). Unsupported parameter. Given 'keep' != 'first'")
+
+        # data: [0, 1, -1, 1, 0] -> [1, 1, 0, 0, -1]
+        # index: [0, 1,  2, 3, 4] -> [1, 3, 0, 4,  2] (not [3, 1, 4, 0, 2])
+        # subtract 1 to ensure reverse ordering at boundaries
+        indices = (-self._data - 1).argsort(kind='mergesort')[:max(n, 0)]
+
+        return self.take(indices)
+
+    return hpat_pandas_series_nlargest_impl
 
 
 @overload_attribute(SeriesType, 'shape')
@@ -653,7 +804,7 @@ def hpat_pandas_series_copy(self, deep=True):
     deep: :obj:`bool`, default :obj:`True`
         Make a deep copy, including a copy of the data and the indices.
         With deep=False neither the indices nor the data are copied.
-        [HPAT limitations]:
+        [SDC limitations]:
             - deep=False: shallow copy of index is not supported
 
     Returns
@@ -1180,35 +1331,34 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
          returns :obj:`pandas.Series` object containing the elements taken from the object
     """
 
-    _func_name = 'Method take().'
+    ty_checker = TypeChecker('Method take().')
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    if (not isinstance(axis, (int, types.Integer, str, types.UnicodeType, types.StringLiteral, types.Omitted))
+        and axis not in (0, 'index')):
+        ty_checker.raise_exc(axis, 'integer or string', 'axis')
 
-    if not isinstance(indices, types.List):
-        raise TypingError('{} The indices must be a List. Given: {}'.format(_func_name, indices))
+    if not isinstance(is_copy, (bool, types.Boolean, types.Omitted)) and is_copy is not False:
+        ty_checker.raise_exc(is_copy, 'boolean', 'is_copy')
 
-    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis == 0):
-        raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
+    if not isinstance(indices, (types.List, types.Array)):
+        ty_checker.raise_exc(indices, 'array-like', 'indices')
 
-    if not (isinstance(is_copy, (types.Boolean, types.Omitted)) or is_copy == False):
-        raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, is_copy))
-
-    if self.index is not types.none:
-        def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
-            local_data = [self._data[i] for i in indices]
-            local_index = [self._index[i] for i in indices]
-
-            return pandas.Series(local_data, local_index)
-
-        return hpat_pandas_series_take_impl
-    else:
+    if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
             local_data = [self._data[i] for i in indices]
 
             return pandas.Series(local_data, indices)
 
         return hpat_pandas_series_take_noindex_impl
+
+    def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
+        local_data = [self._data[i] for i in indices]
+        local_index = [self._index[i] for i in indices]
+
+        return pandas.Series(local_data, local_index)
+
+    return hpat_pandas_series_take_impl
 
 
 @overload_method(SeriesType, 'idxmax')
@@ -2514,13 +2664,245 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
     return hpat_pandas_series_median_impl
 
 
+@overload_method(SeriesType, 'argsort')
+def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
+    """
+    Pandas Series method :meth:`pandas.Series.argsort` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_argsort*
+
+    Parameters
+    -----------
+    self: :class:`pandas.Series`
+        input series
+    axis: :obj:`int`
+        Has no effect but is accepted for compatibility with numpy.
+        *unsupported*
+    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
+        Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
+        *uses python func - sorted() for str and numpy func - sort() for num*
+        *unsupported*
+    order: :obj:`str` or  :obj:`list of str`, default: None
+        Has no effect but is accepted for compatibility with numpy.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns: Positions of values within the sort order with -1 indicating nan values.
+    """
+
+    _func_name = 'Method argsort().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, types.Number):
+        raise TypingError('{} Non-numeric type unsupported. Given: {}'.format(_func_name, self.data.dtype))
+
+    if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
+    if not isinstance(self.index, types.NoneType):
+        def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
+            sort = numpy.argsort(self._data, kind='mergesort')
+            na = self.isna().sum()
+            result = numpy.empty(len(self._data), dtype=numpy.int64)
+            na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+            sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+            q = 0
+            for id, i in enumerate(sort):
+                if id not in list(sort[len(self._data) - na:]):
+                    result[id] = sort_nona[id-q]
+                else:
+                    q += 1
+            for i in sort[len(self._data) - na:]:
+                result[i] = -1
+
+            return pandas.Series(result, self._index)
+
+        return hpat_pandas_series_argsort_idx_impl
+
+    def hpat_pandas_series_argsort_noidx_impl(self, axis=0, kind='quicksort', order=None):
+        sort = numpy.argsort(self._data, kind='mergesort')
+        na = self.isna().sum()
+        result = numpy.empty(len(self._data), dtype=numpy.int64)
+        na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
+        sort_nona = numpy.argsort(self._data[~na_data_arr])
+        q = 0
+        for id, i in enumerate(sort):
+            if id not in list(sort[len(self._data) - na:]):
+                result[id] = sort_nona[id - q]
+            else:
+                q += 1
+        for i in sort[len(self._data) - na:]:
+            result[i] = -1
+
+        return pandas.Series(result)
+
+    return hpat_pandas_series_argsort_noidx_impl
+
+
+@overload_method(SeriesType, 'sort_values')
+def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
+    """
+    Pandas Series method :meth:`pandas.Series.sort_values` implementation.
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_sort_values*
+
+    Parameters
+    -----------
+    self: :class:'pandas.Series'
+        input series
+    axis: 0 or :obj:'pandas.Series.index', default: 0
+        Axis to direct sorting.
+        *unsupported*
+    ascending: :obj:'bool', default: True
+        If True, sort values in ascending order, otherwise descending.
+    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
+        Choice of sorting algorithm.
+        *uses python func - sorted() for str and numpy func - sort() for num*
+        *unsupported*
+    na_position: {'first' or 'last'}, default 'last'
+        Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+    """
+
+    _func_name = 'Method sort_values().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(ascending, types.Omitted) or isinstance(ascending, types.Boolean) or ascending is True or False):
+        raise TypingError('{} Unsupported parameters. Given ascending: {}'.format(_func_name, ascending))
+
+    if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_sort_values_str_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+            index = numpy.arange(len(self._data))
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = sorted(self._data)
+            cycle = range(len(self._data))
+            if not ascending:
+                result = result[::-1]
+                cycle = range(len(self._data) - 1, -1, -1)
+            result_index = index.copy()
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+            na = self.isna().sum()
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_str_noidx_impl
+
+    if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
+        def hpat_pandas_series_sort_values_num_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+            na = self.isna().sum()
+            indices = numpy.arange(len(self._data))
+            index_result = numpy.argsort(self._data, kind='mergesort')
+            result = numpy.sort(self._data)
+            i = len(self._data) - na
+            index_result[i:] = index_result[i:][::-1]
+            if not ascending:
+                index_result[:i] = index_result[:i][::-1]
+                result[:i] = result[:i][::-1]
+            for i in range(len(index_result)):
+                indices[i] = index_result[i]
+
+            return pandas.Series(result, indices)
+
+        return hpat_pandas_series_sort_values_num_noidx_impl
+
+    if isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_sort_values_str_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+            index = self._index
+            my_index = numpy.arange(len(self._data))
+            used_index = numpy.full((len(self._data)), -1)
+            result = sorted(self._data)
+            cycle = range(len(self._data))
+            if not ascending:
+                result = result[::-1]
+                cycle = range(len(self._data) - 1, -1, -1)
+            result_index = self._index.copy()
+            for i in range(len(result_index)):
+                find = 0
+                for search in cycle:
+                    check = 0
+                    for j in used_index:
+                        if my_index[search] == j:
+                            check = 1
+                    if (self._data[search] == result[i]) and check == 0 and find == 0:
+                        result_index[i] = index[search]
+                        used_index[i] = my_index[search]
+                        find = 1
+            na = self.isna().sum()
+            num = 0
+            for i in self.isna():
+                j = len(result_index) - na
+                if i and used_index[j] == -1:
+                    result_index[j] = index[num]
+                    used_index[j] = my_index[num]
+                    na -= 1
+                num += 1
+
+            return pandas.Series(result, result_index)
+
+        return hpat_pandas_series_sort_values_str_idx_impl
+
+    if isinstance(self.data.dtype, types.Number):
+        def hpat_pandas_series_sort_values_num_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
+                                                na_position='last'):
+            na = self.isna().sum()
+            indices = self._index.copy()
+            index_result = numpy.argsort(self._data, kind='mergesort')
+            result = numpy.sort(self._data)
+            i = len(self._data) - na
+            index_result[i:] = index_result[i:][::-1]
+            if not ascending:
+                index_result[:i] = index_result[:i][::-1]
+                result[:i] = result[:i][::-1]
+            for i in range(len(index_result)):
+                indices[i] = self._index[index_result[i]]
+
+            return pandas.Series(result, indices)
+
+        return hpat_pandas_series_sort_values_num_idx_impl
+
+
 @overload_method(SeriesType, 'dropna')
 def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     """
     Pandas Series method :meth:`pandas.Series.dropna` implementation.
 
     .. only:: developer
-
        Tests: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_dropna*
 
     Parameters
@@ -2532,7 +2914,6 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     inplace: :obj:`bool`, default False
         If True, do operation inplace and return None.
         *unsupported*
-
     Returns
     -------
     :obj:`pandas.Series`
