@@ -14,14 +14,14 @@ jobs:
       ${{ insert }}: ${{ parameters.matrix }}
 
   steps:
-    - script: |
-        buildscripts\\install_conda.bat "%UserProfile%\\Miniconda3"
-      displayName: 'Install conda'
+    # - script: |
+    #     buildscripts\\install_conda.bat "%UserProfile%\\Miniconda3"
+    #   displayName: 'Install conda'
 
     - script: |
-        "%UserProfile%\\Miniconda3\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%UserProfile%\\Miniconda3"
+        "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
       displayName: 'Build conda and wheel packages'
 
     - script: |
-        "%UserProfile%\\Miniconda3\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="%UserProfile%\\Miniconda3"
+        "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
       displayName: 'Test conda package'
