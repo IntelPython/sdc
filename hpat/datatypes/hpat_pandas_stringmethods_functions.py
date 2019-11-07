@@ -90,10 +90,12 @@ from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.str_arr_ext import to_string_list
 
 
-_hpat_pandas_stringmethods_autogen_global_dict = {'pandas': pandas,
-                                                  'numpy' : numpy,
-                                                  'numba' : numba,
-                                                  'StringMethodsType': StringMethodsType}
+_hpat_pandas_stringmethods_autogen_global_dict = {
+    'pandas': pandas,
+    'numpy': numpy,
+    'numba': numba,
+    'StringMethodsType': StringMethodsType
+}
 
 _hpat_pandas_stringmethods_functions_params = {
     'cat': ', others=None, sep=None, na_rep=None, join="left"',
@@ -139,7 +141,7 @@ _hpat_pandas_stringmethods_functions_template = """
 # @overload_method(StringMethodsType, '{methodname}')
 def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
     \"\"\"
-    Pandas Series method :meth:`pandas.core.strings.StringMethods.{methodname}()` implementation. 
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.{methodname}()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
 
@@ -157,7 +159,8 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
     self: :class:`pandas.core.strings.StringMethods`
         input arg
     other: {methodparams}
-        input arguments decription in https://pandas.pydata.org/pandas-docs/version/0.25/reference/series.html#string-handling
+        input arguments decription in
+        https://pandas.pydata.org/pandas-docs/version/0.25/reference/series.html#string-handling
 
     Returns
     -------
@@ -205,7 +208,7 @@ def _hpat_pandas_stringmethods_autogen(method_name):
 
         For example:
             parameters for split(): ', pat=None, n=-1, expand=False'
-                    translate into: 'pat, n, expand' 
+                    translate into: 'pat, n, expand'
         """
 
         params_call_splitted = params.split(',')
@@ -214,7 +217,7 @@ def _hpat_pandas_stringmethods_autogen(method_name):
             params_call_list.append(item.split("=")[0])
         params_call = ",".join(params_call_list)
         if len(params_call) > 1:
-            params_call = params_call[2:] 
+            params_call = params_call[2:]
 
     sourcecode = _hpat_pandas_stringmethods_functions_template.format(methodname=method_name,
                                                                       methodparams=params,

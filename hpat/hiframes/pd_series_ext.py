@@ -760,7 +760,7 @@ str2str_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title
 str2str_methods_excluded = ['upper', 'lower']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
-    
+
     Test: HPAT_CONFIG_PIPELINE_HPAT=0 python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str2str
 """
 
@@ -770,7 +770,7 @@ str2str_methods_excluded = ['upper', 'lower']
 #         super(SeriesStrMethodType, self).__init__(name)
 
 
-#series_str_methods_type = SeriesStrMethodType
+# series_str_methods_type = SeriesStrMethodType
 
 
 @infer_getattr

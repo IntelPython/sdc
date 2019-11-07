@@ -110,7 +110,8 @@ def _hpat_pandas_stringmethods_init(typingctx, data):
 @overload(pandas.core.strings.StringMethods)
 def hpat_pandas_stringmethods(obj):
     """
-    Special Numba procedure to overload Python type pandas.core.strings.StringMethods::ctor() with Numba registered model
+    Special Numba procedure to overload Python type pandas.core.strings.StringMethods::ctor()
+    with Numba registered model
     """
 
     def hpat_pandas_stringmethods_impl(obj):
