@@ -3684,7 +3684,7 @@ class TestSeries(unittest.TestCase):
                 for period in [None, 2, 1, 8, -4, 0.1]:
                     result_ref = test_series_corr_impl(S1, S2, min_periods=period)
                     result = hpat_func(S1, S2, min_periods=period)
-                    np.testing.assert_allclose(result, result_ref)
+                    np.testing.assert_equal(result, result_ref)
 
     def test_series_corr2(self):
         def test_series_corr_impl(S1, S2, method, min_periods=None):
@@ -3698,7 +3698,7 @@ class TestSeries(unittest.TestCase):
         print(result_ref)
         result = hpat_func(S1, S2, method='spearman')
         print(result)
-        pd.testing.assert_series_equal(result, result_ref)
+        np.testing.assert_equal(result, result_ref)
 
     # def test_series_corr_str(self):
     #     def test_series_corr_impl(S1, S2, method='pearson', min_periods=None):

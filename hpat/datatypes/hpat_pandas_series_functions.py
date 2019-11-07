@@ -3122,6 +3122,11 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         if method == 'pearson':
             return numpy.corrcoef(self_arr, other_arr)[0, 1]
 
+        # if method == 'spearman':
+        #     x = numpy.argsort(self_arr).argsort()
+        #     y = numpy.argsort(other_arr).argsort()
+        #     return numpy.corrcoef(x, y)[0, 1]
+
         if method == 'kendall':
             length = len(self_arr)
             nc = 0
