@@ -4104,7 +4104,6 @@ class TestSeries(unittest.TestCase):
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-
     def test_series_pct_change(self):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
@@ -4139,31 +4138,9 @@ class TestSeries(unittest.TestCase):
         msg = 'Method pct_change(). The function only applies to elements that are all numeric. Given data type: unicode_type'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_pct_change_period_not_integer(self):
-        def test_series_pct_change_impl(S, periods):
-            return S.pct_change(periods=periods, fill_method='pad', limit=None, freq=None)
-
-        hpat_func = hpat.jit(test_series_pct_change_impl)
-        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, 1.6)
-        msg = 'Method pct_change(). The function uses only periods is integer. Given periods type: float64'
-        self.assertIn(msg, str(raises.exception))
-
-    def test_series_pct_change_fill_method_not_string(self):
-        def test_series_pct_change_impl(S, fill_method):
-            return S.pct_change(periods=1, fill_method=fill_method, limit=None, freq=None)
-
-        hpat_func = hpat.jit(test_series_pct_change_impl)
-        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, 1.6)
-        msg = 'Method pct_change(). The function uses only fill_method is string. Given fill_method type: float64'
-        self.assertIn(msg, str(raises.exception))
-
     def test_series_pct_change_not_supported(self):
-        def test_series_pct_change_impl(S, fill_method='pad', limit=None, freq=None):
-            return S.pct_change(periods=1, fill_method=fill_method, limit=limit, freq=freq)
+        def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
+            return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
 
         hpat_func = hpat.jit(test_series_pct_change_impl)
         S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
@@ -4180,6 +4157,16 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, freq=5)
         msg = 'Method pct_change(). The function unsupport freq is not None.'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, fill_method=1.6)
+        msg = 'Method pct_change(). The function uses only fill_method is string. Given fill_method type: float64'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, periods=1.6)
+        msg = 'Method pct_change(). The function uses only periods is integer. Given periods type: float64'
         self.assertIn(msg, str(raises.exception))
 
 
