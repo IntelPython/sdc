@@ -69,7 +69,7 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
-    [1., np.nan, -1., 0., min_float64, max_float64],
+    [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
 
@@ -380,20 +380,25 @@ class TestSeries(unittest.TestCase):
         def test_impl(series):
             return series.argsort()
 
+        def pandas_impl(series):
+            return series.argsort(kind='mergesort')
+
         hpat_func = hpat.jit(test_impl)
 
         all_data = test_global_input_data_numeric
 
         for data in all_data:
             series = pd.Series(data * 3)
-            ref_result = test_impl(series)
+            ref_result = pandas_impl(series)
             jit_result = hpat_func(series)
             pd.testing.assert_series_equal(ref_result, jit_result)
-
 
     def test_series_argsort_full_idx(self):
         def test_impl(series):
             return series.argsort()
+
+        def pandas_impl(series):
+            return series.argsort(kind='mergesort')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -403,7 +408,7 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 series = pd.Series(data, index)
-                ref_result = test_impl(series)
+                ref_result = pandas_impl(series)
                 jit_result = hpat_func(series)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
@@ -2993,6 +2998,9 @@ class TestSeries(unittest.TestCase):
         def test_impl(series, ascending):
             return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
 
+        def pandas_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
+
         hpat_func = hpat.jit(test_impl)
 
         all_data = test_global_input_data_numeric + [test_global_input_data_unicode_kind1]
@@ -3001,7 +3009,7 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = test_impl(series, ascending)
+                ref_result = pandas_impl(series, ascending)
                 jit_result = hpat_func(series, ascending)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
@@ -3009,6 +3017,9 @@ class TestSeries(unittest.TestCase):
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending):
             return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
+
+        def pandas_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -3018,13 +3029,16 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = test_impl(series, ascending)
+                ref_result = pandas_impl(series, ascending)
                 jit_result = hpat_func(series, ascending)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
     def test_series_sort_values_full_idx(self):
         def test_impl(series, ascending):
             return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='quicksort', na_position='last')
+
+        def pandas_impl(series, ascending):
+            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind='mergesort', na_position='last')
 
         hpat_func = hpat.jit(test_impl)
 
@@ -3035,7 +3049,7 @@ class TestSeries(unittest.TestCase):
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 for ascending in [True, False]:
                     series = pd.Series(data, index)
-                    ref_result = test_impl(series, ascending)
+                    ref_result = pandas_impl(series, ascending)
                     jit_result = hpat_func(series, ascending)
                     pd.testing.assert_series_equal(ref_result, jit_result)
 
