@@ -2,85 +2,63 @@ import os
 import platform
 import re
 import subprocess
+import time
 import traceback
+
 
 """
 Create conda environment with desired python and packages
 """
-def create_conda_env(conda_activate, env_name, python, packages=None, channels=''):
-    print('='*80)
-    print(f'Setup conda {env_name} environment', flush=True)
-    run_command(f'{conda_activate}conda remove -y --name {env_name} --all')
-    run_command(f'{conda_activate}conda create -y -n {env_name} python={python}')
-    if packages:
-        packages_list = ' '.join(packages)
-        if platform.system() == 'Windows':
-            run_command(f'{conda_activate}activate {env_name} && conda install -y {packages_list} {channels}')
-        else:
-            run_command(f'{conda_activate}source activate {env_name} && conda install -y {packages_list} {channels}')
+def create_conda_env(conda_activate, env_name, python, packages=[], channels=''):
+    packages_list = ' '.join(packages)
+
+    format_print(f'Setup conda {env_name} environment')
+    run_command(f'{conda_activate}conda remove -q -y --name {env_name} --all')
+    run_command(f'{conda_activate}conda create -q -y -n {env_name} python={python} {packages_list} {channels}')
 
 
 """
 Create list of packages required for build and test from conda recipe
 """
 def get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, channels):
-    build_env = []
-    test_env  = []
-    build_env_set = set()
-    test_env_set  = set()
+    def create_env_list(packages, exclude=''):
+        env_list = []
+        env_set = set()
+
+        for item in packages:
+            package = re.search(r"[\w-]+" , item).group()
+            version = ''
+            if re.search(r"\d+\.[\d\*]*\.?[\d\*]*", item) and '<=' not in item and '>=' not in item:
+                version = '={}'.format(re.search(r"\d+\.[\d\*]*\.?[\d\*]*", item).group())
+            if package not in env_set and package not in exclude:
+                env_set.add(package)
+                env_list.append(f'{package}{version}')
+        return env_list
+
+    from ruamel_yaml import YAML
+
+    yaml=YAML()
     sdc_recipe_render = os.path.join(sdc_src, 'sdc_recipe_render.yaml')
 
     # Create environment with conda-build
     sdc_render_env = 'sdc_render'
     sdc_render_env_activate = get_activate_env_cmd(conda_activate, sdc_render_env)
-    print('='*80)
-    print('Render sdc build and test environment using conda-build')
+    format_print('Render sdc build and test environment using conda-build')
     create_conda_env(conda_activate, sdc_render_env, python, ['conda-build'])
     run_command('{} && {}'.format(sdc_render_env_activate,
-                                  ' '.join(['conda render --python={}'.format(python),
-                                                         '--numpy={}'.format(numpy),
-                                                         '{} -f {} {}'.format(channels,
-                                                                              sdc_recipe_render,
-                                                                              sdc_recipe)])))
+                                  ' '.join([f'conda render --python={python}',
+                                                         f'--numpy={numpy}',
+                                                         f'{channels} -f {sdc_recipe_render} {sdc_recipe}'])))
 
-    try:
-        with open(sdc_recipe_render, 'r') as recipe:
-            section = 'other'
-            requirements_started = False
+    with open(sdc_recipe_render, 'r') as recipe:
+        data = yaml.load(recipe)
+        build = data['requirements']['build']
+        host = data['requirements']['host']
+        run = data['requirements']['run']
+        test = data['test']['requires']
 
-            for line in recipe:
-                # Check current recipe section
-                if re.search(r"build:|run:|host:|test:|requires:", line):
-                    section = re.search(r"build:|run:|host:|test:|requires:", line).group()
-                    requirements_started = True
-                    continue
-                elif ':' in line:
-                    requirements_started = False
-                    continue
-
-                # Get package with version (for <= or >= version is not set)
-                if requirements_started and re.search(r"^\s+- [\w-]+", line):
-                    # Get package name
-                    package = re.search(r"^\s+- ([\w-]+)", line).group(1)
-
-                    # Get package version
-                    package_version = None
-                    if re.search(r"\d+\.[\d\*]*\.?[\d\*]*", line) and '<=' not in line and '>=' not in line:
-                        package_version = re.search(r"\d+\.[\d\*]*\.?[\d\*]*", line).group()
-
-                    # Finally add package to build or test environment
-                    if section in ['build:', 'host:', 'run:'] and package not in build_env_set:
-                        build_env.append('{}{}'.format(package, '=' + package_version if package_version else ''))
-                        build_env_set.add(package)
-                    if section in ['run:', 'requires:'] and package not in test_env_set:
-                        test_env.append('{}{}'.format(package, '=' + package_version if package_version else ''))
-                        test_env_set.add(package)
-    except:
-        print('='*80)
-        print(f'ERROR: Render environment for sdc from {sdc_recipe} recipe failed')
-        print(traceback.format_exc())
-
-    return {'build': build_env, 'test': test_env}
+    return {'build': create_env_list(build + host + run, 'vs2017_win-64'),
+            'test': create_env_list(run + test)}
 
 
 """
@@ -128,12 +106,21 @@ def get_conda_activate_cmd(conda_prefix):
 
 
 """
+Print format message with timestamp
+"""
+def format_print(msg, new_block=True):
+    if new_block:
+        print('='*80, flush=True)
+    print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
+
+
+"""
 Execute command
 """
 def run_command(command):
     print('='*80,  flush=True)
-    print(command, flush=True)
-    print('='*80,  flush=True)
+    print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {command}', flush=True)
+    print('-'*80,  flush=True)
     if platform.system() == 'Windows':
         subprocess.check_call(command, stdout=None, stderr=None, shell=True)
     else:
@@ -148,3 +135,17 @@ def set_environment_variable(key, value):
         os.environ[key] += os.pathsep + value
     else:
         os.environ[key] = value
+
+
+"""
+Set channels and change conda configuration
+"""
+def setup_conda(conda_activate):
+    conda_metachannel = 'https://metachannel.conda-forge.org/conda-forge/python,setuptools,numpy,pandas,pyarrow,arrow-cpp,boost,hdf5,h5py,wheel,pip'
+    run_command(f'{conda_activate}conda config --set safety_checks disabled')
+    run_command(f'{conda_activate}conda config --set channel_priority strict')
+    run_command(f'{conda_activate}conda config --add channels intel')
+    run_command(f'{conda_activate}conda config --add channels numba')
+    run_command(f'{conda_activate}conda config --add channels defaults')
+    run_command(f'{conda_activate}conda config --add channels conda-forge')
+    run_command(f'{conda_activate}conda config --add channels {conda_metachannel}')

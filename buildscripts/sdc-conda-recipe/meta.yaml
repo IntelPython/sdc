@@ -23,10 +23,6 @@ requirements:
     - {{ compiler('cxx') }}
     - wheel
     - python
-    - conda-verify   # [win]
-    - vc             # [win]
-    - vs2015_runtime # [win]
-    - vs2015_win-64  # [win]
 
   host:
     - python
@@ -88,10 +84,6 @@ outputs:
         - impi_rt                         # [win]
         - impi-devel                      # [win]
         - conda-package-handling ==1.3.11 # [win]
-        - conda-verify                    # [win]
-        - vc                              # [win]
-        - vs2015_runtime                  # [win]
-        - vs2015_win-64                   # [win]
 
 about:
   home: https://github.com/IntelPython/sdc
