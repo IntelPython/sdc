@@ -148,4 +148,4 @@ def setup_conda(conda_activate):
     run_command(f'{conda_activate}conda config --add channels numba')
     run_command(f'{conda_activate}conda config --add channels defaults')
     run_command(f'{conda_activate}conda config --add channels conda-forge')
-    run_command(f'{conda_activate}conda config --add channels {conda_metachannel}')
+    # run_command(f'{conda_activate}conda config --add channels {conda_metachannel}')

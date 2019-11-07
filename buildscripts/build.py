@@ -67,14 +67,10 @@ if __name__ == '__main__':
 
     conda_build_packages = ['conda-build']
     if platform.system() == 'Windows':
-        set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
-        set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
-        """
-        For develop build vs-2015 and vs-2017 runtime is installed.
-        If Visual Studio 2017 is not installed, activation returns non-zero code
-        thus next command executed with && fails.
-        This delimited is used for develop build and after-build smoke tests.
-        """
+        if build_mode != 'package':
+            set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
+            set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
+
         conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
 
     # Setup conda

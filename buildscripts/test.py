@@ -65,12 +65,6 @@ if __name__ == '__main__':
 
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')
-        """
-        For develop build vs-2015 and vs-2017 runtime is installed.
-        If Visual Studio 2017 is not installed, activation returns non-zero code
-        thus next command executed with && fails.
-        This delimited is used for develop build and after-build smoke tests.
-        """
     else:
         test_script = os.path.join(sdc_recipe, 'run_test.sh')
 
@@ -82,7 +76,7 @@ if __name__ == '__main__':
         run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls')
         os.environ['PYTHONPATH'] = '.'
         try:
-            run_command(f'{develop_env_activate} && coverage erase && coverage run -m hpat.runtests && coveralls -v')
+            run_command(f'{develop_env_activate} && python -m hpat.tests.gen_test_data && coverage erase && coverage run -m hpat.runtests && coveralls -v')
         except:
             format_print('Coverage fails')
             print(traceback.format_exc())
