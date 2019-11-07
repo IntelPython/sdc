@@ -3627,6 +3627,72 @@ class TestSeries(unittest.TestCase):
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
 
+    def test_series_getitem_value_int(self):
+        def test_impl(S):
+            return S[2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], [2, 3, 5])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_getitem_value_str1(self):
+        def test_impl(S):
+            return S[2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_getitem_value_str2(self):
+        def test_impl(S):
+            return S['2']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_getitem_slice_int(self):
+        def test_impl(S):
+            return S[0:2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], [2, 3, 5])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_getitem_slice_str1(self):
+        def test_impl(S):
+            return S[0:2]
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
+    def test_series_getitem_slice_str2(self):
+        def test_impl(S):
+            return S['2':'5']
+
+        jit_impl = hpat.jit(test_impl)
+
+        S = pd.Series([11, 22, 33], ['2', '3', '5'])
+        print(jit_impl(S))
+        print(test_impl(S))
+        self.assertEqual(jit_impl(S), test_impl(S))
+
 
 if __name__ == "__main__":
     unittest.main()
