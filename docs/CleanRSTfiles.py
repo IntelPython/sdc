@@ -34,8 +34,8 @@ api_dir = os.path.join(cur_dir, "docs", "usersource", "api")
 os.chdir(api_dir)
 for file in os.listdir(os.getcwd()):
     with open(file, "r") as rstfile:
-        l = rstfile.readlines()
+        line = rstfile.readlines()
     with open(file, 'w') as rstfile:
         rstfile.truncate(0)
         rstfile.write(":orphan:\n\n")
-        rstfile.writelines(l[3:])
+        rstfile.writelines(line[3:])
