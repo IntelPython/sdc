@@ -3071,6 +3071,8 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     .. only:: developer
 
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
+       Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_corr_unsupported_period
 
     Parameters
     ----------
@@ -3088,17 +3090,20 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
          returns :obj:`float` object
     """
 
-    _func_name = 'Method corr().'
 
-    if not (isinstance(self, SeriesType) and isinstance(other, SeriesType)):
-        raise TypingError('{} The object must be a pandas.series. Given: {} and {}'.format(_func_name, self, other))
+    ty_checker = TypeChecker('Method corr().')
+    ty_checker.check(self, SeriesType)
 
-    if not (isinstance(self.data.dtype, types.Number) and isinstance(other.data.dtype, types.Number)):
-        raise TypingError(
-            'Currently function supports only numeric values. Given: {} and {}'.format(_func_name, self, other))
+    ty_checker.check(other, SeriesType)
 
-    if not isinstance(min_periods, (types.Number, types.Omitted, types.NoneType)):
-        raise TypingError('{} Unsupported parameter. Given: {}'.format(_func_name, min_periods))
+    if not isinstance(self.data.dtype, types.Number):
+        ty_checker.raise_exc(self.data, 'number', 'self.data')
+
+    if not isinstance(other.data.dtype, types.Number):
+        ty_checker.raise_exc(other.data, 'number', 'other.data')
+
+    if not isinstance(min_periods, (types.Integer, types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
 
