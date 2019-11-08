@@ -1,4 +1,4 @@
-Intel(R) SDC User's Guide
+Intel® SDC User's Guide
 ===================
    
 .. toctree::
@@ -14,4 +14,4 @@ Intel(R) SDC User's Guide
    apireference
    developers
 
-To download Intel(R) SDC documentation PDF click here :download:`pdf <../SDC.pdf>`
+To download Intel® SDC documentation PDF click here :download:`pdf <../SDC.pdf>`

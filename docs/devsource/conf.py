@@ -28,7 +28,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Intel(R) SDC documentation build configuration file, created by
+# Intel® SDC documentation build configuration file, created by
 # sphinx-quickstart on Wed Sep  6 09:29:19 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -134,7 +134,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Intel(R) SDC'
+project = 'Intel® SDC'
 #copyright = '2017, Ehsan Totoni'
 author = 'Intel'
 
