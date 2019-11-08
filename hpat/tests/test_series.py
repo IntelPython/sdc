@@ -3684,7 +3684,7 @@ class TestSeries(unittest.TestCase):
                 for period in [None, 2, 1, 8, -4, 0.1]:
                     result_ref = test_series_corr_impl(S1, S2, min_periods=period)
                     result = hpat_func(S1, S2, min_periods=period)
-                    np.testing.assert_equal(result, result_ref)
+                    np.testing.assert_allclose(result, result_ref)
 
 
 if __name__ == "__main__":
