@@ -3661,7 +3661,7 @@ class TestSeries(unittest.TestCase):
             self.assertIn(msg, str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.corr() parameter "min_periods" unsupported')
+                    'Series.corr() parameter "min_periods" unsupported')
     def test_series_corr(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
             return S1.corr(S2, min_periods=min_periods)
