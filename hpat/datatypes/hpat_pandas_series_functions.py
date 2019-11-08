@@ -3272,9 +3272,6 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     ty_checker = TypeChecker('Method pct_change().')
     ty_checker.check(self, SeriesType)
 
-    # if not isinstance(indices, (types.List, types.Array)):
-    #     ty_checker.raise_exc(indices, 'array-like', 'indices')
-
     if not isinstance(self.data.dtype, types.Number):
         ty_checker.raise_exc(self.data.dtype, 'number', 'self.data')
 
