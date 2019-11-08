@@ -23,7 +23,7 @@ install:
     - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
 
 script:
-    - travis_wait $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
+    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
 
 after_success: skip
 

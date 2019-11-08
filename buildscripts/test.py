@@ -75,6 +75,7 @@ if __name__ == '__main__':
         format_print('Install scipy and coveralls')
         run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls')
         os.environ['PYTHONPATH'] = '.'
+        os.environ['HDF5_DIR'] = conda_prefix
         try:
             run_command(f'{develop_env_activate} && python -m hpat.tests.gen_test_data && coverage erase && coverage run -m hpat.runtests && coveralls -v')
         except:
