@@ -857,9 +857,9 @@ class SeriesRollingAttribute(AttributeTemplate):
     def resolve_cov(self, ary, args, kws):
         return signature(SeriesType(types.float64), *args)
 
-    # @bound_function("rolling.corr")
-    # def resolve_corr(self, ary, args, kws):
-    #     return signature(SeriesType(types.float64), *args)
+    @bound_function("rolling.corr")
+    def resolve_corr(self, ary, args, kws):
+        return signature(SeriesType(types.float64), *args)
 
 # similar to install_array_method in arraydecl.py
 
