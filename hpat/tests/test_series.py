@@ -1809,31 +1809,21 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
-    def test_series_value_counts_int(self):
+    def test_series_value_counts_number(self):
         def test_impl(S):
             return S.value_counts()
 
-        additional_data = [1, 2, 3, 1, 1, 3]
+        input_data = [test_global_input_data_integer64, test_global_input_data_float64]
+        extras = [[1, 2, 3, 1, 1, 3], [0.1, 0., 0.1, 0.1]]
 
         hpat_func = hpat.jit(test_impl)
 
-        for data in test_global_input_data_integer64:
-            S = pd.Series(data + additional_data)
-            # Remove sort_index() after implementing sorting with the same number of frequency
-            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+        for data, extra in zip(input_data, extras):
+            for d in data:
+                S = pd.Series(d + extra)
+                # Remove sort_index() after implementing sorting with the same number of frequency
+                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
-    def test_series_value_counts_float(self):
-        def test_impl(S):
-            return S.value_counts()
-
-        additional_data = [0.1, 0., 0.1, 0.1]
-
-        hpat_func = hpat.jit(test_impl)
-
-        for data in test_global_input_data_float64:
-            S = pd.Series(data + additional_data)
-            # Remove sort_index() after implementing sorting with the same number of frequency
-            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_sort(self):
         def test_impl(S, asceding):
@@ -1862,9 +1852,9 @@ class TestSeries(unittest.TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_value_counts_str(self):
-        def test_impl(S):
-            return S.value_counts()
+    def test_series_value_counts_str_sort(self):
+        def test_impl(S, ascending):
+            return S.value_counts(sort=True, ascending=ascending)
 
         data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
                         ['dog', 'cat', 'cat', 'cat', 'dog']]
@@ -1872,21 +1862,9 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         for data in data_to_test:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_value_counts_str_sort_ascending(self):
-        def test_impl(S):
-            return S.value_counts(sort=True, ascending=True)
-
-        data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
-                        ['dog', 'cat', 'cat', 'cat', 'dog']]
-
-        hpat_func = hpat.jit(test_impl)
-
-        for data in data_to_test:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            for ascending in (True, False):
+                S = pd.Series(data)
+                pd.testing.assert_series_equal(hpat_func(S, ascending), test_impl(S, ascending))
 
     def test_series_value_counts_index(self):
         def test_impl(S):

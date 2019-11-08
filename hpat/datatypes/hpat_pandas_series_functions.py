@@ -470,7 +470,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
                     value_counts_dict[value] = 1
 
             # TODO: workaround, keys() result can not be casted to array type
-            # TODO: use list comprehension instead or self.unique()?
+            # TODO: use list comprehension instead or self.unique()
             unique_values = [key for key in value_counts_dict]
             unique_values_len = len(unique_values)
 
@@ -489,7 +489,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
             sorted_unique_values = [unique_values[i] for i in indexes_order]
             sorted_value_counts = numpy.take(value_counts, indexes_order)
 
-            return pandas.Series(sorted_value_counts, index=sorted_unique_values)
+            return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
 
         return hpat_pandas_series_value_counts_str_impl
 
@@ -515,7 +515,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
         sorted_unique_values = numpy.take(unique_values, indexes_order)
         sorted_value_counts = numpy.take(value_counts, indexes_order)
 
-        return pandas.Series(sorted_value_counts, index=sorted_unique_values)
+        return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
 
     return hpat_pandas_series_value_counts_number_impl
 
