@@ -442,7 +442,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     ty_checker = TypeChecker('Method value_counts().')
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(normalize, types.Omitted) and normalize:
+    if not isinstance(normalize, (types.Omitted, types.Boolean, bool)) and normalize is True:
         ty_checker.raise_exc(normalize, 'boolean', 'normalize')
 
     if not isinstance(sort, (types.Omitted, types.Boolean, bool)):
