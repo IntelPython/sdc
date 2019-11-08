@@ -1540,7 +1540,7 @@ class HiFramesTypedPassImpl(object):
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
 
-        if func_name in ('cov', 'corr'):
+        if func_name == 'corr':
             # TODO: variable window
             if len(rhs.args) == 1:
                 other = self._get_series_data(rhs.args[0], nodes)
