@@ -26,3 +26,13 @@ jobs:
         SDC_NP_MPI: '2'
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: Ubuntu_16_04
+    vmImage: ubuntu-16.04
+    matrix:
+      py3.7_numpy1.16_np3:
+        SDC_NP_MPI: '3'
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'

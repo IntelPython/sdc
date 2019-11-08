@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 
+import os
 import unittest
 import platform
 import pandas as pd
@@ -162,6 +163,8 @@ class TestIO(unittest.TestCase):
         f.close()
         np.testing.assert_almost_equal(X, arr)
 
+    @unittest.skipIf(os.getenv('RUN_COVERAGE', 'False') == 'True',
+                               'Test fails on coverage run if SDC installed in develop mode\n')
     def test_h5_read_group(self):
         def test_impl():
             f = h5py.File("test_group_read.hdf5", "r")

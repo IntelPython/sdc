@@ -12,7 +12,6 @@ env:
     matrix:
         - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
         - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=2
-        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=3
         - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
 
 before_install:
