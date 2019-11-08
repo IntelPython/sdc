@@ -3269,31 +3269,26 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
          returns :obj:`pandas.Series` object
     """
 
-    _func_name = 'Method pct_change().'
+    ty_checker = TypeChecker('Method pct_change().')
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+    # if not isinstance(indices, (types.List, types.Array)):
+    #     ty_checker.raise_exc(indices, 'array-like', 'indices')
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError(
-            '{} The function only applies to elements that are all numeric. Given data type: {}'.format(_func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'number', 'self.data')
 
     if not isinstance(periods, (types.Integer, types.Omitted)):
-        raise TypingError(
-            '{} The function uses only periods is integer. Given periods type: {}'.format(_func_name, periods))
+        ty_checker.raise_exc(periods, 'int64', 'periods')
 
     if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
-        raise TypingError(
-            '{} The function uses only fill_method is string. Given fill_method type: {}'.format(_func_name, fill_method))
+        ty_checker.raise_exc(fill_method, 'string', 'fill_method')
 
     if not isinstance(limit, (types.Omitted, types.NoneType)):
-        raise TypingError(
-            '{} The function unsupport limit is not None.'.format(_func_name))
+        ty_checker.raise_exc(limit, 'None', 'limit')
 
     if not isinstance(freq, (types.Omitted, types.NoneType)):
-        raise TypingError(
-            '{} The function unsupport freq is not None.'.format(_func_name))
+        ty_checker.raise_exc(freq, 'None', 'freq')
 
     def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
         if not (fill_method is None or fill_method in ['pad', 'ffill', 'backfill', 'bfill']):
