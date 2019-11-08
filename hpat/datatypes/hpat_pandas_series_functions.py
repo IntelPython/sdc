@@ -3246,8 +3246,6 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     .. only:: developer
 
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change
-       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_str
-       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change_not_supported
 
     Parameters
     -----------
