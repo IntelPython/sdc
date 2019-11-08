@@ -6,42 +6,23 @@ env:
     global:
         - GIT_DESCRIBE_TAG=0.29.2
         - GIT_DESCRIBE_NUMBER=1
-        - CONDA_ENV=travisci
         - PYTHON_VER=3.7
         - NUMPY_VER=1.16
+        - CONDA_PREFIX_PATH=$HOME/miniconda3
     matrix:
-        - HPAT_CHECK_STYLE=True
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=1
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=2
-        - HPAT_RUN_BUILD=True HPAT_NUM_PES=3
-        - HPAT_RUN_BUILD=True HPAT_WHEELS=True
-        - HPAT_RUN_BUILD=True HPAT_RUN_COVERAGE=True
-matrix:
-    allow_failures:
-        - env: HPAT_CHECK_STYLE=True
-        - env: HPAT_RUN_BUILD=True HPAT_NUM_PES=3
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=2
+        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
 
 before_install:
-    - buildscripts/setup_conda.sh
-    - export PATH=$HOME/miniconda3/bin:$PATH
+    - chmod 777 buildscripts/install_conda.sh
+    - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
 
 install:
-    - export PATH=$HOME/miniconda3/bin:$PATH
-    - export HPAT_SOURCE_DIR="$(pwd)/hpat"
-    - env | grep HPAT_SOURCE_DIR
-    - export HPAT_WHEELS_DIR="$(pwd)/hpat-wheels"
-    - env | grep HPAT_WHEELS_DIR
-    - mkdir $HPAT_WHEELS_DIR
-    - if [ "$HPAT_RUN_BUILD" == "True" ]; then
-          buildscripts/build.sh;
-      fi
+    - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
 
 script:
-    - export PATH=$HOME/miniconda3/bin:$PATH
-    - if [ "$HPAT_CHECK_STYLE" == "True" ]; then
-          chmod 777 buildscripts/code_style.sh;
-          buildscripts/code_style.sh;
-      fi
+    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
 
 after_success: skip
 

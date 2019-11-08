@@ -706,7 +706,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skipIf(int(os.getenv('SDC_NUM_PES', '0')) > 1, 'Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
+    @unittest.skipIf(int(os.getenv('SDC_NP_MPI', '0')) > 1, 'Test hangs on NP=2 and NP=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100

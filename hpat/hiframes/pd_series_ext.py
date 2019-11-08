@@ -1004,7 +1004,7 @@ if not hpat.config.config_pipeline_hpat_default:
     for attr in ['resolve_std', 'resolve_var']:
         _not_series_array_attrs.append(attr)
 
-_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest']
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
