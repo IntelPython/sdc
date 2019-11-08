@@ -3661,8 +3661,8 @@ class TestSeries(unittest.TestCase):
             self.assertIn(msg, str(raises.exception))
 
     def test_series_corr(self):
-        def test_series_corr_impl(S1, S2, method='pearson', min_periods=None):
-            return S1.corr(S2, method, min_periods)
+        def test_series_corr_impl(S1, S2, min_periods=None):
+            return S1.corr(S2, min_periods=min_periods)
 
         hpat_func = hpat.jit(test_series_corr_impl)
         test_input_data1 = [[.2, .0, .6, .2],
@@ -3685,31 +3685,6 @@ class TestSeries(unittest.TestCase):
                     result_ref = test_series_corr_impl(S1, S2, min_periods=period)
                     result = hpat_func(S1, S2, min_periods=period)
                     np.testing.assert_equal(result, result_ref)
-
-    def test_series_corr2(self):
-        def test_series_corr_impl(S1, S2, method, min_periods=None):
-            return S1.corr(S2, method, min_periods)
-
-        hpat_func = hpat.jit(test_series_corr_impl)
-
-        S1 = pd.Series([.2, .0, .6, .2, .5, .6, .7, .8])
-        S2 = pd.Series([.3, .6, .0, .1, .8])
-        result_ref = test_series_corr_impl(S1, S2, method='spearman')
-        print(result_ref)
-        result = hpat_func(S1, S2, method='spearman')
-        print(result)
-        np.testing.assert_equal(result, result_ref)
-
-    # def test_series_corr_str(self):
-    #     def test_series_corr_impl(S1, S2, method='pearson', min_periods=None):
-    #         return S1.corr(S2, method, min_periods)
-    #
-    #     hpat_func = hpat.jit(test_series_corr_impl)
-    #     S1 = pd.Series(['aaaa', 'v', 'sdfgh'])
-    #     S2 = pd.Series([1, 2, 3])
-    #     result_ref = test_series_corr_impl(S1, S2)
-    #     result = hpat_func(S1, S2)
-    #     np.testing.assert_allclose(result, result_ref)
 
 
 if __name__ == "__main__":
