@@ -1,3 +1,30 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
 import unittest
 import itertools
 import pandas as pd
@@ -18,7 +45,7 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
 class TestHiFrames(unittest.TestCase):
 
     def test_column_list_select2(self):
-        # make sure HPAT copies the columns like Pandas does
+        # make sure SDC copies the columns like Pandas does
         def test_impl(df):
             df2 = df[['A']]
             df2['A'] += 10
@@ -679,7 +706,7 @@ class TestHiFrames(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skipIf(int(os.getenv('HPAT_NUM_PES', '0')) > 1, 'Test hangs on NUM_PES=2 and NUM_PES=3 on all platforms')
+    @unittest.skipIf(int(os.getenv('SDC_NP_MPI', '0')) > 1, 'Test hangs on NP=2 and NP=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
             max_num_days = 100
