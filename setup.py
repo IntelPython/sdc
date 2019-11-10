@@ -129,7 +129,7 @@ if 'OPENCV_DIR' in os.environ:
 
 _has_xenon = False
 
-if 'HPAT_XE_SUPPORT' in os.environ and os.environ['HPAT_XE_SUPPORT'] != "0":
+if 'SDC_XE_SUPPORT' in os.environ and os.environ['SDC_XE_SUPPORT'] != "0":
     _has_xenon = True
 
 ind = [PREFIX_DIR + '/include', ]
@@ -528,4 +528,10 @@ setup(name='hpat',
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
       cmdclass=hpat_build_commands,
-      ext_modules=_ext_mods)
+      ext_modules=_ext_mods,
+      entry_points={
+          "numba_extensions": [
+              "init = hpat:_init_extension",
+          ],
+      },
+)

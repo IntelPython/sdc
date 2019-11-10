@@ -1,6 +1,6 @@
 .. _performance:
 
-Getting Performance With HPAT
+Getting Performance With Intel® SDC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Compilation Overheads

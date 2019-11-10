@@ -477,21 +477,21 @@ class SeriesAttribute(AttributeTemplate):
     def resolve_rolling(self, ary, args, kws):
         return signature(SeriesRollingType(ary.dtype), *args)
 
-    @bound_function("array.argsort")
-    def resolve_argsort(self, ary, args, kws):
-        resolver = ArrayAttribute.resolve_argsort.__wrapped__
-        sig = resolver(self, ary.data, args, kws)
-        sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.argsort")
+    # def resolve_argsort(self, ary, args, kws):
+    #     resolver = ArrayAttribute.resolve_argsort.__wrapped__
+    #     sig = resolver(self, ary.data, args, kws)
+    #     sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
-    @bound_function("series.sort_values")
-    def resolve_sort_values(self, ary, args, kws):
-        # output will have permuted input index
-        out_index = ary.index
-        if out_index == types.none:
-            out_index = types.Array(types.intp, 1, 'C')
-        out = SeriesType(ary.dtype, ary.data, out_index)
-        return signature(out, *args)
+    # @bound_function("series.sort_values")
+    # def resolve_sort_values(self, ary, args, kws):
+    #     # output will have permuted input index
+    #     out_index = ary.index
+    #     if out_index == types.none:
+    #         out_index = types.Array(types.intp, 1, 'C')
+    #     out = SeriesType(ary.dtype, ary.data, out_index)
+    #     return signature(out, *args)
 
 #     @bound_function("array.take")
 #     def resolve_take(self, ary, args, kws):
@@ -723,12 +723,12 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    @bound_function("series.value_counts")
-    def resolve_value_counts(self, ary, args, kws):
-        # output is int series with original data as index
-        out = SeriesType(
-            types.int64, types.Array(types.int64, 1, 'C'), ary.data)
-        return signature(out, *args)
+    # @bound_function("series.value_counts")
+    # def resolve_value_counts(self, ary, args, kws):
+    #     # output is int series with original data as index
+    #     out = SeriesType(
+    #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
+    #     return signature(out, *args)
 
     @bound_function("series.rename")
     def resolve_rename(self, ary, args, kws):
@@ -993,12 +993,18 @@ install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_cumsum', 'resolve_var',
-                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
+                           'resolve_cumsum',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_corr', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
+                           'resolve_argsort', 'resolve_sort_values',
                            'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
+
+# disable using of some Array attributes in non-hpat pipeline only
 if not hpat.config.config_pipeline_hpat_default:
-    _not_series_array_attrs.append('resolve_std')
+    for attr in ['resolve_std', 'resolve_var']:
+        _not_series_array_attrs.append(attr)
+
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov', 'resolve_corr']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
@@ -1007,6 +1013,11 @@ for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
             and attr not in _not_series_array_attrs):
         setattr(SeriesAttribute, attr, func)
 
+# remove some attributes from SeriesAttribute for non-hpat pipeline
+if not hpat.config.config_pipeline_hpat_default:
+    for attr in _non_hpat_pipeline_attrs:
+        if attr in SeriesAttribute.__dict__:
+            delattr(SeriesAttribute, attr)
 
 # PR135. This needs to be commented out
 @infer_global(operator.getitem)
@@ -1277,7 +1288,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
         '''' use binop here as otherwise Numba's dead branch pruning doesn't work
         TODO: replace with 'if not is_index_none' when resolved '''
-        if is_index_none == False:
+        if is_index_none == False:  # noqa
             fix_index = hpat.hiframes.api.fix_df_array(index)
         else:
             fix_index = index

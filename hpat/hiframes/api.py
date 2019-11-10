@@ -1,3 +1,30 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
 import itertools
 import operator
 from collections import namedtuple
@@ -9,7 +36,7 @@ import llvmlite.llvmpy.core as lc
 
 import numba
 from numba import ir, ir_utils
-from numba import types, cgutils
+from numba import numpy_support, types, cgutils
 from numba.ir_utils import require, mk_unique_var
 import numba.array_analysis
 from numba.typing import signature
@@ -29,7 +56,12 @@ import hpat
 from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.set_ext import build_set
-from hpat.str_arr_ext import (StringArrayType, string_array_type, is_str_arr_typ)
+from hpat.str_arr_ext import (
+    StringArrayType,
+    string_array_type,
+    is_str_arr_typ,
+    num_total_chars,
+    append_string_array_to)
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower)
 from hpat.hiframes.pd_series_ext import (
     SeriesType,
@@ -585,13 +617,13 @@ def select_k_nonan_overload(A, m, k):
     dtype = A.dtype
     if isinstance(dtype, types.Integer):
         # ints don't have nans
-        return lambda A, m, k: (A[:k].copy(), k)
+        return lambda A, m, k: (A[:max(k, 0)].copy(), k)
 
     assert isinstance(dtype, types.Float)
 
     def select_k_nonan_float(A, m, k):
         # select the first k elements but ignore NANs
-        min_heap_vals = np.empty(k, A.dtype)
+        min_heap_vals = np.empty(max(k, 0), A.dtype)
         i = 0
         ind = 0
         while i < m and ind < k:

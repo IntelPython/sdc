@@ -1,34 +1,34 @@
-This file provides guidelines for developers on how to update the documentation. The content of the file will be added to the developers' document later. If you have any questions about this file or HPAT documentation please contact Rujal Desai.
+This file provides guidelines for developers on how to update the documentation. The content of the file will be added to the developers' document later. If you have any questions about this file or Intel® SDC documentation please contact Rujal Desai.
 How to update the documentation
 
-HPAT documentation is built using Sphinx. Building the documentation is not part of HPAT build as of now(that may change later). So you have to follow few extra steps to build new documentation. 
+Intel® SDC documentation is built using Sphinx. Building the documentation is not part of Intel® SDC build as of now(that may change later). So you have to follow few extra steps to build new documentation. 
 
 Sphinx uses RST files to generate html/pdf output. Therefore the new documentation should either be in RST file or standardized docstring(provided with the function/class definition inside source code). 
 
 There are two ways to contribute to the documentation:
-1. Add documentation for a Pandas API overloaded in HPAT
+1. Add documentation for a Pandas API overloaded in Intel® SDC
 2. Add/Change content of one of the section of the existing documentation
 
 Pandas API Documentation
 
-If you have implemented a Pandas function/operator in HPAT follow these steps to add it to the new documentation:
+If you have implemented a Pandas function/operator in Intel® SDC follow these steps to add it to the new documentation:
 
-1. Write a docstring inside the function/operator definition and make sure it is in the standardized format that HPAT follows
+1. Write a docstring inside the function/operator definition and make sure it is in the standardized format that Intel® SDC follows
 
    If you are not aware of the standardized format of docstring refer to pandas.Series.append method in hpat/datatypes/hpat_series_functions.py . Also, make sure the function definition has all the arguments included in it even though HPAt doesn't support that argument. For example, Pandas Series.ne(not equal) method has the following signature:
    
    Series.ne(self, other, level=None, fill_value=None, axis=0)
    
-   HPAT doesn't support 'level' , 'fill_value' and 'axis' but the function definition in HPAT should looik like this:
+   Intel® SDC doesn't support 'level' , 'fill_value' and 'axis' but the function definition in Intel® SDC should looik like this:
    
    new_funcname(self, other, level=None, fill_value=None, axis=0)
    where new_funcname : function name given by developer 
    
 2. Edit the script rename_function.py
 
-   This step is part of a work around. Hence it is specific to HPAT. Sphinx uses autodoc to automatically generate documentation from a function docstring. However, if we use that directly the function name displayed in User's Guide for HPAT will be the function name that developer has used to overload Pandas API instead of the actual name of that Pandas API that is overloaded. For example,
+   This step is part of a work around. Hence it is specific to Intel® SDC. Sphinx uses autodoc to automatically generate documentation from a function docstring. However, if we use that directly the function name displayed in User's Guide for Intel® SDC will be the function name that developer has used to overload Pandas API instead of the actual name of that Pandas API that is overloaded. For example,
    
-   Pandas.Series.append method is overloaded in HPAT by this function definition:
+   Pandas.Series.append method is overloaded in Intel® SDC by this function definition:
    
    @overload_method(SeriesType, 'append')
    def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integrity=False)
