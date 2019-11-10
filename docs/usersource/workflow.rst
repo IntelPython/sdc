@@ -1,6 +1,6 @@
 .. workflow:
 
-Typical Intel(R) SDC workflow
+Typical Intel® SDC workflow
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. todo::
