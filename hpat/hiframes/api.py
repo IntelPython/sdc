@@ -36,7 +36,7 @@ import llvmlite.llvmpy.core as lc
 
 import numba
 from numba import ir, ir_utils
-from numba import types, cgutils
+from numba import numpy_support, types, cgutils
 from numba.ir_utils import require, mk_unique_var
 import numba.array_analysis
 from numba.typing import signature
@@ -56,7 +56,12 @@ import hpat
 from hpat.utils import _numba_to_c_type_map, unliteral_all
 from hpat.str_ext import string_type, list_string_array_type
 from hpat.set_ext import build_set
-from hpat.str_arr_ext import (StringArrayType, string_array_type, is_str_arr_typ)
+from hpat.str_arr_ext import (
+    StringArrayType,
+    string_array_type,
+    is_str_arr_typ,
+    num_total_chars,
+    append_string_array_to)
 from hpat.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type, set_df_datetime_date_lower)
 from hpat.hiframes.pd_series_ext import (
     SeriesType,

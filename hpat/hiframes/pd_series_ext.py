@@ -1288,7 +1288,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
         '''' use binop here as otherwise Numba's dead branch pruning doesn't work
         TODO: replace with 'if not is_index_none' when resolved '''
-        if is_index_none == False:
+        if is_index_none == False:  # noqa
             fix_index = hpat.hiframes.api.fix_df_array(index)
         else:
             fix_index = index
