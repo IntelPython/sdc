@@ -1,6 +1,6 @@
 .. developers:
 
-HPAT for Developers
+Intel® SDC for Developers
 ~~~~~~~~~~~~~~~~~~~~
 
 .. todo::

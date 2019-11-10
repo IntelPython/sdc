@@ -1,6 +1,6 @@
 .. workflow:
 
-Typical HPAT workflow
+Typical Intel® SDC workflow
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. todo::

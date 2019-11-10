@@ -129,7 +129,7 @@ if 'OPENCV_DIR' in os.environ:
 
 _has_xenon = False
 
-if 'HPAT_XE_SUPPORT' in os.environ and os.environ['HPAT_XE_SUPPORT'] != "0":
+if 'SDC_XE_SUPPORT' in os.environ and os.environ['SDC_XE_SUPPORT'] != "0":
     _has_xenon = True
 
 ind = [PREFIX_DIR + '/include', ]

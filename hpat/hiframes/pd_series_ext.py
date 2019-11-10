@@ -993,16 +993,18 @@ install_array_method('cumprod', generic_expand_cumulative_series)
 
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
-                           'resolve_cumsum', 'resolve_var',
+                           'resolve_cumsum',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_argsort', 'resolve_sort_values',
                            'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
 
+# disable using of some Array attributes in non-hpat pipeline only
 if not hpat.config.config_pipeline_hpat_default:
-    _not_series_array_attrs.append('resolve_std')
+    for attr in ['resolve_std', 'resolve_var']:
+        _not_series_array_attrs.append(attr)
 
-_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest']
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
@@ -1286,7 +1288,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
         '''' use binop here as otherwise Numba's dead branch pruning doesn't work
         TODO: replace with 'if not is_index_none' when resolved '''
-        if is_index_none == False:
+        if is_index_none == False:  # noqa
             fix_index = hpat.hiframes.api.fix_df_array(index)
         else:
             fix_index = index
