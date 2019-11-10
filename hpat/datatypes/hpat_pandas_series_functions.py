@@ -386,7 +386,7 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
 
 
 @overload_attribute(SeriesType, 'values')
-def hpat_pandas_series_iloc(self):
+def hpat_pandas_series_values(self):
     """
     Pandas Series attribute 'values' implementation.
         https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.values.html#pandas.Series.values
@@ -406,6 +406,118 @@ def hpat_pandas_series_iloc(self):
         return self._data
 
     return hpat_pandas_series_values_impl
+
+
+@overload_method(SeriesType, 'value_counts')
+def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+    """
+    Pandas Series method :meth:`pandas.Series.value_counts` implementation.
+    .. only:: developer
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_value_counts*
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    normalize: :obj:`boolean`, default False
+        If True then the object returned will contain the relative frequencies of the unique values
+    sort: :obj: `boolean`, default True
+        Sort by frequencies
+    ascending: :obj:`boolean`, default False
+        Sort in ascending order
+    bins: :obj:`integer`, default None
+        *unsupported*
+    dropna: :obj:`boolean`, default True
+        Skip counts of NaN
+        *unsupported* for String
+
+    Returns
+    -------
+    :returns :obj:`pandas.Series`
+    """
+
+    _func_name = 'Method value_counts().'
+
+    ty_checker = TypeChecker('Method value_counts().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(normalize, (types.Omitted, types.Boolean, bool)) and normalize is True:
+        ty_checker.raise_exc(normalize, 'boolean', 'normalize')
+
+    if not isinstance(sort, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(sort, 'boolean', 'sort')
+
+    if not isinstance(ascending, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(ascending, 'boolean', 'ascending')
+
+    if not isinstance(bins, (types.Omitted, types.NoneType)) and bins is not None:
+        ty_checker.raise_exc(bins, 'boolean', 'bins')
+
+    if not isinstance(dropna, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(dropna, 'boolean', 'dropna')
+
+    if isinstance(self.data, StringArrayType):
+        def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+            # TODO: if dropna add nan handling
+
+            value_counts_dict = {}
+
+            for value in self._data:
+                if value in value_counts_dict:
+                    value_counts_dict[value] += 1
+                else:
+                    value_counts_dict[value] = 1
+
+            # TODO: workaround, keys() result can not be casted to array type
+            # TODO: use list comprehension instead or self.unique()
+            unique_values = [key for key in value_counts_dict]
+            unique_values_len = len(unique_values)
+
+            value_counts = numpy.empty(unique_values_len, dtype=numpy.intp)
+            for i, key in enumerate(value_counts_dict):
+                value_counts[i] = value_counts_dict[key]
+
+            # Take initial order as default
+            indexes_order = numpy.arange(unique_values_len)
+            if sort:
+                # TODO: consider order of values with the same frequency
+                indexes_order = value_counts.argsort()
+                if not ascending:
+                    indexes_order = indexes_order[::-1]
+
+            sorted_unique_values = [unique_values[i] for i in indexes_order]
+            sorted_value_counts = numpy.take(value_counts, indexes_order)
+
+            return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
+
+        return hpat_pandas_series_value_counts_str_impl
+
+    def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+        unique_values = self.unique()
+
+        if dropna:
+            nan_mask = numpy.isnan(unique_values)
+            unique_values = unique_values[~nan_mask]
+        #else:
+        # TODO: unique() can not handle numpy.nan because numpy.nan == numpy.nan is False
+
+        # TODO: not optimal
+        value_counts = numpy.array([numpy.sum(self._data == value) for value in unique_values])
+
+        # Series.unique() returns values in ascending order
+        indexes_order = numpy.arange(len(unique_values))
+        if sort:
+            indexes_order = value_counts.argsort()
+            if not ascending:
+                indexes_order = indexes_order[::-1]
+
+        sorted_unique_values = numpy.take(unique_values, indexes_order)
+        sorted_value_counts = numpy.take(value_counts, indexes_order)
+
+        return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
+
+    return hpat_pandas_series_value_counts_number_impl
 
 
 @overload_method(SeriesType, 'var')
