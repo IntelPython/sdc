@@ -2897,7 +2897,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         na = self.isna().sum()
         result = numpy.empty(len(self._data), dtype=numpy.int64)
         na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
-        sort_nona = numpy.argsort(self._data[~na_data_arr])
+        sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
         q = 0
         for id, i in enumerate(sort):
             if id not in list(sort[len(self._data) - na:]):
