@@ -1,6 +1,6 @@
 .. developers:
 
-Intel(R) SDC for Developers
+Intel® SDC for Developers
 ~~~~~~~~~~~~~~~~~~~~
 
 .. todo::

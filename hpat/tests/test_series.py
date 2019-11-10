@@ -1404,7 +1404,6 @@ class TestSeries(unittest.TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'No support of axis argument in old-style Series.dropna() impl')
     def test_series_dropna_axis1(self):
@@ -1835,13 +1834,81 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
-    def test_series_value_counts(self):
+    def test_series_value_counts_number(self):
         def test_impl(S):
             return S.value_counts()
+
+        input_data = [test_global_input_data_integer64, test_global_input_data_float64]
+        extras = [[1, 2, 3, 1, 1, 3], [0.1, 0., 0.1, 0.1]]
+
         hpat_func = hpat.jit(test_impl)
 
-        S = pd.Series(['AA', 'BB', 'C', 'AA', 'C', 'AA'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        for data, extra in zip(input_data, extras):
+            for d in data:
+                S = pd.Series(d + extra)
+                # Remove sort_index() after implementing sorting with the same number of frequency
+                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+
+
+    def test_series_value_counts_sort(self):
+        def test_impl(S, asceding):
+            return S.value_counts(sort=True, ascending=asceding)
+
+        hpat_func = hpat.jit(test_impl)
+
+        data = [1, 0, 0, 1, 1, -1, 0, -1, 0]
+
+        for asceding in (False, True):
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S, asceding), test_impl(S, asceding))
+
+    @unittest.skip('Unimplemented: need handling of numpy.nan comparison')
+    def test_series_value_counts_dropna_false(self):
+        def test_impl(S):
+            return S.value_counts(dropna=False)
+
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_value_counts_str_sort(self):
+        def test_impl(S, ascending):
+            return S.value_counts(sort=True, ascending=ascending)
+
+        data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
+                        ['dog', 'cat', 'cat', 'cat', 'dog']]
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in data_to_test:
+            for ascending in (True, False):
+                S = pd.Series(data)
+                pd.testing.assert_series_equal(hpat_func(S, ascending), test_impl(S, ascending))
+
+    def test_series_value_counts_index(self):
+        def test_impl(S):
+            return S.value_counts()
+
+        hpat_func = hpat.jit(test_impl)
+
+        for data in test_global_input_data_integer64:
+            index = np.arange(start=1, stop=len(data) + 1)
+            S = pd.Series(data, index=index)
+            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+
+    def test_series_value_counts_no_unboxing(self):
+        def test_impl():
+            S = pd.Series([1, 2, 3, 1, 1, 3])
+            return S.value_counts()
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_dist_input1(self):
         '''Verify distribution of a Series without index'''
@@ -2110,27 +2177,264 @@ class TestSeries(unittest.TestCase):
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_append1(self):
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Old-style append implementation doesn't handle ignore_index argument")
+    def test_series_append_single_ignore_index(self):
+        '''Verify Series.append() concatenates Series with other single Series ignoring indexes'''
         def test_impl(S, other):
-            return S.append(other).values
+            return S.append(other, ignore_index=True)
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series([-2., 3., 9.1])
-        S2 = pd.Series([-2., 5.0])
-        # Test single series
-        np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1]],
+                         'string': [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]}
 
-    def test_series_append2(self):
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Old-style append implementation doesn't handle ignore_index argument")
+    def test_series_append_list_ignore_index(self):
+        '''Verify Series.append() concatenates Series with list of other Series ignoring indexes'''
         def test_impl(S1, S2, S3):
-            return S1.append([S2, S3]).values
+            return S1.append([S2, S3], ignore_index=True)
         hpat_func = hpat.jit(test_impl)
 
-        S1 = pd.Series([-2., 3., 9.1])
+        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, ''], ['d', None], ['']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
+    def test_series_append_tuple_ignore_index(self):
+        '''Verify Series.append() concatenates Series with tuple of other Series ignoring indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append((S2, S3, ), ignore_index=True)
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, ''], ['d', None], ['']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_single_index_default(self):
+        '''Verify Series.append() concatenates Series with other single Series respecting default indexes'''
+        def test_impl(S, other):
+            return S.append(other)
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_list_index_default(self):
+        '''Verify Series.append() concatenates Series with list of other Series respecting default indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append([S2, S3])
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
+    def test_series_append_tuple_index_default(self):
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting default indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append((S2, S3, ))
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1], [-2., 5.0], [1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', 'b', 'q'], ['d', 'e'], ['s']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data) for data in data_list]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_single_index_int(self):
+        '''Verify Series.append() concatenates Series with other single Series respecting integer indexes'''
+        def test_impl(S, other):
+            return S.append(other)
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3, 4]]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_list_index_int(self):
+        '''Verify Series.append() concatenates Series with list of other Series respecting integer indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append([S2, S3])
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3], [4]]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
+    def test_series_append_tuple_index_int(self):
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting integer indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append((S2, S3, ))
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [[1, 2, 3, 4], [7, 8, 11, 3], [4]]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_single_index_str(self):
+        '''Verify Series.append() concatenates Series with other single Series respecting string indexes'''
+        def test_impl(S, other):
+            return S.append(other)
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0, -1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e', 'ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['a1', 'a2', 'a3', 'a4', 'a5']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_list_index_str(self):
+        '''Verify Series.append() concatenates Series with list of other Series respecting string indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append([S2, S3])
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['q', 't', 'a', 'x'], ['dd']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
+    def test_series_append_tuple_index_str(self):
+        '''Verify Series.append() concatenates Series with tuple of other Series respecting string indexes'''
+        def test_impl(S1, S2, S3):
+            return S1.append((S2, S3, ))
+        hpat_func = hpat.jit(test_impl)
+
+        dtype_to_data = {'float': [[-2., 3., 9.1, np.nan], [-2., 5.0, np.inf, 0], [-1.0]]}
+        if not hpat.config.config_pipeline_hpat_default:
+            dtype_to_data['string'] = [['a', None, 'bbbb', ''], ['dd', None, '', 'e'], ['ttt']]
+        indexes = [['a', 'bb', 'ccc', 'dddd'], ['q', 't', 'a', 'x'], ['dd']]
+
+        for dtype, data_list in dtype_to_data.items():
+            with self.subTest(series_dtype=dtype, concatenated_data=data_list):
+                S1, S2, S3 = [pd.Series(data, index=indexes[i]) for i, data in enumerate(data_list)]
+                pd.testing.assert_series_equal(hpat_func(S1, S2, S3), test_impl(S1, S2, S3))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Old-style append implementation doesn't handle ignore_index argument")
+    def test_series_append_ignore_index_literal(self):
+        '''Verify Series.append() implementation handles ignore_index argument as Boolean literal'''
+        def test_impl(S, other):
+            return S.append(other, ignore_index=False)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([-2., 3., 9.1], ['a1', 'b1', 'c1'])
+        S2 = pd.Series([-2., 5.0], ['a2', 'b2'])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "Old-style append implementation doesn't handle ignore_index argument")
+    def test_series_append_ignore_index_non_literal(self):
+        '''Verify Series.append() implementation raises if ignore_index argument is not a Boolean literal'''
+        def test_impl(S, other, param):
+            return S.append(other, ignore_index=param)
+        hpat_func = hpat.jit(test_impl)
+
+        ignore_index = True
+        S1 = pd.Series([-2., 3., 9.1], ['a1', 'b1', 'c1'])
+        S2 = pd.Series([-2., 5.0], ['a2', 'b2'])
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S1, S2, ignore_index)
+        msg = 'Method append(). The ignore_index must be a literal Boolean constant. Given: {}'
+        self.assertIn(msg.format(types.bool_), str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_single_dtype_promotion(self):
+        '''Verify Series.append() implementation handles appending single Series with different dtypes'''
+        def test_impl(S, other):
+            return S.append(other)
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([-2., 3., 9.1], ['a1', 'b1', 'c1'])
+        S2 = pd.Series([-2, 5], ['a2', 'b2'])
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     "BUG: old-style append implementation doesn't handle series index")
+    def test_series_append_list_dtype_promotion(self):
+        '''Verify Series.append() implementation handles appending list of Series with different dtypes'''
+        def test_impl(S1, S2, S3):
+            return S1.append([S2, S3])
+        hpat_func = hpat.jit(test_impl)
+
+        S1 = pd.Series([-2, 3, 9])
         S2 = pd.Series([-2., 5.0])
         S3 = pd.Series([1.0])
-        # Test series tuple
-        np.testing.assert_array_equal(hpat_func(S1, S2, S3),
-                                      test_impl(S1, S2, S3))
+        pd.testing.assert_series_equal(hpat_func(S1, S2, S3),
+                                       test_impl(S1, S2, S3))
 
     def test_series_isin_list1(self):
         def test_impl(S, values):
@@ -3658,6 +3962,76 @@ class TestSeries(unittest.TestCase):
                 cfunc(series, axis=axis)
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cov() parameter "min_periods" unsupported')
+    def test_series_cov(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2, min_periods)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        test_input_data1 = [[.2, .0, .6, .2],
+                            [.2, .0, .6, .2, .5, .6, .7, .8],
+                            [],
+                            [2, 0, 6, 2],
+                            [.2, .1, np.nan, .5, .3],
+                            [-1, np.nan, 1, np.inf]]
+        test_input_data2 = [[.3, .6, .0, .1],
+                            [.3, .6, .0, .1, .8],
+                            [],
+                            [3, 6, 0, 1],
+                            [.3, .2, .9, .6, np.nan],
+                            [np.nan, np.nan, np.inf, np.nan]]
+        for input_data1 in test_input_data1:
+            for input_data2 in test_input_data2:
+                S1 = pd.Series(input_data1)
+                S2 = pd.Series(input_data2)
+                for period in [None, 2, 1, 8, -4]:
+                    result_ref = test_series_cov_impl(S1, S2, min_periods=period)
+                    result = hpat_func(S1, S2, min_periods=period)
+                    np.testing.assert_allclose(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cov() parameter "min_periods" unsupported')
+    def test_series_cov_unsupported_dtype(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2, min_periods=min_periods)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        S1 = pd.Series([.2, .0, .6, .2])
+        S2 = pd.Series(['abcdefgh', 'a','abcdefg', 'ab', 'abcdef', 'abc'])
+        S3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        S4 = pd.Series([.3, .6, .0, .1])
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S1, S2, min_periods=5)
+        msg = 'Method cov(). The object other.data'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S3, S4, min_periods=5)
+        msg = 'Method cov(). The object self.data'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.cov() parameter "min_periods" unsupported')
+    def test_series_cov_unsupported_period(self):
+        def test_series_cov_impl(S1, S2, min_periods=None):
+            return S1.cov(S2, min_periods)
+
+        hpat_func = hpat.jit(test_series_cov_impl)
+        S1 = pd.Series([.2, .0, .6, .2])
+        S2 = pd.Series([.3, .6, .0, .1])
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S1, S2, min_periods='aaaa')
+        msg = 'Method cov(). The object min_periods'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S1, S2, min_periods=0.5)
+        msg = 'Method cov(). The object min_periods'
+        self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":
