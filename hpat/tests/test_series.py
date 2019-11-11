@@ -122,6 +122,55 @@ def gen_strlist(size, nchars=8):
     return [''.join(chars) for chars in generated_chars]
 
 
+def restore_series_argsort(series, my_result):
+    nona = series.dropna()
+    data = np.copy(nona.data)
+    new_result = np.copy(series.data)
+    result = np.copy(my_result)
+    for i in range(len(result)):
+        if result[i] != -1:
+            new_result[i] = data[result[i]]
+        else:
+            new_result[i] = np.nan
+    return new_result
+
+
+#if indices right - return 0; wrong - return 1
+def restore_series_sort_values(series, my_result_index, ascending):
+    value_dict = {}
+    nan_list = []
+    data = np.copy(series.data)
+    index = np.copy(series.index)
+    for value in range(len(data)):
+        # if np.isnan(data[value]):
+        if series.isna()[index[value]]:
+            nan_list.append(index[value])
+        if data[value] in value_dict:
+            value_dict[data[value]].append(index[value])
+        else:
+            value_dict[data[value]] = [index[value]]
+    na = series.isna().sum()
+    sort = np.argsort(data)
+    result = np.copy(my_result_index)
+    if not ascending:
+        sort[:len(result)-na] = sort[:len(result)-na][::-1]
+    for i in range(len(result)-na):
+        check = 0
+        for j in value_dict[data[sort[i]]]:
+            if j == result[i]:
+                check = 1
+        if check == 0:
+            return 1
+    for i in range(len(result)-na, len(result)):
+        check = 0
+        for j in nan_list:
+            if result[i] == j:
+                check = 1
+        if check == 0:
+            return 1
+    return 0
+
+
 def _make_func_from_text(func_text, func_name='test_impl'):
     loc_vars = {}
     exec(func_text, {}, loc_vars)
@@ -385,10 +434,17 @@ class TestSeries(unittest.TestCase):
         all_data = test_global_input_data_numeric
 
         for data in all_data:
-            series = pd.Series(data * 3)
-            ref_result = test_impl(series, kind='mergesort')
-            jit_result = hpat_func(series, kind='quicksort')
-            pd.testing.assert_series_equal(ref_result, jit_result)
+            for kind in ['quicksort', 'mergesort']:
+                series = pd.Series(data * 3)
+                ref_result = test_impl(series, kind=kind)
+                jit_result = hpat_func(series, kind=kind)
+                ref = restore_series_argsort(series, ref_result.data)
+                jit = restore_series_argsort(series, jit_result.data)
+                if kind == 'mergesort':
+                    pd.testing.assert_series_equal(ref_result, jit_result)
+                else:
+                    np.testing.assert_array_equal(ref, jit)
+
 
     def test_series_argsort_full_idx(self):
         def test_impl(series, kind):
@@ -401,10 +457,16 @@ class TestSeries(unittest.TestCase):
         for data in all_data:
             data = data * 3
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
-                series = pd.Series(data, index)
-                ref_result = test_impl(series, kind='mergesort')
-                jit_result = hpat_func(series, kind='quicksort')
-                pd.testing.assert_series_equal(ref_result, jit_result)
+                for kind in ['quicksort', 'mergesort']:
+                    series = pd.Series(data, index)
+                    ref_result = test_impl(series, kind=kind)
+                    jit_result = hpat_func(series, kind=kind)
+                    ref = restore_series_argsort(series, ref_result.data)
+                    jit = restore_series_argsort(series, jit_result.data)
+                    if kind == 'mergesort':
+                        pd.testing.assert_series_equal(ref_result, jit_result)
+                    else:
+                        np.testing.assert_array_equal(ref, jit)
 
 
     def test_series_attr6(self):
@@ -3000,9 +3062,12 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = test_impl(series, ascending, kind='mergesort')
+                ref_result = test_impl(series, ascending, kind='quicksort')
                 jit_result = hpat_func(series, ascending, kind='quicksort')
-                pd.testing.assert_series_equal(ref_result, jit_result)
+                ref = restore_series_sort_values(series, ref_result.index, ascending)
+                jit = restore_series_sort_values(series, jit_result.index, ascending)
+                np.testing.assert_array_equal(ref_result.data, jit_result.data)
+                self.assertEqual(ref, jit)
 
     @unittest.skip("Creating Python string/unicode object failed")
     def test_series_sort_values_full_unicode4(self):
@@ -3017,9 +3082,12 @@ class TestSeries(unittest.TestCase):
             data = data * 3
             for ascending in [True, False]:
                 series = pd.Series(data)
-                ref_result = test_impl(series, ascending, kind='mergesort')
+                ref_result = test_impl(series, ascending, kind='quicksort')
                 jit_result = hpat_func(series, ascending, kind='quicksort')
-                pd.testing.assert_series_equal(ref_result, jit_result)
+                ref = restore_series_sort_values(series, ref_result.index, ascending)
+                jit = restore_series_sort_values(series, jit_result.index, ascending)
+                np.testing.assert_array_equal(ref_result.data, jit_result.data)
+                self.assertEqual(ref, jit)
 
     def test_series_sort_values_full_idx(self):
         def test_impl(series, ascending, kind):
@@ -3034,9 +3102,12 @@ class TestSeries(unittest.TestCase):
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 for ascending in [True, False]:
                     series = pd.Series(data, index)
-                    ref_result = test_impl(series, ascending, kind='mergesort')
+                    ref_result = test_impl(series, ascending, kind='quicksort')
                     jit_result = hpat_func(series, ascending, kind='quicksort')
-                    pd.testing.assert_series_equal(ref_result, jit_result)
+                    ref = restore_series_sort_values(series, ref_result.index, ascending)
+                    jit = restore_series_sort_values(series, jit_result.index, ascending)
+                    np.testing.assert_array_equal(ref_result.data, jit_result.data)
+                    self.assertEqual(ref, jit)
 
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file
