@@ -1709,9 +1709,9 @@ class DistributedPassImpl(object):
 
         dist_depth = 0
 
-        if depth > dist_depth:
+        if depth >= dist_depth:
             # Do not distribute
-            if depth == (dist_depth + 1):
+            if depth == dist_depth:
                 parfor.no_sequential_lowering = True
             return [parfor]
 
