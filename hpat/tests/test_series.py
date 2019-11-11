@@ -4107,5 +4107,140 @@ class TestSeries(unittest.TestCase):
         self.assertIn(msg, str(raises.exception))
 
 
+# Sort Lines Ascending
+_numba_not_supported_tests = [
+    "test_create_str",
+    "test_create1",
+    "test_create2",
+    "test_getitem_series_str1",
+    "test_getitem_series1",
+    "test_list_convert",
+    "test_np_call_on_series1",
+    "test_pass_df_str",
+    "test_pass_df1",
+    "test_pass_series_str",
+    "test_pass_series1",
+    "test_pass_series2",
+    "test_series_apply1",
+    "test_series_argsort_parallel",
+    "test_series_astype_float_to_int32",
+    "test_series_astype_int_to_float64",
+    "test_series_astype_int_to_str1",
+    "test_series_astype_int_to_str2",
+    "test_series_astype_int32_to_int64",
+    "test_series_astype_str_index_int",
+    "test_series_astype_str_index_str",
+    "test_series_astype_str_to_str_index_int",
+    "test_series_astype_str_to_str_index_str",
+    "test_series_astype_str_to_str1",
+    "test_series_astype_str_to_str2",
+    "test_series_attr7",
+    "test_series_combine_assert1",
+    "test_series_combine_assert2",
+    "test_series_combine_different_types",
+    "test_series_combine_float3264",
+    "test_series_combine_integer_samelen",
+    "test_series_combine_integer",
+    "test_series_combine_samelen",
+    "test_series_combine_value_samelen",
+    "test_series_combine_value",
+    "test_series_combine",
+    "test_series_concat1",
+    "test_series_corr1",
+    "test_series_count1",
+    "test_series_cov1",
+    "test_series_dist_input1",
+    "test_series_dist_input2",
+    "test_series_dropna_bool_no_index1",
+    "test_series_dropna_str_parallel1",
+    "test_series_fillna_bool_no_index1",
+    "test_series_fillna_float_inplace3",
+    "test_series_fillna_inplace_non_literal",
+    "test_series_fillna_str_inplace_empty1",
+    "test_series_fillna_str_inplace1",
+    "test_series_fusion1",
+    "test_series_fusion2",
+    "test_series_head_default1",
+    "test_series_head_index_parallel1",
+    "test_series_head_index1",
+    "test_series_head_index2",
+    "test_series_head_index3",
+    "test_series_head_noidx_float",
+    "test_series_head_parallel1",
+    "test_series_head1",
+    "test_series_iat1",
+    "test_series_iat2",
+    "test_series_iloc1",
+    "test_series_iloc2",
+    "test_series_inplace_binop_array",
+    "test_series_list_str_unbox1",
+    "test_series_map_global1",
+    "test_series_map_tup_map1",
+    "test_series_map_tup1",
+    "test_series_map1",
+    "test_series_median_parallel1",
+    "test_series_nlargest_index",
+    "test_series_nlargest_parallel",
+    "test_series_nlargest_unboxing",
+    "test_series_nlargest",
+    "test_series_nsmallest_index",
+    "test_series_nsmallest_parallel",
+    "test_series_nsmallest_unboxing",
+    "test_series_nsmallest",
+    "test_series_op1",
+    "test_series_op2",
+    "test_series_op3",
+    "test_series_op4",
+    "test_series_op6",
+    "test_series_op7",
+    "test_series_rolling1",
+    "test_series_sort_values_parallel1",
+    "test_series_std",
+    "test_series_str_len1",
+    "test_series_str2str",
+    "test_series_sum2",
+    "test_series_ufunc1",
+    "test_series_values1",
+    "test_series_var",
+    "test_series_var1",
+    "test_setitem_series_bool1",
+    "test_setitem_series_bool2",
+    "test_setitem_series1",
+    "test_setitem_series2",
+    "test_static_getitem_series1",
+    "test_static_setitem_series1",
+]
+
+
+def decorate_methods(decorator, methods):
+    """Decorator for classes. It adds new methods decorated with given decorator.
+    It is useful for skipping tests from a base class.
+
+    Example:
+        class MyTestBase(unittest.TestCase):
+            def test_mytest(self):
+                ...
+
+        @decorate_methods(unittest.skip("my reason"), ["test_mytest"])
+        class MyTest(MyTestBase):
+            pass
+    """
+
+    def decorate(cls):
+        def _func(self): pass
+        for attr in methods:
+            setattr(cls, attr, decorator(_func))
+        return cls
+    return decorate
+
+
+@decorate_methods(unittest.skip("numba not supported"), _numba_not_supported_tests)
+class TestSeriesNumba(TestSeries):
+
+    def jit(self, *args, **kwargs):
+        import numba
+        return numba.njit(*args, **kwargs)
+
+
 if __name__ == "__main__":
     unittest.main()
