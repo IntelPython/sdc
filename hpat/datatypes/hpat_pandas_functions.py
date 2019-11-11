@@ -24,7 +24,31 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""Pandas function implemented in Intel SDC
+"""
 
-import hpat.datatypes.hpat_pandas_functions
-import hpat.datatypes.hpat_pandas_dataframe_functions
-import hpat.datatypes.hpat_pandas_seriesgroupby_functions
+import pandas
+import pyarrow
+
+from numba import types, objmode
+from numba.extending import (overload, overload_method, overload_attribute)
+from numba.errors import TypingError
+
+from hpat.datatypes.hpat_pandas_dataframe_types import DataFrameType
+
+
+# setattr(types, 'hpat_DataFrameType', DataFrameType)
+
+
+# @overload(pandas.read_csv)
+# def sdc_pandas_read_csv(fname):
+
+#     def _impl(fname):
+#         with objmode(df='hpat_DataFrameType'):
+#         # with objmode(df='int64'):
+#             # df = pyarrow.csv.read_csv("fname")
+#             # df = pyarrow.csv.read_csv("fname").to_pandas()
+#             df = pandas.read_csv(fname)
+#         return df
+
+#     return _impl
