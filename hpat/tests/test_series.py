@@ -4124,11 +4124,8 @@ class TestSeries(unittest.TestCase):
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
                 for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
-                    print(input_data, periods, method)
                     result_ref = test_series_pct_change_impl(S, periods, method)
-                    print(result_ref)
                     result = hpat_func(S, periods, method)
-                    print(result)
                     pd.testing.assert_series_equal(result, result_ref)
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
