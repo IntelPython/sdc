@@ -2884,6 +2884,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             if kind != 'quicksort' and kind != 'mergesort':
                 raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
             if kind == 'mergesort':
+                #It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
                 sort = numpy.argsort(self._data, kind='mergesort')
             else:
                 sort = numpy.argsort(self._data)
@@ -3030,6 +3031,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             na = self.isna().sum()
             indices = numpy.arange(len(self._data))
             if kind == 'mergesort':
+                # It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
                 index_result = numpy.argsort(self._data, kind='mergesort')
             else:
                 index_result = numpy.argsort(self._data)
