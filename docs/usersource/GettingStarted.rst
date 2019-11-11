@@ -1,31 +1,31 @@
 .. _GettingStarted:
 
-Getting Started with Intel(R) SDC
+Getting Started with Intel® SDC
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Intel(R) SDC is useful to accelerate a subset of `Python <https://docs.python.org/3/>`_ operations working with  `Pandas Series <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html>`_ and `Dataframes <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html>`_ as well as with `Numpy Arrays <https://docs.scipy.org/doc/numpy/reference/generated/numpy.array.html>`_ . Being the just-in-time compiler built on top of `Numba <http://numba.pydata.org/numba-doc/latest/index.html>`_ Intel(R) SDC will compile a subset of Pandas and Numpy codes into the native code. The compilation is controlled by a set of `Numba decorators <http://numba.pydata.org/numba-doc/0.8/modules/decorators.html>`_ and **Intel(R) SDC decorators** that can be applied to a function.
+Intel® SDC is useful to accelerate a subset of `Python <https://docs.python.org/3/>`_ operations working with  `Pandas Series <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html>`_ and `Dataframes <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html>`_ as well as with `Numpy Arrays <https://docs.scipy.org/doc/numpy/reference/generated/numpy.array.html>`_ . Being the just-in-time compiler built on top of `Numba <http://numba.pydata.org/numba-doc/latest/index.html>`_ Intel® SDC will compile a subset of Pandas and Numpy codes into the native code. The compilation is controlled by a set of `Numba decorators <http://numba.pydata.org/numba-doc/0.8/modules/decorators.html>`_ and **Intel® SDC decorators** that can be applied to a function.
  
-The code below illustrates a typical workflow that Intel(R) SDC is intended to compile
+The code below illustrates a typical workflow that Intel® SDC is intended to compile
 
 .. todo::
     Short code illustrating how hpat can compile read_csv and compute aggregators over columns
  
 We also recommend to read `A ~5 minute guide to Numba <https://numba.pydata.org/numba-doc/dev/user/5minguide.html>`_ .
  
-Installing Intel(R) SDC
+Installing Intel® SDC
 ===============
 
 .. todo::
          
    instructions how to install hpat using 1) conda, 2) pip
  
-Experienced users can also compile Intel(R) SDC  from sources<link to github build instructions for hpat>
+Experienced users can also compile Intel® SDC  from sources<link to github build instructions for hpat>
  
-How to use Intel(R) SDC
+How to use Intel® SDC
 ================
 
 .. todo::
-   Provide a few code snapshots illustrating typical usages of Intel(R) SDC:
+   Provide a few code snapshots illustrating typical usages of Intel® SDC:
     •	Reading a file
     •	Working with a column - a few basic ops, e.g. aggregation or sorting + UDF
     •	Working with a dataframe
@@ -54,11 +54,11 @@ What If I Get A Compilation Error
 =================================
 
 .. todo::
-   Need to give basic information that hpat and numba do not support full set of Pandas and Numpy APIs, provide the link to the API Reference section for Intel(R) SDC, relevant reference to Numba documentation.
+   Need to give basic information that hpat and numba do not support full set of Pandas and Numpy APIs, provide the link to the API Reference section for Intel® SDC, relevant reference to Numba documentation.
  
-Also give very short introduction to what kind of code Numba/Intel(R) SDC can compile and what cannot, i.e. type stability etc. Provide the links to relevant sections in Intel(R) SDC and Numba documentations focusing on compilation issues/limitations
+Also give very short introduction to what kind of code Numba/Intel® SDC can compile and what cannot, i.e. type stability etc. Provide the links to relevant sections in Intel® SDC and Numba documentations focusing on compilation issues/limitations
   
-Measuring Intel(R) SDC performance
+Measuring Intel® SDC performance
 ===========================
 
 .. todo::
@@ -69,4 +69,4 @@ What If I Get Poor Performance?
 
 .. todo::
    Short introduction why performance may be slower than expected. GIL, Object mode and nopython mode. Overheads related to boxing and unboxing Python objects.
-   Reference to relevant sections of Intel(R) SDC and Numba documentation for detailed discussion
+   Reference to relevant sections of Intel® SDC and Numba documentation for detailed discussion
