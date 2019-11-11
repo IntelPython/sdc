@@ -704,7 +704,7 @@ def hpat_pandas_series_T(self):
     .. only:: developer
 
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_getattr_T
-    
+
     Parameters
     ----------
     self: :obj:`pandas.Series`
@@ -1396,7 +1396,7 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.sub` implementation.
     .. only:: developer
-    
+
        Test: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_op5
 
     Parameters
@@ -2860,7 +2860,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
     -------
     :obj:`float` or :obj:`pandas.Series` (if level is specified)
          median of values in the series
-    
+
     """
 
     _func_name = 'Method median().'
@@ -2986,7 +2986,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     Pandas Series method :meth:`pandas.Series.sort_values` implementation.
 
     .. only:: developer
-    
+
        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_sort_values*
 
     Parameters
