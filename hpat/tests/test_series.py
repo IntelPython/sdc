@@ -153,8 +153,8 @@ GLOBAL_VAL = 2
 
 class TestSeries(unittest.TestCase):
 
-    def jit(self, func):
-        return hpat.jit(func)
+    def jit(self, *args, **kwargs):
+        return hpat.jit(*args, **kwargs)
 
     def test_create1(self):
         def test_impl():
