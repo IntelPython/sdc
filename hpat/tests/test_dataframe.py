@@ -52,16 +52,54 @@ def inner_get_column(df):
 COL_IND = 0
 
 
-class TestDataFrame(unittest.TestCase):
+class TestDataFrame(object):
+
+    def _check_frame(self, py_func):
+        nb_func = self.jit(py_func)
+        pd.testing.assert_frame_equal(nb_func(), py_func())
+
+    def _check_series(self, py_func):
+        nb_func = self.jit(py_func)
+        pd.testing.assert_series_equal(nb_func(), py_func())
+
+    def test_create_DataFrame(self):
+        def test_impl():
+            # Force dtype value.
+            # np.arange(2).dtype == np.int32 [Windows]
+            # np.arange(2).dtype == np.int64 [Linux]
+            # At this time Numba doesn't support kwargs for arange.
+            df = pd.DataFrame({'A': np.arange(0, 2, 1, np.int64)})
+            return df
+
+        self._check_frame(test_impl)
+
+    def test_create2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': np.ones(11), 'B': np.random.ranf(11)})
+            return df['A']
+
+        self._check_series(test_impl)
+
+
+@unittest.skipIf(hpat.config.config_pipeline_hpat_default != 0,
+                 "New style is not enabled.")
+class TestDataFrameNumba(TestDataFrame, unittest.TestCase):
+
+    def jit(self, func):
+        return numba.jit(func, nopython=True)
+
+
+class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
+
+    def jit(self, func):
+        return hpat.jit(func)
 
     def test_create1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
+        def test_impl():
+            df = pd.DataFrame({'A': np.ones(11), 'B': np.random.ranf(11)})
             return df.A
 
-        hpat_func = hpat.jit(test_impl)
-        n = 11
-        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+        self._check_series(test_impl)
 
     def test_create_cond1(self):
         def test_impl(A, B, c):
