@@ -4104,6 +4104,8 @@ class TestSeries(unittest.TestCase):
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change unsupported some Series')
     def test_series_pct_change(self):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
@@ -4122,10 +4124,15 @@ class TestSeries(unittest.TestCase):
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
                 for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
+                    print(input_data, periods, method)
                     result_ref = test_series_pct_change_impl(S, periods, method)
+                    print(result_ref)
                     result = hpat_func(S, periods, method)
+                    print(result)
                     pd.testing.assert_series_equal(result, result_ref)
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change unsupported some Series')
     def test_series_pct_change_str(self):
         def test_series_pct_change_impl(S):
             return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
@@ -4135,9 +4142,11 @@ class TestSeries(unittest.TestCase):
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S)
-        msg = 'Method pct_change(). The function only applies to elements that are all numeric. Given data type: unicode_type'
+        msg = 'Method pct_change(). The object self.data'
         self.assertIn(msg, str(raises.exception))
 
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change unsupported some Series')
     def test_series_pct_change_not_supported(self):
         def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
             return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
@@ -4151,22 +4160,22 @@ class TestSeries(unittest.TestCase):
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, limit=5)
-        msg = 'Method pct_change(). The function unsupport limit is not None.'
+        msg = 'Method pct_change(). The object limit'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, freq=5)
-        msg = 'Method pct_change(). The function unsupport freq is not None.'
+        msg = 'Method pct_change(). The object freq'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, fill_method=1.6)
-        msg = 'Method pct_change(). The function uses only fill_method is string. Given fill_method type: float64'
+        msg = 'Method pct_change(). The object fill_method'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, periods=1.6)
-        msg = 'Method pct_change(). The function uses only periods is integer. Given periods type: float64'
+        msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
 
