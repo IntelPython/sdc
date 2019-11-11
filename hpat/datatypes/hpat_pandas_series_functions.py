@@ -98,7 +98,7 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Pandas Series operator :attr:`pandas.Series.get` implementation
     **Algorithm**: result = series[idx]
-    
+
     **Test**: python -m hpat.runtests hpat.tests.test_series.TestSeries.test_static_getitem_series1
     
     Parameters
