@@ -4132,7 +4132,7 @@ class TestSeries(unittest.TestCase):
                     pd.testing.assert_series_equal(result, result_ref)
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.pct_change unsupported some Series')
+                     'Series.pct_change() strings as input data unsupported')
     def test_series_pct_change_str(self):
         def test_series_pct_change_impl(S):
             return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
@@ -4146,7 +4146,7 @@ class TestSeries(unittest.TestCase):
         self.assertIn(msg, str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
-                     'Series.pct_change unsupported some Series')
+                     'Series.pct_change() does not raise an exception')
     def test_series_pct_change_not_supported(self):
         def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
             return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
