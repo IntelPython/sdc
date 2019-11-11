@@ -122,6 +122,11 @@ def gen_strlist(size, nchars=8):
     return [''.join(chars) for chars in generated_chars]
 
 
+#   Restores a series and checks the correct arrangement of data,
+#   taking into account the same elements for unstable sortings
+#   Example: pd.Series([15, 3, 7, 3, 1],[2, 4, 6, 8, 10])
+#   Result can be pd.Series([4, 1, 3, 2, 0],[2, 4, 6, 8, 10]) or pd.Series([4, 2, 3, 1, 0],[2, 4, 6, 8, 10])
+#   return restore series
 def restore_series_argsort(series, my_result):
     nona = series.dropna()
     data = np.copy(nona.data)
@@ -135,7 +140,11 @@ def restore_series_argsort(series, my_result):
     return new_result
 
 
-#if indices right - return 0; wrong - return 1
+#   Restores a series and checks the correct arrangement of indices,
+#   taking into account the same elements for unstable sortings
+#   Example: pd.Series([15, 3, 7, 3, 1],[2, 4, 6, 8, 10])
+#   Result can be pd.Series([1, 3, 3, 7, 15],[10, 4, 8, 6, 2]) or pd.Series([1, 3, 3, 7, 15],[10, 8, 4, 6, 2])
+#   if indices correct - return 0; wrong - return 1
 def restore_series_sort_values(series, my_result_index, ascending):
     value_dict = {}
     nan_list = []
