@@ -147,12 +147,12 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 
     .. only:: developer
 
-       Test: python -m hpat.runtests hpat.tests.test_strings.TestStrings.test_str2str
-             python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str2str
-             python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_get
-             python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_replace_noregex
-             python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_split
-             python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_contains_regex
+    Test: python -m hpat.runtests hpat.tests.test_strings.TestStrings.test_str2str
+          python -m hpat.runtests hpat.tests.test_series.TestSeries.test_series_str2str
+          python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_get
+          python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_replace_noregex
+          python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_split
+          python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_contains_regex
 
     Parameters
     ----------
@@ -183,7 +183,7 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
             else:
                 result[it] = item
 
-        return pandas.Series(result)
+        return pandas.Series(result, name=self._data._name)
 
     return hpat_pandas_stringmethods_{methodname}_impl
 """
