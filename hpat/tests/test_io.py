@@ -39,6 +39,8 @@ from hpat.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    get_start_end)
 from numba.config import IS_32BITS
 
+import hpat
+
 
 kde_file = 'kde.parquet'
 
@@ -380,6 +382,14 @@ class TestIO(unittest.TestCase):
 
         hpat_func = hpat.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_pandas_read_csv(self):
+        def py_func():
+            df = pd.read_csv("csv_data1.csv")
+            return df
+
+        nb_func = self.jit(py_func)
+        pd.testing.assert_frame_equal(nb_func(), py_func())
 
     def test_csv1(self):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
