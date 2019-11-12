@@ -135,17 +135,3 @@ def set_environment_variable(key, value):
         os.environ[key] += os.pathsep + value
     else:
         os.environ[key] = value
-
-
-"""
-Set channels and change conda configuration
-"""
-def setup_conda(conda_activate):
-    conda_metachannel = 'https://metachannel.conda-forge.org/conda-forge/python,setuptools,numpy,pandas,pyarrow,arrow-cpp,boost,hdf5,h5py,wheel,pip'
-    run_command(f'{conda_activate}conda config --set safety_checks disabled')
-    run_command(f'{conda_activate}conda config --set channel_priority strict')
-    run_command(f'{conda_activate}conda config --add channels intel')
-    run_command(f'{conda_activate}conda config --add channels numba')
-    run_command(f'{conda_activate}conda config --add channels defaults')
-    run_command(f'{conda_activate}conda config --add channels conda-forge')
-    # run_command(f'{conda_activate}conda config --add channels {conda_metachannel}')

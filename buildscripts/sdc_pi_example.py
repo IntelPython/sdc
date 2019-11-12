@@ -2,6 +2,7 @@ import hpat
 import numpy as np
 import time
 
+
 @hpat.jit
 def calc_pi(n):
     t1 = time.time()
