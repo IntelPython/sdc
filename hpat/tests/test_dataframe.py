@@ -54,13 +54,13 @@ COL_IND = 0
 
 class TestDataFrame(object):
 
-    def _check_frame(self, py_func):
+    def _check_frame(self, py_func, *argv, **kwargs):
         nb_func = self.jit(py_func)
-        pd.testing.assert_frame_equal(nb_func(), py_func())
+        pd.testing.assert_frame_equal(nb_func(*argv, **kwargs), py_func(*argv, **kwargs))
 
-    def _check_series(self, py_func):
+    def _check_series(self, py_func, *argv, **kwargs):
         nb_func = self.jit(py_func)
-        pd.testing.assert_series_equal(nb_func(), py_func())
+        pd.testing.assert_series_equal(nb_func(*argv, **kwargs), py_func(*argv, **kwargs))
 
     def test_create_DataFrame(self):
         def test_impl():
