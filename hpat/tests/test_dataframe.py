@@ -237,6 +237,26 @@ class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
         np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
         np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
 
+    @unittest.skip("Crash without a message. Possibly incorrect DataFrameType.")
+    def test_create_dataframe_objmode(self):
+        'Create DataFrame in objmode'
+        from hpat.hiframes.pd_dataframe_ext import DataFrameType
+        setattr(numba.types, "DataFrameType", DataFrameType)
+
+        def test_impl():
+            with numba.objmode(df="DataFrameType(data=(Array(int64, 1, 'C', True),), columns=('A',), has_parent=True)"):
+                df = pd.DataFrame(data={"A": pd.Series([1, 2])})
+            return df
+        self._check_frame(test_impl)
+
+        # Note: This code with unboxing should work by the same mechanics as objmode.
+        # def test_impl(df):
+        #     return df
+        # df = pd.DataFrame(data={"A": pd.Series([1, 2])})
+        # self._check_frame(test_impl, df)
+
+        delattr(numba.types, "DataFrameType")
+
     def test_len1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
