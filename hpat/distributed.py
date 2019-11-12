@@ -1892,8 +1892,6 @@ class DistributedPassImpl(object):
             parfor, parfor.params, self.state.calltypes)
 
         for reduce_varname, (init_val, reduce_nodes) in reductions.items():
-            # print(len(reduce_nodes))
-            # print('\n'.join([str(a) for a in reduce_nodes]))
             reduce_op = guard(self._get_reduce_op, reduce_nodes)
             # TODO: initialize reduction vars (arrays)
             reduce_var = namevar_table[reduce_varname]
