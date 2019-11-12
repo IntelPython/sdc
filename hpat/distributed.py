@@ -106,6 +106,7 @@ distributed_run_extensions = {}
 dist_analysis = None
 fir_text = None
 
+_distribution_depth = int(os.getenv('SDC_DISTRIBUTION_DEPTH', '1'))
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class DistributedPass(FunctionPass):
@@ -1707,11 +1708,10 @@ class DistributedPassImpl(object):
         # stencil_accesses, neighborhood = get_stencil_accesses(
         #     parfor, self.state.typemap)
 
-        dist_depth = 0
-
-        if depth >= dist_depth:
+        global _distribution_depth
+        if depth >= _distribution_depth:
             # Do not distribute
-            if depth == dist_depth:
+            if depth == _distribution_depth:
                 parfor.no_sequential_lowering = True
             return [parfor]
 
