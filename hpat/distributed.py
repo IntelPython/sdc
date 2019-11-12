@@ -121,14 +121,7 @@ class DistributedPass(FunctionPass):
         pass
 
     def run_pass(self, state):
-        # print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        # state.func_ir.dump()
-        # print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
-        res = DistributedPassImpl(state).run_pass()
-        # print('XXXXXXXXXXXXXXXXXXXXXXXXXXX')
-        # state.func_ir.dump()
-        # print('YYYYYYYYYYYYYYYYYYYYYYYYYYY')
-        return res
+        return DistributedPassImpl(state).run_pass()
 
 class DistributedPassImpl(object):
     """The summary of the class should be here for example below is the summary line for this class
@@ -219,14 +212,12 @@ class DistributedPassImpl(object):
                                   self.state.typemap, self.state.calltypes, self.state.typingctx,
                                   self.state.targetctx, self)
                 elif isinstance(inst, Parfor):
-                    print('********** process parfor **********')
                     out_nodes = self._run_parfor(inst, namevar_table, depth)
                     # run dist pass recursively
                     p_blocks = wrap_parfor_blocks(inst)
                     # build_definitions(p_blocks, self.state.func_ir._definitions)
                     self._run_dist_pass(p_blocks, depth + 1)
                     unwrap_parfor_blocks(inst)
-                    print('********** process parfor end **********')
                 elif isinstance(inst, ir.Assign):
                     lhs = inst.target.name
                     rhs = inst.value
@@ -287,9 +278,6 @@ class DistributedPassImpl(object):
 
             if not replaced:
                 blocks[label].body = new_body
-                # print('******************** new_body')
-                # print('\n'.join([str(a) for a in new_body]))
-                # print('********************')
 
         return blocks
 
@@ -1725,7 +1713,7 @@ class DistributedPassImpl(object):
             return self._run_parfor_1D_Var(parfor, namevar_table)
 
         if self._dist_analysis.parfor_dists[parfor.id] != Distribution.OneD:
-            if True or debug_prints():  # pragma: no cover
+            if debug_prints():  # pragma: no cover
                 print("parfor " + str(parfor.id) + " not parallelized.")
             return [parfor]
 
@@ -1903,9 +1891,6 @@ class DistributedPassImpl(object):
         _, reductions = get_parfor_reductions(
             parfor, parfor.params, self.state.calltypes)
 
-        # print('aaaaaaaaaaaaaaaaaaa')
-        # parfor.dump()
-        # print('aaaaaaaaaaaaaaaaaaa')
         for reduce_varname, (init_val, reduce_nodes) in reductions.items():
             # print(len(reduce_nodes))
             # print('\n'.join([str(a) for a in reduce_nodes]))
@@ -2113,9 +2098,6 @@ class DistributedPassImpl(object):
         replace_arg_nodes(block, [reduce_var, op_var])
         dist_reduce_nodes = [op_assign] + block.body[:-3]
         dist_reduce_nodes[-1].target = reduce_var
-        # print('*****************************')
-        # print('\n'.join([str(a) for a in dist_reduce_nodes]))
-        # print('*****************************')
         return dist_reduce_nodes
 
     def _get_reduce_op(self, reduce_nodes):
