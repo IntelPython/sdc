@@ -4239,7 +4239,13 @@ class TestSeriesNumba(TestSeries):
 
     def jit(self, *args, **kwargs):
         import numba
-        return numba.njit(*args, **kwargs)
+        import warnings
+        if 'nopython' in kwargs:
+            warnings.warn('nopython is set to True and is ignored', RuntimeWarning)
+        if 'parallel' in kwargs:
+            warnings.warn('parallel is set to True and is ignored', RuntimeWarning)
+        kwargs.update({'nopython': True, 'parallel': True})
+        return numba.jit(*args, **kwargs)
 
 
 if __name__ == "__main__":
