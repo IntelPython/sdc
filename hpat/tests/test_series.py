@@ -213,6 +213,7 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
 
     def test_create_series1(self):
+        'Create pandas.Series([int])'
         def test_impl():
             A = pd.Series([1, 2, 3])
             return A
