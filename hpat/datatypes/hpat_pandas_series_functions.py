@@ -2978,9 +2978,11 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     return hpat_pandas_series_argsort_noidx_impl
 
+
 @njit
 def _sort_map_func(list1):
     return numpy.sort(list1)
+
 
 @njit
 def _sort_reduce_func(list1, list2):
@@ -3009,6 +3011,7 @@ def _sort_reduce_func(list1, list2):
         k += 1
 
     return res
+
 
 @overload_method(SeriesType, 'sort_values')
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
@@ -3093,7 +3096,11 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             indices = numpy.arange(len(self._data))
             index_result = numpy.argsort(self._data, kind='mergesort')
 
-            result = common_functions.map_reduce_chunked(self._data, numpy.empty(0, self._data.dtype), _sort_map_func, _sort_reduce_func)
+            result = common_functions.map_reduce_chunked(
+                self._data,
+                numpy.empty(0, self._data.dtype),
+                _sort_map_func,
+                _sort_reduce_func)
             # result = numpy.sort(self._data)
 
             i = len(self._data) - na

@@ -132,13 +132,15 @@ def hpat_arrays_append_overload(A, B):
 
             return _append_list_string_array_impl
 
+
 @njit
 def _compute_map_chunks(l, n):
     assert n > 0
     a = len(l) // n
     b = a + 1
     c = len(l) % n
-    return [l[i * b : i * b + b] if i < c else l[c * b + (i - c) * a : c * b + (i - c) * a + a] for i in range(n)]
+    return [l[i * b: i * b + b] if i < c else l[c * b + (i - c) * a: c * b + (i - c) * a + a] for i in range(n)]
+
 
 @njit(parallel=True)
 def map_reduce(arg, init_val, map_func, reduce_func):
@@ -147,6 +149,7 @@ def map_reduce(arg, init_val, map_func, reduce_func):
         val = map_func(arg[i])
         res = reduce_func(res, val)
     return res
+
 
 @njit(parallel=True)
 def map_reduce_chunked(arg, init_val, map_func, reduce_func):
