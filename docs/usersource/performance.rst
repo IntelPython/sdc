@@ -1,6 +1,6 @@
 .. _performance:
 
-Getting Performance With Intel(R) SDC
+Getting Performance With Intel® SDC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Compilation Overheads

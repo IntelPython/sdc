@@ -1,32 +1,38 @@
 jobs:
-- template: buildscripts/azure-template-windows.yml
+- template: buildscripts/azure/template-windows.yml
   parameters:
-    name: Windows
+    name: Windows_2016
     vmImage: vs2017-win2016
     matrix:
-      py37_np116_numpes0:
-        CONDA_ENV: 'travisci'
+      vs2017_py3.7_numpy1.16_np0:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
 
-      py37_np116_numpes2:
-        CONDA_ENV: 'travisci'
-        HPAT_NUM_PES: '2'
+      vs2017_py3.7_numpy1.16_np2:
+        SDC_NP_MPI: '2'
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
 
-- template: buildscripts/azure-template-linux-macos.yml
+- template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: macOS
+    name: OSX_10_13
     vmImage: xcode9-macos10.13
     matrix:
-      py37_np116_numpes0:
-        CONDA_ENV: 'travisci'
+      xcode9_py3.7_numpy1.16_np0:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
 
-      py37_np116_numpes2:
-        CONDA_ENV: 'travisci'
-        HPAT_NUM_PES: '2'
+      xcode9_py3.7_numpy1.16_np2:
+        SDC_NP_MPI: '2'
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: Ubuntu_16_04
+    vmImage: ubuntu-16.04
+    matrix:
+      py3.7_numpy1.16_np3:
+        SDC_NP_MPI: '3'
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'

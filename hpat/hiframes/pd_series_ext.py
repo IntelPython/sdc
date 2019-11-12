@@ -723,12 +723,12 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    @bound_function("series.value_counts")
-    def resolve_value_counts(self, ary, args, kws):
-        # output is int series with original data as index
-        out = SeriesType(
-            types.int64, types.Array(types.int64, 1, 'C'), ary.data)
-        return signature(out, *args)
+    # @bound_function("series.value_counts")
+    # def resolve_value_counts(self, ary, args, kws):
+    #     # output is int series with original data as index
+    #     out = SeriesType(
+    #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
+    #     return signature(out, *args)
 
     @bound_function("series.rename")
     def resolve_rename(self, ary, args, kws):
@@ -994,7 +994,7 @@ install_array_method('cumprod', generic_expand_cumulative_series)
 # TODO: add itemsize, strides, etc. when removed from Pandas
 _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flatten',
                            'resolve_cumsum',
-                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_mean',
+                           'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_corr', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_argsort', 'resolve_sort_values',
                            'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
@@ -1004,7 +1004,7 @@ if not hpat.config.config_pipeline_hpat_default:
     for attr in ['resolve_std', 'resolve_var']:
         _not_series_array_attrs.append(attr)
 
-_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest']
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov', 'resolve_corr']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
@@ -1288,7 +1288,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
 
         '''' use binop here as otherwise Numba's dead branch pruning doesn't work
         TODO: replace with 'if not is_index_none' when resolved '''
-        if is_index_none == False:
+        if is_index_none == False:  # noqa
             fix_index = hpat.hiframes.api.fix_df_array(index)
         else:
             fix_index = index
