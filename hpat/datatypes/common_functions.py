@@ -160,7 +160,7 @@ def map_reduce_chunked(arg, init_val, map_func, reduce_func):
         return map_func(arg)
     else:
         c = _compute_map_chunks(arg, chunks_count)
-        for i in range(len(c)):
+        for i in prange(len(c)):
             val = map_func(c[i])
             res = reduce_func(res, val)
         return res
