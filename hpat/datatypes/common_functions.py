@@ -32,7 +32,7 @@
 
 import numpy
 
-from numba import types
+from numba import types, njit, prange
 from numba.extending import overload
 from numba import numpy_support
 
@@ -131,3 +131,33 @@ def hpat_arrays_append_overload(A, B):
                 return new_data
 
             return _append_list_string_array_impl
+
+@njit
+def _compute_map_chunks(l, n):
+    assert n > 0
+    a = len(l) // n
+    b = a + 1
+    c = len(l) % n
+    return [l[i * b : i * b + b] if i < c else l[c * b + (i - c) * a : c * b + (i - c) * a + a] for i in range(n)]
+
+@njit(parallel=True)
+def map_reduce(arg, init_val, map_func, reduce_func):
+    res = init_val
+    for i in prange(len(arg)):
+        val = map_func(arg[i])
+        res = reduce_func(res, val)
+    return res
+
+@njit(parallel=True)
+def map_reduce_chunked(arg, init_val, map_func, reduce_func):
+    res = init_val
+    # TODO: proper cores/nodes count
+    chunks_count = 4
+    if 1 == chunks_count:
+        return map_func(arg)
+    else:
+        c = _compute_map_chunks(arg, chunks_count)
+        for i in range(len(c)):
+            val = map_func(c[i])
+            res = reduce_func(res, val)
+        return res
