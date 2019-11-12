@@ -38,6 +38,7 @@ import copy
 import warnings
 from collections import defaultdict
 import numpy as np
+import os
 
 import numba
 from numba import ir, types, typing, config, numpy_support, ir_utils, postproc
