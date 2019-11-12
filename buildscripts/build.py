@@ -83,7 +83,7 @@ if __name__ == '__main__':
                                                             f'--python {python}',
                                                             f'--numpy={numpy}',
                                                             f'--output-folder {output_folder}',
-                                                            f'--prefix-length 10 {sdc_recipe}']))
+                                                            f'--prefix-length 10 {conda_channels} {sdc_recipe}']))
     else:
         create_conda_env(conda_activate, develop_env, python, sdc_env['build'], conda_channels)
         build_cmd = f'{develop_env_activate} && python setup.py {build_mode}'
