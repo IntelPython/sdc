@@ -101,6 +101,26 @@ class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
 
         self._check_series(test_impl)
 
+    def test_create_dataframe_from_series(self):
+        'Create DataFrame from Series'
+        def test_impl():
+            df = pd.DataFrame(
+                data={"A": pd.Series([1, 2]), "B": pd.Series([3, 4])}
+            )
+            return df.A
+
+        self._check_series(test_impl)
+
+    def test_create_dataframe_list(self):
+        'Create DataFrame from List'
+        def test_impl():
+            df = pd.DataFrame(
+                data={"A": [1, 2], "B": [3, 4]}
+            )
+            return df.A
+
+        self._check_series(test_impl)
+
     def test_create_cond1(self):
         def test_impl(A, B, c):
             if c:
