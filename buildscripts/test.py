@@ -12,7 +12,6 @@ from utilities import get_sdc_build_packages
 from utilities import get_activate_env_cmd
 from utilities import get_conda_activate_cmd
 from utilities import run_command
-from utilities import setup_conda
 
 
 if __name__ == '__main__':
@@ -58,10 +57,7 @@ if __name__ == '__main__':
     test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = '-c conda-forge -c defaults -c numba -c intel'
-
-    # Setup conda
-    setup_conda(conda_activate)
+    conda_channels = '-c conda-forge -c numba -c intel -c defaults --override-channels'
 
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')
@@ -109,7 +105,7 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package:
                 format_print(f'Run tests for sdc conda package: {package}')
-                run_command(f'{test_env_activate} && conda build --test --prefix-length 10 {package}')
+                run_command(f'{test_env_activate} && conda build --test --prefix-length 10 {conda_channels} {package}')
         format_print('Tests for conda packages are PASSED')
         sys.exit(0)
 
@@ -136,12 +132,12 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package and package_type == 'conda':
                 format_print(f'Run tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'])
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
                 run_command(f'{test_env_activate} && {test_script}')
             elif '.whl' in package and package_type == 'wheel':
                 format_print(f'Run tests for sdc wheel package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'])
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'], conda_channels)
                 run_command(f'{test_env_activate} && pip install {package}')
                 run_command(f'{test_env_activate} && {test_script}')
 
