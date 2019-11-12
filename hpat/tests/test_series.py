@@ -37,7 +37,7 @@ from itertools import islice, permutations
 from hpat.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
 from hpat.tests.gen_test_data import ParquetGenerator
-from numba import types
+from numba import types, objmode
 from numba.config import IS_32BITS
 from numba.errors import TypingError
 
@@ -220,6 +220,21 @@ class TestSeries(unittest.TestCase):
         hpat_func = hpat.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_objmode(self):
+        'with objmode pandas.Series([int]) create, unbox, box'
+        from hpat.hiframes.pd_series_ext import SeriesType
+        setattr(types, "SeriesType", SeriesType)
+
+        def test_impl():
+            with objmode(A='SeriesType(int64)'):
+                A = pd.Series([1, 2, 3])
+            return A
+
+        hpat_func = hpat.jit(test_impl)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+        delattr(types, "SeriesType")
 
     def test_create_series_index1(self):
         # create and box an indexed Series
