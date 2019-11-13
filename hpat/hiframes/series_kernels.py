@@ -412,19 +412,19 @@ def _series_isna_impl(arr):
     return hpat.hiframes.api.init_series(out_arr)
 
 
-def _series_astype_str_impl(arr):
-    n = len(arr)
-    num_chars = 0
-    # get total chars in new array
-    for i in numba.parfor.internal_prange(n):
-        s = arr[i]
-        num_chars += len(str(s))  # TODO: check NA
-
-    A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
-    for i in numba.parfor.internal_prange(n):
-        s = arr[i]
-        A[i] = str(s)  # TODO: check NA
-    return hpat.hiframes.api.init_series(A)
+# def _series_astype_str_impl(arr):
+#     n = len(arr)
+#     num_chars = 0
+#     # get total chars in new array
+#     for i in numba.parfor.internal_prange(n):
+#         s = arr[i]
+#         num_chars += len(str(s))  # TODO: check NA
+#
+#     A = hpat.str_arr_ext.pre_alloc_string_array(n, num_chars)
+#     for i in numba.parfor.internal_prange(n):
+#         s = arr[i]
+#         A[i] = str(s)  # TODO: check NA
+#     return hpat.hiframes.api.init_series(A)
 
 
 # def _str_replace_regex_impl(str_arr, pat, val):
@@ -548,7 +548,7 @@ series_replace_funcs = {
     # 'isna': _series_isna_impl,
     # isnull is just alias of isna
     'isnull': _series_isna_impl,
-    'astype_str': _series_astype_str_impl,
+    # 'astype_str': _series_astype_str_impl,
     'nlargest': lambda A, k, name: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, True, gt_f), None, name),
     'nlargest_default': lambda A, name: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, 5, True, gt_f), None, name),
     'nsmallest': lambda A, k, name: hpat.hiframes.api.init_series(hpat.hiframes.api.nlargest(A, k, False, lt_f), None, name),
