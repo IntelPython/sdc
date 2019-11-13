@@ -257,6 +257,20 @@ class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
 
         delattr(numba.types, "DataFrameType")
 
+    def test_create_dataframe_from_series_objmode(self):
+        'Create DataFrame from series created in objmode'
+        from hpat.hiframes.pd_series_ext import SeriesType
+        setattr(numba.types, "SeriesType", SeriesType)
+
+        def test_impl():
+            with numba.objmode(out="SeriesType(int64)"):
+                out = pd.Series([1, 2])
+            df = pd.DataFrame(data={"A": out})
+            return df
+        self._check_frame(test_impl)
+
+        delattr(numba.types, "SeriesType")
+
     def test_len1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
