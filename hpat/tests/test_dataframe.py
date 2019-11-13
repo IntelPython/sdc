@@ -244,7 +244,7 @@ class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
         setattr(numba.types, "DataFrameType", DataFrameType)
 
         def test_impl():
-            with numba.objmode(df="DataFrameType(data=(Array(int64, 1, 'C', True),), columns=('A',), has_parent=True)"):
+            with numba.objmode(df="DataFrameType(data=(Array(int64, 1, 'C'),), columns=('A',), has_parent=True)"):
                 df = pd.DataFrame(data={"A": pd.Series([1, 2])})
             return df
         self._check_frame(test_impl)
